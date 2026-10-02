@@ -73,7 +73,7 @@ def test_acquire_stack_saves_nd2(handle, fake_api, tmp_path):
         options={"z_start": -10, "z_end": 10, "z_step": 2, "format": "nd2", "exposure_ms": 12},
     )
     assert rec["planes"] == 11 and fake_api.z_series == (510.0, 490.0, 2.0, 11)
-    assert rec["image_files"] == [str(tmp_path / "out" / "data" / "z_stack_p1.nd2")]
+    assert rec["files"] == [str(tmp_path / "out" / "data" / "z_stack_p1.nd2")]
     assert fake_api.exposure_ms == 12.0
 
 

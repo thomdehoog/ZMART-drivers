@@ -745,7 +745,8 @@ class TestAcquire(unittest.TestCase):
         self.assertEqual(calls["state"]["provenance"]["position_label"], "well-7")
         self.assertEqual(record["settle"], "direct")
         self.assertEqual(record["acquisition_hash"], naming.hash6)
-        self.assertEqual([Path(p) for p in record["images"]], [Path("/tmp/out/img.ome.tif")])
+        self.assertEqual([Path(p) for p in record["files"]], [Path("/tmp/out/img.ome.tif")])
+        self.assertNotIn("images", record)
         # Nothing has driven this handle, so the acquisition says it does not
         # know where it was taken rather than naming a place nobody went.
         self.assertEqual(
@@ -756,6 +757,52 @@ class TestAcquire(unittest.TestCase):
                 "x_um": None, "y_um": None, "z_um": None,
             }],
         )
+
+    def test_files_lists_every_file_the_acquisition_saved(self):
+        """The images, the state printed beside them and the vendor's metadata, under one name.
+
+        ``files`` is the name the ZMART Controller's contract fixes, so a
+        workflow finds what was saved on any microscope; the controller's own
+        check confirms the answer fits.
+        """
+        from zmart_controller import check_acquire_answer
+
+        with tempfile.TemporaryDirectory() as folder:
+            out = Path(folder)
+            image = out / "img_c0.ome.tif"
+            state = out / "metadata" / "ZMART_state" / "img.json"
+            vendor = out / "MetaData" / "img.xlif"
+            for path in (image, state, vendor):
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(b"saved")
+            h = _handle(connection={**adapter.CONNECTION, "output_root": str(out)})
+
+            def fake_save(client, acq, output_root, naming, **kwargs):
+                return SimpleNamespace(
+                    image_paths={0: image},
+                    naming=naming,
+                    vendor_metadata_paths=(vendor,),
+                    state_paths=(state,),
+                )
+
+            patches = _patch_position(job="Overview")
+            with (
+                patch.object(adapter._readers, "get_jobs", return_value=self._jobs()),
+                patch.object(adapter._readers, "get_hardware_info", return_value={}),
+                patch.object(adapter._commands, "select_job", lambda *a, **k: {"success": True}),
+                patch.object(adapter._motion, "correct_backlash", lambda client, **k: None),
+                patch.object(adapter._capture, "acquire", lambda client, job, **k: SimpleNamespace(job=job)),
+                patch.object(adapter._save, "save", fake_save),
+                patch.object(adapter._scanfields, "get_template_state", return_value="fresh"),
+                patches[0], patches[1], patches[2], patches[3],
+            ):
+                record = adapter.acquire(
+                    h, acquisition_type="prescan", position_label="well-7",
+                    options={"job": "HiRes", "backlash_correction": False},
+                )
+
+            self.assertEqual(record["files"], [str(image), str(vendor), str(state)])
+            self.assertEqual(check_acquire_answer({"success": True, "report": record}), [])
 
     def test_a_plane_says_where_on_the_sample_it_was_taken(self):
         """The place the last confirmed move put the stage, in the frame.

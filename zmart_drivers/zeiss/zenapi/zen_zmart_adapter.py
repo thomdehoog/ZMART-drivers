@@ -558,7 +558,7 @@ def acquire(
 
     zen_path = zen_image_path(handle.client, result["output_name"])
     copied = False
-    image_files = [str(zen_path)]
+    files = [str(zen_path)]
     if options.get("copy_to_output_root", True):
         data_dir = handle.output_root / "data"
         data_dir.mkdir(parents=True, exist_ok=True)
@@ -577,7 +577,7 @@ def acquire(
                 _wait_stable(zen_path, timeout_s=timeout, poll_s=0.2)
                 shutil.copy2(zen_path, dst)
                 copied = True
-                image_files = [str(dst)]
+                files = [str(dst)]
             except (TimeoutError, OSError) as exc:
                 log.warning("CZI left on the ZEN computer (%s): %s", zen_path, exc)
 
@@ -590,7 +590,9 @@ def acquire(
         "experiment": handle.experiment.name,
         "output_name": result["output_name"],
         "planes": planes if planes and planes > 0 else None,
-        "image_files": image_files,
+        # Every file saved, under the name the ZMART Controller's contract fixes,
+        # so a workflow finds the pictures on any microscope.
+        "files": files,
         "zen_image_path": str(zen_path),
         "copied": copied,
         "metadata_file": None,

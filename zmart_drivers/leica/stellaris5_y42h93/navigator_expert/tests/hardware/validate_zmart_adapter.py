@@ -691,7 +691,7 @@ def phase_acquire(v: vh.Validator, sess: Any, args: argparse.Namespace) -> None:
         )
         if not rec:
             return
-        images = rec.get("images") or []
+        images = [plane["path"] for plane in rec.get("planes") or []]
         xml = rec.get("xml") or []
         v.compare("acquire: at least one image", len(images) >= 1, True)
         # Canonical ZMART output is flat and no-sidecar: the OME-XML (incl. the

@@ -585,7 +585,10 @@ def acquire(
         "position_label": position_label,
         "format": fmt,
         "planes": result.planes,
-        "image_files": [str(p) for p in saved.image_paths],
+        # Every file saved, under the name the ZMART Controller's contract fixes,
+        # so a workflow finds the pictures on any microscope: the images, then
+        # the metadata written beside them.
+        "files": [str(p) for p in [*saved.image_paths, saved.metadata_path] if p],
         "metadata_file": str(saved.metadata_path) if saved.metadata_path else None,
         "position": _user_xyz(handle, _readers.get_positions(handle.client)),
         "duration_s": result.duration_s,
