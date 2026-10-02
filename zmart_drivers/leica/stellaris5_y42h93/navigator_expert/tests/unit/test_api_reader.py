@@ -25,7 +25,9 @@ import math
 import unittest
 from types import SimpleNamespace
 
-from navigator_expert.readers import api_reader as A
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.readers import (
+    api_reader as A,
+)
 
 
 def _client(**extra):

@@ -5,9 +5,13 @@ and returns it; captures one image into a temp folder.
 """
 
 import pytest
-from nis_elements_6_10.commands import commands as cmd
-from nis_elements_6_10.connection.client import NisClient, NisConnectionError
-from nis_elements_6_10.readers import readers
+
+from zmart_drivers.nikon.nis_elements_6_10.commands import commands as cmd
+from zmart_drivers.nikon.nis_elements_6_10.connection.client import (
+    NisClient,
+    NisConnectionError,
+)
+from zmart_drivers.nikon.nis_elements_6_10.readers import readers
 
 pytestmark = pytest.mark.hardware
 

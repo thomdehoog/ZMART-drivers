@@ -16,7 +16,7 @@ pytest.importorskip("grpclib", reason="grpclib is not installed")
 @pytest.fixture
 def gateway(tmp_path):
     """A running fake gateway on a free port with its own work folder."""
-    from zenapi.simulator import FakeGateway
+    from zmart_drivers.zeiss.zenapi.simulator import FakeGateway
 
     gw = FakeGateway(tmp_path / "gateway")
     gw.start()
@@ -35,7 +35,7 @@ def config_ini(gateway, tmp_path):
 @pytest.fixture
 def client(config_ini):
     """A connected driver client with generous stage limits."""
-    import zenapi as drv
+    import zmart_drivers.zeiss.zenapi as drv
 
     c = drv.connect(str(config_ini))
     drv.set_stage_limits(x_min=-1e5, x_max=1e5, y_min=-1e5, y_max=1e5, z_min=-1e4, z_max=1e4)
@@ -48,7 +48,7 @@ def client(config_ini):
 @pytest.fixture
 def connection(config_ini, tmp_path):
     """A controller-style connection dict pointing at the fake gateway and temp folders."""
-    from zenapi import CONNECTION
+    from zmart_drivers.zeiss.zenapi import CONNECTION
 
     return {
         **CONNECTION,  # the registered identity: vendor / microscope / api

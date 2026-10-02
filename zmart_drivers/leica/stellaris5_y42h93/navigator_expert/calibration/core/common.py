@@ -31,7 +31,7 @@ from typing import Any
 import numpy as np
 import tifffile
 
-import navigator_expert as drv
+import zmart_drivers.leica.stellaris5_y42h93.navigator_expert as drv
 
 from ... import orientation as _orientation
 from ...acquisition.naming import Naming, run_hash

@@ -5,12 +5,14 @@ Drives a ZEISS microscope through ZEN's API (gRPC, reached through the ZEN
 API Gateway). A vendor sibling of the Leica, mesoSPIM and Nikon drivers: the
 public surface is **synchronous** (a blocking facade over the async gRPC
 client, see ``connection.client.ZenClient``), so notebooks stay 1-3 lines per
-step, and importing the package registers the instrument with
-``zmart_controller`` (see ``zen_zmart_adapter``).
+step. To drive it through the ZMART Controller, plug it in by its folder or
+module name with ``zmart_controller.register_driver`` (see
+``zmart_controller/`` in this folder); importing the package registers
+nothing.
 
 Typical session::
 
-    import zenapi as drv
+    import zmart_drivers.zeiss.zenapi as drv
     client = drv.connect("config.ini")
     drv.apply_stage_limits_from_config(drv.load_stage_config("stage_limits.json"))
     drv.move_xy(client, 1000, 2000)          # micrometers
@@ -21,7 +23,7 @@ Typical session::
     saved = drv.save(client, acq, output_root, naming)
     drv.close(client)
 
-No ZEN at hand? ``python -m zenapi.simulator`` starts a fake ZEN API gateway
+No ZEN at hand? ``python -m zmart_drivers.zeiss.zenapi.simulator`` starts a fake ZEN API gateway
 that speaks the real protocol; point ``config.ini`` at it.
 
 Author: Thom de Hoog (ZMB, University of Zurich)
@@ -98,8 +100,8 @@ from .readers import (
     ping,
 )
 
-# --- the ZMART controller adapter (registers the instrument on import) ---
-from .zen_zmart_adapter import CONNECTION, register  # noqa: E402
+# --- the ZMART controller adapter (the plug-in folder hands it to the controller) ---
+from .zen_zmart_adapter import CONNECTION  # noqa: E402
 
 __all__ = [
     # connection
@@ -133,7 +135,6 @@ __all__ = [
     "Experiment",
     # controller adapter
     "CONNECTION",
-    "register",
     # stage limits + backlash
     "set_stage_limits",
     "get_stage_limits",

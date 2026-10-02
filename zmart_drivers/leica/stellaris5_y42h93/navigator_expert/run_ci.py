@@ -38,49 +38,27 @@ import time
 from pathlib import Path
 
 DRIVER_ROOT = Path(__file__).resolve().parent  # .../navigator_expert
-MACHINE_ROOT = DRIVER_ROOT.parent  # .../<machine> (import root)
+REPO_ROOT = DRIVER_ROOT.parents[3]  # the repository root (import root of zmart_drivers)
 REPORT_DIR = DRIVER_ROOT / "tests" / "_report"
 TEST_PATHS = [DRIVER_ROOT / "tests", DRIVER_ROOT / "calibration" / "tests"]
 
 
-def repo_root() -> Path:
-    """Locate the repo root robustly (no fragile parents[N] depth counting).
-
-    Prefer git; otherwise walk up until we find the directory that holds the
-    zmart_controller package. Falls back to the machine dir's parent.
-    """
-    try:
-        result = subprocess.run(
-            ["git", "rev-parse", "--show-toplevel"],
-            capture_output=True,
-            text=True,
-            cwd=str(DRIVER_ROOT),
-            timeout=10,
-        )
-        if result.returncode == 0 and result.stdout.strip():
-            return Path(result.stdout.strip())
-    except Exception:
-        pass
-    candidate = DRIVER_ROOT
-    for _ in range(8):
-        if (candidate / "zmart_controller").is_dir():
-            return candidate
-        candidate = candidate.parent
-    return MACHINE_ROOT.parent
-
-
 def build_env() -> dict:
-    """Child-process environment with the import roots on PYTHONPATH up front.
+    """Child-process environment with the repository root on PYTHONPATH up front.
 
-    Setting these here (rather than relying only on conftest) means coverage,
-    which starts before collection, can already import navigator_expert.
+    The driver imports by its full name,
+    ``zmart_drivers.leica.stellaris5_y42h93.navigator_expert``. Setting the root
+    here (rather than relying only on conftest) means coverage, which starts
+    before collection, can already import it, also when the repository has not
+    been installed with pip.
     """
     env = dict(os.environ)
-    roots = [str(MACHINE_ROOT), str(repo_root())]
     existing = env.get("PYTHONPATH", "")
-    env["PYTHONPATH"] = os.pathsep.join([*roots, existing]) if existing else os.pathsep.join(roots)
-    # Force-colour off in subprocesses we capture nothing from; pytest handles
-    # its own colour based on tty. Nothing to set here -- documented intent only.
+    env["PYTHONPATH"] = os.pathsep.join([str(REPO_ROOT), existing]) if existing else str(REPO_ROOT)
+    # Do not put the working directory on the search path. The driver's plug-in
+    # folder is called zmart_controller, so a run started in the driver folder
+    # would otherwise import it in place of the real ZMART Controller.
+    env["PYTHONSAFEPATH"] = "1"
     return env
 
 
@@ -196,7 +174,7 @@ def main(argv: list[str] | None = None) -> int:
         ]
         if cov_available:
             pytest_cmd += [
-                "--cov=navigator_expert",
+                "--cov=zmart_drivers.leica.stellaris5_y42h93.navigator_expert",
                 f"--cov-config={DRIVER_ROOT / '.coveragerc'}",
                 "--cov-report=term-missing:skip-covered",
                 f"--cov-report=xml:{REPORT_DIR / 'coverage.xml'}",

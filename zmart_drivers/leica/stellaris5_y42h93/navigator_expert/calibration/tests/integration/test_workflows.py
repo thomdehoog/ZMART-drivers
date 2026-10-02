@@ -25,16 +25,25 @@ import tifffile
 
 pytest.importorskip("cv2")  # calibration core imports cv2
 
-from navigator_expert.acquisition.naming import build_image_name, parse_image_name
-from navigator_expert.calibration.core import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.acquisition.naming import (
+    build_image_name,
+    parse_image_name,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.calibration.core import (
     adopt as wf_adopt,
 )
-from navigator_expert.calibration.core import common as cm
-from navigator_expert.calibration.core import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.calibration.core import (
+    common as cm,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.calibration.core import (
     objective_pair as wf_obj,
 )
-from navigator_expert.config.machine import MachineProfile
-from navigator_expert.orientation import Orientation
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.config.machine import (
+    MachineProfile,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.orientation import (
+    Orientation,
+)
 
 # ---------------------------------------------------------------------
 # Explicit runtime roots
@@ -613,7 +622,9 @@ def test_adoption_refuses_a_reference_missing_from_the_calibration(sessions_root
 
 def test_common_reference_adoptions_infer_every_objective_pair(sessions_root, machine):
     """10→20/40/60 measurements must imply every pair and reverse."""
-    from navigator_expert.calibration.core import model as calibration_model
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.calibration.core import (
+        model as calibration_model,
+    )
 
     calibration_name = "shared_lens_setup"
     reference = {
@@ -739,8 +750,12 @@ def test_orientation_unmeasured_warning_signals(tmp_path, caplog, monkeypatch):
     """
     import logging
 
-    from navigator_expert.calibration.core import objective_pair as op
-    from navigator_expert.config import machine as machine_mod
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.calibration.core import (
+        objective_pair as op,
+    )
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.config import (
+        machine as machine_mod,
+    )
 
     profile = MachineProfile(programdata_root=tmp_path / "programdata")
     snap = profile.ensure_snapshot("orientation")  # seeds the shipped placeholder
@@ -1144,7 +1159,7 @@ def test_objective_pair_defaults_to_machine_workspace_calibration_and_active_job
     machine,
 ):
     _seed_snapshot(machine)
-    monkeypatch.setattr("navigator_expert.config.machine.MACHINE", machine)
+    monkeypatch.setattr("zmart_drivers.leica.stellaris5_y42h93.navigator_expert.config.machine.MACHINE", machine)
     _patch_objective_driver(monkeypatch)
     monkeypatch.setattr(
         wf_obj.drv, "get_selected_job", lambda client, **kwargs: {"Name": "Overview"}
@@ -1270,7 +1285,7 @@ def test_objective_pair_can_select_named_machine_calibration(
         calibration=cal,
         calibration_name="lens_A",
     )
-    monkeypatch.setattr("navigator_expert.config.machine.MACHINE", machine)
+    monkeypatch.setattr("zmart_drivers.leica.stellaris5_y42h93.navigator_expert.config.machine.MACHINE", machine)
     _patch_objective_driver(monkeypatch)
 
     session = wf_obj.start_session(
@@ -1334,7 +1349,7 @@ def test_configured_reference_may_differ_on_a_placeholder_only_calibration(
     """
     calibration_path = tmp_path / "calibration.json"
     calibration_path.write_text(json.dumps(_placeholder_calibration_payload()), encoding="utf-8")
-    monkeypatch.setattr("navigator_expert.config.machine.MACHINE", machine)
+    monkeypatch.setattr("zmart_drivers.leica.stellaris5_y42h93.navigator_expert.config.machine.MACHINE", machine)
     _patch_objective_driver(monkeypatch)
 
     session = wf_obj.start_session(
@@ -1354,7 +1369,9 @@ def test_adoption_reanchors_a_placeholder_only_calibration(sessions_root, machin
     placeholder positions are dropped (they were relative to the shipped
     origin, which no longer exists), and the objective names survive.
     """
-    from navigator_expert.calibration.core import model as calibration_model
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.calibration.core import (
+        model as calibration_model,
+    )
 
     machine.publish_snapshot(_SEED_MOMENT, calibration=_placeholder_calibration_payload())
     payload = {

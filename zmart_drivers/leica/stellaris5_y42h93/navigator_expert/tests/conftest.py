@@ -6,11 +6,12 @@ from pathlib import Path
 
 import pytest
 
-# Add the machine dir (parent of navigator_expert) to sys.path so
-# `import navigator_expert` works regardless of where pytest is invoked from.
-_DRIVER_PARENT = Path(__file__).resolve().parents[2]
-if str(_DRIVER_PARENT) not in sys.path:
-    sys.path.insert(0, str(_DRIVER_PARENT))
+# Add the repository root to sys.path so the driver imports by its full name,
+# zmart_drivers.leica.stellaris5_y42h93.navigator_expert, even when the
+# repository has not been installed with pip.
+_REPO_ROOT = Path(__file__).resolve().parents[5]
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
 
 _HELPERS = Path(__file__).resolve().parent / "helpers"
 if str(_HELPERS) not in sys.path:
@@ -46,7 +47,7 @@ def _clean_limits_gate():
     installed by one test must never govern another test's client, and the
     adversarial suite depends on starting from the fail-closed empty state.
     """
-    from navigator_expert.commands import gate
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.commands import gate
 
     gate._GATE_STATE.clear()
     yield
@@ -64,8 +65,8 @@ def fast_timing_windows(monkeypatch):
     every poll loop. Shipped values are unchanged; a test that needs a
     specific window passes an explicit ``poll_window=``/``timeout=``.
     """
-    from navigator_expert.commands import dispatch
-    from navigator_expert.config import timing
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.commands import dispatch
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.config import timing
 
     monkeypatch.setattr(timing, "CONFIRM_POLL_S", 0.05)
     monkeypatch.setattr(dispatch, "ECHO_SETTLE_TIMEOUT_S", 0.05)

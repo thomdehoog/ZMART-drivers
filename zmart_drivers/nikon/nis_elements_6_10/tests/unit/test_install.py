@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from nis_elements_6_10.bridge import install
+from zmart_drivers.nikon.nis_elements_6_10.bridge import install
 
 
 def test_render_doubles_backslashes_and_carries_port():
@@ -23,6 +23,6 @@ def test_install_writes_both_macros(tmp_path):
     raw = start_path.read_bytes()
     assert b"\r\n" in raw and b"\r\r\n" not in raw
     text = raw.decode("utf-8")
-    assert "nis_elements_6_10.bridge.nis_bridge" in text
-    # the path baked in is the real drivers/nikon folder of this checkout
-    assert install._mac_literal(install.DRIVERS_NIKON_DIR) in text
+    assert "zmart_drivers.nikon.nis_elements_6_10.bridge.nis_bridge" in text
+    # the path baked in is the repository root of this checkout
+    assert install._mac_literal(install.REPO_DIR) in text

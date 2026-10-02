@@ -1,7 +1,7 @@
 """
 A fake ZEN API gateway, for working without a microscope.
 =========================================================
-``python -m zenapi.simulator`` starts a small server that speaks the real ZEN
+``python -m zmart_drivers.zeiss.zenapi.simulator`` starts a small server that speaks the real ZEN
 API protocol (gRPC over TLS, the same service definitions from ZEISS's
 ``zen_api`` wheel, the same control-token check) but drives an imaginary
 microscope instead of ZEN. Point the driver's ``config.ini`` at it and every

@@ -7,11 +7,12 @@ from pathlib import Path
 
 import pytest
 
+# The repository root, so the driver imports by its full name even when the
+# repository is not pip-installed, and the helpers folder for the fake NIS API.
 # parents: [0]=tests [1]=nis_elements_6_10 [2]=nikon [3]=zmart_drivers [4]=repo root
-_VENDOR_DIR = Path(__file__).resolve().parents[2]
 _REPO_ROOT = Path(__file__).resolve().parents[4]
 _HELPERS = Path(__file__).resolve().parent / "helpers"
-for entry in (_VENDOR_DIR, _REPO_ROOT, _HELPERS):
+for entry in (_REPO_ROOT, _HELPERS):
     if str(entry) not in sys.path:
         sys.path.insert(0, str(entry))
 
@@ -26,7 +27,7 @@ def fake_api():
 @pytest.fixture
 def bridge(fake_api):
     """The real bridge server, listening on a free loopback port, over the fake API."""
-    from nis_elements_6_10.bridge import nis_bridge
+    from zmart_drivers.nikon.nis_elements_6_10.bridge import nis_bridge
 
     server = nis_bridge.serve(fake_api, "127.0.0.1", 0, pump_thread=True)
     try:
@@ -38,7 +39,7 @@ def bridge(fake_api):
 
 @pytest.fixture
 def client(bridge):
-    from nis_elements_6_10.connection.client import NisClient
+    from zmart_drivers.nikon.nis_elements_6_10.connection.client import NisClient
 
     c = NisClient("127.0.0.1", bridge.server_address[1], timeout=5.0)
     c.connect()

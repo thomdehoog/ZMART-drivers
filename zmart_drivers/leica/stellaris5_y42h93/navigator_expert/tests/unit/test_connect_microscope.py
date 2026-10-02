@@ -15,12 +15,24 @@ from unittest.mock import patch
 
 import pytest
 from mock_lasx_api import MockLasxClient
-from navigator_expert.commands import gate
-from navigator_expert.config.machine import MachineProfile
-from navigator_expert.config.profiles import IMAGE_SAVE
-from navigator_expert.connection import session as drv_session
-from navigator_expert.connection import session_state
-from navigator_expert.orientation import Orientation, orientation_config
+
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.commands import gate
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.config.machine import (
+    MachineProfile,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.config.profiles import (
+    IMAGE_SAVE,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.connection import (
+    session as drv_session,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.connection import (
+    session_state,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.orientation import (
+    Orientation,
+    orientation_config,
+)
 
 
 def _connect(**kwargs) -> MockLasxClient:

@@ -12,9 +12,12 @@ import json
 import numpy as np
 import pytest
 import tifffile
-from navigator_expert import orientation as orient
-from navigator_expert.acquisition import materialize
-from navigator_expert.acquisition.product import (
+
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert import orientation as orient
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.acquisition import (
+    materialize,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.acquisition.product import (
     AcquisitionMetadata,
     ChannelMetadata,
     PlaneIndex,
@@ -162,10 +165,12 @@ def test_rig_orientation_defaults_to_identity_template(monkeypatch, tmp_path):
     # template -- "no turn." The real value is measured by the set_orientation
     # notebook, never hard-coded. A hermetic ProgramData root (no snapshot)
     # exercises that fallback without touching the machine's real config.
-    from navigator_expert.config.machine import MachineProfile
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.config.machine import (
+        MachineProfile,
+    )
 
     monkeypatch.setattr(
-        "navigator_expert.config.machine.MACHINE",
+        "zmart_drivers.leica.stellaris5_y42h93.navigator_expert.config.machine.MACHINE",
         MachineProfile(programdata_root=tmp_path / "programdata"),
     )
     assert orient.rig_orientation() == Orientation()
@@ -176,14 +181,16 @@ def test_rig_orientation_reads_the_measured_snapshot(monkeypatch, tmp_path):
     # reads the measured turn from it -- not the identity template.
     from datetime import datetime, timezone
 
-    from navigator_expert.config.machine import MachineProfile
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.config.machine import (
+        MachineProfile,
+    )
 
     machine = MachineProfile(programdata_root=tmp_path / "programdata")
     machine.publish_snapshot(
         datetime(2026, 7, 1, 12, 0, tzinfo=timezone.utc),
         orientation={"schema_version": 1, "rotate_deg": 270},
     )
-    monkeypatch.setattr("navigator_expert.config.machine.MACHINE", machine)
+    monkeypatch.setattr("zmart_drivers.leica.stellaris5_y42h93.navigator_expert.config.machine.MACHINE", machine)
     assert orient.rig_orientation() == Orientation(rotate_deg=270)
 
 

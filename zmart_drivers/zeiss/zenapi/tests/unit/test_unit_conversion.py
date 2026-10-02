@@ -1,8 +1,9 @@
 """Micrometer (public) <-> meter (wire) conversion, at the boundary and scalars."""
 
 import pytest
-import zenapi as drv
-from zenapi.config.units import m_to_um, to_um, um_to_m
+
+import zmart_drivers.zeiss.zenapi as drv
+from zmart_drivers.zeiss.zenapi.config.units import m_to_um, to_um, um_to_m
 
 
 def test_scalar_conversions():

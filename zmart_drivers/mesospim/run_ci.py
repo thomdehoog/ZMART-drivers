@@ -42,39 +42,21 @@ import time
 from pathlib import Path
 
 DRIVER_ROOT = Path(__file__).resolve().parent  # .../mesospim
-DRIVERS_DIR = DRIVER_ROOT.parent  # .../zmart_drivers (import root for `import mesospim`)
+REPO_ROOT = DRIVER_ROOT.parents[1]  # the repository root (import root of zmart_drivers)
 REPORT_DIR = DRIVER_ROOT / "tests" / "_report"
 
 
-def repo_root() -> Path:
-    """Locate the repo root (git first, else walk up to the dir holding shared/)."""
-    try:
-        result = subprocess.run(
-            ["git", "rev-parse", "--show-toplevel"],
-            capture_output=True,
-            text=True,
-            cwd=str(DRIVER_ROOT),
-            timeout=10,
-        )
-        if result.returncode == 0 and result.stdout.strip():
-            return Path(result.stdout.strip())
-    except Exception:
-        pass
-    candidate = DRIVER_ROOT
-    for _ in range(8):
-        if (candidate / "shared").is_dir():
-            return candidate
-        candidate = candidate.parent
-    return DRIVERS_DIR.parent
-
-
 def build_env() -> dict:
-    """Child-process env with the import roots on PYTHONPATH (so coverage, which
-    starts before collection, can already import `mesospim`)."""
+    """Child-process env with the repository root on PYTHONPATH, so coverage,
+    which starts before collection, can already import
+    ``zmart_drivers.mesospim``, also when the repository is not pip-installed."""
     env = dict(os.environ)
-    roots = [str(DRIVERS_DIR), str(repo_root())]
     existing = env.get("PYTHONPATH", "")
-    env["PYTHONPATH"] = os.pathsep.join([*roots, existing]) if existing else os.pathsep.join(roots)
+    env["PYTHONPATH"] = os.pathsep.join([str(REPO_ROOT), existing]) if existing else str(REPO_ROOT)
+    # Do not put the working directory on the search path. The driver's plug-in
+    # folder is called zmart_controller, so a run started in the driver folder
+    # would otherwise import it in place of the real ZMART Controller.
+    env["PYTHONSAFEPATH"] = "1"
     # mesoSPIM PCs default to a cp1252 console; keep child stdout UTF-8 so the
     # headless validator's PASS/FAIL glyph can't crash a step.
     env.setdefault("PYTHONUTF8", "1")
@@ -98,7 +80,7 @@ def env_header(env: dict) -> dict:
     probe = (
         "import json,sys;"
         "d={};"
-        "\nfor m in ('mesospim','pytest','numpy','tifffile','PyQt5','ruff','pytest_cov'):"
+        "\nfor m in ('zmart_drivers.mesospim','pytest','numpy','tifffile','PyQt5','ruff','pytest_cov'):"
         "\n try:\n  mod=__import__(m);d[m]=getattr(mod,'__version__','present')"
         "\n except Exception as e:\n  d[m]=f'MISSING ({type(e).__name__})'"
         "\nprint(json.dumps(d))"
@@ -207,7 +189,7 @@ def main() -> int:
         ]
         if not args.no_cov and has("pytest_cov"):
             pytest_cmd += [
-                "--cov=mesospim",
+                "--cov=zmart_drivers.mesospim",
                 "--cov-branch",
                 "--cov-report=term-missing:skip-covered",
                 f"--cov-report=xml:{REPORT_DIR / 'coverage.xml'}",

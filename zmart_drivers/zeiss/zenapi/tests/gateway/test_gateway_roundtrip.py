@@ -6,7 +6,6 @@ gateway's. The round-trip checks are shared with the hardware suite.
 """
 
 import pytest
-import zenapi as drv
 from roundtrip_checks import (
     check_experiment_run,
     check_motion,
@@ -14,7 +13,9 @@ from roundtrip_checks import (
     check_reads,
     check_started_experiment_can_be_monitored,
 )
-from zenapi.simulator.fake_gateway import CONTROLLING_DENIED
+
+import zmart_drivers.zeiss.zenapi as drv
+from zmart_drivers.zeiss.zenapi.simulator.fake_gateway import CONTROLLING_DENIED
 
 
 def test_connect_records_runtime(client):
@@ -89,7 +90,7 @@ def test_unknown_experiment_is_not_found(client):
 
 
 def test_save_copies_the_czi(client, tmp_path):
-    from zenapi.acquisition.naming import Naming, run_hash
+    from zmart_drivers.zeiss.zenapi.acquisition.naming import Naming, run_hash
 
     exp = drv.load_experiment(client, "ZMART_2CH")
     acq = drv.acquire(client, exp, mode="snap", output_name="two_channels")
@@ -121,7 +122,7 @@ def test_supervised_mode_allows_reads_but_refuses_moves(client, gateway):
 
 
 def test_config_ini_round_trip(config_ini, gateway):
-    from zenapi.connection import zen_runtime
+    from zmart_drivers.zeiss.zenapi.connection import zen_runtime
 
     cfg = zen_runtime.load_config(config_ini)
     assert cfg["port"] == gateway.port
@@ -156,7 +157,7 @@ def test_starting_a_running_experiment_is_refused(client, gateway):
 
 
 def test_gateway_can_be_stopped_and_started_again(tmp_path):
-    from zenapi.simulator import FakeGateway
+    from zmart_drivers.zeiss.zenapi.simulator import FakeGateway
 
     gw = FakeGateway(tmp_path / "again")
     gw.start()

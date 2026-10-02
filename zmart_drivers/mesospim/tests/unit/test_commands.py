@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import pytest
-from mesospim import commands as cmd
-from mesospim.limits import checks as limits
+
+from zmart_drivers.mesospim import commands as cmd
+from zmart_drivers.mesospim.limits import checks as limits
 
 
 @pytest.fixture(autouse=True)
@@ -28,7 +29,7 @@ def test_move_absolute_out_of_limits_no_fire(client):
     assert not r["success"]
     assert "outside limits" in r["message"]
     # stage must not have moved
-    from mesospim import readers
+    from zmart_drivers.mesospim import readers
 
     assert readers.get_positions(client)["x"] == 0.0
 
@@ -42,7 +43,7 @@ def test_move_relative_confirms(client):
     cmd.move_absolute(client, {"z": 500})
     r = cmd.move_relative(client, {"z": 250})
     assert r["success"] and r["confirmed"] is True
-    from mesospim import readers
+    from zmart_drivers.mesospim import readers
 
     assert readers.get_positions(client)["z"] == 750
 
@@ -56,7 +57,7 @@ def test_move_relative_respects_limits(client):
 def test_move_relative_baseline_failure_returns_envelope(client, monkeypatch):
     # A dropped link during the pre-fire baseline read must come back as the
     # standard failure envelope, like every sibling -- not a raw exception.
-    from mesospim.commands import movement
+    from zmart_drivers.mesospim.commands import movement
 
     def broken(_client):
         raise ConnectionError("link down")
@@ -71,7 +72,7 @@ def test_move_xy_z_focus_rotation(client):
     assert cmd.move_z(client, 30)["success"]
     assert cmd.move_focus(client, 40)["success"]
     assert cmd.move_rotation(client, 15)["success"]
-    from mesospim import readers
+    from zmart_drivers.mesospim import readers
 
     pos = readers.get_positions(client)
     assert (pos["x"], pos["y"], pos["z"], pos["f"], pos["theta"]) == (10, 20, 30, 40, 15)
@@ -83,7 +84,7 @@ def test_set_filter_zoom_laser_intensity_shutter(client):
     assert cmd.set_laser(client, "561 nm")["success"]
     assert cmd.set_intensity(client, 42)["success"]
     assert cmd.set_shutter(client, "Both")["success"]
-    from mesospim import readers
+    from zmart_drivers.mesospim import readers
 
     state = readers.get_state(client)
     assert state["filter"] == "561/LP"
@@ -101,7 +102,7 @@ def test_set_intensity_out_of_range(client):
 def test_set_etl(client):
     r = cmd.set_etl(client, "left", amplitude=3.0, offset=1.5)
     assert r["success"]
-    from mesospim import readers
+    from zmart_drivers.mesospim import readers
 
     state = readers.get_state(client)
     assert state["etl_l_amplitude"] == 3.0
@@ -116,6 +117,6 @@ def test_stop_and_zero(client):
     assert cmd.stop(client)["success"]
     cmd.move_absolute(client, {"x": 500})
     assert cmd.zero_axes(client, ["x"])["success"]
-    from mesospim import readers
+    from zmart_drivers.mesospim import readers
 
     assert readers.get_positions(client)["x"] == 0.0

@@ -1,9 +1,10 @@
 """Readers: parsing, m->µm, objective enrichment, diagnostics, status, ping."""
 
 import pytest
-import zenapi as drv
 from mock_zen_api import FakeGRPCError
-from zenapi.readers.reading import Reading
+
+import zmart_drivers.zeiss.zenapi as drv
+from zmart_drivers.zeiss.zenapi.readers.reading import Reading
 
 
 def test_get_xy_parses_and_converts(fake_client):

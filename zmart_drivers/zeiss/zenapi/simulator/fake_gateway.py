@@ -30,7 +30,7 @@ What is **not** simulated: images have no pixels (the ``.czi`` is a
 placeholder), no optics or camera model, and the many ZEN services the driver
 does not use answer ``UNIMPLEMENTED`` as an unimplemented ZEN service would.
 
-Run it from the command line (``python -m zenapi.simulator``) or in-process
+Run it from the command line (``python -m zmart_drivers.zeiss.zenapi.simulator``) or in-process
 (``FakeGateway().start()``), see the driver README.
 
 Author: Thom de Hoog (ZMB, University of Zurich)

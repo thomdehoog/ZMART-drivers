@@ -25,7 +25,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from types import SimpleNamespace
 
-from zenapi.connection.client import ZenClient
+from zmart_drivers.zeiss.zenapi.connection.client import ZenClient
 
 # =============================================================================
 # Fake exception + status helpers

@@ -35,9 +35,16 @@ from typing import Any
 import numpy as np
 import tifffile
 
-import navigator_expert as drv
-from navigator_expert.acquisition.naming import Naming, run_hash
-from navigator_expert.algorithms import D4_RESIDUAL_MAX, classify_d4, register_voting
+import zmart_drivers.leica.stellaris5_y42h93.navigator_expert as drv
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.acquisition.naming import (
+    Naming,
+    run_hash,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.algorithms import (
+    D4_RESIDUAL_MAX,
+    classify_d4,
+    register_voting,
+)
 
 from ..calibration.core.common import (
     SessionPaths,

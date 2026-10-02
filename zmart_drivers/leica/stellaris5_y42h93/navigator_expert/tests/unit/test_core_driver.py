@@ -25,9 +25,9 @@ from functools import partial
 from types import SimpleNamespace
 from unittest.mock import MagicMock, PropertyMock, patch
 
-import navigator_expert as drv
-from navigator_expert import readers as readers
-from navigator_expert.commands import (
+import zmart_drivers.leica.stellaris5_y42h93.navigator_expert as drv
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert import readers as readers
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.commands import (
     commands,
     confirm_select_job,
     confirmations,
@@ -35,8 +35,8 @@ from navigator_expert.commands import (
     errors,
     prechecks,
 )
-from navigator_expert.config import profiles
-from navigator_expert.connection import session
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.config import profiles
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.connection import session
 
 # =============================================================================
 # Helpers - mock factory
@@ -495,7 +495,7 @@ class TestRetryBackoff(unittest.TestCase):
 
         with (
             patch(
-                "navigator_expert.commands.dispatch.time.sleep",
+                "zmart_drivers.leica.stellaris5_y42h93.navigator_expert.commands.dispatch.time.sleep",
                 # patching dispatch.time.sleep rebinds the STDLIB time.sleep;
                 # leftover daemon threads (confirmation-race legs from earlier
                 # tests) also call it, so record main-thread sleeps only
@@ -532,7 +532,7 @@ class TestRetryBackoff(unittest.TestCase):
 
         with (
             patch(
-                "navigator_expert.commands.dispatch.time.sleep",
+                "zmart_drivers.leica.stellaris5_y42h93.navigator_expert.commands.dispatch.time.sleep",
                 # patching dispatch.time.sleep rebinds the STDLIB time.sleep;
                 # leftover daemon threads (confirmation-race legs from earlier
                 # tests) also call it, so record main-thread sleeps only
@@ -568,7 +568,7 @@ class TestRetryBackoff(unittest.TestCase):
 
         with (
             patch(
-                "navigator_expert.commands.dispatch.time.sleep",
+                "zmart_drivers.leica.stellaris5_y42h93.navigator_expert.commands.dispatch.time.sleep",
                 # patching dispatch.time.sleep rebinds the STDLIB time.sleep;
                 # leftover daemon threads (confirmation-race legs from earlier
                 # tests) also call it, so record main-thread sleeps only
@@ -609,7 +609,7 @@ class TestRetryBackoff(unittest.TestCase):
 
         with (
             patch(
-                "navigator_expert.commands.dispatch.time.sleep",
+                "zmart_drivers.leica.stellaris5_y42h93.navigator_expert.commands.dispatch.time.sleep",
                 # patching dispatch.time.sleep rebinds the STDLIB time.sleep;
                 # leftover daemon threads (confirmation-race legs from earlier
                 # tests) also call it, so record main-thread sleeps only
@@ -645,7 +645,7 @@ class TestRetryBackoff(unittest.TestCase):
 
         with (
             patch(
-                "navigator_expert.commands.dispatch.time.sleep",
+                "zmart_drivers.leica.stellaris5_y42h93.navigator_expert.commands.dispatch.time.sleep",
                 # patching dispatch.time.sleep rebinds the STDLIB time.sleep;
                 # leftover daemon threads (confirmation-race legs from earlier
                 # tests) also call it, so record main-thread sleeps only
@@ -680,7 +680,7 @@ class TestRetryBackoff(unittest.TestCase):
 
         with (
             patch(
-                "navigator_expert.commands.dispatch.time.sleep",
+                "zmart_drivers.leica.stellaris5_y42h93.navigator_expert.commands.dispatch.time.sleep",
                 # patching dispatch.time.sleep rebinds the STDLIB time.sleep;
                 # leftover daemon threads (confirmation-race legs from earlier
                 # tests) also call it, so record main-thread sleeps only
@@ -713,7 +713,9 @@ class TestRetryBackoff(unittest.TestCase):
         client = make_client()
         api_obj = make_api_obj()
 
-        from navigator_expert.config.profiles import CommandProfile
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.config.profiles import (
+            CommandProfile,
+        )
 
         profile = CommandProfile(
             retry_backoff=2.0,
@@ -744,7 +746,9 @@ class TestRetryBackoff(unittest.TestCase):
         client = make_client()
         api_obj = make_api_obj()
 
-        from navigator_expert.config.profiles import CommandProfile
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.config.profiles import (
+            CommandProfile,
+        )
 
         profile = CommandProfile(
             refire_on_unconfirmed=False,
@@ -2655,7 +2659,9 @@ class TestHybridSelectJobApiLegEndToEnd(unittest.TestCase):
     """
 
     def test_api_leg_confirms_when_log_has_no_evidence(self):
-        from navigator_expert.readers import log_wait
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.readers import (
+            log_wait,
+        )
 
         client = make_client()
         api_obj = make_api_obj()
@@ -2750,15 +2756,15 @@ class TestCommandReaderSafety(unittest.TestCase):
             patch.object(readers, "get_job_settings", side_effect=fake_get_job_settings),
             patch.object(readers, "get_base_fov", side_effect=fake_get_base_fov),
             patch(
-                "navigator_expert.readers.parsing.parse_tile_geometry",
+                "zmart_drivers.leica.stellaris5_y42h93.navigator_expert.readers.parsing.parse_tile_geometry",
                 return_value={"pixel_w_um": 1.0, "pixels_x": 512},
             ),
             patch(
-                "navigator_expert.experimental.lrp_edits.roi.galvo_pan_for_pixel",
+                "zmart_drivers.leica.stellaris5_y42h93.navigator_expert.experimental.lrp_edits.roi.galvo_pan_for_pixel",
                 return_value=(0.0, 0.0),
             ),
             patch(
-                "navigator_expert.scanfields.transaction.apply_lrp_change",
+                "zmart_drivers.leica.stellaris5_y42h93.navigator_expert.scanfields.transaction.apply_lrp_change",
                 side_effect=fake_apply_lrp_change,
             ),
         ):

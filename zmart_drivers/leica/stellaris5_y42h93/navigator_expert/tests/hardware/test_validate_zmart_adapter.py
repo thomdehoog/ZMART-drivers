@@ -22,20 +22,19 @@ import pytest
 
 _HERE = Path(__file__).resolve().parent
 _HELPERS = _HERE.parent / "helpers"
-_LEICA_ROOT = _HERE.parents[2]
-_REPO_ROOT = _HERE.parents[6]
-for _p in (_HERE, _HELPERS, _LEICA_ROOT, _REPO_ROOT):
+_REPO_ROOT = _HERE.parents[5]
+for _p in (_HERE, _HELPERS, _REPO_ROOT):
     if str(_p) not in sys.path:
         sys.path.insert(0, str(_p))
 
 import zmart_controller
 import validate_zmart_adapter
-from navigator_expert.zmart_adapter import zmart_adapter as adapter
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.zmart_adapter import zmart_adapter as adapter
 
 
 def _run_mock(tmp_path, *extra):
     """Run the validator against the mock, restoring global state afterwards."""
-    from navigator_expert.config import profiles
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.config import profiles
 
     output = tmp_path / "adapter_mock.jsonl"
     original_connect = adapter._session.connect_python_client
@@ -195,7 +194,7 @@ def test_state_phase_does_not_switch_away_from_autofocus_job():
 
 
 def test_connect_session_leaves_output_root_for_driver_discovery():
-    from navigator_expert.config import profiles
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.config import profiles
 
     original_connect = adapter._session.connect_python_client
     original_profile = profiles.STATE_READERS
@@ -226,7 +225,7 @@ def test_acquire_backlash_rounds_through_the_controller_seam(tmp_path, rounds, c
     which ``MockLasxClient`` does not implement, and scan-field handling is
     unrelated to what this test verifies.
     """
-    from navigator_expert.config import profiles
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.config import profiles
 
     original_connect = adapter._session.connect_python_client
     original_profile = profiles.STATE_READERS

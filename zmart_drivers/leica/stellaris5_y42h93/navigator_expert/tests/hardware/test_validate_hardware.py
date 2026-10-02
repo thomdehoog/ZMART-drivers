@@ -20,13 +20,13 @@ if str(_HERE) not in sys.path:
 _HELPERS = _HERE.parent / "helpers"
 if str(_HELPERS) not in sys.path:
     sys.path.insert(0, str(_HELPERS))
-_LEICA_ROOT = _HERE.parents[2]
-if str(_LEICA_ROOT) not in sys.path:
-    sys.path.insert(0, str(_LEICA_ROOT))
+_REPO_ROOT = _HERE.parents[5]
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
 
 import validate_hardware
 from mock_lasx_api import MockLasxClient, _SET_DISPATCH
-from navigator_expert.config import profiles
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.config import profiles
 
 
 def test_classify_result_statuses():

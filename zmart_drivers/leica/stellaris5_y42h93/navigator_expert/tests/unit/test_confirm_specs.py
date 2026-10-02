@@ -19,7 +19,11 @@ Offline: ``_readback`` is monkeypatched, so no hardware/API is touched.
 import inspect
 
 import pytest
-from navigator_expert.commands import confirm_specs, confirmations
+
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.commands import (
+    confirm_specs,
+    confirmations,
+)
 
 CONFIRM_SPECS = confirm_specs.CONFIRM_SPECS
 

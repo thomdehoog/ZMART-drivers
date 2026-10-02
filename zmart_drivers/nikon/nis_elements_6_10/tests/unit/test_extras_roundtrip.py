@@ -1,10 +1,11 @@
 """Piezo Z, autofocus, PFS, exposure, live view and Z-stacks through the real bridge server."""
 
 import pytest
-from nis_elements_6_10.commands import commands as cmd
-from nis_elements_6_10.commands.commands import LimitError
-from nis_elements_6_10.connection.client import NisClient
-from nis_elements_6_10.readers import readers
+
+from zmart_drivers.nikon.nis_elements_6_10.commands import commands as cmd
+from zmart_drivers.nikon.nis_elements_6_10.commands.commands import LimitError
+from zmart_drivers.nikon.nis_elements_6_10.connection.client import NisClient
+from zmart_drivers.nikon.nis_elements_6_10.readers import readers
 
 
 def test_z_drives_report_the_piezo(client):

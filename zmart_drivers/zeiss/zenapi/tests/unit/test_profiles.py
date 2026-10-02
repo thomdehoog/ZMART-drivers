@@ -1,7 +1,8 @@
 """CommandProfile construction, the coherence guard, and per-command postures."""
 
 import pytest
-from zenapi.config.profiles import (
+
+from zmart_drivers.zeiss.zenapi.config.profiles import (
     FOCUS_MOVE,
     OBJECTIVE,
     RUN_EXPERIMENT,

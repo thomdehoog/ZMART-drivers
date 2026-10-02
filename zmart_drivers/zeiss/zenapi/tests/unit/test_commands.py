@@ -1,8 +1,9 @@
 """Command wrappers end-to-end over the fake scope (real bridge + dispatch)."""
 
 import pytest
-import zenapi as drv
 from mock_zen_api import FakeGRPCError
+
+import zmart_drivers.zeiss.zenapi as drv
 
 
 def _wide_limits():

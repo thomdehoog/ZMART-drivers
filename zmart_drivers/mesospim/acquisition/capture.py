@@ -25,8 +25,7 @@ import time
 from pathlib import Path
 
 from ..config.profiles import ACQUISITION, HARDWARE
-from ..readers.readers import get_state
-from ..readers.readers import _safe_float
+from ..readers.readers import _safe_float, get_state
 from .product import AcquisitionMetadata, AcquisitionResult, ChannelMetadata
 
 log = logging.getLogger(__name__)

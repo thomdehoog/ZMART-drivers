@@ -5,7 +5,9 @@ from __future__ import annotations
 import sys
 from types import ModuleType
 
-from navigator_expert.notebook_support import NotebookCheckpoint
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.notebook_support import (
+    NotebookCheckpoint,
+)
 
 
 def test_save_and_adopt_clears_prompt_after_saved_checkpoint(tmp_path, monkeypatch):

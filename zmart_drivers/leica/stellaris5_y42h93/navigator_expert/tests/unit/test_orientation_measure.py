@@ -20,11 +20,21 @@ import tifffile
 
 pytest.importorskip("cv2")  # calibration.core.common (reused by measure) imports cv2
 
-from navigator_expert.acquisition.naming import build_image_name
-from navigator_expert.calibration.core import common as cm
-from navigator_expert.notebook_support import NotebookCheckpoint
-from navigator_expert.orientation import Orientation
-from navigator_expert.orientation import measure as wf
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.acquisition.naming import (
+    build_image_name,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.calibration.core import (
+    common as cm,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.notebook_support import (
+    NotebookCheckpoint,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.orientation import (
+    Orientation,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.orientation import (
+    measure as wf,
+)
 
 
 @pytest.fixture
@@ -171,7 +181,9 @@ def _untrusted():
 def _start(sessions_root, **kw):
     from datetime import datetime, timezone
 
-    from navigator_expert.config.machine import MachineProfile
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.config.machine import (
+        MachineProfile,
+    )
 
     kw.pop("session_id", None)  # legacy test label; run names are automatic
     return wf.start_session(
@@ -465,7 +477,9 @@ def test_measure_rerun_replaces_this_sessions_outputs(monkeypatch, sessions_root
 def test_start_session_creates_a_new_session_after_kernel_restart(monkeypatch, sessions_root):
     from datetime import datetime, timezone
 
-    from navigator_expert.config.machine import MachineProfile
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.config.machine import (
+        MachineProfile,
+    )
 
     _patch(monkeypatch)
     machine = MachineProfile(programdata_root=sessions_root)
@@ -555,7 +569,9 @@ def test_failed_run_keeps_evidence_but_is_not_active(monkeypatch, sessions_root)
     assert not (session.paths.session_dir / wf.ORIENTATION_NAME).exists()
     assert (session.paths.reports_dir / "orientation_report.json").is_file()
 
-    from navigator_expert.config.machine import MachineProfile
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.config.machine import (
+        MachineProfile,
+    )
 
     machine = MachineProfile(programdata_root=sessions_root)
     assert machine.latest_snapshot("orientation") is None

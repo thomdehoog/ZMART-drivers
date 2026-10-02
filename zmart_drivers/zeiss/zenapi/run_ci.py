@@ -56,12 +56,15 @@ def main() -> int:
             print("ruff not installed; skipping lint.")
 
     # --- tests ---
-    cmd = [sys.executable, "-m", "pytest", "tests", "--junit-xml", str(REPORT_DIR / "junit.xml")]
+    # -P: do not put this folder on the search path. The driver's plug-in folder
+    # is called zmart_controller, and would otherwise be imported in place of
+    # the real ZMART Controller.
+    cmd = [sys.executable, "-P", "-m", "pytest", "tests", "--junit-xml", str(REPORT_DIR / "junit.xml")]
     cmd += ["-m", "hardware"] if args.hardware else ["-m", "not hardware"]
 
     if not args.no_cov and find_spec("pytest_cov") is not None:
         cmd += [
-            "--cov=zenapi",
+            "--cov=zmart_drivers.zeiss.zenapi",
             "--cov-branch",
             "--cov-report",
             f"xml:{REPORT_DIR / 'coverage.xml'}",

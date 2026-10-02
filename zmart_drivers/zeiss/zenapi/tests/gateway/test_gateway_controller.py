@@ -1,72 +1,89 @@
 """The ZMART controller session over the real wheel and the fake gateway.
 
-This is what a workflow does: pick the instrument, move, acquire. Setting the
-origin is not a controller command; it is a one-time setup step done with the
-driver itself, so the one place this file reaches past the controller is to call
-the adapter's ``set_origin`` on the session's driver handle.
+This is what a workflow does: plug the driver in, pick the instrument, move,
+acquire. Every answer comes back as ``{"success": ..., "report": ...}``.
+Setting the origin is not a controller command; it is a one-time setup step
+done with the driver itself, so the one place this file reaches past the
+controller is to call the adapter's ``set_origin`` on the session's driver
+handle.
 """
 
+from pathlib import Path
+
 import pytest
+import zmart_controller
+from zmart_controller import utils
+
+from zmart_drivers.zeiss.zenapi import zen_zmart_adapter as adapter
+
+DRIVER_DIR = Path(adapter.__file__).resolve().parent
 
 
 @pytest.fixture
-def session(connection):
-    import zenapi  # noqa: F401 - registers the instrument
+def registered(monkeypatch, tmp_path):
+    """The driver plugged in by its folder, for this test only."""
+    monkeypatch.setenv("ZMART_MICROSCOPY_ROOT", str(tmp_path / "zmart-microscopy"))
+    monkeypatch.setattr(utils, "REGISTRY", {})
+    monkeypatch.setattr(utils, "_discovered", False)
+    zmart_controller.register_driver(DRIVER_DIR, remember=False)
 
-    from zmart_controller.layer import set_instrument
 
-    s = set_instrument({**connection, "experiment": "ZMART_Snap"})
+@pytest.fixture
+def session(registered, connection):
+    s = zmart_controller.session.set_instrument({**connection, "experiment": "ZMART_Snap"})
     try:
         yield s
     finally:
         s.disconnect()
 
 
-def test_instrument_is_listed():
-    import zenapi  # noqa: F401
+def test_instrument_is_listed(registered):
+    assert any(
+        i["vendor"] == "zeiss" and i["api"] == "zen-api" for i in zmart_controller.get_instruments()
+    )
 
-    from zmart_controller.registry import get_instruments
 
-    assert any(i["vendor"] == "zeiss" and i["api"] == "zen-api" for i in get_instruments())
+def test_the_driver_fits_the_controller_contract(registered, connection):
+    assert zmart_controller.validate_driver(connection) == []
 
 
 def test_full_round_trip(session, gateway, tmp_path):
-    info = session.get_info()
+    info = session.get_info()["report"]
     assert info["limits_are_defaults"] is True
     assert info["server"]["zen_api_version"]
     assert info["experiment"] == "ZMART_Snap"
 
-    from zenapi import zen_zmart_adapter as adapter
-
     assert not hasattr(session, "set_origin")  # the controller does not offer it
     adapter.set_origin(session._handle)  # driver setup step, done on the handle
-    assert session.get_xyz()["x"]["value"] == 0.0
-    rec = session.set_xyz(250, -250, 12.5)
+    assert session.get_xyz()["report"]["x"]["value"] == 0.0
+    rec = session.set_xyz(250, -250, 12.5)["report"]
     assert rec["confirmed"] == pytest.approx({"x": 250.0, "y": -250.0, "z": 12.5})
     assert gateway.zen.x_m == pytest.approx(250e-6)
 
-    state = session.get_state()
+    state = session.get_state()["report"]
     assert state["changeable"]["experiment"] == "ZMART_Snap"
     assert "ZMART_ZStack" in state["observed"]["available_experiments"]
     session.set_state({"changeable": {"objective_position": 3}})
     assert gateway.zen.objective_position == 3
 
-    options = session.get_acquisition_options()
+    options = session.get_acquisition_options()["report"]
     assert options["mode"]["options"] == ["snap", "experiment"]
-    rec = session.acquire(acquisition_type="overview", position_label="A1")
+    answer = session.acquire(acquisition_type="overview", position_label="A1")
+    assert answer["success"] is True
+    rec = answer["report"]
     assert rec["copied"] is True
     assert rec["image_files"] == [str(tmp_path / "out" / "data" / "overview_A1.czi")]
     assert rec["position"] == pytest.approx({"x": 250.0, "y": -250.0, "z": 12.5})
 
     rec = session.acquire(
         acquisition_type="z-stack", position_label="A1", options={"experiment": "ZMART_ZStack"}
-    )
+    )["report"]
     assert rec["mode"] == "experiment" and rec["planes"] == 5
 
-    af = session.run_procedure({"name": "software_autofocus", "timeout_s": 3})
+    af = session.run_procedure({"name": "software_autofocus", "timeout_s": 3})["report"]
     assert af["frame_z_um"] == pytest.approx(135.0 - 0.0)  # origin z was 0
-    assert session.run_procedure({"name": "live"})["ran"] == "live"
-    assert session.run_procedure({"name": "stop"})["ran"] == "stop"
+    assert session.run_procedure({"name": "live"})["report"]["ran"] == "live"
+    assert session.run_procedure({"name": "stop"})["report"]["ran"] == "stop"
 
 
 def test_move_outside_limits_is_refused_before_zen_is_asked(session, gateway):

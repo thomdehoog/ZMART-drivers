@@ -8,14 +8,16 @@ a local socket.
 
 Quick use::
 
-    import nis_elements_6_10 as nis
+    import zmart_drivers.nikon.nis_elements_6_10 as nis
     client = nis.connect({"host": "127.0.0.1", "port": 54468})
     nis.get_position(client)          # {'x': ..., 'y': ..., 'z': ...} in um
     nis.move_xyz(client, 100, 0, 500) # absolute, checked against NIS limits
     nis.capture(client); nis.save_image(client, r"C:\data\snap.tif")
 
-Importing this package also registers the instrument with ``zmart_controller``
-(see ``nis_zmart_adapter``). See ``README.md`` for the setup steps.
+To drive it through the ZMART Controller, plug it in by its folder or module
+name with ``zmart_controller.register_driver`` (see ``zmart_controller/`` in
+this folder); importing this package registers nothing. See ``README.md`` for
+the setup steps.
 
 Author: Thom de Hoog (ZMB, University of Zurich)
         thom.dehoog@zmb.uzh.ch . thomdehoog@gmail.com
@@ -44,7 +46,7 @@ from .commands.commands import (
 )
 from .connection.client import NisClient, NisConnectionError
 from .connection.session import close, connect
-from .nis_zmart_adapter import CONNECTION, register
+from .nis_zmart_adapter import CONNECTION
 from .protocol import PROTOCOL_VERSION, ProtocolError
 from .readers.readers import (
     get_bridge_info,
@@ -90,7 +92,6 @@ __all__ = [
     "move_xy",
     "move_xyz",
     "move_z",
-    "register",
     "save_image",
     "select_optical_configuration",
     "set_exposure_ms",

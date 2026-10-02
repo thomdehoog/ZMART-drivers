@@ -6,8 +6,9 @@ import json
 
 import pytest
 import tifffile
-from mesospim import acquisition as acq
-from mesospim import readers
+
+from zmart_drivers.mesospim import acquisition as acq
+from zmart_drivers.mesospim import readers
 
 
 def test_build_acquisition_from_state(client):
@@ -77,7 +78,8 @@ def test_save_multiple_source_files_get_plane_suffixes(tmp_path):
     # If a writer ever returns one file per plane, save() names them in order.
     # (Covers the multi-file naming branch directly, without the mock.)
     import numpy as np
-    from mesospim.acquisition.product import (
+
+    from zmart_drivers.mesospim.acquisition.product import (
         AcquisitionMetadata,
         AcquisitionResult,
         ChannelMetadata,
@@ -106,7 +108,7 @@ def test_save_multiple_source_files_get_plane_suffixes(tmp_path):
 
 
 def _result_from(files, planes=1):
-    from mesospim.acquisition.product import (
+    from zmart_drivers.mesospim.acquisition.product import (
         AcquisitionMetadata,
         AcquisitionResult,
         ChannelMetadata,
@@ -185,7 +187,7 @@ def test_acquire_timeout_raises_and_restores(client, server, monkeypatch):
     # reads 'running_script'), so "never finishes" here means "never writes".
     from dataclasses import replace
 
-    from mesospim.acquisition import capture
+    from zmart_drivers.mesospim.acquisition import capture
 
     def never_writes(row=0):
         pass  # fire the run but never produce the stack file

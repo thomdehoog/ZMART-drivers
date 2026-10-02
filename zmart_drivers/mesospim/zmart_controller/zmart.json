@@ -1,0 +1,12 @@
+{
+  "contract": 1,
+  "instruments": [
+    {
+      "vendor": "mesospim",
+      "microscope": "mesospim-01",
+      "api": "remote-scripting",
+      "host": "127.0.0.1",
+      "port": 42000
+    }
+  ]
+}

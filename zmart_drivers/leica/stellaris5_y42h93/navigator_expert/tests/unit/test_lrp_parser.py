@@ -14,9 +14,18 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 
 import pytest
-from navigator_expert.scanfields import files as sf_files
-from navigator_expert.scanfields.files import TEMPLATE_LRP, save_and_read_lrp
-from navigator_expert.scanfields.lrp import _get_job_names, parse_lrp
+
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.scanfields import (
+    files as sf_files,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.scanfields.files import (
+    TEMPLATE_LRP,
+    save_and_read_lrp,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.scanfields.lrp import (
+    _get_job_names,
+    parse_lrp,
+)
 
 TEST_DATA = Path(__file__).resolve().parents[1] / "data"
 # The two folders holding exports of the 3-job "collecting pattern" sequence
@@ -253,7 +262,7 @@ class TestParseLrpSyntheticEdgeCases:
         assert line["_BeamRoute"] == [{"BeamPositionLevel": "0", "BeamPosition": "2"}]
 
     def test_duplicate_job_name_keeps_last_and_warns(self, synthetic, caplog):
-        with caplog.at_level("WARNING", logger="navigator_expert.scanfields.lrp"):
+        with caplog.at_level("WARNING", logger="zmart_drivers.leica.stellaris5_y42h93.navigator_expert.scanfields.lrp"):
             result = parse_lrp(synthetic)
         assert result["jobs"]["ROI Job"]["sequential_attrs"]["Marker"] == "second"
         assert any("duplicate job name 'ROI Job'" in r.message for r in caplog.records)

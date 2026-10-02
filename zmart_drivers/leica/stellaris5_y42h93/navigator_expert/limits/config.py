@@ -44,7 +44,9 @@ _AXIS_FILE_KEYS = {
 # These are visible in the file even while unrestricted. Each entry is either
 # ``[]`` or one typed constraint, and the command wrapper with the same name
 # enforces a typed constraint immediately before its native CAM call.
-from .checks import SETTER_LIMIT_KEYS  # noqa: E402  (rulebook vocabulary lives with the checks)
+from .checks import (
+    SETTER_LIMIT_KEYS,  # noqa: E402  (rulebook vocabulary lives with the checks)
+)
 
 _REQUIRED_FILE_KEYS = (*_AXIS_FILE_KEYS.values(), "objective_slot", *SETTER_LIMIT_KEYS)
 

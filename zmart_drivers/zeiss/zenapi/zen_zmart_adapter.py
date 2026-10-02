@@ -3,9 +3,10 @@ ZMART controller adapter for ZEISS ZEN.
 =======================================
 The seam that plugs this driver into the vendor-agnostic **ZMART controller**
 (``zmart_controller``). The controller drives every microscope through one
-small ops table -- ``connect`` plus one callable per operation -- registered
-under a ``connection`` identity dict. This module implements that table for
-ZEN (through the ZEN API gateway, see ``connection/``) and registers it.
+small set of functions -- ``connect`` plus one function per command. This
+module implements them for ZEN (through the ZEN API gateway, see
+``connection/``); the plug-in folder ``zmart_controller/`` hands them to the
+controller, and its ``zmart.json`` names the instrument.
 
 As in the other drivers, the driver owns the frame **origin**: the controller
 works in micrometres from an origin the driver subtracts, so the controller
@@ -25,10 +26,12 @@ What the neutral surface covers for ZEN today:
   series) when asked, written by ZEN as one CZI and copied into
   ``<output_root>/data/``.
 
-Register at import: importing this module (which ``import zenapi`` does) calls
-:func:`register` at the bottom of the file, so
-``zmart_controller.get_instruments()`` lists the ZEISS entry with no explicit
-call. It is a safe no-op when ``zmart_controller`` is not installed.
+Plug the driver in once on the microscope computer, by its folder or module
+name; importing this module registers nothing::
+
+    import zmart_controller
+
+    zmart_controller.register_driver("zmart_drivers.zeiss.zenapi")
 
 Author: Thom de Hoog (ZMB, University of Zurich)
         thom.dehoog@zmb.uzh.ch . thomdehoog@gmail.com
@@ -37,6 +40,8 @@ License: MIT
 
 from __future__ import annotations
 
+import functools
+import json
 import logging
 import re
 import shutil
@@ -60,17 +65,14 @@ log = logging.getLogger(__name__)
 # Every axis is driven by one motor under ZEN: the XY stage and the focus drive.
 _ACTUATORS: dict[str, list[str]] = {"x": ["motoric"], "y": ["motoric"], "z": ["motoric"]}
 
-# The connection identity the ZMART controller keys on. ``microscope`` names a
-# specific instrument; edit it (and ``config`` / ``output_root``) per
-# deployment. ``config`` is the ZEN API ``config.ini`` (host, port, gateway
-# certificate, control token); ``host`` / ``port`` / ``cert_file`` /
-# ``control_token`` may be given directly instead.
-CONNECTION = {
-    "vendor": "zeiss",
-    "microscope": "zen-lm",
-    "api": "zen-api",
-    "config": "config.ini",
-}
+# The instrument this driver serves, with its connect settings, exactly as the
+# controller reads it from the plug-in folder's zmart.json. ``microscope``
+# names a specific instrument; edit it (and ``config``) per deployment.
+# ``config`` is the ZEN API ``config.ini`` (host, port, gateway certificate,
+# control token); ``host`` / ``port`` / ``cert_file`` / ``control_token`` may
+# be given directly instead.
+_MANIFEST = Path(__file__).resolve().parent / "zmart_controller" / "zmart.json"
+CONNECTION = json.loads(_MANIFEST.read_text(encoding="utf-8"))["instruments"][0]
 
 
 @dataclass
@@ -283,12 +285,25 @@ def _resolve_actuators(with_actuators: dict | None) -> dict[str, str]:
 
 
 def get_xyz(handle: ZenHandle, *, with_actuators: dict | None = None) -> dict:
-    """Report the position per axis (um, relative to the origin) with its actuator."""
+    """Report the position per axis (um, relative to the origin) with its actuator.
+
+    ``range`` is how far each axis may travel, ``[min, max]`` in um from the
+    origin: this microscope's stage limits, the ones every move is checked
+    against.
+    """
     _require_open(handle)
     chosen = _resolve_actuators(with_actuators)
     user = _user_xyz(handle, _raw_xyz(handle.client))
     return {
-        axis: {"value": user[axis], "actuator": chosen[axis], "unit": "um"}
+        axis: {
+            "value": user[axis],
+            "actuator": chosen[axis],
+            "unit": "um",
+            "range": [
+                handle.limits[axis]["min"] - handle.origin[axis],
+                handle.limits[axis]["max"] - handle.origin[axis],
+            ],
+        }
         for axis in ("x", "y", "z")
     }
 
@@ -586,53 +601,144 @@ def acquire(
 
 
 # =============================================================================
-# info + registration
+# info
 # =============================================================================
 
 
+# The microscope in plain words, for whoever drives it: a person, a notebook,
+# or the ZMART AI agent, which builds its picture of the instrument from this.
+# It says what the other answers cannot. The parts in braces are filled in by
+# _described() from this session's limits and from what ZEN reports.
+DESCRIPTION = """A ZEISS microscope driven through ZEN and the ZEN API, by way of the ZEN API Gateway.
+
+Stage: x and y move the motorised stage, and z moves the focus drive; each axis has one motor ("motoric"). All positions are in micrometres from the origin saved with this driver's set_origin step (plain stage coordinates until one is saved). Every move is checked against this microscope's stage limits before ZEN is asked to move.{defaults}
+
+Settings (the changeable part of the state): objective_position is the position of the objective on the objective changer, as listed below; experiment is the name of a ZEN experiment, which carries the imaging settings: channels, exposure and z-stack.
+
+Objectives on the changer, by position: {objectives}.
+
+Experiments ZEN can load: {experiments}.
+
+Acquiring needs a loaded experiment. It takes a snap with that experiment, or runs the whole experiment (tiles, z-stack, time series) when the mode is "experiment" or the acquisition type mentions a stack, tiles or a time lapse. ZEN writes one CZI file, which is copied into the data folder under the output folder when ZEN's image folder can be reached from this computer."""
+
+
+def _objective_text(objective: dict) -> str:
+    """One objective as text: its position, name, and what ZEN knows of it."""
+    details = []
+    if objective.get("magnification"):
+        details.append(f"{objective['magnification']:g}x")
+    if objective.get("na"):
+        details.append(f"NA {objective['na']:g}")
+    if objective.get("immersion"):
+        details.append(str(objective["immersion"]).lower())
+    text = f"{objective.get('index')}: {objective.get('name')}"
+    return f"{text} ({', '.join(details)})" if details else text
+
+
+def _described(handle: ZenHandle, experiments: list) -> str:
+    """The description, filled in from this session's limits and what ZEN reports."""
+    defaults = (
+        " The stage limits in use are still the generic defaults copied on the first "
+        "connect; replace them with the real travel range of this stage."
+        if handle.limits_are_defaults
+        else ""
+    )
+    objectives = ", ".join(
+        _objective_text(o) for o in handle.immutable.get("objectives", [])
+    )
+    return DESCRIPTION.format(
+        defaults=defaults,
+        objectives=objectives or "none reported",
+        experiments=", ".join(str(name) for name in experiments) or "none reported",
+    )
+
+
 def get_info(handle: ZenHandle) -> dict:
-    """Read-only extras: where the session started, the limits, the objectives, the output root."""
+    """Where images go, a description of the microscope, and read-only extras.
+
+    The extras: where the session started, the limits, the objectives, the
+    loaded experiment and the gateway.
+    """
     _require_open(handle)
+    experiments = _safe(_readers.get_available_experiments, handle.client, default=[])
     return {
+        "output_root": str(handle.output_root),
+        "description": _described(handle, experiments),
         "initial_position": dict(handle.initial_position),
         "limits": dict(handle.limits),
         "limits_file": str(handle.machine.limits_path()),
         "limits_are_defaults": handle.limits_are_defaults,
         "objectives": list(handle.immutable.get("objectives", [])),
-        "output_root": str(handle.output_root),
         "image_output_path": handle.immutable.get("image_output_path"),
         "experiment": handle.experiment.name if handle.experiment else None,
         "server": dict(handle.immutable.get("runtime", {})),
     }
 
 
-OPS = {
-    "connect": connect,
-    "disconnect": disconnect,
-    "get_acquisition_options": get_acquisition_options,
-    "get_actuators": get_actuators,
-    "get_xyz": get_xyz,
-    "set_xyz": set_xyz,
-    "acquire": acquire,
-    "get_state": get_state,
-    "set_state": set_state,
-    "get_procedures": get_procedures,
-    "run_procedure": run_procedure,
-    "get_info": get_info,
-}
+# =============================================================================
+# the controller's shape
+# =============================================================================
+
+# The commands that answer in the controller's shape. connect returns the
+# handle and disconnect returns nothing, so those two are handed over as they are.
+_ANSWERING_OPS = (
+    "get_acquisition_options",
+    "get_actuators",
+    "get_xyz",
+    "set_xyz",
+    "acquire",
+    "get_state",
+    "set_state",
+    "get_procedures",
+    "run_procedure",
+    "get_info",
+)
 
 
-def register(connection: dict | None = None) -> None:
-    """Register the ZEISS driver with the ZMART controller registry.
+def _answered(function):
+    """Wrap a command so it answers the way the controller documents.
 
-    Safe to call more than once: a second call only overwrites the same entry.
+    The controller promises every workflow the same answer from every
+    microscope: ``{"success": ..., "report": ...}``. The functions in this
+    module return the report alone, and raise when something goes wrong.
+    ``success`` is therefore True, unless the report says that a change was
+    sent but could not be confirmed (``"confirmed": False``): an outcome that
+    is safe to carry on from, so it is reported rather than raised.
     """
-    try:
-        from zmart_controller.registry import register as _register
-    except Exception:  # noqa: BLE001 - controller optional at import time
-        log.debug("zmart_controller not importable; skipping registration", exc_info=True)
-        return
-    _register(connection or dict(CONNECTION), ops=dict(OPS))
+
+    @functools.wraps(function)
+    def command(*args, **kwargs):
+        report = function(*args, **kwargs)
+        unconfirmed = isinstance(report, dict) and report.get("confirmed") is False
+        return {"success": not unconfirmed, "report": report}
+
+    return command
 
 
-register()
+def ops_table() -> dict[str, Any]:
+    """The functions this driver hands to the controller, one per command.
+
+    The plug-in folder ``zmart_controller/`` exposes these by name.
+    ``connect`` and ``disconnect`` are handed over unchanged. Every other
+    command is wrapped so that, called through the controller, it answers
+    ``{"success": ..., "report": ...}``. Called directly from this module,
+    the same functions return the report alone.
+    """
+    functions = {
+        "connect": connect,
+        "disconnect": disconnect,
+        "get_acquisition_options": get_acquisition_options,
+        "get_actuators": get_actuators,
+        "get_xyz": get_xyz,
+        "set_xyz": set_xyz,
+        "acquire": acquire,
+        "get_state": get_state,
+        "set_state": set_state,
+        "get_procedures": get_procedures,
+        "run_procedure": run_procedure,
+        "get_info": get_info,
+    }
+    return {
+        name: _answered(function) if name in _ANSWERING_OPS else function
+        for name, function in functions.items()
+    }

@@ -1,9 +1,10 @@
 """Acquisition status: the GetStatus readback (confirm_acquire) and the monitor() stream."""
 
 import pytest
-import zenapi as drv
 from mock_zen_api import idle_status, running_status
-from zenapi.commands.confirmations import confirm_acquire
+
+import zmart_drivers.zeiss.zenapi as drv
+from zmart_drivers.zeiss.zenapi.commands.confirmations import confirm_acquire
 
 
 def test_confirm_acquire_reads_final_status(fake_client):

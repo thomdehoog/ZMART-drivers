@@ -7,13 +7,9 @@ from pathlib import Path
 
 import pytest
 
-# Add the drivers dir (parent of mesospim) so `import mesospim` works regardless
-# of where pytest is invoked from. parents: [0]=tests [1]=mesospim [2]=zmart_drivers.
-_DRIVERS_DIR = Path(__file__).resolve().parents[2]
-if str(_DRIVERS_DIR) not in sys.path:
-    sys.path.insert(0, str(_DRIVERS_DIR))
-
-# Add the repo root so `import zmart_controller` resolves.
+# Add the repository root so the driver imports by its full name,
+# zmart_drivers.mesospim, even when the repository is not pip-installed.
+# parents: [0]=tests [1]=mesospim [2]=zmart_drivers [3]=repository root.
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
@@ -36,7 +32,7 @@ def server(tmp_path):
 @pytest.fixture
 def client(server):
     """A connected MesospimClient talking to the mock server."""
-    from mesospim.connection.client import MesospimClient
+    from zmart_drivers.mesospim.connection.client import MesospimClient
 
     c = MesospimClient(server.host, server.port, timeout=3.0)
     c.connect()

@@ -14,13 +14,13 @@ import sys
 from pathlib import Path
 
 _HERE = Path(__file__).resolve().parent
-_LEICA_ROOT = _HERE.parents[2]
-for _p in (_HERE, _LEICA_ROOT):
+_REPO_ROOT = _HERE.parents[5]
+for _p in (_HERE, _REPO_ROOT):
     if str(_p) not in sys.path:
         sys.path.insert(0, str(_p))
 
 import probe_four_readers as probe
-from navigator_expert.readers import capabilities
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.readers import capabilities
 
 
 def test_jobs_log_read_is_expected_skip_not_error():

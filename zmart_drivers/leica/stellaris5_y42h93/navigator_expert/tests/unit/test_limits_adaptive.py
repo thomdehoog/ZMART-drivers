@@ -5,7 +5,8 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-from navigator_expert.limits import adaptive
+
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.limits import adaptive
 
 POINTS = [
     {"x_um": 10_000.0, "y_um": 20_000.0},

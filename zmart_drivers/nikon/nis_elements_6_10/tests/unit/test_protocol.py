@@ -1,7 +1,8 @@
 """The wire format: requests and replies survive a round trip, errors come back as exceptions."""
 
 import pytest
-from nis_elements_6_10 import protocol
+
+from zmart_drivers.nikon.nis_elements_6_10 import protocol
 
 
 def test_request_round_trip():

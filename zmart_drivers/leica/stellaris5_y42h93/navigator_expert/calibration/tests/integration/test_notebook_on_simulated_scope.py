@@ -39,10 +39,17 @@ import tifffile
 pytest.importorskip("cv2")
 pytest.importorskip("scipy")
 
-from navigator_expert.calibration.core import common as cm
-from navigator_expert.calibration.core import objective_pair as wf_obj
-from navigator_expert.config.machine import MachineProfile
 from scipy.ndimage import gaussian_filter
+
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.calibration.core import (
+    common as cm,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.calibration.core import (
+    objective_pair as wf_obj,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.config.machine import (
+    MachineProfile,
+)
 
 NOTEBOOK_PATH = Path(wf_obj.__file__).parents[1] / "notebooks" / "calibrate_objective_pair.ipynb"
 
@@ -107,7 +114,7 @@ def _install_simulator(monkeypatch, machine) -> SimulatedScope:
     sim = SimulatedScope()
     drv = cm.drv  # objective-pair workflow modules import the same driver module
 
-    monkeypatch.setattr("navigator_expert.config.machine.MACHINE", machine)
+    monkeypatch.setattr("zmart_drivers.leica.stellaris5_y42h93.navigator_expert.config.machine.MACHINE", machine)
     monkeypatch.setattr(drv, "connect_python_client", lambda *a, **k: object())
     monkeypatch.setattr(
         drv,

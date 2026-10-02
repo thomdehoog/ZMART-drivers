@@ -15,7 +15,7 @@ wire framing.
 The public surface is **synchronous**, so operator notebooks keep the thin
 1-3-line invocation style used across the ZMART drivers::
 
-    import mesospim as drv
+    import zmart_drivers.mesospim as drv
     client = drv.connect({"host": "127.0.0.1", "port": 42000})
     drv.apply_stage_limits_from_config(drv.load_stage_config())
     drv.move_xy(client, 1000, 2000)          # micrometers
@@ -25,8 +25,9 @@ The public surface is **synchronous**, so operator notebooks keep the thin
     saved = drv.save(acq, run_dir, position_label="A1")
     drv.close(client)
 
-To drive it through the vendor-neutral controller instead, call
-:func:`mesospim.register` and use ``zmart_controller``.
+To drive it through the vendor-neutral controller instead, plug it in by its
+folder or module name with ``zmart_controller.register_driver`` (see
+``zmart_controller/`` in this folder); importing the package registers nothing.
 
 Author: Thom de Hoog (ZMB, University of Zurich)
         thom.dehoog@zmb.uzh.ch . thomdehoog@gmail.com
@@ -81,9 +82,6 @@ from .config import (
 )
 from .connection.client import MesospimClient, MesospimError
 from .connection.session import close, connect
-
-# --- controller integration ---
-from .mesospim_zmart_adapter import register
 
 # --- stage limits (movement wrappers come in via .commands above) ---
 from .limits import (
@@ -178,5 +176,4 @@ __all__ = [
     "ChannelMetadata",
     "SavedAcquisition",
     # controller
-    "register",
 ]

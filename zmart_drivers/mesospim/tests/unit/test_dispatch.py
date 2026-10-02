@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-from mesospim.commands.dispatch import confirm_and_fire
-from mesospim.config.profiles import CommandProfile
-from mesospim.connection.client import MesospimError
-from mesospim.protocol import Reply
-from mesospim.readers.readers import Reading, _reading_value_after
+from zmart_drivers.mesospim.commands.dispatch import confirm_and_fire
+from zmart_drivers.mesospim.config.profiles import CommandProfile
+from zmart_drivers.mesospim.connection.client import MesospimError
+from zmart_drivers.mesospim.protocol import Reply
+from zmart_drivers.mesospim.readers.readers import Reading, _reading_value_after
 
 
 def _ok(data=None):
@@ -127,7 +127,7 @@ def test_fresh_readback_confirms():
 def test_unexpected_fire_error_returns_envelope_not_exception():
     # A non-transient, non-NAK error (e.g. a ProtocolError on a garbled reply)
     # must be converted to a failed envelope, not raised.
-    from mesospim.protocol import ProtocolError
+    from zmart_drivers.mesospim.protocol import ProtocolError
 
     def fire():
         raise ProtocolError("garbled reply line")

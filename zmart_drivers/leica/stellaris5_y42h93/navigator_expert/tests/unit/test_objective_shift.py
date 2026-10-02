@@ -11,13 +11,22 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-import navigator_expert.readers as readers
 import pytest
 from limits_fixtures import install_permissive_limits
-from navigator_expert.commands import commands as cmds
-from navigator_expert.commands import objective_shift as shift
-from navigator_expert.connection import session_state
-from navigator_expert.orientation import Orientation
+
+import zmart_drivers.leica.stellaris5_y42h93.navigator_expert.readers as readers
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.commands import (
+    commands as cmds,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.commands import (
+    objective_shift as shift,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.connection import (
+    session_state,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.orientation import (
+    Orientation,
+)
 
 TRANSLATIONS = {1: (0.0, 0.0, 0.0), 2: (10.0, -6.0, 3.0)}
 
@@ -313,13 +322,17 @@ class TestSingleSourcedDelta:
     layers is structurally impossible."""
 
     def test_sign_convention_is_to_minus_from(self):
-        from navigator_expert.calibration.core import model
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.calibration.core import (
+            model,
+        )
 
         assert model.translation_delta_um(TRANSLATIONS, 1, 2) == (10.0, -6.0, 3.0)
         assert model.translation_delta_um(TRANSLATIONS, 2, 1) == (-10.0, 6.0, -3.0)
 
     def test_uncovered_pair_raises_the_one_shared_message(self):
-        from navigator_expert.calibration.core import model
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.calibration.core import (
+            model,
+        )
 
         with pytest.raises(RuntimeError, match="no calibration translation covers"):
             model.translation_delta_um(TRANSLATIONS, 1, 5)
@@ -331,7 +344,9 @@ class TestSingleSourcedDelta:
         swap-time stage move equals the adapter's per-move frame offset for
         the same lens pair. Swap-then-move-to-F therefore lands exactly
         where move-to-F-alone would."""
-        from navigator_expert.zmart_adapter import zmart_adapter as adapter
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.zmart_adapter import (
+            zmart_adapter as adapter,
+        )
 
         _arm(client)
         slot = {"value": 1}

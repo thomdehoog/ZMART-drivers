@@ -5,7 +5,8 @@ from __future__ import annotations
 import json
 
 import pytest
-from mesospim.limits import checks as limits
+
+from zmart_drivers.mesospim.limits import checks as limits
 
 
 @pytest.fixture(autouse=True)

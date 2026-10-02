@@ -30,8 +30,10 @@ from typing import Any
 
 import numpy as np
 
-import navigator_expert as drv
-from navigator_expert.algorithms import register_voting
+import zmart_drivers.leica.stellaris5_y42h93.navigator_expert as drv
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.algorithms import (
+    register_voting,
+)
 
 from . import model as _model
 from .common import (

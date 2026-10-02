@@ -11,7 +11,8 @@ import io
 from contextlib import redirect_stdout
 
 import pytest
-from mesospim import protocol as p
+
+from zmart_drivers.mesospim import protocol as p
 
 
 def _run(script: str, core=None) -> str:

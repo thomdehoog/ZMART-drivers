@@ -1,7 +1,8 @@
 """The controller contract for the extras: piezo actuator, state, procedures, stacks."""
 
 import pytest
-from nis_elements_6_10 import nis_zmart_adapter as adapter
+
+from zmart_drivers.nikon.nis_elements_6_10 import nis_zmart_adapter as adapter
 
 
 @pytest.fixture

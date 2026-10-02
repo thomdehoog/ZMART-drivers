@@ -3,9 +3,10 @@ ZMART controller adapter for Nikon NIS-Elements.
 ================================================
 The seam that plugs this driver into the vendor-agnostic **ZMART controller**
 (``zmart_controller``). The controller drives every microscope through one
-small ops table -- ``connect`` plus one callable per operation -- registered
-under a ``connection`` identity dict. This module implements that table for
-NIS-Elements (through the bridge, see ``bridge/nis_bridge.py``) and registers it.
+small set of functions -- ``connect`` plus one function per command. This
+module implements them for NIS-Elements (through the bridge, see
+``bridge/nis_bridge.py``); the plug-in folder ``zmart_controller/`` hands them
+to the controller, and its ``zmart.json`` names the instrument.
 
 As in the reference ``mock_driver``, the driver owns the frame **origin**: the
 controller works in micrometres from an origin the driver subtracts, so the
@@ -25,10 +26,12 @@ What the neutral surface covers for Nikon today:
 * **acquire** -- one snapshot, or a Z-stack when the acquisition type contains
   "stack", saved as TIFF / ND2 / OME-TIFF into ``<output_root>/data/``.
 
-Register at import: importing this module (which ``import nis_elements_6_10`` does)
-calls :func:`register` at the bottom of the file, so
-``zmart_controller.get_instruments()`` lists the Nikon entry with no explicit
-call. It is a safe no-op when ``zmart_controller`` is not installed.
+Plug the driver in once on the microscope computer, by its folder or module
+name; importing this module registers nothing::
+
+    import zmart_controller
+
+    zmart_controller.register_driver("zmart_drivers.nikon.nis_elements_6_10")
 
 Author: Thom de Hoog (ZMB, University of Zurich)
         thom.dehoog@zmb.uzh.ch . thomdehoog@gmail.com
@@ -37,6 +40,8 @@ License: MIT
 
 from __future__ import annotations
 
+import functools
+import json
 import logging
 import re
 import tempfile
@@ -57,15 +62,11 @@ log = logging.getLogger(__name__)
 # connect() adds "piezo" to z on the handle (see NisHandle.actuators).
 _ACTUATORS: dict[str, list[str]] = {"x": ["motoric"], "y": ["motoric"], "z": ["motoric"]}
 
-# The connection identity the ZMART controller keys on. ``microscope`` names a
-# specific instrument; edit it (and host/port/output_root) per deployment.
-CONNECTION = {
-    "vendor": "nikon",
-    "microscope": "ti2-simulator",
-    "api": "nis-elements-bridge",
-    "host": "127.0.0.1",
-    "port": 54468,
-}
+# The instrument this driver serves, with its connect settings, exactly as the
+# controller reads it from the plug-in folder's zmart.json. ``microscope``
+# names a specific instrument; edit it (and host/port) per deployment.
+_MANIFEST = Path(__file__).resolve().parent / "zmart_controller" / "zmart.json"
+CONNECTION = json.loads(_MANIFEST.read_text(encoding="utf-8"))["instruments"][0]
 
 
 @dataclass
@@ -265,7 +266,9 @@ def get_xyz(handle: NisHandle, *, with_actuators: dict | None = None) -> dict:
     """Report the position per axis (um, relative to the origin) with its actuator.
 
     With ``with_actuators={"z": "piezo"}`` the z value is the piezo insert's
-    position (relative to the piezo origin), not the focus drive's.
+    position (relative to the piezo origin), not the focus drive's. ``range``
+    is how far each axis may travel, from the stage limits NIS-Elements
+    reports.
     """
     _require_open(handle)
     chosen = _resolve_actuators(handle, with_actuators)
@@ -273,9 +276,27 @@ def get_xyz(handle: NisHandle, *, with_actuators: dict | None = None) -> dict:
     if chosen["z"] == "piezo":
         user["z"] = _piezo_z(handle) - handle.piezo_origin
     return {
-        axis: {"value": user[axis], "actuator": chosen[axis], "unit": "um"}
+        axis: {
+            "value": user[axis],
+            "actuator": chosen[axis],
+            "unit": "um",
+            "range": _range(handle, axis, chosen[axis]),
+        }
         for axis in ("x", "y", "z")
     }
+
+
+def _range(handle: NisHandle, axis: str, actuator: str) -> list[float] | None:
+    """How far an axis may travel, ``[min, max]`` in um from the origin.
+
+    These are the stage limits NIS-Elements reported at connect, the ones
+    every move is checked against. NIS reports none for the piezo insert, so
+    its range is None.
+    """
+    bounds = handle.limits.get(axis)
+    if bounds is None or actuator == "piezo":
+        return None
+    return [float(bounds["min"]) - handle.origin[axis], float(bounds["max"]) - handle.origin[axis]]
 
 
 def set_xyz(
@@ -540,47 +561,136 @@ def acquire(
 
 
 # =============================================================================
-# info + registration
+# info
 # =============================================================================
 
 
+# The microscope in plain words, for whoever drives it: a person, a notebook,
+# or the ZMART AI agent, which builds its picture of the instrument from this.
+# It says what the other answers cannot. The parts in braces are filled in by
+# _described() from what NIS-Elements reports in this session.
+DESCRIPTION = """A Nikon microscope driven through NIS-Elements {version}, by way of a small bridge that runs inside NIS-Elements.
+
+Stage: x and y move the motorised stage, and z moves the focus drive ("motoric").{piezo} All positions are in micrometres from the origin saved with this driver's set_origin step (plain stage coordinates until one is saved). Every move is checked against the stage limits that NIS-Elements reports.
+
+Settings (the changeable part of the state): objective_position is the nosepiece position of the objective, counted from 1; exposure_ms is the camera exposure time in milliseconds.{pfs} set_state also accepts optical_configuration, the name of an optical configuration defined in NIS-Elements, which sets up the light path. It is applied first, so an exposure given in the same call wins over the one the configuration brings along.
+
+Objectives on the nosepiece, by position: {objectives}.
+
+Optical configurations: {configurations}.
+
+Acquiring takes one image, or a z-stack when the acquisition type contains "stack"; a stack needs z_start and z_end (micrometres from the origin) and uses z_step. Files are saved as tif, nd2 or ome.tif in the data folder under the output folder, named by the acquisition type and the position label. A stack is best saved as nd2, which keeps every plane and all metadata."""
+
+
+def _described(handle: NisHandle, objectives: dict) -> str:
+    """The description, filled in from what NIS-Elements reports now."""
+    devices = handle.immutable.get("devices", {})
+    piezo = (
+        ' z can also be moved by the piezo insert ("piezo"), for fine, fast steps.'
+        if devices.get("piezo_z")
+        else ""
+    )
+    pfs = (
+        " pfs is the Perfect Focus System, on (true) or off (false)."
+        if devices.get("pfs")
+        else ""
+    )
+    listed = ", ".join(
+        f"{o.get('position')}: {o.get('name')}" for o in objectives.get("objectives", [])
+    )
+    configurations = ", ".join(_readers.get_optical_configurations(handle.client))
+    return DESCRIPTION.format(
+        version=handle.immutable.get("version") or "",
+        piezo=piezo,
+        pfs=pfs,
+        objectives=listed or "none reported",
+        configurations=configurations or "none defined",
+    )
+
+
 def get_info(handle: NisHandle) -> dict:
-    """Read-only extras: where the session started, the limits, the objectives, the output root."""
+    """Where images go, a description of the microscope, and read-only extras.
+
+    The extras: where the session started, the limits, the objectives and the
+    pixel calibration.
+    """
     _require_open(handle)
+    objectives = _readers.get_objectives(handle.client)
     return {
+        "output_root": str(handle.output_root),
+        "description": _described(handle, objectives),
         "initial_position": dict(handle.initial_position),
         "limits": dict(handle.limits),
-        "objectives": _readers.get_objectives(handle.client),
+        "objectives": objectives,
         "calibration": _readers.get_calibration(handle.client),
-        "output_root": str(handle.output_root),
         "server": dict(handle.immutable),
     }
 
 
-OPS = {
-    "connect": connect,
-    "disconnect": disconnect,
-    "get_acquisition_options": get_acquisition_options,
-    "get_actuators": get_actuators,
-    "get_xyz": get_xyz,
-    "set_xyz": set_xyz,
-    "acquire": acquire,
-    "get_state": get_state,
-    "set_state": set_state,
-    "get_procedures": get_procedures,
-    "run_procedure": run_procedure,
-    "get_info": get_info,
-}
+# =============================================================================
+# the controller's shape
+# =============================================================================
+
+# The commands that answer in the controller's shape. connect returns the
+# handle and disconnect returns nothing, so those two are handed over as they are.
+_ANSWERING_OPS = (
+    "get_acquisition_options",
+    "get_actuators",
+    "get_xyz",
+    "set_xyz",
+    "acquire",
+    "get_state",
+    "set_state",
+    "get_procedures",
+    "run_procedure",
+    "get_info",
+)
 
 
-def register(connection: dict | None = None) -> None:
-    """Register the Nikon driver with the ZMART controller registry (idempotent)."""
-    try:
-        from zmart_controller.registry import register as _register
-    except Exception:  # noqa: BLE001 - controller optional at import time
-        log.debug("zmart_controller not importable; skipping registration", exc_info=True)
-        return
-    _register(connection or dict(CONNECTION), ops=dict(OPS))
+def _answered(function):
+    """Wrap a command so it answers the way the controller documents.
+
+    The controller promises every workflow the same answer from every
+    microscope: ``{"success": ..., "report": ...}``. The functions in this
+    module return the report alone, and raise when something goes wrong.
+    ``success`` is therefore True, unless the report says that a change was
+    sent but could not be confirmed (``"confirmed": False``): an outcome that
+    is safe to carry on from, so it is reported rather than raised.
+    """
+
+    @functools.wraps(function)
+    def command(*args, **kwargs):
+        report = function(*args, **kwargs)
+        unconfirmed = isinstance(report, dict) and report.get("confirmed") is False
+        return {"success": not unconfirmed, "report": report}
+
+    return command
 
 
-register()
+def ops_table() -> dict[str, Any]:
+    """The functions this driver hands to the controller, one per command.
+
+    The plug-in folder ``zmart_controller/`` exposes these by name.
+    ``connect`` and ``disconnect`` are handed over unchanged. Every other
+    command is wrapped so that, called through the controller, it answers
+    ``{"success": ..., "report": ...}``. Called directly from this module,
+    the same functions return the report alone.
+    """
+    functions = {
+        "connect": connect,
+        "disconnect": disconnect,
+        "get_acquisition_options": get_acquisition_options,
+        "get_actuators": get_actuators,
+        "get_xyz": get_xyz,
+        "set_xyz": set_xyz,
+        "acquire": acquire,
+        "get_state": get_state,
+        "set_state": set_state,
+        "get_procedures": get_procedures,
+        "run_procedure": run_procedure,
+        "get_info": get_info,
+    }
+    return {
+        name: _answered(function) if name in _ANSWERING_OPS else function
+        for name, function in functions.items()
+    }
