@@ -65,9 +65,9 @@ stand in until ZEISS's simulator or a real microscope is available, so that
 the switch is only a change of `config.ini`.
 
 ```
+pip install -e ".[zeiss]"                                   # from the repository root
 pip install -r zmart_drivers/zeiss/zenapi/requirements.txt   # grpclib + the zen_api wheel
-cd zmart_drivers/zeiss
-python -m zenapi.simulator
+python -m zmart_drivers.zeiss.zenapi.simulator
 ```
 
 It prints where it listens and writes a ready `config.ini` (by default under
@@ -118,19 +118,21 @@ driver does not use (they answer *unimplemented*).
 
 ## Using it
 
-With the controller (what a workflow does):
+With the controller (what a workflow does). Install this repository once,
+from its root folder, with `pip install -e ".[zeiss]"` and the `zen_api`
+package from `requirements.txt`. Then plug the driver into the controller,
+once per computer, by its folder or module name. The controller reads
+`zmart_controller/zmart.json` in this folder, which names the instrument:
 
 ```python
-import sys
+import zmart_controller
 
-sys.path.insert(0, r"...\ZMART-microscopy\zmart_drivers\zeiss")
-import zenapi  # registers the instrument with zmart_controller
+zmart_controller.register_driver("zmart_drivers.zeiss.zenapi")
+instrument = next(i for i in zmart_controller.get_instruments() if i["vendor"] == "zeiss")
 
-from zmart_controller.layer import set_instrument
-
-s = set_instrument(
+s = zmart_controller.set_instrument(
     {
-        **zenapi.CONNECTION,
+        **instrument,
         "config": r"C:\zen\config.ini",
         "output_root": r"D:\runs\today",
         "experiment": "ZMART_Snap",
@@ -142,10 +144,12 @@ s.run_procedure({"name": "software_autofocus"})
 s.disconnect()
 ```
 
+Every answer comes back as `{"success": ..., "report": ...}`.
+
 Or without the controller, using the driver directly:
 
 ```python
-import zenapi as drv
+import zmart_drivers.zeiss.zenapi as drv
 
 client = drv.connect(r"C:\zen\config.ini")
 drv.apply_stage_limits_from_config(drv.load_stage_config("stage_limits.json"))
@@ -171,9 +175,9 @@ configuration, not to a single experiment, so the controller does not offer a
 the stage to the point you want as zero, then run
 
 ```python
-from zenapi import zen_zmart_adapter as adapter
+from zmart_drivers.zeiss.zenapi import zen_zmart_adapter as adapter
 
-handle = adapter.connect({**zenapi.CONNECTION, "config": r"C:\zen\config.ini"})
+handle = adapter.connect({**adapter.CONNECTION, "config": r"C:\zen\config.ini"})
 adapter.set_origin(handle)  # the current position is (0, 0, 0) from now on
 adapter.disconnect(handle)
 ```
@@ -207,7 +211,8 @@ you whether that has been done.
 
 ```
 zmart_drivers/zeiss/zenapi/
-├── zen_zmart_adapter.py   the ZMART controller ops table (registers on import)
+├── zen_zmart_adapter.py   the functions the ZMART Controller calls, one per command
+├── zmart_controller/      the plug-in folder the controller reads (zmart.json names the instrument)
 ├── connection/   zen_runtime.py  the ONE place that imports zen_api: service classes
 │                                 (with the stage-service fallback across ZEN releases),
 │                                 request messages, TLS, token, config.ini
@@ -223,7 +228,7 @@ zmart_drivers/zeiss/zenapi/
 ├── acquisition/  capture.py (acquire), save.py (find and copy the CZI), naming.py, product.py
 ├── limits/       checks.py, stage_config.py, defaults/stage_limits.json
 ├── calibration/  machine.py      origin.json + stage_limits.json under ProgramData
-├── simulator/    fake_gateway.py the fake ZEN API gateway; certs.py; `python -m zenapi.simulator`
+├── simulator/    fake_gateway.py the fake ZEN API gateway; certs.py; `python -m zmart_drivers.zeiss.zenapi.simulator`
 └── tests/        unit/ (fake objects, no wheel) · gateway/ (real wheel, fake gateway)
                   · hardware/ (real ZEN, marked) · helpers/roundtrip_checks.py (shared checks)
 ```
@@ -244,13 +249,18 @@ package provides; nothing else in the driver knows the difference.
 
 ## Testing
 
+From the repository root, after `pip install -e ".[zeiss,test]"`:
+
 ```bash
-cd zmart_drivers/zeiss/zenapi
-python run_ci.py                # ruff + offline pytest + coverage
-pytest tests/unit               # 74 tests: fake ZEN API objects, no ZEISS package needed
-pytest tests/gateway            # 19 tests: the real zen_api wheel over TLS to the fake gateway
-python run_ci.py --hardware     # ONLY the @pytest.mark.hardware suite (needs a real gateway)
+python zmart_drivers/zeiss/zenapi/run_ci.py              # ruff + offline pytest + coverage
+python -P -m pytest zmart_drivers/zeiss/zenapi/tests/unit     # 81 tests: fake ZEN API objects, no ZEISS package needed
+python -P -m pytest zmart_drivers/zeiss/zenapi/tests/gateway  # 23 tests: the real zen_api wheel over TLS to the fake gateway
+python zmart_drivers/zeiss/zenapi/run_ci.py --hardware   # ONLY the @pytest.mark.hardware suite (needs a real gateway)
 ```
+
+`-P` keeps the folder Python starts in off its search path. Without it,
+starting Python inside this driver folder would import the plug-in folder
+`zmart_controller/` in place of the real ZMART Controller.
 
 The unit layer injects fake service objects into a **real** `ZenClient`, so the
 async-to-blocking bridge, the dispatch retry and confirm loop, unit conversion,

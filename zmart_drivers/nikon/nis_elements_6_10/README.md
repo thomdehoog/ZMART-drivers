@@ -4,7 +4,7 @@
 > with the Ti2 simulator. The full ZMART round trip runs — connect, set origin,
 > move, **acquire** (snapshot and **Z-stack**), state (objective, optical
 > configuration, exposure, PFS), procedures (autofocus, live/freeze, PFS).
-> Offline suite: 52 tests, no NIS needed; hardware suite: 7 against the
+> Offline suite: 57 tests, no NIS needed; hardware suite: 7 against the
 > simulator. Not yet run on a real microscope. The folder name carries the NIS
 > version the driver was built against; other versions may need small changes
 > in `bridge/nis_bridge.py`.
@@ -45,38 +45,45 @@ needed. The bridge is a file in this repository that NIS runs from a macro.
    computer (and ignored by git):
 
    ```
-   cd <repo>\zmart_drivers\nikon
-   python -m nis_elements_6_10.bridge.install
+   cd <repo>
+   python -m zmart_drivers.nikon.nis_elements_6_10.bridge.install
    ```
 
    This writes `bridge/start_bridge.mac` and `bridge/stop_bridge.mac` and
    prints where they are. Any Python 3.10+ will do; nothing is installed.
+   The macros put the repository folder on NIS-Elements' own Python path, so
+   the bridge inside NIS imports the driver by its full name.
 2. **Start NIS-Elements** (with the microscope, or the simulator).
 3. **Start the bridge:** in NIS, *Macro ▸ Run Macro From File…* and pick
    `bridge/start_bridge.mac`. Two short texts appear ("starting", then
    "running on port 54468"). The macro then stays running — that is intended,
    see the note below. A log is written to `zmart-nikon-bridge.log` in the
    NIS user's temp folder.
-4. **Use the driver from Python** (the normal ZMART environment, see
-   `getting_started/`):
+4. **Use the driver from Python.** Install this repository once, from its
+   root folder, with `pip install -e .` (this also installs the ZMART
+   Controller; the Nikon driver needs nothing else). Then plug the driver into
+   the controller, once per computer, by its folder or module name. The
+   controller reads `zmart_controller/zmart.json` in this folder, which names
+   the instrument and where the bridge listens:
 
    ```python
-   import sys
+   import zmart_controller
 
-   sys.path.insert(0, r"...\ZMART-microscopy\zmart_drivers\nikon")
-   import nis_elements_6_10  # registers the instrument with zmart_controller
+   zmart_controller.register_driver("zmart_drivers.nikon.nis_elements_6_10")
+   instrument = next(i for i in zmart_controller.get_instruments() if i["vendor"] == "nikon")
 
-   from zmart_controller.layer import set_instrument
-
-   s = set_instrument({**nis_elements_6_10.CONNECTION, "output_root": r"D:\runs\today"})
+   s = zmart_controller.set_instrument({**instrument, "output_root": r"D:\runs\today"})
    s.set_xyz(100, -100, 5)  # micrometres from the origin (see "Setting the origin")
    s.acquire(acquisition_type="snap", position_label="tile_01")
    s.disconnect()
    ```
 
+   Every answer comes back as `{"success": ..., "report": ...}`.
    Or without the controller, using the driver directly:
 
    ```python
+   import zmart_drivers.nikon.nis_elements_6_10 as nis_elements_6_10
+
    client = nis_elements_6_10.connect()
    nis_elements_6_10.get_position(client)  # {'x': ..., 'y': ..., 'z': ...}  µm
    nis_elements_6_10.move_xyz(client, 0, 0, 500)  # refused if outside the NIS stage limits
@@ -116,7 +123,7 @@ configuration, not to a single experiment, so the controller does not offer a
 the stage to the point you want as zero, then run
 
 ```python
-from nis_elements_6_10 import nis_zmart_adapter as adapter
+from zmart_drivers.nikon.nis_elements_6_10 import nis_zmart_adapter as adapter
 
 handle = adapter.connect(nis_elements_6_10.CONNECTION)
 adapter.set_origin(handle)  # the current position is (0, 0, 0) from now on
@@ -159,19 +166,22 @@ multi-channel captures beyond what an optical configuration sets.
 | `readers/` | Read-only questions: position, limits, objectives, optical configurations, calibration, Z drives, PFS, exposure. |
 | `commands/` | Moves (limit-checked, incl. piezo Z), objective / optical-configuration / exposure / PFS setting, autofocus, live/freeze, capture, Z-stack, save. |
 | `calibration/machine.py` | Where the persisted origin lives. |
-| `nis_zmart_adapter.py` | The `zmart_controller` ops table and registration. |
+| `nis_zmart_adapter.py` | The functions the ZMART Controller calls, one per command. |
+| `zmart_controller/` | The plug-in folder the controller reads: `zmart.json` names the instrument, `__init__.py` hands over the functions. |
 | `tests/` | `unit/` runs the real bridge server over a fake NIS API (`tests/helpers/fake_nis_api.py`); `hardware/` runs against a live NIS (`pytest -m hardware`). |
 
 ## Running the tests
 
-From this folder, in an environment with `pytest` (for example the
-`zmart-dev` conda env):
+From the repository root, after `pip install -e ".[test]"`:
 
 ```
-pytest              # offline: 52 tests, ~20 s, no NIS needed
-pytest -m hardware  # against a running NIS with start_bridge.mac active
-ruff check . && ruff format --check .
+python -P -m pytest zmart_drivers/nikon/nis_elements_6_10              # offline: 57 tests, ~20 s, no NIS needed
+python -P -m pytest zmart_drivers/nikon/nis_elements_6_10 -m hardware  # against a running NIS with start_bridge.mac active
 ```
+
+`-P` keeps the folder Python starts in off its search path. Without it,
+starting Python inside this driver folder would import the plug-in folder
+`zmart_controller/` in place of the real ZMART Controller.
 
 ## Where the NIS function names come from
 

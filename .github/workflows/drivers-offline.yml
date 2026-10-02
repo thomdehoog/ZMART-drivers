@@ -1,0 +1,80 @@
+# The offline test suite of every driver, on Linux and Windows, Python 3.11 and 3.12.
+#
+# This file is intentionally thin. What each suite runs is defined beside the
+# driver itself (its run_ci.py and pytest.ini); this workflow only installs the
+# repository with the driver's extras and starts the suite. Installing the
+# repository also installs the ZMART Controller, from its own repository
+# (thomdehoog/ZMART-controller), because every driver plugs into it.
+#
+# None of these suites needs a microscope or vendor software. The ZEISS suite
+# also installs ZEISS's zen_api package, so its tests against the fake ZEN API
+# gateway run too.
+name: drivers-offline
+
+on:
+  push:
+    branches: [main, release-candidate]
+  pull_request:
+  workflow_dispatch:
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  offline:
+    name: ${{ matrix.driver }} (${{ matrix.os }}, py${{ matrix.python-version }})
+    runs-on: ${{ matrix.os }}
+    env:
+      MPLBACKEND: Agg # headless matplotlib for the Leica calibration plot tests
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python-version: ["3.11", "3.12"]
+        driver: [leica, nikon, zeiss, mesospim]
+        include:
+          - driver: leica
+            extras: leica,test
+            run: python zmart_drivers/leica/stellaris5_y42h93/navigator_expert/run_ci.py
+          - driver: nikon
+            extras: test
+            # -P keeps the working folder off the search path, as the run_ci
+            # scripts do: a driver's plug-in folder is called zmart_controller.
+            run: python -P -m pytest zmart_drivers/nikon/nis_elements_6_10
+          - driver: zeiss
+            extras: zeiss,test
+            # The ZEISS suite treats lint findings as failures; the existing
+            # style findings are not fixed yet, so lint is left out here.
+            run: python zmart_drivers/zeiss/zenapi/run_ci.py --no-lint
+          - driver: mesospim
+            extras: test
+            run: python zmart_drivers/mesospim/run_ci.py
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # full history so the environment header records the real git revision
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install the drivers, the ZMART Controller and the test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[${{ matrix.extras }}]"
+
+      - name: Install ZEISS's zen_api package
+        if: matrix.driver == 'zeiss'
+        run: python -m pip install -r zmart_drivers/zeiss/zenapi/requirements.txt
+
+      - name: Run the offline suite
+        run: ${{ matrix.run }}
+
+      - name: Upload reports
+        if: always() # keep reports even when tests fail -- that's when they matter most
+        uses: actions/upload-artifact@v4
+        with:
+          name: reports-${{ matrix.driver }}-${{ matrix.os }}-py${{ matrix.python-version }}
+          path: zmart_drivers/**/tests/_report/
+          if-no-files-found: ignore
