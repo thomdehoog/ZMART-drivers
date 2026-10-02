@@ -10,7 +10,8 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 
 import pytest
-from navigator_expert.scanfields.parsers import (
+
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.scanfields.parsers import (
     _get_raw_tiles,
     _parse_size_string,
     _tile_size_from_image_size_str,
@@ -263,7 +264,9 @@ class TestParseTemplatePositionsFromRgnGrid:
     ):
         base = self._write_grid_template(tmp_path)
 
-        from navigator_expert import readers as readers
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert import (
+            readers as readers,
+        )
 
         def fake_get_job_settings(_client, job_name, *, mode=None):
             assert job_name == "Overview"
@@ -329,7 +332,9 @@ class TestParseTemplatePositionsFromRgnGrid:
             encoding="utf-8",
         )
 
-        from navigator_expert import readers as readers
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert import (
+            readers as readers,
+        )
 
         def fake_get_job_settings(_client, job_name, *, mode=None):
             assert job_name == "Overview"

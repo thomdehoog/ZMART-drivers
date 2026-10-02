@@ -56,8 +56,12 @@ from typing import Any
 
 import numpy as np
 
-import navigator_expert as drv
-from navigator_expert.algorithms import VOTING_METHODS, brenner, register_voting
+import zmart_drivers.leica.stellaris5_y42h93.navigator_expert as drv
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.algorithms import (
+    VOTING_METHODS,
+    brenner,
+    register_voting,
+)
 
 from .common import (
     STAGING_SCHEMA_VERSION,

@@ -20,13 +20,17 @@ from __future__ import annotations
 
 import os
 import socket
+from pathlib import Path
 
-# Import the driver so its adapter self-registers (mesospim, mesospim-01,
-# remote-scripting) with the controller at import time.
-import mesospim  # noqa: F401
 import pytest
-
 import zmart_controller
+
+from zmart_drivers.mesospim import mesospim_zmart_adapter as adapter
+
+# Plug the driver in by its folder, for this test run only: it registers the
+# instrument named in zmart_controller/zmart.json (mesospim, mesospim-01,
+# remote-scripting).
+zmart_controller.register_driver(Path(adapter.__file__).resolve().parent, remember=False)
 
 pytestmark = pytest.mark.integration
 
@@ -76,19 +80,19 @@ def test_instrument_is_registered():
 
 
 def test_info_and_actuators(session):
-    info = session.get_info()
+    info = session.get_info()["report"]
     assert info["server"]["app"] == "mesoSPIM-control"
-    actuators = session.get_actuators()
+    actuators = session.get_actuators()["report"]
     assert set(actuators) == {"x", "y", "z"}
     assert actuators["x"] == ["motoric"]
 
 
 def test_get_xyz_and_state_shape(session):
-    xyz = session.get_xyz()
+    xyz = session.get_xyz()["report"]
     for axis in ("x", "y", "z"):
         assert xyz[axis]["unit"] == "um"
         assert isinstance(xyz[axis]["value"], (int, float))
-    state = session.get_state()
+    state = session.get_state()["report"]
     # changeable = the light-path settings; observed = identity + limits (never
     # the run-state, which is unobservable over the bridge).
     assert "laser" in state["changeable"]
@@ -96,16 +100,16 @@ def test_get_xyz_and_state_shape(session):
 
 
 def test_acquisition_options(session):
-    opts = session.get_acquisition_options()
+    opts = session.get_acquisition_options()["report"]
     assert "planes" in opts and "z_step" in opts
     assert opts["format"]["active"] in opts["format"]["options"]
 
 
 def test_set_xyz_zero_net_motion_confirms(session):
     """Exercise set_xyz + confirm through the adapter with zero net motion."""
-    xyz = session.get_xyz()
+    xyz = session.get_xyz()["report"]
     x, y, z = (xyz[a]["value"] for a in ("x", "y", "z"))
-    result = session.set_xyz(x, y, z)
+    result = session.set_xyz(x, y, z)["report"]
     assert result["confirmed"], result
 
 
@@ -114,7 +118,7 @@ def test_set_xyz_zero_net_motion_confirms(session):
     reason="set MESOSPIM_ALLOW_ACQUIRE=1 to run the capture (fires a snap)",
 )
 def test_acquire_through_session(session, tmp_path):
-    result = session.acquire("snap", "A1")
+    result = session.acquire("snap", "A1")["report"]
     files = result.get("image_files") or []
     assert files, f"no image files in acquire result: {result!r}"
     for path in files:

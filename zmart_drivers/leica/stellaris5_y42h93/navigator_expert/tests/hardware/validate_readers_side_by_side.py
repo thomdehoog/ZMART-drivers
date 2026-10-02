@@ -47,17 +47,23 @@ import threading
 import time
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[3]))  # vendor/leica
+sys.path.insert(0, str(Path(__file__).resolve().parents[6]))  # the repository root
 sys.path.insert(0, str(Path(__file__).resolve().parent))  # tests/hardware
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "helpers"))  # mock
 
-import navigator_expert as drv
 from _report import RunReport, attempts_of, confirmation_of, replay_envelope_logs
-from navigator_expert import readers
-from navigator_expert.config import profiles
-from navigator_expert.readers import capabilities
-from navigator_expert.readers import log_reader as L
-from navigator_expert.readers.parsing import make_changeable_copy, parse_tile_geometry
+
+import zmart_drivers.leica.stellaris5_y42h93.navigator_expert as drv
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert import readers
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.config import profiles
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.readers import capabilities
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.readers import (
+    log_reader as L,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.readers.parsing import (
+    make_changeable_copy,
+    parse_tile_geometry,
+)
 
 API_HANG_MS = 1500.0  # an API read slower than this is treated as a dialog-hang
 
@@ -780,7 +786,9 @@ def _connect(args):
         print("Connect: mock (in-process MockLasxClient)")
         print(f"Limits: hermetic machine root provisioned at {root}")
         return MockLasxClient(latency=args.mock_latency)
-    from navigator_expert.connection.lasx_runtime import load_lasx_api_runtime  # noqa: PLC0415
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.connection.lasx_runtime import (
+        load_lasx_api_runtime,  # noqa: PLC0415
+    )
 
     lasx_api = load_lasx_api_runtime()
     client = lasx_api.LasxApiClientPyModel

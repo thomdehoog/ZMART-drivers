@@ -1,4 +1,4 @@
-"""``python -m zenapi.simulator`` starts, writes a config.ini, and serves the driver."""
+"""``python -m zmart_drivers.zeiss.zenapi.simulator`` starts, writes a config.ini, and serves the driver."""
 
 import subprocess
 import sys
@@ -9,11 +9,11 @@ import pytest
 
 
 def test_cli_serves_until_interrupted(tmp_path):
-    import zenapi as drv
+    import zmart_drivers.zeiss.zenapi as drv
 
     zeiss_dir = Path(drv.__file__).resolve().parents[1]
     proc = subprocess.Popen(
-        [sys.executable, "-m", "zenapi.simulator", "--port", "0", "--workdir", str(tmp_path)],
+        [sys.executable, "-m", "zmart_drivers.zeiss.zenapi.simulator", "--port", "0", "--workdir", str(tmp_path)],
         cwd=str(zeiss_dir),
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,

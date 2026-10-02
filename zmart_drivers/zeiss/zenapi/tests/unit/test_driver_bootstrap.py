@@ -1,7 +1,8 @@
 """The package imports cleanly with only its own roots on sys.path.
 
 Guards against accidental dependence on being launched from a particular
-directory, and confirms `import zenapi` works without the zen_api wheel
+directory, and confirms the package imports by its full name,
+``zmart_drivers.zeiss.zenapi``, without the zen_api wheel
 (everything vendor-specific is lazily imported).
 """
 
@@ -13,11 +14,11 @@ from pathlib import Path
 def test_imports_with_minimal_syspath():
     here = Path(__file__).resolve()
     # parents: [0]=unit [1]=tests [2]=zenapi [3]=zeiss [4]=zmart_drivers [5]=repo root
-    zeiss_dir = here.parents[3]  # .../zmart_drivers/zeiss  (so `import zenapi` resolves)
+    repo_root = here.parents[5]
     code = (
         "import sys;"
-        f"sys.path.insert(0, r'{zeiss_dir}');"
-        "import zenapi;"
+        f"sys.path.insert(0, r'{repo_root}');"
+        "import zmart_drivers.zeiss.zenapi as zenapi;"
         "assert hasattr(zenapi, 'connect');"
         "assert hasattr(zenapi, 'move_xy');"
         "assert hasattr(zenapi, 'acquire');"

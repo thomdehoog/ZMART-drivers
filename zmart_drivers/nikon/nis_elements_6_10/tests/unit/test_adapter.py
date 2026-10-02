@@ -1,7 +1,8 @@
 """The ZMART controller contract, end to end through the fake bridge."""
 
 import pytest
-from nis_elements_6_10 import nis_zmart_adapter as adapter
+
+from zmart_drivers.nikon.nis_elements_6_10 import nis_zmart_adapter as adapter
 
 
 @pytest.fixture
@@ -14,11 +15,11 @@ def handle(connection):
 
 
 def test_ops_table_is_complete():
-    from zmart_controller.registry import OPS
+    from zmart_controller.utils import OPS
 
-    assert set(OPS) <= set(adapter.OPS)
+    assert set(OPS) <= set(adapter.ops_table())
     # The origin is a driver setup step, so it is not offered to the controller.
-    assert "set_origin" not in adapter.OPS
+    assert "set_origin" not in adapter.ops_table()
 
 
 def test_connect_reads_limits_and_identity(handle):
@@ -87,10 +88,3 @@ def test_ops_refuse_after_disconnect(connection):
     adapter.disconnect(h)
     with pytest.raises(RuntimeError, match="disconnected"):
         adapter.get_xyz(h)
-
-
-def test_registered_with_controller():
-    from zmart_controller import registry
-
-    adapter.register()
-    assert any(c["vendor"] == "nikon" for c in registry.get_instruments())

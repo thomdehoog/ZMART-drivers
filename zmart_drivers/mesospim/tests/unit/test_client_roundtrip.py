@@ -8,8 +8,9 @@ real framing + harness + vocabulary, only without a live hardware Core.
 from __future__ import annotations
 
 import pytest
-from mesospim.connection.client import MesospimClient, MesospimError
 from mock_mesospim_server import MockMesospimServer
+
+from zmart_drivers.mesospim.connection.client import MesospimClient, MesospimError
 
 
 def test_connect_handshake_populates_server_info(client):

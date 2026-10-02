@@ -15,13 +15,13 @@ from pathlib import Path
 
 _HERE = Path(__file__).resolve().parent
 _HELPERS = _HERE.parent / "helpers"
-_LEICA_ROOT = _HERE.parents[2]
-for _p in (_HERE, _HELPERS, _LEICA_ROOT):
+_REPO_ROOT = _HERE.parents[5]
+for _p in (_HERE, _HELPERS, _REPO_ROOT):
     if str(_p) not in sys.path:
         sys.path.insert(0, str(_p))
 
 import validate_readers_side_by_side as sxs
-from navigator_expert.config import profiles
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.config import profiles
 
 
 def _run_mock(tmp_path, *extra):

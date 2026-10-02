@@ -8,20 +8,32 @@ import time
 from pathlib import Path
 from unittest.mock import Mock, patch
 
-import navigator_expert as drv
 import numpy as np
 import pytest
 import tifffile
-from navigator_expert.acquisition import capture, materialize
-from navigator_expert.acquisition import lasx_native_autosave as native
-from navigator_expert.acquisition import save as acquisition
-from navigator_expert.acquisition.naming import Naming
-from navigator_expert.orientation import Orientation
+
+import zmart_drivers.leica.stellaris5_y42h93.navigator_expert as drv
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.acquisition import (
+    capture,
+    materialize,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.acquisition import (
+    lasx_native_autosave as native,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.acquisition import (
+    save as acquisition,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.acquisition.naming import (
+    Naming,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.orientation import (
+    Orientation,
+)
 
 
 @pytest.fixture(autouse=True)
 def _identity_rig_orientation(monkeypatch):
-    monkeypatch.setattr("navigator_expert.orientation.rig_orientation", Orientation)
+    monkeypatch.setattr("zmart_drivers.leica.stellaris5_y42h93.navigator_expert.orientation.rig_orientation", Orientation)
 
 
 @pytest.fixture

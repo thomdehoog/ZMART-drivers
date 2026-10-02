@@ -321,7 +321,7 @@ def _test_data_dir() -> Path:
 
 def _install_general_workflow(source_dir: Path, templates_dir: Path) -> None:
     """Install one offline LRP/XML/RGN bundle under driver template filenames."""
-    from navigator_expert.scanfields.files import (  # noqa: PLC0415
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.scanfields.files import (  # noqa: PLC0415
         TEMPLATE_LRP,
         TEMPLATE_RGN,
         TEMPLATE_XML,
@@ -351,7 +351,7 @@ def _workflow_environment(args: argparse.Namespace) -> Iterator[WorkflowBundle]:
         )
         return
 
-    import navigator_expert.scanfields.strip_restore as strip_mod  # noqa: PLC0415
+    import zmart_drivers.leica.stellaris5_y42h93.navigator_expert.scanfields.strip_restore as strip_mod  # noqa: PLC0415
 
     old_find = strip_mod.find_scanning_templates_dir
     old_save = strip_mod.save_experiment
@@ -793,14 +793,16 @@ def op_load_general_workflow(
     args: argparse.Namespace,
 ) -> tuple[str, str, dict[str, Any] | None, str | None, dict[str, Any]]:
     """Install and load the committed workflow bundle before stress starts."""
-    from navigator_expert.scanfields.files import (  # noqa: PLC0415
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.scanfields.files import (  # noqa: PLC0415
         TEMPLATE_RGN,
         TEMPLATE_XML,
         find_scanning_templates_dir,
         load_experiment,
         save_experiment,
     )
-    from navigator_expert.scanfields.strip_restore import _count_objects  # noqa: PLC0415
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.scanfields.strip_restore import (
+        _count_objects,  # noqa: PLC0415
+    )
 
     started = time.perf_counter()
     context: dict[str, Any] = {
@@ -1272,7 +1274,9 @@ def main(argv: list[str] | None = None) -> int:
         # exist; pin selected-job confirmation to the api leg.
         from dataclasses import replace  # noqa: PLC0415
 
-        from navigator_expert.config import profiles  # noqa: PLC0415
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.config import (
+            profiles,  # noqa: PLC0415
+        )
 
         profiles.STATE_READERS = replace(profiles.STATE_READERS, selected_job_confirm_source="api")
         log.info("mock backend: selected-job confirmation pinned to api (no log stream exists)")

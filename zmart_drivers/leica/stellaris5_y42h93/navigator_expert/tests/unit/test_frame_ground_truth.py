@@ -26,14 +26,27 @@ from contextlib import contextmanager
 from types import SimpleNamespace
 from unittest.mock import patch
 
-import navigator_expert.readers as readers
 import pytest
-from navigator_expert.commands import commands as commands_mod
-from navigator_expert.commands import objective_shift as shift
-from navigator_expert.connection import session_state
-from navigator_expert.orientation import Orientation
-from navigator_expert.readers import parsing as _readers_parsing
-from navigator_expert.zmart_adapter import zmart_adapter as adapter
+
+import zmart_drivers.leica.stellaris5_y42h93.navigator_expert.readers as readers
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.commands import (
+    commands as commands_mod,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.commands import (
+    objective_shift as shift,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.connection import (
+    session_state,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.orientation import (
+    Orientation,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.readers import (
+    parsing as _readers_parsing,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.zmart_adapter import (
+    zmart_adapter as adapter,
+)
 
 # The ground-truth translation table (µm). Slot 1 is the reference lens.
 TRUE_T = {1: (0.0, 0.0, 0.0), 2: (50.0, -30.0, 7.0), 3: (-12.5, 4.0, -3.25)}

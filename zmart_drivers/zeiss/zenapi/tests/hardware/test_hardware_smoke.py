@@ -25,7 +25,7 @@ def live_client():
     config = os.environ.get("ZENAPI_CONFIG")
     if not config:
         pytest.skip("set ZENAPI_CONFIG to a ZEN API config.ini to run hardware tests")
-    import zenapi as drv
+    import zmart_drivers.zeiss.zenapi as drv
 
     client = drv.connect(config)
     # The bench envelope: generous limits so the small test moves pass; the

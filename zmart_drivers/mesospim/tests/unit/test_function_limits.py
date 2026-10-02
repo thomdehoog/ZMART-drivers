@@ -7,10 +7,11 @@ semantics, and the provenance record.
 """
 
 import json
+import re
 
 import pytest
 
-from mesospim.limits import (
+from zmart_drivers.mesospim.limits import (
     FunctionLimits,
     LimitsError,
     LimitViolation,
@@ -242,7 +243,7 @@ class TestLoadAndDescribe:
         limits = load(path, functions=OPS)
         assert limits.path == path
         assert limits.is_fallback is False
-        with pytest.raises(LimitViolation, match=str(path)):
+        with pytest.raises(LimitViolation, match=re.escape(str(path))):
             limits.check("set_xyz", {"x_um": 0})
 
     def test_describe_reports_provenance(self, tmp_path):

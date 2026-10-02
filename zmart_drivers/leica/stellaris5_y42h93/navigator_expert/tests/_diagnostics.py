@@ -129,7 +129,9 @@ def _lasx_runtime_status() -> str:
     on a clean "unavailable", which is the correct, expected answer there.
     """
     try:
-        from navigator_expert.connection import lasx_runtime
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.connection import (
+            lasx_runtime,
+        )
     except Exception as exc:
         return f"module import failed: {type(exc).__name__}: {exc}"
 
@@ -168,7 +170,7 @@ def context() -> dict:
         "git_dirty": git_dirty,
     }
     try:
-        import navigator_expert as drv
+        import zmart_drivers.leica.stellaris5_y42h93.navigator_expert as drv
 
         ctx["navigator_expert_version"] = getattr(drv, "__version__", "(unknown)")
         ctx["navigator_expert_path"] = str(Path(drv.__file__).resolve().parent)
@@ -214,16 +216,9 @@ def _bootstrap_sys_path() -> None:
     but it lets ``python tests/_diagnostics.py`` report the driver version and
     location too -- handy as a quick setup check on a freshly cloned machine.
     """
-    machine_root = _HERE.parents[1]  # navigator_expert/tests -> .../<machine>
-    if str(machine_root) not in sys.path:
-        sys.path.insert(0, str(machine_root))
-    directory = machine_root
-    for _ in range(8):
-        if (directory / "shared").is_dir():
-            if str(directory) not in sys.path:
-                sys.path.insert(0, str(directory))
-            break
-        directory = directory.parent
+    repo_root = _HERE.parents[4]  # navigator_expert/tests -> the repository root
+    if str(repo_root) not in sys.path:
+        sys.path.insert(0, str(repo_root))
 
 
 def main() -> int:

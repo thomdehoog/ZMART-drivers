@@ -67,7 +67,12 @@ from typing import Any
 if str(Path(__file__).resolve().parent) not in sys.path:
     sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from _report import RunReport, attempts_of, confirmation_of, replay_envelope_logs  # noqa: E402
+from _report import (  # noqa: E402
+    RunReport,
+    attempts_of,
+    confirmation_of,
+    replay_envelope_logs,
+)
 
 # --- Record + classification ------------------------------------------------
 
@@ -407,14 +412,14 @@ def _bootstrap() -> tuple[Any, type]:
     """Configure sys.path and return (drv, MockLasxClient)."""
     here = Path(__file__).resolve()
     nav_root = here.parents[2]  # navigator_expert/
-    leica_root = nav_root.parent  # vendor/leica/
-    repo_root = here.parents[6]  # smart-microscopy/
+    repo_root = here.parents[6]  # the repository root, which holds zmart_drivers/
     helpers = nav_root / "tests" / "helpers"
-    for p in (str(leica_root), str(repo_root), str(helpers)):
+    for p in (str(repo_root), str(helpers)):
         if p not in sys.path:
             sys.path.insert(0, p)
-    import navigator_expert as drv  # noqa: PLC0415
     from mock_lasx_api import MockLasxClient  # noqa: PLC0415
+
+    import zmart_drivers.leica.stellaris5_y42h93.navigator_expert as drv  # noqa: PLC0415
 
     return drv, MockLasxClient
 
@@ -431,7 +436,7 @@ def _connect(args: argparse.Namespace, MockClient: type, log: logging.Logger) ->
         log.info("limits | hermetic machine root provisioned at %s", root)
         return MockClient(latency=args.mock_latency)
     try:
-        from navigator_expert.connection.lasx_runtime import (  # noqa: PLC0415
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.connection.lasx_runtime import (  # noqa: PLC0415
             load_lasx_api_runtime,
         )
 
@@ -449,7 +454,9 @@ def _connect(args: argparse.Namespace, MockClient: type, log: logging.Logger) ->
         log.error("Connect returned False (LAS X reachable but refused the client name)")
         return None
     try:
-        from navigator_expert.connection.session import configure_lasx_api_delay  # noqa: PLC0415
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.connection.session import (
+            configure_lasx_api_delay,  # noqa: PLC0415
+        )
 
         applied_delay_ms = configure_lasx_api_delay(lasx_api, args.api_delay_ms)
     except RuntimeError as exc:
@@ -649,7 +656,7 @@ def _record_log_selected_job_poll(
     context: dict,
 ) -> None:
     """Record the experimental log-only selected-job wait."""
-    from navigator_expert.readers.log_wait import (  # noqa: PLC0415
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.readers.log_wait import (  # noqa: PLC0415
         wait_for_selected_job_log,
     )
 
@@ -795,7 +802,9 @@ def phase_readonly(drv: Any, v: Validator, client: Any, args: argparse.Namespace
         v.callable("get_hardware_info", lambda: drv.get_hardware_info(client))
         v.callable("get_xy", lambda: drv.get_xy(client))
 
-        from navigator_expert.readers import capabilities  # noqa: PLC0415
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.readers import (
+            capabilities,  # noqa: PLC0415
+        )
 
         jobs_has_log_leg = capabilities.DATUMS["jobs"].log_fn is not None
         if not jobs:
@@ -1490,7 +1499,9 @@ def _apply_state_reader_mode(mode: str | None, log: logging.Logger) -> None:
     """Override all profile-routed passive state readers for this run."""
     if mode is None:
         return
-    from navigator_expert.config import profiles  # noqa: PLC0415
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.config import (
+        profiles,  # noqa: PLC0415
+    )
 
     profiles.STATE_READERS = profiles.StateReaderProfile(
         xy_mode=mode,
@@ -1528,7 +1539,9 @@ def _apply_log_select_confirmation(args: argparse.Namespace, log: logging.Logger
         or args.prime_log_select_cluster
     ):
         return
-    from navigator_expert.config import profiles  # noqa: PLC0415
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.config import (
+        profiles,  # noqa: PLC0415
+    )
 
     updates = {
         "selected_job_confirm_source": (

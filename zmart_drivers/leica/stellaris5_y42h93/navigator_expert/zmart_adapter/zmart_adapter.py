@@ -1,14 +1,15 @@
 r"""ZMART Controller adapter for the Navigator Expert driver.
 
-The ops table that plugs this driver into ``zmart_controller``: one
-function per controller op, each taking the opaque handle as its first
-argument. The controller stays vendor-free — this module (not the
-controller) knows both contracts, and importing it registers the
+The functions that plug this driver into ``zmart_controller``: one function
+per controller command, each taking the opaque handle as its first argument.
+The controller stays vendor-free — this module (not the controller) knows
+both contracts. The controller finds these functions through the driver's
+plug-in folder, ``zmart_controller/``, whose ``zmart.json`` names the
 instrument::
 
     import zmart_controller
-    import zmart_drivers.leica.stellaris5_y42h93.navigator_expert.zmart_adapter  # registers
 
+    zmart_controller.register_driver("zmart_drivers.leica.stellaris5_y42h93.navigator_expert")
     instrument = next(
         i for i in zmart_controller.get_instruments() if i["vendor"] == "leica"
     )
@@ -65,13 +66,15 @@ pass (park the galvo at a known offset, move z-wide, check the focus sum)
 before trusting large z moves.
 
 Dependency direction:
-    - Imports: driver internals and ``zmart_controller.registry``.
-    - Imported by: nothing in the driver — workflows opt in explicitly.
+    - Imports: driver internals only; nothing from ``zmart_controller``.
+    - Imported by: the plug-in folder ``zmart_controller/`` — nothing else
+      in the driver.
 """
 
 from __future__ import annotations
 
 import functools
+import json
 import logging
 import math
 import time
@@ -79,8 +82,6 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
-
-from zmart_controller import registry as _registry
 
 try:  # driver version for embedded export state; never fail acquire over it
     from .. import __version__ as _DRIVER_VERSION
@@ -105,24 +106,13 @@ from . import info as _info
 
 log = logging.getLogger(__name__)
 
-CONNECTION = {
-    "vendor": "leica",
-    "microscope": "stellaris5-y42h93",
-    "api": "navigator-expert",
-    # driver-specific connect params — edit before set_instrument():
-    "client": "PythonClient",
-    "api_delay_ms": None,
-    "output_root": None,  # optional override; otherwise discovered from native AutoSave
-    # Limits and calibration connection choices. Image orientation is enabled
-    # by IMAGE_SAVE in config/profiles.py; only the orientation measurement
-    # explicitly saves raw pixels.
-    "load_limits": True,
-    "load_calibration": True,
-    # The saved frame origin is loaded at connect. Set this to False only to
-    # start in plain stage coordinates, for example to re-capture the origin
-    # when the saved origin file is damaged and connect refuses to read it.
-    "load_origin": True,
-}
+# The instrument this driver serves, with its connect settings, exactly as the
+# controller reads it from the plug-in folder's zmart.json. The plug-in's
+# docstring explains each setting. Image orientation is enabled by IMAGE_SAVE
+# in config/profiles.py; only the orientation measurement explicitly saves raw
+# pixels.
+_MANIFEST = Path(__file__).resolve().parents[1] / "zmart_controller" / "zmart.json"
+CONNECTION = json.loads(_MANIFEST.read_text(encoding="utf-8"))["instruments"][0]
 
 _ACTUATORS = {"x": ("motoric",), "y": ("motoric",), "z": ("z-wide", "z-galvo")}
 
@@ -574,7 +564,7 @@ def set_origin(handle: ZmartHandle) -> dict:
     This is a setup step for the driver, not a controller command. The
     operator runs it once, working with the driver directly, for example::
 
-        from navigator_expert.zmart_adapter import zmart_adapter as adapter
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.zmart_adapter import zmart_adapter as adapter
         handle = adapter.connect(adapter.CONNECTION)
         adapter.set_origin(handle)
 
@@ -670,6 +660,11 @@ def get_xyz(handle: ZmartHandle, *, with_actuators: dict | None = None) -> dict:
     (uncompensated-but-loud when translations are unavailable). The
     untranslated stage values (XY, both z drives, objective) ride along
     under ``"hardware"``.
+
+    ``range`` is how far each axis may travel, ``[min, max]`` in the frame:
+    the limits envelope of the stage (for z, of the z-wide drive) shifted by
+    the origin, the same envelope :func:`get_info` reports as ``canvas``. It
+    is None when no limits govern the session; every move is then refused.
     """
     _require_open(handle)
     chosen = _resolve_actuators(with_actuators)
@@ -681,8 +676,14 @@ def get_xyz(handle: ZmartHandle, *, with_actuators: dict | None = None) -> dict:
         "y": snap["y_um"] - handle.origin["y_um"] - dt[1],
         "z": z_focus - handle.origin["z_focus_um"] - dt[2],
     }
+    canvas = _canvas(handle) or {}
     result = {
-        axis: {"value": frame[axis], "unit": "um", "actuator": chosen[axis]}
+        axis: {
+            "value": frame[axis],
+            "unit": "um",
+            "actuator": chosen[axis],
+            "range": canvas.get(f"{axis}_um"),
+        }
         for axis in ("x", "y", "z")
     }
     result["objective_translation_um"] = list(dt)
@@ -1436,15 +1437,62 @@ def get_info(handle: ZmartHandle) -> dict:
     scan_field = _scan_field(handle, default_job_name=selected)
     root = _info.output_root(handle, _save.save_source_root)
     return {
+        "output_root": str(root),
+        "description": _described(handle),
         "selected_job": selected,
         "tile_positions": _info.tile_positions(scan_field),
         "focus_positions": _info.focus_positions(scan_field),
         "client": handle.connection.get("client"),
-        "output_root": str(root),
         "session_hash6": handle.hash6,
         "canvas": _canvas(handle),
         "connection_status": _connection_status(handle, root),
     }
+
+
+# The microscope in plain words, for whoever drives it: a person, a notebook,
+# or the ZMART AI agent, which builds its picture of the instrument from this.
+# It says what the other answers cannot. The parts in braces are filled in by
+# _described() from what this session has loaded and what LAS X reports, so
+# the description never promises more than the driver allows.
+DESCRIPTION = """A Leica STELLARIS 5 confocal microscope, driven through LAS X and its Navigator Expert (CAM) interface.
+
+Stage: x and y move the motorised stage; z is the focus. The focus has two drives: "z-wide", the focus drive for long moves, and "z-galvo", a fast drive for small steps. The z position reported is their sum, so it reads the same whichever drive made the move. All positions are in micrometres from the origin saved in this microscope's setup (plain stage coordinates until one is saved). When the objective changes, the driver applies the objective calibration, so the origin stays on the same spot of the sample. {galvo}
+
+Settings (the changeable part of the state): job is the name of a LAS X job. A job holds the whole imaging setup: objective, lasers, detectors, zoom and z-stack. Choosing a job applies all of it at once; set_state refuses a job that does not exist. {jobs}
+
+Objectives on the turret, as slot: LAS X objective number: {objectives}.
+
+Acquiring runs a LAS X job and saves what LAS X captured under the output folder, named by the acquisition type and the position label."""
+
+
+def _described(handle: ZmartHandle) -> str:
+    """The description, filled in from the loaded limits and what LAS X reports now."""
+    state = _gate.state_for(handle.client)
+    galvo_range = None
+    if state is not None and state.stage_cfg is not None:
+        galvo_range = state.stage_cfg["stage_um"].get("z_galvo")
+    galvo = (
+        f"This microscope's limits let the z-galvo travel from {galvo_range[0]:g} to "
+        f"{galvo_range[1]:g} um around its own zero."
+        if galvo_range
+        else "No limits are loaded in this session, so every move is refused."
+    )
+    normal, autofocus = _job_catalog(handle)
+    names = [j["Name"] for j in normal if j.get("Name")]
+    af_names = [j["Name"] for j in autofocus if j.get("Name")]
+    jobs = f"The jobs on this microscope now: {', '.join(names) or 'none'}."
+    if af_names:
+        jobs += (
+            f" The autofocus jobs ({', '.join(af_names)}) are not settings; run them "
+            "with the autofocus procedure."
+        )
+    hardware = _readers.get_hardware_info(handle.client) or {}
+    turret = (hardware.get("Microscope") or {}).get("objectives") or []
+    objectives = (
+        ", ".join(f"{o.get('slotIndex')}: {o.get('objectiveNumber')}" for o in turret)
+        or "not reported by LAS X"
+    )
+    return DESCRIPTION.format(galvo=galvo, jobs=jobs, objectives=objectives)
 
 
 def _canvas(handle: ZmartHandle) -> dict | None:
@@ -1550,14 +1598,3 @@ def ops_table() -> dict[str, Any]:
         name: _answered(function) if name in _ANSWERING_OPS else function
         for name, function in functions.items()
     }
-
-
-def register() -> None:
-    """Register this instrument's ops table with the controller registry."""
-    _registry.register(CONNECTION, ops=ops_table())
-
-
-# Import-time registration IS the opt-in: nothing in the driver imports
-# this module, so the instrument appears in get_instruments() exactly when
-# a workflow imports the adapter (see the module docstring example).
-register()

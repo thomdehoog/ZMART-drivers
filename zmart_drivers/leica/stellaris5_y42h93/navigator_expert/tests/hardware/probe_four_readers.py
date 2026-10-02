@@ -33,11 +33,11 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[3]))  # vendor/leica
+sys.path.insert(0, str(Path(__file__).resolve().parents[6]))  # the repository root
 
-import navigator_expert as drv
-from navigator_expert import readers
-from navigator_expert.readers import capabilities
+import zmart_drivers.leica.stellaris5_y42h93.navigator_expert as drv
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert import readers
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.readers import capabilities
 
 HERE = Path(__file__).resolve().parent
 PASSIVE_MODES = ("api", "log", "hybrid")

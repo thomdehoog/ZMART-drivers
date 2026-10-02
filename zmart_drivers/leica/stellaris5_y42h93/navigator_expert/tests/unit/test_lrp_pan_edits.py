@@ -13,12 +13,15 @@ File edits run against a copy of the real workflow LRP bundle in
 from __future__ import annotations
 
 import pytest
-from navigator_expert.experimental.lrp_edits._primitives import _job_setting_attr_values
-from navigator_expert.experimental.lrp_edits.roi import (
+
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.experimental.lrp_edits._primitives import (
+    _job_setting_attr_values,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.experimental.lrp_edits.roi import (
     galvo_pan_for_pixel,
     roi_translation_to_pan,
 )
-from navigator_expert.experimental.lrp_edits.scan import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.experimental.lrp_edits.scan import (
     lrp_get_pan,
     lrp_set_pan,
     lrp_verify_pan,

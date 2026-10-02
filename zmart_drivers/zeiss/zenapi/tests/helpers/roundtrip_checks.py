@@ -24,7 +24,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import zenapi as drv
+import zmart_drivers.zeiss.zenapi as drv
 
 
 def check_reads(client) -> dict:

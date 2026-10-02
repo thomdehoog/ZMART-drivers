@@ -9,13 +9,17 @@ verification, and cross-job Sequential_Master edits.
 
 import xml.etree.ElementTree as ET
 
-from navigator_expert.experimental.lrp_edits._primitives import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.experimental.lrp_edits._primitives import (
     _set_job_attr,
     _verify_job_attr,
     _verify_job_attr_float,
 )
-from navigator_expert.experimental.lrp_edits.focus import lrp_set_stack_calculation_mode
-from navigator_expert.scanfields.transaction import reorder_jobs
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.experimental.lrp_edits.focus import (
+    lrp_set_stack_calculation_mode,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.scanfields.transaction import (
+    reorder_jobs,
+)
 
 PROLOG = (
     '<?xml version="1.0"?>'

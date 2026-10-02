@@ -5,7 +5,8 @@ from __future__ import annotations
 import os
 
 import pytest
-from navigator_expert.config import profiles
+
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.config import profiles
 
 
 @pytest.fixture(autouse=True)

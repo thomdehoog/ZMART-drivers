@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-import mesospim
 import pytest
-from mesospim import mesospim_zmart_adapter as adapter
-from mesospim.limits import checks as limits
+
+from zmart_drivers.mesospim import mesospim_zmart_adapter as adapter
+from zmart_drivers.mesospim.limits import checks as limits
 
 
 @pytest.fixture(autouse=True)
@@ -22,12 +22,24 @@ def _registry_isolation():
     # register point at per-test mock servers that die with the test. Restore
     # the registry afterwards so other suites in the same run never resolve a
     # stale mesospim entry.
-    from zmart_controller import registry
+    from zmart_controller import utils
 
-    before = dict(registry.REGISTRY)
+    before = dict(utils.REGISTRY)
     yield
-    registry.REGISTRY.clear()
-    registry.REGISTRY.update(before)
+    utils.REGISTRY.clear()
+    utils.REGISTRY.update(before)
+
+
+def _register(connection):
+    """Register the driver under this test's own instrument name.
+
+    ``register_driver`` registers the instrument named in the plug-in's
+    ``zmart.json``; these tests use a name of their own, so they hand the
+    controller the same functions the plug-in folder exposes.
+    """
+    from zmart_controller import utils
+
+    utils.register(connection, ops=adapter.ops_table())
 
 
 @pytest.fixture
@@ -46,7 +58,7 @@ def session(server, tmp_path):
         # never touch the real ProgramData root from a test.
         "machine_root": str(tmp_path / "machine"),
     }
-    mesospim.register(connection)
+    _register(connection)
     sess = zmart_controller.set_instrument(connection)
     try:
         yield sess
@@ -70,7 +82,11 @@ def test_get_instruments_lists_mesospim(session):
 
 
 def test_actuators_and_origin(session):
-    assert session.get_actuators() == {"x": ["motoric"], "y": ["motoric"], "z": ["motoric"]}
+    assert session.get_actuators()["report"] == {
+        "x": ["motoric"],
+        "y": ["motoric"],
+        "z": ["motoric"],
+    }
     # The origin is driver setup, so it is set on the driver handle directly.
     out = adapter.set_origin(session._handle)
     assert "origin" in out
@@ -79,41 +95,41 @@ def test_actuators_and_origin(session):
 def test_controller_session_does_not_offer_set_origin(session):
     # Setting the origin is a one-time driver setup step, not a controller command.
     assert not hasattr(session, "set_origin")
-    assert "set_origin" not in adapter.OPS
+    assert "set_origin" not in adapter.ops_table()
 
 
 def test_set_and_get_xyz_relative_to_origin(session):
     session.set_xyz(10, 20, 5)
     adapter.set_origin(session._handle)  # current position becomes (0,0,0)
-    pos = session.get_xyz()
+    pos = session.get_xyz()["report"]
     assert pos["x"]["value"] == 0.0
     session.set_xyz(3, 0, 0)
-    assert session.get_xyz()["x"]["value"] == 3.0
+    assert session.get_xyz()["report"]["x"]["value"] == 3.0
 
 
 def test_state_capture_and_reapply(session):
-    state = session.get_state()
+    state = session.get_state()["report"]
     assert list(state) == ["changeable", "observed"]  # changeable first
     state["changeable"]["intensity"] = 77.0
     session.set_state(state)
-    assert session.get_state()["changeable"]["intensity"] == 77.0
+    assert session.get_state()["report"]["changeable"]["intensity"] == 77.0
 
 
 def test_observed_is_a_report_never_an_instruction(session):
     # A mismatching observed part does not block applying the changeable part
     # (operator decision: set_state acts on changeable only).
-    state = session.get_state()
+    state = session.get_state()["report"]
     assert state["observed"]["microscope"] == "mesospim-test"
     state["observed"]["host"] = "10.0.0.99"
     state["changeable"]["intensity"] = 55.0
     session.set_state(state)
-    assert session.get_state()["changeable"]["intensity"] == 55.0
+    assert session.get_state()["report"]["changeable"]["intensity"] == 55.0
 
 
 def test_acquire_stack_z_bounds_use_origin(session, monkeypatch):
     # z_start/z_end are given in the user frame; with a non-zero origin they must
     # be mapped to raw stage coordinates before the capture.
-    import mesospim.mesospim_zmart_adapter as ctl
+    import zmart_drivers.mesospim.mesospim_zmart_adapter as ctl
 
     captured = {}
     real = ctl._acq.acquire
@@ -134,12 +150,12 @@ def test_acquire_stack_z_bounds_use_origin(session, monkeypatch):
 
 
 def test_acquisition_options(session):
-    opts = session.get_acquisition_options()
+    opts = session.get_acquisition_options()["report"]
     assert "format" in opts and "backlash_correction" in opts
 
 
 def test_acquire_captures_and_saves(session, tmp_path):
-    record = session.acquire("prescan", "A1", options={"format": "ome-tiff"})
+    record = session.acquire("prescan", "A1", options={"format": "ome-tiff"})["report"]
     assert record["acquisition_type"] == "prescan"
     assert record["planes"] == 1
     assert record["image_files"]
@@ -149,14 +165,16 @@ def test_acquire_captures_and_saves(session, tmp_path):
 
 
 def test_acquire_stack(session):
-    record = session.acquire("stack", "B2", options={"z_start": 0, "z_end": 4, "z_step": 1})
+    record = session.acquire("stack", "B2", options={"z_start": 0, "z_end": 4, "z_step": 1})[
+        "report"
+    ]
     assert record["planes"] == 5
     # A 5-plane stack is one multi-page file (matches the real Tiff writer).
     assert len(record["image_files"]) == 1
 
 
 def test_acquire_cleans_staging_and_does_not_duplicate(session, tmp_path):
-    record = session.acquire("prescan", "A1")
+    record = session.acquire("prescan", "A1")["report"]
     from pathlib import Path
 
     out = Path(record["image_files"][0])
@@ -167,8 +185,8 @@ def test_acquire_cleans_staging_and_does_not_duplicate(session, tmp_path):
 
 
 def test_repeated_same_label_acquire_does_not_overwrite(session):
-    r1 = session.acquire("prescan", "A1")
-    r2 = session.acquire("prescan", "A1")
+    r1 = session.acquire("prescan", "A1")["report"]
+    r2 = session.acquire("prescan", "A1")["report"]
     # Same type+label twice must yield two distinct saved datasets, not a clobber.
     assert r1["image_files"][0] != r2["image_files"][0]
     from pathlib import Path
@@ -177,7 +195,7 @@ def test_repeated_same_label_acquire_does_not_overwrite(session):
 
 
 def test_acquire_stack_z_out_of_limits_raises(session):
-    from mesospim.limits import checks as limits
+    from zmart_drivers.mesospim.limits import checks as limits
 
     limits.set_stage_limits(z=(0, 100))  # tight envelope for this test
     with pytest.raises(RuntimeError, match="stage limits"):
@@ -185,11 +203,14 @@ def test_acquire_stack_z_out_of_limits_raises(session):
 
 
 def test_procedures(session):
-    from mesospim import MesospimError
+    from zmart_drivers.mesospim import MesospimError
 
-    procs = session.get_procedures()
+    procs = session.get_procedures()["report"]
     assert "autofocus" in procs and "move_focus" in procs
-    assert session.run_procedure({"name": "move_focus", "value": 12.0})["ran"] == "move_focus"
+    assert (
+        session.run_procedure({"name": "move_focus", "value": 12.0})["report"]["ran"]
+        == "move_focus"
+    )
     # autofocus/find_sample are advertised but the resident server NAKs them today
     # (TODO §5), so forwarding raises rather than silently "succeeding".
     with pytest.raises(MesospimError):
@@ -199,7 +220,7 @@ def test_procedures(session):
 
 
 def test_info(session):
-    info = session.get_info()
+    info = session.get_info()["report"]
     assert "initial_positions" in info
     assert "output_root" in info
 
@@ -223,9 +244,9 @@ def _connection(server, tmp_path):
 
 def test_bundled_function_limits_cover_every_mutating_op():
     """THE completeness guard: adding a mutating op without a limits entry fails here."""
-    from mesospim import mesospim_zmart_adapter as controller
-    from mesospim.calibration import machine
-    from mesospim.limits import function_limits as shared_limits
+    from zmart_drivers.mesospim import mesospim_zmart_adapter as controller
+    from zmart_drivers.mesospim.calibration import machine
+    from zmart_drivers.mesospim.limits import function_limits as shared_limits
 
     path = machine._bundled_default(machine.FUNCTION_LIMITS_FILENAME)
     loaded = shared_limits.load(path, functions=controller._MUTATING_OPS)
@@ -248,11 +269,11 @@ def test_origin_set_with_driver_is_loaded_by_controller_session(server, tmp_path
     finally:
         adapter.disconnect(handle)
 
-    mesospim.register(connection)
+    _register(connection)
     session = zmart_controller.set_instrument(connection)
     try:
         # The saved origin is loaded at connect, so the same spot reads (0, 0, 0).
-        pos = session.get_xyz()
+        pos = session.get_xyz()["report"]
         assert (pos["x"]["value"], pos["y"]["value"], pos["z"]["value"]) == (0.0, 0.0, 0.0)
     finally:
         session.disconnect()
@@ -283,7 +304,7 @@ def test_machine_stage_envelope_overrides_bundled(server, tmp_path):
         ),
         encoding="utf-8",
     )
-    mesospim.register(connection)
+    _register(connection)
     sess = zmart_controller.set_instrument(connection)
     try:
         sess.set_xyz(400, 0, 0)  # inside the machine envelope
@@ -299,7 +320,10 @@ def test_focus_and_rotation_procedures_are_limit_gated(session):
     with pytest.raises(RuntimeError, match="stage.theta"):
         session.run_procedure({"name": "move_rotation", "value": 720.0})
     # In-bounds still runs.
-    assert session.run_procedure({"name": "move_rotation", "value": 15.0})["ran"] == "move_rotation"
+    assert (
+        session.run_procedure({"name": "move_rotation", "value": 15.0})["report"]["ran"]
+        == "move_rotation"
+    )
 
 
 def test_mutating_ops_refuse_without_function_limits(session):
@@ -313,10 +337,10 @@ def test_mutating_ops_refuse_without_function_limits(session):
     ):
         with pytest.raises(RuntimeError, match="function limits are not configured"):
             call()
-    assert "move_focus" in session.get_procedures()  # read-only unaffected
+    assert "move_focus" in session.get_procedures()["report"]  # read-only unaffected
 
 
 def test_observed_reports_limits_provenance(session):
-    observed = session.get_state()["observed"]
+    observed = session.get_state()["report"]["observed"]
     assert observed["limits"]["schema_version"] == 1
     assert observed["limits"]["is_fallback"] is True  # no machine copy in this fixture

@@ -11,10 +11,11 @@ Author: Thom de Hoog (ZMB, University of Zurich). License: MIT.
 
 from __future__ import annotations
 
-import mesospim as drv
 import pytest
-from mesospim.connection.client import MesospimClient, MesospimError
 from mock_mesospim_server import MockMesospimServer
+
+import zmart_drivers.mesospim as drv
+from zmart_drivers.mesospim.connection.client import MesospimClient, MesospimError
 
 
 def test_open_server_allows_connect_without_token():
@@ -77,7 +78,7 @@ def test_token_server_refuses_script_before_token():
     """
     import socket
 
-    from mesospim.protocol import frame
+    from zmart_drivers.mesospim.protocol import frame
 
     with MockMesospimServer(token="s3cret") as srv:
         raw = socket.create_connection((srv.host, srv.port), timeout=3.0)

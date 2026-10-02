@@ -20,8 +20,11 @@ from types import SimpleNamespace
 
 import pytest
 from limits_fixtures import install_permissive_limits
-from navigator_expert.config.timing import RECEIPT_TIMEOUT
-from navigator_expert.scanfields import files
+
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.config.timing import (
+    RECEIPT_TIMEOUT,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.scanfields import files
 
 # Content with no operator objects: no ScanFieldData in the XML, empty
 # Items/FocusMap in the RGN.

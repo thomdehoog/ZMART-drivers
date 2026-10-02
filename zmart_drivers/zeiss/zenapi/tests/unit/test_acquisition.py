@@ -1,9 +1,10 @@
 """acquire() success/raise and save(): the CZI lands under <type>/data/."""
 
 import pytest
-import zenapi as drv
 from mock_zen_api import FakeGRPCError
-from zenapi.acquisition.naming import Naming, run_hash
+
+import zmart_drivers.zeiss.zenapi as drv
+from zmart_drivers.zeiss.zenapi.acquisition.naming import Naming, run_hash
 
 
 def test_acquire_experiment_success(fake_client, tmp_path):

@@ -2,7 +2,8 @@
 
 import pytest
 from mock_zen_api import FakeGRPCError, build_fake_client
-from zenapi import zen_zmart_adapter as adapter
+
+from zmart_drivers.zeiss.zenapi import zen_zmart_adapter as adapter
 
 
 @pytest.fixture
@@ -43,11 +44,11 @@ def handle(scope_box, connection):
 
 
 def test_ops_table_is_complete():
-    from zmart_controller.registry import OPS
+    from zmart_controller.utils import OPS
 
-    assert set(OPS) <= set(adapter.OPS)
+    assert set(OPS) <= set(adapter.ops_table())
     # The origin is a driver setup step, so it is not offered to the controller.
-    assert "set_origin" not in adapter.OPS
+    assert "set_origin" not in adapter.ops_table()
 
 
 def test_connect_copies_default_limits_and_reads_identity(handle, connection, tmp_path):
@@ -188,10 +189,3 @@ def test_ops_refuse_after_disconnect(scope_box, connection):
     adapter.disconnect(h)
     with pytest.raises(RuntimeError, match="disconnected"):
         adapter.get_xyz(h)
-
-
-def test_registered_with_controller():
-    from zmart_controller import registry
-
-    adapter.register()
-    assert any(c["vendor"] == "zeiss" for c in registry.get_instruments())

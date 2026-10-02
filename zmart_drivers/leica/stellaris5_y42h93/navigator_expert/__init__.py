@@ -14,7 +14,8 @@ Package layout::
     - limits/       the instrument's whole rulebook — stage envelope, objective
                     allow-list, setter allow-lists (config + checks), templates,
                     and the operator notebook that creates the machine-local files
-    - zmart_adapter/ ops table plugging this driver into zmart_controller
+    - zmart_adapter/ the functions that plug this driver into zmart_controller
+    - zmart_controller/ the plug-in folder the controller reads (zmart.json)
     - experimental/ LRP mutation helpers without live-state readback
     - tests/        offline unit suite + hardware validators
 """
@@ -123,18 +124,6 @@ __all__ = [
     "save_source_root",
     "save",
 ]
-
-# The low-level command gate uses the repository-wide limits specification.
-# Keep direct driver imports working when callers put only this machine folder
-# on sys.path; output naming itself is private to this driver.
-import sys as _sys
-from pathlib import Path as _Path
-
-_here = _Path(__file__).resolve()
-_repo_root = str(_here.parents[4])
-if _repo_root not in _sys.path:
-    _sys.path.insert(0, _repo_root)
-del _sys, _Path, _here, _repo_root
 
 # -- parsing + command mechanics
 from .readers.parsing import (

@@ -1,10 +1,14 @@
 """Client <-> real bridge server <-> fake NIS: every operation, and the refusals."""
 
 import pytest
-from nis_elements_6_10.commands import commands as cmd
-from nis_elements_6_10.commands.commands import LimitError
-from nis_elements_6_10.connection.client import NisClient, NisConnectionError
-from nis_elements_6_10.readers import readers
+
+from zmart_drivers.nikon.nis_elements_6_10.commands import commands as cmd
+from zmart_drivers.nikon.nis_elements_6_10.commands.commands import LimitError
+from zmart_drivers.nikon.nis_elements_6_10.connection.client import (
+    NisClient,
+    NisConnectionError,
+)
+from zmart_drivers.nikon.nis_elements_6_10.readers import readers
 
 
 def test_ping_reports_versions(client):
@@ -94,7 +98,7 @@ def test_two_clients_are_served_in_turn(bridge):
 
 def test_without_a_pump_requests_time_out_with_a_hint(fake_api):
     """Inside NIS the macro loop pumps; if it is not running, the client learns why."""
-    from nis_elements_6_10.bridge import nis_bridge
+    from zmart_drivers.nikon.nis_elements_6_10.bridge import nis_bridge
 
     server = nis_bridge.serve(fake_api, "127.0.0.1", 0)  # no pump thread
     server.job_timeout = 0.2

@@ -8,24 +8,40 @@ from dataclasses import replace
 from pathlib import Path
 from unittest.mock import Mock, patch
 
-import navigator_expert as drv
 import numpy as np
 import pytest
 import tifffile
-from navigator_expert.acquisition import capture, materialize, ome_canonical
-from navigator_expert.acquisition import save as acquisition
-from navigator_expert.acquisition.naming import Naming, build_image_name, parse_image_name
-from navigator_expert.acquisition.product import (
+
+import zmart_drivers.leica.stellaris5_y42h93.navigator_expert as drv
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.acquisition import (
+    capture,
+    materialize,
+    ome_canonical,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.acquisition import (
+    save as acquisition,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.acquisition.naming import (
+    Naming,
+    build_image_name,
+    parse_image_name,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.acquisition.product import (
     ExportedAcquisition,
     ExportedPosition,
 )
-from navigator_expert.orientation import Orientation, reorient_array
-from navigator_expert.readers import router as readers_router
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.orientation import (
+    Orientation,
+    reorient_array,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.readers import (
+    router as readers_router,
+)
 
 
 @pytest.fixture(autouse=True)
 def _identity_rig_orientation(monkeypatch):
-    monkeypatch.setattr("navigator_expert.orientation.rig_orientation", Orientation)
+    monkeypatch.setattr("zmart_drivers.leica.stellaris5_y42h93.navigator_expert.orientation.rig_orientation", Orientation)
 
 
 @pytest.fixture
@@ -361,7 +377,7 @@ class TestSave:
     ):
         orientation = Orientation(rotate_deg=90, mirrored=True)
         monkeypatch.setattr(
-            "navigator_expert.orientation.rig_orientation",
+            "zmart_drivers.leica.stellaris5_y42h93.navigator_expert.orientation.rig_orientation",
             lambda: orientation,
         )
 

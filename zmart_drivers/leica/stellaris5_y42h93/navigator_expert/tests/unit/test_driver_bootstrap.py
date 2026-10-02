@@ -16,10 +16,10 @@ import pytest
 
 CHILD_SCRIPT = """
 import sys
-# Mimic an example-script entry point: only leica/ on sys.path.
-sys.path.insert(0, r"{leica}")
-import navigator_expert as drv
-from navigator_expert.connection import lasx_runtime
+# Mimic an example-script entry point: only the repository root on sys.path.
+sys.path.insert(0, r"{repo}")
+import zmart_drivers.leica.stellaris5_y42h93.navigator_expert as drv
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.connection import lasx_runtime
 assert drv.acquire is not None
 assert drv.save is not None
 assert drv.AcquisitionResult is not None
@@ -29,14 +29,13 @@ print("bootstrap-ok")
 """
 
 
-def test_driver_imports_with_only_leica_on_path(tmp_path):
-    """The Leica package must not depend on a repository-level naming package."""
+def test_driver_imports_with_only_the_repository_root_on_path(tmp_path):
+    """The Leica package imports by its full name from the repository root alone."""
     repo_root = Path(__file__).resolve().parents[6]
-    driver_parent = repo_root / "zmart_drivers" / "leica" / "stellaris5_y42h93"
-    assert driver_parent.is_dir(), f"missing {driver_parent}"
+    assert (repo_root / "zmart_drivers" / "__init__.py").is_file(), f"not the repo root: {repo_root}"
 
     script = tmp_path / "child.py"
-    script.write_text(CHILD_SCRIPT.format(leica=str(driver_parent)))
+    script.write_text(CHILD_SCRIPT.format(repo=str(repo_root)))
 
     # Inherit parent env (numpy etc. come from site-packages) but the
     # child does NOT call conftest, so sys.path will only contain what
@@ -64,7 +63,9 @@ def test_lasx_runtime_load_smoke_when_installed():
     Bare dev/CI machines can import the loader but cannot load LAS X assemblies;
     hardware validation covers the required installed-runtime path.
     """
-    from navigator_expert.connection import lasx_runtime
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.connection import (
+        lasx_runtime,
+    )
 
     try:
         runtime = lasx_runtime.load_lasx_api_runtime()

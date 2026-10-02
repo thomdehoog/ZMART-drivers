@@ -1,10 +1,10 @@
 """
 Start the fake ZEN API gateway from the command line.
 =====================================================
-    python -m zenapi.simulator                 # 127.0.0.1:5002, files under ./fake_zen_gateway
-    python -m zenapi.simulator --port 5010 --workdir C:\\zen-fake
-    python -m zenapi.simulator --slow          # moves and frames take a little time
-    python -m zenapi.simulator --supervised    # controlling calls refused, as in ZEN's default mode
+    python -m zmart_drivers.zeiss.zenapi.simulator                 # 127.0.0.1:5002, files under ./fake_zen_gateway
+    python -m zmart_drivers.zeiss.zenapi.simulator --port 5010 --workdir C:\\zen-fake
+    python -m zmart_drivers.zeiss.zenapi.simulator --slow          # moves and frames take a little time
+    python -m zmart_drivers.zeiss.zenapi.simulator --supervised    # controlling calls refused, as in ZEN's default mode
 
 It prints the ``config.ini`` it wrote; point the driver (or a ZMART
 ``connection`` dict) at that file. Stop it with Ctrl+C.

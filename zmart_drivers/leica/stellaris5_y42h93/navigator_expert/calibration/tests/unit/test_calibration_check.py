@@ -22,11 +22,21 @@ matplotlib.use("Agg")
 
 pytest.importorskip("cv2")  # register_voting imports cv2/skimage
 
-from navigator_expert.acquisition.naming import build_image_name
-from navigator_expert.calibration.core import calibration_check as chk
-from navigator_expert.calibration.core import common as cm
-from navigator_expert.config.machine import MachineProfile
-from navigator_expert.orientation import Orientation
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.acquisition.naming import (
+    build_image_name,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.calibration.core import (
+    calibration_check as chk,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.calibration.core import (
+    common as cm,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.config.machine import (
+    MachineProfile,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.orientation import (
+    Orientation,
+)
 
 PIXEL_UM = 0.5
 JOB = "Overview"
@@ -113,7 +123,7 @@ def _patch(
         },
     )
     monkeypatch.setattr(
-        "navigator_expert.calibration.core.adopt.compile_session_calibration",
+        "zmart_drivers.leica.stellaris5_y42h93.navigator_expert.calibration.core.adopt.compile_session_calibration",
         lambda session: Path(session.paths.session_dir) / "calibration.json",
     )
     monkeypatch.setattr(chk.drv, "connect_python_client", lambda *a, **k: object())
@@ -121,7 +131,7 @@ def _patch(
         chk.drv, "connect_limits_handshake", lambda c, **k: SimpleNamespace(ok=True, error=None)
     )
     monkeypatch.setattr(chk.drv, "get_hardware_info", lambda c, **k: {"ok": True})
-    monkeypatch.setattr("navigator_expert.orientation.rig_orientation", Orientation)
+    monkeypatch.setattr("zmart_drivers.leica.stellaris5_y42h93.navigator_expert.orientation.rig_orientation", Orientation)
 
     get_xy = lambda c, **k: {"x_um": rig["x"], "y_um": rig["y"]}  # noqa: E731
 
@@ -236,7 +246,7 @@ def test_start_session_requires_two_calibrated_slots(monkeypatch, tmp_path):
 
 def test_start_session_defaults_to_machine_workspace_and_active_job(monkeypatch, tmp_path):
     machine = MachineProfile(programdata_root=tmp_path / "programdata")
-    monkeypatch.setattr("navigator_expert.config.machine.MACHINE", machine)
+    monkeypatch.setattr("zmart_drivers.leica.stellaris5_y42h93.navigator_expert.config.machine.MACHINE", machine)
     _patch(monkeypatch, [])
 
     session = chk.start_session(session_id="check_defaults")

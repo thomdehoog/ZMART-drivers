@@ -1,8 +1,9 @@
 """Stage safety envelope: set/get, config, and out-of-range rejection (no RPC)."""
 
 import pytest
-import zenapi as drv
-from zenapi.limits import checks as limits
+
+import zmart_drivers.zeiss.zenapi as drv
+from zmart_drivers.zeiss.zenapi.limits import checks as limits
 
 
 def test_set_get_roundtrip():

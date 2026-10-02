@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from mesospim.config import profiles
+from zmart_drivers.mesospim.config import profiles
 
 
 def test_connection_defaults():

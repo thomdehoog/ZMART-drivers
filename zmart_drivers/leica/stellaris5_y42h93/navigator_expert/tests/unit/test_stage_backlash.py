@@ -5,7 +5,10 @@ from __future__ import annotations
 from unittest.mock import patch
 
 import pytest
-from navigator_expert.commands import routines as stage_movement
+
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.commands import (
+    routines as stage_movement,
+)
 
 
 class TestCorrectBacklash:

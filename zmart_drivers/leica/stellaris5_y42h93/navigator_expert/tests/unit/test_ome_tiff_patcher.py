@@ -14,7 +14,8 @@ from pathlib import Path
 import numpy as np
 import pytest
 import tifffile
-from navigator_expert.acquisition.ome import (
+
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.acquisition.ome import (
     check_ome_tiff,
     check_ome_xml_bytes,
     check_ome_xml_file,

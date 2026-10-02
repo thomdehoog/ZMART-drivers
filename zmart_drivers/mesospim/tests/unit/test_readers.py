@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from mesospim import readers
-from mesospim.readers.readers import Reading, _reading_value_after
+from zmart_drivers.mesospim import readers
+from zmart_drivers.mesospim.readers.readers import Reading, _reading_value_after
 
 
 def test_ping_true(client):

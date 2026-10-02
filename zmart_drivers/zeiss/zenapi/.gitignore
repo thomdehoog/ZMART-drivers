@@ -5,5 +5,5 @@ __pycache__/
 *.pyc
 # Local connection config (never commit tokens/certs)
 config.ini
-# What `python -m zenapi.simulator` writes by default (certificate, token, fake images)
+# What `python -m zmart_drivers.zeiss.zenapi.simulator` writes by default (certificate, token, fake images)
 fake_zen_gateway/

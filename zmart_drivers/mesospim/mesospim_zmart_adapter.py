@@ -3,9 +3,9 @@ ZMART controller adapter.
 =========================
 The seam that plugs this driver into the vendor-agnostic **ZMART controller**
 (``zmart_controller``). The controller drives every microscope through one small
-ops table -- ``connect`` plus one callable per operation -- registered under a
-``connection`` identity dict. This module implements that table for mesoSPIM and
-registers it.
+set of functions -- ``connect`` plus one function per command. This module
+implements them for mesoSPIM; the plug-in folder ``zmart_controller/`` hands them
+to the controller, and its ``zmart.json`` names the instrument.
 
 Like the reference ``mock_driver``, the driver owns the frame **origin**: the
 controller works in micrometers from an origin the driver subtracts, so the
@@ -18,13 +18,15 @@ The controller surface is deliberately x/y/z centric. mesoSPIM's extra axes
 state**. The full driver API (``import mesospim``) remains available for anything
 the neutral surface does not cover.
 
-Register at import: importing this module (which ``import mesospim`` does via the
-package ``__init__``) runs :func:`register` at the bottom of the file, so
-``zmart_controller.get_instruments()`` lists the mesoSPIM entry with no explicit
-call -- exactly like the Leica adapter. ``register(connection)`` may be re-called
-to override the identity/params (a specific ``microscope`` name, ``host``/``port``,
-``output_root``); it is idempotent and a safe no-op if ``zmart_controller`` is
-not installed.
+Plug the driver in once on the microscope computer, by its folder or module
+name; importing this module registers nothing::
+
+    import zmart_controller
+
+    zmart_controller.register_driver("zmart_drivers.mesospim")
+
+To give the instrument another name, host or port, edit the plug-in folder's
+``zmart.json``.
 
 Author: Thom de Hoog (ZMB, University of Zurich)
         thom.dehoog@zmb.uzh.ch . thomdehoog@gmail.com
@@ -33,6 +35,8 @@ License: MIT
 
 from __future__ import annotations
 
+import functools
+import json
 import logging
 import shutil
 import tempfile
@@ -97,6 +101,9 @@ class MesospimHandle:
     # loaded at connect; None when the file could not be loaded — every
     # mutating op then refuses (fail-closed), read-only use still works.
     function_limits: Any | None = None
+    # The stage envelope loaded at connect, ``{axis: [min, max]}`` in raw stage
+    # coordinates (um, theta in degrees): what get_xyz reports as each axis's range.
+    stage_limits: dict = field(default_factory=dict)
     # Monotonic counter to give each acquisition a unique image-writer staging
     # dir (so repeated/same-label captures never collide).
     _acq_seq: int = 0
@@ -130,7 +137,7 @@ def connect(connection: dict) -> MesospimHandle:
     output_root = Path(connection.get("output_root") or tempfile.mkdtemp(prefix="mesospim_run_"))
     output_root.mkdir(parents=True, exist_ok=True)
     machine = _machine.MachineProfile(
-        microscope_id=connection.get("microscope") or "mesospim-01",
+        microscope_id=connection.get("microscope") or CONNECTION["microscope"],
         programdata_root=connection.get("machine_root"),
     )
 
@@ -169,6 +176,7 @@ def connect(connection: dict) -> MesospimHandle:
             "port": client.port,
         },
         initial_positions=[{k: positions.get(k) for k in ("x", "y", "z", "f", "theta")}],
+        stage_limits={axis: list(bounds) for axis, bounds in stage_cfg["axes"].items()},
     )
     handle.function_limits = _load_function_limits(machine, stage_cfg)
     _restore_persisted_origin(handle)
@@ -328,14 +336,32 @@ def _validate_actuators(with_actuators: dict | None) -> None:
 
 
 def get_xyz(handle: MesospimHandle, *, with_actuators: dict | None = None) -> dict:
-    """Report the linear position per axis (um, relative to origin)."""
+    """Report the linear position per axis (um, relative to origin).
+
+    ``range`` is how far each axis may travel, ``[min, max]`` in um from the
+    origin: the stage envelope loaded at connect, the one every move is
+    checked against. It is None for an axis the envelope does not cover.
+    """
     _validate_actuators(with_actuators)
     pos = _readers.get_positions(handle.client)
     user = _user_xyz(handle, pos)
     return {
-        axis: {"value": user[axis], "actuator": _ACTUATORS[axis][0], "unit": "um"}
+        axis: {
+            "value": user[axis],
+            "actuator": _ACTUATORS[axis][0],
+            "unit": "um",
+            "range": _range(handle, axis),
+        }
         for axis in ("x", "y", "z")
     }
+
+
+def _range(handle: MesospimHandle, axis: str) -> list[float] | None:
+    """The stage envelope of one axis, shifted into the frame."""
+    bounds = handle.stage_limits.get(axis)
+    if bounds is None:
+        return None
+    return [float(bounds[0]) - handle.origin[axis], float(bounds[1]) - handle.origin[axis]]
 
 
 def set_xyz(
@@ -587,66 +613,144 @@ def _settle(handle: MesospimHandle, overshoot_um: float = 5.0) -> None:
 
 
 # =============================================================================
-# registration
+# info
 # =============================================================================
 
-# The connection identity the ZMART controller keys on. ``microscope`` is a
-# placeholder for a specific instrument; edit it (and host/port/output_root) per
-# deployment before connecting.
-CONNECTION = {
-    "vendor": "mesospim",
-    "microscope": "mesospim-01",
-    "api": "remote-scripting",
-    "host": "127.0.0.1",
-    "port": 42000,
-}
+# The instrument this driver serves, with its connect settings, exactly as the
+# controller reads it from the plug-in folder's zmart.json. ``microscope``
+# is a placeholder for a specific instrument; edit it (and host/port) per
+# deployment.
+_MANIFEST = Path(__file__).resolve().parent / "zmart_controller" / "zmart.json"
+CONNECTION = json.loads(_MANIFEST.read_text(encoding="utf-8"))["instruments"][0]
+
+# The microscope in plain words, for whoever drives it: a person, a notebook,
+# or the ZMART AI agent, which builds its picture of the instrument from this.
+# It says what the other answers cannot. The parts in braces are filled in by
+# _described() from the stage envelope loaded at connect and from the hardware
+# model mesoSPIM-control reports.
+DESCRIPTION = """A mesoSPIM light-sheet microscope, driven through mesoSPIM-control and its Remote Scripting server.
+
+Stage: x, y and z move the sample, one motor each ("motoric"), in micrometres from the origin saved with this driver's set_origin step (plain stage coordinates until one is saved). Every move is checked against this microscope's stage limits. Two more axes are moved with procedures: move_focus moves the detection focus (f, in micrometres{f_bounds}) and move_rotation turns the sample (theta, in degrees{theta_bounds}).
+
+Settings (the changeable part of the state): laser is the laser line ({lasers}); intensity is the laser intensity in percent, 0 to 100; filter is the emission filter ({filters}); zoom is the detection zoom ({zooms}); shutterconfig chooses which light sheet is on ({shutters}); etl_l_amplitude, etl_l_offset, etl_r_amplitude and etl_r_offset are the amplitude and offset of the electrically tunable lens of the left and the right light sheet.{camera}
+
+Acquiring captures one plane with the current settings, or a stack when z_start and z_end (micrometres from the origin) or planes are given, with z_step micrometres between planes. Laser, intensity, filter, zoom and shutterconfig may be given as options too. The images are saved as ome-tiff, raw or h5 in the data folder under the output folder, named by the position label."""
+
+
+def _bounds(handle: MesospimHandle, axis: str) -> str:
+    bounds = handle.stage_limits.get(axis)
+    return f", from {bounds[0]:g} to {bounds[1]:g}" if bounds else ""
+
+
+def _described(handle: MesospimHandle) -> str:
+    """The description, filled in from the loaded limits and mesoSPIM-control's hardware model."""
+    config = _readers.get_config(handle.client)
+    lasers = ", ".join(str(laser.get("name")) for laser in config.get("lasers", []))
+    filters = ", ".join(str(name) for name in config.get("filters", []))
+    zooms = ", ".join(
+        f"{z.get('name')} at {z.get('pixel_size_um'):g} um per pixel"
+        if z.get("pixel_size_um")
+        else str(z.get("name"))
+        for z in config.get("zooms", [])
+    )
+    shutters = ", ".join(str(name) for name in config.get("shutter_configs", []))
+    camera = config.get("camera") or {}
+    camera_text = (
+        f" The camera image is {camera['pixels_x']} x {camera['pixels_y']} pixels."
+        if camera.get("pixels_x") and camera.get("pixels_y")
+        else ""
+    )
+    return DESCRIPTION.format(
+        f_bounds=_bounds(handle, "f"),
+        theta_bounds=_bounds(handle, "theta"),
+        lasers=lasers or "none reported",
+        filters=filters or "none reported",
+        zooms=zooms or "none reported",
+        shutters=shutters or "none reported",
+        camera=camera_text,
+    )
 
 
 def get_info(handle: MesospimHandle) -> dict:
-    """Read-only extras the driver exposes: initial positions, focus/rotation."""
+    """Where images go, a description of the microscope, and read-only extras.
+
+    The extras: the initial positions, and the focus and rotation now.
+    """
     pos = _readers.get_positions(handle.client)
     return {
+        "output_root": str(handle.output_root),
+        "description": _described(handle),
         "initial_positions": [dict(p) for p in handle.initial_positions],
         "focus_um": pos.get("f"),
         "rotation_deg": pos.get("theta"),
-        "output_root": str(handle.output_root),
         "server": dict(handle.immutable),
     }
 
 
-OPS = {
-    "connect": connect,
-    "disconnect": disconnect,
-    "get_acquisition_options": get_acquisition_options,
-    "get_actuators": get_actuators,
-    "get_xyz": get_xyz,
-    "set_xyz": set_xyz,
-    "acquire": acquire,
-    "get_state": get_state,
-    "set_state": set_state,
-    "get_procedures": get_procedures,
-    "run_procedure": run_procedure,
-    "get_info": get_info,
-}
+# =============================================================================
+# the controller's shape
+# =============================================================================
+
+# The commands that answer in the controller's shape. connect returns the
+# handle and disconnect returns nothing, so those two are handed over as they are.
+_ANSWERING_OPS = (
+    "get_acquisition_options",
+    "get_actuators",
+    "get_xyz",
+    "set_xyz",
+    "acquire",
+    "get_state",
+    "set_state",
+    "get_procedures",
+    "run_procedure",
+    "get_info",
+)
 
 
-def register(connection: dict | None = None) -> None:
-    """Register the mesoSPIM driver with the ZMART controller registry.
+def _answered(function):
+    """Wrap a command so it answers the way the controller documents.
 
-    Safe to call more than once (idempotent per identity). ``connection`` may
-    override the default identity/params (e.g. a specific ``microscope`` name,
-    ``host``/``port``, ``output_root``).
+    The controller promises every workflow the same answer from every
+    microscope: ``{"success": ..., "report": ...}``. The functions in this
+    module return the report alone, and raise when something goes wrong.
+    ``success`` is therefore True, unless the report says that a change was
+    sent but could not be confirmed (``"confirmed": False``): an outcome that
+    is safe to carry on from, so it is reported rather than raised.
     """
-    try:
-        from zmart_controller.registry import register as _register
-    except Exception:  # noqa: BLE001 - controller optional at import time
-        log.debug("zmart_controller not importable; skipping registration", exc_info=True)
-        return
-    _register(connection or dict(CONNECTION), ops=dict(OPS))
+
+    @functools.wraps(function)
+    def command(*args, **kwargs):
+        report = function(*args, **kwargs)
+        unconfirmed = isinstance(report, dict) and report.get("confirmed") is False
+        return {"success": not unconfirmed, "report": report}
+
+    return command
 
 
-# Import-time registration IS the opt-in: importing this module (which the package
-# ``__init__`` does) makes the mesoSPIM instrument available to zmart_controller
-# with no explicit call, exactly like the Leica adapter. No-op if the controller
-# is not installed.
-register()
+def ops_table() -> dict[str, Any]:
+    """The functions this driver hands to the controller, one per command.
+
+    The plug-in folder ``zmart_controller/`` exposes these by name.
+    ``connect`` and ``disconnect`` are handed over unchanged. Every other
+    command is wrapped so that, called through the controller, it answers
+    ``{"success": ..., "report": ...}``. Called directly from this module,
+    the same functions return the report alone.
+    """
+    functions = {
+        "connect": connect,
+        "disconnect": disconnect,
+        "get_acquisition_options": get_acquisition_options,
+        "get_actuators": get_actuators,
+        "get_xyz": get_xyz,
+        "set_xyz": set_xyz,
+        "acquire": acquire,
+        "get_state": get_state,
+        "set_state": set_state,
+        "get_procedures": get_procedures,
+        "run_procedure": run_procedure,
+        "get_info": get_info,
+    }
+    return {
+        name: _answered(function) if name in _ANSWERING_OPS else function
+        for name, function in functions.items()
+    }

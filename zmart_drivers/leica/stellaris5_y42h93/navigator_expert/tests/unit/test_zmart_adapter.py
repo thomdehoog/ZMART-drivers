@@ -20,10 +20,22 @@ from limits_fixtures import (
     install_permissive_limits,
     provision_machine_limits,
 )
-from navigator_expert.commands import gate as _gate
-from navigator_expert.limits import checks as limits_checks
-from navigator_expert.readers import parsing as _readers_parsing
-from navigator_expert.zmart_adapter import zmart_adapter as adapter
+
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.commands import (
+    gate as _gate,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.limits import (
+    checks as limits_checks,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.readers import (
+    parsing as _readers_parsing,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.zmart_adapter import (
+    zmart_adapter as adapter,
+)
+
+# The driver folder, as an operator passes it to zmart_controller.register_driver.
+_DRIVER_DIR = Path(adapter.__file__).resolve().parents[1]
 
 
 def _origin(x_um=0.0, y_um=0.0, z_wide_um=0.0, z_galvo_um=0.0, z_focus_um=0.0, objective=None):
@@ -105,20 +117,27 @@ class TestRegistration(unittest.TestCase):
     def test_connection_profile_does_not_select_operator_calibration(self):
         self.assertNotIn("calibration_name", adapter.CONNECTION)
 
-    def test_importing_the_adapter_registers_the_instrument(self):
-        from zmart_controller import registry
+    def test_registering_the_driver_folder_registers_the_instrument(self):
+        from zmart_controller import utils
 
-        entry = registry.REGISTRY.get(("leica", "stellaris5-y42h93", "navigator-expert"))
-        self.assertIsNotNone(entry, "adapter import must register the instrument")
-        for op in registry.OPS:
+        added = utils.register_driver(_DRIVER_DIR, remember=False)
+        self.assertEqual(added, [adapter.CONNECTION])
+        entry = utils.REGISTRY.get(("leica", "stellaris5-y42h93", "navigator-expert"))
+        self.assertIsNotNone(entry, "register_driver must register the instrument")
+        for op in utils.OPS:
             self.assertIn(op, entry["ops"])
         self.assertIn("disconnect", entry["ops"])
 
+    def test_importing_the_adapter_registers_nothing(self):
+        source = Path(adapter.__file__).read_text(encoding="utf-8")
+        self.assertNotIn("zmart_controller import", source)
+
     def test_set_origin_is_a_driver_step_not_a_controller_op(self):
         """The origin is driver configuration: the controller cannot set it."""
-        from zmart_controller import registry
+        from zmart_controller import utils
 
-        entry = registry.REGISTRY.get(("leica", "stellaris5-y42h93", "navigator-expert"))
+        utils.register_driver(_DRIVER_DIR, remember=False)
+        entry = utils.REGISTRY.get(("leica", "stellaris5-y42h93", "navigator-expert"))
         self.assertNotIn("set_origin", entry["ops"])
         self.assertTrue(callable(adapter.set_origin))
 
@@ -128,8 +147,12 @@ class TestCalibrationSelection(unittest.TestCase):
         # The driver now owns loading: the named calibration flows through
         # connect_microscope -> session._load_objective_calibration, where one
         # exact document supplies both translations and readiness provenance.
-        from navigator_expert.calibration.core import model as cal_model
-        from navigator_expert.connection import session as drv_session
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.calibration.core import (
+            model as cal_model,
+        )
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.connection import (
+            session as drv_session,
+        )
 
         cfg = {
             "schema_version": 13,
@@ -158,8 +181,12 @@ class TestCalibrationSelection(unittest.TestCase):
 
     def test_translations_and_provenance_come_from_one_calibration_read(self):
         """A snapshot adoption during connect cannot mix old math with new proof."""
-        from navigator_expert.calibration.core import model as cal_model
-        from navigator_expert.connection import session as drv_session
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.calibration.core import (
+            model as cal_model,
+        )
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.connection import (
+            session as drv_session,
+        )
 
         old = {
             "schema_version": 13,
@@ -217,7 +244,10 @@ class TestFrame(unittest.TestCase):
         import json
         import tempfile
 
-        from navigator_expert.config.machine import MachineProfile, is_snapshot_name
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.config.machine import (
+            MachineProfile,
+            is_snapshot_name,
+        )
 
         with tempfile.TemporaryDirectory() as tmp:
             profile = MachineProfile(programdata_root=Path(tmp))
@@ -255,7 +285,9 @@ class TestFrame(unittest.TestCase):
         """The newest saved origin, objective included, becomes the session's frame."""
         import tempfile
 
-        from navigator_expert.config.machine import MachineProfile
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.config.machine import (
+            MachineProfile,
+        )
 
         objective = {"slotIndex": 2, "magnification": 63, "name": "HC PL APO 63x"}
         with tempfile.TemporaryDirectory() as tmp:
@@ -282,7 +314,9 @@ class TestFrame(unittest.TestCase):
         """What set_origin captures is exactly what the next connect loads."""
         import tempfile
 
-        from navigator_expert.config.machine import MachineProfile
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.config.machine import (
+            MachineProfile,
+        )
 
         with tempfile.TemporaryDirectory() as tmp:
             profile = MachineProfile(programdata_root=Path(tmp))
@@ -303,7 +337,9 @@ class TestFrame(unittest.TestCase):
         """No origin saved yet: the frame is the absolute stage, with a warning."""
         import tempfile
 
-        from navigator_expert.config.machine import MachineProfile
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.config.machine import (
+            MachineProfile,
+        )
 
         with tempfile.TemporaryDirectory() as tmp:
             profile = MachineProfile(programdata_root=Path(tmp))
@@ -316,7 +352,9 @@ class TestFrame(unittest.TestCase):
         """A damaged origin file stops connect before LAS X is contacted."""
         import tempfile
 
-        from navigator_expert.config.machine import MachineProfile
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.config.machine import (
+            MachineProfile,
+        )
 
         with tempfile.TemporaryDirectory() as tmp:
             profile = MachineProfile(programdata_root=Path(tmp))
@@ -334,7 +372,9 @@ class TestFrame(unittest.TestCase):
         """An origin missing a value or its objective is refused, not zero-filled."""
         import tempfile
 
-        from navigator_expert.config.machine import MachineProfile
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.config.machine import (
+            MachineProfile,
+        )
 
         broken = [
             ({"origin": {"x_um": 5}}, "'y_um'"),
@@ -355,7 +395,9 @@ class TestFrame(unittest.TestCase):
         """load_origin=False starts in stage coordinates, even over a damaged file."""
         import tempfile
 
-        from navigator_expert.config.machine import MachineProfile
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.config.machine import (
+            MachineProfile,
+        )
 
         with tempfile.TemporaryDirectory() as tmp:
             profile = MachineProfile(programdata_root=Path(tmp))
@@ -793,7 +835,9 @@ class TestAcquire(unittest.TestCase):
         """
         from datetime import datetime, timezone
 
-        from navigator_expert.config.machine import MachineProfile
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.config.machine import (
+            MachineProfile,
+        )
 
         h = _handle(connection={**adapter.CONNECTION, "output_root": "/tmp/out"})
         seen = {}
@@ -1915,6 +1959,7 @@ class TestLifecycle(unittest.TestCase):
 
         import zmart_controller
 
+        zmart_controller.register_driver(_DRIVER_DIR, remember=False)
         _clear_limits()
         self.addCleanup(_clear_limits)
         provision_machine_limits(os.environ["ZMART_MICROSCOPY_ROOT"])
@@ -1974,7 +2019,7 @@ class TestLifecycle(unittest.TestCase):
 
     def test_the_ops_table_wraps_every_answering_command(self):
         """connect and disconnect are handed over as they are; the rest are wrapped."""
-        from zmart_controller.registry import OPS
+        from zmart_controller.utils import OPS
 
         table = adapter.ops_table()
         self.assertIs(table["connect"], adapter.connect)
@@ -1998,7 +2043,9 @@ class TestFunctionLimits(unittest.TestCase):
 
     def test_bundled_template_covers_every_declared_key(self):
         """THE completeness guard on the template: a new key cannot ship absent."""
-        from navigator_expert.limits import config as limits_config
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.limits import (
+            config as limits_config,
+        )
 
         path = adapter._machine.MACHINE.bundled_default_path(adapter._machine.LIMITS_FILENAME)
         payload = limits_config.validate_payload(json.loads(path.read_text(encoding="utf-8")))

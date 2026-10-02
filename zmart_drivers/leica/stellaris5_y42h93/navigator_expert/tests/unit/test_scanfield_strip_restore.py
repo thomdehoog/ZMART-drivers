@@ -5,8 +5,11 @@ from __future__ import annotations
 import shutil
 
 import pytest
-from navigator_expert.scanfields import strip_restore
-from navigator_expert.scanfields.files import (
+
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.scanfields import (
+    strip_restore,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.scanfields.files import (
     STRIPPED_LRP,
     STRIPPED_RGN,
     STRIPPED_XML,
@@ -239,7 +242,7 @@ def test_strip_template_warns_when_xml_strip_is_incomplete(bundle_dir, patch_las
     text = xml_path.read_text(encoding="utf-8") + '<ScanFields><ScanFieldData X="1" />'
     xml_path.write_text(text, encoding="utf-8")
     patch_lasx()
-    with caplog.at_level("WARNING", logger="navigator_expert.scanfields.strip_restore"):
+    with caplog.at_level("WARNING", logger="zmart_drivers.leica.stellaris5_y42h93.navigator_expert.scanfields.strip_restore"):
         assert strip_restore.strip_template(object(), save_timeout=1) is None
     assert any("Strip incomplete" in m for m in caplog.messages)
 

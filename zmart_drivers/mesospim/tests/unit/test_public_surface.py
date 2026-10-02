@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-import mesospim
+import zmart_drivers.mesospim as mesospim
 
 
 def test_version_present():
@@ -23,7 +23,6 @@ def test_key_functions_exposed():
         "set_filter",
         "acquire",
         "save",
-        "register",
         "load_stage_config",
     ):
         assert callable(getattr(mesospim, name))
@@ -35,18 +34,3 @@ def test_connect_close_via_public_api(server):
         assert mesospim.ping(client)
     finally:
         mesospim.close(client)
-
-
-def test_register_is_safe_without_controller(monkeypatch):
-    # register() must not raise even if zmart_controller import fails.
-    import builtins
-
-    real_import = builtins.__import__
-
-    def block(name, *a, **k):
-        if name.startswith("zmart_controller"):
-            raise ImportError("blocked")
-        return real_import(name, *a, **k)
-
-    monkeypatch.setattr(builtins, "__import__", block)
-    mesospim.register({"vendor": "mesospim", "microscope": "x", "api": "remote-scripting"})

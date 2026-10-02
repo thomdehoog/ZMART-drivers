@@ -5,14 +5,12 @@ from pathlib import Path
 
 import pytest
 
-# Add the vendor dir (parent of zenapi) so `import zenapi` works regardless of
-# where pytest is invoked from, and the repo root so `zmart_controller` does.
+# Add the repository root so the driver imports by its full name,
+# zmart_drivers.zeiss.zenapi, even when the repository is not pip-installed.
 # parents: [0]=tests [1]=zenapi [2]=zeiss [3]=zmart_drivers [4]=repo root.
-_ZEISS_DIR = Path(__file__).resolve().parents[2]
 _REPO_ROOT = Path(__file__).resolve().parents[4]
-for entry in (_ZEISS_DIR, _REPO_ROOT):
-    if str(entry) not in sys.path:
-        sys.path.insert(0, str(entry))
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
 
 # Add the helpers dir so `import mock_zen_api` works.
 _HELPERS = Path(__file__).resolve().parent / "helpers"

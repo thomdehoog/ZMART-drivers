@@ -11,7 +11,7 @@
 ;                tray icon (right-click -> copy token) or from
 ;                %PROGRAMDATA%\Carl Zeiss\ZEN APIGateway\GlobalControlToken.txt
 ;
-; Working without a microscope? `python -m zenapi.simulator` writes a ready
+; Working without a microscope? `python -m zmart_drivers.zeiss.zenapi.simulator` writes a ready
 ; config.ini for the fake gateway; use that file instead.
 [api]
 host = 127.0.0.1

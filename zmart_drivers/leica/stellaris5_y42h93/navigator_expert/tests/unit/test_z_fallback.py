@@ -15,13 +15,25 @@ from pathlib import Path
 from unittest.mock import patch
 
 import pytest
-from navigator_expert import readers
-from navigator_expert.commands import commands, confirmations
-from navigator_expert.readers import derived
-from navigator_expert.readers.derived import z_um_from_settings
-from navigator_expert.readers.parsing import make_changeable_copy
-from navigator_expert.scanfields.lrp import parse_lrp
-from navigator_expert.zmart_adapter import zmart_adapter as adapter
+
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert import readers
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.commands import (
+    commands,
+    confirmations,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.readers import derived
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.readers.derived import (
+    z_um_from_settings,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.readers.parsing import (
+    make_changeable_copy,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.scanfields.lrp import (
+    parse_lrp,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.zmart_adapter import (
+    zmart_adapter as adapter,
+)
 
 TEST_DATA = Path(__file__).resolve().parents[1] / "data"
 SAVED = TEST_DATA / "z_readback"

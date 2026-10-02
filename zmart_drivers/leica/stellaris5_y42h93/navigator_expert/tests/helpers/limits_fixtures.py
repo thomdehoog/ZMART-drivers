@@ -17,11 +17,19 @@ import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 
-from navigator_expert.commands import gate as _gate
-from navigator_expert.config import profiles
-from navigator_expert.config.machine import MachineProfile
-from navigator_expert.limits import checks as _motion_limits
-from navigator_expert.limits import config as _limits_config
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.commands import (
+    gate as _gate,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.config import profiles
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.config.machine import (
+    MachineProfile,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.limits import (
+    checks as _motion_limits,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.limits import (
+    config as _limits_config,
+)
 
 # The bundled conservative default envelope. The absolute X/Y backstop
 # (limits/checks.py) extends down to coordinate zero, so measured limits may

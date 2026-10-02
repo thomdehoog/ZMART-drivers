@@ -10,8 +10,8 @@ against Unknown status (Unknown is not idle).
 import unittest
 from unittest.mock import patch
 
-from navigator_expert.commands import prechecks
-from navigator_expert.config import profiles
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.commands import prechecks
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.config import profiles
 
 IDLE_GUARDED = [
     "MOVE_XY",

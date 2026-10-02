@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from nis_elements_6_10.bridge.nis_bridge import NisError
+from zmart_drivers.nikon.nis_elements_6_10.bridge.nis_bridge import NisError
 
 
 class FakeNisApi:

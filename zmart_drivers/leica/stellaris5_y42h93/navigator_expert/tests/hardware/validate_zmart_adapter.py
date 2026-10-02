@@ -50,20 +50,18 @@ from pathlib import Path
 from typing import Any
 
 # --- sys.path bootstrap -----------------------------------------------------
-# Put the machine root (for ``navigator_expert``), the repo root (for
-# ``zmart_controller`` / ``shared``), this dir (for ``validate_hardware``), and
-# tests/helpers (for the mock) on the path, regardless of CWD.
+# Put the repository root (for ``zmart_drivers``), this dir (for
+# ``validate_hardware``), and tests/helpers (for the mock) on the path,
+# regardless of CWD.
 _HERE = Path(__file__).resolve()
 _NAV_ROOT = _HERE.parents[2]  # navigator_expert/
-_MACHINE_ROOT = _NAV_ROOT.parent  # .../leica/stellaris5_y42h93
-_REPO_ROOT = _HERE.parents[6]  # repo root (zmart_controller / shared live here)
+_REPO_ROOT = _HERE.parents[6]  # the repository root, which holds zmart_drivers/
 _HELPERS = _NAV_ROOT / "tests" / "helpers"
-for _p in (str(_HERE.parent), str(_MACHINE_ROOT), str(_REPO_ROOT), str(_HELPERS)):
+for _p in (str(_HERE.parent), str(_REPO_ROOT), str(_HELPERS)):
     if _p not in sys.path:
         sys.path.insert(0, _p)
 
 import validate_hardware as vh  # reuse Record/Validator/sink/logging
-
 import zmart_controller
 
 # Readback tolerances: match the driver's own confirmation gates
@@ -86,9 +84,16 @@ CI_DEFAULT_POSITION_UM = {
 
 
 def _register_adapter() -> Any:
-    """Import the adapter (registers on import) and return the implementation module."""
-    from navigator_expert.zmart_adapter import zmart_adapter as adapter  # noqa: PLC0415
+    """Plug the driver into the controller by its folder; return the adapter module.
 
+    The registration is for this run only (``remember=False``), so the
+    validator never adds the driver to this computer's saved driver list.
+    """
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.zmart_adapter import (
+        zmart_adapter as adapter,  # noqa: PLC0415
+    )
+
+    zmart_controller.register_driver(_NAV_ROOT, remember=False)
     return adapter
 
 
@@ -162,7 +167,10 @@ def _connect_session(args: argparse.Namespace, adapter: Any, output_root: str | 
 
         from limits_fixtures import hermetic_mock_machine_root  # noqa: PLC0415
         from mock_lasx_api import MockLasxClient  # noqa: PLC0415
-        from navigator_expert.config import profiles  # noqa: PLC0415
+
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.config import (
+            profiles,  # noqa: PLC0415
+        )
 
         # Use a hermetic ProgramData fixture so the adapter connect's REAL
         # limits handshake succeeds without touching this developer machine.
@@ -694,7 +702,9 @@ def phase_acquire(v: vh.Validator, sess: Any, args: argparse.Namespace) -> None:
         non_empty = all(Path(p).is_file() and Path(p).stat().st_size > 0 for p in images)
         v.compare("acquire: image files exist and are non-empty", non_empty, True)
         if images:
-            from navigator_expert.acquisition import materialize  # noqa: PLC0415
+            from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.acquisition import (
+                materialize,  # noqa: PLC0415
+            )
 
             # The no-sidecar contract means the metadata must be INSIDE the
             # image; prove it on the real produced TIFF (offline tests only
@@ -789,7 +799,7 @@ def main(argv: list[str] | None = None) -> int:
 
     adapter = _register_adapter()
     vh._apply_state_reader_mode(args.state_reader_mode, log)
-    import navigator_expert as drv  # noqa: PLC0415
+    import zmart_drivers.leica.stellaris5_y42h93.navigator_expert as drv  # noqa: PLC0415
 
     output_root = args.output_root
     if args.mock and output_root is None:

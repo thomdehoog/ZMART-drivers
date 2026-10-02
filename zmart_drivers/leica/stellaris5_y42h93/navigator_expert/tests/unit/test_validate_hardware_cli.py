@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 from types import SimpleNamespace
 
-from navigator_expert.config import profiles
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.config import profiles
 
 
 def _load_validator():

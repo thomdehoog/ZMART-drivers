@@ -29,14 +29,29 @@ import os
 from pathlib import Path
 
 import pytest
-from limits_fixtures import DEFAULT_STAGE_UM, merged_limits_payload, provision_machine_limits
+from limits_fixtures import (
+    DEFAULT_STAGE_UM,
+    merged_limits_payload,
+    provision_machine_limits,
+)
 from mock_lasx_api import MockLasxClient
-from navigator_expert.commands import commands as commands_mod
-from navigator_expert.commands import gate
-from navigator_expert.config.machine import MachineProfile
-from navigator_expert.limits import checks as motion_limits
-from navigator_expert.limits import config as limits_config
-from navigator_expert.scanfields import files as scanfield_files
+
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.commands import (
+    commands as commands_mod,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.commands import gate
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.config.machine import (
+    MachineProfile,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.limits import (
+    checks as motion_limits,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.limits import (
+    config as limits_config,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.scanfields import (
+    files as scanfield_files,
+)
 
 DRIVER_ROOT = Path(__file__).resolve().parents[2]
 
@@ -318,9 +333,13 @@ def test_poisoned_pixel_target_cannot_compose_a_nan_galvo_pan(governed_client, p
     LAS X executes."""
     from unittest.mock import patch
 
-    from navigator_expert import readers
-    from navigator_expert.experimental.lrp_edits import scan as lrp_scan
-    from navigator_expert.scanfields import transaction as lrp_transaction
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert import readers
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.experimental.lrp_edits import (
+        scan as lrp_scan,
+    )
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.scanfields import (
+        transaction as lrp_transaction,
+    )
 
     written = []
 
@@ -335,7 +354,7 @@ def test_poisoned_pixel_target_cannot_compose_a_nan_galvo_pan(governed_client, p
         patch.object(readers, "get_job_settings", return_value={"settings": "raw"}),
         patch.object(readers, "get_base_fov", return_value=(0.000512, 0.000512)),
         patch(
-            "navigator_expert.readers.parsing.parse_tile_geometry",
+            "zmart_drivers.leica.stellaris5_y42h93.navigator_expert.readers.parsing.parse_tile_geometry",
             return_value={"pixel_w_um": 1.0, "pixels_x": 512},
         ),
         patch.object(lrp_scan, "lrp_get_pan", return_value=(0.0, 0.0)),
@@ -543,7 +562,7 @@ def test_absent_setter_falls_back_but_explicit_empty_list_is_unlimited(mock_clie
 def test_reads_work_without_a_handshake_while_mutations_refuse(mock_client):
     """No handshake == read-only session, not a dead session. Reads never touch
     the gate; mutations refuse fail-closed until a handshake runs."""
-    import navigator_expert as drv
+    import zmart_drivers.leica.stellaris5_y42h93.navigator_expert as drv
 
     # This client never handshook — the one path that stays fail-closed.
     assert gate.state_for(mock_client) is None
@@ -797,8 +816,12 @@ def test_adapter_bypass_refuses_at_the_commands_layer(clear_stage_limits):
     not a missing handshake."""
     from unittest.mock import patch
 
-    from navigator_expert.readers import parsing as _cmd_settings
-    from navigator_expert.zmart_adapter import zmart_adapter as adapter
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.readers import (
+        parsing as _cmd_settings,
+    )
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.zmart_adapter import (
+        zmart_adapter as adapter,
+    )
 
     _raw_snapshot(_machine_root(), limits_text=_BAD_LIMITS_TEXTS["missing_axis"])
     client = MockLasxClient(latency=0.0)
@@ -829,11 +852,16 @@ def test_controller_session_bypass_refuses_at_the_commands_layer(clear_stage_lim
     an out-of-envelope move still refuses at the commands layer."""
     from unittest.mock import patch
 
-    from navigator_expert.readers import parsing as _cmd_settings
-    from navigator_expert.zmart_adapter import zmart_adapter as adapter
-
     import zmart_controller
 
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.readers import (
+        parsing as _cmd_settings,
+    )
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.zmart_adapter import (
+        zmart_adapter as adapter,
+    )
+
+    zmart_controller.register_driver(Path(adapter.__file__).resolve().parents[1], remember=False)
     _raw_snapshot(_machine_root(), limits_text=_BAD_LIMITS_TEXTS["missing_axis"])
     client = MockLasxClient(latency=0.0)
     settings = {
@@ -1024,7 +1052,9 @@ def test_backlash_is_not_config_and_the_primitive_uses_its_default_params():
     there is no config path (and so no NaN-backlash path) left in limits."""
     import inspect
 
-    from navigator_expert.commands import routines as movement
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.commands import (
+        routines as movement,
+    )
 
     profile = provision_machine_limits(_machine_root())
     limits_path = profile.latest_snapshot("limits") / "limits.json"

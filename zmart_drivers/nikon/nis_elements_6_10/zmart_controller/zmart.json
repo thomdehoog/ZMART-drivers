@@ -1,0 +1,12 @@
+{
+  "contract": 1,
+  "instruments": [
+    {
+      "vendor": "nikon",
+      "microscope": "ti2-simulator",
+      "api": "nis-elements-bridge",
+      "host": "127.0.0.1",
+      "port": 54468
+    }
+  ]
+}

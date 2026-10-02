@@ -2,7 +2,8 @@
 
 import pytest
 from mock_zen_api import build_fake_client
-from zenapi.commands.dispatch import confirm_and_fire
+
+from zmart_drivers.zeiss.zenapi.commands.dispatch import confirm_and_fire
 
 
 @pytest.fixture

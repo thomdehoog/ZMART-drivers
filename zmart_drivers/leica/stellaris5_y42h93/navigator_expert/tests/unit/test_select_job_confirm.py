@@ -16,10 +16,13 @@ import time
 import unittest
 from unittest.mock import patch
 
-from navigator_expert import readers as readers
-from navigator_expert.commands import confirm_select_job, confirmations
-from navigator_expert.config import profiles
-from navigator_expert.readers import log_wait
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert import readers as readers
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.commands import (
+    confirm_select_job,
+    confirmations,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.config import profiles
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.readers import log_wait
 
 
 def _poll_result(success, value=None, reason="matched"):

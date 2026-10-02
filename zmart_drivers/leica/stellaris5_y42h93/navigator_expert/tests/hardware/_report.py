@@ -62,7 +62,7 @@ def confirmation_of(result: dict) -> str:
     return "success"  # command has no readback confirmation concept
 
 
-_ENVELOPE_LOG = logging.getLogger("navigator_expert.envelope")
+_ENVELOPE_LOG = logging.getLogger("zmart_drivers.leica.stellaris5_y42h93.navigator_expert.envelope")
 _ENVELOPE_LEVELS = {
     "debug": logging.DEBUG,
     "info": logging.INFO,

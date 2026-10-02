@@ -1,0 +1,96 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "zmart-drivers"
+dynamic = ["version"]
+description = "Drivers that connect the ZMART Controller to real microscopes."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "Thom de Hoog", email = "thom.dehoog@zmb.uzh.ch" }]
+# Every driver plugs into the ZMART Controller. It is not on PyPI, so it is
+# installed from its own repository.
+dependencies = [
+    "zmart-controller @ git+https://github.com/thomdehoog/ZMART-controller",
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering :: Image Acquisition",
+]
+
+# What each driver needs beyond the controller. Install only the one for your
+# microscope, for example: pip install -e ".[leica]". The Nikon and mesoSPIM
+# drivers need nothing extra.
+[project.optional-dependencies]
+# The Leica driver: images and their metadata (numpy, tifffile), the setup
+# notebooks for orientation and objective calibration (scipy, scikit-image,
+# opencv, matplotlib, pillow, ipython), and pythonnet, which loads Leica's
+# LAS X interface. LAS X runs on Windows only, so pythonnet is installed there.
+leica = [
+    "numpy>=1.24",
+    "tifffile>=2024.1",
+    "scipy>=1.10",
+    "scikit-image>=0.21",
+    "opencv-python-headless>=4.8",
+    "matplotlib>=3.7",
+    "pillow>=10",
+    "ipython>=8",
+    "pythonnet>=3; sys_platform == 'win32'",
+]
+# The ZEISS driver speaks gRPC through grpclib. ZEISS's own zen_api package is
+# not on PyPI and must match the ZEN version; install it from
+# zmart_drivers/zeiss/zenapi/requirements.txt.
+zeiss = [
+    "grpclib>=0.4.7",
+]
+# What the offline test suites need on top of the drivers' own extras.
+test = [
+    "pytest>=8",
+    "pytest-cov>=5",
+    "ruff>=0.6",
+    "numpy>=1.24",
+    "tifffile>=2024.1",
+    "ome-types>=0.5",
+    "lxml>=4.9",
+    "cryptography",
+]
+
+[project.urls]
+Homepage = "https://github.com/thomdehoog/ZMART-drivers"
+Controller = "https://github.com/thomdehoog/ZMART-controller"
+
+[tool.setuptools.dynamic]
+version = { attr = "zmart_drivers.__version__" }
+
+[tool.setuptools.packages.find]
+include = ["zmart_drivers*"]
+# Only folders with an __init__.py are packages. That leaves out the spikes
+# (Nikon, Evident), which are investigations rather than drivers, and the
+# test suites, which stay in the repository.
+namespaces = false
+exclude = ["*.tests", "*.tests.*"]
+
+[tool.setuptools]
+# Ship only the data files listed below, never whatever else sits in a folder.
+include-package-data = false
+
+[tool.setuptools.package-data]
+# Data files a driver reads at run time: the plug-in's zmart.json, the bundled
+# default limits, orientation and calibration, the ZEISS config.ini example,
+# and the Leica setup notebooks with their import helper.
+"*" = [
+    "*.json",
+    "defaults/*.json",
+    "notebooks/*.ipynb",
+    "notebooks/_bootstrap.py",
+    "*.example",
+]
+
+[tool.ruff.lint.isort]
+# The drivers import each other's parts by their full names, zmart_drivers.<...>;
+# sort those as this project's own imports wherever ruff is started from.
+known-first-party = ["zmart_drivers"]

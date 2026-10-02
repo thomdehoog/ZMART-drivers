@@ -31,10 +31,11 @@ from __future__ import annotations
 
 import os
 
-import mesospim as drv
 import pytest
-from mesospim.limits import checks as limits
-from mesospim.protocol import PROTOCOL_VERSION
+
+import zmart_drivers.mesospim as drv
+from zmart_drivers.mesospim.limits import checks as limits
+from zmart_drivers.mesospim.protocol import PROTOCOL_VERSION
 
 pytestmark = pytest.mark.integration
 
@@ -95,7 +96,7 @@ def test_get_state_has_position_and_settings(live_client):
 
 def test_move_absolute_confirms_without_moving(live_client, wide_limits):
     """Exercise the move+confirm plumbing with zero net motion (stage-safe)."""
-    from mesospim import commands as cmd
+    from zmart_drivers.mesospim import commands as cmd
 
     pos = drv.get_positions(live_client)
     targets = {a: float(pos[a]) for a in ("x", "y", "z") if pos.get(a) is not None}

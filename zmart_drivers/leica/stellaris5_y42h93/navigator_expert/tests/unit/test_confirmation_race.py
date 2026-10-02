@@ -24,10 +24,12 @@ import time
 import unittest
 from unittest.mock import patch
 
-from navigator_expert import readers
-from navigator_expert.commands import confirmations
-from navigator_expert.config import profiles
-from navigator_expert.readers import router
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert import readers
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.commands import (
+    confirmations,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.config import profiles
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.readers import router
 
 
 def _ok(msg="ok"):

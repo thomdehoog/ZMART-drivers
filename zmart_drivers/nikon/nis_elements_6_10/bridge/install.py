@@ -5,7 +5,7 @@ NIS-Elements macros cannot find out where this repository lives, so the
 macros that start and stop the bridge carry the folder path as a literal. This
 small script writes them with the right path for the machine it runs on::
 
-    python -m nis_elements_6_10.bridge.install
+    python -m zmart_drivers.nikon.nis_elements_6_10.bridge.install
 
 It prints where the macros were written; run ``start_bridge.mac`` from NIS
 (*Macro ▸ Run Macro From File…*). The generated ``.mac`` files are ignored by
@@ -27,18 +27,20 @@ import argparse
 from pathlib import Path
 
 BRIDGE_DIR = Path(__file__).resolve().parent
-PACKAGE_DIR = BRIDGE_DIR.parent  # the folder that holds nis_elements_6_10/
-DRIVERS_NIKON_DIR = PACKAGE_DIR.parent
+PACKAGE_DIR = BRIDGE_DIR.parent  # nis_elements_6_10/
+# The repository root, the folder that holds zmart_drivers/. NIS-Elements' own
+# Python gets it on its search path, so the bridge imports by its full name.
+REPO_DIR = PACKAGE_DIR.parents[2]
 
 START_TEMPLATE = """WaitText(1, "ZMART bridge: starting");
-Python_RunString("import sys; p = r'{nikon_dir}'; sys.path.insert(0, p) if p not in sys.path else None; import importlib, nis_elements_6_10.bridge.nis_bridge as b; importlib.reload(b); import nis; nis.log(b.start(port={port}))");
+Python_RunString("import sys; p = r'{repo_dir}'; sys.path.insert(0, p) if p not in sys.path else None; import importlib, zmart_drivers.nikon.nis_elements_6_10.bridge.nis_bridge as b; importlib.reload(b); import nis; nis.log(b.start(port={port}))");
 WaitText(1, "ZMART bridge: running on port {port} - stop with stop_bridge.mac");
 while (ExistFile("{stop_file}") == 0)
 {{
-    Python_RunString("import nis_elements_6_10.bridge.nis_bridge as b; b.pump(0.05)");
+    Python_RunString("import zmart_drivers.nikon.nis_elements_6_10.bridge.nis_bridge as b; b.pump(0.05)");
     Wait(0.01);
 }}
-Python_RunString("import nis_elements_6_10.bridge.nis_bridge as b; import nis; nis.log(b.stop())");
+Python_RunString("import zmart_drivers.nikon.nis_elements_6_10.bridge.nis_bridge as b; import nis; nis.log(b.stop())");
 WaitText(2, "ZMART bridge: stopped");
 """
 
@@ -52,10 +54,10 @@ def _mac_literal(path: Path) -> str:
     return str(path).replace("\\", "\\\\")
 
 
-def render(nikon_dir: Path, stop_file: Path, port: int) -> tuple[str, str]:
+def render(repo_dir: Path, stop_file: Path, port: int) -> tuple[str, str]:
     """The text of the start and stop macros for the given folders."""
     values = {
-        "nikon_dir": _mac_literal(nikon_dir),
+        "repo_dir": _mac_literal(repo_dir),
         "stop_file": _mac_literal(stop_file),
         "port": int(port),
     }
@@ -67,7 +69,7 @@ def install(target_dir: Path | None = None, port: int = 54468) -> tuple[Path, Pa
     target_dir = Path(target_dir) if target_dir else BRIDGE_DIR
     target_dir.mkdir(parents=True, exist_ok=True)
     stop_file = BRIDGE_DIR / "bridge.stop"
-    start_text, stop_text = render(DRIVERS_NIKON_DIR, stop_file, port)
+    start_text, stop_text = render(REPO_DIR, stop_file, port)
     start_path = target_dir / "start_bridge.mac"
     stop_path = target_dir / "stop_bridge.mac"
     # NIS macros are plain text; CRLF line ends match what its editor writes.

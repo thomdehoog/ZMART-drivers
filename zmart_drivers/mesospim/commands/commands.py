@@ -27,8 +27,8 @@ from functools import partial
 
 from ..config.profiles import SET_STATE
 from ..readers.readers import _reading_value_after, get_state
-from .envelope import _fail
 from .dispatch import confirm_and_fire
+from .envelope import _fail
 
 log = logging.getLogger(__name__)
 
