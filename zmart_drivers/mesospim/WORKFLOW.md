@@ -119,7 +119,7 @@ sess.run_procedure({"name": "move_focus", "value": 5100.0})
 
 # Acquire one frame at a labelled position; returns the written files.
 r = sess.acquire("snap", "A1", options={"format": "ome-tiff"})
-#   → r["report"] = {'image_files': [...snap_A1.tiff], 'metadata_file': [...snap_A1.json], 'planes': 1, ...}
+#   → r["report"] = {'files': [...snap_A1.tiff, ...snap_A1.json], 'metadata_file': ...snap_A1.json, 'planes': 1, ...}
 
 sess.disconnect()
 ```

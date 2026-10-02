@@ -124,7 +124,8 @@ def test_acquire_snap_copies_czi_into_data_folder(handle, scope_box, tmp_path):
         handle, acquisition_type="overview", position_label="tile 3/a", options={"timeout_s": 2}
     )
     dst = tmp_path / "out" / "data" / "overview_tile_3_a.czi"
-    assert rec["image_files"] == [str(dst)] and dst.exists()
+    assert rec["files"] == [str(dst)] and dst.exists()
+    assert "image_files" not in rec
     assert rec["copied"] is True and rec["mode"] == "snap"
     assert rec["zen_image_path"] == str(tmp_path / "zen_images" / "overview_tile_3_a.czi")
     assert scope_box["scope"].calls[-1] == ("run_snap", "exp::ZMART_Snap", "overview_tile_3_a")
@@ -153,7 +154,7 @@ def test_acquire_leaves_czi_on_zen_when_folder_unreachable(handle, scope_box, tm
     )
     assert time.perf_counter() - t0 < 5  # an absent folder is reported at once, not waited for
     assert rec["copied"] is False
-    assert rec["image_files"] == [rec["zen_image_path"]]
+    assert rec["files"] == [rec["zen_image_path"]]
 
 
 def test_same_experiment_is_not_loaded_twice(handle, scope_box):

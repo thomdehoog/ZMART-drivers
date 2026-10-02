@@ -119,7 +119,7 @@ def test_set_xyz_zero_net_motion_confirms(session):
 )
 def test_acquire_through_session(session, tmp_path):
     result = session.acquire("snap", "A1")["report"]
-    files = result.get("image_files") or []
-    assert files, f"no image files in acquire result: {result!r}"
+    files = result.get("files") or []
+    assert files, f"no files in acquire result: {result!r}"
     for path in files:
-        assert os.path.isfile(path), f"reported image file missing: {path}"
+        assert os.path.isfile(path), f"reported file missing: {path}"

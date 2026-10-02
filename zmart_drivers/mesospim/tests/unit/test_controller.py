@@ -158,10 +158,12 @@ def test_acquire_captures_and_saves(session, tmp_path):
     record = session.acquire("prescan", "A1", options={"format": "ome-tiff"})["report"]
     assert record["acquisition_type"] == "prescan"
     assert record["planes"] == 1
-    assert record["image_files"]
+    assert "image_files" not in record
     from pathlib import Path
 
-    assert Path(record["image_files"][0]).exists()
+    # Every file saved: the image, then the metadata written beside it.
+    assert record["files"] == [*record["files"][:-1], record["metadata_file"]]
+    assert all(Path(path).exists() for path in record["files"])
 
 
 def test_acquire_stack(session):
@@ -170,14 +172,14 @@ def test_acquire_stack(session):
     ]
     assert record["planes"] == 5
     # A 5-plane stack is one multi-page file (matches the real Tiff writer).
-    assert len(record["image_files"]) == 1
+    assert len(record["files"]) == 2  # the stack and its metadata
 
 
 def test_acquire_cleans_staging_and_does_not_duplicate(session, tmp_path):
     record = session.acquire("prescan", "A1")["report"]
     from pathlib import Path
 
-    out = Path(record["image_files"][0])
+    out = Path(record["files"][0])
     assert out.exists() and out.parent.name == "data"
     # staging is transient: the writer's originals are removed after relocation.
     staging = out.parent.parent / "_staging"
@@ -188,10 +190,10 @@ def test_repeated_same_label_acquire_does_not_overwrite(session):
     r1 = session.acquire("prescan", "A1")["report"]
     r2 = session.acquire("prescan", "A1")["report"]
     # Same type+label twice must yield two distinct saved datasets, not a clobber.
-    assert r1["image_files"][0] != r2["image_files"][0]
+    assert r1["files"][0] != r2["files"][0]
     from pathlib import Path
 
-    assert Path(r1["image_files"][0]).exists() and Path(r2["image_files"][0]).exists()
+    assert Path(r1["files"][0]).exists() and Path(r2["files"][0]).exists()
 
 
 def test_acquire_stack_z_out_of_limits_raises(session):

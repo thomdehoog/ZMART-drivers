@@ -975,7 +975,9 @@ def acquire(
     (``handle.hash6``) rides along only in lineage/provenance. The machine/software state is captured
     and embedded in each saved plane's OME-XML (no sidecar).
 
-    Returns a record with the resolved job/options and the saved image paths.
+    Returns a record with the resolved job/options, ``files`` (every file
+    saved) and ``planes`` (which file holds which channel, z and t, and where
+    on the sample it was taken).
     Raises on any unrecoverable step — job selection, capture, export
     detection, or persistence.
     """
@@ -1054,6 +1056,8 @@ def acquire(
         }
         for ordinal, (index, path) in enumerate(written)
     ]
+    vendor_metadata = [str(path) for path in getattr(saved, "vendor_metadata_paths", ())]
+    printed = [str(path) for path in getattr(saved, "state_paths", ())]
     return {
         "acquisition_type": acquisition_type,
         "position_label": label,
@@ -1062,14 +1066,17 @@ def acquire(
         "acquisition_hash": acquisition_hash,
         "settle": "backlash-corrected" if apply_backlash else "direct",
         "backlash_rounds": backlash_rounds if apply_backlash else 0,
-        # ``images`` stays as the simple compatibility list. ``planes`` is the
-        # lossless manifest workflows need to distinguish channels from z/t.
-        "images": [plane["path"] for plane in planes],
+        # Every file this acquisition saved, under the name the ZMART
+        # Controller's contract fixes, so a workflow finds them on any
+        # microscope: the images, then the vendor's metadata, then the state.
+        "files": list(dict.fromkeys([*(plane["path"] for plane in planes), *vendor_metadata, *printed])),
+        # The manifest a workflow needs to tell channels from z and t, and
+        # where on the sample each plane was taken.
         "planes": planes,
-        "vendor_metadata": [str(path) for path in getattr(saved, "vendor_metadata_paths", ())],
+        "vendor_metadata": vendor_metadata,
         # What the driver printed about this capture: the state, beside the
         # images in ``data/metadata``. A client moving a record moves this too.
-        "metadata": [str(path) for path in getattr(saved, "state_paths", ())],
+        "metadata": printed,
     }
 
 

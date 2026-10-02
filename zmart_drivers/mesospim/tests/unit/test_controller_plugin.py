@@ -85,7 +85,8 @@ def test_every_command_answers_in_the_controller_shape(instrument):
     for name, answer in answers.items():
         assert set(answer) == {"success", "report"}, name
         assert answer["success"] is True, name
-    assert Path(answers["acquire"]["report"]["image_files"][0]).is_file()
+    assert zmart_controller.check_acquire_answer(answers["acquire"]) == []
+    assert Path(answers["acquire"]["report"]["files"][0]).is_file()
 
 
 def test_get_info_describes_the_microscope_in_plain_words(instrument):

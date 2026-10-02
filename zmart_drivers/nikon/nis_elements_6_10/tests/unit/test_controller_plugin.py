@@ -82,7 +82,8 @@ def test_every_command_answers_in_the_controller_shape(instrument):
         assert set(answer) == {"success", "report"}, name
         assert answer["success"] is True, name
     assert answers["set_state"]["report"]["applied"]["exposure_ms"] == pytest.approx(20.0)
-    assert Path(answers["acquire"]["report"]["image_files"][0]).is_file()
+    assert zmart_controller.check_acquire_answer(answers["acquire"]) == []
+    assert Path(answers["acquire"]["report"]["files"][0]).is_file()
 
 
 def test_failures_are_raised_not_reported(instrument):
