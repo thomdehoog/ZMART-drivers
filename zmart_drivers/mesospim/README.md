@@ -163,21 +163,15 @@ dependencies. Only the resident server + live `Core` need mesoSPIM-control, whic
 **Windows-only** (Python ≥ 3.12; `requirements-conda-mamba.txt` pins Windows-only packages). `-D` demo mode
 needs **no camera / stage / DAQ hardware** — a bare Windows box or VM is enough.
 
-**Install the driver (import the package):**
+**Install the driver.** From the root folder of this repository, `pip install -e .` installs the
+drivers and the ZMART Controller; the mesoSPIM driver needs nothing else. Then import it by its full name:
 
 ```python
-import sys
-from pathlib import Path
-sys.path.insert(0, str(Path("zmart_drivers").resolve()))   # parent of the mesospim package
-
-import mesospim as drv
+import zmart_drivers.mesospim as drv
 ```
 
-Test/optional dependencies (the client itself needs none of these):
-
-```bash
-pip install -r requirements-dev.txt   # repo-root dev list (covers pytest, numpy, tifffile); PyQt5 optional (validator)
-```
+Test dependencies (the client itself needs none of these): `pip install -e ".[test]"`; PyQt5 is optional
+(for the headless validator).
 
 **Start Remote Scripting on the mesoSPIM PC:**
 
@@ -227,7 +221,7 @@ the acquisition PC, the server is off by default and started by an operator. See
 ## 4. Quick start
 
 ```python
-import mesospim as drv
+import zmart_drivers.mesospim as drv
 
 # 1. Connect to mesoSPIM's Remote Scripting server (handshake + ping-verified).
 client = drv.connect({"host": "127.0.0.1", "port": 42000})
@@ -260,12 +254,17 @@ Through the vendor-neutral controller instead (`import zmart_controller`):
 
 ```python
 import zmart_controller
-import mesospim  # importing the driver registers it (vendor=mesospim, api=remote-scripting)
+
+# Once per computer: plug the driver in by its folder or module name. The
+# controller reads zmart_controller/zmart.json in the driver folder, which
+# names the instrument (vendor=mesospim, microscope=mesospim-01,
+# api=remote-scripting) and where the server listens.
+zmart_controller.register_driver("zmart_drivers.mesospim")
+instrument = next(i for i in zmart_controller.get_instruments() if i["vendor"] == "mesospim")
 
 # Add "token": "…" if the server requires one; host/port default to 127.0.0.1:42000.
-sess = zmart_controller.set_instrument({"vendor": "mesospim", "microscope": "mesospim-01",
-                                        "api": "remote-scripting", "host": "127.0.0.1", "port": 42000})
-sess.set_xyz(10, 20, 5)                             # µm from the saved origin
+sess = zmart_controller.set_instrument(instrument)
+sess.set_xyz(10, 20, 5)                             # µm from the saved origin; answers {"success", "report"}
 sess.acquire("prescan", "A1", options={"format": "ome-tiff"})
 sess.disconnect()
 ```
@@ -276,9 +275,9 @@ configuration, not to a single experiment, so the controller does not offer a `s
 set it once with the driver directly: move the stage to the point you want as zero, then run
 
 ```python
-from mesospim import mesospim_zmart_adapter as adapter
+from zmart_drivers.mesospim import mesospim_zmart_adapter as adapter
 
-handle = adapter.connect({**mesospim.CONNECTION, "host": "127.0.0.1", "port": 42000})
+handle = adapter.connect({**adapter.CONNECTION, "host": "127.0.0.1", "port": 42000})
 adapter.set_origin(handle)                          # the current position is (0, 0, 0) from now on
 adapter.disconnect(handle)
 ```
@@ -424,7 +423,7 @@ Profiles `ACQUISITION`, `CONNECTION`, `HARDWARE` and the exception `LimitError` 
 
 ### Controller & protocol
 ```python
-register(connection=None) -> None                   # register the ops table with zmart_controller (idempotent)
+# zmart_controller.register_driver("zmart_drivers.mesospim") plugs the driver in (see zmart_controller/zmart.json)
 # protocol (advanced callers / server authors):
 Request, Reply, encode_request, parse_request, parse_reply, PROTOCOL_VERSION
 ```
@@ -448,7 +447,8 @@ zmart_drivers/mesospim/
 ├── acquisition/    product.py   typed results     capture.py  build/acquire/snap/run_acquisition_list
 │                   save.py      relocate the writer's frames into <output_root>/data/ + JSON sidecar
 │                   connection/scripts.py  the injected-script templates (the mesoSPIM vocabulary, client-side)
-├── mesospim_zmart_adapter.py  ZMART controller adapter — ops table (connect, set_xyz, acquire, get/set_state, …); registers at import
+├── mesospim_zmart_adapter.py  ZMART controller adapter — one function per command (connect, set_xyz, acquire, get/set_state, …)
+├── zmart_controller/          the plug-in folder the controller reads (zmart.json names the instrument)
 ├── pull_request/   the upstream mesoSPIM Remote Scripting patch (GPL) + PROTOCOL.md + demo_client.py
 └── tests/          unit/  offline vs a mock server     integration/  vs mesoSPIM -D demo     helpers/mock_mesospim_server.py
 ```
@@ -503,7 +503,7 @@ deadline, 600 s), and `HARDWARE` (the offline device model / validation referenc
 One self-contained gate ([`run_ci.py`](run_ci.py) — env header + lint + tests + reports), three modes:
 
 ```bash
-pip install -r requirements-dev.txt        # first run only; repo-root dev list (covers pytest, numpy, tifffile)
+pip install -e ".[test]"                   # first run only, from the repository root
 
 python zmart_drivers/mesospim/run_ci.py            # OFFLINE (default, portable): mock-server suite + coverage
 python zmart_drivers/mesospim/run_ci.py online     # ONLINE:  live round-trip vs a running mesoSPIM -D demo
@@ -515,7 +515,7 @@ The two layers it runs, portable to most-faithful:
 1. **Offline suite** — the MIT client vs a **mock Remote Scripting server** over a real socket;
    no mesoSPIM, no hardware. The mock is a *faithful* double: it `exec`s the very injected scripts the driver
    sends against a Core-shaped fake and returns the captured console, so the framing, harness, and command
-   vocabulary are all exercised for real. `python -m pytest zmart_drivers/mesospim/tests` runs it directly
+   vocabulary are all exercised for real. `python -P -m pytest zmart_drivers/mesospim/tests` runs it directly
    (`-m "not integration"` is the default).
 2. **Live round-trip** — the `-m integration` suite against a **running mesoSPIM `-D` demo** (real software,
    Demo backends, no hardware) on `MESOSPIM_HOST`/`MESOSPIM_PORT` (default `127.0.0.1:42000`). It skips
@@ -591,7 +591,7 @@ These **silently misbehave** instead of failing loudly — respect them or resul
 
 ## 13. References
 
-- ZMART controller (the vendor-agnostic surface this driver registers with): [`zmart_controller/`](../../zmart_controller/README.md)
+- ZMART controller (the vendor-agnostic surface this driver plugs into): [ZMART-controller](https://github.com/thomdehoog/ZMART-controller)
 - Sibling drivers: [`zmart_drivers/zeiss/zenapi/`](../zeiss/zenapi/README.md) (gRPC), [`zmart_drivers/leica/stellaris5_y42h93/navigator_expert/`](../leica/stellaris5_y42h93/navigator_expert/README.md) (CAM API), [`zmart_drivers/nikon/`](../nikon/README.md) (socket macro)
 - Remote Scripting bridge (the upstream mesoSPIM patch) & wire framing: [`pull_request/README.md`](pull_request/README.md) · [`pull_request/PROTOCOL.md`](pull_request/PROTOCOL.md)
 - Remaining work & bench-validation notes: [`TODO.md`](TODO.md)

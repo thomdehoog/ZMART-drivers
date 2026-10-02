@@ -46,19 +46,25 @@ Live control requires **LAS X installed** on the acquisition PC, with the Naviga
 directory that contains the CAM assemblies. Offline work (parsing, template edits, tests) needs no
 LAS X.
 
-- **Python 3.10–3.12**, `pythonnet` (loads the .NET CAM assemblies). Offline dev/test deps:
-  `pip install -r zmart_drivers/leica/stellaris5_y42h93/navigator_expert/requirements-dev.txt`.
-- **Import the package** (put the machine dir on `sys.path`):
+- **Python 3.11 or newer** (the ZMART Controller needs it) and `pythonnet`, which loads the .NET
+  CAM assemblies. Install the repository with the Leica extra from its root folder; this also
+  installs the ZMART Controller and `pythonnet` (on Windows):
+  `pip install -e ".[leica]"`. Add `test` for the offline suite: `pip install -e ".[leica,test]"`.
+- **Import the package** by its full name:
   ```python
-  import sys
-  from pathlib import Path
-  sys.path.insert(0, str(Path("zmart_drivers/leica/stellaris5_y42h93").resolve()))
-
-  import navigator_expert as lasx                       # namespace import
-  from navigator_expert import connect_python_client, set_zoom, acquire, save
+  import zmart_drivers.leica.stellaris5_y42h93.navigator_expert as lasx
+  from zmart_drivers.leica.stellaris5_y42h93.navigator_expert import connect_python_client, set_zoom, acquire, save
   ```
   The Leica package is self-contained; its filename helper lives under
   `navigator_expert.acquisition.naming`.
+- **Plug it into the ZMART Controller** once on the LAS X computer, by its folder or module name.
+  The controller reads `zmart_controller/zmart.json` in this folder, which names the instrument and
+  its connect settings:
+  ```python
+  import zmart_controller
+
+  zmart_controller.register_driver("zmart_drivers.leica.stellaris5_y42h93.navigator_expert")
+  ```
 
 ### Machine paths this driver assumes
 
@@ -120,12 +126,12 @@ runtime where possible. Override via the profile, not at call sites.
 ## 4. Quick start
 
 ```python
-from navigator_expert import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert import (
     connect_python_client, ping,
     connect_limits_handshake, select_job, set_zoom, set_scan_speed,
     move_xy, acquire, save,
 )
-from navigator_expert.acquisition.naming import Naming, run_hash
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.acquisition.naming import Naming, run_hash
 
 # 1. Connect and validate the scope
 client = connect_python_client()
@@ -193,7 +199,7 @@ once in a setup step and then reused by every session. During that step the oper
 the driver directly and calls the adapter's `set_origin`:
 
 ```python
-from navigator_expert.zmart_adapter import zmart_adapter as adapter
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.zmart_adapter import zmart_adapter as adapter
 
 handle = adapter.connect(adapter.CONNECTION)
 adapter.set_origin(handle)  # the current position becomes (0, 0, 0)
@@ -439,7 +445,8 @@ zmart_drivers/leica/stellaris5_y42h93/navigator_expert/
 ├── calibration/  objective-pair calibration (data machine-local; defaults/ + notebooks/ inside)
 ├── limits/       config.py · checks.py (envelope + backstop + objective/setter allow-lists) · defaults/ · setup notebook; runtime truth is ProgramData
 ├── orientation/  camera↔stage quarter-turn, applied at save; measured by set_orientation, stored in the machine snapshot next to calibration + limits
-├── zmart_adapter/  ops table plugging this driver into zmart_controller (import to register)
+├── zmart_adapter/  the functions the ZMART Controller calls, one per command
+├── zmart_controller/  the plug-in folder the controller reads (zmart.json names the instrument)
 ├── tests/        unit/ (offline) + hardware/ (validate_*.py live scripts + mock-backed test_* gates)
 └── run_ci.py · pytest.ini   (package root)
 ```
@@ -496,10 +503,10 @@ must never re-send or it would start a duplicate acquisition.
 ## 9. Testing
 
 ```powershell
-# Offline suite (no microscope, no LAS X)
-python -m pip install -r zmart_drivers/leica/stellaris5_y42h93/navigator_expert/requirements-dev.txt
-python -m pytest -q zmart_drivers/leica/stellaris5_y42h93/navigator_expert/tests/unit
-python -m pytest -q zmart_drivers/leica/stellaris5_y42h93/navigator_expert/calibration/tests
+# Offline suite (no microscope, no LAS X), from the repository root
+python -m pip install -e ".[leica,test]"
+python -P -m pytest -q zmart_drivers/leica/stellaris5_y42h93/navigator_expert/tests/unit
+python -P -m pytest -q zmart_drivers/leica/stellaris5_y42h93/navigator_expert/calibration/tests
 
 # Self-contained gates
 python zmart_drivers/leica/stellaris5_y42h93/navigator_expert/run_ci.py             # mock/offline (default)

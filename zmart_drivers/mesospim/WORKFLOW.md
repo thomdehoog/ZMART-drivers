@@ -51,18 +51,21 @@ Validated end to end on **both** v1.20.0 and `release/candidate-py312`.
 ## 2. Point at the driver
 
 The driver is pure standard-library on the client side (sockets + JSON); no heavy
-deps. Put the drivers dir on `PYTHONPATH` (and the repo root for `zmart_controller`):
+deps. Install the ZMART Drivers repository once, from its root folder, which also
+installs the ZMART Controller:
 
-```python
-import sys
-sys.path.insert(0, r"…/ZMART-microscopy")                 # for zmart_controller
-sys.path.insert(0, r"…/ZMART-microscopy/zmart_drivers")   # for `import mesospim`
+```bash
+pip install -e .
 ```
 
-Importing the driver self-registers it with the controller:
+Then plug the driver into the controller, once per computer. The controller reads
+`zmart_controller/zmart.json` in the driver folder, which names the instrument
+(vendor=mesospim, microscope=mesospim-01, api=remote-scripting):
 
 ```python
-import mesospim   # registers instrument (vendor=mesospim, api=remote-scripting)
+import zmart_controller
+
+zmart_controller.register_driver("zmart_drivers.mesospim")
 ```
 
 ## 3. Start the Remote Scripting server
@@ -90,16 +93,15 @@ python zmart_drivers/mesospim/tests/hardware/launch_demo_server.py
 
 ```python
 import zmart_controller
-import mesospim   # registers the instrument at import
 
-sess = zmart_controller.set_instrument({
-    "vendor": "mesospim", "microscope": "mesospim-01", "api": "remote-scripting",
-    "host": "127.0.0.1", "port": 42000, "token": "choose-a-token",   # omit if open
-})
+instrument = next(i for i in zmart_controller.get_instruments() if i["vendor"] == "mesospim")
+sess = zmart_controller.set_instrument({**instrument, "token": "choose-a-token"})   # omit the token if open
+
+# Every answer comes back as {"success": ..., "report": ...}.
 
 sess.get_info()                # identity, initial positions, focus/rotation, output_root
 sess.get_actuators()           # {'x': ['motoric'], 'y': [...], 'z': [...]}
-sess.get_xyz()                 # {'x': {'value','actuator','unit'}, ...} — µm from origin
+sess.get_xyz()                 # report: {'x': {'value','actuator','unit','range'}, ...} — µm from origin
 sess.get_state()               # {'changeable': {laser,intensity,filter,zoom,shutter,etl_*}, 'observed': {...}}
 sess.get_acquisition_options() # {format, planes, z_step, zoom, shutterconfig, backlash_correction}
 
@@ -109,7 +111,7 @@ sess.get_acquisition_options() # {format, planes, z_step, zoom, shutterconfig, b
 sess.set_xyz(50, 0, 10)        # move to x=50 µm, y=0, z=10 (relative to origin)
 
 # Change light-path settings (the 'changeable' block):
-sess.set_state({"laser": "488 nm", "intensity": 20, "filter": "Empty", "zoom": "1x"})
+sess.set_state({"changeable": {"laser": "488 nm", "intensity": 20, "filter": "Empty", "zoom": "1x"}})
 
 # Focus / rotation / autofocus etc. are exposed as procedures:
 sess.get_procedures()                       # move_focus, move_rotation, zero_stage, ...
@@ -117,7 +119,7 @@ sess.run_procedure({"name": "move_focus", "value": 5100.0})
 
 # Acquire one frame at a labelled position; returns the written files.
 r = sess.acquire("snap", "A1", options={"format": "ome-tiff"})
-#   → {'image_files': [...snap_A1.tiff], 'metadata_file': [...snap_A1.json], 'planes': 1, ...}
+#   → r["report"] = {'image_files': [...snap_A1.tiff], 'metadata_file': [...snap_A1.json], 'planes': 1, ...}
 
 sess.disconnect()
 ```
@@ -131,10 +133,9 @@ configuration, not to a single experiment, so the controller does not offer a
 to the point you want as zero, then run
 
 ```python
-import mesospim
-from mesospim import mesospim_zmart_adapter as adapter
+from zmart_drivers.mesospim import mesospim_zmart_adapter as adapter
 
-handle = adapter.connect({**mesospim.CONNECTION, "host": "127.0.0.1", "port": 42000})
+handle = adapter.connect({**adapter.CONNECTION, "host": "127.0.0.1", "port": 42000})
 adapter.set_origin(handle)     # the current position is (0, 0, 0) from now on
 adapter.disconnect(handle)
 ```
@@ -146,7 +147,7 @@ session. Run these lines again whenever you want a new origin.
 ## 4b. Drive it — flat driver (mesoSPIM-specific)
 
 ```python
-import mesospim as drv
+import zmart_drivers.mesospim as drv
 c = drv.connect({"host": "127.0.0.1", "port": 42000, "token": "choose-a-token"})
 
 drv.get_config(c)      # lasers / filters / zooms / camera / app / version
@@ -185,7 +186,7 @@ drv.close(c)
 
 ```powershell
 # offline (no mesoSPIM, no hardware) — mock server exercises the real scripts:
-python zmart_drivers/mesospim/run_ci.py offline          # 130 tests
+python zmart_drivers/mesospim/run_ci.py offline          # 165 tests
 
 # online (needs a live server from §3) — driver + adapter round-trip incl. acquire:
 $env:MESOSPIM_TOKEN = "choose-a-token"; $env:MESOSPIM_ALLOW_ACQUIRE = "1"
