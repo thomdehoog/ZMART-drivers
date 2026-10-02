@@ -4,19 +4,25 @@
 [![license](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 [![status](https://img.shields.io/badge/status-release%20candidate-orange)](#status)
 
-**ZMART drivers** connect the [ZMART Controller](https://github.com/thomdehoog/ZMART-controller)
-to real microscopes. The controller gives every workflow the same short list of commands:
-move in x, y and z, read and apply the microscope's settings, and acquire an image. A driver
-translates those commands into what one particular microscope understands, through that
-vendor's own programming interface.
+<img src="docs/zmart-drivers-icon.png" align="left" width="150" alt="ZMART Drivers">
 
-[ZMART](https://github.com/thomdehoog/ZMART-microscopy) (ZMB's Microscopy-Agnostic Research Toolkit) is the set of tools we use for smart
-microscopy at the Center for Microscopy and Image Analysis (ZMB), University of Zurich.
+The **ZMART Drivers** connect the [ZMART Controller](https://github.com/thomdehoog/ZMART-controller) to real microscopes.
+Each driver translates the controller's short list of commands into what one particular microscope understands, through that vendor's own programming interface.
+It is part of [**ZMART**](https://github.com/thomdehoog/ZMART-microscopy) (ZMB's Microscopy-Agnostic Research Toolkit), the tools we use for smart microscopy
+at the Center for Microscopy and Image Analysis (ZMB), University of Zurich.
+<br clear="left"/>
 
-## What a driver does for you
+## The Problem
 
-A workflow should not have to know which microscope it runs on. The driver takes care of
-everything that is specific to the instrument, so the workflow does not have to:
+Every microscope speaks its own language: its own programming interface, its own names for
+settings, its own habits. A workflow written against one vendor's interface does not run on
+another, and it has to take care of that microscope's safety limits and coordinates itself.
+
+## The Solution
+
+A driver takes care of everything that is specific to the instrument, so the workflow does
+not have to. A workflow talks only to the [ZMART Controller](https://github.com/thomdehoog/ZMART-controller),
+and the driver plugged into it does the rest:
 
 1. **It speaks the vendor's language.** Each microscope has its own interface, its own names
    for settings, and its own habits. The driver hides these behind the controller's commands.
@@ -47,7 +53,9 @@ Drivers are organised by vendor, then by microscope, then by the vendor interfac
 `zmart_drivers/<vendor>/<microscope>/<interface>/`. A single microscope can therefore have
 more than one driver if its vendor offers more than one way in.
 
-## Getting started with the Leica driver
+## Try it yourself
+
+With the Leica driver:
 
 The Leica driver runs on the computer that runs LAS X, because it loads Leica's interface
 directly into Python. Its [README](zmart_drivers/leica/stellaris5_y42h93/navigator_expert/README.md)
@@ -67,7 +75,7 @@ zmart_controller.get_instruments()
 Registering it by folder path does not work yet for this driver; the release candidate review
 explains why (finding L8).
 
-## Status
+### Status
 
 This repository is a **release candidate**. It collects the drivers that are ready to be
 reviewed for release, separately from the rest of ZMART-microscopy. Nothing in it is released
