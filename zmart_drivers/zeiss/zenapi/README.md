@@ -127,16 +127,20 @@ with `microscope`:
 
 ```python
 import zmart_controller
-import zmart_drivers.zeiss.zenapi.driver as zeiss
 
-s = zmart_controller.set_instrument(
-    zeiss,
+# Once, on the microscope computer: add the driver to the controller's list.
+zmart_controller.add_driver(
+    "zeiss",
+    "zmart_drivers.zeiss.zenapi.driver",
     {
         "config": r"C:\zen\config.ini",
         "output_root": r"D:\runs\today",
         "experiment": "ZMART_Snap",
-    }
+    },
 )
+
+# In every session:
+s = zmart_controller.set_instrument("zeiss")
 s.set_xyz(100, -100, 5)              # micrometres from the origin (see "Setting the origin")
 s.acquire(position_label="tile_01")
 s.run_procedure({"name": "software_autofocus"})

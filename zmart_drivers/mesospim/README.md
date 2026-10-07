@@ -254,12 +254,15 @@ Through the vendor-neutral controller instead (`import zmart_controller`):
 
 ```python
 import zmart_controller
-import zmart_drivers.mesospim.driver as mesospim
 
-# Hand the driver module to the controller. Every connection setting is
-# optional: host and port default to 127.0.0.1:42000, and the instrument is
-# called mesospim-01. Add "token": "…" if the server requires one.
-sess = zmart_controller.set_instrument(mesospim)
+# Once, on the microscope computer: add the driver to the controller's list.
+# Every connection setting is optional: host and port default to
+# 127.0.0.1:42000, and the instrument is called mesospim-01. Add
+# {"token": "…"} as a third argument if the server requires one.
+zmart_controller.add_driver("mesospim", "zmart_drivers.mesospim.driver")
+
+# In every session:
+sess = zmart_controller.set_instrument("mesospim")
 sess.set_xyz(10, 20, 5)                             # µm from the saved origin; answers {"success", "content"}
 sess.acquire("A1", acquisition_settings={"format": "ome-tiff"})
 sess.disconnect()
@@ -419,7 +422,7 @@ Profiles `ACQUISITION`, `CONNECTION`, `HARDWARE` and the exception `LimitError` 
 
 ### Controller & protocol
 ```python
-# zmart_controller.set_instrument(zmart_drivers.mesospim.driver) plugs the driver in (see driver.py)
+# zmart_controller.add_driver("mesospim", "zmart_drivers.mesospim.driver") installs it once (see driver.py)
 # protocol (advanced callers / server authors):
 Request, Reply, encode_request, parse_request, parse_reply, PROTOCOL_VERSION
 ```

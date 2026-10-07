@@ -61,16 +61,22 @@ needed. The bridge is a file in this repository that NIS runs from a macro.
    NIS user's temp folder.
 4. **Use the driver from Python.** Install this repository once, from its
    root folder, with `pip install -e .` (this also installs the ZMART
-   Controller; the Nikon driver needs nothing else). Then hand the driver
-   module to the controller. Every connection setting is optional: left out,
-   the driver looks for the bridge on this computer, on port 54468, and saves
-   images to a temporary folder. Here the images go to a folder of your choice:
+   Controller; the Nikon driver needs nothing else). Then add the driver to
+   the controller's list of drivers, once. Every connection setting is
+   optional: left out, the driver looks for the bridge on this computer, on
+   port 54468, and saves images to a temporary folder. Here the images go to a
+   folder of your choice:
 
    ```python
    import zmart_controller
-   import zmart_drivers.nikon.nis_elements_6_10.driver as nikon
 
-   s = zmart_controller.set_instrument(nikon, {"output_root": r"D:\runs\today"})
+   # Once, on the microscope computer:
+   zmart_controller.add_driver(
+       "nikon", "zmart_drivers.nikon.nis_elements_6_10.driver", {"output_root": r"D:\runs\today"}
+   )
+
+   # In every session:
+   s = zmart_controller.set_instrument("nikon")
    s.set_xyz(100, -100, 5)  # micrometres from the origin (see "Setting the origin")
    s.acquire(position_label="tile_01")
    s.disconnect()

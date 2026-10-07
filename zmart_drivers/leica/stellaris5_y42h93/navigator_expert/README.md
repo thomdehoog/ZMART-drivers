@@ -57,13 +57,17 @@ LAS X.
   ```
   The Leica package is self-contained; its filename helper lives under
   `navigator_expert.acquisition.naming`.
-- **Plug it into the ZMART Controller** on the LAS X computer by handing it the driver module,
-  `driver.py` in this folder. Every connection setting is optional; `driver.py` explains each one:
+- **Plug it into the ZMART Controller** on the LAS X computer. Add the driver module,
+  `driver.py` in this folder, to the controller's list of drivers once; from then on every
+  session plugs it in by name. Every connection setting is optional; `driver.py` explains each one:
   ```python
   import zmart_controller
-  import zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver as stellaris
 
-  zmart_controller.set_instrument(stellaris)
+  # Once, on the LAS X computer:
+  zmart_controller.add_driver("stellaris", "zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver")
+
+  # In every session:
+  zmart_controller.set_instrument("stellaris")
   ```
   The package itself is not the driver: it keeps its own lower-level functions, such as
   `acquire`, for notebooks and scripts that work with LAS X directly. In `get_xyz`, each axis
