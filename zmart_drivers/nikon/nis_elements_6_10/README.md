@@ -74,11 +74,11 @@ needed. The bridge is a file in this repository that NIS runs from a macro.
 
    s = zmart_controller.set_instrument({**instrument, "output_root": r"D:\runs\today"})
    s.set_xyz(100, -100, 5)  # micrometres from the origin (see "Setting the origin")
-   s.acquire(acquisition_type="snap", position_label="tile_01")
+   s.acquire(position_label="tile_01")
    s.disconnect()
    ```
 
-   Every answer comes back as `{"success": ..., "report": ...}`.
+   Every answer comes back as `{"success": ..., "content": ...}`.
    Or without the controller, using the driver directly:
 
    ```python
@@ -141,7 +141,7 @@ these lines again whenever you want a new origin.
 | Neutral surface | Nikon meaning |
 |---|---|
 | `get_xyz` / `set_xyz` | XY stage and the main Z (focus) drive, µm, absolute. Every move is checked against the limits NIS-Elements reports (*Devices ▸ Stage limits*) before it is sent. When NIS reports a piezo Z insert, `with_actuators={"z": "piezo"}` drives it instead of the focus drive. |
-| `acquire` | A snapshot (`Capture()`), or a **Z-stack** through NIS's ND acquisition when the acquisition type contains "stack" (`z_start`, `z_end`, `z_step` in µm from the origin). Saved as TIFF, ND2 or OME-TIFF to `<output_root>/data/<type>_<label>.<ext>`, then the NIS window is closed. Options may also select an optical configuration and set the exposure first. |
+| `acquire` | A snapshot (`Capture()`), or a **Z-stack** through NIS's ND acquisition when the acquisition settings give `z_start` and `z_end` (with `z_step`, all in µm from the origin). Saved as TIFF, ND2 or OME-TIFF to `<output_root>/data/<label>.<ext>`, or to `<output_root>/data/<folder>/<label>.<ext>` when the `folder` setting is given, then the NIS window is closed. The settings may also select an optical configuration and set the exposure first. |
 | `get_state` / `set_state` | Changeable: `objective_position` (nosepiece slot, 1-based), `optical_configuration` (by name), `exposure_ms`, `pfs` (on/off, when a PFS is present). Observed: NIS version, objectives, optical configurations, Z drives, PFS status, limits. |
 | `get_procedures` / `run_procedure` | `autofocus` (NIS's image-based focus sweep over `range_um`; reports `frame_z_um`), `live` / `freeze`, `pfs_on` / `pfs_off`. |
 | `get_info` | Initial position, limits, objectives, pixel calibration of the current image, output root. |

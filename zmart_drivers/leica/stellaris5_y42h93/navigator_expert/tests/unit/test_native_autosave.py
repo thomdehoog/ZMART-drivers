@@ -39,7 +39,7 @@ def _identity_rig_orientation(monkeypatch):
 @pytest.fixture
 def naming() -> Naming:
     return Naming(
-        acquisition_type="overview-scan",
+        folder="overview-scan",
         hash6="000001",
         position_label="000003",
     )

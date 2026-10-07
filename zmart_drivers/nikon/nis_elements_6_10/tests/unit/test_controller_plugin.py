@@ -73,17 +73,17 @@ def test_every_command_answers_in_the_controller_shape(instrument):
             "set_xyz": session.set_xyz(0.0, 0.0, 0.0),
             "set_state": session.set_state({"changeable": {"exposure_ms": 20.0}}),
             "run_procedure": session.run_procedure({"name": "live"}),
-            "acquire": session.acquire("prescan", "A1"),
+            "acquire": session.acquire("A1"),
         }
     finally:
         session.disconnect()
 
     for name, answer in answers.items():
-        assert set(answer) == {"success", "report"}, name
+        assert set(answer) == {"success", "content"}, name
         assert answer["success"] is True, name
-    assert answers["set_state"]["report"]["applied"]["exposure_ms"] == pytest.approx(20.0)
+    assert answers["set_state"]["content"]["applied"]["exposure_ms"] == pytest.approx(20.0)
     assert zmart_controller.check_acquire_answer(answers["acquire"]) == []
-    assert Path(answers["acquire"]["report"]["files"][0]).is_file()
+    assert Path(answers["acquire"]["content"]["files"][0]).is_file()
 
 
 def test_failures_are_raised_not_reported(instrument):
@@ -100,8 +100,8 @@ def test_failures_are_raised_not_reported(instrument):
 def test_get_info_describes_the_microscope_in_plain_words(instrument):
     session = zmart_controller.session.set_instrument(instrument)
     try:
-        report = session.get_info()["report"]
-        xyz = session.get_xyz()["report"]
+        report = session.get_info()["content"]
+        xyz = session.get_xyz()["content"]
     finally:
         session.disconnect()
 

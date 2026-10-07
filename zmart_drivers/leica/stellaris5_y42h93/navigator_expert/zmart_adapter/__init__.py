@@ -17,7 +17,7 @@ from .zmart_adapter import (  # noqa: F401 -- re-exported public surface
     acquire,
     connect,
     disconnect,
-    get_acquisition_options,
+    get_acquisition_settings,
     get_actuators,
     get_info,
     get_procedures,

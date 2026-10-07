@@ -68,11 +68,10 @@ def test_state_round_trip(handle, fake_api):
 def test_acquire_saves_into_data_folder(handle, fake_api, tmp_path):
     rec = adapter.acquire(
         handle,
-        acquisition_type="overview",
         position_label="tile 3/a",
-        options={"optical_configuration": "FITC"},
+        acquisition_settings={"folder": "overview", "optical_configuration": "FITC"},
     )
-    path = tmp_path / "out" / "data" / "overview_tile_3_a.tif"
+    path = tmp_path / "out" / "data" / "overview" / "tile_3_a.tif"
     assert rec["files"] == [str(path)] and path.exists()
     assert "image_files" not in rec
     assert rec["planes"] == 1 and fake_api.selected_configuration == "FITC"
@@ -81,7 +80,7 @@ def test_acquire_saves_into_data_folder(handle, fake_api, tmp_path):
 
 def test_acquire_bad_format_is_a_value_error(handle):
     with pytest.raises(ValueError, match="unknown format"):
-        adapter.acquire(handle, acquisition_type="a", position_label="b", options={"format": "png"})
+        adapter.acquire(handle, position_label="b", acquisition_settings={"format": "png"})
 
 
 def test_ops_refuse_after_disconnect(connection):

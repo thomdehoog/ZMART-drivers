@@ -491,20 +491,18 @@ def _require_experiment(handle: ZenHandle, what: str) -> None:
 # acquire (captures and saves)
 # =============================================================================
 
-# What ``acquisition_type`` means here: anything containing one of these runs
-# the whole experiment (tiles, Z-stack, time series); everything else is a snap.
-EXPERIMENT_TYPES = ("experiment", "stack", "z_stack", "zstack", "z-stack", "tiles", "timelapse")
+def get_acquisition_settings(handle: ZenHandle) -> dict:
+    """The acquisition and saving settings this instrument offers, with the active value of each.
 
-
-def get_acquisition_options(handle: ZenHandle) -> dict:
-    """The acquisition + saving options this instrument offers (options + active).
-
+    ``folder`` groups the CZI in a folder of that name inside
+    ``<output_root>/data/`` (empty saves it straight into ``data``),
     ``experiment`` chooses the ZEN experiment (the imaging settings), ``mode``
     a single snap or the whole experiment, ``copy_to_output_root`` whether the
     CZI is copied from ZEN's image folder into ``<output_root>/data/``.
     """
     _require_open(handle)
     return {
+        "folder": {"options": "any text; empty saves straight into data", "active": ""},
         "experiment": {
             "options": _safe(_readers.get_available_experiments, handle.client, default=[]),
             "active": handle.experiment.name if handle.experiment else None,
@@ -516,41 +514,47 @@ def get_acquisition_options(handle: ZenHandle) -> dict:
     }
 
 
-def canonical_stem(acquisition_type: str, position_label: str) -> str:
-    """A file-name stem safe on Windows: ``<type>_<label>`` with odd characters replaced."""
-    raw = f"{acquisition_type}_{position_label}"
+def canonical_stem(folder: str, position_label: str) -> str:
+    """A file-name stem safe on Windows: ``<folder>_<label>`` with odd characters replaced.
+
+    With no folder, the stem is the label alone.
+    """
+    raw = f"{folder}_{position_label}"
     return re.sub(r"[^A-Za-z0-9._-]+", "_", raw).strip("_") or "acquisition"
 
 
 def acquire(
-    handle: ZenHandle, *, acquisition_type: str, position_label: str, options: dict | None = None
+    handle: ZenHandle, *, position_label: str, acquisition_settings: dict | None = None
 ) -> dict:
     """Acquire with the loaded ZEN experiment and bring the CZI into the output folder.
 
-    A snap by default; the whole experiment when ``mode`` is "experiment" or
-    the acquisition type mentions a stack, tiles or a time lapse. ZEN writes
-    ``<type>_<label>.czi`` into its image folder; that file is then copied to
-    ``<output_root>/data/`` (when the ZEN folder is reachable from here). The
-    record names both locations.
+    A snap by default; the whole experiment (Z-stack, tiles, time series) when
+    ``mode`` is "experiment". ZEN writes ``<folder>_<label>.czi`` (or
+    ``<label>.czi`` with no folder) into its image folder; that file is then
+    copied to ``<output_root>/data/<folder>/`` (when the ZEN folder is
+    reachable from here). The record names both locations.
     """
     _require_open(handle)
-    options = dict(options or {})
+    options = dict(acquisition_settings or {})
+    folder = options.get("folder") or ""
+    if not isinstance(folder, str):
+        # A ValueError, like every other unusable acquisition setting.
+        raise ValueError(  # noqa: TRY004
+            f"acquisition setting 'folder' must be text, not {folder!r}"
+        )
     if options.get("experiment"):
         _use_experiment(handle, str(options["experiment"]))
     _require_experiment(handle, "acquire")
     fmt = str(options.get("format", "czi"))
     if fmt != "czi":
         raise ValueError(f"unknown format {fmt!r}; ZEN writes 'czi'")
-    mode = options.get("mode")
-    if mode is None:
-        lowered = str(acquisition_type).lower()
-        mode = "experiment" if any(t in lowered for t in EXPERIMENT_TYPES) else "snap"
+    mode = options.get("mode", "snap")
     if mode not in ("snap", "experiment"):
         raise ValueError(f"unknown mode {mode!r}; choose 'snap' or 'experiment'")
     timeout = float(options.get("timeout_s", 60.0))
 
     started = time.perf_counter()
-    output_name = canonical_stem(acquisition_type, position_label)
+    output_name = canonical_stem(folder, position_label)
     run = _cmd.run_snap if mode == "snap" else _cmd.run_experiment
     result = run(handle.client, handle.experiment, output_name=output_name)
     _raise_if_failed(result, "acquire")
@@ -561,6 +565,8 @@ def acquire(
     files = [str(zen_path)]
     if options.get("copy_to_output_root", True):
         data_dir = handle.output_root / "data"
+        if folder:
+            data_dir = data_dir / canonical_stem(folder, "")
         data_dir.mkdir(parents=True, exist_ok=True)
         dst = data_dir / f"{result['output_name']}.czi"
         if not zen_path.parent.is_dir():
@@ -583,8 +589,8 @@ def acquire(
 
     planes = status.get("images_count")
     return {
-        "acquisition_type": acquisition_type,
         "position_label": position_label,
+        "folder": folder,
         "format": "czi",
         "mode": mode,
         "experiment": handle.experiment.name,
@@ -684,7 +690,7 @@ def get_info(handle: ZenHandle) -> dict:
 # The commands that answer in the controller's shape. connect returns the
 # handle and disconnect returns nothing, so those two are handed over as they are.
 _ANSWERING_OPS = (
-    "get_acquisition_options",
+    "get_acquisition_settings",
     "get_actuators",
     "get_xyz",
     "set_xyz",
@@ -701,18 +707,18 @@ def _answered(function):
     """Wrap a command so it answers the way the controller documents.
 
     The controller promises every workflow the same answer from every
-    microscope: ``{"success": ..., "report": ...}``. The functions in this
-    module return the report alone, and raise when something goes wrong.
-    ``success`` is therefore True, unless the report says that a change was
+    microscope: ``{"success": ..., "content": ...}``. The functions in this
+    module return the content alone, and raise when something goes wrong.
+    ``success`` is therefore True, unless the content says that a change was
     sent but could not be confirmed (``"confirmed": False``): an outcome that
     is safe to carry on from, so it is reported rather than raised.
     """
 
     @functools.wraps(function)
     def command(*args, **kwargs):
-        report = function(*args, **kwargs)
-        unconfirmed = isinstance(report, dict) and report.get("confirmed") is False
-        return {"success": not unconfirmed, "report": report}
+        content = function(*args, **kwargs)
+        unconfirmed = isinstance(content, dict) and content.get("confirmed") is False
+        return {"success": not unconfirmed, "content": content}
 
     return command
 
@@ -723,13 +729,13 @@ def ops_table() -> dict[str, Any]:
     The plug-in folder ``zmart_controller/`` exposes these by name.
     ``connect`` and ``disconnect`` are handed over unchanged. Every other
     command is wrapped so that, called through the controller, it answers
-    ``{"success": ..., "report": ...}``. Called directly from this module,
-    the same functions return the report alone.
+    ``{"success": ..., "content": ...}``. Called directly from this module,
+    the same functions return the content alone.
     """
     functions = {
         "connect": connect,
         "disconnect": disconnect,
-        "get_acquisition_options": get_acquisition_options,
+        "get_acquisition_settings": get_acquisition_settings,
         "get_actuators": get_actuators,
         "get_xyz": get_xyz,
         "set_xyz": set_xyz,

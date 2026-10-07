@@ -127,7 +127,7 @@ def _persist_export(
     """Shared persistence for stable exported source paths.
 
     Flat: each 2-D plane is written directly under
-    ``data_dir(output_root, acquisition_type)`` and its OME-XML is
+    ``data_dir(output_root, folder)`` and its OME-XML is
     embedded (no sidecar companion). *state* is embedded per-plane.
     """
     if cleanup_source and not exported.cleanup_source_supported:
@@ -153,7 +153,7 @@ def _persist_export(
             for idx, image_src in sorted(pos.planes.items()):
                 plane_naming = replace(naming, t=idx.t, c=idx.c, z=idx.z)
                 image_dest = data_dir(
-                    output_root, plane_naming.acquisition_type
+                    output_root, plane_naming.folder
                 ) / build_image_name(plane_naming)
                 image_dest.parent.mkdir(parents=True, exist_ok=True)
 
@@ -215,7 +215,7 @@ def _print_state(state: dict | None, output_root: Path, naming: Naming) -> Path 
 
     if state is None:
         return None
-    destination = state_dir(output_root, naming.acquisition_type) / build_state_name(naming)
+    destination = state_dir(output_root, naming.folder) / build_state_name(naming)
     if not destination.exists():
         _write_json_atomic(destination, state)
     return destination
@@ -232,7 +232,7 @@ def _persist_vendor_metadata(
     # it sits under the same roof rather than beside `data` -- what is beside
     # `data` is what was made from the pixels afterwards, and this was not.
     vendor_dir = (
-        metadata_dir(output_root, naming.acquisition_type)
+        metadata_dir(output_root, naming.folder)
         / "vendor"
         / _safe_component(exported.source_exporter)
     )
@@ -296,7 +296,7 @@ def _rel_posix(p: Path, base: Path) -> str:
 
 def _naming_to_dict(n: Naming) -> dict:
     return {
-        "acquisition_type": n.acquisition_type,
+        "folder": n.folder,
         "hash6": n.hash6,
         "position_label": n.position_label,
         "t": n.t,

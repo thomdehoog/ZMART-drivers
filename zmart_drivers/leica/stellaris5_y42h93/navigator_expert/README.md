@@ -158,7 +158,7 @@ move_xy(client, 65_000, 65_000, unit="um")
 acq = acquire(client, "MyExperiment")                     # -> AcquisitionResult (RAISES on failure)
 
 # 5. Persist with Leica's private naming helper (a separate step from acquire)
-naming = Naming(acquisition_type="overview", hash6=run_hash())
+naming = Naming(folder="overview", hash6=run_hash())
 saved = save(client, acq, output_root="D:/runs/demo", naming=naming)
 print(saved.image_paths)                                  # {PlaneIndex(t,z,c): Path, ...}
 ```
@@ -362,7 +362,7 @@ save(client, acq, output_root, naming, *, lineage=None, fix_ome=True,
 ```
 `save()` collects LAS X native AutoSave output into a neutral product and
 writes canonical single-plane OME-TIFFs with OME-XML embedded in each image.
-They land in `<output_root>/<acquisition_type>/data/`, so what is made from
+They land in `<output_root>/<folder>/data/`, so what is made from
 them later (a stitched view, an analysis) becomes a folder beside `data` and is
 never confused with it. Everything describing the capture is under
 `data/metadata`, one folder per party:
@@ -390,20 +390,21 @@ in place, preserving byte formatting; `acquisition/ome_canonical.py` writes clea
 `save(..., fix_ome=True)` validates/repairs each written file.
 
 **Acquiring empties the scanning template by default.** Through the zmart adapter, every `acquire()`
-(and the autofocus procedure) applies the `strip_scan_fields` acquisition option: operator-drawn scan
+(and the autofocus procedure) applies the `strip_scan_fields` acquisition setting: operator-drawn scan
 fields, regions, and focus points vanish from LAS X. The strip is sidecar-backed — restore with
 `restore_template` — but read `get_info()["tile_positions"]` and `focus_positions`
-*before* the first acquire, or pass `options={"strip_scan_fields": False}`.
+*before* the first acquire, or pass `acquisition_settings={"strip_scan_fields": False}`.
 
-**Extra in-place backlash rounds are off by default.** The acquisition option
+**Extra in-place backlash rounds are off by default.** The acquisition setting
 `backlash_rounds` defaults to `0`; pass a positive whole number to opt in for a
 particular capture. The normal XY move still uses the driver's consistent final
 approach to the requested position.
 
-**`Naming` constraints.** Name parts (`acquisition_type` etc.) must be
-kebab-case lowercase (`"overview"`, `"target-scan"`); `Naming` raises `ValueError` on `"Prescan"` or
-`"target_scan"` — and on the adapter path that raise happens **after the scan has fired**, so the
-capture is wasted. Validate names before acquiring. The adapter's driver-owned helper gives every
+**`Naming` constraints.** The `folder` must be kebab-case lowercase (`"overview"`,
+`"target-scan"`); `Naming` raises `ValueError` on `"Prescan"` or `"target_scan"`. Through the
+adapter, the `folder` acquisition setting (default `"scan"`) is checked before the scan fires, so a
+bad name never wastes a capture. Calling `save()` directly, the raise comes after the capture, so
+validate names before acquiring. The adapter's driver-owned helper gives every
 acquired position a unique hash, and the workflow supplies the `K/M/G/P/V` position label.
 
 ### Templates / scan-fields (offline-capable)

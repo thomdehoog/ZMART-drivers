@@ -93,7 +93,7 @@ def test_save_multiple_source_files_get_plane_suffixes(tmp_path):
         tifffile.imwrite(str(p), np.zeros((8, 8), dtype="uint16"))
         sources.append(p)
     result = AcquisitionResult(
-        acquisition_type="stack",
+        label="stack",
         acquisition={},
         started_at=0.0,
         finished_at=1.0,
@@ -115,7 +115,7 @@ def _result_from(files, planes=1):
     )
 
     return AcquisitionResult(
-        acquisition_type="snap",
+        label="snap",
         acquisition={},
         started_at=0.0,
         finished_at=1.0,

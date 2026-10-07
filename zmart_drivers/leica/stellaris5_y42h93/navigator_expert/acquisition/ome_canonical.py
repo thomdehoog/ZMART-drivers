@@ -369,7 +369,7 @@ def _state_map_entries(state: dict) -> list[tuple[str, str]]:
     provenance = state.get("provenance")
     if isinstance(provenance, dict):
         for key in (
-            "acquisition_type",
+            "folder",
             "position_label",
             "acquisition_hash",
             "session_hash6",

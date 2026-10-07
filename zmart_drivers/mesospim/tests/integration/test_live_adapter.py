@@ -80,36 +80,36 @@ def test_instrument_is_registered():
 
 
 def test_info_and_actuators(session):
-    info = session.get_info()["report"]
+    info = session.get_info()["content"]
     assert info["server"]["app"] == "mesoSPIM-control"
-    actuators = session.get_actuators()["report"]
+    actuators = session.get_actuators()["content"]
     assert set(actuators) == {"x", "y", "z"}
     assert actuators["x"] == ["motoric"]
 
 
 def test_get_xyz_and_state_shape(session):
-    xyz = session.get_xyz()["report"]
+    xyz = session.get_xyz()["content"]
     for axis in ("x", "y", "z"):
         assert xyz[axis]["unit"] == "um"
         assert isinstance(xyz[axis]["value"], (int, float))
-    state = session.get_state()["report"]
+    state = session.get_state()["content"]
     # changeable = the light-path settings; observed = identity + limits (never
     # the run-state, which is unobservable over the bridge).
     assert "laser" in state["changeable"]
     assert state["observed"]["app"] == "mesoSPIM-control"
 
 
-def test_acquisition_options(session):
-    opts = session.get_acquisition_options()["report"]
+def test_acquisition_settings(session):
+    opts = session.get_acquisition_settings()["content"]
     assert "planes" in opts and "z_step" in opts
     assert opts["format"]["active"] in opts["format"]["options"]
 
 
 def test_set_xyz_zero_net_motion_confirms(session):
     """Exercise set_xyz + confirm through the adapter with zero net motion."""
-    xyz = session.get_xyz()["report"]
+    xyz = session.get_xyz()["content"]
     x, y, z = (xyz[a]["value"] for a in ("x", "y", "z"))
-    result = session.set_xyz(x, y, z)["report"]
+    result = session.set_xyz(x, y, z)["content"]
     assert result["confirmed"], result
 
 
@@ -118,7 +118,7 @@ def test_set_xyz_zero_net_motion_confirms(session):
     reason="set MESOSPIM_ALLOW_ACQUIRE=1 to run the capture (fires a snap)",
 )
 def test_acquire_through_session(session, tmp_path):
-    result = session.acquire("snap", "A1")["report"]
+    result = session.acquire("A1")["content"]
     files = result.get("files") or []
     assert files, f"no files in acquire result: {result!r}"
     for path in files:

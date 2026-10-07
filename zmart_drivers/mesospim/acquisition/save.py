@@ -2,9 +2,9 @@
 Save: persist a capture into the canonical output layout.
 =========================================================
 The mesoSPIM image writer produces frame files on the acquisition PC; ``save``
-relocates them into ``<output_root>/data/`` under a stable, sortable name and
-writes a JSON metadata sidecar next to them. It returns a
-:class:`SavedAcquisition` manifest.
+relocates them into ``<output_root>/data/`` (or a ``folder`` inside it), named
+after the position label, and writes a JSON metadata sidecar next to them. It
+returns a :class:`SavedAcquisition` manifest.
 
 This is intentionally simple and dependency-light: it copies the frames the
 image writer already wrote (it does not re-encode pixels). The per-plane
@@ -29,15 +29,13 @@ from .product import AcquisitionResult, SavedAcquisition
 log = logging.getLogger(__name__)
 
 
-def canonical_stem(acquisition_type: str, position_label: str) -> str:
-    """Stable, filesystem-safe stem for one acquisition's output files.
+def canonical_stem(name: str) -> str:
+    """A file or folder name that is safe on every operating system.
 
     Public so the controller can pre-name the image-writer output folder/file
     with the same stem the saved frames end up under.
     """
-    safe_label = "".join(c if c.isalnum() or c in ("-", "_") else "_" for c in position_label)
-    safe_type = "".join(c if c.isalnum() or c in ("-", "_") else "_" for c in acquisition_type)
-    return f"{safe_type}_{safe_label}"
+    return "".join(c if c.isalnum() or c in ("-", "_") else "_" for c in name)
 
 
 def save(
@@ -45,6 +43,7 @@ def save(
     output_root: str | Path,
     *,
     position_label: str,
+    folder: str = "",
     format: str = "ome-tiff",
 ) -> SavedAcquisition:
     """Persist ``acq``'s frames under ``<output_root>/data/`` and write metadata.
@@ -53,6 +52,8 @@ def save(
         acq: the :class:`AcquisitionResult` from ``capture.acquire``.
         output_root: the workflow-owned run directory.
         position_label: names the position in the output filenames.
+        folder: a folder inside ``data`` to group the files in; empty saves
+            them straight into ``data``.
         format: recorded in the manifest and metadata sidecar.
 
     Returns:
@@ -62,6 +63,8 @@ def save(
         FileNotFoundError: a source frame file is missing on disk.
     """
     data_dir = Path(output_root) / "data"
+    if folder:
+        data_dir = data_dir / canonical_stem(folder)
     data_dir.mkdir(parents=True, exist_ok=True)
 
     # Validate every source up front so a missing frame can't leave a partial
@@ -72,8 +75,8 @@ def save(
         raise FileNotFoundError(f"source frame file(s) missing: {missing}")
 
     # A distinct stem per acquisition: never silently overwrite a prior dataset
-    # that shares the same type+label (a retry, a re-image of the same well).
-    stem = _unique_stem(data_dir, canonical_stem(acq.acquisition_type, position_label))
+    # that shares the same label (a retry, a re-image of the same well).
+    stem = _unique_stem(data_dir, canonical_stem(position_label))
 
     image_paths: list[Path] = []
     multiplane = len(sources) > 1
@@ -86,7 +89,7 @@ def save(
 
     metadata_path = data_dir / f"{stem}.json"
     payload = {
-        "acquisition_type": acq.acquisition_type,
+        "folder": folder,
         "position_label": position_label,
         "format": format,
         "planes": acq.planes,
@@ -100,14 +103,13 @@ def save(
     tmp.replace(metadata_path)
 
     log.info(
-        "saved %s/%s: %d frame(s) -> %s",
-        acq.acquisition_type,
+        "saved %s: %d frame(s) -> %s",
         position_label,
         len(image_paths),
         data_dir,
     )
     return SavedAcquisition(
-        acquisition_type=acq.acquisition_type,
+        folder=folder,
         position_label=position_label,
         image_paths=tuple(image_paths),
         metadata_path=metadata_path,
@@ -120,7 +122,7 @@ def _unique_stem(data_dir: Path, stem: str) -> str:
     """Return ``stem`` or ``stem_2`` / ``stem_3`` / … that isn't already used.
 
     The per-acquisition metadata sidecar (``<stem>.json``) is the sentinel, so a
-    repeated type+label can't clobber an earlier dataset's frames or metadata.
+    repeated label can't clobber an earlier dataset's frames or metadata.
     """
     candidate = stem
     n = 2

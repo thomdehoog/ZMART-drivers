@@ -47,7 +47,7 @@ def _identity_rig_orientation(monkeypatch):
 @pytest.fixture
 def naming() -> Naming:
     return Naming(
-        acquisition_type="overview-scan",
+        folder="overview-scan",
         hash6="000001",
         position_label="000003",
     )
@@ -55,7 +55,7 @@ def naming() -> Naming:
 
 def test_leica_private_naming_round_trips_time_channel_and_z():
     naming = Naming(
-        acquisition_type="overview",
+        folder="overview",
         hash6="abc123",
         position_label="K00_M000000_G000000_P000000_V00",
         t=12,
@@ -70,7 +70,7 @@ def test_leica_private_naming_round_trips_time_channel_and_z():
 def test_leica_private_naming_rejects_unrepresentable_plane_indices(field, value):
     with pytest.raises(ValueError, match=field):
         Naming(
-            acquisition_type="overview",
+            folder="overview",
             hash6="abc123",
             position_label="P0",
             **{field: value},
@@ -544,7 +544,7 @@ class TestSave:
             "software": {"driver_version": "6.0.0"},
             "hardware": {"Microscope": {"name": "DM Manual-6"}},
             "provenance": {
-                "acquisition_type": "overview-scan",
+                "folder": "overview-scan",
                 "position_label": "000003",
                 "acquisition_hash": "9k2m4p",
                 "session_hash6": "000abc",
@@ -629,7 +629,7 @@ class TestSave:
         tmp_path,
     ):
         naming = Naming(
-            acquisition_type="overview-scan",
+            folder="overview-scan",
             hash6="000001",
             position_label="well_B7",
         )
@@ -644,7 +644,7 @@ class TestSave:
         for idx, path in saved.image_paths.items():
             parsed = parse_image_name(path.name)
             assert parsed is not None
-            assert parsed.acquisition_type == "overview-scan"
+            assert parsed.folder == "overview-scan"
             assert parsed.hash6 == "000001"
             assert parsed.position_label == "well_B7"
             assert parsed.z == idx.z
@@ -766,7 +766,7 @@ class TestSave:
 
         state = {
             "software": {"driver_version": "6.0.0"},
-            "provenance": {"acquisition_type": "overview-scan", "position_label": "000003"},
+            "provenance": {"folder": "overview-scan", "position_label": "000003"},
         }
         saved = drv.save(
             None,
@@ -873,7 +873,7 @@ class TestSave:
         output_root = tmp_path / "run_000001"
         state = {
             "software": {"driver_version": "6.0.0"},
-            "provenance": {"acquisition_type": "overview-scan"},
+            "provenance": {"folder": "overview-scan"},
         }
 
         drv.save(None, successful_acq, output_root, naming, state=state)

@@ -9,11 +9,11 @@ from pathlib import Path
 
 EPOCH = 1767225600  # 2026-01-01 00:00:00 UTC
 _ALPHABET = "0123456789abcdefghijklmnopqrstuvwxyz"
-_ACQUISITION_TYPE_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
+_FOLDER_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 _HASH_RE = re.compile(r"^[0-9a-z]{6}$")
 _UNSAFE_LABEL_RE = re.compile(r"[^A-Za-z0-9_-]")
 _IMAGE_RE = re.compile(
-    r"^(?P<acq>[a-z0-9]+(?:-[a-z0-9]+)*)_(?P<hash>[0-9a-z]{6})"
+    r"^(?P<folder>[a-z0-9]+(?:-[a-z0-9]+)*)_(?P<hash>[0-9a-z]{6})"
     r"_(?P<label>[A-Za-z0-9_-]+)_T(?P<t>\d{6})_C(?P<c>\d{2})_Z(?P<z>\d{5})"
     r"\.ome\.tiff$"
 )
@@ -36,7 +36,7 @@ def run_hash(start_time: float | None = None) -> str:
 class Naming:
     """Validated filename values for one Leica OME-TIFF plane."""
 
-    acquisition_type: str
+    folder: str
     hash6: str
     position_label: str
     t: int = 0
@@ -44,12 +44,12 @@ class Naming:
     z: int = 0
 
     def __post_init__(self) -> None:
-        if not _ACQUISITION_TYPE_RE.fullmatch(self.acquisition_type):
+        if not _FOLDER_RE.fullmatch(self.folder):
             raise ValueError(
-                f"acquisition_type must be kebab-case lowercase, got {self.acquisition_type!r}"
+                f"folder must be kebab-case lowercase, got {self.folder!r}"
             )
-        if len(self.acquisition_type) > 25:
-            raise ValueError("acquisition_type is longer than 25 characters")
+        if len(self.folder) > 25:
+            raise ValueError("folder is longer than 25 characters")
         if not _HASH_RE.fullmatch(self.hash6):
             raise ValueError(f"hash6 must be 6 lowercase base36 characters, got {self.hash6!r}")
         for field, value, maximum in (
@@ -70,7 +70,7 @@ def build_image_name(naming: Naming) -> str:
     """Return the canonical Leica filename for one T/C/Z plane."""
 
     return (
-        f"{naming.acquisition_type}_{naming.hash6}_{naming.position_label}_"
+        f"{naming.folder}_{naming.hash6}_{naming.position_label}_"
         f"T{naming.t:06d}_C{naming.c:02d}_Z{naming.z:05d}.ome.tiff"
     )
 
@@ -82,7 +82,7 @@ def parse_image_name(filename: str) -> Naming | None:
     if match is None:
         return None
     return Naming(
-        acquisition_type=match.group("acq"),
+        folder=match.group("folder"),
         hash6=match.group("hash"),
         position_label=match.group("label"),
         t=int(match.group("t")),
@@ -91,14 +91,14 @@ def parse_image_name(filename: str) -> Naming | None:
     )
 
 
-def acquisition_dir(output_root: Path | str, acquisition_type: str) -> Path:
-    """Return the driver's staging directory for an acquisition type."""
+def acquisition_dir(output_root: Path | str, folder: str) -> Path:
+    """Return the driver's staging directory for one folder of acquisitions."""
 
-    return Path(output_root) / acquisition_type
+    return Path(output_root) / folder
 
 
-def data_dir(output_root: Path | str, acquisition_type: str) -> Path:
-    """Return where the images of an acquisition go: ``<type>/data``.
+def data_dir(output_root: Path | str, folder: str) -> Path:
+    """Return where the images of an acquisition go: ``<folder>/data``.
 
     An acquisition is a folder with parts, and the pixels the microscope
     captured are one of them. Giving them their own folder leaves room beside
@@ -107,24 +107,24 @@ def data_dir(output_root: Path | str, acquisition_type: str) -> Path:
     from an image by its name.
     """
 
-    return acquisition_dir(output_root, acquisition_type) / "data"
+    return acquisition_dir(output_root, folder) / "data"
 
 
-def metadata_dir(output_root: Path | str, acquisition_type: str) -> Path:
-    """Return where an acquisition's printed metadata goes: ``<type>/data/metadata``."""
+def metadata_dir(output_root: Path | str, folder: str) -> Path:
+    """Return where an acquisition's printed metadata goes: ``<folder>/data/metadata``."""
 
-    return data_dir(output_root, acquisition_type) / "metadata"
+    return data_dir(output_root, folder) / "metadata"
 
 
-def state_dir(output_root: Path | str, acquisition_type: str) -> Path:
+def state_dir(output_root: Path | str, folder: str) -> Path:
     """Return where ZMART's own account of a capture goes.
 
-    ``<type>/data/metadata/ZMART_state``, beside ``metadata/vendor`` -- one
+    ``<folder>/data/metadata/ZMART_state``, beside ``metadata/vendor`` -- one
     folder per party, so whose account a file is never has to be read off its
     name.
     """
 
-    return metadata_dir(output_root, acquisition_type) / "ZMART_state"
+    return metadata_dir(output_root, folder) / "ZMART_state"
 
 
 def build_state_name(naming: Naming) -> str:
@@ -137,6 +137,6 @@ def build_state_name(naming: Naming) -> str:
     """
 
     return (
-        f"{naming.acquisition_type}_{naming.hash6}_{naming.position_label}_"
+        f"{naming.folder}_{naming.hash6}_{naming.position_label}_"
         f"T{naming.t:06d}_ZMART_state.json"
     )

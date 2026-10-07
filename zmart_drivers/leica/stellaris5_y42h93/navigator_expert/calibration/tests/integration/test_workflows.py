@@ -95,7 +95,7 @@ def test_calibration_capture_explicitly_passes_active_orientation(monkeypatch, t
     result = cm._capture_for_calibration(
         session,
         name="reference",
-        acquisition_type="calibration-frame",
+        folder="calibration-frame",
     )
 
     assert result is saved
@@ -1047,7 +1047,7 @@ def _patch_objective_driver(
         return SimpleNamespace(job=job, command_result={"success": True})
 
     def _save(client, acq, output_root, naming, **kw):
-        if naming.acquisition_type == "calibration-stack":
+        if naming.folder == "calibration-stack":
             idx = stack_count["n"]
             stack_count["n"] += 1
             if idx < len(stack_effects) and stack_effects[idx] is not None:
@@ -1969,7 +1969,7 @@ def test_objective_pair_target_xy_acquire_at_post_switch_xy(
     real_save = cm.drv.save
 
     def _tracking_save(client, acq, output_root, naming, **kw):
-        if naming.acquisition_type == "calibration-frame":
+        if naming.folder == "calibration-frame":
             acquire_positions.append((state["x"], state["y"]))
         return real_save(client, acq, output_root, naming, **kw)
 

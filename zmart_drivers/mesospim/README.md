@@ -264,8 +264,8 @@ instrument = next(i for i in zmart_controller.get_instruments() if i["vendor"] =
 
 # Add "token": "…" if the server requires one; host/port default to 127.0.0.1:42000.
 sess = zmart_controller.set_instrument(instrument)
-sess.set_xyz(10, 20, 5)                             # µm from the saved origin; answers {"success", "report"}
-sess.acquire("prescan", "A1", options={"format": "ome-tiff"})
+sess.set_xyz(10, 20, 5)                             # µm from the saved origin; answers {"success", "content"}
+sess.acquire("A1", acquisition_settings={"format": "ome-tiff"})
 sess.disconnect()
 ```
 
@@ -394,12 +394,12 @@ and never raise on a bad read.
 
 ### Acquisition & save
 ```python
-acquire(client, acquisition_type="snap", *, options=None, state=None) -> AcquisitionResult   # RAISES if no frames
+acquire(client, label="snap", *, options=None, state=None) -> AcquisitionResult              # RAISES if no frames
 snap(client, *, options=None) -> AcquisitionResult                                            # single frame (planes=1)
 run_acquisition_list(client, acquisitions: list[dict]) -> dict                                # multi-tile/-channel
 build_acquisition(state: dict, options=None) -> dict                                          # compose an Acquisition dict
-save(acq, output_root, *, position_label, format="ome-tiff") -> SavedAcquisition              # relocate frames + JSON sidecar
-canonical_stem(acquisition_type, position_label) -> str
+save(acq, output_root, *, position_label, folder="", format="ome-tiff") -> SavedAcquisition   # relocate frames + JSON sidecar
+canonical_stem(name) -> str
 ```
 `options` may set `folder`/`filename` (where the image writer writes — the controller path fills these in) and
 acquisition fields (`planes`, `z_step`, `z_start`, `z_end`, `laser`, `intensity`, `filter`, `zoom`,

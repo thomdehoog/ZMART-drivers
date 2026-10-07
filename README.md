@@ -51,7 +51,7 @@ Each of the four drivers carries a folder called `zmart_controller/`. It holds a
 which names the microscope and its connection settings, and the driver's functions, which the
 controller finds by name (see the controller's
 [driver guide](https://github.com/thomdehoog/ZMART-controller/blob/main/docs/driver.md)).
-Through the controller, every command answers `{"success": ..., "report": ...}`, and
+Through the controller, every command answers `{"success": ..., "content": ...}`, and
 `get_info` describes the microscope in plain words: what each setting means, its unit and its
 bounds, and which objectives (or, on the mesoSPIM, which zooms) are fitted, filled in from what
 the microscope itself reports.
@@ -96,7 +96,7 @@ import zmart_controller
 zmart_controller.register_driver("zmart_drivers.leica.stellaris5_y42h93.navigator_expert")
 instrument = next(i for i in zmart_controller.get_instruments() if i["vendor"] == "leica")
 zmart_controller.set_instrument(instrument)
-print(zmart_controller.get_info()["report"]["description"])
+print(zmart_controller.get_info()["content"]["description"])
 ```
 
 The controller remembers the driver, so later sessions find it by themselves. The module names

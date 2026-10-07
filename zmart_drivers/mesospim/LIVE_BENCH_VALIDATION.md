@@ -18,7 +18,7 @@ not pip-install ~2 GB of GPU deps; `PluginRegistry` then skips those processors)
   (laser/filter/zoom/camera bindings), `get_state`, `move_absolute`+confirm, and
   `acquire` (real demo snap → file written and resolved).
 - **`test_live_adapter` (through `zmart_controller.Session`)** — 6/6: registered
-  instrument, context/actuators, `get_xyz`/`get_state` shape, acquisition options,
+  instrument, context/actuators, `get_xyz`/`get_state` shape, acquisition settings,
   `set_xyz`+confirm, and `acquire` through the Session (wrote `snap_A1.tiff` + JSON).
 
 Three live-only bugs the offline mock had masked were found here and fixed (see

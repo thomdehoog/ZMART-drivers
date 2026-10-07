@@ -127,7 +127,7 @@ actually wrote; the driver's `save()` then relocates them.
       driver correctly does *not* return as frame data. **Still bench-pending:**
       confirm for non-Tiff writers (OME-Zarr / BigTIFF / raw).
 - [ ] Decide `snap` (single live frame, `sig_get_snap_image`) vs. a 1-plane
-      series for `acquisition_type="snap"`, and where a live snap writes to.
+      series for a single-plane `acquire`, and where a live snap writes to.
 
 ### Bench validation results (mesoSPIM `-D` demo, v1.20.0, Windows — old transport)
 

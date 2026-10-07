@@ -56,9 +56,10 @@ class AcquisitionResult:
     acquisition PC -- normally one multi-page stack per acquisition (the default
     Tiff writer), so ``files`` is usually a single path even for a Z-stack.
     ``acquisition`` is the mesoSPIM ``Acquisition`` dict that produced them.
+    ``label`` is a short name for the capture, such as ``"snap"``.
     """
 
-    acquisition_type: str
+    label: str
     acquisition: dict
     started_at: float
     finished_at: float
@@ -76,7 +77,7 @@ class AcquisitionResult:
 class SavedAcquisition:
     """Manifest for one persisted acquisition product."""
 
-    acquisition_type: str
+    folder: str
     position_label: str
     image_paths: tuple[Path, ...]
     metadata_path: Path | None

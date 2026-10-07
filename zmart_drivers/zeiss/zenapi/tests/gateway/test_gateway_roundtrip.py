@@ -94,7 +94,7 @@ def test_save_copies_the_czi(client, tmp_path):
 
     exp = drv.load_experiment(client, "ZMART_2CH")
     acq = drv.acquire(client, exp, mode="snap", output_name="two_channels")
-    naming = Naming(acquisition_type="snap", hash6=run_hash(), position_label="p1")
+    naming = Naming(folder="snap", hash6=run_hash(), position_label="p1")
     saved = drv.save(client, acq, tmp_path / "run", naming, stable_poll_s=0.05)
     assert saved.czi_path.exists()
     assert saved.czi_path.parent == tmp_path / "run" / "snap" / "data"

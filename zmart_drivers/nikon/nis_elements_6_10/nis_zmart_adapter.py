@@ -462,20 +462,18 @@ def run_procedure(handle: NisHandle, procedure: dict) -> dict:
 # =============================================================================
 
 
-# What ``acquisition_type`` means here: anything containing "stack" acquires a
-# Z-series; everything else takes one image.
-STACK_TYPES = ("stack", "z_stack", "zstack", "z-stack")
+def get_acquisition_settings(handle: NisHandle) -> dict:
+    """The acquisition and saving settings this instrument offers, with the active value of each.
 
-
-def get_acquisition_options(handle: NisHandle) -> dict:
-    """The acquisition + saving options this instrument offers (options + active).
-
-    ``z_start`` / ``z_end`` / ``z_step`` are only read for a stack
-    (``acquisition_type`` containing "stack"); they are in the same frame as
-    ``set_xyz`` (um from the origin) and must lie inside the stage limits.
+    ``folder`` names a folder under ``<output_root>/data`` to group the files
+    in; left empty, they are saved straight into ``data``. ``z_start`` and
+    ``z_end`` turn the acquisition into a Z-stack: give both, and ``z_step``
+    sets the spacing. They are in the same frame as ``set_xyz`` (um from the
+    origin) and must lie inside the stage limits.
     """
     _require_open(handle)
     return {
+        "folder": {"options": "any text; empty saves straight into data", "active": ""},
         "format": {"options": list(_cmd.SAVE_FORMATS), "active": "tif"},
         "optical_configuration": {
             "options": _readers.get_optical_configurations(handle.client),
@@ -489,29 +487,35 @@ def get_acquisition_options(handle: NisHandle) -> dict:
     }
 
 
-def canonical_stem(acquisition_type: str, position_label: str) -> str:
-    """A file-name stem safe on Windows: ``<type>_<label>`` with odd characters replaced."""
-    raw = f"{acquisition_type}_{position_label}"
-    return re.sub(r"[^A-Za-z0-9._-]+", "_", raw).strip("_") or "acquisition"
+def canonical_stem(name: str) -> str:
+    """A file or folder name safe on Windows, with odd characters replaced."""
+    return re.sub(r"[^A-Za-z0-9._-]+", "_", name).strip("_") or "acquisition"
 
 
 def acquire(
-    handle: NisHandle, *, acquisition_type: str, position_label: str, options: dict | None = None
+    handle: NisHandle, *, position_label: str, acquisition_settings: dict | None = None
 ) -> dict:
     """Take one image (or a Z-stack) and save it; return the record.
 
     Optionally switches the optical configuration and sets the exposure first.
-    A stack needs ``z_start`` and ``z_end`` (um from the origin) and uses
-    ``z_step``; it is best saved as ``nd2`` so every plane and all metadata
-    survive. The file goes to ``<output_root>/data/<type>_<label>.<format>``
-    and the NIS window is closed afterwards by default, so windows do not pile
-    up during a scan.
+    Giving both ``z_start`` and ``z_end`` (um from the origin) takes a stack,
+    spaced by ``z_step``; a stack is best saved as ``nd2`` so every plane and
+    all metadata survive. The file goes to
+    ``<output_root>/data/<folder>/<label>.<format>`` (straight into ``data``
+    when ``folder`` is empty), and the NIS window is closed afterwards by
+    default, so windows do not pile up during a scan.
     """
     _require_open(handle)
-    options = dict(options or {})
+    options = dict(acquisition_settings or {})
     fmt = str(options.get("format", "tif"))
     if fmt not in _cmd.SAVE_FORMATS:
         raise ValueError(f"unknown format {fmt!r}; choose one of {_cmd.SAVE_FORMATS}")
+    folder = options.get("folder") or ""
+    if not isinstance(folder, str):
+        # A ValueError, like every other unusable acquisition setting.
+        raise ValueError(  # noqa: TRY004
+            f"acquisition setting 'folder' must be text, not {folder!r}"
+        )
     if options.get("optical_configuration"):
         _cmd.select_optical_configuration(handle.client, str(options["optical_configuration"]))
     if options.get("exposure_ms") is not None:
@@ -519,10 +523,13 @@ def acquire(
     timeout = float(options.get("timeout", 300.0))
 
     started = time.perf_counter()
-    is_stack = any(token in str(acquisition_type).lower() for token in STACK_TYPES)
+    is_stack = options.get("z_start") is not None or options.get("z_end") is not None
     if is_stack:
         if options.get("z_start") is None or options.get("z_end") is None:
-            raise ValueError("a stack needs 'z_start' and 'z_end' (um from the origin) in options")
+            raise ValueError(
+                "a stack needs both 'z_start' and 'z_end' (um from the origin) "
+                "in the acquisition settings"
+            )
         z_top = handle.origin["z"] + float(options["z_end"])
         z_bottom = handle.origin["z"] + float(options["z_start"])
         try:
@@ -542,14 +549,16 @@ def acquire(
         image = _cmd.capture(handle.client, timeout=timeout)
 
     data_dir = handle.output_root / "data"
+    if folder:
+        data_dir = data_dir / canonical_stem(folder)
     data_dir.mkdir(parents=True, exist_ok=True)
-    path = data_dir / f"{canonical_stem(acquisition_type, position_label)}.{fmt}"
+    path = data_dir / f"{canonical_stem(position_label)}.{fmt}"
     saved = _cmd.save_image(
         handle.client, str(path), format=fmt, close=bool(options.get("close_after_save", True))
     )
     return {
-        "acquisition_type": acquisition_type,
         "position_label": position_label,
+        "folder": folder,
         "format": fmt,
         "planes": image.get("z_planes", image.get("planes")),
         # Every file saved, under the name the ZMART Controller's contract fixes,
@@ -636,7 +645,7 @@ def get_info(handle: NisHandle) -> dict:
 # The commands that answer in the controller's shape. connect returns the
 # handle and disconnect returns nothing, so those two are handed over as they are.
 _ANSWERING_OPS = (
-    "get_acquisition_options",
+    "get_acquisition_settings",
     "get_actuators",
     "get_xyz",
     "set_xyz",
@@ -653,18 +662,18 @@ def _answered(function):
     """Wrap a command so it answers the way the controller documents.
 
     The controller promises every workflow the same answer from every
-    microscope: ``{"success": ..., "report": ...}``. The functions in this
-    module return the report alone, and raise when something goes wrong.
-    ``success`` is therefore True, unless the report says that a change was
+    microscope: ``{"success": ..., "content": ...}``. The functions in this
+    module return the content alone, and raise when something goes wrong.
+    ``success`` is therefore True, unless the content says that a change was
     sent but could not be confirmed (``"confirmed": False``): an outcome that
     is safe to carry on from, so it is reported rather than raised.
     """
 
     @functools.wraps(function)
     def command(*args, **kwargs):
-        report = function(*args, **kwargs)
-        unconfirmed = isinstance(report, dict) and report.get("confirmed") is False
-        return {"success": not unconfirmed, "report": report}
+        content = function(*args, **kwargs)
+        unconfirmed = isinstance(content, dict) and content.get("confirmed") is False
+        return {"success": not unconfirmed, "content": content}
 
     return command
 
@@ -675,13 +684,13 @@ def ops_table() -> dict[str, Any]:
     The plug-in folder ``zmart_controller/`` exposes these by name.
     ``connect`` and ``disconnect`` are handed over unchanged. Every other
     command is wrapped so that, called through the controller, it answers
-    ``{"success": ..., "report": ...}``. Called directly from this module,
-    the same functions return the report alone.
+    ``{"success": ..., "content": ...}``. Called directly from this module,
+    the same functions return the content alone.
     """
     functions = {
         "connect": connect,
         "disconnect": disconnect,
-        "get_acquisition_options": get_acquisition_options,
+        "get_acquisition_settings": get_acquisition_settings,
         "get_actuators": get_actuators,
         "get_xyz": get_xyz,
         "set_xyz": set_xyz,

@@ -97,13 +97,13 @@ import zmart_controller
 instrument = next(i for i in zmart_controller.get_instruments() if i["vendor"] == "mesospim")
 sess = zmart_controller.set_instrument({**instrument, "token": "choose-a-token"})   # omit the token if open
 
-# Every answer comes back as {"success": ..., "report": ...}.
+# Every answer comes back as {"success": ..., "content": ...}.
 
 sess.get_info()                # identity, initial positions, focus/rotation, output_root
 sess.get_actuators()           # {'x': ['motoric'], 'y': [...], 'z': [...]}
-sess.get_xyz()                 # report: {'x': {'value','actuator','unit','range'}, ...} — µm from origin
+sess.get_xyz()                 # content: {'x': {'value','actuator','unit','range'}, ...} — µm from origin
 sess.get_state()               # {'changeable': {laser,intensity,filter,zoom,shutter,etl_*}, 'observed': {...}}
-sess.get_acquisition_options() # {format, planes, z_step, zoom, shutterconfig, backlash_correction}
+sess.get_acquisition_settings() # {folder, format, planes, z_step, zoom, shutterconfig, backlash_correction}
 
 # Positions are in µm from the frame origin. The origin is not set here: it is a
 # one-time driver setup step (see "Setting the origin" below), saved to the
@@ -118,8 +118,8 @@ sess.get_procedures()                       # move_focus, move_rotation, zero_st
 sess.run_procedure({"name": "move_focus", "value": 5100.0})
 
 # Acquire one frame at a labelled position; returns the written files.
-r = sess.acquire("snap", "A1", options={"format": "ome-tiff"})
-#   → r["report"] = {'files': [...snap_A1.tiff, ...snap_A1.json], 'metadata_file': ...snap_A1.json, 'planes': 1, ...}
+r = sess.acquire("A1", acquisition_settings={"format": "ome-tiff"})
+#   → r["content"] = {'files': [...A1.tiff, ...A1.json], 'metadata_file': ...A1.json, 'planes': 1, ...}
 
 sess.disconnect()
 ```

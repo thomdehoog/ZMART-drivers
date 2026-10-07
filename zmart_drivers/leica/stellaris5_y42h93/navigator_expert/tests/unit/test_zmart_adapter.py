@@ -532,8 +532,8 @@ class TestAcquire(unittest.TestCase):
                 return_value={"Name": "HiRes", "IsSelected": True},
             ) as selected,
         ):
-            opts = adapter.get_acquisition_options(h)
-        # autofocus jobs are a separate category, never acquisition options
+            opts = adapter.get_acquisition_settings(h)
+        # autofocus jobs are a separate category, never acquisition settings
         self.assertEqual(opts["job"]["options"], ["Overview", "HiRes"])
         self.assertEqual(opts["job"]["active"], "HiRes")
         self.assertNotIn("mode", selected.call_args.kwargs)
@@ -554,22 +554,26 @@ class TestAcquire(unittest.TestCase):
                 return_value={"Name": "Overview", "IsSelected": True},
             ),
         ):
-            with self.assertRaisesRegex(ValueError, "unknown acquisition option"):
+            with self.assertRaisesRegex(ValueError, "unknown acquisition setting"):
                 adapter.acquire(
-                    h, acquisition_type="prescan", position_label="A1", options={"fromat": "x"}
+                    h, position_label="A1", acquisition_settings={"fromat": "x"}
                 )
             with self.assertRaisesRegex(ValueError, "invalid value"):
                 adapter.acquire(
-                    h, acquisition_type="prescan", position_label="A1", options={"job": "Nope"}
+                    h, position_label="A1", acquisition_settings={"job": "Nope"}
+                )
+            # A folder Naming would refuse is refused before anything is captured.
+            with self.assertRaisesRegex(ValueError, "kebab-case"):
+                adapter.acquire(
+                    h, position_label="A1", acquisition_settings={"folder": "Prescan"}
                 )
             for value in (-1, 1.5, True, "2"):
                 with self.subTest(backlash_rounds=value):
                     with self.assertRaisesRegex(ValueError, "non-negative integer"):
                         adapter.acquire(
                             h,
-                            acquisition_type="prescan",
                             position_label="A1",
-                            options={"backlash_rounds": value},
+                            acquisition_settings={"backlash_rounds": value},
                         )
 
     def test_missing_output_root_is_a_clear_error(self):
@@ -580,7 +584,7 @@ class TestAcquire(unittest.TestCase):
             ),
             self.assertRaisesRegex(RuntimeError, "output_root"),
         ):
-            adapter.acquire(h, acquisition_type="prescan", position_label="A1")
+            adapter.acquire(h, position_label="A1")
 
     def test_get_info_creates_and_reports_default_workflow_root(self):
         h = _handle()
@@ -722,9 +726,12 @@ class TestAcquire(unittest.TestCase):
         ):
             record = adapter.acquire(
                 h,
-                acquisition_type="prescan",
                 position_label="well-7",
-                options={"job": "HiRes", "backlash_correction": False},
+                acquisition_settings={
+                    "folder": "prescan",
+                    "job": "HiRes",
+                    "backlash_correction": False,
+                },
             )
         self.assertEqual(calls["selected"], "HiRes")
         self.assertEqual(calls["captured"], "HiRes")
@@ -732,10 +739,10 @@ class TestAcquire(unittest.TestCase):
         self.assertEqual(
             Path(saved_root), Path("/tmp/out").resolve() / ".staging" / h.hash6
         )  # OS-agnostic separators
-        self.assertEqual(naming.acquisition_type, "prescan")
+        self.assertEqual(naming.folder, "prescan")
         self.assertEqual(naming.position_label, "well-7")  # explicit label travels verbatim
         self.assertEqual(calls["lineage"]["position_label"], "well-7")
-        self.assertEqual(calls["lineage"]["acquisition_type"], "prescan")
+        self.assertEqual(calls["lineage"]["folder"], "prescan")
         # per-acquisition hash: the Naming hash is NOT the session hash
         self.assertNotEqual(naming.hash6, h.hash6)
         self.assertEqual(calls["lineage"]["acquisition_hash"], naming.hash6)
@@ -797,12 +804,12 @@ class TestAcquire(unittest.TestCase):
                 patches[0], patches[1], patches[2], patches[3],
             ):
                 record = adapter.acquire(
-                    h, acquisition_type="prescan", position_label="well-7",
-                    options={"job": "HiRes", "backlash_correction": False},
+                    h, position_label="well-7",
+                    acquisition_settings={"job": "HiRes", "backlash_correction": False},
                 )
 
             self.assertEqual(record["files"], [str(image), str(vendor), str(state)])
-            self.assertEqual(check_acquire_answer({"success": True, "report": record}), [])
+            self.assertEqual(check_acquire_answer({"success": True, "content": record}), [])
 
     def test_a_plane_says_where_on_the_sample_it_was_taken(self):
         """The place the last confirmed move put the stage, in the frame.
@@ -816,7 +823,7 @@ class TestAcquire(unittest.TestCase):
         h = _handle()
         h.driven_to = {"x": 1200.0, "y": -450.0, "z": 33.5, "z_wide_um": 900.0}
         with self._capturing() as calls:
-            record = adapter.acquire(h, acquisition_type="overview", position_label="A1")
+            record = adapter.acquire(h, position_label="A1")
 
         del calls
         self.assertEqual(
@@ -839,7 +846,7 @@ class TestAcquire(unittest.TestCase):
             adapter._readers, "get_job_settings",
             return_value={"stack": {"begin": 990.0, "end": 1010.0, "sections": 5}},
         ):
-            record = adapter.acquire(h, acquisition_type="focussing", position_label="A1")
+            record = adapter.acquire(h, position_label="A1")
 
         del calls
         # 5 slices over 20 um about the z-wide the drive was realized at.
@@ -862,7 +869,7 @@ class TestAcquire(unittest.TestCase):
             adapter._readers, "get_job_settings",
             return_value={"stack": {"begin": 1000.0, "end": 1020.0, "sections": 3}},
         ):
-            record = adapter.acquire(h, acquisition_type="focussing", position_label="A1")
+            record = adapter.acquire(h, position_label="A1")
 
         self.assertEqual([p["z_um"] for p in record["planes"]], [100.0, 110.0, 120.0])
 
@@ -920,9 +927,8 @@ class TestAcquire(unittest.TestCase):
             ):
                 adapter.acquire(
                     h,
-                    acquisition_type="overview",
                     position_label="A1",
-                    options={"backlash_correction": False},
+                    acquisition_settings={"backlash_correction": False},
                 )
 
         # The measured 90-degree turn was read from the snapshot and threaded
@@ -957,7 +963,7 @@ class TestAcquire(unittest.TestCase):
             patches[3],
         )
 
-    def test_acquire_defaults_to_scan_type_and_counter_label(self):
+    def test_acquire_defaults_to_scan_folder_and_counter_label(self):
         h = _handle(connection={**adapter.CONNECTION, "output_root": "/tmp/out"})
         calls = {}
         env = self._fake_acquire_env(calls)
@@ -978,7 +984,7 @@ class TestAcquire(unittest.TestCase):
         ):
             record0 = adapter.acquire(h)
             record1 = adapter.acquire(h)
-        self.assertEqual(record0["acquisition_type"], "scan")
+        self.assertEqual(record0["folder"], "scan")
         self.assertEqual(calls.get("backlash", []), [])
         self.assertEqual(record0["settle"], "direct")
         self.assertEqual(record0["backlash_rounds"], 0)
@@ -1056,9 +1062,8 @@ class TestAcquire(unittest.TestCase):
         ):
             record = adapter.acquire(
                 h,
-                acquisition_type="prescan",
                 position_label="7",
-                options={
+                acquisition_settings={
                     "job": "HiRes",
                     "backlash_correction": True,
                     "backlash_rounds": 2,
@@ -1095,9 +1100,8 @@ class TestAcquire(unittest.TestCase):
         ):
             record = adapter.acquire(
                 h,
-                acquisition_type="prescan",
                 position_label="7",
-                options={"backlash_rounds": 0},
+                acquisition_settings={"backlash_rounds": 0},
             )
         self.assertEqual(calls, [])
         self.assertEqual(record["settle"], "direct")
@@ -1132,7 +1136,7 @@ class TestAcquire(unittest.TestCase):
             ),
             patches[2],
         ):
-            adapter.acquire(h, acquisition_type="prescan", position_label="1", options=options)
+            adapter.acquire(h, position_label="1", acquisition_settings=options)
         return calls
 
     def test_acquire_strips_an_unstripped_template_before_capturing(self):
@@ -2038,17 +2042,17 @@ class TestLifecycle(unittest.TestCase):
                 adapter.set_origin(session._handle)
                 answer = session.set_xyz(10, 20, 5, with_actuators={"z": "z-galvo"})
                 self.assertIs(answer["success"], True)
-                self.assertEqual(answer["report"]["position"], {"x": 10, "y": 20, "z": 5})
+                self.assertEqual(answer["content"]["position"], {"x": 10, "y": 20, "z": 5})
                 xyz = session.get_xyz()
-                self.assertEqual(xyz["report"]["x"]["value"], 0.0)  # mocked readback
+                self.assertEqual(xyz["content"]["x"]["value"], 0.0)  # mocked readback
             finally:
                 session.disconnect()
 
     def test_every_command_answers_in_the_controller_shape(self):
-        """Read through the controller, every answer is {"success", "report"}.
+        """Read through the controller, every answer is {"success", "content"}.
 
         The controller documents this shape for every driver, and a workflow
-        reads ``answer["report"]``. Each command here is called through a real
+        reads ``answer["content"]``. Each command here is called through a real
         controller Session and checked against the adapter function it wraps.
         """
         import zmart_controller
@@ -2060,9 +2064,9 @@ class TestLifecycle(unittest.TestCase):
             for name in ("get_actuators", "get_xyz"):
                 with self.subTest(command=name):
                     answer = getattr(session, name)()
-                    self.assertEqual(set(answer), {"success", "report"})
+                    self.assertEqual(set(answer), {"success", "content"})
                     self.assertIs(answer["success"], True)
-                    self.assertEqual(answer["report"], getattr(adapter, name)(handle))
+                    self.assertEqual(answer["content"], getattr(adapter, name)(handle))
 
     def test_the_ops_table_wraps_every_answering_command(self):
         """connect and disconnect are handed over as they are; the rest are wrapped."""

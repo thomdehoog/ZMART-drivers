@@ -98,9 +98,9 @@ def _register_adapter() -> Any:
 
 
 class _ReportingSession:
-    """A controller Session that checks each answer, then hands back its report.
+    """A controller Session that checks each answer, then hands back its content.
 
-    Every command answers ``{"success": ..., "report": ...}`` through the
+    Every command answers ``{"success": ..., "content": ...}`` through the
     controller. This wrapper reads each answer the way the controller
     documents it, so the validator exercises that exact shape: a missing
     key, or ``success`` that is not ``True``, fails the step with a clear
@@ -110,7 +110,7 @@ class _ReportingSession:
 
     _COMMANDS = frozenset(
         {
-            "get_acquisition_options",
+            "get_acquisition_settings",
             "get_actuators",
             "get_xyz",
             "set_xyz",
@@ -133,14 +133,14 @@ class _ReportingSession:
 
         def command(*args: Any, **kwargs: Any) -> Any:
             answer = attribute(*args, **kwargs)
-            if not isinstance(answer, dict) or not {"success", "report"} <= answer.keys():
+            if not isinstance(answer, dict) or not {"success", "content"} <= answer.keys():
                 raise RuntimeError(
                     f"{name} did not answer in the controller's shape "
-                    f"{{'success': ..., 'report': ...}}; it returned {answer!r}"
+                    f"{{'success': ..., 'content': ...}}; it returned {answer!r}"
                 )
             if answer["success"] is not True:
                 raise RuntimeError(f"{name} reported success={answer['success']!r}: {answer!r}")
-            return answer["report"]
+            return answer["content"]
 
         return command
 
@@ -247,7 +247,7 @@ def phase_readonly(v: vh.Validator, sess: Any, args: argparse.Namespace) -> None
             )
 
         state = v.callable("get_state", sess.get_state)
-        opts = v.callable("get_acquisition_options", sess.get_acquisition_options)
+        opts = v.callable("get_acquisition_settings", sess.get_acquisition_settings)
         if state is not None and opts is not None:
             selected_job = state["changeable"]["job"]
             normal_jobs = (opts.get("job") or {}).get("options") or []
@@ -598,7 +598,7 @@ def phase_state(v: vh.Validator, sess: Any) -> None:
         if not captured:
             return
         original = captured["changeable"]["job"]
-        names = (sess.get_acquisition_options().get("job") or {}).get("options") or []
+        names = (sess.get_acquisition_settings().get("job") or {}).get("options") or []
         autofocus_names = {
             job.get("Name")
             for job in captured["observed"].get("autofocus_jobs", [])
@@ -678,13 +678,12 @@ def phase_acquire(v: vh.Validator, sess: Any, args: argparse.Namespace) -> None:
     with v.phase("acquire (capture + save)"):
         # The live LAS X session decides where it writes; save collects from
         # the single native AutoSave path.
-        options: dict[str, Any] = {"backlash_correction": True}
+        settings: dict[str, Any] = {"folder": "adapter-smoke", "backlash_correction": True}
         rec = v.callable(
             "acquire: capture + save",
             lambda: sess.acquire(
-                acquisition_type="adapter-smoke",
                 position_label="1",
-                options=options,
+                acquisition_settings=settings,
             ),
             context={"backlash_correction": True},
             mutating=True,

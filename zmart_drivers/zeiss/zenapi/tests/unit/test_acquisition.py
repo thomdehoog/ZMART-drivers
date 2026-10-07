@@ -1,4 +1,4 @@
-"""acquire() success/raise and save(): the CZI lands under <type>/data/."""
+"""acquire() success/raise and save(): the CZI lands under <folder>/data/."""
 
 import pytest
 from mock_zen_api import FakeGRPCError
@@ -50,7 +50,7 @@ def test_save_copies_czi(fake_client, tmp_path):
     acq = drv.acquire(client, exp, output_name="run1")
 
     naming = Naming(
-        acquisition_type="overview", hash6=run_hash(1767225601), position_label="000000"
+        folder="overview", hash6=run_hash(1767225601), position_label="000000"
     )
     saved = drv.save(client, acq, tmp_path / "run", naming, stable_poll_s=0.01)
 
@@ -58,7 +58,7 @@ def test_save_copies_czi(fake_client, tmp_path):
     assert saved.czi_path.read_bytes() == (tmp_path / "zen_out" / "run1.czi").read_bytes()
     assert saved.czi_path.suffix == ".czi"
     assert "overview" in saved.czi_path.name
-    # ``<type>/data``: the same shape every ZMART driver writes, so what is
+    # ``<folder>/data``: the same shape every ZMART driver writes, so what is
     # made from a capture later becomes a folder beside the pixels.
     assert saved.czi_path.parent.name == "data"
     assert saved.czi_path.parent.parent.name == "overview"
@@ -70,6 +70,6 @@ def test_save_times_out_when_zen_folder_unreachable(fake_client, tmp_path):
     exp = drv.load_experiment(client, "ZMART_Snap")
     acq = drv.acquire(client, exp, mode="snap", output_name="gone")
     (tmp_path / "zen_out" / "gone.czi").unlink()  # as if the share were not mounted
-    naming = Naming(acquisition_type="snap", hash6=run_hash(1767225601), position_label="a")
+    naming = Naming(folder="snap", hash6=run_hash(1767225601), position_label="a")
     with pytest.raises(TimeoutError, match="reachable"):
         drv.save(client, acq, tmp_path / "run", naming, stable_timeout_s=0.05, stable_poll_s=0.01)
