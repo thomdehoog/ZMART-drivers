@@ -79,9 +79,9 @@ exclude = ["*.tests", "*.tests.*"]
 include-package-data = false
 
 [tool.setuptools.package-data]
-# Data files a driver reads at run time: the plug-in's zmart.json, the bundled
-# default limits, orientation and calibration, the ZEISS config.ini example,
-# and the Leica setup notebooks with their import helper.
+# Data files a driver reads at run time: the bundled default limits,
+# orientation and calibration, the ZEISS config.ini example, and the Leica
+# setup notebooks with their import helper.
 "*" = [
     "*.json",
     "defaults/*.json",

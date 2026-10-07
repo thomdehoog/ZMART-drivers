@@ -56,9 +56,9 @@ def main() -> int:
             print("ruff not installed; skipping lint.")
 
     # --- tests ---
-    # -P: do not put this folder on the search path. The driver's plug-in folder
-    # is called zmart_controller, and would otherwise be imported in place of
-    # the real ZMART Controller.
+    # -P: do not put this folder on the search path. It holds folders with
+    # common names, such as config and connection, which would otherwise be
+    # imported in place of other packages.
     cmd = [sys.executable, "-P", "-m", "pytest", "tests", "--junit-xml", str(REPORT_DIR / "junit.xml")]
     cmd += ["-m", "hardware"] if args.hardware else ["-m", "not hardware"]
 

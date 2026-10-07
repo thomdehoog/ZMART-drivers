@@ -3,17 +3,13 @@ r"""ZMART Controller adapter for the Navigator Expert driver.
 The functions that plug this driver into ``zmart_controller``: one function
 per controller command, each taking the opaque handle as its first argument.
 The controller stays vendor-free — this module (not the controller) knows
-both contracts. The controller finds these functions through the driver's
-plug-in folder, ``zmart_controller/``, whose ``zmart.json`` names the
-instrument::
+both contracts. The controller finds these functions through the driver
+module, ``driver.py`` in the driver folder::
 
     import zmart_controller
+    import zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver as stellaris
 
-    zmart_controller.register_driver("zmart_drivers.leica.stellaris5_y42h93.navigator_expert")
-    instrument = next(
-        i for i in zmart_controller.get_instruments() if i["vendor"] == "leica"
-    )
-    zmart_controller.set_instrument(instrument)
+    zmart_controller.set_instrument(stellaris)
 
 Answers: through the controller, every command answers
 ``{"success": True, "content": ...}``, the shape the controller documents for
@@ -67,14 +63,13 @@ before trusting large z moves.
 
 Dependency direction:
     - Imports: driver internals only; nothing from ``zmart_controller``.
-    - Imported by: the plug-in folder ``zmart_controller/`` — nothing else
-      in the driver.
+    - Imported by: the driver module ``driver.py`` — nothing else in the
+      driver.
 """
 
 from __future__ import annotations
 
 import functools
-import json
 import logging
 import math
 import time
@@ -106,13 +101,19 @@ from . import info as _info
 
 log = logging.getLogger(__name__)
 
-# The instrument this driver serves, with its connect settings, exactly as the
-# controller reads it from the plug-in folder's zmart.json. The plug-in's
-# docstring explains each setting. Image orientation is enabled by IMAGE_SAVE
-# in config/profiles.py; only the orientation measurement explicitly saves raw
-# pixels.
-_MANIFEST = Path(__file__).resolve().parents[1] / "zmart_controller" / "zmart.json"
-CONNECTION = json.loads(_MANIFEST.read_text(encoding="utf-8"))["instruments"][0]
+# The connection settings used for any key the caller leaves out; the
+# docstring of driver.py explains each one. ``microscope`` names this
+# instrument. Image orientation is enabled by IMAGE_SAVE in config/profiles.py;
+# only the orientation measurement explicitly saves raw pixels.
+CONNECTION = {
+    "microscope": "stellaris5-y42h93",
+    "client": "PythonClient",
+    "api_delay_ms": None,
+    "output_root": None,
+    "load_limits": True,
+    "load_calibration": True,
+    "load_origin": True,
+}
 
 _ACTUATORS = {"x": ("motoric",), "y": ("motoric",), "z": ("z-wide", "z-galvo")}
 
@@ -205,15 +206,16 @@ def _require_open(handle: ZmartHandle) -> None:
 # =============================================================================
 
 
-def connect(connection: dict) -> ZmartHandle:
+def connect(connection: dict | None = None) -> ZmartHandle:
     """Open the CAM client and return the controller handle.
 
     Args:
-        connection: The instrument dict from ``get_instruments()``.
-            ``client`` and ``api_delay_ms`` feed the CAM connection;
-            ``output_root`` (edited in by the caller) is where
-            :func:`acquire` saves; ``load_origin`` (default True) decides
-            whether the saved frame origin is loaded.
+        connection: The connection settings, all optional; a key left out
+            takes its value from :data:`CONNECTION`, so an empty dictionary
+            connects with the defaults. ``client`` and ``api_delay_ms`` feed
+            the CAM connection; ``output_root`` is where :func:`acquire`
+            saves; ``load_origin`` (default True) decides whether the saved
+            frame origin is loaded.
 
     Delegates to the driver's own connection entry point
     (:func:`navigator_expert.connect_microscope`), which loads this microscope's
@@ -248,6 +250,7 @@ def connect(connection: dict) -> ZmartHandle:
         Whatever :func:`connect_microscope` raises when LAS X is
         unreachable; the controller passes that to the caller unchanged.
     """
+    connection = {**CONNECTION, **(connection or {})}
     saved_origin = _load_saved_origin() if connection.get("load_origin", True) else None
     client = _session.connect_microscope(
         client_name=connection.get("client", "PythonClient"),
@@ -661,10 +664,10 @@ def get_xyz(handle: ZmartHandle, *, with_actuators: dict | None = None) -> dict:
     untranslated stage values (XY, both z drives, objective) ride along
     under ``"hardware"``.
 
-    ``range`` is how far each axis may travel, ``[min, max]`` in the frame:
-    the limits envelope of the stage (for z, of the z-wide drive) shifted by
-    the origin, the same envelope :func:`get_info` reports as ``canvas``. It
-    is None when no limits govern the session; every move is then refused.
+    ``canvas`` is everywhere a picture can show on each axis, ``[min, max]``
+    in the frame, the same one :func:`get_info` reports; see :func:`_canvas`.
+    When no limits govern the session (every move is then refused), the
+    canvas is the current position alone.
     """
     _require_open(handle)
     chosen = _resolve_actuators(with_actuators)
@@ -680,9 +683,8 @@ def get_xyz(handle: ZmartHandle, *, with_actuators: dict | None = None) -> dict:
     result = {
         axis: {
             "value": frame[axis],
-            "unit": "um",
             "actuator": chosen[axis],
-            "range": canvas.get(f"{axis}_um"),
+            "canvas": canvas.get(f"{axis}_um") or [frame[axis], frame[axis]],
         }
         for axis in ("x", "y", "z")
     }
@@ -950,7 +952,7 @@ def _export_state(
         "software": {
             "driver_version": _DRIVER_VERSION,
             "client": handle.connection.get("client"),
-            "api": handle.connection.get("api"),
+            "api": "navigator-expert",
         },
         "hardware": _try(lambda: _readers.get_hardware_info(handle.client)),
         "job_settings": _try(lambda: _readers.get_job_settings(handle.client, job)),
@@ -1181,7 +1183,7 @@ def get_state(handle: ZmartHandle) -> dict:
     return {
         "changeable": {"job": selected["Name"]},
         "observed": {
-            "vendor": handle.connection.get("vendor"),
+            "vendor": "leica",
             "microscope": handle.connection.get("microscope"),
             "serial_number": hw.get("SerialNumber"),
             "system_type": hw.get("SystemType"),
@@ -1524,17 +1526,30 @@ def _described(handle: ZmartHandle) -> str:
 
 
 def _canvas(handle: ZmartHandle) -> dict | None:
-    """The limits envelope, shifted into the frame: nothing can be imaged
-    outside it. None when no limits govern the session."""
+    """Everywhere a picture can show, per axis, in the frame. None when no limits govern the session.
+
+    On z the frame follows the focus, the sum of the two z drives, so the
+    canvas is the z-wide travel widened by the z-galvo travel: a z-stack on
+    the galvo reaches no further than the galvo can go. On x and y the
+    canvas is the stage travel itself. A picture taken at the edge of the
+    travel does show half a field beyond it, but the field depends on the
+    objective and the zoom, and LAS X only reports it for the objective in
+    place now, so the driver cannot know the widest field of every allowed
+    objective ahead of time and does not widen x and y.
+    """
     state = _gate.state_for(handle.client)
     if state is None or state.stage_cfg is None:
         return None
     stage = state.stage_cfg["stage_um"]
+    galvo = stage.get("z_galvo") or [0.0, 0.0]
     origin = handle.origin
     return {
         "x_um": [stage["x"][0] - origin["x_um"], stage["x"][1] - origin["x_um"]],
         "y_um": [stage["y"][0] - origin["y_um"], stage["y"][1] - origin["y_um"]],
-        "z_um": [stage["z_wide"][0] - origin["z_wide_um"], stage["z_wide"][1] - origin["z_wide_um"]],
+        "z_um": [
+            stage["z_wide"][0] + galvo[0] - origin["z_focus_um"],
+            stage["z_wide"][1] + galvo[1] - origin["z_focus_um"],
+        ],
     }
 
 

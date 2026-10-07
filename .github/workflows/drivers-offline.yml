@@ -40,7 +40,7 @@ jobs:
           - driver: nikon
             extras: test
             # -P keeps the working folder off the search path, as the run_ci
-            # scripts do: a driver's plug-in folder is called zmart_controller.
+            # scripts do.
             run: python -P -m pytest zmart_drivers/nikon/nis_elements_6_10
           - driver: zeiss
             extras: zeiss,test

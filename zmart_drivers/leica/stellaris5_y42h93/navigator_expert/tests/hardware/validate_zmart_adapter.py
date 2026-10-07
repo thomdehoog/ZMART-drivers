@@ -1,7 +1,7 @@
 """ZMART controller <-> Leica adapter validator.
 
 Drives the Navigator Expert ``zmart_adapter`` through the **real
-``zmart_controller`` surface** (``get_instruments`` / ``set_instrument`` /
+``zmart_controller`` surface** (``set_instrument`` /
 ``Session``), not the adapter functions directly -- so it validates the exact
 path a workflow takes. The one exception is ``set_origin``: capturing the
 frame origin is a driver setup step, not a controller command, so the move
@@ -84,16 +84,11 @@ CI_DEFAULT_POSITION_UM = {
 
 
 def _register_adapter() -> Any:
-    """Plug the driver into the controller by its folder; return the adapter module.
-
-    The registration is for this run only (``remember=False``), so the
-    validator never adds the driver to this computer's saved driver list.
-    """
+    """Return the adapter module, whose seams the --mock mode swaps out."""
     from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.zmart_adapter import (
         zmart_adapter as adapter,  # noqa: PLC0415
     )
 
-    zmart_controller.register_driver(_NAV_ROOT, remember=False)
     return adapter
 
 
@@ -151,13 +146,9 @@ def _connect_session(args: argparse.Namespace, adapter: Any, output_root: str | 
     In --mock mode the adapter's CAM connect is swapped for the in-process
     Python mock, so the whole controller -> adapter -> driver path runs offline.
     """
-    inst = next(
-        i
-        for i in zmart_controller.get_instruments()
-        if i.get("vendor") == "leica" and i.get("api") == "navigator-expert"
-    )
-    inst = dict(inst)
-    inst["client"] = args.client_name
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert import driver
+
+    inst = {"client": args.client_name}
     inst["api_delay_ms"] = args.api_delay_ms
     if output_root is not None:
         inst["output_root"] = output_root
@@ -183,7 +174,7 @@ def _connect_session(args: argparse.Namespace, adapter: Any, output_root: str | 
         # (same pinning as validate_hardware --mock).
         profiles.STATE_READERS = replace(profiles.STATE_READERS, selected_job_confirm_source="api")
 
-    return _ReportingSession(zmart_controller.set_instrument(inst))
+    return _ReportingSession(zmart_controller.set_instrument(driver, inst))
 
 
 def _confirm_live_write(args: argparse.Namespace) -> bool:
@@ -213,13 +204,6 @@ def _confirm_live_write(args: argparse.Namespace) -> bool:
 def phase_readonly(v: vh.Validator, sess: Any, args: argparse.Namespace) -> None:
     """Read-only controller round-trip: no moves, no writes, no acquisition."""
     with v.phase("read-only"):
-        insts = v.callable("get_instruments", zmart_controller.get_instruments)
-        if insts is not None:
-            present = any(
-                i.get("vendor") == "leica" and i.get("api") == "navigator-expert" for i in insts
-            )
-            v.compare("registry: leica adapter registered", present, True)
-
         act = v.callable("get_actuators", sess.get_actuators)
         if act is not None:
             v.compare(
@@ -231,7 +215,11 @@ def phase_readonly(v: vh.Validator, sess: Any, args: argparse.Namespace) -> None
         xyz = v.callable("get_xyz", sess.get_xyz)
         if xyz is not None:
             for axis in ("x", "y", "z"):
-                v.compare(f"get_xyz: {axis} unit is um", xyz[axis]["unit"], "um")
+                v.compare(
+                    f"get_xyz: {axis} has value, actuator and canvas",
+                    set(xyz[axis]) >= {"value", "actuator", "canvas"},
+                    True,
+                )
             hw = xyz.get("hardware") or {}
             needed = {"x_um", "y_um", "z_wide_um", "z_galvo_um", "objective", "job"}
             v.compare("get_xyz: hardware block complete", needed.issubset(hw), True)

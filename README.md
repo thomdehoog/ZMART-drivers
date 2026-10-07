@@ -38,19 +38,21 @@ and the driver plugged into it does the rest:
 
 | Microscope | Vendor interface | Driver | Status |
 |---|---|---|---|
-| Leica STELLARIS 5 | LAS X Python (CAM) API, Navigator Expert | [`zmart_drivers/leica/stellaris5_y42h93/navigator_expert/`](zmart_drivers/leica/stellaris5_y42h93/navigator_expert/README.md) | **Release candidate `6.0.0rc1`**, not yet released. Tested on the LAS X simulator and a real STELLARIS. Plugs into the controller by its folder. See its [release candidate review](zmart_drivers/leica/stellaris5_y42h93/navigator_expert/RELEASE_CANDIDATE_REVIEW.md). |
-| Nikon Ti2 | NIS-Elements AR 6.10, a bridge inside NIS | [`zmart_drivers/nikon/nis_elements_6_10/`](zmart_drivers/nikon/nis_elements_6_10/README.md) | Working on the NIS-Elements Ti2 simulator; not yet run on a real microscope. Plugs into the controller by its folder. |
-| ZEISS (ZEN blue or ZEN core) | ZEN API (`zen_api`, gRPC) | [`zmart_drivers/zeiss/zenapi/`](zmart_drivers/zeiss/zenapi/README.md) | Speaks the published ZEN API, tested against its own fake gateway; not yet run against ZEN itself. Plugs into the controller by its folder. |
-| mesoSPIM light-sheet | mesoSPIM-control, Remote Scripting | [`zmart_drivers/mesospim/`](zmart_drivers/mesospim/README.md) | Working through Remote Scripting. mesoSPIM-control's own Remote Control is the newer way in; this driver has not moved to it yet. Plugs into the controller by its folder. |
+| Leica STELLARIS 5 | LAS X Python (CAM) API, Navigator Expert | [`zmart_drivers/leica/stellaris5_y42h93/navigator_expert/`](zmart_drivers/leica/stellaris5_y42h93/navigator_expert/README.md) | **Release candidate `6.0.0rc1`**, not yet released. Tested on the LAS X simulator and a real STELLARIS. Plugs into the controller as a module. See its [release candidate review](zmart_drivers/leica/stellaris5_y42h93/navigator_expert/RELEASE_CANDIDATE_REVIEW.md). |
+| Nikon Ti2 | NIS-Elements AR 6.10, a bridge inside NIS | [`zmart_drivers/nikon/nis_elements_6_10/`](zmart_drivers/nikon/nis_elements_6_10/README.md) | Working on the NIS-Elements Ti2 simulator; not yet run on a real microscope. Plugs into the controller as a module. |
+| ZEISS (ZEN blue or ZEN core) | ZEN API (`zen_api`, gRPC) | [`zmart_drivers/zeiss/zenapi/`](zmart_drivers/zeiss/zenapi/README.md) | Speaks the published ZEN API, tested against its own fake gateway; not yet run against ZEN itself. Plugs into the controller as a module. |
+| mesoSPIM light-sheet | mesoSPIM-control, Remote Scripting | [`zmart_drivers/mesospim/`](zmart_drivers/mesospim/README.md) | Working through Remote Scripting. mesoSPIM-control's own Remote Control is the newer way in; this driver has not moved to it yet. Plugs into the controller as a module. |
 | Evident FLUOVIEW FV4000 | Remote Development Kit (RDK) | [`zmart_drivers/evident/`](zmart_drivers/evident/README.md) | Investigation only: a spike that proves the connection against a pretend RDK server. No driver yet, so nothing to plug in. |
 
 The Leica driver is the furthest along. The others work in their own test setups but have
 not been reviewed for release.
 
-Each of the four drivers carries a folder called `zmart_controller/`. It holds a `zmart.json`,
-which names the microscope and its connection settings, and the driver's functions, which the
-controller finds by name (see the controller's
-[driver guide](https://github.com/thomdehoog/ZMART-controller/blob/main/docs/driver.md)).
+Each of the four drivers carries a module called `driver.py`. It holds the driver's functions,
+one per controller command, which the controller finds by name when you hand it the module (see
+the controller's
+[guide to plugging in a driver](https://github.com/thomdehoog/ZMART-controller/blob/main/docs/1_plug_in_a_driver/README.md)).
+Every connection setting is optional: a driver fills in what you leave out, such as where its
+vendor software listens.
 Through the controller, every command answers `{"success": ..., "content": ...}`, and
 `get_info` describes the microscope in plain words: what each setting means, its unit and its
 bounds, and which objectives (or, on the mesoSPIM, which zooms) are fitted, filled in from what
@@ -87,22 +89,21 @@ pip install -e ".[leica]"
 The ZEISS driver also needs ZEISS's own `zen_api` package, which must match your ZEN version;
 its [README](zmart_drivers/zeiss/zenapi/README.md) explains how to install it.
 
-Then plug the driver for your microscope into the controller, once on the microscope computer.
-Give the controller the driver's folder or its module name:
+Then import the driver module for your microscope and hand it to the controller:
 
 ```python
 import zmart_controller
+import zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver as stellaris
 
-zmart_controller.register_driver("zmart_drivers.leica.stellaris5_y42h93.navigator_expert")
-instrument = next(i for i in zmart_controller.get_instruments() if i["vendor"] == "leica")
-zmart_controller.set_instrument(instrument)
+zmart_controller.set_instrument(stellaris)
 print(zmart_controller.get_info()["content"]["description"])
 ```
 
-The controller remembers the driver, so later sessions find it by themselves. The module names
-of the other drivers are `zmart_drivers.nikon.nis_elements_6_10`, `zmart_drivers.zeiss.zenapi`
-and `zmart_drivers.mesospim`. To give an instrument another name or connection setting, edit
-the `zmart.json` in the driver's `zmart_controller/` folder.
+The driver modules of the other drivers are `zmart_drivers.nikon.nis_elements_6_10.driver`,
+`zmart_drivers.zeiss.zenapi.driver` and `zmart_drivers.mesospim.driver`. To give an instrument
+another name or connection setting, pass a connection dictionary as the second argument, for
+example `zmart_controller.set_instrument(stellaris, {"output_root": r"D:\images"})`; each
+driver's `driver.py` lists the settings it understands.
 
 The Leica driver runs on the computer that runs LAS X, because it loads Leica's interface
 directly into Python. Each driver's README explains its own installation, its setup, and how
@@ -126,7 +127,7 @@ each driver's setup lives in the driver, as listed above.
 ## Testing
 
 Every driver carries its own offline test suite, which runs without a microscope or vendor
-software. Each suite also plugs its driver into the ZMART Controller by its folder and lets the
+software. Each suite also plugs its driver module into the ZMART Controller and lets the
 controller check every answer. Install the test extras, then run the suites from the root
 folder of this repository:
 
@@ -141,9 +142,9 @@ python zmart_drivers/mesospim/run_ci.py
 ```
 
 The ZEISS suite counts style findings from ruff as failures; `--no-lint` leaves that check out
-until its existing findings are fixed. `-P` keeps the folder Python starts in off its search path. Start pytest from the repository
-root, or keep `-P`: started inside a driver folder, Python would otherwise find the driver's
-plug-in folder `zmart_controller/` in place of the real ZMART Controller.
+until its existing findings are fixed. `-P` keeps the folder Python starts in off its search
+path, so that a driver folder with a common name, such as `config`, is never imported in place
+of another package.
 
 The continuous-integration workflow in `.github/workflows/` runs all four suites on Linux and
 Windows, with Python 3.11 and 3.12. Six tests of the Leica suite fail and are known; its

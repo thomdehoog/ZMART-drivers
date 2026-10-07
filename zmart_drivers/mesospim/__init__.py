@@ -25,9 +25,13 @@ The public surface is **synchronous**, so operator notebooks keep the thin
     saved = drv.save(acq, run_dir, position_label="A1")
     drv.close(client)
 
-To drive it through the vendor-neutral controller instead, plug it in by its
-folder or module name with ``zmart_controller.register_driver`` (see
-``zmart_controller/`` in this folder); importing the package registers nothing.
+To drive it through the vendor-neutral controller instead, hand its driver
+module to the controller (see ``driver.py`` in this folder)::
+
+    import zmart_controller
+    import zmart_drivers.mesospim.driver as mesospim
+
+    zmart_controller.set_instrument(mesospim)
 
 Author: Thom de Hoog (ZMB, University of Zurich)
         thom.dehoog@zmb.uzh.ch . thomdehoog@gmail.com

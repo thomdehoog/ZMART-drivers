@@ -4,8 +4,8 @@ ZMART controller adapter.
 The seam that plugs this driver into the vendor-agnostic **ZMART controller**
 (``zmart_controller``). The controller drives every microscope through one small
 set of functions -- ``connect`` plus one function per command. This module
-implements them for mesoSPIM; the plug-in folder ``zmart_controller/`` hands them
-to the controller, and its ``zmart.json`` names the instrument.
+implements them for mesoSPIM; ``driver.py`` beside it hands them to the
+controller.
 
 Like the reference ``mock_driver``, the driver owns the frame **origin**: the
 controller works in micrometers from an origin the driver subtracts, so the
@@ -18,15 +18,17 @@ The controller surface is deliberately x/y/z centric. mesoSPIM's extra axes
 state**. The full driver API (``import mesospim``) remains available for anything
 the neutral surface does not cover.
 
-Plug the driver in once on the microscope computer, by its folder or module
-name; importing this module registers nothing::
+Plug the driver in by handing its ``driver`` module to the controller::
 
     import zmart_controller
+    import zmart_drivers.mesospim.driver as mesospim
 
-    zmart_controller.register_driver("zmart_drivers.mesospim")
+    zmart_controller.set_instrument(mesospim)
 
-To give the instrument another name, host or port, edit the plug-in folder's
-``zmart.json``.
+To give the instrument another name, host or port, pass them in the
+connection dictionary, for example
+``zmart_controller.set_instrument(mesospim, {"host": "10.0.0.5"})``; any key
+left out takes its value from :data:`CONNECTION`.
 
 Author: Thom de Hoog (ZMB, University of Zurich)
         thom.dehoog@zmb.uzh.ch . thomdehoog@gmail.com
@@ -36,7 +38,6 @@ License: MIT
 from __future__ import annotations
 
 import functools
-import json
 import logging
 import shutil
 import tempfile
@@ -55,6 +56,13 @@ from .limits import checks as _limits
 from .readers import readers as _readers
 
 log = logging.getLogger(__name__)
+
+# The connection settings used for any key the caller leaves out.
+# ``microscope`` names this instrument (it picks the folder its origin and
+# limits are saved in), and ``host`` and ``port`` are where mesoSPIM-control's
+# Remote Scripting server listens. Pass other values to connect to change them
+# for one session.
+CONNECTION = {"microscope": "mesospim-01", "host": "127.0.0.1", "port": 42000}
 
 # The ops that change something about the microscope. Each MUST have an entry
 # in function_limits.json (null = reviewed-and-unlimited); the loader rejects
@@ -114,11 +122,14 @@ class MesospimHandle:
 # =============================================================================
 
 
-def connect(connection: dict) -> MesospimHandle:
+def connect(connection: dict | None = None) -> MesospimHandle:
     """Open a mesoSPIM session and capture the initial positions.
 
-    Honours ``connection`` keys ``host`` / ``port`` / ``timeout`` (forwarded to
-    the driver ``connect``), ``output_root`` (where ``acquire`` saves),
+    Every key of ``connection`` is optional; a key left out takes its value
+    from :data:`CONNECTION`, so an empty dictionary connects to the Remote
+    Scripting server on this computer. Honours ``microscope`` (the name of
+    this instrument, which picks its configuration folder), ``host`` /
+    ``port`` / ``timeout`` (forwarded to the driver ``connect``), ``output_root`` (where ``acquire`` saves),
     ``machine_root`` (override for the ProgramData root -- see
     ``calibration.machine``), and ``stage_limits`` (an explicit path to a
     stage-limits config; default resolves the machine copy, else the bundled
@@ -133,11 +144,12 @@ def connect(connection: dict) -> MesospimHandle:
     with the driver's :func:`set_origin` setup step is loaded as well, so the
     zero point survives reconnects.
     """
+    connection = {**CONNECTION, **(connection or {})}
     client = _connect(connection)
     output_root = Path(connection.get("output_root") or tempfile.mkdtemp(prefix="mesospim_run_"))
     output_root.mkdir(parents=True, exist_ok=True)
     machine = _machine.MachineProfile(
-        microscope_id=connection.get("microscope") or CONNECTION["microscope"],
+        microscope_id=connection["microscope"],
         programdata_root=connection.get("machine_root"),
     )
 
@@ -336,11 +348,10 @@ def _validate_actuators(with_actuators: dict | None) -> None:
 
 
 def get_xyz(handle: MesospimHandle, *, with_actuators: dict | None = None) -> dict:
-    """Report the linear position per axis (um, relative to origin).
+    """Report each linear axis: its position (um from the origin), motor and canvas.
 
-    ``range`` is how far each axis may travel, ``[min, max]`` in um from the
-    origin: the stage envelope loaded at connect, the one every move is
-    checked against. It is None for an axis the envelope does not cover.
+    The ``canvas`` is everywhere a picture can show on that axis, ``[min,
+    max]`` in um from the origin; see :func:`_canvas`.
     """
     _validate_actuators(with_actuators)
     pos = _readers.get_positions(handle.client)
@@ -349,19 +360,35 @@ def get_xyz(handle: MesospimHandle, *, with_actuators: dict | None = None) -> di
         axis: {
             "value": user[axis],
             "actuator": _ACTUATORS[axis][0],
-            "unit": "um",
-            "range": _range(handle, axis),
+            "canvas": _canvas(handle, axis, user[axis]),
         }
         for axis in ("x", "y", "z")
     }
 
 
-def _range(handle: MesospimHandle, axis: str) -> list[float] | None:
-    """The stage envelope of one axis, shifted into the frame."""
+def _canvas(handle: MesospimHandle, axis: str, value: float) -> list[float]:
+    """Everywhere a picture can show on one axis, ``[min, max]`` in um from the origin.
+
+    It starts from the stage envelope loaded at connect, the one every move
+    is checked against. A picture is centred on the stage position, so one
+    taken at the edge of x or y shows half a field beyond it. The widest field
+    is that of the zoom with the largest pixels, over the longer side of the
+    camera, so x and y are both widened by half of it. z is not widened: a
+    stack is refused unless both its ends lie inside the envelope, so no plane
+    is ever taken outside it. When the envelope does not cover an axis, the
+    canvas is the current position alone.
+    """
     bounds = handle.stage_limits.get(axis)
     if bounds is None:
-        return None
-    return [float(bounds[0]) - handle.origin[axis], float(bounds[1]) - handle.origin[axis]]
+        return [value, value]
+    widen = 0.0
+    if axis in ("x", "y"):
+        widest_pixel_um = max(size for _name, size in HARDWARE.zoom_pixel_size_um)
+        widen = max(HARDWARE.camera_pixels) * widest_pixel_um / 2
+    return [
+        float(bounds[0]) - handle.origin[axis] - widen,
+        float(bounds[1]) - handle.origin[axis] + widen,
+    ]
 
 
 def set_xyz(
@@ -592,7 +619,7 @@ def acquire(
         "position_label": position_label,
         "folder": folder,
         "format": fmt,
-        "planes": result.planes,
+        "planes": _planes(handle, result, saved),
         # Every file saved, under the name the ZMART Controller's contract fixes,
         # so a workflow finds the pictures on any microscope: the images, then
         # the metadata written beside them.
@@ -601,6 +628,40 @@ def acquire(
         "position": _user_xyz(handle, _readers.get_positions(handle.client)),
         "duration_s": result.duration_s,
     }
+
+
+def _planes(handle: MesospimHandle, result: Any, saved: Any) -> list[dict]:
+    """One entry per saved image plane: which file, which depth, and where it was taken.
+
+    mesoSPIM records one channel per acquisition, so ``c`` is always 0. The
+    stage stays at one x and y during a stack, and the planes step from
+    ``z_start`` towards ``z_end`` by ``z_step``. The image writer saves either
+    one file holding every plane, or one file per plane; in the first case
+    every plane names that file, and ``z`` finds the plane inside it.
+    """
+    acq = result.acquisition
+    paths = [str(p) for p in saved.image_paths]
+    count = int(result.planes)
+    z_start = float(acq.get("z_start") or 0.0)
+    z_end = float(acq.get("z_end") or z_start)
+    step = abs(float(acq.get("z_step") or 1.0)) * (-1.0 if z_end < z_start else 1.0)
+    x_um = float(acq.get("x_pos") or 0.0) - handle.origin["x"]
+    y_um = float(acq.get("y_pos") or 0.0) - handle.origin["y"]
+    # ponytail: assumes one file per plane only when the counts match; any other
+    # split falls back to the first file.
+    one_per_file = len(paths) == count and count > 1
+    return [
+        {
+            "path": paths[index] if one_per_file else paths[0],
+            "c": 0,
+            "z": index,
+            "t": 0,
+            "x_um": x_um,
+            "y_um": y_um,
+            "z_um": z_start + index * step - handle.origin["z"],
+        }
+        for index in range(count)
+    ]
 
 
 def _settle(handle: MesospimHandle, overshoot_um: float = 5.0) -> None:
@@ -626,13 +687,6 @@ def _settle(handle: MesospimHandle, overshoot_um: float = 5.0) -> None:
 # =============================================================================
 # info
 # =============================================================================
-
-# The instrument this driver serves, with its connect settings, exactly as the
-# controller reads it from the plug-in folder's zmart.json. ``microscope``
-# is a placeholder for a specific instrument; edit it (and host/port) per
-# deployment.
-_MANIFEST = Path(__file__).resolve().parent / "zmart_controller" / "zmart.json"
-CONNECTION = json.loads(_MANIFEST.read_text(encoding="utf-8"))["instruments"][0]
 
 # The microscope in plain words, for whoever drives it: a person, a notebook,
 # or the ZMART AI agent, which builds its picture of the instrument from this.
@@ -741,7 +795,7 @@ def _answered(function):
 def ops_table() -> dict[str, Any]:
     """The functions this driver hands to the controller, one per command.
 
-    The plug-in folder ``zmart_controller/`` exposes these by name.
+    ``driver.py`` exposes these by name.
     ``connect`` and ``disconnect`` are handed over unchanged. Every other
     command is wrapped so that, called through the controller, it answers
     ``{"success": ..., "content": ...}``. Called directly from this module,

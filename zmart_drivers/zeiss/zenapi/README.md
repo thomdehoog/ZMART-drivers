@@ -120,19 +120,18 @@ driver does not use (they answer *unimplemented*).
 
 With the controller (what a workflow does). Install this repository once,
 from its root folder, with `pip install -e ".[zeiss]"` and the `zen_api`
-package from `requirements.txt`. Then plug the driver into the controller,
-once per computer, by its folder or module name. The controller reads
-`zmart_controller/zmart.json` in this folder, which names the instrument:
+package from `requirements.txt`. Then hand the driver module to the
+controller, with the path of your `config.ini`. Every other connection
+setting is optional; the instrument is called `zen-lm` unless you name it
+with `microscope`:
 
 ```python
 import zmart_controller
-
-zmart_controller.register_driver("zmart_drivers.zeiss.zenapi")
-instrument = next(i for i in zmart_controller.get_instruments() if i["vendor"] == "zeiss")
+import zmart_drivers.zeiss.zenapi.driver as zeiss
 
 s = zmart_controller.set_instrument(
+    zeiss,
     {
-        **instrument,
         "config": r"C:\zen\config.ini",
         "output_root": r"D:\runs\today",
         "experiment": "ZMART_Snap",
@@ -191,8 +190,8 @@ Run these lines again whenever you want a new origin.
 
 | Neutral surface | ZEN meaning |
 |---|---|
-| `get_xyz` / `set_xyz` | The XY stage and the focus drive, µm, absolute from the origin. Every target is checked against this microscope's stage limits before ZEN is asked to move (XY first, then Z). One motor per axis, so `get_actuators` lists `motoric` only. |
-| `acquire` | Runs the loaded ZEN experiment: a **snap** (one image with the active channels) by default, the **whole experiment** (Z-stack, tiles, time series) when the acquisition setting `mode` is `"experiment"`. ZEN writes `<label>.czi` into its image folder (`<folder>_<label>.czi` when the `folder` setting is given); the file is copied to `<output_root>/data/` (or `<output_root>/data/<folder>/`) when that folder is reachable, otherwise the record says where ZEN left it. |
+| `get_xyz` / `set_xyz` | The XY stage and the focus drive, µm, absolute from the origin. Every target is checked against this microscope's stage limits before ZEN is asked to move (XY first, then Z). One motor per axis, so `get_actuators` lists `motoric` only. Each axis reports its `value`, its `actuator` and its `canvas`, everywhere a picture can show. Here the canvas is the travel itself, because the field size and the depth of a stack are set inside the ZEN experiment, which the ZEN API does not report. |
+| `acquire` | Runs the loaded ZEN experiment: a **snap** (one image with the active channels) by default, the **whole experiment** (Z-stack, tiles, time series) when the acquisition setting `mode` is `"experiment"`. ZEN writes `<label>.czi` into its image folder (`<folder>_<label>.czi` when the `folder` setting is given); the file is copied to `<output_root>/data/` (or `<output_root>/data/<folder>/`) when that folder is reachable, otherwise the record says where ZEN left it. For a snap the answer lists each channel under `planes`; for a whole experiment `planes` stays empty, because how its images are laid out is only written inside the CZI, and `image_count` says how many images ZEN took. |
 | `get_state` / `set_state` | Changeable: `objective_position` (position on the objective changer), `experiment` (the loaded ZEN experiment, which carries the imaging settings). Observed: objectives (name, magnification, NA), the experiments ZEN can load, ZEN's image folder, the limits, whether ZEN is busy. |
 | `get_procedures` / `run_procedure` | `software_autofocus` (ZEN's focus search with the settings of the loaded experiment; reports `frame_z_um`), `find_surface` / `store_focus` / `recall_focus` (Definite Focus, on systems that have it), `live`, `stop`. |
 | `get_info` | Initial position, limits and where they came from, objectives, output root, ZEN's image folder, and which `zen_api` version and services the session speaks. |
@@ -212,7 +211,7 @@ you whether that has been done.
 ```
 zmart_drivers/zeiss/zenapi/
 ├── zen_zmart_adapter.py   the functions the ZMART Controller calls, one per command
-├── zmart_controller/      the plug-in folder the controller reads (zmart.json names the instrument)
+├── driver.py              the module handed to zmart_controller.set_instrument
 ├── connection/   zen_runtime.py  the ONE place that imports zen_api: service classes
 │                                 (with the stage-service fallback across ZEN releases),
 │                                 request messages, TLS, token, config.ini
@@ -258,9 +257,9 @@ python -P -m pytest zmart_drivers/zeiss/zenapi/tests/gateway  # 23 tests: the re
 python zmart_drivers/zeiss/zenapi/run_ci.py --hardware   # ONLY the @pytest.mark.hardware suite (needs a real gateway)
 ```
 
-`-P` keeps the folder Python starts in off its search path. Without it,
-starting Python inside this driver folder would import the plug-in folder
-`zmart_controller/` in place of the real ZMART Controller.
+`-P` keeps the folder Python starts in off its search path, so that a folder
+of this driver with a common name, such as `config` or `connection`, is never
+imported in place of another package.
 
 The unit layer injects fake service objects into a **real** `ZenClient`, so the
 async-to-blocking bridge, the dispatch retry and confirm loop, unit conversion,

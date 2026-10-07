@@ -14,10 +14,15 @@ Quick use::
     nis.move_xyz(client, 100, 0, 500) # absolute, checked against NIS limits
     nis.capture(client); nis.save_image(client, r"C:\data\snap.tif")
 
-To drive it through the ZMART Controller, plug it in by its folder or module
-name with ``zmart_controller.register_driver`` (see ``zmart_controller/`` in
-this folder); importing this package registers nothing. See ``README.md`` for
-the setup steps.
+To drive it through the ZMART Controller, hand its ``driver`` module to the
+controller (see ``driver.py`` in this folder)::
+
+    import zmart_controller
+    import zmart_drivers.nikon.nis_elements_6_10.driver as nikon
+
+    zmart_controller.set_instrument(nikon)
+
+See ``README.md`` for the setup steps.
 
 Author: Thom de Hoog (ZMB, University of Zurich)
         thom.dehoog@zmb.uzh.ch . thomdehoog@gmail.com

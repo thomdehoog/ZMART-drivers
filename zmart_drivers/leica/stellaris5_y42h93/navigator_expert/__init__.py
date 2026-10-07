@@ -15,7 +15,7 @@ Package layout::
                     allow-list, setter allow-lists (config + checks), templates,
                     and the operator notebook that creates the machine-local files
     - zmart_adapter/ the functions that plug this driver into zmart_controller
-    - zmart_controller/ the plug-in folder the controller reads (zmart.json)
+    - driver.py     the module handed to zmart_controller.set_instrument
     - experimental/ LRP mutation helpers without live-state readback
     - tests/        offline unit suite + hardware validators
 """
