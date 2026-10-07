@@ -4,10 +4,10 @@ The functions that plug this driver into ``zmart_controller``: one function
 per controller command, each taking the opaque handle as its first argument.
 The controller stays vendor-free — this module (not the controller) knows
 both contracts. The controller finds these functions through the driver
-module, ``driver.py`` in the driver folder::
+module, ``zmart_controller_plugin.py`` in the driver folder::
 
     import zmart_controller
-    import zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver as stellaris
+    import zmart_drivers.leica.stellaris5_y42h93.navigator_expert.zmart_controller_plugin as stellaris
 
     zmart_controller.set_instrument(stellaris)
 
@@ -63,7 +63,7 @@ before trusting large z moves.
 
 Dependency direction:
     - Imports: driver internals only; nothing from ``zmart_controller``.
-    - Imported by: the driver module ``driver.py`` — nothing else in the
+    - Imported by: the driver module ``zmart_controller_plugin.py`` — nothing else in the
       driver.
 """
 
@@ -102,7 +102,7 @@ from . import info as _info
 log = logging.getLogger(__name__)
 
 # The connection settings used for any key the caller leaves out; the
-# docstring of driver.py explains each one. ``microscope`` names this
+# docstring of zmart_controller_plugin.py explains each one. ``microscope`` names this
 # instrument. Image orientation is enabled by IMAGE_SAVE in config/profiles.py;
 # only the orientation measurement explicitly saves raw pixels.
 CONNECTION = {

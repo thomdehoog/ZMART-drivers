@@ -26,10 +26,10 @@ The public surface is **synchronous**, so operator notebooks keep the thin
     drv.close(client)
 
 To drive it through the vendor-neutral controller instead, hand its driver
-module to the controller (see ``driver.py`` in this folder)::
+module to the controller (see ``zmart_controller_plugin.py`` in this folder)::
 
     import zmart_controller
-    import zmart_drivers.mesospim.driver as mesospim
+    import zmart_drivers.mesospim.zmart_controller_plugin as mesospim
 
     zmart_controller.set_instrument(mesospim)
 

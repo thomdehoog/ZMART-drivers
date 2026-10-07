@@ -854,7 +854,7 @@ def test_controller_session_bypass_refuses_at_the_commands_layer(clear_stage_lim
 
     import zmart_controller
 
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert import driver
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert import zmart_controller_plugin as driver
     from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.readers import (
         parsing as _cmd_settings,
     )

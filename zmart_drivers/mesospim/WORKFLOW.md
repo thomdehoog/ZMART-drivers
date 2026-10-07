@@ -59,7 +59,7 @@ pip install -e .
 ```
 
 There is nothing to register: you plug the driver in by handing its module,
-`zmart_drivers.mesospim.driver`, to the controller, as shown in section 4.
+`zmart_drivers.mesospim.zmart_controller_plugin`, to the controller, as shown in section 4.
 
 ## 3. Start the Remote Scripting server
 
@@ -87,8 +87,8 @@ python zmart_drivers/mesospim/tests/hardware/launch_demo_server.py
 ```python
 import zmart_controller
 
-# Once: add the driver to the controller's list (omit the token if the server is open).
-zmart_controller.add_driver("mesospim", "zmart_drivers.mesospim.driver", {"token": "choose-a-token"})
+# Once: register the driver's plug-in file (omit the token if the server is open).
+zmart_controller.register_driver("C:/ZMART-drivers/zmart_drivers/mesospim/zmart_controller_plugin.py", {"token": "choose-a-token"})
 
 sess = zmart_controller.set_instrument("mesospim")
 

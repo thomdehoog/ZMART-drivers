@@ -2,7 +2,7 @@
 
 The implementation lives in :mod:`.zmart_adapter`; this file only re-exports
 the public surface. The controller is handed the driver module,
-``driver.py`` in the driver folder (see the module docstring for the usage
+``zmart_controller_plugin.py`` in the driver folder (see the module docstring for the usage
 example).
 
 Tests and validators that patch the adapter's driver seams (``_session``,

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from zmart_drivers.mesospim import driver
+from zmart_drivers.mesospim import zmart_controller_plugin as driver
 from zmart_drivers.mesospim import mesospim_zmart_adapter as adapter
 from zmart_drivers.mesospim.limits import checks as limits
 
@@ -39,7 +39,7 @@ def session(server, tmp_path):
 
 
 def test_context_names_the_driver(session):
-    assert session.context == {"driver": "zmart_drivers.mesospim.driver"}
+    assert session.context == {"driver": "zmart_drivers.mesospim.zmart_controller_plugin"}
 
 
 def test_actuators_and_origin(session):

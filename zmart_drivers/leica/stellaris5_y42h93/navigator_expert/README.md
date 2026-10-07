@@ -57,14 +57,14 @@ LAS X.
   ```
   The Leica package is self-contained; its filename helper lives under
   `navigator_expert.acquisition.naming`.
-- **Plug it into the ZMART Controller** on the LAS X computer. Add the driver module,
-  `driver.py` in this folder, to the controller's list of drivers once; from then on every
-  session plugs it in by name. Every connection setting is optional; `driver.py` explains each one:
+- **Plug it into the ZMART Controller** on the LAS X computer. Register `zmart_controller_plugin.py`,
+  in this folder, with the controller once; from then on every session plugs the driver in by name.
+  Its settings, `CONNECTION` in that file, are all optional; the file explains each one:
   ```python
   import zmart_controller
 
   # Once, on the LAS X computer:
-  zmart_controller.add_driver("stellaris", "zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver")
+  zmart_controller.register_driver("C:/ZMART-drivers/zmart_drivers/leica/stellaris5_y42h93/navigator_expert/zmart_controller_plugin.py")
 
   # In every session:
   zmart_controller.set_instrument("stellaris")
@@ -457,7 +457,7 @@ zmart_drivers/leica/stellaris5_y42h93/navigator_expert/
 ├── limits/       config.py · checks.py (envelope + backstop + objective/setter allow-lists) · defaults/ · setup notebook; runtime truth is ProgramData
 ├── orientation/  camera↔stage quarter-turn, applied at save; measured by set_orientation, stored in the machine snapshot next to calibration + limits
 ├── zmart_adapter/  the functions the ZMART Controller calls, one per command
-├── driver.py     the module handed to zmart_controller.set_instrument
+├── zmart_controller_plugin.py     the module handed to zmart_controller.set_instrument
 ├── tests/        unit/ (offline) + hardware/ (validate_*.py live scripts + mock-backed test_* gates)
 └── run_ci.py · pytest.ini   (package root)
 ```

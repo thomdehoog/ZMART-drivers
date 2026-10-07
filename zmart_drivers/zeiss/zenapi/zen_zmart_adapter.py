@@ -5,7 +5,7 @@ The seam that plugs this driver into the vendor-agnostic **ZMART controller**
 (``zmart_controller``). The controller drives every microscope through one
 small set of functions -- ``connect`` plus one function per command. This
 module implements them for ZEN (through the ZEN API gateway, see
-``connection/``); ``driver.py`` beside it hands them to the controller.
+``connection/``); ``zmart_controller_plugin.py`` beside it hands them to the controller.
 
 As in the other drivers, the driver owns the frame **origin**: the controller
 works in micrometres from an origin the driver subtracts, so the controller
@@ -28,7 +28,7 @@ What the neutral surface covers for ZEN today:
 Plug the driver in by handing its ``driver`` module to the controller::
 
     import zmart_controller
-    import zmart_drivers.zeiss.zenapi.driver as zeiss
+    import zmart_drivers.zeiss.zenapi.zmart_controller_plugin as zeiss
 
     zmart_controller.set_instrument(zeiss, {"config": "C:/ZEN/config.ini"})
 
@@ -757,7 +757,7 @@ def _answered(function):
 def ops_table() -> dict[str, Any]:
     """The functions this driver hands to the controller, one per command.
 
-    ``driver.py`` exposes these by name.
+    ``zmart_controller_plugin.py`` exposes these by name.
     ``connect`` and ``disconnect`` are handed over unchanged. Every other
     command is wrapped so that, called through the controller, it answers
     ``{"success": ..., "content": ...}``. Called directly from this module,

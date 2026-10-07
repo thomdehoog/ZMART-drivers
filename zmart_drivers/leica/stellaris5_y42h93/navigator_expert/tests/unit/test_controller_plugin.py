@@ -15,7 +15,7 @@ import zmart_controller
 from limits_fixtures import hermetic_mock_machine_root
 from mock_lasx_api import MockLasxClient
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert import driver
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert import zmart_controller_plugin as driver
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.config import profiles
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.zmart_adapter import (
     zmart_adapter as adapter,

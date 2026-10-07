@@ -24,7 +24,7 @@ import socket
 import pytest
 import zmart_controller
 
-from zmart_drivers.mesospim import driver
+from zmart_drivers.mesospim import zmart_controller_plugin as driver
 
 pytestmark = pytest.mark.integration
 

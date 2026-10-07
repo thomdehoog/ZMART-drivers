@@ -30,7 +30,7 @@ uses the parts below it.
 ```
   experiments and workflows
   ───────────────────────────────────────────────────────────────
-  8  driver.py                  the functions the controller calls
+  8  zmart_controller_plugin.py                  the functions the controller calls
   5  Procedures                 recipes built from get and set actions
   4  Set actions  ──────────┐   change the microscope, then confirm it
      + set dispatcher        │   (limits gate, retry, confirm, give up softly)
@@ -60,7 +60,7 @@ my_driver/
         limits/
         optical_calibration/
         machine_description/
-    driver.py                  # the functions the controller calls
+    zmart_controller_plugin.py                  # the functions the controller calls
     __init__.py                # makes them available by name on the package
     testing/
         mock_api/
@@ -360,11 +360,11 @@ the objective offsets) lives once, as a pair of plain functions next to this
 configuration. The get and set actions for position use these functions.
 That way:
 
-- everything above the actions (procedures, `driver.py`, experiments) speaks
+- everything above the actions (procedures, `zmart_controller_plugin.py`, experiments) speaks
   one coordinate system, the user's;
 - the limits gate checks raw stage coordinates, so recording a new origin can
   never move the safe travel range;
-- `driver.py` does no arithmetic of its own.
+- `zmart_controller_plugin.py` does no arithmetic of its own.
 
 Today the Leica driver does this arithmetic inside its controller adapter.
 Moving it down into the actions means procedures and setup notebooks can no
@@ -375,7 +375,7 @@ longer accidentally use a different coordinate system from the experiments.
 **Purpose.** To present the driver to the ZMART Controller in the shape every
 microscope shares.
 
-They live in one file, `driver.py`: the 11 functions of the controller
+They live in one file, `zmart_controller_plugin.py`: the 11 functions of the controller
 contract, `connect`, `get_info`, `get_actuators`, `get_xyz`, `set_xyz`,
 `get_state`, `set_state`, `get_acquisition_settings`, `acquire`,
 `get_procedures` and `run_procedure`, plus an optional `disconnect`. The
@@ -386,7 +386,7 @@ The full contract is described in [Plug in a driver](https://github.com/thomdeho
 
 **Rules.**
 
-- `driver.py` **only maps** the driver's get actions, set actions and
+- `zmart_controller_plugin.py` **only maps** the driver's get actions, set actions and
   procedures onto the 11 functions. It does no coordinate arithmetic and no
   safety checks of its own; those already happened further down.
 - `validate_driver(my_driver)` checks that every answer has the right shape.
@@ -479,7 +479,7 @@ What is the same in every driver, and what differs:
 | Procedures | The "get and set actions only" rule; the algorithms | The recipes |
 | Data handling | OME-TIFF and OME-Zarr writing, naming, the command log | Finding and reading the vendor's raw output |
 | Configuration | Load, check and save; the notebook pattern | Default values; the machine description |
-| `driver.py` | The 11-function contract and `validate_driver` | Mapping actions onto those 11 |
+| `zmart_controller_plugin.py` | The 11-function contract and `validate_driver` | Mapping actions onto those 11 |
 | Testing | The dispatcher and error-rule tests; offline before hardware | The mock API; the hardware checks |
 
 ## Experimental code
@@ -518,7 +518,7 @@ by any other part of the driver. The Leica driver already works this way.
    and the first user of the shared package.
 2. **Write the contract additions** into the controller's [Plug in a driver](https://github.com/thomdehoog/ZMART-controller/blob/main/docs/1_plug_in_a_driver/README.md):
    the unconfirmed rule, and stop once it is decided.
-3. **Give Leica a `driver.py`.** The controller now plugs in a driver by
+3. **Give Leica a `zmart_controller_plugin.py`.** The controller now plugs in a driver by
    being handed its module, `set_instrument(my_driver)`, so each driver
    needs one module that offers the 11 functions by name.
 4. **Move the shared parts out of Leica one at a time** (the algorithms, then

@@ -398,7 +398,7 @@ This finding and H13 are both about the "freshness" of what the driver reads bac
   - Where: `pytest.ini`.
   - `pytest.ini` already says so openly. There is nothing to fix now; the note is here only so no one assumes `-m "not hardware"` filters anything.
 - **L8. Plugging the driver in by its folder path failed.** *Resolved.*
-  - The controller used to register drivers by folder or module name, and registering the Leica folder failed on a relative import. The controller no longer keeps a registry: a driver is a module handed to `zmart_controller.set_instrument`, and this driver's module is `navigator_expert/driver.py`, imported by its full name. Nothing is looked up by folder any more, so the failure cannot occur.
+  - The controller used to register drivers by folder or module name, and registering the Leica folder failed on a relative import. The controller no longer keeps a registry: a driver is a module handed to `zmart_controller.set_instrument`, and this driver's module is `navigator_expert/zmart_controller_plugin.py`, imported by its full name. Nothing is looked up by folder any more, so the failure cannot occur.
   - Source: Claude, found while preparing this release candidate.
 
 ---

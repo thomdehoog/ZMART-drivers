@@ -13,7 +13,7 @@ from pathlib import Path
 import pytest
 import zmart_controller
 
-from zmart_drivers.mesospim import driver
+from zmart_drivers.mesospim import zmart_controller_plugin as driver
 from zmart_drivers.mesospim import mesospim_zmart_adapter as adapter
 from zmart_drivers.mesospim.config.profiles import HARDWARE
 from zmart_drivers.mesospim.limits import checks as limits
@@ -36,7 +36,7 @@ def instrument(server, tmp_path, monkeypatch):
 def test_the_module_holds_every_function_the_controller_needs(instrument):
     session = zmart_controller.session.set_instrument(driver, instrument)
     try:
-        assert session.context == {"driver": "zmart_drivers.mesospim.driver"}
+        assert session.context == {"driver": "zmart_drivers.mesospim.zmart_controller_plugin"}
     finally:
         session.disconnect()
 

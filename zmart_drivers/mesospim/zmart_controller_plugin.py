@@ -5,7 +5,7 @@ names the controller looks for. Hand it to the controller to drive the
 microscope::
 
     import zmart_controller
-    import zmart_drivers.mesospim.driver as mesospim
+    import zmart_drivers.mesospim.zmart_controller_plugin as mesospim
 
     zmart_controller.set_instrument(mesospim)
 
@@ -31,6 +31,11 @@ University of Zurich (thom.dehoog@zmb.uzh.ch, thomdehoog@gmail.com).
 """
 
 from . import mesospim_zmart_adapter as _adapter
+
+# The driver's name in the controller's list of drivers, and its configuration
+# on this computer: the adapter's defaults, which you may edit here.
+NAME = "mesospim"
+CONNECTION = dict(_adapter.CONNECTION)
 
 _OPS = _adapter.ops_table()
 

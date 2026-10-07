@@ -255,11 +255,11 @@ Through the vendor-neutral controller instead (`import zmart_controller`):
 ```python
 import zmart_controller
 
-# Once, on the microscope computer: add the driver to the controller's list.
-# Every connection setting is optional: host and port default to
-# 127.0.0.1:42000, and the instrument is called mesospim-01. Add
-# {"token": "…"} as a third argument if the server requires one.
-zmart_controller.add_driver("mesospim", "zmart_drivers.mesospim.driver")
+# Once, on the microscope computer: register the driver's plug-in file.
+# Its settings (CONNECTION in that file) are optional: host and port default
+# to 127.0.0.1:42000, and the instrument is called mesospim-01. Add
+# {"token": "…"} as a second argument if the server requires one.
+zmart_controller.register_driver("C:/ZMART-drivers/zmart_drivers/mesospim/zmart_controller_plugin.py")
 
 # In every session:
 sess = zmart_controller.set_instrument("mesospim")
@@ -422,7 +422,7 @@ Profiles `ACQUISITION`, `CONNECTION`, `HARDWARE` and the exception `LimitError` 
 
 ### Controller & protocol
 ```python
-# zmart_controller.add_driver("mesospim", "zmart_drivers.mesospim.driver") installs it once (see driver.py)
+# zmart_controller.register_driver(".../mesospim/zmart_controller_plugin.py") registers it once
 # protocol (advanced callers / server authors):
 Request, Reply, encode_request, parse_request, parse_reply, PROTOCOL_VERSION
 ```
@@ -447,7 +447,7 @@ zmart_drivers/mesospim/
 │                   save.py      relocate the writer's frames into <output_root>/data/ + JSON sidecar
 │                   connection/scripts.py  the injected-script templates (the mesoSPIM vocabulary, client-side)
 ├── mesospim_zmart_adapter.py  ZMART controller adapter — one function per command (connect, set_xyz, acquire, get/set_state, …)
-├── driver.py                  the module handed to zmart_controller.set_instrument
+├── zmart_controller_plugin.py                  the module handed to zmart_controller.set_instrument
 ├── pull_request/   the upstream mesoSPIM Remote Scripting patch (GPL) + PROTOCOL.md + demo_client.py
 └── tests/          unit/  offline vs a mock server     integration/  vs mesoSPIM -D demo     helpers/mock_mesospim_server.py
 ```

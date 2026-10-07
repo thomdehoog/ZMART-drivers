@@ -128,10 +128,9 @@ with `microscope`:
 ```python
 import zmart_controller
 
-# Once, on the microscope computer: add the driver to the controller's list.
-zmart_controller.add_driver(
-    "zeiss",
-    "zmart_drivers.zeiss.zenapi.driver",
+# Once, on the microscope computer: register the driver's plug-in file.
+zmart_controller.register_driver(
+    "C:/ZMART-drivers/zmart_drivers/zeiss/zenapi/zmart_controller_plugin.py",
     {
         "config": r"C:\zen\config.ini",
         "output_root": r"D:\runs\today",
@@ -215,7 +214,7 @@ you whether that has been done.
 ```
 zmart_drivers/zeiss/zenapi/
 ├── zen_zmart_adapter.py   the functions the ZMART Controller calls, one per command
-├── driver.py              the module handed to zmart_controller.set_instrument
+├── zmart_controller_plugin.py              the module handed to zmart_controller.set_instrument
 ├── connection/   zen_runtime.py  the ONE place that imports zen_api: service classes
 │                                 (with the stage-service fallback across ZEN releases),
 │                                 request messages, TLS, token, config.ini
