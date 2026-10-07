@@ -117,7 +117,7 @@ class TestRegistration(unittest.TestCase):
     def test_the_driver_module_holds_every_command(self):
         from zmart_controller import utils
 
-        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert import driver
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert import zmart_controller_plugin as driver
 
         ops = utils.driver_functions(driver)
         for op in utils.OPS:
@@ -132,7 +132,7 @@ class TestRegistration(unittest.TestCase):
         """The origin is driver configuration: the controller cannot set it."""
         from zmart_controller import utils
 
-        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert import driver
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert import zmart_controller_plugin as driver
 
         self.assertNotIn("set_origin", utils.driver_functions(driver))
         self.assertTrue(callable(adapter.set_origin))
@@ -2009,7 +2009,7 @@ class TestLifecycle(unittest.TestCase):
 
         import zmart_controller
 
-        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert import driver
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert import zmart_controller_plugin as driver
 
         _clear_limits()
         self.addCleanup(_clear_limits)

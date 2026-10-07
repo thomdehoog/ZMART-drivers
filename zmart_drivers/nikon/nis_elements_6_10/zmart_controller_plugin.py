@@ -5,7 +5,7 @@ names the controller looks for. Hand it to the controller to drive the
 microscope::
 
     import zmart_controller
-    import zmart_drivers.nikon.nis_elements_6_10.driver as nikon
+    import zmart_drivers.nikon.nis_elements_6_10.zmart_controller_plugin as nikon
 
     zmart_controller.set_instrument(nikon)
 
@@ -30,6 +30,11 @@ University of Zurich (thom.dehoog@zmb.uzh.ch, thomdehoog@gmail.com).
 """
 
 from . import nis_zmart_adapter as _adapter
+
+# The driver's name in the controller's list of drivers, and its configuration
+# on this computer: the adapter's defaults, which you may edit here.
+NAME = "nikon"
+CONNECTION = dict(_adapter.CONNECTION)
 
 _OPS = _adapter.ops_table()
 

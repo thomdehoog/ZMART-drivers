@@ -61,18 +61,19 @@ needed. The bridge is a file in this repository that NIS runs from a macro.
    NIS user's temp folder.
 4. **Use the driver from Python.** Install this repository once, from its
    root folder, with `pip install -e .` (this also installs the ZMART
-   Controller; the Nikon driver needs nothing else). Then add the driver to
-   the controller's list of drivers, once. Every connection setting is
-   optional: left out, the driver looks for the bridge on this computer, on
-   port 54468, and saves images to a temporary folder. Here the images go to a
-   folder of your choice:
+   Controller; the Nikon driver needs nothing else). Then register the
+   driver's `zmart_controller_plugin.py` (in this folder) with the controller,
+   once. Its settings, `CONNECTION` in that file, are all optional: left out,
+   the driver looks for the bridge on this computer, on port 54468, and saves
+   images to a temporary folder. Here the images go to a folder of your choice:
 
    ```python
    import zmart_controller
 
    # Once, on the microscope computer:
-   zmart_controller.add_driver(
-       "nikon", "zmart_drivers.nikon.nis_elements_6_10.driver", {"output_root": r"D:\runs\today"}
+   zmart_controller.register_driver(
+       "C:/ZMART-drivers/zmart_drivers/nikon/nis_elements_6_10/zmart_controller_plugin.py",
+       {"output_root": r"D:\runs\today"},
    )
 
    # In every session:
@@ -171,7 +172,7 @@ multi-channel captures beyond what an optical configuration sets.
 | `commands/` | Moves (limit-checked, incl. piezo Z), objective / optical-configuration / exposure / PFS setting, autofocus, live/freeze, capture, Z-stack, save. |
 | `calibration/machine.py` | Where the persisted origin lives. |
 | `nis_zmart_adapter.py` | The functions the ZMART Controller calls, one per command. |
-| `driver.py` | The module handed to `zmart_controller.set_instrument`: it hands over the adapter's functions, each answering `{"success": ..., "content": ...}`. |
+| `zmart_controller_plugin.py` | The module handed to `zmart_controller.set_instrument`: it hands over the adapter's functions, each answering `{"success": ..., "content": ...}`. |
 | `tests/` | `unit/` runs the real bridge server over a fake NIS API (`tests/helpers/fake_nis_api.py`); `hardware/` runs against a live NIS (`pytest -m hardware`). |
 
 ## Running the tests

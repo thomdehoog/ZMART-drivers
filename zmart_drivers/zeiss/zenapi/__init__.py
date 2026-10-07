@@ -7,8 +7,8 @@ public surface is **synchronous** (a blocking facade over the async gRPC
 client, see ``connection.client.ZenClient``), so notebooks stay 1-3 lines per
 step. To drive it through the ZMART Controller, hand its ``driver`` module
 to the controller with
-``zmart_controller.set_instrument(zmart_drivers.zeiss.zenapi.driver, {"config": ...})``
-(see ``driver.py`` in this folder).
+``zmart_controller.set_instrument(zmart_drivers.zeiss.zenapi.zmart_controller_plugin, {"config": ...})``
+(see ``zmart_controller_plugin.py`` in this folder).
 
 Typical session::
 
@@ -100,7 +100,7 @@ from .readers import (
     ping,
 )
 
-# --- the ZMART controller adapter (driver.py hands it to the controller) ---
+# --- the ZMART controller adapter (zmart_controller_plugin.py hands it to the controller) ---
 from .zen_zmart_adapter import CONNECTION  # noqa: E402
 
 __all__ = [

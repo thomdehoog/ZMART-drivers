@@ -10,7 +10,7 @@ handle.
 import pytest
 import zmart_controller
 
-from zmart_drivers.zeiss.zenapi import driver
+from zmart_drivers.zeiss.zenapi import zmart_controller_plugin as driver
 from zmart_drivers.zeiss.zenapi import zen_zmart_adapter as adapter
 
 

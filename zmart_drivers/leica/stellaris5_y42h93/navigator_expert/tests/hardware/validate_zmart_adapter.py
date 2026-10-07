@@ -146,7 +146,7 @@ def _connect_session(args: argparse.Namespace, adapter: Any, output_root: str | 
     In --mock mode the adapter's CAM connect is swapped for the in-process
     Python mock, so the whole controller -> adapter -> driver path runs offline.
     """
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert import driver
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert import zmart_controller_plugin as driver
 
     inst = {"client": args.client_name}
     inst["api_delay_ms"] = args.api_delay_ms

@@ -5,7 +5,7 @@ names the controller looks for. Hand it to the controller, with the path of
 the ZEN API ``config.ini``, to drive the microscope::
 
     import zmart_controller
-    import zmart_drivers.zeiss.zenapi.driver as zeiss
+    import zmart_drivers.zeiss.zenapi.zmart_controller_plugin as zeiss
 
     zmart_controller.set_instrument(zeiss, {"config": "C:/ZEN/config.ini"})
 
@@ -29,6 +29,11 @@ University of Zurich (thom.dehoog@zmb.uzh.ch, thomdehoog@gmail.com).
 """
 
 from . import zen_zmart_adapter as _adapter
+
+# The driver's name in the controller's list of drivers, and its configuration
+# on this computer: the adapter's defaults, which you may edit here.
+NAME = "zeiss"
+CONNECTION = dict(_adapter.CONNECTION)
 
 _OPS = _adapter.ops_table()
 

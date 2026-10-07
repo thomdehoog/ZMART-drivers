@@ -12,7 +12,7 @@ import pytest
 import zmart_controller
 from mock_zen_api import build_fake_client
 
-from zmart_drivers.zeiss.zenapi import driver
+from zmart_drivers.zeiss.zenapi import zmart_controller_plugin as driver
 from zmart_drivers.zeiss.zenapi import zen_zmart_adapter as adapter
 
 
@@ -36,7 +36,7 @@ def instrument(monkeypatch, tmp_path):
 def test_the_module_holds_every_function_the_controller_needs(instrument):
     session = zmart_controller.session.set_instrument(driver, instrument)
     try:
-        assert session.context == {"driver": "zmart_drivers.zeiss.zenapi.driver"}
+        assert session.context == {"driver": "zmart_drivers.zeiss.zenapi.zmart_controller_plugin"}
         # The microscope's name came from CONNECTION, since the dictionary left it out.
         assert session._handle.connection["microscope"] == adapter.CONNECTION["microscope"]
     finally:

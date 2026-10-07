@@ -13,11 +13,11 @@ computer, import the driver module that belongs to that microscope and hand
 it to the controller::
 
     import zmart_controller
-    import zmart_drivers.nikon.nis_elements_6_10.driver as nikon
+    import zmart_drivers.nikon.nis_elements_6_10.zmart_controller_plugin as nikon
 
     zmart_controller.set_instrument(nikon)
 
-Each driver folder holds a ``driver.py`` with one function per controller
+Each driver folder holds a ``zmart_controller_plugin.py`` with one function per controller
 command; that module is what the controller is handed.
 
 Author: Thom de Hoog, Center for Microscopy and Image Analysis (ZMB),

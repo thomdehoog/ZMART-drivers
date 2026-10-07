@@ -13,7 +13,7 @@ from pathlib import Path
 import pytest
 import zmart_controller
 
-from zmart_drivers.nikon.nis_elements_6_10 import driver
+from zmart_drivers.nikon.nis_elements_6_10 import zmart_controller_plugin as driver
 from zmart_drivers.nikon.nis_elements_6_10 import nis_zmart_adapter as adapter
 
 
@@ -31,7 +31,7 @@ def instrument(bridge, tmp_path, monkeypatch):
 def test_the_module_holds_every_function_the_controller_needs(instrument):
     session = zmart_controller.session.set_instrument(driver, instrument)
     try:
-        assert session.context == {"driver": "zmart_drivers.nikon.nis_elements_6_10.driver"}
+        assert session.context == {"driver": "zmart_drivers.nikon.nis_elements_6_10.zmart_controller_plugin"}
     finally:
         session.disconnect()
 

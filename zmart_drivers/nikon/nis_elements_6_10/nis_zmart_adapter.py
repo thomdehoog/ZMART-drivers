@@ -5,7 +5,7 @@ The seam that plugs this driver into the vendor-agnostic **ZMART controller**
 (``zmart_controller``). The controller drives every microscope through one
 small set of functions -- ``connect`` plus one function per command. This
 module implements them for NIS-Elements (through the bridge, see
-``bridge/nis_bridge.py``); ``driver.py`` beside it hands them to the
+``bridge/nis_bridge.py``); ``zmart_controller_plugin.py`` beside it hands them to the
 controller.
 
 As in the reference ``mock_driver``, the driver owns the frame **origin**: the
@@ -29,7 +29,7 @@ What the neutral surface covers for Nikon today:
 Plug the driver in by handing its ``driver`` module to the controller::
 
     import zmart_controller
-    import zmart_drivers.nikon.nis_elements_6_10.driver as nikon
+    import zmart_drivers.nikon.nis_elements_6_10.zmart_controller_plugin as nikon
 
     zmart_controller.set_instrument(nikon)
 
@@ -718,7 +718,7 @@ def _answered(function):
 def ops_table() -> dict[str, Any]:
     """The functions this driver hands to the controller, one per command.
 
-    ``driver.py`` exposes these by name.
+    ``zmart_controller_plugin.py`` exposes these by name.
     ``connect`` and ``disconnect`` are handed over unchanged. Every other
     command is wrapped so that, called through the controller, it answers
     ``{"success": ..., "content": ...}``. Called directly from this module,

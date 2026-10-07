@@ -15,10 +15,10 @@ Quick use::
     nis.capture(client); nis.save_image(client, r"C:\data\snap.tif")
 
 To drive it through the ZMART Controller, hand its ``driver`` module to the
-controller (see ``driver.py`` in this folder)::
+controller (see ``zmart_controller_plugin.py`` in this folder)::
 
     import zmart_controller
-    import zmart_drivers.nikon.nis_elements_6_10.driver as nikon
+    import zmart_drivers.nikon.nis_elements_6_10.zmart_controller_plugin as nikon
 
     zmart_controller.set_instrument(nikon)
 
