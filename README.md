@@ -92,21 +92,25 @@ pip install -e ".[leica]"
 The ZEISS driver also needs ZEISS's own `zen_api` package, which must match your ZEN version;
 its [README](zmart_drivers/zeiss/zenapi/README.md) explains how to install it.
 
-Then import the driver module for your microscope and hand it to the controller:
+Then add the driver for your microscope to the controller's list of drivers, once, on the
+microscope computer. From then on, every session plugs it in by name:
 
 ```python
 import zmart_controller
-import zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver as stellaris
 
-zmart_controller.set_instrument(stellaris)
+# Once, on the microscope computer:
+zmart_controller.add_driver("stellaris", "zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver")
+
+# In every session:
+zmart_controller.set_instrument("stellaris")
 print(zmart_controller.get_info()["content"]["description"])
 ```
 
 The driver modules of the other drivers are `zmart_drivers.nikon.nis_elements_6_10.driver`,
-`zmart_drivers.zeiss.zenapi.driver` and `zmart_drivers.mesospim.driver`. To give an instrument
-another name or connection setting, pass a connection dictionary as the second argument, for
-example `zmart_controller.set_instrument(stellaris, {"output_root": r"D:\images"})`; each
-driver's `driver.py` lists the settings it understands.
+`zmart_drivers.zeiss.zenapi.driver` and `zmart_drivers.mesospim.driver`. A connection
+dictionary given to `add_driver` is saved with the driver and used every time it is plugged in,
+for example `zmart_controller.add_driver("stellaris", "...driver", {"output_root": r"D:\images"})`;
+each driver's `driver.py` lists the settings it understands.
 
 The Leica driver runs on the computer that runs LAS X, because it loads Leica's interface
 directly into Python. Each driver's README explains its own installation, its setup, and how

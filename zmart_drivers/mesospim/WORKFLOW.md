@@ -86,9 +86,11 @@ python zmart_drivers/mesospim/tests/hardware/launch_demo_server.py
 
 ```python
 import zmart_controller
-import zmart_drivers.mesospim.driver as mesospim
 
-sess = zmart_controller.set_instrument(mesospim, {"token": "choose-a-token"})   # omit the token if open
+# Once: add the driver to the controller's list (omit the token if the server is open).
+zmart_controller.add_driver("mesospim", "zmart_drivers.mesospim.driver", {"token": "choose-a-token"})
+
+sess = zmart_controller.set_instrument("mesospim")
 
 # Every answer comes back as {"success": ..., "content": ...}.
 
