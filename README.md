@@ -34,6 +34,9 @@ and the driver plugged into it does the rest:
 4. **It confirms what happened.** After a command, the driver reads the microscope back to
    check that it really did what was asked, and says so in its answer.
 
+How these drivers are organised inside, so that the safety behaviour is the same on every
+microscope, is described in [the anatomy of a ZMART driver](docs/driver-anatomy.md).
+
 ## Drivers in this repository
 
 | Microscope | Vendor interface | Driver | Status |
