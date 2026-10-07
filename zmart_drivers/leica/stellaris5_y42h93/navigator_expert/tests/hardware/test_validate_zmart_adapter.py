@@ -111,7 +111,7 @@ def test_readonly_mock_run(tmp_path):
     assert counts["FAIL"] == 0
     assert counts["WARN"] == 0
     names = {r["name"] for r in records}
-    assert "registry: leica adapter registered" in names
+    assert "get_xyz: x has value, actuator and canvas" in names
     assert "get_xyz: hardware block complete" in names
 
 

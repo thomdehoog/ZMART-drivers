@@ -53,9 +53,9 @@ def build_env() -> dict:
     env = dict(os.environ)
     existing = env.get("PYTHONPATH", "")
     env["PYTHONPATH"] = os.pathsep.join([str(REPO_ROOT), existing]) if existing else str(REPO_ROOT)
-    # Do not put the working directory on the search path. The driver's plug-in
-    # folder is called zmart_controller, so a run started in the driver folder
-    # would otherwise import it in place of the real ZMART Controller.
+    # Do not put the working directory on the search path. The driver folder
+    # holds folders with common names, such as config and connection, which a
+    # run started there would otherwise import in place of other packages.
     env["PYTHONSAFEPATH"] = "1"
     # mesoSPIM PCs default to a cp1252 console; keep child stdout UTF-8 so the
     # headless validator's PASS/FAIL glyph can't crash a step.

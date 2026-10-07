@@ -58,15 +58,8 @@ installs the ZMART Controller:
 pip install -e .
 ```
 
-Then plug the driver into the controller, once per computer. The controller reads
-`zmart_controller/zmart.json` in the driver folder, which names the instrument
-(vendor=mesospim, microscope=mesospim-01, api=remote-scripting):
-
-```python
-import zmart_controller
-
-zmart_controller.register_driver("zmart_drivers.mesospim")
-```
+There is nothing to register: you plug the driver in by handing its module,
+`zmart_drivers.mesospim.driver`, to the controller, as shown in section 4.
 
 ## 3. Start the Remote Scripting server
 
@@ -93,15 +86,15 @@ python zmart_drivers/mesospim/tests/hardware/launch_demo_server.py
 
 ```python
 import zmart_controller
+import zmart_drivers.mesospim.driver as mesospim
 
-instrument = next(i for i in zmart_controller.get_instruments() if i["vendor"] == "mesospim")
-sess = zmart_controller.set_instrument({**instrument, "token": "choose-a-token"})   # omit the token if open
+sess = zmart_controller.set_instrument(mesospim, {"token": "choose-a-token"})   # omit the token if open
 
 # Every answer comes back as {"success": ..., "content": ...}.
 
 sess.get_info()                # identity, initial positions, focus/rotation, output_root
 sess.get_actuators()           # {'x': ['motoric'], 'y': [...], 'z': [...]}
-sess.get_xyz()                 # content: {'x': {'value','actuator','unit','range'}, ...} — µm from origin
+sess.get_xyz()                 # content: {'x': {'value','actuator','canvas'}, ...} — µm from origin
 sess.get_state()               # {'changeable': {laser,intensity,filter,zoom,shutter,etl_*}, 'observed': {...}}
 sess.get_acquisition_settings() # {folder, format, planes, z_step, zoom, shutterconfig, backlash_correction}
 

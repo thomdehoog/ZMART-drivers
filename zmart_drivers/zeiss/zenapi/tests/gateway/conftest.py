@@ -51,7 +51,7 @@ def connection(config_ini, tmp_path):
     from zmart_drivers.zeiss.zenapi import CONNECTION
 
     return {
-        **CONNECTION,  # the registered identity: vendor / microscope / api
+        **CONNECTION,  # the driver's own defaults, such as the microscope's name
         "config": str(config_ini),
         "output_root": str(tmp_path / "out"),
         "machine_root": str(tmp_path / "programdata"),

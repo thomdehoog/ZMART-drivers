@@ -1,50 +1,38 @@
 """The ZMART controller session over the real wheel and the fake gateway.
 
-This is what a workflow does: plug the driver in, pick the instrument, move,
-acquire. Every answer comes back as ``{"success": ..., "content": ...}``.
+This is what a workflow does: plug the driver in, move, acquire. Every answer comes back as ``{"success": ..., "content": ...}``.
 Setting the origin is not a controller command; it is a one-time setup step
 done with the driver itself, so the one place this file reaches past the
 controller is to call the adapter's ``set_origin`` on the session's driver
 handle.
 """
 
-from pathlib import Path
-
 import pytest
 import zmart_controller
-from zmart_controller import utils
 
+from zmart_drivers.zeiss.zenapi import driver
 from zmart_drivers.zeiss.zenapi import zen_zmart_adapter as adapter
 
-DRIVER_DIR = Path(adapter.__file__).resolve().parent
-
 
 @pytest.fixture
-def registered(monkeypatch, tmp_path):
-    """The driver plugged in by its folder, for this test only."""
+def isolated(monkeypatch, tmp_path):
+    """An empty configuration folder, for this test only."""
     monkeypatch.setenv("ZMART_MICROSCOPY_ROOT", str(tmp_path / "zmart-microscopy"))
-    monkeypatch.setattr(utils, "REGISTRY", {})
-    monkeypatch.setattr(utils, "_discovered", False)
-    zmart_controller.register_driver(DRIVER_DIR, remember=False)
 
 
 @pytest.fixture
-def session(registered, connection):
-    s = zmart_controller.session.set_instrument({**connection, "experiment": "ZMART_Snap"})
+def session(isolated, connection):
+    s = zmart_controller.session.set_instrument(
+        driver, {**connection, "experiment": "ZMART_Snap"}
+    )
     try:
         yield s
     finally:
         s.disconnect()
 
 
-def test_instrument_is_listed(registered):
-    assert any(
-        i["vendor"] == "zeiss" and i["api"] == "zen-api" for i in zmart_controller.get_instruments()
-    )
-
-
-def test_the_driver_fits_the_controller_contract(registered, connection):
-    assert zmart_controller.validate_driver(connection) == []
+def test_the_driver_fits_the_controller_contract(isolated, connection):
+    assert zmart_controller.validate_driver(driver, connection) == []
 
 
 def test_full_round_trip(session, gateway, tmp_path):
@@ -74,12 +62,16 @@ def test_full_round_trip(session, gateway, tmp_path):
     assert rec["copied"] is True
     assert rec["files"] == [str(tmp_path / "out" / "data" / "overview" / "overview_A1.czi")]
     assert rec["position"] == pytest.approx({"x": 250.0, "y": -250.0, "z": 12.5})
+    assert zmart_controller.check_acquire_answer(answer) == []
 
     rec = session.acquire(
         position_label="A1",
         acquisition_settings={"experiment": "ZMART_ZStack", "mode": "experiment"},
     )["content"]
-    assert rec["mode"] == "experiment" and rec["planes"] == 5
+    assert rec["mode"] == "experiment" and rec["image_count"] == 5
+    # How the images of a whole experiment are laid out is inside the CZI,
+    # which the driver does not read yet, so it leaves the planes empty.
+    assert rec["planes"] == []
 
     af = session.run_procedure({"name": "software_autofocus", "timeout_s": 3})["content"]
     assert af["frame_z_um"] == pytest.approx(135.0 - 0.0)  # origin z was 0

@@ -8,16 +8,17 @@ then by the vendor interface it uses::
     zmart_drivers/zeiss/zenapi/                               ZEISS, ZEN API
     zmart_drivers/mesospim/                                   mesoSPIM light-sheet
 
-Importing this package does not import any driver, and no driver is plugged
-into the controller by itself. On the microscope computer, plug in the one
-driver that belongs to that microscope, once, by its folder or module name::
+Importing this package does not import any driver. On the microscope
+computer, import the driver module that belongs to that microscope and hand
+it to the controller::
 
     import zmart_controller
+    import zmart_drivers.nikon.nis_elements_6_10.driver as nikon
 
-    zmart_controller.register_driver("zmart_drivers.nikon.nis_elements_6_10")
+    zmart_controller.set_instrument(nikon)
 
-Each driver folder holds a ``zmart_controller/`` folder with a ``zmart.json``
-that names its instrument; that is what the controller reads.
+Each driver folder holds a ``driver.py`` with one function per controller
+command; that module is what the controller is handed.
 
 Author: Thom de Hoog, Center for Microscopy and Image Analysis (ZMB),
 University of Zurich (thom.dehoog@zmb.uzh.ch, thomdehoog@gmail.com).

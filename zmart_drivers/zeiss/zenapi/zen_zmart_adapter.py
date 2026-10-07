@@ -5,8 +5,7 @@ The seam that plugs this driver into the vendor-agnostic **ZMART controller**
 (``zmart_controller``). The controller drives every microscope through one
 small set of functions -- ``connect`` plus one function per command. This
 module implements them for ZEN (through the ZEN API gateway, see
-``connection/``); the plug-in folder ``zmart_controller/`` hands them to the
-controller, and its ``zmart.json`` names the instrument.
+``connection/``); ``driver.py`` beside it hands them to the controller.
 
 As in the other drivers, the driver owns the frame **origin**: the controller
 works in micrometres from an origin the driver subtracts, so the controller
@@ -26,12 +25,12 @@ What the neutral surface covers for ZEN today:
   series) when asked, written by ZEN as one CZI and copied into
   ``<output_root>/data/``.
 
-Plug the driver in once on the microscope computer, by its folder or module
-name; importing this module registers nothing::
+Plug the driver in by handing its ``driver`` module to the controller::
 
     import zmart_controller
+    import zmart_drivers.zeiss.zenapi.driver as zeiss
 
-    zmart_controller.register_driver("zmart_drivers.zeiss.zenapi")
+    zmart_controller.set_instrument(zeiss, {"config": "C:/ZEN/config.ini"})
 
 Author: Thom de Hoog (ZMB, University of Zurich)
         thom.dehoog@zmb.uzh.ch . thomdehoog@gmail.com
@@ -41,7 +40,6 @@ License: MIT
 from __future__ import annotations
 
 import functools
-import json
 import logging
 import re
 import shutil
@@ -65,14 +63,13 @@ log = logging.getLogger(__name__)
 # Every axis is driven by one motor under ZEN: the XY stage and the focus drive.
 _ACTUATORS: dict[str, list[str]] = {"x": ["motoric"], "y": ["motoric"], "z": ["motoric"]}
 
-# The instrument this driver serves, with its connect settings, exactly as the
-# controller reads it from the plug-in folder's zmart.json. ``microscope``
-# names a specific instrument; edit it (and ``config``) per deployment.
-# ``config`` is the ZEN API ``config.ini`` (host, port, gateway certificate,
-# control token); ``host`` / ``port`` / ``cert_file`` / ``control_token`` may
-# be given directly instead.
-_MANIFEST = Path(__file__).resolve().parent / "zmart_controller" / "zmart.json"
-CONNECTION = json.loads(_MANIFEST.read_text(encoding="utf-8"))["instruments"][0]
+# The connection settings used for any key the caller leaves out.
+# ``microscope`` names this instrument (it picks the folder its origin and
+# stage limits are saved in). ``config`` is the ZEN API ``config.ini`` (host,
+# port, gateway certificate, control token); left out, a ``config.ini`` in the
+# folder Python was started from is used. ``host`` / ``port`` / ``cert_file``
+# / ``control_token`` may be given directly instead.
+CONNECTION = {"microscope": "zen-lm"}
 
 
 @dataclass
@@ -109,10 +106,12 @@ def _open_client(connection: dict):
     )
 
 
-def connect(connection: dict) -> ZenHandle:
+def connect(connection: dict | None = None) -> ZenHandle:
     """Open a session with ZEN through its API gateway and read what it offers.
 
-    Honours ``config`` (path to the ZEN API ``config.ini``) or the explicit
+    Every key is optional; a key left out takes its value from
+    :data:`CONNECTION`. Honours ``microscope`` (the name of this instrument),
+    ``config`` (path to the ZEN API ``config.ini``) or the explicit
     ``host`` / ``port`` / ``cert_file`` / ``control_token`` keys,
     ``output_root`` (where ``acquire`` copies images; a temp folder when
     omitted), ``machine_root`` (override for the ProgramData root) and
@@ -121,12 +120,13 @@ def connect(connection: dict) -> ZenHandle:
     copied there on the first connect, with a warning) and govern every move
     of the session; the frame origin a previous session persisted is restored.
     """
+    connection = {**CONNECTION, **(connection or {})}
     client = _open_client(connection)
     try:
         output_root = Path(connection.get("output_root") or tempfile.mkdtemp(prefix="zeiss_run_"))
         output_root.mkdir(parents=True, exist_ok=True)
         machine = _machine.MachineProfile(
-            microscope_id=connection.get("microscope") or CONNECTION["microscope"],
+            microscope_id=connection["microscope"],
             programdata_root=connection.get("machine_root"),
         )
         limits_path, copied = machine.ensure_limits_file()
@@ -285,11 +285,15 @@ def _resolve_actuators(with_actuators: dict | None) -> dict[str, str]:
 
 
 def get_xyz(handle: ZenHandle, *, with_actuators: dict | None = None) -> dict:
-    """Report the position per axis (um, relative to the origin) with its actuator.
+    """Report each axis: its position (um from the origin), its motor and its canvas.
 
-    ``range`` is how far each axis may travel, ``[min, max]`` in um from the
-    origin: this microscope's stage limits, the ones every move is checked
-    against.
+    The ``canvas`` is everywhere a picture can show on that axis, ``[min,
+    max]`` in um from the origin. For this driver it is the travel itself:
+    this microscope's stage limits, the ones every move is checked against.
+    A picture taken at the edge of the travel does show half a field beyond
+    it, and a z-stack may reach past it, but the field size and the stack
+    depth are set inside the ZEN experiment, which the ZEN API does not
+    report, so the driver cannot widen the canvas by them.
     """
     _require_open(handle)
     chosen = _resolve_actuators(with_actuators)
@@ -298,8 +302,7 @@ def get_xyz(handle: ZenHandle, *, with_actuators: dict | None = None) -> dict:
         axis: {
             "value": user[axis],
             "actuator": chosen[axis],
-            "unit": "um",
-            "range": [
+            "canvas": [
                 handle.limits[axis]["min"] - handle.origin[axis],
                 handle.limits[axis]["max"] - handle.origin[axis],
             ],
@@ -587,7 +590,8 @@ def acquire(
             except (TimeoutError, OSError) as exc:
                 log.warning("CZI left on the ZEN computer (%s): %s", zen_path, exc)
 
-    planes = status.get("images_count")
+    count = status.get("images_count")
+    position = _user_xyz(handle, _raw_xyz(handle.client))
     return {
         "position_label": position_label,
         "folder": folder,
@@ -595,7 +599,8 @@ def acquire(
         "mode": mode,
         "experiment": handle.experiment.name,
         "output_name": result["output_name"],
-        "planes": planes if planes and planes > 0 else None,
+        "image_count": count if count and count > 0 else None,
+        "planes": _planes(files[0], mode, count, position),
         # Every file saved, under the name the ZMART Controller's contract fixes,
         # so a workflow finds the pictures on any microscope.
         "files": files,
@@ -603,9 +608,35 @@ def acquire(
         "copied": copied,
         "metadata_file": None,
         "status": status,
-        "position": _user_xyz(handle, _raw_xyz(handle.client)),
+        "position": position,
         "duration_s": round(time.perf_counter() - started, 3),
     }
+
+
+def _planes(path: str, mode: str, count: int | None, position: dict) -> list[dict]:
+    """One entry per saved image plane: which channel it is, and where it was taken.
+
+    A snap is taken once, at one depth, with the stage standing still, so
+    each image ZEN reports is one channel (``c``) at the stage position. A
+    whole experiment may hold tiles, depths and moments as well, and how its
+    images are laid out is only written inside the CZI, which this driver
+    does not read yet. So for an experiment the planes are left empty rather
+    than guessed; ``image_count`` still says how many images ZEN took.
+    """
+    if mode != "snap":
+        return []
+    return [
+        {
+            "path": path,
+            "c": channel,
+            "z": 0,
+            "t": 0,
+            "x_um": position["x"],
+            "y_um": position["y"],
+            "z_um": position["z"],
+        }
+        for channel in range(max(int(count or 1), 1))
+    ]
 
 
 # =============================================================================
@@ -726,7 +757,7 @@ def _answered(function):
 def ops_table() -> dict[str, Any]:
     """The functions this driver hands to the controller, one per command.
 
-    The plug-in folder ``zmart_controller/`` exposes these by name.
+    ``driver.py`` exposes these by name.
     ``connect`` and ``disconnect`` are handed over unchanged. Every other
     command is wrapped so that, called through the controller, it answers
     ``{"success": ..., "content": ...}``. Called directly from this module,

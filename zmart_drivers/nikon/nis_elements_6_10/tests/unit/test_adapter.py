@@ -74,7 +74,7 @@ def test_acquire_saves_into_data_folder(handle, fake_api, tmp_path):
     path = tmp_path / "out" / "data" / "overview" / "tile_3_a.tif"
     assert rec["files"] == [str(path)] and path.exists()
     assert "image_files" not in rec
-    assert rec["planes"] == 1 and fake_api.selected_configuration == "FITC"
+    assert len(rec["planes"]) == 1 and fake_api.selected_configuration == "FITC"
     assert fake_api.open_documents == 0
 
 

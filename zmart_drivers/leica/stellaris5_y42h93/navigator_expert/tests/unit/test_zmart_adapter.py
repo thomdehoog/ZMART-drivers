@@ -34,9 +34,6 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.zmart_adapter import
     zmart_adapter as adapter,
 )
 
-# The driver folder, as an operator passes it to zmart_controller.register_driver.
-_DRIVER_DIR = Path(adapter.__file__).resolve().parents[1]
-
 
 def _origin(x_um=0.0, y_um=0.0, z_wide_um=0.0, z_galvo_um=0.0, z_focus_um=0.0, objective=None):
     return {
@@ -117,16 +114,15 @@ class TestRegistration(unittest.TestCase):
     def test_connection_profile_does_not_select_operator_calibration(self):
         self.assertNotIn("calibration_name", adapter.CONNECTION)
 
-    def test_registering_the_driver_folder_registers_the_instrument(self):
+    def test_the_driver_module_holds_every_command(self):
         from zmart_controller import utils
 
-        added = utils.register_driver(_DRIVER_DIR, remember=False)
-        self.assertEqual(added, [adapter.CONNECTION])
-        entry = utils.REGISTRY.get(("leica", "stellaris5-y42h93", "navigator-expert"))
-        self.assertIsNotNone(entry, "register_driver must register the instrument")
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert import driver
+
+        ops = utils.driver_functions(driver)
         for op in utils.OPS:
-            self.assertIn(op, entry["ops"])
-        self.assertIn("disconnect", entry["ops"])
+            self.assertIn(op, ops)
+        self.assertIn("disconnect", ops)
 
     def test_importing_the_adapter_registers_nothing(self):
         source = Path(adapter.__file__).read_text(encoding="utf-8")
@@ -136,9 +132,9 @@ class TestRegistration(unittest.TestCase):
         """The origin is driver configuration: the controller cannot set it."""
         from zmart_controller import utils
 
-        utils.register_driver(_DRIVER_DIR, remember=False)
-        entry = utils.REGISTRY.get(("leica", "stellaris5-y42h93", "navigator-expert"))
-        self.assertNotIn("set_origin", entry["ops"])
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert import driver
+
+        self.assertNotIn("set_origin", utils.driver_functions(driver))
         self.assertTrue(callable(adapter.set_origin))
 
 
@@ -236,7 +232,7 @@ class TestFrame(unittest.TestCase):
             pos = adapter.get_xyz(h)
         self.assertEqual(pos["x"]["value"], 0.0)
         self.assertEqual(pos["z"]["value"], 0.0)
-        self.assertEqual(pos["x"]["unit"], "um")
+        self.assertEqual(set(pos["x"]), {"value", "actuator", "canvas"})
         self.assertEqual(pos["x"]["actuator"], "motoric")
         self.assertEqual(pos["z"]["actuator"], "z-wide")
 
@@ -652,7 +648,9 @@ class TestAcquire(unittest.TestCase):
             "x_um": {"min": 0, "max": 120_000}, "y_um": {"min": 0, "max": 80_000},
             "z_wide_um": {"min": 0, "max": 10_000},
         })
-        h.origin = {**h.origin, "x_um": 1_000.0, "y_um": 500.0, "z_wide_um": 100.0}
+        h.origin = {
+            **h.origin, "x_um": 1_000.0, "y_um": 500.0, "z_wide_um": 100.0, "z_focus_um": 100.0,
+        }
         # The envelope the gate was handed at connect, in raw stage um.
         gate = adapter._gate._state_for(h.client)
         adapter._gate._install(h.client, adapter._gate.GateState(
@@ -680,7 +678,8 @@ class TestAcquire(unittest.TestCase):
         # In the frame: the envelope shifted by the origin.
         self.assertEqual(info["canvas"]["x_um"], [-1_000.0, 119_000.0])
         self.assertEqual(info["canvas"]["y_um"], [-500.0, 79_500.0])
-        self.assertEqual(info["canvas"]["z_um"], [-100.0, 9_900.0])
+        # z follows the focus, so the z-wide travel is widened by the z-galvo's.
+        self.assertEqual(info["canvas"]["z_um"], [-150.0, 9_950.0])
 
         checks = info["connection_status"]
         self.assertEqual(checks["api"], "answering")
@@ -2010,7 +2009,8 @@ class TestLifecycle(unittest.TestCase):
 
         import zmart_controller
 
-        zmart_controller.register_driver(_DRIVER_DIR, remember=False)
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert import driver
+
         _clear_limits()
         self.addCleanup(_clear_limits)
         provision_machine_limits(os.environ["ZMART_MICROSCOPY_ROOT"])
@@ -2032,10 +2032,7 @@ class TestLifecycle(unittest.TestCase):
                 return_value={"success": True, "confirmed": True},
             ),
         ):
-            instrument = next(
-                i for i in zmart_controller.get_instruments() if i["vendor"] == "leica"
-            )
-            session = zmart_controller.set_instrument(instrument)
+            session = zmart_controller.set_instrument(driver)
             try:
                 # Capturing the origin is a driver setup step, not a controller
                 # command, so it is called on the adapter with the driver handle.

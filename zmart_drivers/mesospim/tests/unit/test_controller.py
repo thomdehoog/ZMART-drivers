@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import pytest
 
+from zmart_drivers.mesospim import driver
 from zmart_drivers.mesospim import mesospim_zmart_adapter as adapter
 from zmart_drivers.mesospim.limits import checks as limits
 
@@ -16,41 +17,13 @@ def _no_limits():
     limits.clear_stage_limits()
 
 
-@pytest.fixture(autouse=True)
-def _registry_isolation():
-    # The controller registry is process-global; the connections these tests
-    # register point at per-test mock servers that die with the test. Restore
-    # the registry afterwards so other suites in the same run never resolve a
-    # stale mesospim entry.
-    from zmart_controller import utils
-
-    before = dict(utils.REGISTRY)
-    yield
-    utils.REGISTRY.clear()
-    utils.REGISTRY.update(before)
-
-
-def _register(connection):
-    """Register the driver under this test's own instrument name.
-
-    ``register_driver`` registers the instrument named in the plug-in's
-    ``zmart.json``; these tests use a name of their own, so they hand the
-    controller the same functions the plug-in folder exposes.
-    """
-    from zmart_controller import utils
-
-    utils.register(connection, ops=adapter.ops_table())
-
-
 @pytest.fixture
 def session(server, tmp_path):
     """A connected controller Session wired to the mock command server."""
     import zmart_controller
 
     connection = {
-        "vendor": "mesospim",
         "microscope": "mesospim-test",
-        "api": "remote-scripting",
         "host": server.host,
         "port": server.port,
         "output_root": str(tmp_path / "run"),
@@ -58,27 +31,15 @@ def session(server, tmp_path):
         # never touch the real ProgramData root from a test.
         "machine_root": str(tmp_path / "machine"),
     }
-    _register(connection)
-    sess = zmart_controller.set_instrument(connection)
+    sess = zmart_controller.set_instrument(driver, connection)
     try:
         yield sess
     finally:
         sess.disconnect()
 
 
-def test_context_identity(session):
-    assert session.context == {
-        "vendor": "mesospim",
-        "microscope": "mesospim-test",
-        "api": "remote-scripting",
-    }
-
-
-def test_get_instruments_lists_mesospim(session):
-    import zmart_controller
-
-    vendors = {i["vendor"] for i in zmart_controller.get_instruments()}
-    assert "mesospim" in vendors
+def test_context_names_the_driver(session):
+    assert session.context == {"driver": "zmart_drivers.mesospim.driver"}
 
 
 def test_actuators_and_origin(session):
@@ -157,7 +118,7 @@ def test_acquisition_settings(session):
 def test_acquire_captures_and_saves(session, tmp_path):
     record = session.acquire("A1", acquisition_settings={"format": "ome-tiff"})["content"]
     assert record["position_label"] == "A1"
-    assert record["planes"] == 1
+    assert len(record["planes"]) == 1
     assert "image_files" not in record
     from pathlib import Path
 
@@ -170,7 +131,10 @@ def test_acquire_stack(session):
     record = session.acquire("B2", acquisition_settings={"z_start": 0, "z_end": 4, "z_step": 1})[
         "content"
     ]
-    assert record["planes"] == 5
+    assert len(record["planes"]) == 5
+    # Every plane sits in the one stack file, one micrometre above the last.
+    assert [plane["z_um"] for plane in record["planes"]] == pytest.approx([0, 1, 2, 3, 4])
+    assert {plane["path"] for plane in record["planes"]} == {record["files"][0]}
     # A 5-plane stack is one multi-page file (matches the real Tiff writer).
     assert len(record["files"]) == 2  # the stack and its metadata
 
@@ -242,9 +206,7 @@ def test_info(session):
 
 def _connection(server, tmp_path):
     return {
-        "vendor": "mesospim",
         "microscope": "mesospim-test",
-        "api": "remote-scripting",
         "host": server.host,
         "port": server.port,
         "output_root": str(tmp_path / "run"),
@@ -279,8 +241,7 @@ def test_origin_set_with_driver_is_loaded_by_controller_session(server, tmp_path
     finally:
         adapter.disconnect(handle)
 
-    _register(connection)
-    session = zmart_controller.set_instrument(connection)
+    session = zmart_controller.set_instrument(driver, connection)
     try:
         # The saved origin is loaded at connect, so the same spot reads (0, 0, 0).
         pos = session.get_xyz()["content"]
@@ -314,8 +275,7 @@ def test_machine_stage_envelope_overrides_bundled(server, tmp_path):
         ),
         encoding="utf-8",
     )
-    _register(connection)
-    sess = zmart_controller.set_instrument(connection)
+    sess = zmart_controller.set_instrument(driver, connection)
     try:
         sess.set_xyz(400, 0, 0)  # inside the machine envelope
         with pytest.raises(RuntimeError, match="stage.x"):

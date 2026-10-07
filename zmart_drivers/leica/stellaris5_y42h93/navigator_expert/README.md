@@ -57,14 +57,20 @@ LAS X.
   ```
   The Leica package is self-contained; its filename helper lives under
   `navigator_expert.acquisition.naming`.
-- **Plug it into the ZMART Controller** once on the LAS X computer, by its folder or module name.
-  The controller reads `zmart_controller/zmart.json` in this folder, which names the instrument and
-  its connect settings:
+- **Plug it into the ZMART Controller** on the LAS X computer by handing it the driver module,
+  `driver.py` in this folder. Every connection setting is optional; `driver.py` explains each one:
   ```python
   import zmart_controller
+  import zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver as stellaris
 
-  zmart_controller.register_driver("zmart_drivers.leica.stellaris5_y42h93.navigator_expert")
+  zmart_controller.set_instrument(stellaris)
   ```
+  The package itself is not the driver: it keeps its own lower-level functions, such as
+  `acquire`, for notebooks and scripts that work with LAS X directly. In `get_xyz`, each axis
+  reports its `value`, its `actuator` and its `canvas`, everywhere a picture can show. On x and y
+  the canvas is the stage travel itself, because LAS X reports the field of view only for the
+  objective in place now; on z it is the z-wide travel widened by the z-galvo travel, since the
+  frame's z follows the focus, the sum of the two drives.
 
 ### Machine paths this driver assumes
 
@@ -447,7 +453,7 @@ zmart_drivers/leica/stellaris5_y42h93/navigator_expert/
 ├── limits/       config.py · checks.py (envelope + backstop + objective/setter allow-lists) · defaults/ · setup notebook; runtime truth is ProgramData
 ├── orientation/  camera↔stage quarter-turn, applied at save; measured by set_orientation, stored in the machine snapshot next to calibration + limits
 ├── zmart_adapter/  the functions the ZMART Controller calls, one per command
-├── zmart_controller/  the plug-in folder the controller reads (zmart.json names the instrument)
+├── driver.py     the module handed to zmart_controller.set_instrument
 ├── tests/        unit/ (offline) + hardware/ (validate_*.py live scripts + mock-backed test_* gates)
 └── run_ci.py · pytest.ini   (package root)
 ```

@@ -20,17 +20,11 @@ from __future__ import annotations
 
 import os
 import socket
-from pathlib import Path
 
 import pytest
 import zmart_controller
 
-from zmart_drivers.mesospim import mesospim_zmart_adapter as adapter
-
-# Plug the driver in by its folder, for this test run only: it registers the
-# instrument named in zmart_controller/zmart.json (mesospim, mesospim-01,
-# remote-scripting).
-zmart_controller.register_driver(Path(adapter.__file__).resolve().parent, remember=False)
+from zmart_drivers.mesospim import driver
 
 pytestmark = pytest.mark.integration
 
@@ -40,9 +34,6 @@ _TOKEN = os.environ.get("MESOSPIM_TOKEN")  # set when the server requires a toke
 _ALLOW_ACQUIRE = os.environ.get("MESOSPIM_ALLOW_ACQUIRE") == "1"
 
 _CONN = {
-    "vendor": "mesospim",
-    "microscope": "mesospim-01",
-    "api": "remote-scripting",
     "host": _HOST,
     "port": _PORT,
     "token": _TOKEN,
@@ -67,16 +58,11 @@ def session():
     """
     if not _server_listening():
         pytest.skip(f"no live mesoSPIM Remote Scripting server at {_HOST}:{_PORT}")
-    sess = zmart_controller.set_instrument(dict(_CONN))
+    sess = zmart_controller.set_instrument(driver, dict(_CONN))
     try:
         yield sess
     finally:
         sess.disconnect()
-
-
-def test_instrument_is_registered():
-    names = [(i["vendor"], i["microscope"], i["api"]) for i in zmart_controller.get_instruments()]
-    assert ("mesospim", "mesospim-01", "remote-scripting") in names
 
 
 def test_info_and_actuators(session):
@@ -90,7 +76,7 @@ def test_info_and_actuators(session):
 def test_get_xyz_and_state_shape(session):
     xyz = session.get_xyz()["content"]
     for axis in ("x", "y", "z"):
-        assert xyz[axis]["unit"] == "um"
+        assert set(xyz[axis]) == {"value", "actuator", "canvas"}
         assert isinstance(xyz[axis]["value"], (int, float))
     state = session.get_state()["content"]
     # changeable = the light-path settings; observed = identity + limits (never

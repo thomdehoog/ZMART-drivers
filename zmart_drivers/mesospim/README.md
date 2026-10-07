@@ -254,16 +254,12 @@ Through the vendor-neutral controller instead (`import zmart_controller`):
 
 ```python
 import zmart_controller
+import zmart_drivers.mesospim.driver as mesospim
 
-# Once per computer: plug the driver in by its folder or module name. The
-# controller reads zmart_controller/zmart.json in the driver folder, which
-# names the instrument (vendor=mesospim, microscope=mesospim-01,
-# api=remote-scripting) and where the server listens.
-zmart_controller.register_driver("zmart_drivers.mesospim")
-instrument = next(i for i in zmart_controller.get_instruments() if i["vendor"] == "mesospim")
-
-# Add "token": "…" if the server requires one; host/port default to 127.0.0.1:42000.
-sess = zmart_controller.set_instrument(instrument)
+# Hand the driver module to the controller. Every connection setting is
+# optional: host and port default to 127.0.0.1:42000, and the instrument is
+# called mesospim-01. Add "token": "…" if the server requires one.
+sess = zmart_controller.set_instrument(mesospim)
 sess.set_xyz(10, 20, 5)                             # µm from the saved origin; answers {"success", "content"}
 sess.acquire("A1", acquisition_settings={"format": "ome-tiff"})
 sess.disconnect()
@@ -423,7 +419,7 @@ Profiles `ACQUISITION`, `CONNECTION`, `HARDWARE` and the exception `LimitError` 
 
 ### Controller & protocol
 ```python
-# zmart_controller.register_driver("zmart_drivers.mesospim") plugs the driver in (see zmart_controller/zmart.json)
+# zmart_controller.set_instrument(zmart_drivers.mesospim.driver) plugs the driver in (see driver.py)
 # protocol (advanced callers / server authors):
 Request, Reply, encode_request, parse_request, parse_reply, PROTOCOL_VERSION
 ```
@@ -448,7 +444,7 @@ zmart_drivers/mesospim/
 │                   save.py      relocate the writer's frames into <output_root>/data/ + JSON sidecar
 │                   connection/scripts.py  the injected-script templates (the mesoSPIM vocabulary, client-side)
 ├── mesospim_zmart_adapter.py  ZMART controller adapter — one function per command (connect, set_xyz, acquire, get/set_state, …)
-├── zmart_controller/          the plug-in folder the controller reads (zmart.json names the instrument)
+├── driver.py                  the module handed to zmart_controller.set_instrument
 ├── pull_request/   the upstream mesoSPIM Remote Scripting patch (GPL) + PROTOCOL.md + demo_client.py
 └── tests/          unit/  offline vs a mock server     integration/  vs mesoSPIM -D demo     helpers/mock_mesospim_server.py
 ```

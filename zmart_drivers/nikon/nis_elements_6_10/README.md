@@ -61,18 +61,16 @@ needed. The bridge is a file in this repository that NIS runs from a macro.
    NIS user's temp folder.
 4. **Use the driver from Python.** Install this repository once, from its
    root folder, with `pip install -e .` (this also installs the ZMART
-   Controller; the Nikon driver needs nothing else). Then plug the driver into
-   the controller, once per computer, by its folder or module name. The
-   controller reads `zmart_controller/zmart.json` in this folder, which names
-   the instrument and where the bridge listens:
+   Controller; the Nikon driver needs nothing else). Then hand the driver
+   module to the controller. Every connection setting is optional: left out,
+   the driver looks for the bridge on this computer, on port 54468, and saves
+   images to a temporary folder. Here the images go to a folder of your choice:
 
    ```python
    import zmart_controller
+   import zmart_drivers.nikon.nis_elements_6_10.driver as nikon
 
-   zmart_controller.register_driver("zmart_drivers.nikon.nis_elements_6_10")
-   instrument = next(i for i in zmart_controller.get_instruments() if i["vendor"] == "nikon")
-
-   s = zmart_controller.set_instrument({**instrument, "output_root": r"D:\runs\today"})
+   s = zmart_controller.set_instrument(nikon, {"output_root": r"D:\runs\today"})
    s.set_xyz(100, -100, 5)  # micrometres from the origin (see "Setting the origin")
    s.acquire(position_label="tile_01")
    s.disconnect()
@@ -140,8 +138,8 @@ these lines again whenever you want a new origin.
 
 | Neutral surface | Nikon meaning |
 |---|---|
-| `get_xyz` / `set_xyz` | XY stage and the main Z (focus) drive, µm, absolute. Every move is checked against the limits NIS-Elements reports (*Devices ▸ Stage limits*) before it is sent. When NIS reports a piezo Z insert, `with_actuators={"z": "piezo"}` drives it instead of the focus drive. |
-| `acquire` | A snapshot (`Capture()`), or a **Z-stack** through NIS's ND acquisition when the acquisition settings give `z_start` and `z_end` (with `z_step`, all in µm from the origin). Saved as TIFF, ND2 or OME-TIFF to `<output_root>/data/<label>.<ext>`, or to `<output_root>/data/<folder>/<label>.<ext>` when the `folder` setting is given, then the NIS window is closed. The settings may also select an optical configuration and set the exposure first. |
+| `get_xyz` / `set_xyz` | XY stage and the main Z (focus) drive, µm, absolute. Every move is checked against the limits NIS-Elements reports (*Devices ▸ Stage limits*) before it is sent. When NIS reports a piezo Z insert, `with_actuators={"z": "piezo"}` drives it instead of the focus drive. Each axis reports its `value`, its `actuator` and its `canvas`, everywhere a picture can show. Here the canvas is the travel itself: NIS-Elements reports the pixel size of the objective in place only, so the driver cannot widen it by the widest field. |
+| `acquire` | A snapshot (`Capture()`), or a **Z-stack** through NIS's ND acquisition when the acquisition settings give `z_start` and `z_end` (with `z_step`, all in µm from the origin). Saved as TIFF, ND2 or OME-TIFF to `<output_root>/data/<label>.<ext>`, or to `<output_root>/data/<folder>/<label>.<ext>` when the `folder` setting is given, then the NIS window is closed. The answer lists each saved plane under `planes`; the height of the planes of a stack is left unknown (None), because NIS does not say in which order it took them. The settings may also select an optical configuration and set the exposure first. |
 | `get_state` / `set_state` | Changeable: `objective_position` (nosepiece slot, 1-based), `optical_configuration` (by name), `exposure_ms`, `pfs` (on/off, when a PFS is present). Observed: NIS version, objectives, optical configurations, Z drives, PFS status, limits. |
 | `get_procedures` / `run_procedure` | `autofocus` (NIS's image-based focus sweep over `range_um`; reports `frame_z_um`), `live` / `freeze`, `pfs_on` / `pfs_off`. |
 | `get_info` | Initial position, limits, objectives, pixel calibration of the current image, output root. |
@@ -167,7 +165,7 @@ multi-channel captures beyond what an optical configuration sets.
 | `commands/` | Moves (limit-checked, incl. piezo Z), objective / optical-configuration / exposure / PFS setting, autofocus, live/freeze, capture, Z-stack, save. |
 | `calibration/machine.py` | Where the persisted origin lives. |
 | `nis_zmart_adapter.py` | The functions the ZMART Controller calls, one per command. |
-| `zmart_controller/` | The plug-in folder the controller reads: `zmart.json` names the instrument, `__init__.py` hands over the functions. |
+| `driver.py` | The module handed to `zmart_controller.set_instrument`: it hands over the adapter's functions, each answering `{"success": ..., "content": ...}`. |
 | `tests/` | `unit/` runs the real bridge server over a fake NIS API (`tests/helpers/fake_nis_api.py`); `hardware/` runs against a live NIS (`pytest -m hardware`). |
 
 ## Running the tests
@@ -179,9 +177,9 @@ python -P -m pytest zmart_drivers/nikon/nis_elements_6_10              # offline
 python -P -m pytest zmart_drivers/nikon/nis_elements_6_10 -m hardware  # against a running NIS with start_bridge.mac active
 ```
 
-`-P` keeps the folder Python starts in off its search path. Without it,
-starting Python inside this driver folder would import the plug-in folder
-`zmart_controller/` in place of the real ZMART Controller.
+`-P` keeps the folder Python starts in off its search path, so that a folder
+of this driver with a common name, such as `connection`, is never imported in
+place of another package.
 
 ## Where the NIS function names come from
 

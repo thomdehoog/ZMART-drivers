@@ -1,20 +1,17 @@
-r"""The Leica STELLARIS 5 driver's plug-in for the ZMART Controller.
+r"""The Leica STELLARIS 5 driver, as the ZMART Controller plugs it in.
 
-This folder is what the controller looks for. ``zmart.json`` beside this file
-names the instrument, and the functions below are found by name. Plug the
-driver in once on the LAS X computer, by its folder or by its module name::
+This module is the driver: it holds one function per command, under the
+names the controller looks for. Hand it to the controller on the LAS X
+computer to drive the microscope::
 
     import zmart_controller
+    import zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver as stellaris
 
-    zmart_controller.register_driver("zmart_drivers.leica.stellaris5_y42h93.navigator_expert")
-    instrument = next(
-        i for i in zmart_controller.get_instruments() if i["vendor"] == "leica"
-    )
-    zmart_controller.set_instrument(instrument)
+    zmart_controller.set_instrument(stellaris)
 
-The entry in ``zmart.json`` is handed to :func:`connect` as it is, so its
-settings can be changed there, or in the dictionary from ``get_instruments()``
-before it is passed to ``set_instrument``:
+The optional connection dictionary is handed to :func:`connect` as it is.
+Every key may be left out, and then takes its value from ``CONNECTION`` in
+the adapter:
 
 - ``client`` and ``api_delay_ms`` are passed to the LAS X CAM connection.
 - ``output_root`` is the folder where images are saved. Left empty, the
@@ -27,6 +24,10 @@ before it is passed to ``set_instrument``:
   origin when the saved one is damaged.
 - ``calibration_name`` (not set by default) picks a named calibration set.
 
+For example, to save the images in a folder of your choice::
+
+    zmart_controller.set_instrument(stellaris, {"output_root": r"D:\images"})
+
 The commands themselves live in the driver's adapter,
 ``zmart_adapter/zmart_adapter.py``. Called from there directly, each one
 returns its content alone. The versions below, which the controller calls,
@@ -36,9 +37,7 @@ Author: Thom de Hoog, Center for Microscopy and Image Analysis (ZMB),
 University of Zurich (thom.dehoog@zmb.uzh.ch, thomdehoog@gmail.com).
 """
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.zmart_adapter import (
-    zmart_adapter as _adapter,
-)
+from .zmart_adapter import zmart_adapter as _adapter
 
 _OPS = _adapter.ops_table()
 

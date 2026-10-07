@@ -397,11 +397,8 @@ This finding and H13 are both about the "freshness" of what the driver reads bac
 - **L7. The pytest markers are registered but unused.**
   - Where: `pytest.ini`.
   - `pytest.ini` already says so openly. There is nothing to fix now; the note is here only so no one assumes `-m "not hardware"` filters anything.
-- **L8. Registering the driver with the controller by folder path fails.**
-  - Where: `zmart_adapter/zmart_adapter.py:83` (`from .. import orientation`), together with the standalone controller's `register_driver`.
-  - The controller's README says a driver can be registered by "a folder, a file, or a module name". Passing the `zmart_adapter` folder makes the controller import it as a top-level package, so its imports from the parent `navigator_expert` package fail with `ImportError: attempted relative import beyond top-level package`. Passing the `navigator_expert` folder imports the driver but registers nothing, because the driver only registers when its `zmart_adapter` is imported.
-  - What works today: `register_driver("zmart_drivers.leica.stellaris5_y42h93.navigator_expert.zmart_adapter")`, with Python started in the repository root.
-  - Fix: let `navigator_expert/__init__.py` offer a `register()` that imports the adapter and registers it, so passing the `navigator_expert` folder works too.
+- **L8. Plugging the driver in by its folder path failed.** *Resolved.*
+  - The controller used to register drivers by folder or module name, and registering the Leica folder failed on a relative import. The controller no longer keeps a registry: a driver is a module handed to `zmart_controller.set_instrument`, and this driver's module is `navigator_expert/driver.py`, imported by its full name. Nothing is looked up by folder any more, so the failure cannot occur.
   - Source: Claude, found while preparing this release candidate.
 
 ---

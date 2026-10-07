@@ -854,6 +854,7 @@ def test_controller_session_bypass_refuses_at_the_commands_layer(clear_stage_lim
 
     import zmart_controller
 
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert import driver
     from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.readers import (
         parsing as _cmd_settings,
     )
@@ -861,7 +862,6 @@ def test_controller_session_bypass_refuses_at_the_commands_layer(clear_stage_lim
         zmart_adapter as adapter,
     )
 
-    zmart_controller.register_driver(Path(adapter.__file__).resolve().parents[1], remember=False)
     _raw_snapshot(_machine_root(), limits_text=_BAD_LIMITS_TEXTS["missing_axis"])
     client = MockLasxClient(latency=0.0)
     settings = {
@@ -879,8 +879,7 @@ def test_controller_session_bypass_refuses_at_the_commands_layer(clear_stage_lim
         ),
         patch.object(_cmd_settings, "make_changeable_copy", side_effect=lambda s: s),
     ):
-        instrument = next(i for i in zmart_controller.get_instruments() if i["vendor"] == "leica")
-        session = zmart_controller.set_instrument(instrument)
+        session = zmart_controller.set_instrument(driver)
         try:
             with pytest.raises(RuntimeError, match="outside"):
                 session.set_xyz(0.0, 0.0, 0.0)

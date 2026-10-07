@@ -5,8 +5,8 @@ The seam that plugs this driver into the vendor-agnostic **ZMART controller**
 (``zmart_controller``). The controller drives every microscope through one
 small set of functions -- ``connect`` plus one function per command. This
 module implements them for NIS-Elements (through the bridge, see
-``bridge/nis_bridge.py``); the plug-in folder ``zmart_controller/`` hands them
-to the controller, and its ``zmart.json`` names the instrument.
+``bridge/nis_bridge.py``); ``driver.py`` beside it hands them to the
+controller.
 
 As in the reference ``mock_driver``, the driver owns the frame **origin**: the
 controller works in micrometres from an origin the driver subtracts, so the
@@ -26,12 +26,12 @@ What the neutral surface covers for Nikon today:
 * **acquire** -- one snapshot, or a Z-stack when the acquisition type contains
   "stack", saved as TIFF / ND2 / OME-TIFF into ``<output_root>/data/``.
 
-Plug the driver in once on the microscope computer, by its folder or module
-name; importing this module registers nothing::
+Plug the driver in by handing its ``driver`` module to the controller::
 
     import zmart_controller
+    import zmart_drivers.nikon.nis_elements_6_10.driver as nikon
 
-    zmart_controller.register_driver("zmart_drivers.nikon.nis_elements_6_10")
+    zmart_controller.set_instrument(nikon)
 
 Author: Thom de Hoog (ZMB, University of Zurich)
         thom.dehoog@zmb.uzh.ch . thomdehoog@gmail.com
@@ -41,7 +41,6 @@ License: MIT
 from __future__ import annotations
 
 import functools
-import json
 import logging
 import re
 import tempfile
@@ -62,11 +61,12 @@ log = logging.getLogger(__name__)
 # connect() adds "piezo" to z on the handle (see NisHandle.actuators).
 _ACTUATORS: dict[str, list[str]] = {"x": ["motoric"], "y": ["motoric"], "z": ["motoric"]}
 
-# The instrument this driver serves, with its connect settings, exactly as the
-# controller reads it from the plug-in folder's zmart.json. ``microscope``
-# names a specific instrument; edit it (and host/port) per deployment.
-_MANIFEST = Path(__file__).resolve().parent / "zmart_controller" / "zmart.json"
-CONNECTION = json.loads(_MANIFEST.read_text(encoding="utf-8"))["instruments"][0]
+# The connection settings used for any key the caller leaves out. ``microscope``
+# names this instrument (it picks the folder its origin is saved in), and
+# ``host`` and ``port`` are where the bridge inside NIS-Elements listens, as
+# started by ``bridge/start_bridge.mac``. Pass other values to connect to
+# change them for one session.
+CONNECTION = {"microscope": "ti2-simulator", "host": "127.0.0.1", "port": 54468}
 
 
 @dataclass
@@ -93,20 +93,25 @@ class NisHandle:
 # =============================================================================
 
 
-def connect(connection: dict) -> NisHandle:
+def connect(connection: dict | None = None) -> NisHandle:
     """Open a session with the bridge and read what the microscope offers.
 
-    Honours ``host`` / ``port`` / ``timeout`` (where the bridge listens),
-    ``output_root`` (where ``acquire`` saves; a temp folder when omitted) and
-    ``machine_root`` (override for the ProgramData root). The stage limits are
-    read from NIS-Elements here and govern every move of the session; the
-    frame origin a previous session persisted is restored.
+    Every key is optional; a key left out takes its value from
+    :data:`CONNECTION`, so an empty dictionary connects to the bridge on this
+    computer. ``microscope`` names the instrument, ``host``, ``port`` and
+    ``timeout`` say where the bridge listens and how long to wait for it,
+    ``output_root`` is where ``acquire`` saves (a temporary folder when left
+    out), and ``machine_root`` is a different folder for this microscope's
+    saved configuration. The stage limits are read from NIS-Elements here and
+    govern every move of the session, and the origin saved by an earlier
+    ``set_origin`` is loaded.
     """
+    connection = {**CONNECTION, **(connection or {})}
     client = _connect(connection)
     output_root = Path(connection.get("output_root") or tempfile.mkdtemp(prefix="nikon_run_"))
     output_root.mkdir(parents=True, exist_ok=True)
     machine = _machine.MachineProfile(
-        microscope_id=connection.get("microscope") or CONNECTION["microscope"],
+        microscope_id=connection["microscope"],
         programdata_root=connection.get("machine_root"),
     )
     info = _readers.get_bridge_info(client)
@@ -263,12 +268,13 @@ def _piezo_z(handle: NisHandle) -> float:
 
 
 def get_xyz(handle: NisHandle, *, with_actuators: dict | None = None) -> dict:
-    """Report the position per axis (um, relative to the origin) with its actuator.
+    """Report each axis: its position, the motor that reads it, and its canvas.
 
-    With ``with_actuators={"z": "piezo"}`` the z value is the piezo insert's
-    position (relative to the piezo origin), not the focus drive's. ``range``
-    is how far each axis may travel, from the stage limits NIS-Elements
-    reports.
+    Positions are in micrometres from the origin. With
+    ``with_actuators={"z": "piezo"}`` the z value is the piezo insert's
+    position (relative to the piezo origin), not the focus drive's. The
+    ``canvas`` is everywhere a picture can show on that axis; see
+    :func:`_canvas`.
     """
     _require_open(handle)
     chosen = _resolve_actuators(handle, with_actuators)
@@ -279,23 +285,29 @@ def get_xyz(handle: NisHandle, *, with_actuators: dict | None = None) -> dict:
         axis: {
             "value": user[axis],
             "actuator": chosen[axis],
-            "unit": "um",
-            "range": _range(handle, axis, chosen[axis]),
+            "canvas": _canvas(handle, axis, user[axis]),
         }
         for axis in ("x", "y", "z")
     }
 
 
-def _range(handle: NisHandle, axis: str, actuator: str) -> list[float] | None:
-    """How far an axis may travel, ``[min, max]`` in um from the origin.
+def _canvas(handle: NisHandle, axis: str, value: float) -> list[float]:
+    """Everywhere a picture can show on an axis, ``[min, max]`` in um from the origin.
 
-    These are the stage limits NIS-Elements reported at connect, the ones
-    every move is checked against. NIS reports none for the piezo insert, so
-    its range is None.
+    The canvas is the travel itself: the stage limits NIS-Elements reported
+    at connect, the ones every move is checked against. On z this is exact,
+    because a z-stack is refused unless both its ends lie inside the limits.
+    On x and y a picture taken at the edge of the travel shows half a field
+    beyond it, but NIS-Elements only reports the pixel size of the objective
+    in place now, not of every objective on the nosepiece, so this driver
+    cannot know the widest field ahead of time and does not widen the canvas.
+    The z canvas is that of the focus drive, whichever motor reads z; the
+    piezo insert rides on it. When NIS reports no limits for an axis, the
+    canvas is the current position alone.
     """
     bounds = handle.limits.get(axis)
-    if bounds is None or actuator == "piezo":
-        return None
+    if bounds is None:
+        return [value, value]
     return [float(bounds["min"]) - handle.origin[axis], float(bounds["max"]) - handle.origin[axis]]
 
 
@@ -556,19 +568,44 @@ def acquire(
     saved = _cmd.save_image(
         handle.client, str(path), format=fmt, close=bool(options.get("close_after_save", True))
     )
+    position = _user_xyz(handle, _readers.get_position(handle.client))
     return {
         "position_label": position_label,
         "folder": folder,
         "format": fmt,
-        "planes": image.get("z_planes", image.get("planes")),
+        "planes": _planes(saved["path"], position, image, is_stack),
         # Every file saved, under the name the ZMART Controller's contract fixes,
         # so a workflow finds the pictures on any microscope.
         "files": [saved["path"]],
         "metadata_file": None,
         "image": image,
-        "position": _user_xyz(handle, _readers.get_position(handle.client)),
+        "position": position,
         "duration_s": round(time.perf_counter() - started, 3),
     }
+
+
+def _planes(path: str, position: dict, image: dict, is_stack: bool) -> list[dict]:
+    """One entry per saved image plane: which file, which depth, and where it was taken.
+
+    NIS-Elements saves one channel per acquisition here, so ``c`` is always
+    0. A single image sits at the stage position. In a stack the stage does
+    not move sideways, so every plane shares x and y, but NIS-Elements does
+    not say in which order it took the planes between the two ends, so the
+    height of each plane is left unknown (None) rather than guessed.
+    """
+    count = int(image.get("z_planes", 1)) if is_stack else 1
+    return [
+        {
+            "path": path,
+            "c": 0,
+            "z": index,
+            "t": 0,
+            "x_um": position["x"],
+            "y_um": position["y"],
+            "z_um": None if is_stack else position["z"],
+        }
+        for index in range(count)
+    ]
 
 
 # =============================================================================
@@ -681,7 +718,7 @@ def _answered(function):
 def ops_table() -> dict[str, Any]:
     """The functions this driver hands to the controller, one per command.
 
-    The plug-in folder ``zmart_controller/`` exposes these by name.
+    ``driver.py`` exposes these by name.
     ``connect`` and ``disconnect`` are handed over unchanged. Every other
     command is wrapped so that, called through the controller, it answers
     ``{"success": ..., "content": ...}``. Called directly from this module,
