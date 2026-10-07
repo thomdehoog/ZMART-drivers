@@ -75,7 +75,7 @@ def test_every_command_answers_in_the_controller_shape(instrument):
             "set_xyz": session.set_xyz(10.0, 20.0, 5.0),
             "set_state": session.set_state({"changeable": {"intensity": 40.0}}),
             "run_procedure": session.run_procedure({"name": "move_focus", "value": 12.0}),
-            "acquire": session.acquire("prescan", "A1"),
+            "acquire": session.acquire("A1"),
         }
         with pytest.raises(ValueError, match="unknown procedure"):
             session.run_procedure({"name": "no-such-routine"})
@@ -83,17 +83,17 @@ def test_every_command_answers_in_the_controller_shape(instrument):
         session.disconnect()
 
     for name, answer in answers.items():
-        assert set(answer) == {"success", "report"}, name
+        assert set(answer) == {"success", "content"}, name
         assert answer["success"] is True, name
     assert zmart_controller.check_acquire_answer(answers["acquire"]) == []
-    assert Path(answers["acquire"]["report"]["files"][0]).is_file()
+    assert Path(answers["acquire"]["content"]["files"][0]).is_file()
 
 
 def test_get_info_describes_the_microscope_in_plain_words(instrument):
     session = zmart_controller.session.set_instrument(instrument)
     try:
-        description = session.get_info()["report"]["description"]
-        xyz = session.get_xyz()["report"]
+        description = session.get_info()["content"]["description"]
+        xyz = session.get_xyz()["content"]
     finally:
         session.disconnect()
 

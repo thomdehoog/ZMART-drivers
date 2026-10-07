@@ -139,12 +139,12 @@ s = zmart_controller.set_instrument(
     }
 )
 s.set_xyz(100, -100, 5)              # micrometres from the origin (see "Setting the origin")
-s.acquire(acquisition_type="snap", position_label="tile_01")
+s.acquire(position_label="tile_01")
 s.run_procedure({"name": "software_autofocus"})
 s.disconnect()
 ```
 
-Every answer comes back as `{"success": ..., "report": ...}`.
+Every answer comes back as `{"success": ..., "content": ...}`.
 
 Or without the controller, using the driver directly:
 
@@ -192,7 +192,7 @@ Run these lines again whenever you want a new origin.
 | Neutral surface | ZEN meaning |
 |---|---|
 | `get_xyz` / `set_xyz` | The XY stage and the focus drive, µm, absolute from the origin. Every target is checked against this microscope's stage limits before ZEN is asked to move (XY first, then Z). One motor per axis, so `get_actuators` lists `motoric` only. |
-| `acquire` | Runs the loaded ZEN experiment: a **snap** (one image with the active channels) by default, the **whole experiment** (Z-stack, tiles, time series) when `mode="experiment"` or the acquisition type mentions a stack, tiles or a time lapse. ZEN writes `<type>_<label>.czi` into its image folder; the file is copied to `<output_root>/data/` when that folder is reachable, otherwise the record says where ZEN left it. |
+| `acquire` | Runs the loaded ZEN experiment: a **snap** (one image with the active channels) by default, the **whole experiment** (Z-stack, tiles, time series) when the acquisition setting `mode` is `"experiment"`. ZEN writes `<label>.czi` into its image folder (`<folder>_<label>.czi` when the `folder` setting is given); the file is copied to `<output_root>/data/` (or `<output_root>/data/<folder>/`) when that folder is reachable, otherwise the record says where ZEN left it. |
 | `get_state` / `set_state` | Changeable: `objective_position` (position on the objective changer), `experiment` (the loaded ZEN experiment, which carries the imaging settings). Observed: objectives (name, magnification, NA), the experiments ZEN can load, ZEN's image folder, the limits, whether ZEN is busy. |
 | `get_procedures` / `run_procedure` | `software_autofocus` (ZEN's focus search with the settings of the loaded experiment; reports `frame_z_um`), `find_surface` / `store_focus` / `recall_focus` (Definite Focus, on systems that have it), `live`, `stop`. |
 | `get_info` | Initial position, limits and where they came from, objectives, output root, ZEN's image folder, and which `zen_api` version and services the session speaks. |
@@ -299,7 +299,7 @@ What that run confirms, which the fake gateway cannot:
    be reachable there under the same path (a mapped share). Otherwise
    `acquire` leaves the file on the ZEN computer and says so in its record.
 4. **The output-name rules.** ZEN wants a plain file name without extension;
-   the adapter builds `<type>_<label>` with unsafe characters replaced.
+   the adapter builds `<label>` (or `<folder>_<label>`) with unsafe characters replaced.
 5. **The status stream on a started experiment**
    (`test_monitor_started_experiment`): updates arrive several times per
    second and the last one says the experiment is over.

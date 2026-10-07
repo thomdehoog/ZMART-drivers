@@ -268,7 +268,7 @@ def acquire_frame_to(
     saved = _capture_for_calibration(
         session,
         name=name,
-        acquisition_type="calibration-frame",
+        folder="calibration-frame",
         orientation=orientation,
         backlash_passes=backlash_passes,
     )
@@ -303,7 +303,7 @@ def acquire_stack_to(
     saved = _capture_for_calibration(
         session,
         name=dirname,
-        acquisition_type="calibration-stack",
+        folder="calibration-stack",
         orientation=orientation,
         backlash_passes=backlash_passes,
     )
@@ -327,7 +327,7 @@ def _capture_for_calibration(
     session: Any,
     *,
     name: str,
-    acquisition_type: str,
+    folder: str,
     orientation=None,
     backlash_passes: int | None = None,
 ):
@@ -341,7 +341,7 @@ def _capture_for_calibration(
         orientation = _orientation.rig_orientation()
     position_label = f"{len(session.exported_files):06d}"
     naming = Naming(
-        acquisition_type=acquisition_type,
+        folder=folder,
         hash6=run_hash(),
         position_label=position_label,
     )

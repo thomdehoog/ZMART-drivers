@@ -132,7 +132,7 @@ def _run_acquisition(client, acq: dict, *, label: str) -> dict:
 
     Returns the ``acquire_start`` reply data (files, planes, pixels).
     """
-    start = client.request("acquire_start", acquisition=acq, acquisition_type=label)
+    start = client.request("acquire_start", acquisition=acq, label=label)
     data = dict(start.data)
     files = [str(p) for p in data.get("files", [])]
     deadline = time.monotonic() + ACQUISITION.acquire_timeout_s
@@ -171,7 +171,7 @@ def _run_acquisition(client, acq: dict, *, label: str) -> dict:
 
 def acquire(
     client,
-    acquisition_type: str = "snap",
+    label: str = "snap",
     *,
     options: dict | None = None,
     state: dict | None = None,
@@ -190,21 +190,21 @@ def acquire(
     # returns exactly this path, and save() relocates from it.
     options = dict(options or {})
     options.setdefault("folder", tempfile.mkdtemp(prefix="mesospim_capture_"))
-    options.setdefault("filename", f"{acquisition_type}.tiff")
+    options.setdefault("filename", f"{label}.tiff")
     acq = build_acquisition(state, options)
 
     started_at = time.time()
-    data = _run_acquisition(client, acq, label=acquisition_type)
+    data = _run_acquisition(client, acq, label=label)
     finished_at = time.time()
 
     files = tuple(Path(p) for p in data.get("files", []))
     planes = int(data.get("planes", acq.get("planes", 1)))
     if not files:
         raise RuntimeError(
-            f"acquire({acquisition_type!r}) returned no frame files; server data: {data!r}"
+            f"acquire({label!r}) returned no frame files; server data: {data!r}"
         )
     return AcquisitionResult(
-        acquisition_type=acquisition_type,
+        label=label,
         acquisition=acq,
         started_at=started_at,
         finished_at=finished_at,

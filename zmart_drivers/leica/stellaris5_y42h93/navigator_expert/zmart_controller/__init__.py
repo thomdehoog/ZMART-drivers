@@ -29,8 +29,8 @@ before it is passed to ``set_instrument``:
 
 The commands themselves live in the driver's adapter,
 ``zmart_adapter/zmart_adapter.py``. Called from there directly, each one
-returns its report alone. The versions below, which the controller calls,
-answer ``{"success": True, "report": ...}``. Every failure is raised.
+returns its content alone. The versions below, which the controller calls,
+answer ``{"success": True, "content": ...}``. Every failure is raised.
 
 Author: Thom de Hoog, Center for Microscopy and Image Analysis (ZMB),
 University of Zurich (thom.dehoog@zmb.uzh.ch, thomdehoog@gmail.com).
@@ -50,7 +50,7 @@ get_xyz = _OPS["get_xyz"]
 set_xyz = _OPS["set_xyz"]
 get_state = _OPS["get_state"]
 set_state = _OPS["set_state"]
-get_acquisition_options = _OPS["get_acquisition_options"]
+get_acquisition_settings = _OPS["get_acquisition_settings"]
 acquire = _OPS["acquire"]
 get_procedures = _OPS["get_procedures"]
 run_procedure = _OPS["run_procedure"]

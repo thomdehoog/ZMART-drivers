@@ -173,7 +173,7 @@ def test_state_phase_does_not_switch_away_from_autofocus_job():
     }
     session = SimpleNamespace(
         get_state=Mock(return_value=captured),
-        get_acquisition_options=Mock(return_value={"job": {"options": ["Overview", "HiRes"]}}),
+        get_acquisition_settings=Mock(return_value={"job": {"options": ["Overview", "HiRes"]}}),
         set_state=Mock(side_effect=AssertionError("must not switch an autofocus job")),
     )
     validator = SimpleNamespace(
@@ -220,7 +220,7 @@ def test_acquire_backlash_rounds_through_the_controller_seam(tmp_path, rounds, c
     use live) and only patches the I/O boundary (``_capture``/``_save``) that a
     mock CAM cannot satisfy -- so the seam decision #3 cares about (Session ->
     ops table -> adapter) is what is actually exercised for both the default
-    and a positive ``backlash_rounds`` acquisition option. ``strip_scan_fields``
+    and a positive ``backlash_rounds`` acquisition setting. ``strip_scan_fields``
     is passed as ``False`` for the same reason: stripping needs ``PyApiSaveExperiment``,
     which ``MockLasxClient`` does not implement, and scan-field handling is
     unrelated to what this test verifies.
@@ -256,9 +256,8 @@ def test_acquire_backlash_rounds_through_the_controller_seam(tmp_path, rounds, c
             if rounds is not None:
                 options["backlash_rounds"] = rounds
             record = session.acquire(
-                acquisition_type="prescan",
                 position_label="1",
-                options=options,
+                acquisition_settings=options,
             )
     finally:
         adapter._session.connect_python_client = original_connect

@@ -110,11 +110,11 @@ def test_get_info_describes_the_microscope_in_plain_words(clean_registry, monkey
     )
     try:
         answer = session.get_info()
-        xyz = session.get_xyz()["report"]
+        xyz = session.get_xyz()["content"]
     finally:
         session.disconnect()
 
-    description = answer["report"]["description"]
+    description = answer["content"]["description"]
     assert answer["success"] is True
     assert description.startswith("A Leica STELLARIS 5 confocal microscope")
     assert "{" not in description

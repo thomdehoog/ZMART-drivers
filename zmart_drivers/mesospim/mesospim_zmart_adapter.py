@@ -482,10 +482,11 @@ def run_procedure(handle: MesospimHandle, procedure: dict) -> dict:
 # =============================================================================
 
 
-def get_acquisition_options(handle: MesospimHandle) -> dict:
-    """The acquisition + saving options this instrument offers (options + active)."""
+def get_acquisition_settings(handle: MesospimHandle) -> dict:
+    """The acquisition and saving settings this instrument offers, with the active value of each."""
     zooms = [name for name, _px in HARDWARE.zoom_pixel_size_um]
     return {
+        "folder": {"options": "any text; empty saves straight into data", "active": ""},
         "format": {"options": list(ACQUISITION.formats), "active": ACQUISITION.save_format},
         "backlash_correction": {"options": [True, False], "active": True},
         "shutterconfig": {
@@ -505,23 +506,29 @@ _ACQUIRE_CAPTURE_KEYS = ("planes", "z_step", "z_start", "z_end")
 def acquire(
     handle: MesospimHandle,
     *,
-    acquisition_type: str,
     position_label: str,
-    options: dict | None = None,
+    acquisition_settings: dict | None = None,
 ) -> dict:
     """Capture one dataset and save it, returning the record.
 
-    Applies any light-path options as state first, optionally settles the stage
+    Applies any light-path settings as state first, optionally settles the stage
     (backlash correction), captures via the mesoSPIM image writer, then relocates
-    the frames into ``<output_root>/data/``.
+    the frames into ``<output_root>/data/``, named after ``position_label``.
+    The ``folder`` setting puts them in a folder of that name inside ``data``.
     """
-    options = dict(options or {})
+    options = dict(acquisition_settings or {})
     fmt = options.get("format", ACQUISITION.save_format)
+    folder = options.get("folder") or ""
+    if not isinstance(folder, str):
+        # A ValueError, like every other unusable acquisition setting.
+        raise ValueError(  # noqa: TRY004
+            f"acquisition setting 'folder' must be text, not {folder!r}"
+        )
     # Fail-closed gate BEFORE anything is applied; the absolute z bounds are
     # checked again below, once they are mapped through the frame origin.
     _check_limits(handle, "acquire", {})
 
-    # 1) apply light-path settings that were passed as options.
+    # 1) apply light-path settings that were passed as acquisition settings.
     state_updates = {k: options[k] for k in _ACQUIRE_STATE_KEYS if k in options}
     if state_updates:
         res = _cmd.set_state(handle.client, state_updates)
@@ -532,7 +539,7 @@ def acquire(
     if options.get("backlash_correction", True):
         _settle(handle)
 
-    # 3) capture (snap or stack, per the capture options).
+    # 3) capture (snap or stack, per the capture settings).
     capture_options = {k: options[k] for k in _ACQUIRE_CAPTURE_KEYS if k in options}
     # Stack Z bounds arrive in the controller's user frame (like set_xyz); map
     # them to raw stage coordinates via the origin so a non-zero origin does not
@@ -561,12 +568,12 @@ def acquire(
     # resident server can resolve the frame paths and repeated/same-label
     # captures never collide. Cleaned up after the frames are relocated.
     handle._acq_seq += 1
-    stem = _acq.canonical_stem(acquisition_type, position_label)
+    stem = _acq.canonical_stem(position_label)
     staging = handle.output_root / "_staging" / f"{stem}_{handle._acq_seq:04d}"
     staging.mkdir(parents=True, exist_ok=True)
     capture_options.setdefault("folder", str(staging))
     capture_options.setdefault("filename", f"{stem}.tiff")
-    result = _acq.acquire(handle.client, acquisition_type, options=capture_options)
+    result = _acq.acquire(handle.client, stem, options=capture_options)
 
     # 4) save into the canonical layout, then drop the staging copies (save()
     #    copies rather than moves, so remove the writer's originals to avoid
@@ -576,13 +583,14 @@ def acquire(
             result,
             handle.output_root,
             position_label=position_label,
+            folder=folder,
             format=fmt,
         )
     finally:
         shutil.rmtree(staging, ignore_errors=True)
     return {
-        "acquisition_type": acquisition_type,
         "position_label": position_label,
+        "folder": folder,
         "format": fmt,
         "planes": result.planes,
         # Every file saved, under the name the ZMART Controller's contract fixes,
@@ -637,7 +645,7 @@ Stage: x, y and z move the sample, one motor each ("motoric"), in micrometres fr
 
 Settings (the changeable part of the state): laser is the laser line ({lasers}); intensity is the laser intensity in percent, 0 to 100; filter is the emission filter ({filters}); zoom is the detection zoom ({zooms}); shutterconfig chooses which light sheet is on ({shutters}); etl_l_amplitude, etl_l_offset, etl_r_amplitude and etl_r_offset are the amplitude and offset of the electrically tunable lens of the left and the right light sheet.{camera}
 
-Acquiring captures one plane with the current settings, or a stack when z_start and z_end (micrometres from the origin) or planes are given, with z_step micrometres between planes. Laser, intensity, filter, zoom and shutterconfig may be given as options too. The images are saved as ome-tiff, raw or h5 in the data folder under the output folder, named by the position label."""
+Acquiring captures one plane with the current settings, or a stack when z_start and z_end (micrometres from the origin) or planes are given, with z_step micrometres between planes. Laser, intensity, filter, zoom and shutterconfig may be given as acquisition settings too. The images are saved as ome-tiff, raw or h5 in the data folder under the output folder, named by the position label; the folder setting groups them in a folder of that name inside data."""
 
 
 def _bounds(handle: MesospimHandle, axis: str) -> str:
@@ -697,7 +705,7 @@ def get_info(handle: MesospimHandle) -> dict:
 # The commands that answer in the controller's shape. connect returns the
 # handle and disconnect returns nothing, so those two are handed over as they are.
 _ANSWERING_OPS = (
-    "get_acquisition_options",
+    "get_acquisition_settings",
     "get_actuators",
     "get_xyz",
     "set_xyz",
@@ -714,18 +722,18 @@ def _answered(function):
     """Wrap a command so it answers the way the controller documents.
 
     The controller promises every workflow the same answer from every
-    microscope: ``{"success": ..., "report": ...}``. The functions in this
-    module return the report alone, and raise when something goes wrong.
-    ``success`` is therefore True, unless the report says that a change was
+    microscope: ``{"success": ..., "content": ...}``. The functions in this
+    module return the content alone, and raise when something goes wrong.
+    ``success`` is therefore True, unless the content says that a change was
     sent but could not be confirmed (``"confirmed": False``): an outcome that
     is safe to carry on from, so it is reported rather than raised.
     """
 
     @functools.wraps(function)
     def command(*args, **kwargs):
-        report = function(*args, **kwargs)
-        unconfirmed = isinstance(report, dict) and report.get("confirmed") is False
-        return {"success": not unconfirmed, "report": report}
+        content = function(*args, **kwargs)
+        unconfirmed = isinstance(content, dict) and content.get("confirmed") is False
+        return {"success": not unconfirmed, "content": content}
 
     return command
 
@@ -736,13 +744,13 @@ def ops_table() -> dict[str, Any]:
     The plug-in folder ``zmart_controller/`` exposes these by name.
     ``connect`` and ``disconnect`` are handed over unchanged. Every other
     command is wrapped so that, called through the controller, it answers
-    ``{"success": ..., "report": ...}``. Called directly from this module,
-    the same functions return the report alone.
+    ``{"success": ..., "content": ...}``. Called directly from this module,
+    the same functions return the content alone.
     """
     functions = {
         "connect": connect,
         "disconnect": disconnect,
-        "get_acquisition_options": get_acquisition_options,
+        "get_acquisition_settings": get_acquisition_settings,
         "get_actuators": get_actuators,
         "get_xyz": get_xyz,
         "set_xyz": set_xyz,

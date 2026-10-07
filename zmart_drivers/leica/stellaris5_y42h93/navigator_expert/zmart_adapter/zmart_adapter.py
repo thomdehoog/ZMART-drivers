@@ -16,8 +16,8 @@ instrument::
     zmart_controller.set_instrument(instrument)
 
 Answers: through the controller, every command answers
-``{"success": True, "report": ...}``, the shape the controller documents for
-every driver. The functions in this module return the report alone, and
+``{"success": True, "content": ...}``, the shape the controller documents for
+every driver. The functions in this module return the content alone, and
 :func:`ops_table` wraps them for the controller. Failures are always raised,
 never reported as ``success: False``.
 
@@ -54,8 +54,8 @@ Scope of v1 (grow as needed):
       galvo at 0 with the focus kept), and autofocus (with job
       discovery); ``run_procedure`` runs them.
     - ``acquire`` selects the job, captures, and saves in one step;
-      ``acquisition_type``/``position_label`` map onto the driver's
-      Naming slots and travel verbatim in the save lineage.
+      the ``folder`` acquisition setting and ``position_label`` map onto
+      the driver's Naming slots and travel verbatim in the save lineage.
 
 Live-validation note: the z model assumes the two drives combine
 *additively with the same sign*. The arithmetic, readback keys/units,
@@ -802,8 +802,13 @@ def set_xyz(
 # =============================================================================
 
 
-def get_acquisition_options(handle: ZmartHandle) -> dict:
-    """The acquisition + saving options this instrument offers (options + active).
+def get_acquisition_settings(handle: ZmartHandle) -> dict:
+    """The acquisition and saving settings this instrument offers, with the active value of each.
+
+    ``folder`` names the folder the pictures are saved in, and every file
+    name starts with it. The Leica file names always carry one, so it cannot
+    be empty; it defaults to ``"scan"`` and must be kebab-case lowercase (for
+    example ``"overview"`` or ``"high-res"``), at most 25 characters.
 
     Discovered live on every call: ``job`` lists the LAS X jobs with the
     selected one active; ``cleanup_source`` is forwarded
@@ -824,6 +829,10 @@ def get_acquisition_options(handle: ZmartHandle) -> dict:
     if selected not in names:
         selected = next((j["Name"] for j in normal if j.get("IsSelected")), None)
     return {
+        "folder": {
+            "options": "kebab-case lowercase text, at most 25 characters",
+            "active": "scan",
+        },
         "job": {"options": names, "active": selected},
         "backlash_correction": {"options": [True, False], "active": True},
         "backlash_rounds": {
@@ -836,24 +845,34 @@ def get_acquisition_options(handle: ZmartHandle) -> dict:
     }
 
 
-def _with_defaults(handle: ZmartHandle, options: dict | None) -> dict:
-    """Validate options against the live menu, filling omissions from actives."""
-    menu = get_acquisition_options(handle)
+def _with_defaults(handle: ZmartHandle, settings: dict | None) -> dict:
+    """Validate settings against the live menu, filling omissions from actives."""
+    menu = get_acquisition_settings(handle)
     resolved = {name: spec["active"] for name, spec in menu.items()}
-    for name, value in (options or {}).items():
+    for name, value in (settings or {}).items():
         if name not in menu:
-            raise ValueError(f"unknown acquisition option {name!r}")
+            raise ValueError(f"unknown acquisition setting {name!r}")
+        if name == "folder":
+            # Checked here, before the scan fires, so a bad name never wastes a
+            # capture. The rules themselves live in Naming, in one place.
+            if not isinstance(value, str):
+                raise ValueError(
+                    f"acquisition setting 'folder' must be text, not {value!r}"
+                )
+            Naming(folder=value, hash6="000000", position_label="check")
+            resolved[name] = value
+            continue
         if name == "backlash_rounds":
             if isinstance(value, bool) or not isinstance(value, int) or value < 0:
                 raise ValueError(
-                    "invalid value for acquisition option 'backlash_rounds': "
+                    "invalid value for acquisition setting 'backlash_rounds': "
                     f"expected a non-negative integer, got {value!r}"
                 )
             resolved[name] = value
             continue
         if value not in menu[name]["options"]:
             raise ValueError(
-                f"invalid value {value!r} for acquisition option {name!r} "
+                f"invalid value {value!r} for acquisition setting {name!r} "
                 f"(available: {menu[name]['options']!r})"
             )
         resolved[name] = value
@@ -887,7 +906,7 @@ def _ensure_scan_fields_stripped(handle: ZmartHandle) -> None:
     if state == "unreadable":
         raise RuntimeError(
             "scanning template is unreadable; cannot verify the scan field is empty — "
-            "fix or remove the template, or pass options={'strip_scan_fields': False}"
+            "fix or remove the template, or pass acquisition_settings={'strip_scan_fields': False}"
         )
     if not _scanfields.strip_template(handle.client):
         raise RuntimeError("could not strip the scanning template before acquiring")
@@ -916,7 +935,7 @@ def _try(fn):
 def _export_state(
     handle: ZmartHandle,
     *,
-    acquisition_type: str,
+    folder: str,
     position_label: str,
     acquisition_hash: str,
     job: str,
@@ -938,7 +957,7 @@ def _export_state(
         "job_state": (machine_state or {}).get("changeable") if machine_state else None,
         "position": _try(lambda: get_xyz(handle)),
         "provenance": {
-            "acquisition_type": acquisition_type,
+            "folder": folder,
             "position_label": position_label,
             "job": job,
             "session_hash6": handle.hash6,
@@ -951,31 +970,30 @@ def _export_state(
 def acquire(
     handle: ZmartHandle,
     *,
-    acquisition_type: str = "scan",
     position_label: str | None = None,
-    options: dict | None = None,
+    acquisition_settings: dict | None = None,
 ) -> dict:
     """Run the job, wait for the export, and persist the OME-TIFF product.
 
     Args:
-        acquisition_type: Kind of scan; names the output folder/files, so it
-            must be kebab-case lowercase (``Naming`` raises a clear
-            ``ValueError`` otherwise). Defaults to ``"scan"``.
         position_label: Free text naming this position; sanitized into the
             filename by ``Naming``. When omitted, the next per-session
             counter value ("000000", "000001", ...) is used (an explicit
             label does NOT consume a counter value). The label travels
             verbatim in the lineage record ``save()`` writes to
             ``summary.json`` and in the embedded per-plane state.
-        options: Values from :func:`get_acquisition_options`; omitted
-            options use the active defaults, unknown keys/values raise.
+        acquisition_settings: Values from :func:`get_acquisition_settings`;
+            settings left out use the active defaults, unknown keys/values
+            raise. ``folder`` names the output folder and starts every file
+            name, so it must be kebab-case lowercase (``Naming`` raises a
+            clear ``ValueError`` otherwise). It defaults to ``"scan"``.
 
     The driver's helper mints a fresh acquisition-position hash for this
-    capture. The acquisition type itself has no folder hash. The session hash
+    capture. The folder itself has no hash. The session hash
     (``handle.hash6``) rides along only in lineage/provenance. The machine/software state is captured
     and embedded in each saved plane's OME-XML (no sidecar).
 
-    Returns a record with the resolved job/options, ``files`` (every file
+    Returns a record with the resolved job and settings, ``files`` (every file
     saved) and ``planes`` (which file holds which channel, z and t, and where
     on the sample it was taken).
     Raises on any unrecoverable step — job selection, capture, export
@@ -984,10 +1002,13 @@ def acquire(
     _require_open(handle)
     workflow_root = _info.output_root(handle, _save.save_source_root)
     output_root = workflow_root / ".staging" / handle.hash6
-    resolved = _with_defaults(handle, options)
+    resolved = _with_defaults(handle, acquisition_settings)
+    folder = resolved["folder"]
     job = resolved["job"]
     if not job:
-        raise RuntimeError("no LAS X job selected and none passed via options['job']")
+        raise RuntimeError(
+            "no LAS X job selected and none passed via acquisition_settings['job']"
+        )
 
     # Strip BEFORE selecting: stripping reloads the experiment, which could
     # otherwise undo the selection.
@@ -1009,13 +1030,13 @@ def acquire(
     label = position_label if position_label is not None else _next_position_label(handle)
     acquisition_hash = _next_acquisition_hash(handle)
     naming = Naming(
-        acquisition_type=acquisition_type,
+        folder=folder,
         hash6=acquisition_hash,
         position_label=label,
     )
     state = _export_state(
         handle,
-        acquisition_type=acquisition_type,
+        folder=folder,
         position_label=label,
         acquisition_hash=acquisition_hash,
         job=job,
@@ -1026,7 +1047,7 @@ def acquire(
         output_root,
         naming,
         lineage={
-            "acquisition_type": acquisition_type,
+            "folder": folder,
             "position_label": label,
             "job": job,
             "session_hash6": handle.hash6,
@@ -1059,8 +1080,8 @@ def acquire(
     vendor_metadata = [str(path) for path in getattr(saved, "vendor_metadata_paths", ())]
     printed = [str(path) for path in getattr(saved, "state_paths", ())]
     return {
-        "acquisition_type": acquisition_type,
         "position_label": label,
+        "folder": folder,
         "job": job,
         "format": resolved["format"],
         "acquisition_hash": acquisition_hash,
@@ -1341,7 +1362,7 @@ def _scan_field(handle: ZmartHandle, *, default_job_name: str) -> dict | None:
     no LAS X scanning-templates profile.
 
     Read this BEFORE acquiring: the default ``strip_scan_fields``
-    acquisition option empties the template.
+    acquisition setting empties the template.
     """
     templates_dir = _scanfields.find_scanning_templates_dir()
     if templates_dir is None:
@@ -1469,7 +1490,7 @@ Settings (the changeable part of the state): job is the name of a LAS X job. A j
 
 Objectives on the turret, as slot: LAS X objective number: {objectives}.
 
-Acquiring runs a LAS X job and saves what LAS X captured under the output folder, named by the acquisition type and the position label."""
+Acquiring runs a LAS X job and saves what LAS X captured under the output folder, in the folder named by the folder setting ("scan" unless given), with files named by that folder and the position label."""
 
 
 def _described(handle: ZmartHandle) -> str:
@@ -1549,7 +1570,7 @@ def _connection_status(handle: ZmartHandle, root: Path) -> dict:
 # The commands that answer in the controller's shape. connect returns the
 # handle and disconnect returns nothing, so those two are handed over as they are.
 _ANSWERING_OPS = (
-    "get_acquisition_options",
+    "get_acquisition_settings",
     "get_actuators",
     "get_xyz",
     "set_xyz",
@@ -1566,15 +1587,15 @@ def _answered(function):
     """Wrap a command so it answers the way the controller documents.
 
     The controller promises every workflow the same answer from every
-    microscope: ``{"success": ..., "report": ...}``. The functions in this
-    module return only the report. Each of them raises when something goes
-    wrong, so an answer that comes back at all is a success, and the report
+    microscope: ``{"success": ..., "content": ...}``. The functions in this
+    module return only the content. Each of them raises when something goes
+    wrong, so an answer that comes back at all is a success, and the content
     is exactly what the function returned.
     """
 
     @functools.wraps(function)
     def command(*args, **kwargs):
-        return {"success": True, "report": function(*args, **kwargs)}
+        return {"success": True, "content": function(*args, **kwargs)}
 
     return command
 
@@ -1584,13 +1605,13 @@ def ops_table() -> dict[str, Any]:
 
     ``connect`` and ``disconnect`` are handed over unchanged. Every other
     command is wrapped so that, called through the controller, it answers
-    ``{"success": True, "report": ...}``. Called directly from this module,
-    the same functions return the report alone.
+    ``{"success": True, "content": ...}``. Called directly from this module,
+    the same functions return the content alone.
     """
     functions = {
         "connect": connect,
         "disconnect": disconnect,
-        "get_acquisition_options": get_acquisition_options,
+        "get_acquisition_settings": get_acquisition_settings,
         "get_actuators": get_actuators,
         "get_xyz": get_xyz,
         "set_xyz": set_xyz,

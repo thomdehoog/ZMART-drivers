@@ -27,15 +27,15 @@ def run_hash(start_time: float | None = None) -> str:
 
 @dataclass(frozen=True)
 class Naming:
-    acquisition_type: str
+    folder: str
     hash6: str
     position_label: str
     c: int = 0
     z: int = 0
 
     def __post_init__(self) -> None:
-        if not _TYPE_RE.fullmatch(self.acquisition_type):
-            raise ValueError("acquisition_type must be kebab-case lowercase")
+        if not _TYPE_RE.fullmatch(self.folder):
+            raise ValueError("folder must be kebab-case lowercase")
         if not _HASH_RE.fullmatch(self.hash6):
             raise ValueError("hash6 must be 6 lowercase base36 characters")
         if not self.position_label:
@@ -43,14 +43,14 @@ class Naming:
         object.__setattr__(self, "position_label", _UNSAFE_RE.sub("_", self.position_label))
 
 
-def acquisition_dir(output_root: Path | str, acquisition_type: str) -> Path:
-    return Path(output_root) / acquisition_type
+def acquisition_dir(output_root: Path | str, folder: str) -> Path:
+    return Path(output_root) / folder
 
 
-def data_dir(output_root: Path | str, acquisition_type: str) -> Path:
-    """Return where the images of an acquisition go: ``<type>/data``.
+def data_dir(output_root: Path | str, folder: str) -> Path:
+    """Return where the images of an acquisition go: ``<folder>/data``.
 
     The pixels get a folder of their own so what is made from them later --
     a stitched view, an analysis -- becomes a folder beside them.
     """
-    return acquisition_dir(output_root, acquisition_type) / "data"
+    return acquisition_dir(output_root, folder) / "data"

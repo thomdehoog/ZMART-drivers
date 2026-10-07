@@ -793,7 +793,7 @@ def acquire_validation_image(
         acquisition,
         output_root,
         Naming(
-            acquisition_type="orientation-validation",
+            folder="orientation-validation",
             hash6=run_hash(),
             position_label="validation",
         ),

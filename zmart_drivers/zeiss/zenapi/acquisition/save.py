@@ -3,7 +3,7 @@
 ZEN writes every acquisition as one CZI file on the ZEN computer, in the
 folder it reports through ``GetImageOutputPath``, named after the acquisition's
 ``output_name``. ``save`` resolves that file, waits for it to stop growing
-(ZEN may still be flushing it), and copies it into ``<output_root>/<type>/data/``
+(ZEN may still be flushing it), and copies it into ``<output_root>/<folder>/data/``
 under the driver's :class:`Naming` slots. A CZI holds the whole channel x Z
 grid, so like the Leica XML companion the name omits c/z.
 
@@ -28,14 +28,14 @@ from .product import Naming, SavedAcquisition
 
 
 def _czi_name(naming: Naming) -> str:
-    """CZI filename: ``{acquisition_type}_{hash}_{position_label}.czi``.
+    """CZI filename: ``{folder}_{hash}_{position_label}.czi``.
 
     Minimal compatibility naming for the existing flat contract. The
     full Zeiss flat/state alignment is deferred; this only tracks the shared
     field set so the driver keeps building valid names.
     """
     n = naming
-    return f"{n.acquisition_type}_{n.hash6}_{n.position_label}.czi"
+    return f"{n.folder}_{n.hash6}_{n.position_label}.czi"
 
 
 def zen_image_path(client, output_name: str) -> Path:
@@ -78,7 +78,7 @@ def save(
     Args:
         client: the ZenClient.
         acq: an ``AcquisitionResult`` (must carry ``output_name``).
-        output_root: the run root (a CZI lands under ``<type>/data/``).
+        output_root: the run root (a CZI lands under ``<folder>/data/``).
         naming: the driver's :class:`Naming` for this acquisition.
 
     Returns:
@@ -90,7 +90,7 @@ def save(
     src = zen_image_path(client, acq.output_name)
     _wait_stable(src, timeout_s=stable_timeout_s, poll_s=stable_poll_s)
 
-    destination = data_dir(output_root, naming.acquisition_type)
+    destination = data_dir(output_root, naming.folder)
     destination.mkdir(parents=True, exist_ok=True)
     dst = destination / _czi_name(naming)
     shutil.copy2(src, dst)
