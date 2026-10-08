@@ -69,14 +69,19 @@ CONNECTION = {"microscope": "mesospim-01", "host": "127.0.0.1", "port": 42000}
 # a file that misses one, so a new mutating op cannot ship silently unlimited.
 _MUTATING_OPS = ("set_origin", "set_xyz", "set_state", "run_procedure", "acquire")
 
-# Per-axis actuator options this instrument exposes to the controller. mesoSPIM
-# linear axes are single-motoric; focus/rotation are separate axes reached via
-# procedures, not actuators of x/y/z.
+# The motors that move each axis, as the controller's get_actuators lists them.
+# On a mesoSPIM each linear axis has exactly one motor, so every axis offers the
+# single choice "motoric". Focus and rotation are separate axes of their own,
+# reached through procedures, so they are not motors of x, y or z.
 _ACTUATORS: dict[str, list[str]] = {
     "x": ["motoric"],
     "y": ["motoric"],
     "z": ["motoric"],
 }
+
+# The unit every number in a get_xyz or set_xyz answer is given in. The
+# controller requires exactly this spelling, so a workflow can rely on it.
+_UNIT = "micrometer"
 
 # State keys the driver treats as mutable (capturable + reapplyable).
 _MUTABLE_KEYS = (
@@ -110,7 +115,8 @@ class MesospimHandle:
     # mutating op then refuses (fail-closed), read-only use still works.
     function_limits: Any | None = None
     # The stage envelope loaded at connect, ``{axis: [min, max]}`` in raw stage
-    # coordinates (um, theta in degrees): what get_xyz reports as each axis's range.
+    # coordinates (um, theta in degrees): the travel that get_xyz turns into each
+    # axis's canvas.
     stage_limits: dict = field(default_factory=dict)
     # Monotonic counter to give each acquisition a unique image-writer staging
     # dir (so repeated/same-label captures never collide).
@@ -321,8 +327,19 @@ def set_origin(handle: MesospimHandle) -> dict:
     return {"origin": dict(handle.origin), "origin_file": str(path)}
 
 
+def _raw_xyz(pos: dict) -> dict[str, float]:
+    """The stage's own x, y and z readings, in micrometres, exactly as mesoSPIM reports them.
+
+    Nothing is subtracted here: these are the numbers you would see on the
+    stage itself, before the saved origin is taken into account.
+    """
+    return {axis: float(pos.get(axis) or 0.0) for axis in ("x", "y", "z")}
+
+
 def _user_xyz(handle: MesospimHandle, pos: dict) -> dict[str, float]:
-    return {axis: float(pos.get(axis) or 0.0) - handle.origin[axis] for axis in ("x", "y", "z")}
+    """The same readings measured from the saved origin, the frame the controller works in."""
+    raw = _raw_xyz(pos)
+    return {axis: raw[axis] - handle.origin[axis] for axis in ("x", "y", "z")}
 
 
 # =============================================================================
@@ -331,7 +348,11 @@ def _user_xyz(handle: MesospimHandle, pos: dict) -> dict[str, float]:
 
 
 def get_actuators(handle: MesospimHandle) -> dict:
-    """The actuator options each axis offers (driver-defined)."""
+    """The motors that can move each axis: ``{"x": ["motoric"], "y": ["motoric"], "z": ["motoric"]}``.
+
+    A mesoSPIM has one motor per linear axis, so there is nothing to choose
+    between; the names here are the ones ``get_xyz`` reports a reading for.
+    """
     return {axis: list(opts) for axis, opts in _ACTUATORS.items()}
 
 
@@ -348,18 +369,33 @@ def _validate_actuators(with_actuators: dict | None) -> None:
 
 
 def get_xyz(handle: MesospimHandle, *, with_actuators: dict | None = None) -> dict:
-    """Report each linear axis: its position (um from the origin), motor and canvas.
+    """Where the stage is: one entry each for ``x``, ``y`` and ``z``.
 
-    The ``canvas`` is everywhere a picture can show on that axis, ``[min,
-    max]`` in um from the origin; see :func:`_canvas`.
+    Every axis carries the same four entries, and every number in them is in
+    micrometres:
+
+    - ``position``: where the axis is, measured from the origin saved with
+      :func:`set_origin` (plain stage coordinates until one is saved).
+    - ``unit``: always ``"micrometer"``.
+    - ``actuators``: each motor of the axis with its own reading, exactly as
+      mesoSPIM reports it. The origin is not subtracted here, so these are the
+      stage's own numbers. A mesoSPIM has one motor per axis, so this is always
+      ``{"motoric": <reading>}``.
+    - ``canvas``: ``[min, max]``, everywhere a picture can show along the axis,
+      measured from the origin; see :func:`_canvas`.
+
+    ``with_actuators`` may name the motor to read per axis; since each axis has
+    only ``"motoric"``, anything else raises ``ValueError``.
     """
     _validate_actuators(with_actuators)
     pos = _readers.get_positions(handle.client)
+    raw = _raw_xyz(pos)
     user = _user_xyz(handle, pos)
     return {
         axis: {
-            "value": user[axis],
-            "actuator": _ACTUATORS[axis][0],
+            "position": user[axis],
+            "unit": _UNIT,
+            "actuators": {motor: raw[axis] for motor in _ACTUATORS[axis]},
             "canvas": _canvas(handle, axis, user[axis]),
         }
         for axis in ("x", "y", "z")
@@ -399,10 +435,20 @@ def set_xyz(
     *,
     with_actuators: dict | None = None,
 ) -> dict:
-    """Move to an absolute target (um, relative to origin); return a move record.
+    """Move to ``x``, ``y``, ``z`` in micrometres from the origin, then answer like :func:`get_xyz`.
 
-    The driver maps user coordinates to raw stage coordinates via the origin and
-    issues one absolute move, then reports the confirmed position.
+    The target is translated into the stage's own coordinates by adding the
+    saved origin, checked against this microscope's limits, and sent as one
+    absolute move. Once the stage has arrived, the position is read back from
+    the microscope and returned in exactly the shape ``get_xyz`` uses, so the
+    answer shows where the stage really is rather than the numbers that were
+    asked for.
+
+    Raises ``RuntimeError`` when the move is refused by the limits, when the
+    limits file could not be loaded, when mesoSPIM reports a failure, or when
+    the stage did not read back at the target within the move's tolerance:
+    carrying on from an unknown position is never safe. ``ValueError`` names an
+    unknown axis or motor in ``with_actuators``.
     """
     _validate_actuators(with_actuators)
     targets = {
@@ -417,11 +463,15 @@ def set_xyz(
     result = _cmd.move_absolute(handle.client, targets)
     if not result.get("success"):
         raise RuntimeError(f"set_xyz failed: {result.get('message')}")
-    return {
-        "position": {"x": float(x), "y": float(y), "z": float(z)},
-        "confirmed": result.get("confirmed"),
-        "actuators": {axis: _ACTUATORS[axis][0] for axis in ("x", "y", "z")},
-    }
+    # The move profile treats "sent but not read back at the target" as a soft
+    # outcome. The answer below is the read-back itself, so it cannot carry a
+    # confirmed flag any more; the only honest way to report it is to refuse.
+    if result.get("confirmed") is False:
+        raise RuntimeError(
+            f"set_xyz: the move to ({x}, {y}, {z}) was sent, but the stage did not read "
+            f"back at the target: {result.get('message')}"
+        )
+    return get_xyz(handle, with_actuators=with_actuators)
 
 
 # =============================================================================
@@ -780,7 +830,9 @@ def _answered(function):
     module return the content alone, and raise when something goes wrong.
     ``success`` is therefore True, unless the content says that a change was
     sent but could not be confirmed (``"confirmed": False``): an outcome that
-    is safe to carry on from, so it is reported rather than raised.
+    is safe to carry on from for a setting or a procedure, so it is reported
+    rather than raised. ``set_xyz`` is the exception: its answer is the
+    position read back from the stage, so an unconfirmed move raises instead.
     """
 
     @functools.wraps(function)

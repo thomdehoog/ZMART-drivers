@@ -27,7 +27,6 @@ for _p in (_HERE, _HELPERS, _REPO_ROOT):
     if str(_p) not in sys.path:
         sys.path.insert(0, str(_p))
 
-import zmart_controller
 import validate_zmart_adapter
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.zmart_adapter import zmart_adapter as adapter
 
@@ -46,7 +45,6 @@ def _run_mock(tmp_path, *extra):
     finally:
         adapter._session.connect_python_client = original_connect
         profiles.STATE_READERS = original_profile
-        zmart_controller.disconnect()  # clear the module-level active session
     records = [
         json.loads(line) for line in output.read_text(encoding="utf-8").splitlines() if line.strip()
     ]
@@ -111,8 +109,9 @@ def test_readonly_mock_run(tmp_path):
     assert counts["FAIL"] == 0
     assert counts["WARN"] == 0
     names = {r["name"] for r in records}
-    assert "get_xyz: x has value, actuator and canvas" in names
-    assert "get_xyz: hardware block complete" in names
+    assert "get_xyz: x has position, unit, actuators and canvas" in names
+    assert "get_xyz: actuators name every motor" in names
+    assert "get_state: objective has a name" in names
 
 
 def test_full_mock_run_move_and_acquire(tmp_path):
@@ -201,13 +200,15 @@ def test_connect_session_leaves_output_root_for_driver_discovery():
     args = argparse.Namespace(
         mock=True, mock_latency=0.0, client_name="PythonClient", api_delay_ms=None
     )
+    session = None
     try:
         session = validate_zmart_adapter._connect_session(args, adapter, None)
         assert session._handle.connection.get("output_root") is None
     finally:
         adapter._session.connect_python_client = original_connect
         profiles.STATE_READERS = original_profile
-        zmart_controller.disconnect()
+        if session is not None:
+            session.disconnect()
 
 
 @pytest.mark.parametrize(("rounds", "corrects"), [(None, False), (1, True)])
@@ -215,7 +216,7 @@ def test_acquire_backlash_rounds_through_the_controller_seam(tmp_path, rounds, c
     """Default-zero and positive rounds both cross the real Session seam.
 
     Unlike the adapter-direct unit tests (which patch driver internals and pass
-    ``object()`` as the client), this opens a real ``zmart_controller.Session``
+    ``object()`` as the client), this opens a real ``zmart_controller.ZmartController``
     against the in-process mock CAM (same connect path ``phase_acquire`` would
     use live) and only patches the I/O boundary (``_capture``/``_save``) that a
     mock CAM cannot satisfy -- so the seam decision #3 cares about (Session ->
@@ -233,6 +234,7 @@ def test_acquire_backlash_rounds_through_the_controller_seam(tmp_path, rounds, c
         mock=True, mock_latency=0.0, client_name="PythonClient", api_delay_ms=None
     )
     order = []
+    session = None
     try:
         session = validate_zmart_adapter._connect_session(args, adapter, str(tmp_path))
         active_job = session.get_state()["changeable"]["job"]
@@ -262,7 +264,8 @@ def test_acquire_backlash_rounds_through_the_controller_seam(tmp_path, rounds, c
     finally:
         adapter._session.connect_python_client = original_connect
         profiles.STATE_READERS = original_profile
-        zmart_controller.disconnect()
+        if session is not None:
+            session.disconnect()
 
     # Positive rounds fire takeup before capture; an omitted value resolves to
     # zero and reaches capture directly through the same Session -> adapter seam.

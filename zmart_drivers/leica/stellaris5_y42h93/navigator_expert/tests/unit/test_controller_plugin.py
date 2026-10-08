@@ -1,8 +1,8 @@
 """The driver plugs into the standalone ZMART Controller as a module.
 
 These tests do what an operator does on the LAS X computer: import the
-driver module and hand it to ``zmart_controller.set_instrument``. The driver
-then connects to the offline LAS X mock, and the
+driver module and hand it to the controller (``zmart_controller.ZmartController``).
+The driver then connects to the offline LAS X mock, and the
 controller's own ``validate_driver`` checks every answer against its contract.
 """
 
@@ -14,6 +14,8 @@ from dataclasses import replace
 import zmart_controller
 from limits_fixtures import hermetic_mock_machine_root
 from mock_lasx_api import MockLasxClient
+from zmart_controller.registry import driver_functions
+from zmart_controller.zmart_controller import COMMANDS
 
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert import zmart_controller_plugin as driver
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.config import profiles
@@ -23,12 +25,12 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.zmart_adapter import
 
 
 def test_the_module_hands_over_enveloped_commands():
-    ops = zmart_controller.utils.driver_functions(driver)
+    ops = driver_functions(driver)
 
     assert ops["connect"] is adapter.connect
     assert ops["disconnect"] is adapter.disconnect
-    for name in zmart_controller.utils.OPS:
-        if name != "connect":
+    for name in COMMANDS:
+        if name != "disconnect":
             assert ops[name].__wrapped__ is getattr(adapter, name)
 
 
@@ -59,9 +61,7 @@ def test_get_info_describes_the_microscope_in_plain_words(monkeypatch, tmp_path)
     monkeypatch.setattr(
         adapter._session, "connect_python_client", lambda **_kw: MockLasxClient(latency=0.0)
     )
-    session = zmart_controller.session.set_instrument(
-        driver, {"output_root": str(tmp_path / "out")}
-    )
+    session = zmart_controller.ZmartController(driver, {"output_root": str(tmp_path / "out")})
     try:
         answer = session.get_info()
         xyz = session.get_xyz()["content"]
@@ -77,4 +77,8 @@ def test_get_info_describes_the_microscope_in_plain_words(monkeypatch, tmp_path)
     # The fixture limits allow x 1000..130000 um of stage travel; with no saved
     # origin the frame is the stage itself, so the canvas is exactly that.
     assert xyz["x"]["canvas"] == [1000.0, 130000.0]
-    assert set(xyz["x"]) == {"value", "actuator", "canvas"}
+    # Each axis answers the controller's four entries, and the motors are
+    # named exactly as get_actuators lists them.
+    assert list(xyz["x"]) == ["position", "unit", "actuators", "canvas"]
+    assert xyz["z"]["unit"] == "micrometer"
+    assert list(xyz["z"]["actuators"]) == ["z-wide", "z-galvo"]
