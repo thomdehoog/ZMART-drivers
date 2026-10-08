@@ -879,10 +879,13 @@ def test_controller_session_bypass_refuses_at_the_commands_layer(clear_stage_lim
         ),
         patch.object(_cmd_settings, "make_changeable_copy", side_effect=lambda s: s),
     ):
-        session = zmart_controller.set_instrument(driver)
+        session = zmart_controller.ZmartController(driver)
         try:
-            with pytest.raises(RuntimeError, match="outside"):
-                session.set_xyz(0.0, 0.0, 0.0)
+            # The controller turns the driver's RuntimeError into a failed
+            # answer, so the refusal arrives as success False with the reason.
+            answer = session.set_xyz(0.0, 0.0, 0.0)
+            assert answer["success"] is False
+            assert "RuntimeError" in answer["content"] and "outside" in answer["content"]
         finally:
             session.disconnect()
 

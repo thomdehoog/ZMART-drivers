@@ -1,9 +1,8 @@
 """ZMART controller <-> Leica adapter validator.
 
 Drives the Navigator Expert ``zmart_adapter`` through the **real
-``zmart_controller`` surface** (``set_instrument`` /
-``Session``), not the adapter functions directly -- so it validates the exact
-path a workflow takes. The one exception is ``set_origin``: capturing the
+``zmart_controller`` surface** (``ZmartController``), not the adapter
+functions directly -- so it validates the exact path a workflow takes. The one exception is ``set_origin``: capturing the
 frame origin is a driver setup step, not a controller command, so the move
 phase calls the adapter's ``set_origin`` on the session's driver handle, just
 as an operator would during setup. The adapter's own unit tests patch the driver internals
@@ -174,7 +173,28 @@ def _connect_session(args: argparse.Namespace, adapter: Any, output_root: str | 
         # (same pinning as validate_hardware --mock).
         profiles.STATE_READERS = replace(profiles.STATE_READERS, selected_job_confirm_source="api")
 
-    return _ReportingSession(zmart_controller.set_instrument(driver, inst))
+    return _ReportingSession(zmart_controller.ZmartController(driver, inst))
+
+
+def _raw_readings(xyz: dict) -> dict:
+    """The four motor readings of a ``get_xyz`` answer, as the stage reports them.
+
+    ``get_xyz`` lists every motor of each axis under ``actuators`` with its
+    own reading, untouched by the origin. The hardware checks below compare
+    those readings with the targets handed to the driver's own ``move_xy``
+    and ``move_z``, so this gathers them under the driver's names.
+    """
+    return {
+        "x_um": xyz["x"]["actuators"]["motoric"],
+        "y_um": xyz["y"]["actuators"]["motoric"],
+        "z_wide_um": xyz["z"]["actuators"]["z-wide"],
+        "z_galvo_um": xyz["z"]["actuators"]["z-galvo"],
+    }
+
+
+def _selected_job(sess: Any) -> str | None:
+    """The LAS X job selected now, which the driver's own z commands address."""
+    return sess.get_state()["changeable"].get("job")
 
 
 def _confirm_live_write(args: argparse.Namespace) -> bool:
@@ -216,26 +236,41 @@ def phase_readonly(v: vh.Validator, sess: Any, args: argparse.Namespace) -> None
         if xyz is not None:
             for axis in ("x", "y", "z"):
                 v.compare(
-                    f"get_xyz: {axis} has value, actuator and canvas",
-                    set(xyz[axis]) >= {"value", "actuator", "canvas"},
-                    True,
+                    f"get_xyz: {axis} has position, unit, actuators and canvas",
+                    list(xyz[axis]),
+                    ["position", "unit", "actuators", "canvas"],
                 )
-            hw = xyz.get("hardware") or {}
-            needed = {"x_um", "y_um", "z_wide_um", "z_galvo_um", "objective", "job"}
-            v.compare("get_xyz: hardware block complete", needed.issubset(hw), True)
-            # Connect loads the microscope's saved origin (or none), so the
-            # frame values here depend on the rig's setup and are not checked
-            # against the hardware values. The origin arithmetic itself is
-            # verified in phase_move, right after set_origin, via the
-            # "origin: frame -> 0" checks below.
+                v.compare(f"get_xyz: {axis} unit is micrometer", xyz[axis]["unit"], "micrometer")
+            # Every motor of each axis reports its own reading, under the
+            # names get_actuators lists.
             v.compare(
-                "get_xyz: objective has a name",
-                bool((hw.get("objective") or {}).get("name")),
+                "get_xyz: actuators name every motor",
+                {axis: list(xyz[axis]["actuators"]) for axis in ("x", "y", "z")},
+                {"x": ["motoric"], "y": ["motoric"], "z": ["z-wide", "z-galvo"]},
+            )
+            v.compare(
+                "get_xyz: actuator readings are numbers",
+                all(
+                    isinstance(reading, (int, float))
+                    for axis in ("x", "y", "z")
+                    for reading in xyz[axis]["actuators"].values()
+                ),
                 True,
             )
+            # Connect loads the microscope's saved origin (or none), so the
+            # frame positions here depend on the rig's setup and are not
+            # checked against the motor readings. The origin arithmetic itself
+            # is verified in phase_move, right after set_origin, via the
+            # "origin: frame -> 0" checks below.
 
         state = v.callable("get_state", sess.get_state)
         opts = v.callable("get_acquisition_settings", sess.get_acquisition_settings)
+        if state is not None:
+            v.compare(
+                "get_state: objective has a name",
+                bool((state["observed"].get("active_objective") or {}).get("name")),
+                True,
+            )
         if state is not None and opts is not None:
             selected_job = state["changeable"]["job"]
             normal_jobs = (opts.get("job") or {}).get("options") or []
@@ -319,7 +354,7 @@ def phase_ci_default_position(v: vh.Validator, sess: Any, drv: Any) -> bool:
     z-galvo cannot turn the Z-wide target negative.
     """
     with v.phase("hardware-CI default position"):
-        before = v.callable("ci default: read start", lambda: sess.get_xyz()["hardware"])
+        before = v.callable("ci default: read start", lambda: _raw_readings(sess.get_xyz()))
         limits = v.callable("ci default: read limits", drv.get_stage_limits)
         if not before or not limits:
             return False
@@ -334,7 +369,7 @@ def phase_ci_default_position(v: vh.Validator, sess: Any, drv: Any) -> bool:
         ):
             return False
 
-        job = before.get("job")
+        job = v.callable("ci default: selected job", lambda: _selected_job(sess))
         if not job:
             v.fail("ci default: selected job", "no selected job for the Z commands")
             return False
@@ -363,7 +398,7 @@ def phase_ci_default_position(v: vh.Validator, sess: Any, drv: Any) -> bool:
         if any(not result or not result.get("success") for result in commands):
             return False
 
-        after = v.callable("ci default: readback", lambda: sess.get_xyz()["hardware"])
+        after = v.callable("ci default: readback", lambda: _raw_readings(sess.get_xyz()))
         if not after:
             return False
         checks = [
@@ -457,9 +492,8 @@ def phase_move(
     the simulator; the z-wide drive leg is gated on the envelope because the
     simulator's z-wide baseline can sit outside the shipped physical envelope.
     """
-    base = sess.get_xyz()["hardware"]
-    orig = {k: base[k] for k in ("x_um", "y_um", "z_wide_um", "z_galvo_um")}
-    job = base["job"]
+    orig = _raw_readings(sess.get_xyz())
+    job = _selected_job(sess)
     limits = drv.get_stage_limits()
     dx = dy = args.xy_delta_um
     dzw = args.z_wide_delta_um
@@ -475,9 +509,9 @@ def phase_move(
             )
             f = v.callable("get_xyz after set_origin", sess.get_xyz)
             if f is not None:
-                v.compare("origin: frame x -> 0", f["x"]["value"], 0.0, tolerance=XY_TOL_UM)
-                v.compare("origin: frame y -> 0", f["y"]["value"], 0.0, tolerance=XY_TOL_UM)
-                v.compare("origin: frame z -> 0", f["z"]["value"], 0.0, tolerance=Z_TOL_UM)
+                v.compare("origin: frame x -> 0", f["x"]["position"], 0.0, tolerance=XY_TOL_UM)
+                v.compare("origin: frame y -> 0", f["y"]["position"], 0.0, tolerance=XY_TOL_UM)
+                v.compare("origin: frame z -> 0", f["z"]["position"], 0.0, tolerance=Z_TOL_UM)
 
             # XY leg: hold focus via the galvo (keeps z-wide untouched on the sim).
             v.callable(
@@ -488,8 +522,8 @@ def phase_move(
             )
             f = v.callable("get_xyz after XY", sess.get_xyz)
             if f is not None:
-                v.compare("xy: frame x", f["x"]["value"], dx, tolerance=XY_TOL_UM)
-                v.compare("xy: frame y", f["y"]["value"], dy, tolerance=XY_TOL_UM)
+                v.compare("xy: frame x", f["x"]["position"], dx, tolerance=XY_TOL_UM)
+                v.compare("xy: frame y", f["y"]["position"], dy, tolerance=XY_TOL_UM)
 
             # z-galvo leg: focus target dzg via z-galvo; z-wide must stay put.
             # This validates the additive relationship, units, and sign against
@@ -502,16 +536,16 @@ def phase_move(
             )
             f = v.callable("get_xyz after z-galvo", sess.get_xyz)
             if f is not None:
-                v.compare("zgalvo: frame z", f["z"]["value"], dzg, tolerance=Z_TOL_UM)
+                v.compare("zgalvo: frame z", f["z"]["position"], dzg, tolerance=Z_TOL_UM)
                 v.compare(
                     "zgalvo: drive moved by delta (sign check)",
-                    f["hardware"]["z_galvo_um"] - orig["z_galvo_um"],
+                    f["z"]["actuators"]["z-galvo"] - orig["z_galvo_um"],
                     dzg,
                     tolerance=Z_TOL_UM,
                 )
                 v.compare(
                     "zgalvo: z-wide drive unchanged",
-                    f["hardware"]["z_wide_um"],
+                    f["z"]["actuators"]["z-wide"],
                     orig["z_wide_um"],
                     tolerance=Z_TOL_UM,
                 )
@@ -532,19 +566,19 @@ def phase_move(
                 if f is not None:
                     v.compare(
                         "zwide: frame z is additive (z-wide + z-galvo)",
-                        f["z"]["value"],
+                        f["z"]["position"],
                         total,
                         tolerance=Z_TOL_UM,
                     )
                     v.compare(
                         "zwide: drive moved by delta",
-                        f["hardware"]["z_wide_um"] - orig["z_wide_um"],
+                        f["z"]["actuators"]["z-wide"] - orig["z_wide_um"],
                         dzw,
                         tolerance=Z_TOL_UM,
                     )
                     v.compare(
                         "zwide: z-galvo drive unchanged",
-                        f["hardware"]["z_galvo_um"] - orig["z_galvo_um"],
+                        f["z"]["actuators"]["z-galvo"] - orig["z_galvo_um"],
                         dzg,
                         tolerance=Z_TOL_UM,
                     )
