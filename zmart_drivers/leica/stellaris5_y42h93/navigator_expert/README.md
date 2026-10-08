@@ -11,6 +11,8 @@ notebooks keep the thin 1–3-line invocation style used across the ZMART driver
 - **Status:** **Release candidate (`6.0.0rc1`), not yet released.** The driver has been tested on the
   LAS X simulator and on a real STELLARIS. Before it is released for unattended use, the findings in
   [`RELEASE_CANDIDATE_REVIEW.md`](RELEASE_CANDIDATE_REVIEW.md) need to be fixed.
+  [`REFACTORING_PLAN.md`](REFACTORING_PLAN.md) says how we intend to reshape the driver so that
+  those problems are fixed at their root, and in which order.
 
 ## Contents
 
