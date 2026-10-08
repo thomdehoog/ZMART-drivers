@@ -70,11 +70,33 @@ LAS X.
   zmart_controller.set_instrument("stellaris")
   ```
   The package itself is not the driver: it keeps its own lower-level functions, such as
-  `acquire`, for notebooks and scripts that work with LAS X directly. In `get_xyz`, each axis
-  reports its `value`, its `actuator` and its `canvas`, everywhere a picture can show. On x and y
-  the canvas is the stage travel itself, because LAS X reports the field of view only for the
-  objective in place now; on z it is the z-wide travel widened by the z-galvo travel, since the
-  frame's z follows the focus, the sum of the two drives.
+  `acquire`, for notebooks and scripts that work with LAS X directly.
+
+  `get_xyz` and `set_xyz` give the same answer: one dictionary with the keys `x`, `y` and `z`.
+  Each axis has four entries, and every number in them is in micrometres. For example, with the
+  origin saved at stage x 63500, y 41500 and a focus of 2000 (z-wide 2000, z-galvo 0):
+  ```python
+  {'x': {'position': 100.0, 'unit': 'micrometer', 'actuators': {'motoric': 63600.0},                 'canvas': [-62500.0, 66500.0]},
+   'y': {'position': 50.0,  'unit': 'micrometer', 'actuators': {'motoric': 41550.0},                 'canvas': [-40500.0, 58500.0]},
+   'z': {'position': 0.0,   'unit': 'micrometer', 'actuators': {'z-wide': 2000.0, 'z-galvo': 0.0},  'canvas': [-2250.0, 6250.0]},
+   'objective_translation_um': [0.0, 0.0, 0.0]}
+  ```
+  - `position` is where the axis is, measured from the saved origin. For z it is the focus: the
+    sum of the two z drives, so it reads the same whichever drive made the move. When a different
+    objective is in place than the one the origin was saved under, the calibrated objective
+    translation is subtracted too, so the position names the same point of the sample.
+  - `unit` is always `'micrometer'`.
+  - `actuators` lists every motor of the axis, under the names `get_actuators` gives, each with
+    its own reading exactly as LAS X reports it. Nothing is subtracted from these, so they show
+    how z-wide and z-galvo share the focus.
+  - `canvas` is `[min, max]`, everywhere a picture can show along the axis. On x and y it is the
+    stage travel itself, because LAS X reports the field of view only for the objective in place
+    now; on z it is the z-wide travel widened by the z-galvo travel.
+  - `objective_translation_um` is an extra of this driver: the `[x, y, z]` translation that was
+    subtracted for the objective in place, `[0, 0, 0]` under the origin's own objective.
+
+  `set_xyz` moves, waits until every leg is confirmed, and then reads the position back from the
+  microscope, so its answer shows where the stage really is rather than the numbers asked for.
 
 ### Machine paths this driver assumes
 

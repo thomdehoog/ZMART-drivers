@@ -115,11 +115,26 @@ CONNECTION = {
     "load_origin": True,
 }
 
+# The motors that can move each axis, under the names the controller uses.
+# These are the names ``get_actuators`` lists and ``with_actuators`` accepts.
 _ACTUATORS = {"x": ("motoric",), "y": ("motoric",), "z": ("z-wide", "z-galvo")}
+
+# Where each motor's own reading sits in a hardware snapshot (see
+# ``_hardware_snapshot``). ``get_xyz`` reports these readings under
+# ``actuators``, so every motor here must also be listed in ``_ACTUATORS``.
+_MOTOR_READINGS = {
+    "x": {"motoric": "x_um"},
+    "y": {"motoric": "y_um"},
+    "z": {"z-wide": "z_wide_um", "z-galvo": "z_galvo_um"},
+}
 
 # Fixed defaults for axes omitted from ``with_actuators`` — never sticky: a
 # previous call's choice is not state.
 _DEFAULT_ACTUATORS = {"x": "motoric", "y": "motoric", "z": "z-wide"}
+
+# Every number in a get_xyz or set_xyz answer is in micrometres, and each
+# axis says so under this key. The same spelling the controller uses.
+UNIT = "micrometer"
 
 # controller actuator name -> driver move_z z_mode
 _Z_MODES = {"z-wide": "zwide", "z-galvo": "galvo"}
@@ -632,12 +647,13 @@ def set_origin(handle: ZmartHandle) -> dict:
 
 
 def get_actuators(handle: ZmartHandle) -> dict:
-    """The actuator menu per axis — exactly the names ``with_actuators`` accepts.
+    """The motors that can move each axis, by name: exactly the names ``with_actuators`` accepts.
 
     ``{"x": ["motoric"], "y": ["motoric"], "z": ["z-wide", "z-galvo"]}``.
-    Axes omitted from ``with_actuators`` use the fixed defaults (x/y
-    ``motoric``, z ``z-wide``) — never sticky: a previous call's choice is
-    not remembered.
+    These are also the names under which :func:`get_xyz` reports each
+    motor's own reading. An axis left out of ``with_actuators`` uses the
+    first motor listed here (x and y ``motoric``, z ``z-wide``); a previous
+    call's choice is never remembered.
     """
     _require_open(handle)
     return {axis: list(opts) for axis, opts in _ACTUATORS.items()}
@@ -654,23 +670,38 @@ def _resolve_actuators(with_actuators: dict | None) -> dict[str, str]:
 
 
 def get_xyz(handle: ZmartHandle, *, with_actuators: dict | None = None) -> dict:
-    """Position per axis in the frame (um from the origin), plus raw hardware.
+    """Where the stage is, per axis: ``position``, ``unit``, ``actuators`` and ``canvas``.
 
-    ``F = fresh_read − origin − ΔT``: the frame ``z`` is the *focus*
-    displacement ((z-wide + z-galvo) minus the origin's focus sum, so it
-    reads the same regardless of which drive realized the move), and ΔT
-    compensates an objective change relative to the origin's objective
-    (uncompensated-but-loud when translations are unavailable). The
-    untranslated stage values (XY, both z drives, objective) ride along
-    under ``"hardware"``.
+    The answer has the keys ``x``, ``y`` and ``z``. Each axis carries the
+    same four entries, and every number in them is in micrometres:
 
-    ``canvas`` is everywhere a picture can show on each axis, ``[min, max]``
-    in the frame, the same one :func:`get_info` reports; see :func:`_canvas`.
-    When no limits govern the session (every move is then refused), the
-    canvas is the current position alone.
+    - ``position``: where the axis is, measured from the saved origin. For
+      ``z`` this is the *focus*: the sum of the two z drives (z-wide plus
+      z-galvo) minus the origin's focus sum, so it reads the same whichever
+      drive made the move. When the objective in place is not the one the
+      origin was saved under, the calibrated objective translation ΔT is
+      subtracted as well, so the position names the same point of the
+      sample under either objective. (In short: position = fresh reading −
+      origin − ΔT.) When no translation is available, the position is
+      reported uncompensated and a warning is logged, because a read can
+      never land the stage anywhere wrong.
+    - ``unit``: always ``"micrometer"``.
+    - ``actuators``: every motor of the axis with its own reading, exactly
+      as LAS X reports it: ``{"motoric": ...}`` for x and y, ``{"z-wide":
+      ..., "z-galvo": ...}`` for z. These are the stage's own numbers, with
+      nothing subtracted, so they show how the two z drives share the focus.
+    - ``canvas``: ``[min, max]``, everywhere a picture can show along the
+      axis, in the same frame as ``position`` (see :func:`_canvas`). When
+      no limits govern the session, so that every move is refused, the
+      canvas is the current position alone.
+
+    ``with_actuators`` only checks that the motors it names exist; the
+    answer always reports all of them. The driver adds one extra on top,
+    ``objective_translation_um``: the ΔT that was subtracted, as
+    ``[x, y, z]``, so an operator can see when a compensation is in play.
     """
     _require_open(handle)
-    chosen = _resolve_actuators(with_actuators)
+    _resolve_actuators(with_actuators)  # only to refuse an unknown motor name
     snap = _hardware_snapshot(handle)
     dt = _delta_or_warn(handle, snap)
     z_focus = snap["z_wide_um"] + snap["z_galvo_um"]
@@ -682,28 +713,29 @@ def get_xyz(handle: ZmartHandle, *, with_actuators: dict | None = None) -> dict:
     canvas = _canvas(handle) or {}
     result = {
         axis: {
-            "value": frame[axis],
-            "actuator": chosen[axis],
+            "position": frame[axis],
+            "unit": UNIT,
+            "actuators": {
+                motor: snap[reading] for motor, reading in _MOTOR_READINGS[axis].items()
+            },
             "canvas": canvas.get(f"{axis}_um") or [frame[axis], frame[axis]],
         }
         for axis in ("x", "y", "z")
     }
     result["objective_translation_um"] = list(dt)
-    result["hardware"] = {
-        "x_um": snap["x_um"],
-        "y_um": snap["y_um"],
-        "z_wide_um": snap["z_wide_um"],
-        "z_galvo_um": snap["z_galvo_um"],
-        "objective": snap["objective"],
-        "job": snap["job"],
-    }
     return result
 
 
 def set_xyz(
     handle: ZmartHandle, x: float, y: float, z: float, *, with_actuators: dict | None = None
 ) -> dict:
-    """Move to (x, y, z) in the frame; confirmed or this raises.
+    """Move to (x, y, z), in micrometres from the origin, then answer like :func:`get_xyz`.
+
+    Once every leg of the move is confirmed, the position is read back from
+    the microscope and returned in exactly the shape :func:`get_xyz` gives,
+    so the answer shows where the stage really is, not the numbers that
+    were asked for. A move that is refused or cannot be confirmed raises
+    instead, because carrying on at an unknown position is never safe.
 
     Destination = origin + F + ΔT, commanded absolutely. Ordinary frame-Z
     movement uses the selected actuator, but objective-calibration ΔT.z always
@@ -776,6 +808,8 @@ def set_xyz(
                 f"(try with_actuators={{'z': '{alternative}'}})"
             )
 
+    # Remembered for acquire, which labels every saved plane with the frame
+    # position it was asked to go to (see _where_the_planes_are).
     handle.driven_to = {
         "x": x,
         "y": y,
@@ -784,19 +818,8 @@ def set_xyz(
             (target for mode, target in z_targets if mode == "zwide"), snap["z_wide_um"]
         ),
     }
-    return {
-        "position": {"x": x, "y": y, "z": z},
-        "actuators": dict(chosen),
-        "objective_translation_um": list(dt),
-        "hardware_targets": {
-            "x_um": abs_x,
-            "y_um": abs_y,
-            **{
-                ("z_galvo_um" if mode == "galvo" else "z_wide_um"): target
-                for mode, target in z_targets
-            },
-        },
-    }
+    # Read back from the microscope, so the answer is where the stage is now.
+    return get_xyz(handle, with_actuators=with_actuators)
 
 
 # =============================================================================
@@ -1562,7 +1585,10 @@ def _connection_status(handle: ZmartHandle, root: Path) -> dict:
 
     def stage() -> str:
         at = get_xyz(handle)
-        return f"x {at['x']['value']:.0f} · y {at['y']['value']:.0f} · z {at['z']['value']:.1f} um"
+        return (
+            f"x {at['x']['position']:.0f} · y {at['y']['position']:.0f} · "
+            f"z {at['z']['position']:.1f} um"
+        )
 
     return {
         "api": "answering" if _try(lambda: _readers.ping(handle.client)) else "failed — no answer",
