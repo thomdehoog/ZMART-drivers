@@ -146,7 +146,18 @@ s.run_procedure({"name": "software_autofocus"})
 s.disconnect()
 ```
 
-Every answer comes back as `{"success": ..., "content": ...}`.
+Every answer comes back as `{"success": ..., "content": ...}`. A move, for
+example, answers with the position read back from ZEN once the stage has
+arrived, in the same shape `get_xyz` uses. Every number is in micrometres;
+`position` is measured from the origin, while `actuators` gives the one motor
+of each axis (`motoric`) with the stage's own reading, origin not subtracted:
+
+```python
+s.set_xyz(100, -100, 5)["content"]
+# {'x': {'position': 100.0,  'unit': 'micrometer', 'actuators': {'motoric': 20100.0}, 'canvas': [-80000.0, 40000.0]},
+#  'y': {'position': -100.0, 'unit': 'micrometer', 'actuators': {'motoric': 14900.0}, 'canvas': [-55000.0, 25000.0]},
+#  'z': {'position': 5.0,    'unit': 'micrometer', 'actuators': {'motoric': 1005.0},  'canvas': [-11000.0, 9000.0]}}
+```
 
 Or without the controller, using the driver directly:
 
@@ -193,7 +204,7 @@ Run these lines again whenever you want a new origin.
 
 | Neutral surface | ZEN meaning |
 |---|---|
-| `get_xyz` / `set_xyz` | The XY stage and the focus drive, µm, absolute from the origin. Every target is checked against this microscope's stage limits before ZEN is asked to move (XY first, then Z). One motor per axis, so `get_actuators` lists `motoric` only. Each axis reports its `value`, its `actuator` and its `canvas`, everywhere a picture can show. Here the canvas is the travel itself, because the field size and the depth of a stack are set inside the ZEN experiment, which the ZEN API does not report. |
+| `get_xyz` / `set_xyz` | The XY stage and the focus drive, in micrometres from the origin. Every target is checked against this microscope's stage limits before ZEN is asked to move (XY first, then Z). One motor per axis, so `get_actuators` lists `motoric` only. Both commands answer the same dictionary, with the keys `x`, `y` and `z`; `set_xyz` reads it back from ZEN after the stage has arrived, so it shows where the stage really is. Each axis carries `position` (micrometres from the origin), `unit` (always `"micrometer"`), `actuators` (every motor of the axis with its own reading exactly as ZEN reports it, in the stage's own coordinates, so the origin is not subtracted there) and `canvas` (`[min, max]`, everywhere a picture can show). Here the canvas is the travel itself, because the field size and the depth of a stack are set inside the ZEN experiment, which the ZEN API does not report. |
 | `acquire` | Runs the loaded ZEN experiment: a **snap** (one image with the active channels) by default, the **whole experiment** (Z-stack, tiles, time series) when the acquisition setting `mode` is `"experiment"`. ZEN writes `<label>.czi` into its image folder (`<folder>_<label>.czi` when the `folder` setting is given); the file is copied to `<output_root>/data/` (or `<output_root>/data/<folder>/`) when that folder is reachable, otherwise the record says where ZEN left it. For a snap the answer lists each channel under `planes`; for a whole experiment `planes` stays empty, because how its images are laid out is only written inside the CZI, and `image_count` says how many images ZEN took. |
 | `get_state` / `set_state` | Changeable: `objective_position` (position on the objective changer), `experiment` (the loaded ZEN experiment, which carries the imaging settings). Observed: objectives (name, magnification, NA), the experiments ZEN can load, ZEN's image folder, the limits, whether ZEN is busy. |
 | `get_procedures` / `run_procedure` | `software_autofocus` (ZEN's focus search with the settings of the loaded experiment; reports `frame_z_um`), `find_surface` / `store_focus` / `recall_focus` (Definite Focus, on systems that have it), `live`, `stop`. |

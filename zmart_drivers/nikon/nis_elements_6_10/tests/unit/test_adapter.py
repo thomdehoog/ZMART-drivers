@@ -15,9 +15,9 @@ def handle(connection):
 
 
 def test_ops_table_is_complete():
-    from zmart_controller.utils import OPS
+    from zmart_controller.zmart_controller import COMMANDS
 
-    assert set(OPS) <= set(adapter.ops_table())
+    assert set(COMMANDS) <= set(adapter.ops_table())
     # The origin is a driver setup step, so it is not offered to the controller.
     assert "set_origin" not in adapter.ops_table()
 
@@ -30,10 +30,10 @@ def test_connect_reads_limits_and_identity(handle):
 
 def test_origin_shifts_frame_and_persists(connection, fake_api):
     h = adapter.connect(connection)
-    assert adapter.get_xyz(h)["x"]["value"] == pytest.approx(39904.7)
+    assert adapter.get_xyz(h)["x"]["position"] == pytest.approx(39904.7)
     rec = adapter.set_origin(h)
     assert rec["origin"] == {"x": 39904.7, "y": -13433.1, "z": 500.0}
-    assert adapter.get_xyz(h)["x"]["value"] == 0.0
+    assert adapter.get_xyz(h)["x"]["position"] == 0.0
     adapter.disconnect(h)
 
     h2 = adapter.connect(connection)  # a new session restores the persisted origin
@@ -41,11 +41,33 @@ def test_origin_shifts_frame_and_persists(connection, fake_api):
     adapter.disconnect(h2)
 
 
-def test_set_xyz_maps_through_origin_and_confirms(handle, fake_api):
+def test_get_xyz_answers_position_unit_actuators_and_canvas(handle, fake_api):
+    """Each axis carries the four entries of the controller's contract, in this order."""
+    xyz = adapter.get_xyz(handle)
+    assert set(xyz) == {"x", "y", "z"}
+    for axis in ("x", "y", "z"):
+        assert list(xyz[axis]) == ["position", "unit", "actuators", "canvas"]
+        assert xyz[axis]["unit"] == "micrometer"
+    # Without an origin the frame is the raw stage frame, and every motor's
+    # reading is the stage's own number: the fake starts with a piezo at 50 um.
+    assert xyz["x"]["actuators"] == {"motoric": pytest.approx(39904.7)}
+    assert xyz["y"]["actuators"] == {"motoric": pytest.approx(-13433.1)}
+    assert xyz["z"]["actuators"] == {"motoric": 500.0, "piezo": 50.0}
+    # The height of z is the focus drive plus the piezo.
+    assert xyz["z"]["position"] == pytest.approx(550.0)
+    assert xyz["z"]["canvas"] == [0.0, 10000.0]
+
+
+def test_set_xyz_maps_through_origin_and_answers_like_get_xyz(handle, fake_api):
     adapter.set_origin(handle)
     rec = adapter.set_xyz(handle, 10, 20, -100)
     assert fake_api.position == pytest.approx({"x": 39914.7, "y": -13413.1, "z": 400.0})
-    assert rec["confirmed"] == pytest.approx({"x": 10.0, "y": 20.0, "z": -100.0})
+    assert rec == adapter.get_xyz(handle)
+    assert {axis: rec[axis]["position"] for axis in rec} == pytest.approx(
+        {"x": 10.0, "y": 20.0, "z": -100.0}
+    )
+    # The readings stay the stage's own numbers, not measured from the origin.
+    assert rec["z"]["actuators"] == {"motoric": 400.0, "piezo": 50.0}
 
 
 def test_set_xyz_outside_limits_is_a_runtime_error(handle, fake_api):

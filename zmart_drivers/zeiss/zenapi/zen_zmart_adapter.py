@@ -63,6 +63,10 @@ log = logging.getLogger(__name__)
 # Every axis is driven by one motor under ZEN: the XY stage and the focus drive.
 _ACTUATORS: dict[str, list[str]] = {"x": ["motoric"], "y": ["motoric"], "z": ["motoric"]}
 
+# The unit of every number in a get_xyz or set_xyz answer. The controller fixes
+# this word, so a workflow can trust that every microscope speaks micrometres.
+UNIT = "micrometer"
+
 # The connection settings used for any key the caller leaves out.
 # ``microscope`` names this instrument (it picks the folder its origin and
 # stage limits are saved in). ``config`` is the ZEN API ``config.ini`` (host,
@@ -214,7 +218,12 @@ def _require_open(handle: ZenHandle) -> None:
 
 
 def _raw_xyz(client) -> dict[str, float]:
-    """The position ZEN reports, in micrometres, before the origin is subtracted."""
+    """The position ZEN reports, in micrometres, before the origin is subtracted.
+
+    ZEN sends metres over the wire; the readers turn them into micrometres,
+    so these are the stage's own numbers in the unit the rest of the driver
+    speaks. Nothing else is changed: no origin, no correction.
+    """
     xy = _readers.get_xy(client)
     return {"x": float(xy["x_um"]), "y": float(xy["y_um"]), "z": float(_readers.get_z(client))}
 
@@ -255,6 +264,7 @@ def set_origin(handle: ZenHandle) -> dict:
 
 
 def _user_xyz(handle: ZenHandle, raw: dict) -> dict[str, float]:
+    """The same position measured from the origin: what the controller calls ``position``."""
     return {axis: float(raw[axis]) - handle.origin[axis] for axis in ("x", "y", "z")}
 
 
@@ -270,7 +280,11 @@ def get_actuators(handle: ZenHandle) -> dict:
 
 
 def _resolve_actuators(with_actuators: dict | None) -> dict[str, str]:
-    """Per-axis actuator choice for one call, validated; ZEN has one option per axis."""
+    """The motor to use per axis for one call: the one named, or else the only one there is.
+
+    ZEN offers one motor per axis, so this mostly checks that the names a
+    workflow passes exist; an unknown axis or motor raises ``ValueError``.
+    """
     chosen = {axis: opts[0] for axis, opts in _ACTUATORS.items()}
     if not with_actuators:
         return chosen
@@ -285,23 +299,33 @@ def _resolve_actuators(with_actuators: dict | None) -> dict[str, str]:
 
 
 def get_xyz(handle: ZenHandle, *, with_actuators: dict | None = None) -> dict:
-    """Report each axis: its position (um from the origin), its motor and its canvas.
+    """Where the stage is, per axis: ``position``, ``unit``, ``actuators`` and ``canvas``.
+
+    Every number is in micrometres. ``position`` is measured from the origin
+    saved with :func:`set_origin`. ``actuators`` holds every motor of the
+    axis with its own reading exactly as ZEN reports it, in the stage's own
+    coordinates, so the origin is *not* subtracted there; under ZEN each
+    axis has the one motor ``motoric``, so the two numbers differ by the
+    origin alone. ``with_actuators`` only checks that the motors named exist;
+    the answer always reports all of them.
 
     The ``canvas`` is everywhere a picture can show on that axis, ``[min,
-    max]`` in um from the origin. For this driver it is the travel itself:
-    this microscope's stage limits, the ones every move is checked against.
-    A picture taken at the edge of the travel does show half a field beyond
+    max]`` from the origin. For this driver it is the travel itself: this
+    microscope's stage limits, the ones every move is checked against. A
+    picture taken at the edge of the travel does show half a field beyond
     it, and a z-stack may reach past it, but the field size and the stack
     depth are set inside the ZEN experiment, which the ZEN API does not
     report, so the driver cannot widen the canvas by them.
     """
     _require_open(handle)
-    chosen = _resolve_actuators(with_actuators)
-    user = _user_xyz(handle, _raw_xyz(handle.client))
+    _resolve_actuators(with_actuators)
+    raw = _raw_xyz(handle.client)
+    user = _user_xyz(handle, raw)
     return {
         axis: {
-            "value": user[axis],
-            "actuator": chosen[axis],
+            "position": user[axis],
+            "unit": UNIT,
+            "actuators": {motor: raw[axis] for motor in _ACTUATORS[axis]},
             "canvas": [
                 handle.limits[axis]["min"] - handle.origin[axis],
                 handle.limits[axis]["max"] - handle.origin[axis],
@@ -320,15 +344,17 @@ def _raise_if_failed(result: dict, what: str) -> None:
 def set_xyz(
     handle: ZenHandle, x: float, y: float, z: float, *, with_actuators: dict | None = None
 ) -> dict:
-    """Move to an absolute target (um, relative to the origin); return a move record.
+    """Move to a position in micrometres from the origin, then answer like :func:`get_xyz`.
 
     The target is mapped to ZEN's stage coordinates through the origin and
     checked against the stage limits before ZEN is asked to move; XY moves
-    first, then the focus drive. The record carries the position ZEN reported
-    after the move.
+    first, then the focus drive. Once both moves are done, the position is
+    read back from ZEN, so the answer shows where the stage really is rather
+    than the numbers that were asked for. A target outside the limits, or a
+    move ZEN refused, raises ``RuntimeError`` and nothing is answered.
     """
     _require_open(handle)
-    chosen = _resolve_actuators(with_actuators)
+    _resolve_actuators(with_actuators)
     targets = {
         axis: handle.origin[axis] + float(value) for axis, value in (("x", x), ("y", y), ("z", z))
     }
@@ -341,11 +367,7 @@ def set_xyz(
         raise RuntimeError(f"set_xyz refused: {exc}") from exc
     _raise_if_failed(_cmd.move_xy(handle.client, targets["x"], targets["y"]), "set_xyz")
     _raise_if_failed(_cmd.move_z(handle.client, targets["z"]), "set_xyz")
-    return {
-        "position": {"x": float(x), "y": float(y), "z": float(z)},
-        "confirmed": _user_xyz(handle, _raw_xyz(handle.client)),
-        "actuators": chosen,
-    }
+    return get_xyz(handle, with_actuators=with_actuators)
 
 
 # =============================================================================
@@ -739,17 +761,15 @@ def _answered(function):
 
     The controller promises every workflow the same answer from every
     microscope: ``{"success": ..., "content": ...}``. The functions in this
-    module return the content alone, and raise when something goes wrong.
-    ``success`` is therefore True, unless the content says that a change was
-    sent but could not be confirmed (``"confirmed": False``): an outcome that
-    is safe to carry on from, so it is reported rather than raised.
+    module return the content alone, and raise when something goes wrong
+    (a move outside the limits, a call ZEN refused), so an answer that
+    comes back is always a success. The controller catches what is raised
+    and turns it into ``{"success": False, "content": <the error text>}``.
     """
 
     @functools.wraps(function)
     def command(*args, **kwargs):
-        content = function(*args, **kwargs)
-        unconfirmed = isinstance(content, dict) and content.get("confirmed") is False
-        return {"success": not unconfirmed, "content": content}
+        return {"success": True, "content": function(*args, **kwargs)}
 
     return command
 

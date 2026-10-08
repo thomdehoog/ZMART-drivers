@@ -44,9 +44,9 @@ def handle(scope_box, connection):
 
 
 def test_ops_table_is_complete():
-    from zmart_controller.utils import OPS
+    from zmart_controller.zmart_controller import COMMANDS
 
-    assert set(OPS) <= set(adapter.ops_table())
+    assert set(COMMANDS) <= set(adapter.ops_table())
     # The origin is a driver setup step, so it is not offered to the controller.
     assert "set_origin" not in adapter.ops_table()
 
@@ -60,13 +60,45 @@ def test_connect_copies_default_limits_and_reads_identity(handle, connection, tm
     assert [o["index"] for o in handle.immutable["objectives"]] == [1, 2, 3]
 
 
+def test_get_xyz_answers_position_unit_actuators_and_canvas(handle, scope_box):
+    scope_box["scope"].x_m, scope_box["scope"].y_m, scope_box["scope"].z_m = 1e-3, -2e-3, 5e-5
+    xyz = adapter.get_xyz(handle)
+    assert set(xyz) == {"x", "y", "z"}
+    for axis in ("x", "y", "z"):
+        assert list(xyz[axis]) == ["position", "unit", "actuators", "canvas"]
+        assert xyz[axis]["unit"] == "micrometer"
+    # ZEN speaks metres on the wire; the answer is in micrometres throughout.
+    assert xyz["x"]["position"] == pytest.approx(1000.0)
+    assert xyz["y"]["position"] == pytest.approx(-2000.0)
+    assert xyz["z"]["position"] == pytest.approx(50.0)
+    # One motor per axis, reporting the stage's own number.
+    assert xyz["x"]["actuators"] == pytest.approx({"motoric": 1000.0})
+    assert xyz["z"]["actuators"] == pytest.approx({"motoric": 50.0})
+    # The canvas is the travel itself (the generic default limits here).
+    assert xyz["x"]["canvas"] == [-60000.0, 60000.0]
+
+
+def test_get_xyz_checks_the_motor_names(handle):
+    assert adapter.get_xyz(handle, with_actuators={"z": "motoric"})["z"]["actuators"] == {
+        "motoric": 0.0
+    }
+    with pytest.raises(ValueError, match="unknown actuator"):
+        adapter.get_xyz(handle, with_actuators={"z": "piezo"})
+    with pytest.raises(ValueError, match="unknown axis"):
+        adapter.get_xyz(handle, with_actuators={"w": "motoric"})
+
+
 def test_origin_shifts_frame_and_persists(scope_box, connection):
     h = adapter.connect(connection)
     scope_box["scope"].x_m, scope_box["scope"].y_m, scope_box["scope"].z_m = 1e-3, -2e-3, 5e-5
-    assert adapter.get_xyz(h)["x"]["value"] == pytest.approx(1000.0)
+    assert adapter.get_xyz(h)["x"]["position"] == pytest.approx(1000.0)
     rec = adapter.set_origin(h)
     assert rec["origin"] == pytest.approx({"x": 1000.0, "y": -2000.0, "z": 50.0})
-    assert adapter.get_xyz(h)["x"]["value"] == 0.0
+    after = adapter.get_xyz(h)
+    assert after["x"]["position"] == 0.0
+    # The motor's own reading is untouched by the origin: it is the stage's number.
+    assert after["x"]["actuators"] == pytest.approx({"motoric": 1000.0})
+    assert after["x"]["canvas"] == pytest.approx([-61000.0, 59000.0])
     adapter.disconnect(h)
 
     h2 = adapter.connect(connection)  # a new session restores the persisted origin
@@ -74,7 +106,7 @@ def test_origin_shifts_frame_and_persists(scope_box, connection):
     adapter.disconnect(h2)
 
 
-def test_set_xyz_maps_through_origin_and_confirms(handle, scope_box):
+def test_set_xyz_maps_through_origin_and_answers_like_get_xyz(handle, scope_box):
     scope = scope_box["scope"]
     scope.x_m, scope.y_m, scope.z_m = 1e-3, 1e-3, 1e-4
     adapter.set_origin(handle)
@@ -82,8 +114,16 @@ def test_set_xyz_maps_through_origin_and_confirms(handle, scope_box):
     assert scope.x_m == pytest.approx(1010e-6)
     assert scope.y_m == pytest.approx(1020e-6)
     assert scope.z_m == pytest.approx(50e-6)
-    assert rec["confirmed"] == pytest.approx({"x": 10.0, "y": 20.0, "z": -50.0})
-    assert rec["actuators"] == {"x": "motoric", "y": "motoric", "z": "motoric"}
+    # The answer is the read-back position, in the same shape get_xyz gives.
+    assert rec == adapter.get_xyz(handle)
+    assert {axis: rec[axis]["position"] for axis in rec} == pytest.approx(
+        {"x": 10.0, "y": 20.0, "z": -50.0}
+    )
+    # The motors report the stage's own numbers: the origin plus the move.
+    assert rec["x"]["actuators"] == pytest.approx({"motoric": 1010.0})
+    assert rec["y"]["actuators"] == pytest.approx({"motoric": 1020.0})
+    assert rec["z"]["actuators"] == pytest.approx({"motoric": 50.0})
+    assert all(rec[axis]["unit"] == "micrometer" for axis in rec)
 
 
 def test_set_xyz_outside_limits_is_a_runtime_error(handle, scope_box):

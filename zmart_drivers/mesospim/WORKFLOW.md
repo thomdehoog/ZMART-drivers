@@ -96,14 +96,18 @@ sess = zmart_controller.set_instrument("mesospim")
 
 sess.get_info()                # identity, initial positions, focus/rotation, output_root
 sess.get_actuators()           # {'x': ['motoric'], 'y': [...], 'z': [...]}
-sess.get_xyz()                 # content: {'x': {'value','actuator','canvas'}, ...} — µm from origin
+sess.get_xyz()                 # content: {'x': {'position', 'unit', 'actuators', 'canvas'}, 'y': ..., 'z': ...}
+#   position is in µm from the origin; actuators is each motor's own reading
+#   ({'motoric': ...}, the stage's number, origin not subtracted); canvas is [min, max].
 sess.get_state()               # {'changeable': {laser,intensity,filter,zoom,shutter,etl_*}, 'observed': {...}}
 sess.get_acquisition_settings() # {folder, format, planes, z_step, zoom, shutterconfig, backlash_correction}
 
 # Positions are in µm from the frame origin. The origin is not set here: it is a
 # one-time driver setup step (see "Setting the origin" below), saved to the
 # machine configuration and loaded again at every connect.
-sess.set_xyz(50, 0, 10)        # move to x=50 µm, y=0, z=10 (relative to origin)
+sess.set_xyz(50, 0, 10)        # move to x=50 µm, y=0, z=10 (relative to origin);
+#   answers exactly what get_xyz answers, read back from the stage after the move,
+#   so there is no need to call get_xyz afterwards
 
 # Change light-path settings (the 'changeable' block):
 sess.set_state({"changeable": {"laser": "488 nm", "intensity": 20, "filter": "Empty", "zoom": "1x"}})

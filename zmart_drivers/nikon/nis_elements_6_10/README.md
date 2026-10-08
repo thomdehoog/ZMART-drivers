@@ -4,7 +4,7 @@
 > with the Ti2 simulator. The full ZMART round trip runs — connect, set origin,
 > move, **acquire** (snapshot and **Z-stack**), state (objective, optical
 > configuration, exposure, PFS), procedures (autofocus, live/freeze, PFS).
-> Offline suite: 57 tests, no NIS needed; hardware suite: 7 against the
+> Offline suite: 66 tests, no NIS needed; hardware suite: 7 against the
 > simulator. Not yet run on a real microscope. The folder name carries the NIS
 > version the driver was built against; other versions may need small changes
 > in `bridge/nis_bridge.py`.
@@ -138,14 +138,31 @@ adapter.disconnect(handle)
 The origin is saved to
 `C:\ProgramData\zmart-microscopy\nikon\<microscope>\origin.json`, and the
 driver loads it every time it connects, including every controller session.
-When z is driven by a piezo insert, the piezo's zero is saved with it. Run
-these lines again whenever you want a new origin.
+When the microscope has a piezo Z insert, the piezo's reading at that moment
+is saved with it, so that the height z = 0 means the focus drive and the piezo
+together, as they stood when you set the origin. Run these lines again
+whenever you want a new origin.
+
+With the origin set, a position reads like this (the numbers are from the
+offline fake; a real stage reports its own):
+
+```python
+s.get_xyz()["content"]
+# {'x': {'position': 0.0, 'unit': 'micrometer', 'actuators': {'motoric': 39904.7},               'canvas': [-96904.7, 17095.3]},
+#  'y': {'position': 0.0, 'unit': 'micrometer', 'actuators': {'motoric': -13433.1},              'canvas': [-24066.9, 50933.1]},
+#  'z': {'position': 0.0, 'unit': 'micrometer', 'actuators': {'motoric': 500.0, 'piezo': 50.0},  'canvas': [-500.0, 9500.0]}}
+```
+
+`position` is measured from the origin; the readings under `actuators` are
+the stage's own numbers, which is how you can see how the focus drive and
+the piezo share the height. `set_xyz` answers the very same dictionary, read
+back after the move.
 
 ## What the driver offers today
 
 | Neutral surface | Nikon meaning |
 |---|---|
-| `get_xyz` / `set_xyz` | XY stage and the main Z (focus) drive, µm, absolute. Every move is checked against the limits NIS-Elements reports (*Devices ▸ Stage limits*) before it is sent. When NIS reports a piezo Z insert, `with_actuators={"z": "piezo"}` drives it instead of the focus drive. Each axis reports its `value`, its `actuator` and its `canvas`, everywhere a picture can show. Here the canvas is the travel itself: NIS-Elements reports the pixel size of the objective in place only, so the driver cannot widen it by the widest field. |
+| `get_xyz` / `set_xyz` | XY stage and the Z (focus) drive, µm, absolute. Every move is checked against the limits NIS-Elements reports (*Devices ▸ Stage limits*) before it is sent. Both answer the same dictionary, keyed `x`, `y`, `z`; each axis carries `position` (µm from the origin), `unit` (always `"micrometer"`), `actuators` (every motor of the axis with its own raw reading, exactly as NIS-Elements reports it) and `canvas` (`[min, max]`, everywhere a picture can show). `set_xyz` reads the answer back from the microscope after the move, so it shows where the stage really is. When NIS reports a piezo Z insert, the height of z is the focus drive plus the piezo, whichever of them moved; `with_actuators={"z": "piezo"}` makes the piezo carry the step instead of the focus drive, for fine, quick moves within the piezo's reach. Here the canvas is the travel itself: NIS-Elements reports the pixel size of the objective in place only, so the driver cannot widen it by the widest field. |
 | `acquire` | A snapshot (`Capture()`), or a **Z-stack** through NIS's ND acquisition when the acquisition settings give `z_start` and `z_end` (with `z_step`, all in µm from the origin). Saved as TIFF, ND2 or OME-TIFF to `<output_root>/data/<label>.<ext>`, or to `<output_root>/data/<folder>/<label>.<ext>` when the `folder` setting is given, then the NIS window is closed. The answer lists each saved plane under `planes`; the height of the planes of a stack is left unknown (None), because NIS does not say in which order it took them. The settings may also select an optical configuration and set the exposure first. |
 | `get_state` / `set_state` | Changeable: `objective_position` (nosepiece slot, 1-based), `optical_configuration` (by name), `exposure_ms`, `pfs` (on/off, when a PFS is present). Observed: NIS version, objectives, optical configurations, Z drives, PFS status, limits. |
 | `get_procedures` / `run_procedure` | `autofocus` (NIS's image-based focus sweep over `range_um`; reports `frame_z_um`), `live` / `freeze`, `pfs_on` / `pfs_off`. |
@@ -180,7 +197,7 @@ multi-channel captures beyond what an optical configuration sets.
 From the repository root, after `pip install -e ".[test]"`:
 
 ```
-python -P -m pytest zmart_drivers/nikon/nis_elements_6_10              # offline: 57 tests, ~20 s, no NIS needed
+python -P -m pytest zmart_drivers/nikon/nis_elements_6_10              # offline: 66 tests, ~25 s, no NIS needed
 python -P -m pytest zmart_drivers/nikon/nis_elements_6_10 -m hardware  # against a running NIS with start_bridge.mac active
 ```
 
