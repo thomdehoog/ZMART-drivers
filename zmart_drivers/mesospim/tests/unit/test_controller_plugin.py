@@ -1,7 +1,7 @@
 """The driver plugs into the standalone ZMART Controller as a module.
 
 These tests do what an operator does on the mesoSPIM computer: import the
-driver module and hand it to ``zmart_controller.set_instrument``. The driver
+driver module and hand it to ``zmart_controller.ZmartController``. The driver
 then connects to the mock Remote Scripting server, and the controller's own
 ``validate_driver`` checks every answer.
 """
@@ -34,7 +34,7 @@ def instrument(server, tmp_path, monkeypatch):
 
 
 def test_the_module_holds_every_function_the_controller_needs(instrument):
-    session = zmart_controller.session.set_instrument(driver, instrument)
+    session = zmart_controller.ZmartController(driver, instrument)
     try:
         assert session.context == {"driver": "zmart_drivers.mesospim.zmart_controller_plugin"}
     finally:
@@ -55,28 +55,47 @@ def test_the_driver_fits_the_controller_contract(instrument):
 
 
 def test_every_command_answers_in_the_controller_shape(instrument):
-    session = zmart_controller.session.set_instrument(driver, instrument)
+    session = zmart_controller.ZmartController(driver, instrument)
     try:
         answers = {
             "set_xyz": session.set_xyz(10.0, 20.0, 5.0),
             "set_state": session.set_state({"changeable": {"intensity": 40.0}}),
             "run_procedure": session.run_procedure({"name": "move_focus", "value": 12.0}),
-            "acquire": session.acquire("A1"),
+            "acquire": session.acquire(position_label="A1"),
         }
-        with pytest.raises(ValueError, match="unknown procedure"):
-            session.run_procedure({"name": "no-such-routine"})
+        refused = session.run_procedure({"name": "no-such-routine"})
     finally:
         session.disconnect()
 
     for name, answer in answers.items():
         assert set(answer) == {"success", "content"}, name
         assert answer["success"] is True, name
+    # A routine the driver does not know is a failed answer that names the problem.
+    assert refused["success"] is False and "unknown procedure" in refused["content"]
     assert zmart_controller.check_acquire_answer(answers["acquire"]) == []
     assert Path(answers["acquire"]["content"]["files"][0]).is_file()
 
 
+def test_set_xyz_answers_the_position_read_back(instrument):
+    """A move answers exactly what get_xyz answers, read from the microscope afterwards."""
+    session = zmart_controller.ZmartController(driver, instrument)
+    try:
+        moved = session.set_xyz(10.0, 20.0, 5.0)["content"]
+        read = session.get_xyz()["content"]
+    finally:
+        session.disconnect()
+
+    assert moved == read
+    # Every motor get_actuators lists has its own raw reading. There is one per
+    # axis on a mesoSPIM, and with no origin saved it equals the position.
+    assert moved["x"]["actuators"] == {"motoric": 10.0}
+    assert moved["y"]["actuators"] == {"motoric": 20.0}
+    assert moved["z"]["actuators"] == {"motoric": 5.0}
+    assert all(moved[axis]["unit"] == "micrometer" for axis in ("x", "y", "z"))
+
+
 def test_get_info_describes_the_microscope_in_plain_words(instrument):
-    session = zmart_controller.session.set_instrument(driver, instrument)
+    session = zmart_controller.ZmartController(driver, instrument)
     try:
         description = session.get_info()["content"]["description"]
         xyz = session.get_xyz()["content"]
@@ -95,4 +114,5 @@ def test_get_info_describes_the_microscope_in_plain_words(instrument):
     half_field = max(HARDWARE.camera_pixels) * max(p for _, p in HARDWARE.zoom_pixel_size_um) / 2
     assert xyz["x"]["canvas"] == pytest.approx([-half_field, 25000.0 + half_field])
     assert xyz["z"]["canvas"] == pytest.approx([0.0, 25000.0])
-    assert set(xyz["x"]) == {"value", "actuator", "canvas"}
+    # Each axis carries the four entries the controller fixes, in this order.
+    assert list(xyz["x"]) == ["position", "unit", "actuators", "canvas"]

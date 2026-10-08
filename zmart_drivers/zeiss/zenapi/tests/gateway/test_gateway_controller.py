@@ -1,17 +1,17 @@
-"""The ZMART controller session over the real wheel and the fake gateway.
+"""The ZMART controller over the real wheel and the fake gateway.
 
-This is what a workflow does: plug the driver in, move, acquire. Every answer comes back as ``{"success": ..., "content": ...}``.
-Setting the origin is not a controller command; it is a one-time setup step
-done with the driver itself, so the one place this file reaches past the
-controller is to call the adapter's ``set_origin`` on the session's driver
-handle.
+This is what a workflow does: plug the driver in, move, acquire. Every answer
+comes back as ``{"success": ..., "content": ...}``. Setting the origin is not
+a controller command; it is a one-time setup step done with the driver
+itself, so the one place this file reaches past the controller is to call the
+adapter's ``set_origin`` on the session's driver handle.
 """
 
 import pytest
 import zmart_controller
 
-from zmart_drivers.zeiss.zenapi import zmart_controller_plugin as driver
 from zmart_drivers.zeiss.zenapi import zen_zmart_adapter as adapter
+from zmart_drivers.zeiss.zenapi import zmart_controller_plugin as driver
 
 
 @pytest.fixture
@@ -22,9 +22,7 @@ def isolated(monkeypatch, tmp_path):
 
 @pytest.fixture
 def session(isolated, connection):
-    s = zmart_controller.session.set_instrument(
-        driver, {**connection, "experiment": "ZMART_Snap"}
-    )
+    s = zmart_controller.ZmartController(driver, {**connection, "experiment": "ZMART_Snap"})
     try:
         yield s
     finally:
@@ -43,9 +41,16 @@ def test_full_round_trip(session, gateway, tmp_path):
 
     assert not hasattr(session, "set_origin")  # the controller does not offer it
     adapter.set_origin(session._handle)  # driver setup step, done on the handle
-    assert session.get_xyz()["content"]["x"]["value"] == 0.0
+    assert session.get_xyz()["content"]["x"]["position"] == 0.0
     rec = session.set_xyz(250, -250, 12.5)["content"]
-    assert rec["confirmed"] == pytest.approx({"x": 250.0, "y": -250.0, "z": 12.5})
+    # The answer is the position read back from the gateway, like get_xyz.
+    assert {axis: rec[axis]["position"] for axis in rec} == pytest.approx(
+        {"x": 250.0, "y": -250.0, "z": 12.5}
+    )
+    # The origin was the stage's zero, so the motors' own readings match.
+    assert rec["x"]["actuators"] == pytest.approx({"motoric": 250.0})
+    assert rec["z"]["actuators"] == pytest.approx({"motoric": 12.5})
+    assert rec["x"]["unit"] == "micrometer"
     assert gateway.zen.x_m == pytest.approx(250e-6)
 
     state = session.get_state()["content"]
@@ -80,6 +85,7 @@ def test_full_round_trip(session, gateway, tmp_path):
 
 
 def test_move_outside_limits_is_refused_before_zen_is_asked(session, gateway):
-    with pytest.raises(RuntimeError, match="set_xyz refused"):
-        session.set_xyz(0, 0, 50000)
+    answer = session.set_xyz(0, 0, 50000)
+    assert answer["success"] is False
+    assert "set_xyz refused" in answer["content"]
     assert not any(c[0].startswith("focus") for c in gateway.zen.calls)

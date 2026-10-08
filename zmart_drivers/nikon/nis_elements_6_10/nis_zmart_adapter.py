@@ -16,9 +16,13 @@ one step.
 
 What the neutral surface covers for Nikon today:
 
-* **x/y/z** -- the XY stage and the main focus drive (single "motoric" actuator each).
+* **x/y/z** -- the XY stage and the focus drive. Each axis answers its
+  ``position`` from the origin, its ``unit``, the raw reading of each of its
+  motors under ``actuators``, and its ``canvas``.
 * **z actuators** -- ``"motoric"`` (focus drive) and ``"piezo"`` when NIS
-  reports a piezo insert.
+  reports a piezo insert. The height of z is the focus drive plus the piezo,
+  whichever of the two moved last; ``with_actuators`` only chooses which one
+  moves.
 * **changeable state** -- objective (nosepiece slot), optical configuration,
   camera exposure, PFS on/off.
 * **procedures** -- ``autofocus`` (NIS image-based), ``live`` / ``freeze``,
@@ -61,6 +65,11 @@ log = logging.getLogger(__name__)
 # connect() adds "piezo" to z on the handle (see NisHandle.actuators).
 _ACTUATORS: dict[str, list[str]] = {"x": ["motoric"], "y": ["motoric"], "z": ["motoric"]}
 
+# The unit of every position, reading and canvas that get_xyz and set_xyz
+# answer. It is the word the ZMART Controller's contract fixes, so a workflow
+# can trust it on every microscope.
+UNIT = "micrometer"
+
 # The connection settings used for any key the caller leaves out. ``microscope``
 # names this instrument (it picks the folder its origin is saved in), and
 # ``host`` and ``port`` are where the bridge inside NIS-Elements listens, as
@@ -83,7 +92,8 @@ class NisHandle:
     initial_position: dict = field(default_factory=dict)
     # Per-axis actuator options, read at connect ("piezo" for z only when NIS reports one).
     actuators: dict = field(default_factory=lambda: {a: list(o) for a, o in _ACTUATORS.items()})
-    # Raw piezo Z (um) that reads as zero when z is driven by the piezo; set by set_origin.
+    # The raw piezo reading (um) at the moment set_origin ran. Together with
+    # origin["z"] it fixes where the height z = 0 lies: focus drive plus piezo.
     piezo_origin: float = 0.0
     closed: bool = False
 
@@ -220,8 +230,46 @@ def set_origin(handle: NisHandle) -> dict:
     return {"origin": dict(handle.origin), "origin_file": str(path)}
 
 
-def _user_xyz(handle: NisHandle, pos: dict) -> dict[str, float]:
-    return {axis: float(pos[axis]) - handle.origin[axis] for axis in ("x", "y", "z")}
+def _readings(handle: NisHandle) -> dict[str, dict[str, float]]:
+    """Every motor's own reading, per axis, exactly as NIS-Elements reports it.
+
+    The answer is ``{"x": {"motoric": ...}, "y": {"motoric": ...}, "z": {"motoric": ...}}``
+    in raw stage micrometres, with ``"piezo"`` added to z when a piezo insert
+    is present. Nothing is subtracted here: these are the stage's own numbers,
+    which is what the ``actuators`` entry of ``get_xyz`` promises.
+    """
+    pos = _readers.get_position(handle.client)
+    readings = {axis: {"motoric": float(pos[axis])} for axis in ("x", "y", "z")}
+    if "piezo" in handle.actuators["z"]:
+        readings["z"]["piezo"] = _piezo_z(handle)
+    return readings
+
+
+def _frame_xyz(handle: NisHandle, readings: dict) -> dict[str, float]:
+    """Where each axis is, in micrometres from the origin, from the motors' raw readings.
+
+    For x and y this is the stage reading minus the origin. For z the piezo
+    insert rides on the focus drive, so the height of the sample is the sum
+    of the two readings; the origin for that height is the focus-drive origin
+    plus the piezo origin, both recorded by :func:`set_origin` at the same
+    moment. The result is one number for z, whichever motor last moved it.
+    """
+    position = {axis: readings[axis]["motoric"] - handle.origin[axis] for axis in ("x", "y", "z")}
+    if "piezo" in readings["z"]:
+        position["z"] += readings["z"]["piezo"] - handle.piezo_origin
+    return position
+
+
+def _piezo_offset(handle: NisHandle, readings: dict) -> float:
+    """How far the piezo stands from its origin (um); zero when there is no piezo.
+
+    This is the part of the frame height that the piezo contributes, so a
+    move of the focus drive has to leave room for it, and a move of the piezo
+    has to supply it.
+    """
+    if "piezo" not in readings["z"]:
+        return 0.0
+    return readings["z"]["piezo"] - handle.piezo_origin
 
 
 # =============================================================================
@@ -268,24 +316,31 @@ def _piezo_z(handle: NisHandle) -> float:
 
 
 def get_xyz(handle: NisHandle, *, with_actuators: dict | None = None) -> dict:
-    """Report each axis: its position, the motor that reads it, and its canvas.
+    """Where the stage is, per axis: ``position``, ``unit``, ``actuators`` and ``canvas``.
 
-    Positions are in micrometres from the origin. With
-    ``with_actuators={"z": "piezo"}`` the z value is the piezo insert's
-    position (relative to the piezo origin), not the focus drive's. The
-    ``canvas`` is everywhere a picture can show on that axis; see
-    :func:`_canvas`.
+    ``position`` is micrometres from the origin, and it means one thing
+    whichever motor moved the axis: for z it is the height of the sample, the
+    focus drive plus the piezo insert when there is one. ``unit`` says that
+    every number here is in micrometres. ``actuators`` lists every motor of
+    the axis with its own raw reading, exactly as NIS-Elements reports it and
+    not measured from the origin, so you can see how the focus drive and the
+    piezo share the height. ``canvas`` is everywhere a picture can show on
+    that axis; see :func:`_canvas`.
+
+    ``with_actuators`` only checks that the motors it names exist, so that an
+    unknown name is refused with a ``ValueError`` here as well as in
+    ``set_xyz``; the answer always reports all motors.
     """
     _require_open(handle)
-    chosen = _resolve_actuators(handle, with_actuators)
-    user = _user_xyz(handle, _readers.get_position(handle.client))
-    if chosen["z"] == "piezo":
-        user["z"] = _piezo_z(handle) - handle.piezo_origin
+    _resolve_actuators(handle, with_actuators)
+    readings = _readings(handle)
+    position = _frame_xyz(handle, readings)
     return {
         axis: {
-            "value": user[axis],
-            "actuator": chosen[axis],
-            "canvas": _canvas(handle, axis, user[axis]),
+            "position": position[axis],
+            "unit": UNIT,
+            "actuators": dict(readings[axis]),
+            "canvas": _canvas(handle, axis, position[axis]),
         }
         for axis in ("x", "y", "z")
     }
@@ -314,37 +369,40 @@ def _canvas(handle: NisHandle, axis: str, value: float) -> list[float]:
 def set_xyz(
     handle: NisHandle, x: float, y: float, z: float, *, with_actuators: dict | None = None
 ) -> dict:
-    """Move to an absolute target (um, relative to the origin); return a move record.
+    """Move to a position in micrometres from the origin, then answer like :func:`get_xyz`.
 
-    The target is mapped to raw stage coordinates through the origin and checked
-    against the stage limits before NIS-Elements is asked to move. With
-    ``with_actuators={"z": "piezo"}`` the XY stage moves and the piezo insert
-    takes the z target (relative to the piezo origin) while the focus drive stays
-    put. The record carries the position NIS reported after the move.
+    The target is mapped to raw stage coordinates through the origin and
+    checked against the stage limits before NIS-Elements is asked to move; a
+    target outside them raises a ``RuntimeError`` and nothing moves.
+    ``with_actuators`` chooses which motor carries z to the height you ask
+    for. By default it is the focus drive (``"motoric"``), and the piezo
+    insert keeps whatever offset it has. With ``with_actuators={"z": "piezo"}``
+    the focus drive stays put and the piezo supplies the difference, which
+    is quick and fine but limited to the piezo's own reach (NIS-Elements
+    refuses a step beyond it). Either way the height means the same thing,
+    so a target reached by one motor reads the same as one reached by the
+    other. Once the stage has arrived, the position is read back from the
+    microscope, so the answer shows where the stage really is.
     """
     _require_open(handle)
     chosen = _resolve_actuators(handle, with_actuators)
-    targets = {
-        axis: handle.origin[axis] + float(value) for axis, value in (("x", x), ("y", y), ("z", z))
-    }
+    before = _readings(handle)
+    targets = {"x": handle.origin["x"] + float(x), "y": handle.origin["y"] + float(y)}
     try:
         if chosen["z"] == "piezo":
             _cmd.move_xy(handle.client, targets["x"], targets["y"], limits=handle.limits)
-            piezo_z = _cmd.move_piezo_z(handle.client, handle.piezo_origin + float(z))
-            confirmed = _user_xyz(handle, _readers.get_position(handle.client))
-            confirmed["z"] = piezo_z - handle.piezo_origin
+            # The two z readings must add up to the height asked for, in raw
+            # stage micrometres (see _frame_xyz): the frame height plus both
+            # origins. The focus drive stays where it is, so the piezo takes the rest.
+            raw_height = handle.origin["z"] + handle.piezo_origin + float(z)
+            _cmd.move_piezo_z(handle.client, raw_height - before["z"]["motoric"])
         else:
-            raw = _cmd.move_xyz(
-                handle.client, targets["x"], targets["y"], targets["z"], limits=handle.limits
-            )
-            confirmed = _user_xyz(handle, raw)
+            # The focus drive makes up whatever height the piezo does not provide.
+            focus = handle.origin["z"] + float(z) - _piezo_offset(handle, before)
+            _cmd.move_xyz(handle.client, targets["x"], targets["y"], focus, limits=handle.limits)
     except _cmd.LimitError as exc:
         raise RuntimeError(f"set_xyz refused: {exc}") from exc
-    return {
-        "position": {"x": float(x), "y": float(y), "z": float(z)},
-        "confirmed": confirmed,
-        "actuators": chosen,
-    }
+    return get_xyz(handle, with_actuators=with_actuators)
 
 
 # =============================================================================
@@ -449,10 +507,12 @@ def run_procedure(handle: NisHandle, procedure: dict) -> dict:
             timeout=float(procedure.get("timeout", 300.0)),
         )
         raw_z = float(result["position"]["z"])
+        # The sharp height in the frame counts the piezo too, like get_xyz does,
+        # so the number can be handed straight back to set_xyz.
         return {
             "ran": name,
             "focus_um": raw_z,
-            "frame_z_um": raw_z - handle.origin["z"],
+            "frame_z_um": _frame_xyz(handle, _readings(handle))["z"],
             "duration_s": result.get("duration_s"),
         }
     if name == "live":
@@ -542,8 +602,12 @@ def acquire(
                 "a stack needs both 'z_start' and 'z_end' (um from the origin) "
                 "in the acquisition settings"
             )
-        z_top = handle.origin["z"] + float(options["z_end"])
-        z_bottom = handle.origin["z"] + float(options["z_start"])
+        # The stack is taken by the focus drive, so its ends are mapped the way
+        # set_xyz maps a z target for the focus drive: through the origin, and
+        # leaving room for the height the piezo already provides.
+        piezo_offset = _piezo_offset(handle, _readings(handle))
+        z_top = handle.origin["z"] + float(options["z_end"]) - piezo_offset
+        z_bottom = handle.origin["z"] + float(options["z_start"]) - piezo_offset
         try:
             image = _cmd.capture_z_stack(
                 handle.client,
@@ -568,7 +632,7 @@ def acquire(
     saved = _cmd.save_image(
         handle.client, str(path), format=fmt, close=bool(options.get("close_after_save", True))
     )
-    position = _user_xyz(handle, _readers.get_position(handle.client))
+    position = _frame_xyz(handle, _readings(handle))
     return {
         "position_label": position_label,
         "folder": folder,
@@ -634,7 +698,8 @@ def _described(handle: NisHandle, objectives: dict) -> str:
     """The description, filled in from what NIS-Elements reports now."""
     devices = handle.immutable.get("devices", {})
     piezo = (
-        ' z can also be moved by the piezo insert ("piezo"), for fine, fast steps.'
+        ' z can also be moved by the piezo insert ("piezo"), for fine, fast steps;'
+        " the height of z is the focus drive plus the piezo, whichever of the two moved."
         if devices.get("piezo_z")
         else ""
     )
@@ -700,17 +765,14 @@ def _answered(function):
 
     The controller promises every workflow the same answer from every
     microscope: ``{"success": ..., "content": ...}``. The functions in this
-    module return the content alone, and raise when something goes wrong.
-    ``success`` is therefore True, unless the content says that a change was
-    sent but could not be confirmed (``"confirmed": False``): an outcome that
-    is safe to carry on from, so it is reported rather than raised.
+    module return the content alone, and raise when something goes wrong, so
+    here ``success`` is always True; the controller turns a raised error into
+    ``{"success": False, "content": "<the error>"}`` for you.
     """
 
     @functools.wraps(function)
     def command(*args, **kwargs):
-        content = function(*args, **kwargs)
-        unconfirmed = isinstance(content, dict) and content.get("confirmed") is False
-        return {"success": not unconfirmed, "content": content}
+        return {"success": True, "content": function(*args, **kwargs)}
 
     return command
 
