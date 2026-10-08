@@ -166,7 +166,7 @@ def test_viewed_point_is_origin_view_plus_frame_target(
     expected = tuple(o + f for o, f in zip(origin_view, frame_target, strict=True))
     assert sim.viewed_point() == pytest.approx(expected)
     # and the read-back agrees with what was asked, in frame terms
-    assert (got["x"]["value"], got["y"]["value"], got["z"]["value"]) == pytest.approx(frame_target)
+    assert (got["x"]["position"], got["y"]["position"], got["z"]["position"]) == pytest.approx(frame_target)
 
 
 def test_same_target_lands_identically_from_any_history():
@@ -235,7 +235,7 @@ def test_get_xyz_reports_truthfully_after_external_meddling():
         got = adapter.get_xyz(h)
 
     truth = tuple(v - o for v, o in zip(sim.viewed_point(), origin_view, strict=True))
-    assert (got["x"]["value"], got["y"]["value"], got["z"]["value"]) == pytest.approx(truth)
+    assert (got["x"]["position"], got["y"]["position"], got["z"]["position"]) == pytest.approx(truth)
 
 
 def test_focus_split_does_not_change_frame_z():
@@ -247,7 +247,7 @@ def test_focus_split_does_not_change_frame_z():
         h = _handle_at(sim)
         sim.z_wide, sim.z_galvo = z_wide, z_galvo
         with _running(sim):
-            reads.append(adapter.get_xyz(h)["z"]["value"])
+            reads.append(adapter.get_xyz(h)["z"]["position"])
     assert reads[0] == pytest.approx(reads[1])
     assert reads[0] == pytest.approx(reads[2])
 
@@ -315,9 +315,9 @@ def test_zero_z_galvo_procedure_preserves_frame_z():
     sim.z_galvo = 42.0  # someone parked the galvo off-zero
 
     with _running(sim):
-        z_before = adapter.get_xyz(h)["z"]["value"]
+        z_before = adapter.get_xyz(h)["z"]["position"]
         result = adapter.run_procedure(h, {"name": "zero_z_galvo"})
-        z_after = adapter.get_xyz(h)["z"]["value"]
+        z_after = adapter.get_xyz(h)["z"]["position"]
 
     assert sim.z_galvo == 0.0
     assert sim.z_wide == pytest.approx(ORIGIN_STATE["z_wide"] + 42.0)

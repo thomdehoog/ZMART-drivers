@@ -31,7 +31,7 @@ def session(server, tmp_path):
         # never touch the real ProgramData root from a test.
         "machine_root": str(tmp_path / "machine"),
     }
-    sess = zmart_controller.set_instrument(driver, connection)
+    sess = zmart_controller.ZmartController(driver, connection)
     try:
         yield sess
     finally:
@@ -63,9 +63,24 @@ def test_set_and_get_xyz_relative_to_origin(session):
     session.set_xyz(10, 20, 5)
     adapter.set_origin(session._handle)  # current position becomes (0,0,0)
     pos = session.get_xyz()["content"]
-    assert pos["x"]["value"] == 0.0
+    assert pos["x"]["position"] == 0.0
+    # The motor's own reading is the stage's number, untouched by the origin.
+    assert pos["x"]["actuators"] == {"motoric": 10.0}
     session.set_xyz(3, 0, 0)
-    assert session.get_xyz()["content"]["x"]["value"] == 3.0
+    assert session.get_xyz()["content"]["x"]["position"] == 3.0
+
+
+def test_set_xyz_answers_like_get_xyz(session):
+    """A move answers the position read back from the stage, in get_xyz's shape."""
+    moved = session.set_xyz(10, 20, 5)["content"]
+    assert moved == session.get_xyz()["content"]
+    for axis, expected in (("x", 10.0), ("y", 20.0), ("z", 5.0)):
+        assert list(moved[axis]) == ["position", "unit", "actuators", "canvas"]
+        assert moved[axis]["position"] == expected
+        assert moved[axis]["unit"] == "micrometer"
+        assert moved[axis]["actuators"] == {"motoric": expected}  # origin is still 0 here
+    # The old move record is gone: nothing but the three axes.
+    assert set(moved) == {"x", "y", "z"}
 
 
 def test_state_capture_and_reapply(session):
@@ -103,7 +118,7 @@ def test_acquire_stack_z_bounds_use_origin(session, monkeypatch):
 
     session.set_xyz(0, 0, 100)
     adapter.set_origin(session._handle)  # raw z=100 now reads as user z=0
-    session.acquire("C3", acquisition_settings={"z_start": 0, "z_end": 4, "z_step": 1})
+    session.acquire(position_label="C3", acquisition_settings={"z_start": 0, "z_end": 4, "z_step": 1})
 
     assert captured["options"]["z_start"] == 100.0  # 0 (user) + 100 (origin)
     assert captured["options"]["z_end"] == 104.0
@@ -116,7 +131,7 @@ def test_acquisition_settings(session):
 
 
 def test_acquire_captures_and_saves(session, tmp_path):
-    record = session.acquire("A1", acquisition_settings={"format": "ome-tiff"})["content"]
+    record = session.acquire(position_label="A1", acquisition_settings={"format": "ome-tiff"})["content"]
     assert record["position_label"] == "A1"
     assert len(record["planes"]) == 1
     assert "image_files" not in record
@@ -128,7 +143,7 @@ def test_acquire_captures_and_saves(session, tmp_path):
 
 
 def test_acquire_stack(session):
-    record = session.acquire("B2", acquisition_settings={"z_start": 0, "z_end": 4, "z_step": 1})[
+    record = session.acquire(position_label="B2", acquisition_settings={"z_start": 0, "z_end": 4, "z_step": 1})[
         "content"
     ]
     assert len(record["planes"]) == 5
@@ -140,7 +155,7 @@ def test_acquire_stack(session):
 
 
 def test_acquire_cleans_staging_and_does_not_duplicate(session, tmp_path):
-    record = session.acquire("A1")["content"]
+    record = session.acquire(position_label="A1")["content"]
     from pathlib import Path
 
     out = Path(record["files"][0])
@@ -153,14 +168,14 @@ def test_acquire_cleans_staging_and_does_not_duplicate(session, tmp_path):
 def test_a_folder_setting_groups_the_files(session):
     from pathlib import Path
 
-    record = session.acquire("A1", acquisition_settings={"folder": "prescan"})["content"]
+    record = session.acquire(position_label="A1", acquisition_settings={"folder": "prescan"})["content"]
     assert Path(record["files"][0]).parent.name == "prescan"
     assert Path(record["files"][0]).parent.parent.name == "data"
 
 
 def test_repeated_same_label_acquire_does_not_overwrite(session):
-    r1 = session.acquire("A1")["content"]
-    r2 = session.acquire("A1")["content"]
+    r1 = session.acquire(position_label="A1")["content"]
+    r2 = session.acquire(position_label="A1")["content"]
     # Same label twice must yield two distinct saved datasets, not a clobber.
     assert r1["files"][0] != r2["files"][0]
     from pathlib import Path
@@ -172,8 +187,10 @@ def test_acquire_stack_z_out_of_limits_raises(session):
     from zmart_drivers.mesospim.limits import checks as limits
 
     limits.set_stage_limits(z=(0, 100))  # tight envelope for this test
-    with pytest.raises(RuntimeError, match="stage limits"):
-        session.acquire("Z9", acquisition_settings={"z_start": 0, "z_end": 500, "z_step": 1})
+    # The controller turns the driver's RuntimeError into a failed answer.
+    answer = session.acquire(position_label="Z9", acquisition_settings={"z_start": 0, "z_end": 500, "z_step": 1})
+    assert answer["success"] is False
+    assert "RuntimeError" in answer["content"] and "stage limits" in answer["content"]
 
 
 def test_procedures(session):
@@ -186,11 +203,12 @@ def test_procedures(session):
         == "move_focus"
     )
     # autofocus/find_sample are advertised but the resident server NAKs them today
-    # (TODO §5), so forwarding raises rather than silently "succeeding".
-    with pytest.raises(MesospimError):
-        session.run_procedure({"name": "autofocus"})
-    with pytest.raises(ValueError):
-        session.run_procedure({"name": "nope"})
+    # (TODO §5), so forwarding raises rather than silently "succeeding". Through
+    # the controller, a raised error becomes a failed answer naming the error.
+    answer = session.run_procedure({"name": "autofocus"})
+    assert answer["success"] is False and MesospimError.__name__ in answer["content"]
+    answer = session.run_procedure({"name": "nope"})
+    assert answer["success"] is False and "ValueError" in answer["content"]
 
 
 def test_info(session):
@@ -237,15 +255,17 @@ def test_origin_set_with_driver_is_loaded_by_controller_session(server, tmp_path
         adapter.set_xyz(handle, 100, 200, 50)  # move somewhere first (origin still 0)
         out = adapter.set_origin(handle)
         assert out["origin_file"]  # saved to the machine configuration folder
-        assert adapter.get_xyz(handle)["x"]["value"] == 0.0
+        assert adapter.get_xyz(handle)["x"]["position"] == 0.0
     finally:
         adapter.disconnect(handle)
 
-    session = zmart_controller.set_instrument(driver, connection)
+    session = zmart_controller.ZmartController(driver, connection)
     try:
-        # The saved origin is loaded at connect, so the same spot reads (0, 0, 0).
+        # The saved origin is loaded at connect, so the same spot reads (0, 0, 0),
+        # while the motors still report the stage's own numbers.
         pos = session.get_xyz()["content"]
-        assert (pos["x"]["value"], pos["y"]["value"], pos["z"]["value"]) == (0.0, 0.0, 0.0)
+        assert tuple(pos[axis]["position"] for axis in "xyz") == (0.0, 0.0, 0.0)
+        assert tuple(pos[axis]["actuators"]["motoric"] for axis in "xyz") == (100.0, 200.0, 50.0)
     finally:
         session.disconnect()
 
@@ -275,20 +295,20 @@ def test_machine_stage_envelope_overrides_bundled(server, tmp_path):
         ),
         encoding="utf-8",
     )
-    sess = zmart_controller.set_instrument(driver, connection)
+    sess = zmart_controller.ZmartController(driver, connection)
     try:
-        sess.set_xyz(400, 0, 0)  # inside the machine envelope
-        with pytest.raises(RuntimeError, match="stage.x"):
-            sess.set_xyz(600, 0, 0)  # inside bundled, outside the machine copy
+        assert sess.set_xyz(400, 0, 0)["success"] is True  # inside the machine envelope
+        refused = sess.set_xyz(600, 0, 0)  # inside bundled, outside the machine copy
+        assert refused["success"] is False and "stage.x" in refused["content"]
     finally:
         sess.disconnect()
 
 
 def test_focus_and_rotation_procedures_are_limit_gated(session):
-    with pytest.raises(RuntimeError, match="stage.f"):
-        session.run_procedure({"name": "move_focus", "value": 99999.0})
-    with pytest.raises(RuntimeError, match="stage.theta"):
-        session.run_procedure({"name": "move_rotation", "value": 720.0})
+    refused = session.run_procedure({"name": "move_focus", "value": 99999.0})
+    assert refused["success"] is False and "stage.f" in refused["content"]
+    refused = session.run_procedure({"name": "move_rotation", "value": 720.0})
+    assert refused["success"] is False and "stage.theta" in refused["content"]
     # In-bounds still runs.
     assert (
         session.run_procedure({"name": "move_rotation", "value": 15.0})["content"]["ran"]
@@ -299,14 +319,18 @@ def test_focus_and_rotation_procedures_are_limit_gated(session):
 def test_mutating_ops_refuse_without_function_limits(session):
     """Fail-closed: no loaded limits means no mutations — reads still work."""
     session._handle.function_limits = None
+    # Called on the driver directly, the refusal is raised ...
+    with pytest.raises(RuntimeError, match="function limits are not configured"):
+        adapter.set_origin(session._handle)
+    # ... and through the controller it is a failed answer carrying the same words.
     for call in (
-        lambda: adapter.set_origin(session._handle),
         lambda: session.set_xyz(1, 1, 1),
         lambda: session.set_state({"changeable": {}}),
         lambda: session.run_procedure({"name": "zero_stage"}),
     ):
-        with pytest.raises(RuntimeError, match="function limits are not configured"):
-            call()
+        answer = call()
+        assert answer["success"] is False
+        assert "function limits are not configured" in answer["content"]
     assert "move_focus" in session.get_procedures()["content"]  # read-only unaffected
 
 

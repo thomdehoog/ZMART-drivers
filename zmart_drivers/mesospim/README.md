@@ -263,10 +263,33 @@ zmart_controller.register_driver("C:/ZMART-drivers/zmart_drivers/mesospim/zmart_
 
 # In every session:
 sess = zmart_controller.set_instrument("mesospim")
-sess.set_xyz(10, 20, 5)                             # µm from the saved origin; answers {"success", "content"}
+sess.get_xyz()                                      # where the stage is; see the answer below
+sess.set_xyz(10, 20, 5)                             # µm from the saved origin; answers like get_xyz
 sess.acquire("A1", acquisition_settings={"format": "ome-tiff"})
 sess.disconnect()
 ```
+
+**What `get_xyz` and `set_xyz` answer.** Both give the same dictionary, with one entry for each of
+`x`, `y` and `z`. `set_xyz` reads it back from the stage after the move has arrived, so it shows where the
+stage really is rather than the numbers that were asked for, and there is no need to call `get_xyz` after a
+move. Each axis has four entries, and every number is in micrometres:
+
+```python
+{'x': {'position': 10.0, 'unit': 'micrometer', 'actuators': {'motoric': 12510.0}, 'canvas': [-23272.48, 23272.48]},
+ 'y': {'position': 20.0, 'unit': 'micrometer', 'actuators': {'motoric': 12520.0}, 'canvas': [-23272.48, 23272.48]},
+ 'z': {'position': 5.0,  'unit': 'micrometer', 'actuators': {'motoric':  5005.0}, 'canvas': [-5000.0, 20000.0]}}
+```
+
+- `position`: where the axis is, measured from the origin saved with `set_origin` (below).
+- `unit`: always `'micrometer'`.
+- `actuators`: every motor of the axis with its own reading, exactly as mesoSPIM reports it. The origin is
+  not subtracted, so these are the stage's own numbers. A mesoSPIM has one motor per axis, `motoric`; in the
+  example the origin was saved at raw (12500, 12500, 5000).
+- `canvas`: `[min, max]`, everywhere a picture can show along that axis: the stage travel from this
+  microscope's `stage_limits.json`, widened on x and y by half the widest field of view.
+
+A move the limits refuse, or one the stage did not read back at the target, is `success: False` with the
+reason in `content`.
 
 **Setting the origin (a one-time driver setup step).** The origin is the point that reads as (0, 0, 0),
 and every position you give the controller is measured from it. It belongs to the microscope's

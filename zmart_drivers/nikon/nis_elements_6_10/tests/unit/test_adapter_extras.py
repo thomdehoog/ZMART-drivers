@@ -20,16 +20,33 @@ def test_piezo_is_a_second_z_actuator(handle, fake_api):
         "y": ["motoric"],
         "z": ["motoric", "piezo"],
     }
-    adapter.set_origin(handle)  # piezo origin = 50.0
+    adapter.set_origin(handle)  # focus origin = 500.0, piezo origin = 50.0
     rec = adapter.set_xyz(handle, 10, 0, 7, with_actuators={"z": "piezo"})
-    assert rec["actuators"]["z"] == "piezo"
-    # the piezo took the z target; the focus drive was left alone
+    # The piezo took the whole step; the focus drive was left alone.
     assert fake_api.piezo_z == pytest.approx(57.0) and fake_api.position["z"] == 500.0
-    assert rec["confirmed"]["z"] == pytest.approx(7.0)
-    assert adapter.get_xyz(handle, with_actuators={"z": "piezo"})["z"]["value"] == pytest.approx(
-        7.0
-    )
-    assert adapter.get_xyz(handle)["z"]["value"] == 0.0  # default stays the focus drive
+    # The answer is what get_xyz answers: the height in the frame, whichever
+    # motor moved it, and every motor's own raw reading beside it.
+    assert rec == adapter.get_xyz(handle)
+    assert rec["z"]["position"] == pytest.approx(7.0)
+    assert rec["z"]["actuators"] == {"motoric": 500.0, "piezo": pytest.approx(57.0)}
+    # Asking which motor to read changes nothing in the answer.
+    assert adapter.get_xyz(handle, with_actuators={"z": "piezo"}) == rec
+
+
+def test_the_focus_drive_leaves_room_for_the_piezo(handle, fake_api):
+    """A height means the same thing whichever motor reaches it.
+
+    After the piezo has lifted the sample by 7 um, asking the focus drive for
+    a height of 7 um must not move anything, and asking it for 0 must bring
+    the focus drive down by 7 um rather than back to its origin.
+    """
+    adapter.set_origin(handle)
+    adapter.set_xyz(handle, 0, 0, 7, with_actuators={"z": "piezo"})
+    assert adapter.set_xyz(handle, 0, 0, 7)["z"]["position"] == pytest.approx(7.0)
+    assert fake_api.position["z"] == pytest.approx(500.0)
+    back = adapter.set_xyz(handle, 0, 0, 0)
+    assert back["z"]["position"] == pytest.approx(0.0)
+    assert back["z"]["actuators"] == {"motoric": pytest.approx(493.0), "piezo": pytest.approx(57.0)}
 
 
 def test_no_piezo_means_no_piezo_actuator(connection, fake_api):

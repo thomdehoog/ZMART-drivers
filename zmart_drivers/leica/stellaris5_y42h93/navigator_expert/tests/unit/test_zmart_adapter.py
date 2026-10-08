@@ -115,13 +115,15 @@ class TestRegistration(unittest.TestCase):
         self.assertNotIn("calibration_name", adapter.CONNECTION)
 
     def test_the_driver_module_holds_every_command(self):
-        from zmart_controller import utils
+        from zmart_controller.registry import driver_functions
+        from zmart_controller.zmart_controller import COMMANDS
 
         from zmart_drivers.leica.stellaris5_y42h93.navigator_expert import zmart_controller_plugin as driver
 
-        ops = utils.driver_functions(driver)
-        for op in utils.OPS:
+        ops = driver_functions(driver)
+        for op in COMMANDS:
             self.assertIn(op, ops)
+        self.assertIn("connect", ops)
         self.assertIn("disconnect", ops)
 
     def test_importing_the_adapter_registers_nothing(self):
@@ -130,11 +132,11 @@ class TestRegistration(unittest.TestCase):
 
     def test_set_origin_is_a_driver_step_not_a_controller_op(self):
         """The origin is driver configuration: the controller cannot set it."""
-        from zmart_controller import utils
+        from zmart_controller.registry import driver_functions
 
         from zmart_drivers.leica.stellaris5_y42h93.navigator_expert import zmart_controller_plugin as driver
 
-        self.assertNotIn("set_origin", utils.driver_functions(driver))
+        self.assertNotIn("set_origin", driver_functions(driver))
         self.assertTrue(callable(adapter.set_origin))
 
 
@@ -230,11 +232,14 @@ class TestFrame(unittest.TestCase):
             self.assertTrue(record["origin_file"].endswith("origin.json"))
             self.assertEqual(record["reference"]["z_focus_um"], 30.0)
             pos = adapter.get_xyz(h)
-        self.assertEqual(pos["x"]["value"], 0.0)
-        self.assertEqual(pos["z"]["value"], 0.0)
-        self.assertEqual(set(pos["x"]), {"value", "actuator", "canvas"})
-        self.assertEqual(pos["x"]["actuator"], "motoric")
-        self.assertEqual(pos["z"]["actuator"], "z-wide")
+        self.assertEqual(pos["x"]["position"], 0.0)
+        self.assertEqual(pos["z"]["position"], 0.0)
+        # Each axis carries the four entries of the controller's contract, in
+        # this order, and names every motor that can move it.
+        self.assertEqual(list(pos["x"]), ["position", "unit", "actuators", "canvas"])
+        self.assertEqual(pos["x"]["unit"], "micrometer")
+        self.assertEqual(pos["x"]["actuators"], {"motoric": 1000.0})
+        self.assertEqual(pos["z"]["actuators"], {"z-wide": 30.0, "z-galvo": 0.0})
 
     def test_set_origin_persists_into_its_own_origin_folder(self):
         import json
@@ -407,13 +412,32 @@ class TestFrame(unittest.TestCase):
         patches = _patch_position(x_um=1010.0, y_um=1990.0, z_wide_um=32.0, z_galvo_um=3.0)
         with patches[0], patches[1], patches[2], patches[3]:
             pos = adapter.get_xyz(h)
-        self.assertEqual(pos["x"]["value"], 10.0)
-        self.assertEqual(pos["y"]["value"], -10.0)
-        self.assertEqual(pos["z"]["value"], 5.0)  # (32 + 3) - 30 focus sum
-        self.assertEqual(pos["hardware"]["z_wide_um"], 32.0)
-        self.assertEqual(pos["hardware"]["z_galvo_um"], 3.0)
-        self.assertEqual(pos["hardware"]["x_um"], 1010.0)
-        self.assertIn("objective", pos["hardware"])
+        self.assertEqual(pos["x"]["position"], 10.0)
+        self.assertEqual(pos["y"]["position"], -10.0)
+        self.assertEqual(pos["z"]["position"], 5.0)  # (32 + 3) - 30 focus sum
+        # The motors' own readings are the stage's numbers, with nothing
+        # subtracted: neither the origin nor an objective translation.
+        self.assertEqual(pos["x"]["actuators"], {"motoric": 1010.0})
+        self.assertEqual(pos["y"]["actuators"], {"motoric": 1990.0})
+        self.assertEqual(pos["z"]["actuators"], {"z-wide": 32.0, "z-galvo": 3.0})
+        for axis in ("x", "y", "z"):
+            self.assertEqual(pos[axis]["unit"], "micrometer")
+        self.assertNotIn("hardware", pos)
+
+    def test_get_xyz_names_every_motor_get_actuators_lists(self):
+        """The motors reported per axis are exactly the menu, so a workflow can
+        look a motor's reading up by the name it would pass to with_actuators."""
+        h = _handle()
+        patches = _patch_position()
+        with patches[0], patches[1], patches[2], patches[3]:
+            pos = adapter.get_xyz(h)
+            menu = adapter.get_actuators(h)
+        for axis in ("x", "y", "z"):
+            self.assertEqual(list(pos[axis]["actuators"]), menu[axis])
+        # with_actuators only chooses a motor; the answer still reports all of them
+        with patches[0], patches[1], patches[2], patches[3]:
+            pos = adapter.get_xyz(h, with_actuators={"z": "z-galvo"})
+        self.assertEqual(list(pos["z"]["actuators"]), ["z-wide", "z-galvo"])
 
     def test_set_xyz_moves_to_absolute_and_maps_z_actuator(self):
         h = _handle(origin=_origin(x_um=1000.0, y_um=2000.0, z_focus_um=30.0))
@@ -441,8 +465,11 @@ class TestFrame(unittest.TestCase):
         self.assertEqual(moves["xy"], (1010.0, 2020.0))
         # target focus = 30 + 5 = 35; galvo absorbs it minus z-wide's 32 -> 3
         self.assertEqual(moves["z"], (3.0, "galvo"))
-        self.assertEqual(record["actuators"]["z"], "z-galvo")
-        self.assertEqual(record["hardware_targets"]["z_galvo_um"], 3.0)
+        # The answer is a fresh get_xyz: the (patched) readings, not the targets.
+        self.assertEqual(list(record), ["x", "y", "z", "objective_translation_um"])
+        self.assertEqual(list(record["z"]), ["position", "unit", "actuators", "canvas"])
+        self.assertEqual(record["z"]["actuators"], {"z-wide": 32.0, "z-galvo": 3.0})
+        self.assertEqual(record["z"]["position"], 5.0)  # (32 + 3) − 30
         # the selection does NOT persist: defaults are fixed, never sticky
         self.assertEqual(adapter._resolve_actuators(None)["z"], "z-wide")
         self.assertEqual(adapter._resolve_actuators(None)["x"], "motoric")
@@ -1593,9 +1620,13 @@ class TestObjectiveCompensation(unittest.TestCase):
         patches = _patch_position(x_um=1110.0, y_um=2060.0, z_wide_um=45.0, z_galvo_um=0.0, slot=2)
         with patches[0], patches[1], patches[2], patches[3]:
             pos = adapter.get_xyz(h)
-        self.assertEqual(pos["x"]["value"], 10.0)  # 1110 − 1000 − 100
-        self.assertEqual(pos["y"]["value"], 10.0)  # 2060 − 2000 − 50
-        self.assertEqual(pos["z"]["value"], 5.0)  # 45 − 30 − 10
+        self.assertEqual(pos["x"]["position"], 10.0)  # 1110 − 1000 − 100
+        self.assertEqual(pos["y"]["position"], 10.0)  # 2060 − 2000 − 50
+        self.assertEqual(pos["z"]["position"], 5.0)  # 45 − 30 − 10
+        # The motors' readings stay untranslated: the stage's own numbers.
+        self.assertEqual(pos["x"]["actuators"], {"motoric": 1110.0})
+        self.assertEqual(pos["z"]["actuators"], {"z-wide": 45.0, "z-galvo": 0.0})
+        self.assertEqual(pos["objective_translation_um"], [100.0, 50.0, 10.0])
 
     def test_cross_objective_move_targets_include_translation(self):
         h = self._cross_handle()
@@ -1624,8 +1655,9 @@ class TestObjectiveCompensation(unittest.TestCase):
         # ordinary requested frame z=5 is realized by z-galvo (0+5).
         self.assertEqual(moves["z"], [(40.0, "zwide"), (5.0, "galvo")])
         self.assertEqual(record["objective_translation_um"], [100.0, 50.0, 10.0])
-        self.assertEqual(record["hardware_targets"]["z_wide_um"], 40.0)
-        self.assertEqual(record["hardware_targets"]["z_galvo_um"], 5.0)
+        # The answer is read back from the (patched) microscope, like get_xyz.
+        self.assertEqual(record["z"]["actuators"], {"z-wide": 40.0, "z-galvo": 0.0})
+        self.assertEqual(record["z"]["position"], 0.0)  # 40 − 30 − 10
 
     def test_job_change_that_swaps_the_objective_is_compensated(self):
         """A Navigator Expert job change can bring a different objective with it.
@@ -1664,9 +1696,9 @@ class TestObjectiveCompensation(unittest.TestCase):
             record = adapter.set_xyz(h, 10.0, 10.0, 5.0, with_actuators={"z": "z-galvo"})
 
         # Read: compensated with ΔT taken from the NEW job's objective.
-        self.assertEqual(pos["x"]["value"], 10.0)  # 1110 − 1000 − 100
-        self.assertEqual(pos["y"]["value"], 10.0)  # 2060 − 2000 − 50
-        self.assertEqual(pos["z"]["value"], 5.0)  # 45 − 30 − 10
+        self.assertEqual(pos["x"]["position"], 10.0)  # 1110 − 1000 − 100
+        self.assertEqual(pos["y"]["position"], 10.0)  # 2060 − 2000 − 50
+        self.assertEqual(pos["z"]["position"], 5.0)  # 45 − 30 − 10
         # Move: targets include ΔT, and z is driven on the selected job.
         self.assertEqual(moves["xy"], (1110.0, 2060.0))
         self.assertEqual(moves["z"], [("HiRes", 40.0, "zwide"), ("HiRes", 5.0, "galvo")])
@@ -1766,11 +1798,13 @@ class TestObjectiveCompensation(unittest.TestCase):
             ),
             patch.object(_readers_parsing, "make_changeable_copy", side_effect=lambda s: s),
         ):
-            adapter.set_xyz(h, 12.0, -7.0, 4.0, with_actuators={"z": "z-galvo"})
+            moved = adapter.set_xyz(h, 12.0, -7.0, 4.0, with_actuators={"z": "z-galvo"})
             pos = adapter.get_xyz(h)
-        self.assertAlmostEqual(pos["x"]["value"], 12.0)
-        self.assertAlmostEqual(pos["y"]["value"], -7.0)
-        self.assertAlmostEqual(pos["z"]["value"], 4.0)
+        self.assertAlmostEqual(pos["x"]["position"], 12.0)
+        self.assertAlmostEqual(pos["y"]["position"], -7.0)
+        self.assertAlmostEqual(pos["z"]["position"], 4.0)
+        # set_xyz answered the same read-back, so no second call is needed.
+        self.assertEqual(moved, pos)
 
     def test_cross_objective_move_without_translations_refuses(self):
         h = _handle(origin=_origin(objective={"name": "10x", "slotIndex": 1}))
@@ -1797,14 +1831,14 @@ class TestObjectiveCompensation(unittest.TestCase):
             self.assertLogs(adapter.log, level="WARNING"),
         ):
             pos = adapter.get_xyz(h)
-        self.assertEqual(pos["x"]["value"], 110.0)  # uncompensated, but loud
+        self.assertEqual(pos["x"]["position"], 110.0)  # uncompensated, but loud
 
     def test_same_objective_needs_no_calibration(self):
         h = _handle(origin=_origin(x_um=1000.0, objective={"name": "63x", "slotIndex": 3}))
         patches = _patch_position(x_um=1010.0, slot=3)
         with patches[0], patches[1], patches[2], patches[3]:
             pos = adapter.get_xyz(h)
-        self.assertEqual(pos["x"]["value"], 10.0)  # ΔT = 0, translations unused
+        self.assertEqual(pos["x"]["position"], 10.0)  # ΔT = 0, translations unused
 
     def test_out_of_range_galvo_refuses_with_the_actuator_hint(self):
         """An out-of-range galvo target is refused inside the real move_z;
@@ -2032,16 +2066,21 @@ class TestLifecycle(unittest.TestCase):
                 return_value={"success": True, "confirmed": True},
             ),
         ):
-            session = zmart_controller.set_instrument(driver)
+            session = zmart_controller.ZmartController(driver)
             try:
                 # Capturing the origin is a driver setup step, not a controller
                 # command, so it is called on the adapter with the driver handle.
                 adapter.set_origin(session._handle)
                 answer = session.set_xyz(10, 20, 5, with_actuators={"z": "z-galvo"})
                 self.assertIs(answer["success"], True)
-                self.assertEqual(answer["content"]["position"], {"x": 10, "y": 20, "z": 5})
+                # The move answers a read-back in get_xyz's shape. The readers
+                # are mocked and never move, so it reads the origin itself.
+                moved = answer["content"]
+                self.assertEqual(list(moved["x"]), ["position", "unit", "actuators", "canvas"])
+                self.assertEqual(moved["x"]["position"], 0.0)
+                self.assertEqual(moved["z"]["actuators"], {"z-wide": 30.0, "z-galvo": 0.0})
                 xyz = session.get_xyz()
-                self.assertEqual(xyz["content"]["x"]["value"], 0.0)  # mocked readback
+                self.assertEqual(xyz["content"], moved)
             finally:
                 session.disconnect()
 
@@ -2057,7 +2096,12 @@ class TestLifecycle(unittest.TestCase):
         patches = _patch_position(x_um=1000.0, y_um=2000.0, z_wide_um=30.0)
         with patches[0], patches[1], patches[2], patches[3]:
             handle = _handle()
-            session = zmart_controller.Session(adapter.ops_table(), handle, {})
+            # A module driver whose connect hands over this ready-made handle,
+            # so the controller wraps the ops table without a real connect.
+            ops = adapter.ops_table()
+            ops["connect"] = lambda connection: handle
+            driver = SimpleNamespace(__name__="stellaris", **ops)
+            session = zmart_controller.ZmartController(driver, {})
             for name in ("get_actuators", "get_xyz"):
                 with self.subTest(command=name):
                     answer = getattr(session, name)()
@@ -2067,13 +2111,13 @@ class TestLifecycle(unittest.TestCase):
 
     def test_the_ops_table_wraps_every_answering_command(self):
         """connect and disconnect are handed over as they are; the rest are wrapped."""
-        from zmart_controller.utils import OPS
+        from zmart_controller.zmart_controller import COMMANDS
 
         table = adapter.ops_table()
         self.assertIs(table["connect"], adapter.connect)
         self.assertIs(table["disconnect"], adapter.disconnect)
-        for name in OPS:
-            if name == "connect":
+        for name in COMMANDS:
+            if name == "disconnect":
                 continue
             with self.subTest(command=name):
                 self.assertIsNot(table[name], getattr(adapter, name))

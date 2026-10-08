@@ -1,9 +1,9 @@
 """
-Live adapter round-trip through a real ``zmart_controller.Session``.
-===================================================================
+Live adapter round-trip through a real ``zmart_controller.ZmartController``.
+============================================================================
 The controller-level analog of ``test_live_roundtrip`` (which drives the flat
 driver): this drives the mesoSPIM **adapter** (``mesospim_zmart_adapter``) exactly
-as a workflow would -- ``zmart_controller.set_instrument(...) -> Session -> get_*/
+as a workflow would -- ``zmart_controller.ZmartController(...) -> get_*/
 set_*/acquire`` -- against a live mesoSPIM Remote Scripting server (ideally ``-D``
 demo mode). It is the bench check that the neutral controller contract is wired
 end to end, not just the driver's own API.
@@ -58,7 +58,7 @@ def session():
     """
     if not _server_listening():
         pytest.skip(f"no live mesoSPIM Remote Scripting server at {_HOST}:{_PORT}")
-    sess = zmart_controller.set_instrument(driver, dict(_CONN))
+    sess = zmart_controller.ZmartController(driver, dict(_CONN))
     try:
         yield sess
     finally:
@@ -76,8 +76,12 @@ def test_info_and_actuators(session):
 def test_get_xyz_and_state_shape(session):
     xyz = session.get_xyz()["content"]
     for axis in ("x", "y", "z"):
-        assert set(xyz[axis]) == {"value", "actuator", "canvas"}
-        assert isinstance(xyz[axis]["value"], (int, float))
+        assert list(xyz[axis]) == ["position", "unit", "actuators", "canvas"]
+        assert isinstance(xyz[axis]["position"], (int, float))
+        assert xyz[axis]["unit"] == "micrometer"
+        # One motor per axis, reporting the stage's own number.
+        assert set(xyz[axis]["actuators"]) == {"motoric"}
+        assert isinstance(xyz[axis]["actuators"]["motoric"], (int, float))
     state = session.get_state()["content"]
     # changeable = the light-path settings; observed = identity + limits (never
     # the run-state, which is unobservable over the bridge).
@@ -92,11 +96,19 @@ def test_acquisition_settings(session):
 
 
 def test_set_xyz_zero_net_motion_confirms(session):
-    """Exercise set_xyz + confirm through the adapter with zero net motion."""
+    """Exercise set_xyz + confirm through the adapter with zero net motion.
+
+    The move answers the position read back from the stage, in get_xyz's
+    shape; an unconfirmed move would be a failed answer instead.
+    """
     xyz = session.get_xyz()["content"]
-    x, y, z = (xyz[a]["value"] for a in ("x", "y", "z"))
-    result = session.set_xyz(x, y, z)["content"]
-    assert result["confirmed"], result
+    x, y, z = (xyz[a]["position"] for a in ("x", "y", "z"))
+    answer = session.set_xyz(x, y, z)
+    assert answer["success"], answer
+    result = answer["content"]
+    for axis, asked in zip(("x", "y", "z"), (x, y, z)):
+        assert result[axis]["position"] == pytest.approx(asked, abs=1.0)
+        assert list(result[axis]) == ["position", "unit", "actuators", "canvas"]
 
 
 @pytest.mark.skipif(
