@@ -103,7 +103,6 @@ def hermetic_mock_machine_root() -> Path:
     profile = provision_machine_limits(root)
     profile.publish_snapshot(
         _SEED_MOMENT,
-        calibration_name="water_lens_setup",
         calibration={
             "schema_version": 13,
             "objectives": {
