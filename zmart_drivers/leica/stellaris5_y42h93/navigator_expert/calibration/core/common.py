@@ -116,7 +116,7 @@ def read_job_geometry(
     """
     # Calibration geometry is a persisted correctness artifact. Use the
     # authoritative API reader, not the passive state-reader profile.
-    settings = drv.get_job_settings(client, job_name) or {}
+    settings = drv.get_job_settings(client, job_name, mode="api") or {}
     geom = drv.parse_tile_geometry(settings)
     if geom is None or geom.get("pixel_w_um") is None or geom.get("pixels_x") is None:
         raise ValueError(
@@ -423,7 +423,7 @@ def read_stack_z_positions(
 
     # Z-stack positions are persisted calibration geometry. Use the
     # authoritative API reader, not the passive state-reader profile.
-    raw = drv.get_job_settings(client, job_name)
+    raw = drv.get_job_settings(client, job_name, mode="api")
     if not raw:
         raise RuntimeError(
             f"Could not read job settings for job {job_name!r}; cannot "

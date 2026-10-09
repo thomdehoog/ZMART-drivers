@@ -34,6 +34,9 @@ READER_SOURCE_POLICY_MODULES = {
     Path("commands/confirmations.py"),
     Path("commands/confirm_select_job.py"),
     Path("commands/dispatch.py"),
+    # Calibration geometry is saved for good, so it is read from the API
+    # and never from a log entry that may be stale (review finding M4).
+    Path("calibration/core/common.py"),
 }
 EXPLICIT_READER_MODE = re.compile(r"\bmode\s*=\s*['\"](?:api|log|hybrid)['\"]")
 LOW_LEVEL_READER_CALL = re.compile(r"(?<!\w)_?(?:api_reader|log_reader)\.")

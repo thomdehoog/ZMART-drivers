@@ -657,6 +657,9 @@ class TestAcquire(unittest.TestCase):
             patch.object(adapter._capture, "acquire", lambda c, j, **k: SimpleNamespace(job=j)),
             patch.object(adapter._save, "save", fake_save),
             patch.object(adapter._scanfields, "get_template_state", return_value="fresh"),
+            # Where to save is otherwise discovered from LAS X native AutoSave
+            # on this PC, which only the author's PC has.
+            patch.object(adapter._info, "output_root", return_value=Path("/tmp/out")),
             patches[0], patches[1], patches[2], patches[3],
         ):
             yield {}
