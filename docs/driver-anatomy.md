@@ -59,6 +59,7 @@ my_driver/
     vendor_interface/
         client.py              the connection and the primitives
         errors.py              the shared kinds of problem, and the sorting of the vendor's errors into them
+        vendor_side/           code that runs inside the vendor software, if the vendor needs it, with its installer
     dispatcher/
         read.py                the engine that runs a reading
         change.py              the engine that runs a change and confirms it
@@ -179,6 +180,18 @@ be too small to be useful or push the awkward fit up into the actions. The
 list that must be the same everywhere lives higher up, in the `ZmartDriver`
 class (part 7).
 
+**The vendor side.** Some vendor software cannot be driven from outside at
+all; a piece of our code has to run inside it. The Nikon driver runs a small
+bridge inside NIS-Elements, installed as macros, and the mesoSPIM driver sends
+Python script templates into mesoSPIM-control to be run there. That code is
+part of the vendor interface, in its own folder, `vendor_side/`, together
+with whatever installs it. It follows three rules of its own: it uses the
+standard library only, because it runs in the vendor's Python, not ours; it
+imports nothing from the driver except the message format it shares with
+`client.py`; and nothing in the driver imports from it. A patch to the vendor
+software itself, such as mesoSPIM's Remote Scripting server, lives here too,
+with a note on how it is applied.
+
 **Where a workaround belongs.** Every microscope needs workarounds. A simple
 rule decides where each one goes:
 
@@ -215,6 +228,7 @@ sorting what kind of problem this is, and then follow the rule.
 | Temporary | The software is busy; a short timeout | Reads again | Sends again, up to a set number of times | Raises `RuntimeError`, only if every retry fails |
 | Permanent | The vendor reports a failure; a hardware fault | Raises | Does not retry | Raises `RuntimeError` |
 | Connection lost | The vendor software was closed | Raises | Raises | Raises `RuntimeError` |
+| Outcome unknown | The reply never came, after the request was sent | – | Reads back first; never sends again blindly | `False` and a message, if the readback does not show the target |
 | Refused by limits | A target outside the travel range | – | Stops before anything is sent | Raises `ValueError` |
 | Unknown reading | A stale log entry; a read that timed out | Returns "unknown" with the reason | Counts as "not confirmed yet" | – |
 | Unconfirmed | The action was accepted, but the readback never matched | – | Sends again, then gives up softly | `False` and a message saying what could not be confirmed |
@@ -224,6 +238,26 @@ The first four kinds are how the vendor software can fail, and the sorting
 produces them. The others are not errors the vendor raises but outcomes the
 dispatchers reach on their own; they are in the same table so that every
 rule stands in one place.
+
+**Outcome unknown deserves a word**, because it is where three of our drivers
+go wrong today. A short timeout *before* anything was sent is temporary, and
+sending again is harmless. A timeout *after* the request was sent is not: on
+the Nikon bridge the job is still queued inside NIS and will run later, on
+the mesoSPIM the socket is dropped while the script runs on, on ZEN the
+client gives up while the experiment is still acquiring. Sending a move
+again in that state can move the stage twice. So the set dispatcher never
+retries a send whose reply was lost. It reads back first, and only when the
+readback does not show the target does it report a failure.
+
+**The sorting may have to read text.** Not every vendor gives a code. The
+mesoSPIM returns a traceback, NIS buries its code inside a message, and the
+Evident RDK answers a bare minus with no detail at all. Sorting from message
+text is allowed, in the vendor interface and nowhere else. Where we control
+the protocol, as with our own bridge, it should carry the vendor's code or
+the kind itself, so that no text has to be parsed. A vendor that gives no
+detail leaves every refusal permanent, under the first rule below; that is
+the safe reading, and it should be written down as a choice, not left to
+happen.
 
 The last column is what reaches the controller. The controller turns every
 one of these into the same answer for the workflow, `success: False` with
@@ -293,6 +327,26 @@ steps:
 In the Leica driver this engine exists today as `confirm_and_fire` in
 `commands/dispatch.py`.
 
+**When the send already waits.** On most of our microscopes the vendor call
+only returns when the action is done: a ZEN call blocks, a mesoSPIM script
+runs `wait_until_done`, a NIS bridge call runs on the single main thread. Then
+"send, then read back until it matches" collapses to one readback after the
+call returns, and the confirmation is insurance rather than a wait. The set
+dispatcher offers this as a mode of a change: *blocking send*, one send with
+a time limit of its own, then a single readback. The time limit is set per
+action in `tuning.py` and may be long (a mesoSPIM acquisition takes minutes)
+or absent; it is never silently replaced by a short default, which is a bug
+one of our drivers has today. While such a send runs, nothing can be read,
+so a pre-check that needs the instrument's state is declared "not available"
+for that microscope rather than faked.
+
+**A reading need not be instrument state.** The get dispatcher's sources are
+whatever can answer a question honestly: the vendor's API, a log file, or the
+size of a file on disk. The mesoSPIM cannot say whether it is idle, so the
+only proof that an acquisition finished is that its file has stopped growing.
+That is a reading like any other, with a source, an age and a possible
+"unknown".
+
 **The three files they share.**
 
 - `gate.py` is the limits gate, used by the set dispatcher only. It checks
@@ -354,6 +408,14 @@ is fine.
 - A change confirms itself through readings, never the other way round:
   `get.py` never imports `set.py`. The mock's layer test checks this.
 - An action never calls the vendor interface around the dispatcher.
+- **A change may declare that it cannot be confirmed.** NIS has no way to
+  read the exposure or the current optical configuration back; a loaded ZEN
+  experiment is a handle, not a value. Two of our drivers "confirm" these by
+  echoing the value they were given, which proves nothing. Instead the change
+  says so in its definition, the dispatcher records it as *accepted* rather
+  than confirmed, the command log says the same, and `get_info` names the
+  settings this applies to, so whoever drives the microscope knows which
+  answers are the vendor's word rather than a reading.
 
 ## 4. Procedures
 
@@ -409,10 +471,19 @@ time series several `t`.
 **Responsibilities.**
 
 1. **Find** what the vendor software produced: files in a folder, or image
-   data handed over directly.
+   data handed over directly. When the vendor software runs on another
+   computer, as ZEN and mesoSPIM-control do, this step includes reaching the
+   file, over a shared disk or a transfer. A file that cannot be reached is
+   its own outcome, a failure that says so, never a success with a path on a
+   computer the workflow cannot see.
 2. **Wait until it is complete.** A file must have stopped growing and the
    export must have finished, so that we never read a half-written file.
-3. **Convert** it to flat OME-TIFF (one plane per file) or OME-Zarr.
+3. **Convert** it to OME-TIFF or OME-Zarr, when the vendor did not already
+   write one of them: NIS can write OME-TIFF itself, ZEN writes CZI, the
+   mesoSPIM writes its own TIFF stacks. One plane per file is the natural
+   shape for a confocal snap; a light-sheet volume of thousands of planes is
+   one file, as OME-Zarr or one OME-TIFF per stack, and the plane table says
+   which planes it holds.
 4. **Name and place** it in the experiment's folder layout, named after the
    position label. A second picture with the same label gets a new name; an
    earlier one is never overwritten. Any further grouping is the driver's
@@ -455,6 +526,20 @@ The origin has its own folder because recording it is a frequent, everyday
 step, while the registration is measured rarely. Someone recording a new
 origin should never be one notebook cell away from overwriting the
 registration.
+
+**An item may come from the vendor, or not apply.** NIS knows its own
+travel limits, ZEN reports the pixel size live, the mesoSPIM has no
+image-to-stage registration to speak of. Where the vendor is the source, the
+vendor interface offers a reading for it and the item in `configuration/`
+holds only what the operator adds, such as a narrowing of the vendor's
+range, or nothing at all. At connect, the class reads the vendor's value,
+applies what is saved, and hands the result on. The item still lives here,
+it is still data, and the one-way rule still holds. An item that does not
+apply to a microscope is declared so in its folder, not left out, so that
+`get_info` can say it and a reader of the driver is not left guessing.
+Limits are kept per motor, since a piezo has a range of its own, and a
+setting's allowed values are never optional: a setting with no limits entry
+is refused, not passed through.
 
 **Every item follows the same pattern:**
 
@@ -759,6 +844,9 @@ by any other part of the driver. The Leica driver already works this way.
   vendor's messages mean, and the rules sit in the dispatcher, since the
   dispatcher is the only thing that follows them. The kinds table above is
   the seam between the two.
+- **The vendor side.** Code that runs inside the vendor software lives in
+  `vendor_interface/vendor_side/`, standard library only, importing nothing
+  of the driver but the shared message format.
 - **Actions and the dispatcher are separate folders.** The dispatcher is the
   same for every microscope and will move to the shared package; the actions
   are what differs. Readings and changes are two files in one folder, not two
@@ -766,14 +854,22 @@ by any other part of the driver. The Leica driver already works this way.
 
 ## Open questions
 
+- **Axes that are neither x, y, z nor settings.** The mesoSPIM has a focus
+  drive and a rotation axis. Today they are reachable only through
+  procedures, which hides them from the controller's vocabulary. Whether they
+  become settings, extra actuators, or stay procedures is a question for the
+  controller contract, not for this document.
+
 - **Stop.** No driver and no part of the controller contract offers a way to
   stop a running command. If an acquisition or a tile scan goes wrong, the
   only way out today is the vendor software itself. A defined `stop` would
   touch the set dispatcher (a long confirmation wait has to be
   interruptible), the rules (a new kind, "stopped by user") and the
-  controller contract (a new command). This is the largest safety gap we
-  know of, and it needs a decision: add it now, or record it for a later
-  version of the contract.
+  controller contract (a new command). ZEN offers a native stop primitive,
+  which makes the gap concrete: using it needs a second caller while a change
+  is running, which the "one writer" rule forbids today. This is the largest
+  safety gap we know of, and it needs a decision: add it now, or record it
+  for a later version of the contract.
 
 ## Where we are, and how we get there
 
@@ -795,9 +891,20 @@ by any other part of the driver. The Leica driver already works this way.
    beside each plug-in file, naming it as the class file, so that
    `register_driver` and `connect` by name work again; then a `ZmartDriver`
    in `zmart_driver.py` that replaces the plug-in file, driver by driver.
-4. **Move the shared parts out of Leica one at a time** (the algorithms, then
+4. **What a review of the four drivers found**, in October 2026, which the
+   dispatcher fixes once for all of them. Each driver copied Leica's adapter
+   and each drifted the same way: a limits refusal is raised as
+   `RuntimeError` instead of `ValueError`; an unconfirmed change is answered
+   as a success; a malformed origin file is ignored instead of refused; a
+   repeated label overwrites the earlier picture; no command log is kept; the
+   vendor software version is reported but never checked. The three strains
+   the review found in several drivers at once, a send that already waits, a
+   lost reply after sending, and a change that cannot be read back, are now
+   in parts 2 and 3 above, and the mock's dispatcher has to carry them before
+   the first driver copies it.
+5. **Move the shared parts out of Leica one at a time** (the algorithms, then
    the dispatcher), keeping Leica's tests green after
    every step.
-5. **Bring the Nikon, ZEISS and mesoSPIM drivers into the same layout**, each
+6. **Bring the Nikon, ZEISS and mesoSPIM drivers into the same layout**, each
    in its own pull request, so that a problem in one does not hold up the
    others.
