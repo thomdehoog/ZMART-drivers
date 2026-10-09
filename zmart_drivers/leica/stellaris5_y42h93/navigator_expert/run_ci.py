@@ -14,8 +14,8 @@ Design goals (matching the suite's standard):
   * Explicit per step -- every step prints its command, its result, and its
     wall-clock time. Nothing runs silently.
   * Diagnosable across systems -- the run opens with a full environment header
-    (see tests/_diagnostics) and writes machine-readable reports to
-    tests/_report/ (env.json, junit.xml, coverage.xml, htmlcov/, ci_summary.json)
+    (see testing/_diagnostics) and writes machine-readable reports to
+    testing/_report/ (env.json, junit.xml, coverage.xml, htmlcov/, ci_summary.json)
     so a failure carries its own context off-machine.
   * Honest exit code -- lint is reported but non-fatal (pre-existing style debt
     must not mask test results); a test failure fails the run. CI can flip lint
@@ -39,8 +39,8 @@ from pathlib import Path
 
 DRIVER_ROOT = Path(__file__).resolve().parent  # .../navigator_expert
 REPO_ROOT = DRIVER_ROOT.parents[3]  # the repository root (import root of zmart_drivers)
-REPORT_DIR = DRIVER_ROOT / "tests" / "_report"
-TEST_PATHS = [DRIVER_ROOT / "tests", DRIVER_ROOT / "calibration" / "tests"]
+REPORT_DIR = DRIVER_ROOT / "testing" / "_report"
+TEST_PATHS = [DRIVER_ROOT / "testing"]
 
 
 def build_env() -> dict:
@@ -127,7 +127,7 @@ def main(argv: list[str] | None = None) -> int:
     print(_rule())
     print("NAVIGATOR EXPERT DRIVER CI")
     print(_rule())
-    subprocess.run([sys.executable, str(DRIVER_ROOT / "tests" / "_diagnostics.py")], env=env)
+    subprocess.run([sys.executable, str(DRIVER_ROOT / "testing" / "_diagnostics.py")], env=env)
 
     steps: list[dict] = []
 
@@ -197,7 +197,7 @@ def main(argv: list[str] | None = None) -> int:
     # validator scripts keep their granular --allow-* flags for manual debugging;
     # run_ci exposes only the two operational modes: mock or hardware.
     if run_hardware:
-        hw = DRIVER_ROOT / "tests" / "hardware"
+        hw = DRIVER_ROOT / "testing" / "hardware"
         # SAFETY GATE (hard abort): prove the fail-closed limits machinery works
         # in THIS install against the in-process mock BEFORE connecting to real
         # LAS X or moving the stage. If it fails (bad env, regressed code,
@@ -214,7 +214,7 @@ def main(argv: list[str] | None = None) -> int:
                 "-m",
                 "pytest",
                 "-q",
-                str(DRIVER_ROOT / "tests" / "unit" / "test_limits_adversarial.py"),
+                str(DRIVER_ROOT / "testing" / "unit" / "test_limits_adversarial.py"),
             ],
             env,
             fatal=True,

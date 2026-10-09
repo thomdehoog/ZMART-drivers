@@ -22,10 +22,10 @@ import time
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
-from ..acquisition.files import _wait_file_stable
-from ..commands import gate as _gate
-from ..commands.envelope import _make_timing
-from ..config.timing import RECEIPT_TIMEOUT
+from ..dispatcher import gate as _gate
+from ..dispatcher.envelope import _make_timing
+from ..dispatcher.tuning import RECEIPT_TIMEOUT
+from ..output.files import _wait_file_stable
 from .lrp import parse_lrp
 
 log = logging.getLogger(__name__)

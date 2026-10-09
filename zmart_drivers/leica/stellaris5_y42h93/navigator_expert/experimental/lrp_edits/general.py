@@ -10,10 +10,7 @@ Dependency direction:
 
 import logging
 
-from ._primitives import (
-    _set_job_attr,
-    _set_sequential_attr,
-)
+from ._primitives import _set_job_attr, _set_sequential_attr
 
 log = logging.getLogger(__name__)
 

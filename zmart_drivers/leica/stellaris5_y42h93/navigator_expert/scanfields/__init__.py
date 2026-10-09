@@ -27,11 +27,7 @@ from .parsers import (
     parse_scan_positions,
 )
 from .planning import plan_tiles_from_geometries
-from .strip_restore import (
-    restore_template,
-    strip_template,
-    strip_template_in_place,
-)
+from .strip_restore import restore_template, strip_template, strip_template_in_place
 from .transaction import apply_lrp_change, reorder_jobs
 
 __all__ = [
