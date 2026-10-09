@@ -8,9 +8,9 @@ ZMART Controller. Since then two things have settled. The controller's
 contract, the `ZmartDriver` class that every driver fills in, is fixed and
 described in the controller's
 [How do I plug in a ZMART-driver](https://github.com/thomdehoog/ZMART-controller/blob/main/docs/plug_in_a_driver/README.md);
-part 8 of this document follows it. And the controller's mock driver,
-`zmart_controller.mock`, has been built in exactly this layout, so there is
-a complete, small driver to read alongside this text. The last sections say
+part 7 of this document follows it. And the controller's mock driver,
+`zmart_controller.mock`, has been built in exactly this layout, folder for
+folder, so there is a complete, small driver to read alongside this text. The last sections say
 what is still open and in which order we plan to get there.
 
 ## Why a common anatomy
@@ -29,56 +29,71 @@ it can look and behave the same.
 
 ## The parts at a glance
 
-A driver has nine parts. Read the picture from bottom to top: each part only
-uses the parts below it.
+A driver has eight parts. Read the picture from bottom to top: each part
+only uses the parts below it.
 
 ```
   experiments and workflows, through the ZMART Controller
   ───────────────────────────────────────────────────────────────
-  8  zmart_driver.py             the ZmartDriver class: one method per command
-  5  Procedures                 recipes built from get and set actions
-  4  Set actions  ──────────┐   change the microscope, then confirm it
-     + set dispatcher        │   (limits gate, retry, confirm, give up softly)
-  3  Get actions  ◀─────────┘   ask the microscope something
-     + get dispatcher            (one read at a time, time limit, "unknown")
-  2  Error handling             sort every problem into a kind, then follow the rule
-  1  Vendor interface           the only part that is completely microscope-specific
+  7  zmart_driver.py        the ZmartDriver class: one method per command
+  4  Procedures             recipes built from actions
+  3  Actions                the readings (get) and the changes (set), as short definitions
+  2  Dispatcher             the engines that run an action safely:
+                            one read at a time, the limits gate, retry, confirm, give up softly
+  1  Vendor interface       the only part that is completely microscope-specific;
+                            sorts the vendor's errors into the shared kinds
   ───────────────────────────────────────────────────────────────
   vendor software (LAS X, NIS-Elements, ZEN, mesoSPIM-control)
 
-  alongside:  6 Data handling   7 Configuration   9 Testing
+  alongside:  5 Data handling   6 Configuration   8 Testing
 ```
 
-Suggested folder layout inside a driver:
+The folder layout inside a driver, which the mock follows exactly:
 
 ```
 my_driver/
-    zmart_driver.json          # the driver's name and how to reach the microscope
-    zmart_driver.py            # the ZmartDriver class the controller calls
-    __init__.py                # makes the folder a package, so zmart_driver.py can import the parts
+    zmart_driver.json          the driver's name, and how to reach the microscope on this computer
+    zmart_driver.py            the ZmartDriver class the controller calls
+    __init__.py                makes the folder a package, so zmart_driver.py can import the parts
+
     vendor_interface/
-    error_handling/
-    get_actions/
-    set_actions/
+        client.py              the connection and the primitives
+        errors.py              the shared kinds of problem, and the sorting of the vendor's errors into them
+    dispatcher/
+        read.py                the engine that runs a reading
+        change.py              the engine that runs a change and confirms it
+        gate.py                the limits gate
+        rules.py               what each engine does for each kind of problem
+        tuning.py              retries and time windows, set per microscope
+    actions/
+        get.py                 the readings: which primitive, what the value means
+        set.py                 the changes: which primitive, how to confirm it
     procedures/
     data_handling/
     configuration/
-        origin/
+        machine_description/
         image_stage_registration/
+        origin/
         limits/
         optical_calibration/
-        machine_description/
+        coordinates.py         the only place the arithmetic between stage and user coordinates happens
+        store.py               load, check and save
+
     testing/
-        mock_api/
-        unit/
-        hardware/
-        data/
-    experimental/              # ideas that are not yet trusted on hardware
+        mock_api/              the stand-in for the vendor software
+        unit/                  tests against the mock API, on any computer
+        hardware/              checks that only run at the microscope
+        data/                  sample vendor files, logs, example configuration
+    experimental/              ideas that are not yet trusted on hardware
+    notebooks/                 the setup notebooks: limits, orientation, calibration, origin
+    README.md
 ```
 
-The folder names `get_actions/` and `set_actions/` are written out in full
-on purpose. A folder called plain `set/` would clash with Python's built-in
-`set`, and code that uses `set()` could quietly break.
+Two names need a word of care. `actions/set.py` is reached as `actions.set`
+and never written as `from actions import set`, which would hide Python's
+built-in `set` in that file; `from ..actions import set as setter` is the
+form the mock uses. And no folder in a driver is called `config/`, because a
+package with that common name gets imported in place of other packages.
 
 ## Words we use
 
@@ -98,8 +113,9 @@ avoids a lot of confusion.
 - **Primitive**: one plain Python function offered by the vendor interface,
   such as `read_position()` or `move_xy(x, y)`. Get and set actions are built
   on primitives.
-- **Dispatcher**: the general engine that runs an action safely. There is one
-  for gets and one for sets.
+- **Dispatcher**: the general engines that run an action safely. There is one
+  for readings, the *get dispatcher* in `dispatcher/read.py`, and one for
+  changes, the *set dispatcher* in `dispatcher/change.py`.
 - **Procedure**: a recipe that combines several get and set actions, such as
   autofocus.
 - **Raw stage coordinates**: positions in micrometers exactly as the vendor
@@ -130,6 +146,8 @@ What it looks like today in each driver:
   never been tested against should be refused, or at least warned about
   loudly.
 - Offer a list of *primitives*: plain functions that each do one thing.
+- Sort every error the vendor software raises into one of the shared kinds
+  of problem (see "Errors" below), in its `errors.py`.
 
 **The three promises.** Inside, the vendor interface may look like anything.
 At its top edge it keeps three promises:
@@ -137,10 +155,11 @@ At its top edge it keeps three promises:
 1. **Plain values.** Primitives take and return plain Python values, with
    positions in micrometers. No C types, macro text, log lines or network
    tokens leak above this line.
-2. **Classified errors.** Every failure it raises can be sorted by the error
-   handling (part 2) into one of the shared kinds.
+2. **Classified errors.** Every failure it raises can be sorted into one of
+   the shared kinds of problem, and `errors.py` does the sorting, so that
+   nothing above this line ever reads an error message.
 3. **Replaceable by the mock API.** Everything above the vendor interface must
-   run the same way against the mock API (part 9) as against the real
+   run the same way against the mock API (part 8) as against the real
    microscope.
 
 The list of primitives is not the same for every microscope. Leica thinks in
@@ -148,7 +167,7 @@ The list of primitives is not the same for every microscope. Leica thinks in
 mesoSPIM has none of these. Forcing one fixed list on all of them would either
 be too small to be useful or push the awkward fit up into the actions. The
 list that must be the same everywhere lives higher up, in the `ZmartDriver`
-class (part 8).
+class (part 7).
 
 **Where a workaround belongs.** Every microscope needs workarounds. A simple
 rule decides where each one goes:
@@ -159,50 +178,55 @@ rule decides where each one goes:
 - If it is about **what a value means** (for example, Leica's focus position
   is the sum of the z-wide and z-galvo drives), it belongs in a get or set
   action.
-- If it is **a recipe of several get and set actions**, it is a procedure.
+- If it is **a recipe of several actions**, it is a procedure.
 
-## 2. Error handling
+**Errors: the seam between the vendor interface and the dispatcher.** Every
+microscope reports problems in its own way: LAS X as echo text, ZEN as a
+gRPC status code, NIS as captured error output. If each action interpreted
+those messages itself, every action would grow its own if-else rules, and two
+actions would end up treating the same problem differently. So the driver
+decides in two places, and only two, what happens when something goes wrong:
 
-**Purpose.** To decide, in one place, what happens when something goes wrong.
-Without this, every action grows its own if-else rules about error messages,
-and two actions end up treating the same problem differently.
-
-Error handling has two pieces:
-
-- **The classifier** is written per microscope. It takes whatever the vendor
-  reported (an echo text, a gRPC status code, captured error output) and
-  sorts it into one of the shared kinds below.
-- **The rules** are the same for every microscope. For each kind, they say
-  what the get dispatcher and the set dispatcher should do next.
+- **The sorting** is written per microscope, in the vendor interface's
+  `errors.py`. It takes whatever the vendor reported and sorts it into one
+  of the shared kinds below.
+- **The rules** are the same for every microscope, in the dispatcher's
+  `rules.py`. For each kind, they say what the get dispatcher and the set
+  dispatcher do next.
 
 The dispatchers never interpret error messages themselves. They ask the
-classifier what kind of problem this is, and then follow the rule.
+sorting what kind of problem this is, and then follow the rule.
 
 **The shared kinds and rules.**
 
 | Kind | Example | Get dispatcher | Set dispatcher | What the `ZmartDriver` method answers |
 |---|---|---|---|---|
-| Refused by limits | A target outside the travel range | – | Stops before anything is sent | Raises `ValueError` |
 | Bad request | An unknown option; the vendor says "is invalid" | Raises | Does not retry | Raises `ValueError` |
 | Temporary | The software is busy; a short timeout | Reads again | Sends again, up to a set number of times | Raises `RuntimeError`, only if every retry fails |
 | Permanent | The vendor reports a failure; a hardware fault | Raises | Does not retry | Raises `RuntimeError` |
+| Connection lost | The vendor software was closed | Raises | Raises | Raises `RuntimeError` |
+| Refused by limits | A target outside the travel range | – | Stops before anything is sent | Raises `ValueError` |
 | Unknown reading | A stale log entry; a read that timed out | Returns "unknown" with the reason | Counts as "not confirmed yet" | – |
 | Unconfirmed | The action was accepted, but the readback never matched | – | Sends again, then gives up softly | `False` and a message saying what could not be confirmed |
-| Connection lost | The vendor software was closed | Raises | Raises | Raises `RuntimeError` |
 | Stopped by user | See "Stop" under open questions | – | Stops waiting | To be decided |
+
+The first four kinds are how the vendor software can fail, and the sorting
+produces them. The others are not errors the vendor raises but outcomes the
+dispatchers reach on their own; they are in the same table so that every
+rule stands in one place.
 
 The last column is what reaches the controller. The controller turns every
 one of these into the same answer for the workflow, `success: False` with
 the message as its content (a raised error is reported with its text, for
 example `ValueError: x=12000 is outside the travel`). The kinds differ in
 what the driver does *before* it answers, not in the shape of the answer.
-Part 8 says more about the answers.
+Part 7 says more about the answers.
 
 **Rules that always hold.**
 
 - **An error we do not recognise counts as permanent.** Retrying something we
   do not understand could repeat a harmful action. The Leica driver already
-  works this way: its classifier checks the permanent patterns first and
+  works this way: its sorting checks the permanent patterns first and
   treats anything unrecognised as permanent.
 - **Error messages name keys, never values.** The connection settings can
   contain passwords, so a message may say "the key `password` is missing" but
@@ -210,12 +234,17 @@ Part 8 says more about the answers.
 - **How many times** to retry and **how long** to wait may be tuned per
   action. **What to do** for each kind of error is fixed by the table.
 
-## 3. Get actions and the get dispatcher
+## 2. Dispatcher
 
-**Purpose.** To give one honest reading of the microscope: the value, where it
-came from, and how old it is, or "unknown" when the driver cannot be sure.
+**Purpose.** To run every action safely, the same way every time, so that an
+action definition can stay a few lines long and never has to think about
+retries, limits or confirmation itself. The dispatcher is the part that is
+meant to be identical in every driver; only its tuning numbers belong to
+one microscope.
 
-**The get dispatcher** is the general engine behind every reading. It:
+It is two engines, and three files they share.
+
+**The get dispatcher** (`read.py`) is the engine behind every reading. It:
 
 - lets only one read reach the vendor software at a time, so reads do not pile
   up on a busy microscope;
@@ -225,33 +254,20 @@ came from, and how old it is, or "unknown" when the driver cannot be sure.
   read from the API and from the log file, and races the two. Most
   microscopes have a single source, and the dispatcher must not assume two.
 
-In the Leica driver this engine exists today as `readers/router.py`; in the
-mock it is `get_actions/dispatch.py`.
+It hands back a *reading*: the value, where it came from and how old it is,
+or "unknown" with the reason when the driver cannot be sure. In the Leica
+driver this engine exists today as `readers/router.py`.
 
-**Get actions** are short definitions that use the dispatcher: which
-primitive to call, and what the value means.
-
-**Rules.**
-
-- A get action never changes the microscope.
-- A get action never knows a target. It does not know what value anyone is
-  hoping for.
-- The get dispatcher retries **the read**, never the hardware.
-
-## 4. Set actions and the set dispatcher
-
-**Purpose.** To change the microscope safely, and to know afterwards whether
-the change really happened.
-
-**The set dispatcher** runs every set action through the same steps:
+**The set dispatcher** (`change.py`) runs every change through the same
+steps:
 
 1. **Limits gate.** Check the request against the limits from the
    configuration. If it is outside, refuse before anything is sent.
 2. **Pre-check.** Ask the get dispatcher whether the microscope is ready, for
    example whether the scanner is idle.
 3. **Send** the action through a primitive.
-4. **Error check.** Classify any error and follow the rule: retry a temporary
-   error, stop on anything else.
+4. **Error check.** Sort any error into its kind and follow the rule: retry a
+   temporary error, stop on anything else.
 5. **Confirm.** Ask the get dispatcher, again and again within a time window,
    whether the value has reached the target.
 6. **Send again** if the confirmation did not succeed, up to a set number of
@@ -259,32 +275,36 @@ the change really happened.
 7. **Give up softly** if it is still not confirmed: hand back an outcome that
    says the action is unconfirmed and why, instead of raising. The
    `ZmartDriver` method then decides what that means for the command (part
-   8): a setting that could not be confirmed is answered as a failure that
+   7): a setting that could not be confirmed is answered as a failure that
    names the setting, and a move that could not be confirmed is answered as a
    failure that says where the stage is, because carrying on at an unknown
    position is never safe.
 
 In the Leica driver this engine exists today as `confirm_and_fire` in
-`commands/dispatch.py`; in the mock it is `set_actions/dispatch.py`.
+`commands/dispatch.py`.
 
-**Set actions** are short definitions that use the dispatcher. Each one says
-which primitive to call and how to confirm it: which reading to check, the
-target, the tolerance, and how long to wait. Most confirmations follow that
-simple pattern and can be written as a single row of data, the way Leica's
-`confirm_specs.py` already does. A few, such as acquisition, an objective
-change or a z-stack, need their own code, and that is fine.
+**The three files they share.**
+
+- `gate.py` is the limits gate, used by the set dispatcher only. It checks
+  stage positions in raw stage coordinates (part 6), and when the limits
+  could not be loaded it refuses every change. An unknown limit is never
+  treated as "no limit".
+- `rules.py` is the table above: for each kind of problem, what each engine
+  does next.
+- `tuning.py` holds the numbers: how many retries, how long a confirmation
+  window, how long one read may take. The driver author sets them for this
+  microscope; the operator never needs to. It is the one file in this folder
+  that differs between drivers.
 
 **Rules.**
 
-- **Every set action goes through the set dispatcher**, and the limits gate
-  is inside the dispatcher. No set action can skip the gate, because there is
-  no other way to reach the hardware. (In Leica today each wrapper calls the
-  gate itself; moving it into the dispatcher removes the chance of forgetting
-  it. The mock's `set_actions/gate.py` is the model.)
-- **When the limits could not be loaded, the gate refuses every change.** An
-  unknown limit is never treated as "no limit".
+- **Every change goes through the set dispatcher**, and the limits gate is
+  inside it. No action can skip the gate, because there is no other way to
+  reach the hardware. (In Leica today each wrapper calls the gate itself;
+  moving it into the dispatcher removes the chance of forgetting it.)
 - **The set dispatcher uses the get dispatcher**, for the pre-check and for the
-  confirmation. A get never calls a set.
+  confirmation. The get dispatcher never calls the set dispatcher.
+- **The get dispatcher retries the read**, never the hardware.
 - **A single read must fit inside one confirmation window.** Otherwise the set
   dispatcher gives up before the reading arrives, or an abandoned read is
   still running when the next attempt starts. The Leica driver learned this
@@ -292,13 +312,40 @@ change or a z-stack, need their own code, and that is fine.
 - **One read at a time is managed per read, not per confirmation.** When Leica
   held that rule around a whole confirmation, the confirmation's own reads
   were blocked (finding CF-01). Only the get dispatcher manages it.
-- **One writer at a time.** Set actions assume a single caller. A workflow
+- **One writer at a time.** The dispatchers assume a single caller. A workflow
   that sends commands from several threads at once can mix up the results.
-- **Tuning numbers** (retries, time windows, time limits) live in one named
-  file next to the dispatchers (`set_actions/tuning.py` in the mock). The
-  driver author sets them; the operator never needs to.
 
-## 5. Procedures
+## 3. Actions
+
+**Purpose.** To say, for each thing the driver can ask of the microscope,
+which primitive to call and what it means. An action is a short definition
+that the dispatcher runs; all the care about retries, limits and
+confirmation is the dispatcher's, so an action stays a few lines long.
+
+**Readings** (`get.py`) ask the microscope something, such as the stage
+position or the selected objective. Each one names the primitive to call and
+says what the value means, for example that Leica's focus position is the
+sum of the z-wide and z-galvo drives, or that a raw stage position becomes a
+user position through the configuration's coordinate functions (part 6).
+
+**Changes** (`set.py`) change the microscope: a move, a setting, an objective,
+an acquisition. Each one names the primitive to call and how to confirm it:
+which reading to check, the target, the tolerance, and how long to wait.
+Most confirmations follow that simple pattern and can be written as a single
+row of data, the way Leica's `confirm_specs.py` already does. A few, such as
+acquisition, an objective change or a z-stack, need their own code, and that
+is fine.
+
+**Rules.**
+
+- A reading never changes the microscope.
+- A reading never knows a target. It does not know what value anyone is
+  hoping for.
+- A change confirms itself through readings, never the other way round:
+  `get.py` never imports `set.py`. The mock's layer test checks this.
+- An action never calls the vendor interface around the dispatcher.
+
+## 4. Procedures
 
 **Purpose.** To offer recipes that combine several steps, such as autofocus,
 backlash takeup (always finishing a move from the same side, so that
@@ -306,22 +353,22 @@ positions repeat), or parking the z-galvo at zero while keeping the focus.
 
 **Rules.**
 
-- **A procedure uses only get and set actions**, never the vendor interface
-  directly. Every step then passes the limits gate and the error rules
+- **A procedure uses only actions**, never the vendor interface or the
+  dispatcher directly. Every step then passes the limits gate and the error rules
   without any extra effort.
 - **Each procedure describes itself** with a name and a plain-language
   description. That is what `get_procedures` lists and `run_procedure` runs.
 - A procedure that needs image analysis, such as a software autofocus, uses
   the shared algorithms (see "Shared across drivers" below).
 
-## 6. Data handling
+## 5. Data handling
 
 **Purpose.** To turn what the microscope produced into ZMART's product, and to
 say exactly where it was saved. "Data" here means the image data and the
 metadata that travels with it. Configuration is not data in this sense; it
 has its own part.
 
-Acquiring the image is a set action (part 4): it starts the capture and
+Acquiring the image is a change (part 3): it starts the capture and
 confirms that the capture finished. Data handling starts after that.
 
 **Responsibilities.**
@@ -346,11 +393,11 @@ confirms that the capture finished. Data handling starts after that.
    with its file, its channel, depth and time index, and the stage position
    it was taken at, in user coordinates.
 
-Problems here go through the same error handling. A file that never appears
+Problems here go through the same sorting and rules. A file that never appears
 after a confirmed capture is a permanent error, and `acquire` then answers
 with empty lists and `False`.
 
-## 7. Configuration
+## 6. Configuration
 
 **Purpose.** To hold everything the person at the microscope sets up and
 saves, and to load it every time the driver connects.
@@ -377,7 +424,7 @@ registration.
   not guessed at. Saved copies never go into the repository.
 - **A notebook** that walks the operator through setting it.
 
-**Order at connect.** Connecting is making the `ZmartDriver` (part 8): its
+**Order at connect.** Connecting is making the `ZmartDriver` (part 7): its
 `__init__` opens the vendor software and loads the configuration. Each item
 depends on the one before it, so it loads them in this order: machine
 description, image-to-stage registration and origin, limits, optical
@@ -391,8 +438,8 @@ and an untested software version is warned about. The mock's `__init__`
 user coordinates (subtracting the origin, applying the registration, adding
 the objective offsets) lives once, as a pair of plain functions next to this
 configuration (`user_from_raw` and `raw_from_user` in the mock's
-`configuration/coordinates.py`). The get and set actions for position use
-these functions. That way:
+`configuration/coordinates.py`). The actions for position use these
+functions. That way:
 
 - everything above the actions (procedures, `zmart_driver.py`, experiments)
   speaks one coordinate system, the user's;
@@ -404,7 +451,7 @@ Today the Leica driver does this arithmetic inside its controller adapter.
 Moving it down into the actions means procedures and setup notebooks can no
 longer accidentally use a different coordinate system from the experiments.
 
-## 8. The `ZmartDriver` class
+## 7. The `ZmartDriver` class
 
 **Purpose.** To present the driver to the ZMART Controller in the shape every
 microscope shares.
@@ -432,7 +479,7 @@ to fill in. A new driver starts by copying it.
 
 **Connecting.** Making the class is the connection: `__init__(connection)`
 opens the vendor software with what is in the `connection` dictionary and
-loads this microscope's configuration (part 7). `disconnect` closes the
+loads this microscope's configuration (part 6). `disconnect` closes the
 vendor software again. Everything the class needs between calls, such as
 the vendor connection, the two dispatchers and the command log, lives on
 `self`.
@@ -442,15 +489,15 @@ methods, and each one only puts the parts above to work:
 
 | Method | Built from | Hands back |
 |---|---|---|
-| `get_info` | The machine description and the limits (part 7) | `True, description`: the microscope in plain words, for whoever drives it, a person or a program |
+| `get_info` | The machine description and the limits (part 6) | `True, description`: the microscope in plain words, for whoever drives it, a person or a program |
 | `get_actuators` | The machine description | `True, (x_motors, y_motors, z_motors)`: the motors per axis, the first one being the default |
-| `get_xyz` | The get action for position (part 3) | `True, (x, y, z, actuators, canvas)`: the position in user coordinates, every motor's raw reading, and everywhere a picture can show |
-| `set_xyz` | The set action for position (part 4), then `get_xyz` | The same as `get_xyz`, read from the microscope once the stage has arrived |
-| `get_state` | The get actions for settings | `True, (changeable, observed)`: the settings `set_state` can apply, and what can only be read |
-| `set_state` | One set action per setting | `True, applied`: what took |
-| `get_acquisition_settings` | The choices data handling offers (part 6) | `True, {name: {"options": ..., "active": ...}}` |
-| `acquire` | The set action for acquisition, then data handling | `True, (files, planes)`: where everything was saved |
-| `get_procedures` | The procedures' own descriptions (part 5) | `True, {name: {"description": ...}}` |
+| `get_xyz` | The reading for position (part 3) | `True, (x, y, z, actuators, canvas)`: the position in user coordinates, every motor's raw reading, and everywhere a picture can show |
+| `set_xyz` | The change for position (part 3), then `get_xyz` | The same as `get_xyz`, read from the microscope once the stage has arrived |
+| `get_state` | The readings for the settings | `True, (changeable, observed)`: the settings `set_state` can apply, and what can only be read |
+| `set_state` | One change per setting | `True, applied`: what took |
+| `get_acquisition_settings` | The choices data handling offers (part 5) | `True, {name: {"options": ..., "active": ...}}` |
+| `acquire` | The change for acquisition, then data handling | `True, (files, planes)`: where everything was saved |
+| `get_procedures` | The procedures' own descriptions (part 4) | `True, {name: {"description": ...}}` |
 | `run_procedure` | One procedure | `True, name` |
 
 **Three outcomes.** Every method hands back a pair. `True` and the values
@@ -459,16 +506,16 @@ not, and the message says what happened. A method that raises is the third
 outcome, and the controller reports it with the error's text. The controller
 turns all three into the one answer a workflow sees, `{"success": ...,
 "content": ...}`, so a workflow never has to catch an error itself. This is
-how the kinds from part 2 reach the experiment:
+how the kinds from the errors table reach the experiment:
 
 - **A request that is wrong raises `ValueError`.** A position outside the
   limits, a setting or a motor this microscope does not have, an acquisition
   setting that is not listed, a procedure name that `get_procedures` does
-  not list. The limits gate's refusal (part 4) is such a `ValueError`; the
+  not list. The limits gate's refusal (part 2) is such a `ValueError`; the
   method lets it through.
 - **A change that could not be confirmed is a failure, `False` and a
   message.** It is never `True` with a flag. The set dispatcher gave up
-  softly (part 4); the method says plainly what did not take. For `set_state`
+  softly (part 2); the method says plainly what did not take. For `set_state`
   that is which setting, so the workflow can decide whether to carry on. For
   `set_xyz` that is where the stage is, and the workflow should stop, because
   the sample is not where the experiment thinks it is. For `acquire` it is a
@@ -480,8 +527,8 @@ how the kinds from part 2 reach the experiment:
 
 **Rules.**
 
-- `zmart_driver.py` **only maps** the driver's get actions, set actions,
-  procedures and data handling onto the commands. It does no coordinate
+- `zmart_driver.py` **only maps** the driver's actions, procedures and data
+  handling onto the commands. It does no coordinate
   arithmetic and no safety checks of its own; those already happened further
   down. Reading the mock's class file should feel like reading a table of
   contents of the parts beneath it.
@@ -531,7 +578,7 @@ connection on `self` instead of a handle passed around, and lets the
 controller build the answers, so a driver author writes less and the answers
 cannot drift between drivers.
 
-## 9. Testing
+## 8. Testing
 
 **Purpose.** To make every other part safe to change, and to let anyone try
 the driver on a laptop without a microscope.
@@ -572,7 +619,8 @@ missing exactly where someone wants it.
   touching the stage if either fails. The Leica driver already does this for
   the limits gate.
 - **The mock API can produce every kind of error on purpose**, so that one
-  shared set of tests can check that both dispatchers follow the error rules.
+  shared set of tests can check that the sorting and both dispatchers follow
+  the rules.
 - **Every suite plugs the driver into the controller and lets the controller
   check the answers**, with `validate_driver` and `check_acquire_answer`.
   That is the one test that proves the driver fits, and it costs nothing to
@@ -588,11 +636,16 @@ drift apart, and safety behaviour must not drift.
 zmart_drivers/
     shared/
         algorithms/        image registration and focus scoring
-        ...                later: the dispatchers, the error rules,
-                           configuration loading, OME writers
+        ...                later: the dispatcher, configuration loading,
+                           OME writers
 ```
 
-**The algorithms** are the clearest case. Today they live inside the Leica
+**The dispatcher** is the other clear case, and the reason it has a folder
+of its own: everything in it except `tuning.py` is written once for every
+microscope, so the folder can move to the shared package as a whole, and
+each driver keeps only its tuning.
+
+**The algorithms** are the clearest case today. Today they live inside the Leica
 driver (`algorithms/registration.py` and `algorithms/focus.py`), but nothing
 in them is Leica-specific: phase correlation between two images, a vote
 across four registration methods, and the Brenner sharpness score work the
@@ -616,11 +669,10 @@ What is the same in every driver, and what differs:
 
 | Part | The same everywhere | Specific to each microscope |
 |---|---|---|
-| Vendor interface | The three promises | Everything inside |
-| Error handling | The rules | The classifier |
-| Get actions | The get dispatcher | Which primitive, and what the value means |
-| Set actions | The set dispatcher and limits gate | Which primitive, the target, the confirmation |
-| Procedures | The "get and set actions only" rule; the algorithms | The recipes |
+| Vendor interface | The three promises; the names of the kinds of problem | Everything inside, including the sorting of errors |
+| Dispatcher | Both engines, the limits gate and the rules | `tuning.py` |
+| Actions | The shape of a definition | Which primitive, what the value means, the target, the confirmation |
+| Procedures | The "actions only" rule; the algorithms | The recipes |
 | Data handling | OME-TIFF and OME-Zarr writing, naming, the command log | Finding and reading the vendor's raw output |
 | Configuration | Load, check and save; the notebook pattern | Default values; the machine description |
 | `ZmartDriver` | The contract: the methods, their answers and the three outcomes; `validate_driver` | Mapping actions onto those methods; the `connection` keys |
@@ -636,7 +688,7 @@ by any other part of the driver. The Leica driver already works this way.
 
 - **Unconfirmed results.** A change that could not be confirmed is answered
   as a failure, `False` and a message, never as a success with a flag. The
-  controller's contract says so, and the mock does it (part 8). The Leica
+  controller's contract says so, and the mock does it (part 7). The Leica
   driver still reports `success: True` with `confirmed: False` and must be
   brought in line.
 - **Limits in raw coordinates.** The limits are stored and checked in raw
@@ -647,7 +699,16 @@ by any other part of the driver. The Leica driver already works this way.
   dispatcher.
 - **How a driver plugs in.** By its `zmart_driver.json`, through
   `register_driver` and `connect` by name, with a `ZmartDriver` class in
-  `zmart_driver.py` (part 8).
+  `zmart_driver.py` (part 7).
+- **Where error handling lives.** It is not a part of its own. The sorting of
+  errors sits in the vendor interface, since only vendor code knows what the
+  vendor's messages mean, and the rules sit in the dispatcher, since the
+  dispatcher is the only thing that follows them. The kinds table above is
+  the seam between the two.
+- **Actions and the dispatcher are separate folders.** The dispatcher is the
+  same for every microscope and will move to the shared package; the actions
+  are what differs. Readings and changes are two files in one folder, not two
+  folders.
 
 ## Open questions
 
@@ -655,7 +716,7 @@ by any other part of the driver. The Leica driver already works this way.
   stop a running command. If an acquisition or a tile scan goes wrong, the
   only way out today is the vendor software itself. A defined `stop` would
   touch the set dispatcher (a long confirmation wait has to be
-  interruptible), the error rules (a new kind, "stopped by user") and the
+  interruptible), the rules (a new kind, "stopped by user") and the
   controller contract (a new command). This is the largest safety gap we
   know of, and it needs a decision: add it now, or record it for a later
   version of the contract.
@@ -681,7 +742,7 @@ by any other part of the driver. The Leica driver already works this way.
    `register_driver` and `connect` by name work again; then a `ZmartDriver`
    in `zmart_driver.py` that replaces the plug-in file, driver by driver.
 4. **Move the shared parts out of Leica one at a time** (the algorithms, then
-   the set dispatcher and the error rules), keeping Leica's tests green after
+   the dispatcher), keeping Leica's tests green after
    every step.
 5. **Bring the Nikon, ZEISS and mesoSPIM drivers into the same layout**, each
    in its own pull request, so that a problem in one does not hold up the
