@@ -53,7 +53,7 @@ not been reviewed for release.
 Each of the four drivers carries a module called `zmart_controller_plugin.py`. It holds the driver's functions,
 one per controller command, which the controller finds by name when you hand it the module (see
 the controller's
-[guide to plugging in a driver](https://github.com/thomdehoog/ZMART-controller/blob/main/docs/1_plug_in_a_driver/README.md)).
+[guide to plugging in a driver](https://github.com/thomdehoog/ZMART-controller/blob/main/docs/plug_in_a_driver/README.md)).
 Every connection setting is optional: a driver fills in what you leave out, such as where its
 vendor software listens.
 Through the controller, every command answers `{"success": ..., "content": ...}`, and
