@@ -1,5 +1,9 @@
 # Release candidate review: Leica STELLARIS driver (`navigator_expert`)
 
+> **Note, October 2026.** This review was written before the driver was laid out as the
+> anatomy of a ZMART driver describes. The file paths it names are the old ones; the README's
+> architecture section maps them to the new folders. Findings T1 to T3 are fixed.
+
 This review covers the **release candidate** of the Leica driver, version `6.0.0rc1`. The driver is not released yet. This document lists what should be fixed before it is released for unattended use.
 
 - **Code reviewed:** the Leica driver from `thomdehoog/zmart-microscopy`, branch `release-candidate` at commit `decba69`. This is the code in this `zmart-drivers` release candidate.

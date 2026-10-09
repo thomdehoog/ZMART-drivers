@@ -41,7 +41,7 @@ microscope, is described in [the anatomy of a ZMART driver](docs/driver-anatomy.
 
 | Microscope | Vendor interface | Driver | Status |
 |---|---|---|---|
-| Leica STELLARIS 5 | LAS X Python (CAM) API, Navigator Expert | [`zmart_drivers/leica/stellaris5_y42h93/navigator_expert/`](zmart_drivers/leica/stellaris5_y42h93/navigator_expert/README.md) | **Release candidate `6.0.0rc1`**, not yet released. Tested on the LAS X simulator and a real STELLARIS. Plugs into the controller as a module. See its [release candidate review](zmart_drivers/leica/stellaris5_y42h93/navigator_expert/RELEASE_CANDIDATE_REVIEW.md). |
+| Leica STELLARIS 5 | LAS X Python (CAM) API, Navigator Expert | [`zmart_drivers/leica/stellaris5_y42h93/navigator_expert/`](zmart_drivers/leica/stellaris5_y42h93/navigator_expert/README.md) | **Release candidate `6.0.0rc1`**, not yet released. Tested on the LAS X simulator and a real STELLARIS. Laid out as [the anatomy of a ZMART driver](docs/driver-anatomy.md) describes, and plugs into the controller as a `ZmartDriver` class. See its [release candidate review](zmart_drivers/leica/stellaris5_y42h93/navigator_expert/RELEASE_CANDIDATE_REVIEW.md). |
 | Nikon Ti2 | NIS-Elements AR 6.10, a bridge inside NIS | [`zmart_drivers/nikon/nis_elements_6_10/`](zmart_drivers/nikon/nis_elements_6_10/README.md) | Working on the NIS-Elements Ti2 simulator; not yet run on a real microscope. Plugs into the controller as a module. |
 | ZEISS (ZEN blue or ZEN core) | ZEN API (`zen_api`, gRPC) | [`zmart_drivers/zeiss/zenapi/`](zmart_drivers/zeiss/zenapi/README.md) | Speaks the published ZEN API, tested against its own fake gateway; not yet run against ZEN itself. Plugs into the controller as a module. |
 | mesoSPIM light-sheet | mesoSPIM-control, Remote Scripting | [`zmart_drivers/mesospim/`](zmart_drivers/mesospim/README.md) | Working through Remote Scripting. mesoSPIM-control's own Remote Control is the newer way in; this driver has not moved to it yet. Plugs into the controller as a module. |
@@ -50,10 +50,12 @@ microscope, is described in [the anatomy of a ZMART driver](docs/driver-anatomy.
 The Leica driver is the furthest along. The others work in their own test setups but have
 not been reviewed for release.
 
-Each of the four drivers carries a module called `zmart_controller_plugin.py`. It holds the driver's functions,
-one per controller command, which the controller finds by name when you hand it the module (see
-the controller's
-[guide to plugging in a driver](https://github.com/thomdehoog/ZMART-controller/blob/main/docs/plug_in_a_driver/README.md)).
+The Leica driver plugs in the way the controller's
+[guide to plugging in a driver](https://github.com/thomdehoog/ZMART-controller/blob/main/docs/plug_in_a_driver/README.md)
+describes: a `zmart_driver.json` and a `ZmartDriver` class in `zmart_driver.py`, at the top of its
+folder. The other three drivers still carry the older shape, a module called
+`zmart_controller_plugin.py` with one function per controller command, which the controller
+accepts when handed the module directly.
 Every connection setting is optional: a driver fills in what you leave out, such as where its
 vendor software listens.
 Through the controller, every command answers `{"success": ..., "content": ...}`, and
@@ -69,7 +71,7 @@ driver loads it every time it connects:
 
 | Driver | Setup, and where it is described |
 |---|---|
-| Leica | Three notebooks: `limits/notebooks/set_limits.ipynb`, `orientation/notebooks/set_orientation.ipynb` and `calibration/notebooks/calibrate_objective_pair.ipynb`; then the adapter's `set_origin`. See its README, sections 3 to 5. |
+| Leica | Three notebooks, each in the folder of the configuration item it sets: `configuration/limits/notebooks/set_limits.ipynb`, `configuration/image_stage_registration/notebooks/set_orientation.ipynb` and `configuration/optical_calibration/notebooks/calibrate_objective_pair.ipynb`; then the adapter's `set_origin`. See its README, sections 3 to 5. |
 | Nikon | The bridge macros (`python -m zmart_drivers.nikon.nis_elements_6_10.bridge.install`) and the adapter's `set_origin`. The travel limits come from NIS-Elements itself. See "Setting it up on the microscope PC" in its README. |
 | ZEISS | The ZEN API `config.ini`, the stage limits in `stage_limits.json` (generic defaults are copied there on the first connect and must be replaced), and the adapter's `set_origin`. See "Setting it up on the microscope PC" in its README. |
 | mesoSPIM | The Remote Scripting server in mesoSPIM-control, the limits in `stage_limits.json` and `function_limits.json` (bundled defaults until you save your own), and the adapter's `set_origin`. See its [workflow manual](zmart_drivers/mesospim/WORKFLOW.md). |
@@ -92,32 +94,38 @@ pip install -e ".[leica]"
 The ZEISS driver also needs ZEISS's own `zen_api` package, which must match your ZEN version;
 its [README](zmart_drivers/zeiss/zenapi/README.md) explains how to install it.
 
-Each driver has a `zmart_controller_plugin.py` in its folder: the file the controller plugs into.
-It holds the functions the controller calls, the driver's `NAME`, and its `CONNECTION`, the
-settings for this computer. Register it once, on the microscope computer, by pointing the
-controller at that file. From then on, every session plugs the driver in by name:
+The Leica driver is installed once, on the microscope computer, by pointing the controller at its
+folder. From then on, every session connects by name:
+
+```python
+from zmart_controller import mic
+
+# Once, on the microscope computer (where you cloned this repository):
+mic.register_driver("C:/ZMART-drivers/zmart_drivers/leica/stellaris5_y42h93/navigator_expert")
+
+# In every session:
+mic.connect("stellaris")
+print(mic.get_info()["content"]["description"])
+```
+
+To change its settings on this computer, such as where images go, edit the `connection` in its
+`zmart_driver.json`. Every key may be left out; the driver then uses its own default.
+
+The other three drivers are handed to the controller as modules until they have their two files:
 
 ```python
 import zmart_controller
+from zmart_drivers.nikon.nis_elements_6_10 import zmart_controller_plugin as nikon
 
-# Once, on the microscope computer (where you cloned this repository):
-zmart_controller.register_driver("C:/ZMART-drivers/zmart_drivers/leica/stellaris5_y42h93/navigator_expert/zmart_controller_plugin.py")
-
-# In every session:
-zmart_controller.set_instrument("stellaris")
-print(zmart_controller.get_info()["content"]["description"])
+mic = zmart_controller.ZmartController(nikon, {"host": "127.0.0.1"})
 ```
 
-| Driver | Its plug-in file | `NAME` |
+| Driver | How it plugs in | Name |
 |---|---|---|
-| Leica Stellaris | `zmart_drivers/leica/stellaris5_y42h93/navigator_expert/zmart_controller_plugin.py` | `stellaris` |
-| Nikon | `zmart_drivers/nikon/nis_elements_6_10/zmart_controller_plugin.py` | `nikon` |
-| ZEISS | `zmart_drivers/zeiss/zenapi/zmart_controller_plugin.py` | `zeiss` |
-| mesoSPIM | `zmart_drivers/mesospim/zmart_controller_plugin.py` | `mesospim` |
-
-To change a driver's settings on this computer, such as where images go, edit `CONNECTION` in
-its `zmart_controller_plugin.py`, or pass them when registering:
-`zmart_controller.register_driver("…/zmart_controller_plugin.py", {"output_root": r"D:\images"})`.
+| Leica Stellaris | `zmart_drivers/leica/stellaris5_y42h93/navigator_expert/zmart_driver.json` | `stellaris` |
+| Nikon | `zmart_drivers/nikon/nis_elements_6_10/zmart_controller_plugin.py`, as a module | `nikon` |
+| ZEISS | `zmart_drivers/zeiss/zenapi/zmart_controller_plugin.py`, as a module | `zeiss` |
+| mesoSPIM | `zmart_drivers/mesospim/zmart_controller_plugin.py`, as a module | `mesospim` |
 
 The Leica driver runs on the computer that runs LAS X, because it loads Leica's interface
 directly into Python. Each driver's README explains its own installation, its setup, and how
@@ -161,9 +169,7 @@ path, so that a driver folder with a common name, such as `config`, is never imp
 of another package.
 
 The continuous-integration workflow in `.github/workflows/` runs all four suites on Linux and
-Windows, with Python 3.11 and 3.12. Six tests of the Leica suite fail and are known; its
-[release candidate review](zmart_drivers/leica/stellaris5_y42h93/navigator_expert/RELEASE_CANDIDATE_REVIEW.md)
-explains them (findings T1 to T3).
+Windows, with Python 3.11 and 3.12.
 
 ## Author
 
