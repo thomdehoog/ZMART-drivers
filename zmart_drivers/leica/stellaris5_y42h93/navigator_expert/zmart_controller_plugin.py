@@ -1,13 +1,18 @@
-r"""The Leica STELLARIS 5 driver, as the ZMART Controller plugs it in.
+r"""The Leica STELLARIS 5 driver in the older module shape, kept until the class has run on hardware.
 
-This module is the driver: it holds one function per command, under the
-names the controller looks for. Hand it to the controller on the LAS X
-computer to drive the microscope::
+The controller now plugs a driver in through ``zmart_driver.json`` and the
+``ZmartDriver`` class in ``zmart_driver.py``, both at the top of this folder;
+that is the shape to install and use. This module is the shape the
+controller accepted before: one function per command under the names the
+controller looks for, handed over directly::
 
     import zmart_controller
     import zmart_drivers.leica.stellaris5_y42h93.navigator_expert.zmart_controller_plugin as stellaris
 
-    zmart_controller.set_instrument(stellaris)
+    mic = zmart_controller.ZmartController(stellaris, {"output_root": r"D:\images"})
+
+It stays until ``zmart_driver.py`` has driven the real STELLARIS, so that the
+two can be compared on the microscope; then it goes.
 
 The optional connection dictionary is handed to :func:`connect` as it is.
 Every key may be left out, and then takes its value from ``CONNECTION`` in
@@ -23,10 +28,6 @@ the adapter:
   false only to start in plain stage coordinates, for example to capture a new
   origin when the saved one is damaged.
 - ``calibration_name`` (not set by default) picks a named calibration set.
-
-For example, to save the images in a folder of your choice::
-
-    zmart_controller.set_instrument(stellaris, {"output_root": r"D:\images"})
 
 The commands themselves live in the driver's adapter,
 ``zmart_adapter/zmart_adapter.py``. Called from there directly, each one
