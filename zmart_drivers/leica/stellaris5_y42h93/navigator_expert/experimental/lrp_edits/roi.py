@@ -97,10 +97,7 @@ import uuid
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
-from ._primitives import (
-    _set_job_attr,
-    _verify_job_attr,
-)
+from ._primitives import _set_job_attr, _verify_job_attr
 
 log = logging.getLogger(__name__)
 

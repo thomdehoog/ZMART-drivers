@@ -1,23 +1,28 @@
 # ruff: noqa: E402,I001,F401
 """Navigator Expert driver for Leica LAS X.
 
-Package layout::
+Package layout, the anatomy of a ZMART driver (``docs/driver-anatomy.md`` in
+this repository)::
 
     navigator_expert/
-    - commands/     command wrappers, dispatch, confirmation logic
-    - config/       command and reader profiles, tuning defaults
-    - connection/   session helpers and LAS X API connection
-    - readers/      API/log/hybrid state readers
-    - scanfields/   LAS X scan-field files, parsing, planning, strip/restore
-    - acquisition/  acquire-only capture, LAS X file export, OME fixes, save
-    - calibration/  image-stage + objective-pair calibration (model + defaults consumed at connect)
-    - limits/       the instrument's whole rulebook — stage envelope, objective
-                    allow-list, setter allow-lists (config + checks), templates,
-                    and the operator notebook that creates the machine-local files
-    - zmart_adapter/ the functions that plug this driver into zmart_controller
-    - zmart_controller_plugin.py     the module handed to zmart_controller.set_instrument
-    - experimental/ LRP mutation helpers without live-state readback
-    - tests/        offline unit suite + hardware validators
+    - zmart_controller_plugin.py  the module handed to the ZMART Controller (to become zmart_driver.py)
+    - zmart_adapter/      the functions behind it, one per controller command
+    - connect.py          the connect flow: open LAS X, load this microscope's configuration
+    - vendor_interface/   the only part that knows LAS X: the CAM API runtime, the API and
+                          log readers, the parsers, and the sorting of LAS X's errors
+    - dispatcher/         the engines that run an action safely: read.py, change.py, the
+                          limits gate and rulebook, pre-checks, tuning
+    - actions/            the readings (get.py) and the changes (set.py) with their
+                          confirmations and profiles
+    - procedures/         recipes built from actions: backlash, the setup measurements,
+                          and the pure algorithms they use
+    - output/             what comes out of one acquisition: LAS X export, OME, naming, save
+    - configuration/      what is measured once per microscope: limits,
+                          image_stage_registration, optical_calibration (each with its
+                          defaults and notebook), the store, the per-connection state
+    - scanfields/         LAS X scan-field files, parsing, planning, strip/restore
+    - experimental/       LRP mutation helpers without live-state readback
+    - testing/            the mock LAS X API, the offline suite, the hardware validators
 """
 
 __version__ = "6.0.0rc1"
@@ -126,19 +131,15 @@ __all__ = [
 ]
 
 # -- parsing + command mechanics
-from .readers.parsing import (
+from .vendor_interface.parsing import (
     _safe_float,
     make_changeable_copy,
     parse_format,
     parse_tile_geometry,
 )
-from .commands.envelope import _make_log_entry
-from .commands.errors import (
-    _is_transient_error,
-    _check_api_error,
-    _default_error_check,
-)
-from .readers import (
+from .dispatcher.envelope import _make_log_entry
+from .vendor_interface.errors import _is_transient_error, _check_api_error, _default_error_check
+from .dispatcher.read import (
     Reading,
     get_scan_status,
     ping,
@@ -154,8 +155,8 @@ from .readers import (
     get_lasx_settings,
     get_pending_dialog,
 )
-from .commands.confirmations import _readback
-from .commands.commands import (
+from .actions.confirmations import _readback
+from .actions.set import (
     set_zoom,
     set_scan_speed,
     set_scan_resonant,
@@ -182,15 +183,13 @@ from .commands.commands import (
     move_z,
     select_job,
 )
-from .connection.session import connect_python_client, connect_microscope
+from .connect import connect_python_client, connect_microscope
 
 # -- commands/gate - command safety gate + connect handshake
-from .commands.gate import (
-    connect_handshake as connect_limits_handshake,
-)
+from .dispatcher.gate import connect_handshake as connect_limits_handshake
 
 # -- limits/checks.py - the rulebook: stage checks + the compiled limits document
-from .limits.checks import (
+from .dispatcher.checks import (
     _stage_limits,
     set_stage_limits,
     get_stage_limits,
@@ -223,8 +222,8 @@ from .scanfields.parsers import (
 from .scanfields.planning import plan_tiles_from_geometries
 
 # -- acquisition/ - capture, file arrival, and save handling
-from .acquisition.capture import AcquisitionResult, acquire
-from .acquisition.product import (
+from .actions.acquire import AcquisitionResult, acquire
+from .output.product import (
     AcquisitionMetadata,
     ChannelMetadata,
     PlaneIndex,
@@ -233,13 +232,10 @@ from .acquisition.product import (
     SavedAcquisition,
     VendorMetadataSource,
 )
-from .acquisition.save import save_source_root, save
+from .output.save import save_source_root, save
 
 # -- experimental/lrp_edits/ - LRP mutation helpers
-from .experimental.lrp_edits.scan import (
-    lrp_set_zoom,
-    reset_pan,
-)
+from .experimental.lrp_edits.scan import lrp_set_zoom, reset_pan
 from .experimental.lrp_edits.roi import (
     lrp_clear_rois,
     lrp_add_roi,

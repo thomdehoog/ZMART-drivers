@@ -56,7 +56,7 @@ Scope of v1 (grow as needed):
 Live-validation note: the z model assumes the two drives combine
 *additively with the same sign*. The arithmetic, readback keys/units,
 and sign convention are validated against a live CAM by
-``tests/hardware/validate_zmart_adapter.py`` (galvo leg). The *physical*
+``testing/hardware/validate_zmart_adapter.py`` (galvo leg). The *physical*
 additivity of the two drives on a real objective still wants one hardware
 pass (park the galvo at a known offset, move z-wide, check the focus sum)
 before trusting large z moves.
@@ -83,20 +83,20 @@ try:  # driver version for embedded export state; never fail acquire over it
 except Exception:  # noqa: BLE001 -- best-effort provenance
     _DRIVER_VERSION = None
 
-from .. import orientation as _orientation
-from .. import readers as _readers
+from .. import connect as _session
 from .. import scanfields as _scanfields
-from ..acquisition import capture as _capture
-from ..acquisition import save as _save
-from ..acquisition.naming import Naming, run_hash
-from ..commands import commands as _commands
-from ..commands import gate as _gate
-from ..commands import routines as _motion
-from ..config import machine as _machine
-from ..connection import session as _session
-from ..connection import session_state as _session_state
-from ..readers.derived import z_um_from_settings as _z_um_from_settings
-from ..readers.parsing import parse_tile_geometry as _parse_tile_geometry
+from ..actions import acquire as _capture
+from ..actions import set as _commands
+from ..actions.derived import z_um_from_settings as _z_um_from_settings
+from ..configuration import image_stage_registration as _orientation
+from ..configuration import session_state as _session_state
+from ..configuration import store as _machine
+from ..dispatcher import gate as _gate
+from ..dispatcher import read as _readers
+from ..output import save as _save
+from ..output.naming import Naming, run_hash
+from ..procedures import backlash as _motion
+from ..vendor_interface.parsing import parse_tile_geometry as _parse_tile_geometry
 from . import info as _info
 
 log = logging.getLogger(__name__)
@@ -404,7 +404,7 @@ def _objective_delta_um(handle: ZmartHandle, current_objective: dict | None) -> 
     # calibration/core/model.py — shared with the driver's swap-time
     # compensation, so the two layers can never drift apart. Imported
     # lazily, matching the connection layer's calibration imports.
-    from ..calibration.core import model as _cal_model
+    from ..configuration.optical_calibration import model as _cal_model
 
     try:
         return _cal_model.translation_delta_um(handle.translations, origin_slot, current_slot)
@@ -516,7 +516,7 @@ def _setup_readiness(
     if not limits or limits.get("is_fallback") or limits.get("source") != "machine":
         issues.append(
             f"machine-specific limits are not active (got {limits}); publish this "
-            "machine's measured envelope with limits/notebooks/set_limits.ipynb first"
+            "machine's measured envelope with configuration/limits/notebooks/set_limits.ipynb first"
         )
     if not orientation.get("measured"):
         issues.append(

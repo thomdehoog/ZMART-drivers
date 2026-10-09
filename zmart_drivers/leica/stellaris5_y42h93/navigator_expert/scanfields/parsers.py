@@ -51,12 +51,12 @@ import xml.etree.ElementTree as ET
 from collections import defaultdict
 from pathlib import Path
 
-from ..readers.parsing import normalize_unit_mojibake
+from ..vendor_interface.parsing import normalize_unit_mojibake
 from ._convert import _to_float, _to_int
 
 # parse_lrp lives in lrp.py; re-exported here so the (untouched) experimental
 # lrp_edits package can keep importing it from scanfields.parsers.
-from .lrp import _get_job_names, parse_lrp  # noqa: F401
+from .lrp import _get_job_names, parse_lrp
 from .planning import (
     UNASSIGNED_JOB,
     has_lasx_tile_count_tags,
@@ -125,7 +125,7 @@ def _get_tile_sizes_from_reader(client, job_names):
     Returns:
         Dict ``{job_name: tile_size_um}``.
     """
-    from ..readers import get_job_settings
+    from ..dispatcher.read import get_job_settings
 
     sizes = {}
     for jn in job_names:

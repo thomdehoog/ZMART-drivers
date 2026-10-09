@@ -14,7 +14,7 @@ import shutil
 import time
 import xml.etree.ElementTree as ET
 
-from ..acquisition.files import _wait_file_stable
+from ..output.files import _wait_file_stable
 from .files import (
     STRIPPED_LRP,
     STRIPPED_RGN,
