@@ -71,7 +71,7 @@ my_driver/
     procedures/
     data_handling/
     configuration/
-        machine_description/
+        machine_description/   each item: default.json, its check, and the notebook that sets it
         image_stage_registration/
         origin/
         limits/
@@ -85,7 +85,6 @@ my_driver/
         hardware/              checks that only run at the microscope
         data/                  sample vendor files, logs, example configuration
     experimental/              ideas that are not yet trusted on hardware
-    notebooks/                 the setup notebooks: limits, orientation, calibration, origin
     README.md
 ```
 
@@ -422,7 +421,13 @@ registration.
   configuration folder, which `zmart_controller.registry.config_root()` names
   (`C:\ProgramData\zmart-microscopy` on Windows). A malformed file is refused,
   not guessed at. Saved copies never go into the repository.
-- **A notebook** that walks the operator through setting it.
+- **A notebook** in the item's folder that walks the operator through
+  setting it. The notebook holds no logic of its own: measuring the item is
+  a procedure (part 4), and the notebook only calls it, shows the result,
+  and saves it. An interface can then do the same setup later by calling the
+  same procedure. The mock has no notebooks yet; it records its origin
+  through `procedures.record_origin` and saves through `configuration.save`,
+  which is what such a notebook would call.
 
 **Order at connect.** Connecting is making the `ZmartDriver` (part 7): its
 `__init__` opens the vendor software and loads the configuration. Each item
