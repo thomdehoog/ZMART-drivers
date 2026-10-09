@@ -45,7 +45,7 @@ only uses the parts below it.
   ───────────────────────────────────────────────────────────────
   vendor software (LAS X, NIS-Elements, ZEN, mesoSPIM-control)
 
-  alongside:  5 Data handling   6 Configuration   8 Testing
+  alongside:  5 Output   6 Configuration   8 Testing
 ```
 
 The folder layout inside a driver, which the mock follows exactly:
@@ -69,7 +69,18 @@ my_driver/
         get.py                 the readings: which primitive, what the value means
         set.py                 the changes: which primitive, how to confirm it
     procedures/
-    data_handling/
+        autofocus.py           one file per recipe, for experiments and for setup alike
+        measure_orientation.py
+        calibrate_objectives.py
+        record_origin.py
+        focus_score.py         the pure algorithms the recipes use, until the shared package takes them
+        registration.py
+    output/                    what comes out of one acquire call
+        collect.py             find the vendor's product and wait until it is complete
+        ome_tiff.py            convert to the standard formats
+        ome_zarr.py
+        save.py                name by position label, never overwrite, attach the metadata
+        command_log.py         the log of what was asked and what happened, saved beside the images
     configuration/
         machine_description/   each item: default.json, its check, and the notebook that sets it
         image_stage_registration/
@@ -357,18 +368,43 @@ positions repeat), or parking the z-galvo at zero while keeping the focus.
   without any extra effort.
 - **Each procedure describes itself** with a name and a plain-language
   description. That is what `get_procedures` lists and `run_procedure` runs.
-- A procedure that needs image analysis, such as a software autofocus, uses
-  the shared algorithms (see "Shared across drivers" below).
+- **The setup measurements are procedures too.** Measuring the image-to-stage
+  registration, calibrating an objective pair and recording the origin all
+  move the stage and take pictures, so they are recipes like any other. Each
+  one ends by saving its result into the configuration (part 6), and the
+  item's notebook does nothing but call it.
+- **The pure algorithms live here, as plain modules**, next to the recipes
+  that use them: the focus score, the image registration. They take images
+  and numbers and return numbers, and never touch a microscope, so they can
+  be tested on sample images alone. Nothing in them is specific to one
+  microscope, which is why they will move to the shared package once a
+  second driver uses them (see "Shared across drivers" below). The mock has
+  `procedures/focus_score.py` this way.
 
-## 5. Data handling
+## 5. Output
 
-**Purpose.** To turn what the microscope produced into ZMART's product, and to
-say exactly where it was saved. "Data" here means the image data and the
-metadata that travels with it. Configuration is not data in this sense; it
+**Purpose.** To turn what the microscope produced for one `acquire` call into
+ZMART's product of that call, and to say exactly where it was saved. The
+product is the image data in a standard format, the metadata that travels
+with it, and the log of how it came about. Configuration is not output; it
 has its own part.
 
 Acquiring the image is a change (part 3): it starts the capture and
-confirms that the capture finished. Data handling starts after that.
+confirms that the capture finished. The output part starts after that.
+
+**Who organises what.** Two parties organise the data, and the line between
+them matters. The driver organises *one acquisition*: it guarantees that a
+single call's product has the same shape on every microscope, a standard
+format, named after the position label, never overwriting, with a plane
+table and a log beside it. The workflow organises *the experiment*: where
+acquisitions go, how they group and in which order is the experiment's
+layout, which the driver only receives, as `output_root` and, if the
+workflow wants, a `folder` setting. The analysis engine and the viewer read
+across acquisitions, so that layout has to be one the workflow controls,
+not one each driver invents. For the same reason the kind of acquisition, a
+single image, a z-stack, a time series, is not a folder level: it is
+already in the plane table, where the z-stack has several `z` values and the
+time series several `t`.
 
 **Responsibilities.**
 
@@ -385,8 +421,8 @@ confirms that the capture finished. Data handling starts after that.
    state, and the pixel size.
 6. **Keep the command log**: for each acquisition, what was asked, what
    happened, how many attempts it took, and whether it was confirmed. The
-   dispatchers already produce this information; data handling saves it next
-   to the images so the experiment can be traced afterwards.
+   dispatchers already produce this information; the output part saves it
+   next to the images so the experiment can be traced afterwards.
 7. **Report** what was saved, in the two lists `acquire` answers with:
    `files`, the path of every file, and `planes`, one entry per image plane
    with its file, its channel, depth and time index, and the stage position
@@ -400,6 +436,12 @@ with empty lists and `False`.
 
 **Purpose.** To hold everything the person at the microscope sets up and
 saves, and to load it every time the driver connects.
+
+This part holds data, the checks on that data, and the coordinate arithmetic,
+and nothing that touches an image or moves the stage. Measuring an item is a
+procedure (part 4), which writes its result here. The dependency runs one
+way: procedures know the configuration, the configuration knows nothing
+about procedures.
 
 | Folder | What it holds | How often it changes |
 |---|---|---|
@@ -500,8 +542,8 @@ methods, and each one only puts the parts above to work:
 | `set_xyz` | The change for position (part 3), then `get_xyz` | The same as `get_xyz`, read from the microscope once the stage has arrived |
 | `get_state` | The readings for the settings | `True, (changeable, observed)`: the settings `set_state` can apply, and what can only be read |
 | `set_state` | One change per setting | `True, applied`: what took |
-| `get_acquisition_settings` | The choices data handling offers (part 5) | `True, {name: {"options": ..., "active": ...}}` |
-| `acquire` | The change for acquisition, then data handling | `True, (files, planes)`: where everything was saved |
+| `get_acquisition_settings` | The choices the output part offers (part 5) | `True, {name: {"options": ..., "active": ...}}` |
+| `acquire` | The change for acquisition, then the output part | `True, (files, planes)`: where everything was saved |
 | `get_procedures` | The procedures' own descriptions (part 4) | `True, {name: {"description": ...}}` |
 | `run_procedure` | One procedure | `True, name` |
 
@@ -613,6 +655,12 @@ workflows can be tried offline on it. Python packages often leave a folder
 called `tests/` out when they are installed, and then the mock API would be
 missing exactly where someone wants it.
 
+A driver's tests live inside the driver, in `unit/` and `hardware/`, so that
+each driver has one suite that runs on its own. The mock is the one
+deliberate exception: it lives in the controller repository, whose tests all
+sit at that repository's top level, so its tests are in `tests/mock_tests/`
+there, and only its mock API is in `testing/`.
+
 **Rules.**
 
 - **The driver never imports from `testing/`.** Only tests and the mock driver
@@ -650,14 +698,15 @@ of its own: everything in it except `tuning.py` is written once for every
 microscope, so the folder can move to the shared package as a whole, and
 each driver keeps only its tuning.
 
-**The algorithms** are the clearest case today. Today they live inside the Leica
-driver (`algorithms/registration.py` and `algorithms/focus.py`), but nothing
-in them is Leica-specific: phase correlation between two images, a vote
-across four registration methods, and the Brenner sharpness score work the
-same on any microscope. In Leica they are used only by setup (the
-orientation measurement and the objective calibration), and every other
-driver will need the same for its own setup notebooks. The mock's autofocus
-carries its own copy of the focus score for now, marked as such.
+**The algorithms** are the clearest case today. In a driver they live in
+`procedures/` as plain modules (part 4); Leica has them in a folder of their
+own, `algorithms/registration.py` and `algorithms/focus.py`. Nothing in them
+is Leica-specific: phase correlation between two images, a vote across four
+registration methods, and the Brenner sharpness score work the same on any
+microscope. In Leica they are used by the setup procedures (the orientation
+measurement and the objective calibration), and every other driver will need
+the same for its own. The mock, which lives in the controller repository and
+depends on nothing, keeps its own copy of the focus score either way.
 
 **Rules for the shared package.**
 
@@ -678,7 +727,7 @@ What is the same in every driver, and what differs:
 | Dispatcher | Both engines, the limits gate and the rules | `tuning.py` |
 | Actions | The shape of a definition | Which primitive, what the value means, the target, the confirmation |
 | Procedures | The "actions only" rule; the algorithms | The recipes |
-| Data handling | OME-TIFF and OME-Zarr writing, naming, the command log | Finding and reading the vendor's raw output |
+| Output | OME-TIFF and OME-Zarr writing, naming, the command log | Finding and reading the vendor's raw product |
 | Configuration | Load, check and save; the notebook pattern | Default values; the machine description |
 | `ZmartDriver` | The contract: the methods, their answers and the three outcomes; `validate_driver` | Mapping actions onto those methods; the `connection` keys |
 | Testing | The dispatcher and error-rule tests; offline before hardware | The mock API; the hardware checks |
