@@ -371,6 +371,16 @@ def phase_readonly(client, rec):
         log_missing=log_selected is None,
     )
 
+    astat = drv.get_scan_status(client, mode="api")
+    lstat = L.get_scan_status(snap)
+    rec.parity(
+        "get_scan_status (idle-sense)",
+        ("Idle" in str(astat)) == ("Idle" in str(lstat)),
+        f"api={astat!r} log={lstat!r}"
+        + (f" log_age={ag['scan_status']:.0f}s" if ag["scan_status"] else ""),
+        log_missing=lstat in (None, "Unknown"),
+    )
+
     ahw, _, _ = _timed(lambda: drv.get_hardware_info(client, mode="api"))
     lhw = L.get_hardware_info(snap)
     hw_ok = (

@@ -118,9 +118,8 @@ class StateReaderProfile:
     hardware_info_mode: str = "hybrid"
     hardware_info_log_max_age_s: float = 2.0
 
-    # scan_status is API-only like jobs: the log writes it only when it
-    # changes, and only the API decides whether a command may fire.
-    scan_status_mode: str = "api"
+    scan_status_mode: str = "hybrid"
+    scan_status_log_max_age_s: float = 0.5
 
 
 LOG_READER = LogReaderProfile()

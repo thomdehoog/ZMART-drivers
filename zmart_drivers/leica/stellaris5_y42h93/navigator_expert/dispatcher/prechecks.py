@@ -30,18 +30,22 @@ def check_idle(client):
     """Wait for the scanner to be idle, by the one rule; result dict.
 
     The scanner status is an ordinary reading under the one rule, four
-    windows of three seconds. It is an API-only reading in the capability
-    table: whether a command may fire is decided by the API (the README's
-    rule for command-gating reads), which answers on demand, while the LAS X
-    log writes the status only when it changes. A scanner that stays busy
-    fails the check after four windows instead of waiting forever.
+    windows of three seconds, asked of the API alone. Every other reading of
+    the status races the API against the log; this one decides whether a
+    command may fire, which is the API's to decide (the README's rule for
+    command-gating reads). The log writes the status only when it changes,
+    so its "idle" goes stale half a second after a scan ends, and a log-only
+    run would otherwise fail every move. A scanner that stays busy fails the
+    check after four windows instead of waiting forever.
 
     Returns:
         {"success": True, "logs": [...]} once the scanner reads idle,
         {"success": False, "logs": [...]} when it did not within four windows.
     """
     t0 = time.perf_counter()
-    reading = _readers.get_scan_status(client, diagnostics=True, accept=lambda s: "Idle" in s)
+    reading = _readers.get_scan_status(
+        client, mode="api", diagnostics=True, accept=lambda s: "Idle" in s
+    )
     if reading is not None and reading.error is None:
         return {"success": True, "logs": []}
     status = None if reading is None else reading.value

@@ -293,8 +293,9 @@ something is sent again — a command is fired again, an unanswered read is requ
 message is delivered again. The driver looks again every `POLL_S` (0.1 s) and checks for an answer
 already requested every `ANSWER_POLL_S` (0.01 s). After four windows a reading is unknown, a change
 unconfirmed, a delivery failed. The idle check before a command is an ordinary reading under the same
-rule. The scanner status is API-only, like the job list: the log writes it only when it changes, and
-the API decides whether a command fires. Outside the rule, by decision: acquisition (sent once, never again, watched for as long as the
+rule, asked of the API alone: whether a command fires is the API's to decide. Every other reading
+races the API against the log, a backup for each, because what the log shows can differ between
+machines and LAS X versions; only the job list is API-only (the log's list is incomplete). Outside the rule, by decision: acquisition (sent once, never again, watched for as long as the
 scan takes), the one-second wait for LAS X's error report after a command, and waits on files being
 written. **Freshness rule:** a fresh-by-age
 *log* value must never decide whether a command fires, how it is parameterized, whether it confirms,
