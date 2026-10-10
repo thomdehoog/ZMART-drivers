@@ -234,3 +234,18 @@ Decided 2026-10-10:
    not refresh the z position in the job settings, so the driver saves the experiment and reads
    `ZPosition` from the `.lrp` (`actions/derived.py`, `_z_um_from_saved_experiment`). That save waits
    up to 5 s (`scanfields/files.py`, `save_and_read_lrp`): the last save wait outside the rule.
+3. **Not yet run on the microscope.** What is on `main` ran on the STELLARIS as `run_ci.py
+   --hardware` and the burst probes at `877dda5`; the last full run (`--hardware --full`) was at
+   `0368f20`. Still to run there, when the occasion comes:
+   - **a full run on the latest code:** `run_ci.py --hardware --full`, which also covers the two code
+     commits after `0368f20` (the scanner status racing with the idle check on the API, and the
+     shared log parse);
+   - **an objective change during a job switch,** with the stage move that keeps the sample point:
+     no switch has changed the objective yet, as the three jobs on the microscope share one. Needs
+     two jobs on different objectives, and the validator's `--allow-objective`;
+   - **autofocus:** `run_ci` skips it; the adapter validator runs it with `--allow-autofocus`;
+   - **the z readback from the `.lrp`,** for a job whose z-stack runs on the drive being read
+     (point 2 above);
+   - **the stage limits from four real corners,** with the new `set_limits` notebook
+     (`configuration/limits/notebooks/set_limits.ipynb`): drive the stage to each safe corner and
+     record it.
