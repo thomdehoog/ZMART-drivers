@@ -1,8 +1,14 @@
-"""Tests for the driver-only adaptive XY limits notebook support."""
+"""Tests for the XY limits measured at four corners of the stage.
+
+The operator drives the stage to each safe corner (joystick or LAS X) and
+records it in the limits notebook. The procedure reads the stage position
+from the API at each corner and computes the inclusive rectangle; it never
+touches the LAS X scanning template.
+"""
 
 from __future__ import annotations
 
-from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 
@@ -16,37 +22,6 @@ POINTS = [
     {"x_um": 29_900.0, "y_um": 40_000.0},
     {"x_um": 10_100.0, "y_um": 39_900.0},
 ]
-
-
-def _parsed(points=POINTS):
-    return {
-        "geometries": {
-            f"P{index}": {"type": "Point", "center_um": point}
-            for index, point in enumerate(points, start=1)
-        },
-        "acquisition_positions": {},
-        "focus_points": [],
-        "autofocus_points": [],
-    }
-
-
-def test_boundary_points_require_exactly_four_clean_point_markers():
-    points = adaptive.boundary_points_from_template(_parsed())
-    assert len(points) == 4
-    assert points[0] == {"x_um": 10_000.0, "y_um": 20_000.0}
-
-    with pytest.raises(RuntimeError, match="exactly 4"):
-        adaptive.boundary_points_from_template(_parsed(POINTS[:3]))
-
-
-def test_boundary_points_refuse_other_template_content():
-    parsed = _parsed()
-    parsed["geometries"]["scan"] = {
-        "type": "Rectangle",
-        "center_um": {"x_um": 20_000.0, "y_um": 30_000.0},
-    }
-    with pytest.raises(RuntimeError, match="clean template"):
-        adaptive.boundary_points_from_template(parsed)
 
 
 def test_xy_limits_are_the_four_point_bounding_box():
@@ -72,37 +47,77 @@ def test_xy_limits_refuse_points_outside_the_maximum_stage_envelope():
         adaptive.xy_limits_from_points(outside)
 
 
-def test_capture_saves_archives_then_parses_without_mutating_template(monkeypatch, tmp_path):
+def _stage_at(positions):
+    """Patch the stage reading to answer *positions* in turn; returns (patch, calls)."""
+    answers = iter(positions)
     calls = []
-    client = object()
-    for filename in (
-        adaptive.TEMPLATE_XML,
-        adaptive.TEMPLATE_RGN,
-        adaptive.TEMPLATE_LRP,
-    ):
-        (tmp_path / filename).write_text(filename, encoding="utf-8")
-    monkeypatch.setattr(adaptive, "find_scanning_templates_dir", lambda: tmp_path)
-    monkeypatch.setattr(
-        adaptive,
+
+    def get_xy(client, **kwargs):
+        calls.append(kwargs)
+        return next(answers)
+
+    return patch.object(adaptive._readers, "get_xy", side_effect=get_xy), calls
+
+
+def test_four_recorded_corners_give_the_limits():
+    stage, calls = _stage_at([{**point, "x": 0.0, "y": 0.0} for point in POINTS])
+    corners = adaptive.CornerRecorder(object())
+    with stage:
+        for number in (1, 2, 3, 4):
+            corners.record(number)
+    captured = corners.limits()
+
+    assert captured["points_um"] == POINTS
+    assert captured["limits"] == {
+        "x_um": {"range": [10_000.0, 30_000.0]},
+        "y_um": {"range": [20_000.0, 40_000.0]},
+    }
+    assert [call.get("mode") for call in calls] == ["api"] * 4  # saved for good: the API
+
+
+def test_recording_a_corner_again_replaces_it():
+    moved = {"x_um": 9_000.0, "y_um": 20_000.0}
+    stage, _ = _stage_at([*POINTS, moved])
+    corners = adaptive.CornerRecorder(object())
+    with stage:
+        for number in (1, 2, 3, 4):
+            corners.record(number)
+        corners.record(1)
+    assert corners.limits()["points_um"][0] == moved
+    assert corners.limits()["limits"]["x_um"] == {"range": [9_000.0, 30_000.0]}
+
+
+def test_the_limits_need_all_four_corners():
+    stage, _ = _stage_at(POINTS[:3])
+    corners = adaptive.CornerRecorder(object())
+    with stage:
+        for number in (1, 2, 3):
+            corners.record(number)
+    with pytest.raises(RuntimeError, match="corner 4 is not recorded"):
+        corners.limits()
+
+
+@pytest.mark.parametrize("number", [0, 5, "1"])
+def test_a_corner_is_numbered_1_to_4(number):
+    with pytest.raises(ValueError, match="corner number must be 1, 2, 3 or 4"):
+        adaptive.CornerRecorder(object()).record(number)
+
+
+def test_an_unreadable_stage_position_is_refused_not_recorded():
+    stage, _ = _stage_at([None])
+    corners = adaptive.CornerRecorder(object())
+    with stage, pytest.raises(RuntimeError, match="could not read the stage position"):
+        corners.record(1)
+    with pytest.raises(RuntimeError, match="corner 1 is not recorded"):
+        corners.limits()
+
+
+def test_measuring_the_limits_never_touches_the_scanning_template():
+    """Positions are never made in the Navigator Expert, for the setup neither."""
+    for name in (
+        "capture_adaptive_xy_limits",
+        "boundary_points_from_template",
         "save_experiment",
-        lambda *args, **kwargs: calls.append(("save", args, kwargs)) or {"success": True},
-    )
-    monkeypatch.setattr(
-        adaptive,
         "parse_scan_positions",
-        lambda *args, **kwargs: calls.append(("parse", args, kwargs)) or _parsed(),
-    )
-    captured = adaptive.capture_adaptive_xy_limits(client)
-    try:
-        assert captured["limits"]["x_um"]["range"] == [10_000.0, 30_000.0]
-        assert "markers_removed" not in captured
-        assert [name for name, _args, _kwargs in calls] == ["save", "parse"]
-        assert calls[0][1][0] is client
-        assert calls[1][2]["client"] is client
-        archived = [Path(path) for path in captured["template_paths"]]
-        assert calls[1][1][0] == archived[0].parent
-        assert calls[1][1][0] != tmp_path
-        assert {path.suffix for path in archived} == {".xml", ".rgn", ".lrp"}
-        assert all(path.read_text(encoding="utf-8") == path.name for path in archived)
-    finally:
-        captured["_template_archive"].cleanup()
+    ):
+        assert not hasattr(adaptive, name), name

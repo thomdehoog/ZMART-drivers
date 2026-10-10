@@ -44,6 +44,8 @@ READER_SOURCE_POLICY_MODULES = {
     # Calibration geometry is saved for good, so it is read from the API
     # and never from a log entry that may be stale (review finding M4).
     Path("procedures/calibration_common.py"),
+    # The stage limits are saved for good too: the corners are read from the API.
+    Path("procedures/measure_limits.py"),
 }
 EXPLICIT_READER_MODE = re.compile(r"\bmode\s*=\s*['\"](?:api|log|hybrid)['\"]")
 LOW_LEVEL_READER_CALL = re.compile(r"(?<!\w)_?(?:api_reader|log_reader)\.")
