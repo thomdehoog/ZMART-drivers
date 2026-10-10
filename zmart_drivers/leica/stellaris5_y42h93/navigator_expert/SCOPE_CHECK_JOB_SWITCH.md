@@ -245,3 +245,24 @@ about a second instead of 10 to 12 s.
 
 - the three probe runs' lines for `moves done`, the two switches, and any `SLOW` line;
 - the time of `set_state: switch job` in the `run_ci.py --hardware` run, and its result.
+
+### Confirmed on the microscope, 2026-10-11, 00:40
+
+On the STELLARIS at `877dda5`, three runs of `probe_switch_after_moves.py --yes` straight after
+each other, then `run_ci.py --hardware`.
+
+| | Threads alive after the burst | Switch after the burst | Switch back |
+|---|---:|---:|---:|
+| probe run 1 | 4 | 1.02 s | 0.98 s |
+| probe run 2 | 4 | 1.12 s | 0.99 s |
+| probe run 3 | 4 | 1.05 s | 1.09 s |
+
+No `SLOW` line in any run, no `NONE`, and every reading answered in 0.16 s or less. For comparison,
+before the fix on the same microscope the burst left about sixty threads alive and the switch after
+it took 8.3 to 10.6 s.
+
+`run_ci.py --hardware`: **PASSED**, all eight acceptance points. In the adapter step
+`set_state: switch job` took **0.83 s**, against 12.6 s in the full run and 10.5 s in the quick run
+before the fix. The hybrid end-to-end validator passed with every change confirmed.
+
+The question this document opened is closed.
