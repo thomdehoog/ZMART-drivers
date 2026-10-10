@@ -183,20 +183,18 @@ def _api_worker(spec, client, api_kwargs, *, deadline, stop, answers):
     """Request the read, and request it again every ``POLL_S`` until stopped or the window ends.
 
     One request at a time per connection: a busy connection is waited for,
-    never skipped. The request's own check for its answer ends at the window's
-    end or as soon as the watch stops, so an abandoned request frees the
-    connection promptly.
+    never skipped. A request already sent is seen through to its answer or
+    the window's end, even when the race is won meanwhile: abandoning
+    questions mid-flight, which happened on every look the log won, made
+    LAS X drop the next one under a burst of commands (LAS X simulator,
+    2026-10-11). Once the race is won, no new request is sent.
     """
     key = _client_api_key(client)
     while not stop.is_set() and time.monotonic() < deadline:
         if not _API_TURNS.take(key, until=deadline, stop=stop):
             return
         try:
-            reading = _api_read(
-                lambda: spec.api_fn(
-                    client, deadline=deadline, should_stop=stop.is_set, **api_kwargs
-                )
-            )
+            reading = _api_read(lambda: spec.api_fn(client, deadline=deadline, **api_kwargs))
         finally:
             _API_TURNS.give_back(key)
         answers.put(reading)
@@ -205,8 +203,13 @@ def _api_worker(spec, client, api_kwargs, *, deadline, stop, answers):
 
 
 def _log_worker(spec, job_name, max_age_s, *, deadline, stop, answers):
-    """Read the LAS X log, and again every ``POLL_S`` until stopped or the window ends."""
-    while True:
+    """Read the LAS X log, and again every ``POLL_S`` until stopped or the window ends.
+
+    A worker whose race is already won starts no parse. Each read takes the
+    shared live snapshot (``log_reader.LIVE_LOG``), so however many readings
+    race at once, the log is parsed by one parse at a time.
+    """
+    while not stop.is_set():
         answers.put(_snapshot_read(spec, max_age_s=max_age_s, job_name=job_name))
         if stop.wait(tuning.POLL_S) or time.monotonic() >= deadline:
             return

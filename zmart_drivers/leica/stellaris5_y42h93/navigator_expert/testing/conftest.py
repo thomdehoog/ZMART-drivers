@@ -102,6 +102,22 @@ def fast_timing_windows(monkeypatch):
     monkeypatch.setattr(dispatch, "ECHO_SETTLE_TIMEOUT_S", 0.05)
 
 
+@pytest.fixture(autouse=True)
+def fresh_live_log(monkeypatch):
+    """Give every test its own shared live-log parse.
+
+    The live LAS X log is parsed once per ``POLL_S`` and shared by every
+    reader (``log_reader.LIVE_LOG``); without a fresh one per test, a test
+    that points the reader at its own files could be handed the previous
+    test's snapshot.
+    """
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface import (
+        log_reader,
+    )
+
+    monkeypatch.setattr(log_reader, "LIVE_LOG", log_reader.SharedParse())
+
+
 @pytest.fixture
 def general_workflow_data(tmp_path):
     """Return a writable temp copy of the canonical offline workflow bundle."""
