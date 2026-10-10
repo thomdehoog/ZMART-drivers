@@ -243,6 +243,7 @@ def test_acquire_backlash_rounds_through_the_controller_seam(tmp_path, rounds, c
 
         def fake_correct_backlash(client, **kwargs):
             order.append(("backlash", client))
+            return {"success": True, "confirmed": True}
 
         def fake_capture(client, job, **kwargs):
             order.append(("capture", job))

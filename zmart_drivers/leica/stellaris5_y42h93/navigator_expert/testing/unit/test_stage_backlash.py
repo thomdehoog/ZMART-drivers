@@ -132,10 +132,9 @@ class TestCorrectBacklash:
         boundary = [("sleep", 0.1)]
         assert calls == pass_moves + boundary + pass_moves + boundary + pass_moves
 
-    def test_an_unconfirmed_leg_raises(self):
-        """success without confirmed means "accepted, no readback proof" —
-        continuing would let the following capture fire while the stage is
-        still travelling."""
+    def test_an_unconfirmed_leg_is_confirmed_by_one_more_look(self):
+        """success without confirmed means "accepted, no readback proof". The
+        stage is read once more; when it stands at the target, the leg counts."""
         results = iter(
             [
                 {"success": True, "confirmed": True},
@@ -147,15 +146,62 @@ class TestCorrectBacklash:
             patch.object(
                 stage_movement._readers,
                 "get_xy",
-                return_value={"x_um": 0.0, "y_um": 0.0},
+                return_value={"x_um": 0.0, "y_um": 0.0},  # at the target (0, 0)
             ),
             patch.object(
                 stage_movement._commands, "move_xy", side_effect=lambda *a, **k: next(results)
             ),
             patch.object(stage_movement.time, "sleep"),
         ):
-            with pytest.raises(RuntimeError, match="unconfirmed"):
-                stage_movement.correct_backlash(client=None)
+            outcome = stage_movement.correct_backlash(client=None, passes=1)
+        assert outcome == {"success": True, "confirmed": True, "passes": 1}
+
+    def test_an_unconfirmed_leg_the_readback_contradicts_raises(self):
+        """The readback shows the stage somewhere else: that is a real failure."""
+        readings = iter(
+            [
+                {"x_um": 0.0, "y_um": 0.0},  # the position read at the start
+                {"x_um": 700.0, "y_um": 700.0},  # the later look: not at the target
+            ]
+        )
+        results = iter(
+            [
+                {"success": True, "confirmed": True},
+                {"success": True, "confirmed": False},
+            ]
+        )
+        with (
+            patch.object(
+                stage_movement._readers, "get_xy", side_effect=lambda *a, **k: next(readings)
+            ),
+            patch.object(
+                stage_movement._commands, "move_xy", side_effect=lambda *a, **k: next(results)
+            ),
+            patch.object(stage_movement.time, "sleep"),
+        ):
+            with pytest.raises(RuntimeError, match="contradicted"):
+                stage_movement.correct_backlash(client=None, passes=1)
+
+    def test_an_unconfirmed_leg_that_cannot_be_read_is_reported_not_raised(self):
+        """No readback at all: the takeup carries on and says it is unconfirmed."""
+        readings = iter([{"x_um": 0.0, "y_um": 0.0}, None])
+        results = iter(
+            [
+                {"success": True, "confirmed": True},
+                {"success": True, "confirmed": False},
+            ]
+        )
+        with (
+            patch.object(
+                stage_movement._readers, "get_xy", side_effect=lambda *a, **k: next(readings)
+            ),
+            patch.object(
+                stage_movement._commands, "move_xy", side_effect=lambda *a, **k: next(results)
+            ),
+            patch.object(stage_movement.time, "sleep"),
+        ):
+            outcome = stage_movement.correct_backlash(client=None, passes=1)
+        assert outcome == {"success": True, "confirmed": False, "passes": 1}
 
     def test_a_failed_leg_in_a_later_pass_stops_the_takeup(self):
         """A pass-2 failure must raise and fire no further moves — silently

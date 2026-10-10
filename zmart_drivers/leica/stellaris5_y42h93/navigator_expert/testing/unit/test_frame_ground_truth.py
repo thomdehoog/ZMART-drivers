@@ -94,6 +94,7 @@ def _running(sim: SimScope):
 
     def fake_arrive(client, x_um, y_um):
         sim.x, sim.y = float(x_um), float(y_um)
+        return {"success": True, "confirmed": True}
 
     def fake_move_z(client, job, z, unit="um", z_mode="galvo", **_k):
         if z_mode == "zwide":

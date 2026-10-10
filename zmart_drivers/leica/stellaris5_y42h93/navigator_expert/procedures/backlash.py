@@ -39,17 +39,50 @@ BACKLASH_SETTLE_MS = 100
 BACKLASH_DEFAULT_ROUNDS = 3
 
 
+def _leg(client, result, x_um, y_um, what, tolerance_um=20.0):
+    """Judge one move leg: refused or failed raises; unconfirmed gets one more look.
+
+    A leg that LAS X refused, or that failed outright, raises, because
+    nothing has happened or something has gone wrong. A leg that was sent
+    and accepted but whose readback never matched in time is not a failure
+    yet: the stage is read once more, and when it stands at the target the
+    leg counts as confirmed late. When it reads somewhere else, the leg is
+    contradicted, and that raises. When it cannot be read at all, the leg
+    stays unconfirmed, a warning says so, and the recipe carries on; the
+    caller records it, so the workflow is told rather than stopped.
+
+    Returns ``True`` when the leg is confirmed, ``False`` when it is not.
+    """
+    if not result or not result.get("success"):
+        raise RuntimeError(f"{what} failed: {result}")
+    if result.get("confirmed"):
+        return True
+    pos = _readers.get_xy(client)
+    if pos is not None:
+        dx, dy = abs(float(pos["x_um"]) - x_um), abs(float(pos["y_um"]) - y_um)
+        if dx <= tolerance_um and dy <= tolerance_um:
+            log.info("%s confirmed on a later readback", what)
+            return True
+        raise RuntimeError(
+            f"{what} contradicted by the readback: the stage reads "
+            f"({pos['x_um']:.2f}, {pos['y_um']:.2f}), not ({x_um:.2f}, {y_um:.2f})"
+        )
+    log.warning("%s was not confirmed and the stage could not be read; carrying on", what)
+    return False
+
+
 def arrive_xy(client, x_um, y_um):
     """Arrive at ``(x_um, y_um)`` with the backlash taken up.
 
     Approach through an overshoot waypoint in -X -Y, settle, then make
-    the final +X +Y leg. Two moves, no position read. Near the
-    envelope's lower edge the waypoint is clamped inside the envelope,
-    so a legal target close to the boundary stays reachable -- the
-    takeup is merely shortened there.
+    the final +X +Y leg. Near the envelope's lower edge the waypoint is
+    clamped inside the envelope, so a legal target close to the boundary
+    stays reachable -- the takeup is merely shortened there.
 
-    Both legs go through the checked ``move_xy`` door. Either the stage
-    is at ``(x_um, y_um)`` with the slack-state pinned, or this raises.
+    Both legs go through the checked ``move_xy`` door. A refused or failed
+    leg raises. A leg that could not be confirmed is given one more look
+    (see :func:`_leg`); if the stage still cannot be read, this returns
+    ``{"success": True, "confirmed": False}`` and the caller records it.
     """
     # Refuse an illegal destination before any leg fires. Without this,
     # the clamp below could turn an out-of-envelope target into a real
@@ -69,17 +102,19 @@ def arrive_xy(client, x_um, y_um):
             )
         waypoint_x, waypoint_y = clamped_x, clamped_y
     r = _commands.move_xy(client, waypoint_x, waypoint_y, unit="um")
-    if not r or not r.get("success") or not r.get("confirmed"):
-        raise RuntimeError(
-            f"backlash overshoot to ({waypoint_x:.2f}, {waypoint_y:.2f}) "
-            f"failed or was unconfirmed: {r}"
-        )
+    confirmed = _leg(
+        client,
+        r,
+        waypoint_x,
+        waypoint_y,
+        f"backlash overshoot to ({waypoint_x:.2f}, {waypoint_y:.2f})",
+    )
     time.sleep(BACKLASH_SETTLE_MS / 1000.0)
     r = _commands.move_xy(client, x_um, y_um, unit="um")
-    if not r or not r.get("success") or not r.get("confirmed"):
-        raise RuntimeError(
-            f"backlash final approach to ({x_um:.2f}, {y_um:.2f}) failed or was unconfirmed: {r}"
-        )
+    confirmed &= _leg(
+        client, r, x_um, y_um, f"backlash final approach to ({x_um:.2f}, {y_um:.2f})"
+    )
+    return {"success": True, "confirmed": confirmed}
 
 
 def correct_backlash(
@@ -122,9 +157,13 @@ def correct_backlash(
         been measured on the rig -- keep three until bench data says
         otherwise.
 
-    Either every leg confirms via readback or this raises -- an
-    unconfirmed leg could hand the stage to the following capture while
-    it is still travelling back from the overshoot point.
+    A refused or failed leg raises and fires no further moves. A leg
+    that could not be confirmed is given one more look (see
+    :func:`_leg`): confirmed late, contradicted (raises), or still
+    unconfirmed, in which case the takeup carries on and returns
+    ``confirmed: False`` so the caller can record it.
+
+    Returns ``{"success": True, "confirmed": bool, "passes": int}``.
     """
     if passes != int(passes) or int(passes) < 1:
         raise ValueError(
@@ -146,6 +185,7 @@ def correct_backlash(
         overshoot_um,
         passes,
     )
+    confirmed = True
     for index in range(int(passes)):
         if index > 0:
             # Same reason as the mid-pass pause below: without a gap the
@@ -153,15 +193,16 @@ def correct_backlash(
             # motion, and the extra passes would settle nothing.
             time.sleep(settle_ms / 1000.0)
         # success=True alone means "command accepted" (profiles set
-        # success_on_unconfirmed=True). This routine's contract needs
-        # readback evidence: an unconfirmed leg could hand the stage to
-        # the following capture while it is still travelling.
+        # success_on_unconfirmed=True). Each leg gets the readback's word
+        # through _leg: a leg the stage is seen to have made counts, a leg
+        # the stage is seen NOT to have made raises.
         r = _commands.move_xy(
             client, x - overshoot_um, y - overshoot_um, unit="um", tolerance=tolerance_um
         )
-        if not r or not r.get("success") or not r.get("confirmed"):
-            raise RuntimeError(f"backlash overshoot move failed or was unconfirmed: {r}")
+        confirmed &= _leg(
+            client, r, x - overshoot_um, y - overshoot_um, "backlash overshoot move", tolerance_um
+        )
         time.sleep(settle_ms / 1000.0)
         r = _commands.move_xy(client, x, y, unit="um", tolerance=tolerance_um)
-        if not r or not r.get("success") or not r.get("confirmed"):
-            raise RuntimeError(f"backlash return move failed or was unconfirmed: {r}")
+        confirmed &= _leg(client, r, x, y, "backlash return move", tolerance_um)
+    return {"success": True, "confirmed": confirmed, "passes": int(passes)}

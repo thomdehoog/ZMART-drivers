@@ -181,6 +181,12 @@ class ZmartHandle:
             be read (cross-objective moves are then refused, reads warn).
         closed: Set by :func:`disconnect`; every op refuses a closed
             handle.
+        unconfirmed: Every change this session sent that was accepted but
+            could not be confirmed by a readback, newest last: what it was,
+            when, and the driver's message. The driver does its best to
+            confirm every change; when it cannot, it says so here (and in a
+            warning) and carries on, so a workflow is told rather than
+            stopped. ``get_state`` reports the list under ``observed``.
     """
 
     client: Any
@@ -196,18 +202,38 @@ class ZmartHandle:
             "objective": None,
         }
     )
-    #: Where the last confirmed :func:`set_xyz` put the stage: the frame
-    #: position asked for, and the absolute z-wide it was realized at.
-    #: Remembered rather than re-read -- the move is absolute and raises
-    #: unless confirmed, so this is where the stage is, and reading it back
-    #: would put another call that can hang into the capture path. The z-wide
-    #: rides along because a job states its stack in absolute z-wide, and
-    #: without the anchor those slices cannot be put in the frame.
+    #: Where the last :func:`set_xyz` sent the stage: the frame position
+    #: asked for, and the absolute z-wide it was realized at. Remembered
+    #: rather than re-read, so that the capture path holds no extra call that
+    #: can hang. The move is absolute, and a leg that was not confirmed is
+    #: recorded under ``unconfirmed``. The z-wide rides along because a job
+    #: states its stack in absolute z-wide, and without the anchor those
+    #: slices cannot be put in the frame.
     driven_to: dict[str, float] | None = None
     position_counter: int = 0
     acquisition_hashes: set[str] = field(default_factory=set)
     translations: dict[int, tuple[float, float, float]] | None = None
     closed: bool = False
+    unconfirmed: list[dict[str, Any]] = field(default_factory=list)
+
+
+def _note_unconfirmed(handle: ZmartHandle, what: str, result: Any) -> None:
+    """Record a change that was sent and accepted but never confirmed, and carry on.
+
+    The driver confirms what it can. When a readback never matched in
+    time, the change is not known to have failed, only not known to have
+    happened, so it is written down here, said in a warning, and the
+    command goes on. The workflow sees the list in ``get_state``.
+    """
+    message = result.get("message") if isinstance(result, dict) else str(result)
+    note = {
+        "what": what,
+        "at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "message": message or "readback did not confirm the change",
+    }
+    handle.unconfirmed.append(note)
+    del handle.unconfirmed[:-50]  # keep the newest fifty
+    log.warning("unconfirmed, carrying on: %s: %s", what, note["message"])
 
 
 def _require_open(handle: ZmartHandle) -> None:
@@ -452,6 +478,11 @@ def _hardware_snapshot(handle: ZmartHandle) -> dict:
     if not xy:
         raise RuntimeError("could not read stage XY position")
     job = _selected_job_name(handle)
+    if job is None:
+        raise RuntimeError(
+            "could not determine the selected LAS X job, which this command needs "
+            "to read the focus drives; nothing was moved"
+        )
     settings = _readers.get_job_settings(handle.client, job)
     if not settings:
         raise RuntimeError(f"could not read job settings for '{job}'")
@@ -479,12 +510,18 @@ def _delta_or_warn(handle: ZmartHandle, snapshot: dict) -> tuple:
         return (0.0, 0.0, 0.0)
 
 
-def _selected_job_name(handle: ZmartHandle) -> str:
-    """Name of the currently selected LAS X job; raises when unreadable."""
+def _selected_job_name(handle: ZmartHandle) -> str | None:
+    """Name of the currently selected LAS X job, or ``None`` when it cannot be read.
+
+    A reading that fails is unknown, not a stop. The commands that only
+    use this to decide whether a selection is needed go ahead and select;
+    the ones that need the name to compute a move say so and refuse.
+    """
     selected = _readers.get_selected_job(handle.client)
     name = selected.get("Name") if selected else None
     if not name:
-        raise RuntimeError("could not determine the selected LAS X job")
+        log.warning("could not determine the selected LAS X job")
+        return None
     return name
 
 
@@ -751,8 +788,12 @@ def set_xyz(
     (from the calibration's translation totals); a cross-objective move with
     no translations available REFUSES. The adapter does no limit checking of
     its own: every leg is checked inside the command that fires it, in the
-    commands layer. A refused leg raises with an actionable alternative;
-    legs that already ran stay where they arrived (each was checked too).
+    actions. A refused leg raises with an actionable alternative; legs that
+    already ran stay where they arrived (each was checked too). A leg that
+    was sent and accepted but could not be confirmed does not raise: it is
+    recorded under the handle's ``unconfirmed`` list, and the answer is read
+    back from the microscope anyway, so the workflow sees where the stage
+    really is and decides for itself.
     """
     _require_open(handle)
     chosen = _resolve_actuators(with_actuators)
@@ -779,7 +820,9 @@ def set_xyz(
     # Every leg below is limit-checked inside the command it fires — the
     # adapter carries no checks of its own. A refused leg raises here with
     # an actionable message; legs that already ran stay where they arrived.
-    _motion.arrive_xy(handle.client, abs_x, abs_y)
+    arrived = _motion.arrive_xy(handle.client, abs_x, abs_y)
+    if not arrived.get("confirmed"):
+        _note_unconfirmed(handle, f"set_xyz: xy to ({x}, {y})", arrived)
 
     for z_mode, target in z_targets:
         z_result = _commands.move_z(
@@ -789,7 +832,7 @@ def set_xyz(
             unit="um",
             z_mode=z_mode,
         )
-        if not z_result.get("success") or not z_result.get("confirmed"):
+        if not z_result.get("success"):
             # With z-galvo selected across objectives, the extra z-wide leg
             # is the calibrated objective offset — it can only ever be
             # realized by z-wide, so suggesting the other actuator would
@@ -797,16 +840,18 @@ def set_xyz(
             # the leg that carries the requested frame-Z motion.
             if len(z_targets) == 2 and z_mode == "zwide":
                 raise RuntimeError(
-                    f"move_z ({z_mode}) failed or was unconfirmed: {z_result} "
+                    f"move_z ({z_mode}) failed: {z_result} "
                     f"(this z-wide target is the calibrated objective offset, which "
                     f"cannot be moved to the other z drive — re-set the origin under "
                     f"the current objective, or re-adopt the objective calibration)"
                 )
             alternative = "z-wide" if chosen["z"] == "z-galvo" else "z-galvo"
             raise RuntimeError(
-                f"move_z ({z_mode}) failed or was unconfirmed: {z_result} "
+                f"move_z ({z_mode}) failed: {z_result} "
                 f"(try with_actuators={{'z': '{alternative}'}})"
             )
+        if not z_result.get("confirmed"):
+            _note_unconfirmed(handle, f"set_xyz: z ({z_mode}) to {target}", z_result)
 
     # Remembered for acquire, which labels every saved plane with the frame
     # position it was asked to go to (see _where_the_planes_are).
@@ -1040,15 +1085,23 @@ def acquire(
     if resolved["strip_scan_fields"]:
         _ensure_scan_fields_stripped(handle)
 
+    noted_before = len(handle.unconfirmed)
+    # When the selected job cannot be read, select the one asked for anyway:
+    # selecting is harmless to repeat, and a reading that fails is unknown,
+    # not a reason to stop.
     if job != _selected_job_name(handle):
         select = _commands.select_job(handle.client, job)
         if not select.get("success"):
             raise RuntimeError(f"select_job('{job}') failed: {select}")
+        if not select.get("confirmed"):
+            _note_unconfirmed(handle, f"acquire: select_job('{job}')", select)
 
     backlash_rounds = resolved["backlash_rounds"]
     apply_backlash = resolved["backlash_correction"] and backlash_rounds > 0
     if apply_backlash:
-        _motion.correct_backlash(handle.client, passes=backlash_rounds)
+        settled = _motion.correct_backlash(handle.client, passes=backlash_rounds)
+        if not settled.get("confirmed"):
+            _note_unconfirmed(handle, "acquire: backlash takeup", settled)
 
     acq = _capture.acquire(handle.client, job)
 
@@ -1123,6 +1176,10 @@ def acquire(
         # What the driver printed about this capture: the state, beside the
         # images in ``data/metadata``. A client moving a record moves this too.
         "metadata": printed,
+        # The changes made for this capture that were sent but never
+        # confirmed by a readback (the job selection, the backlash takeup).
+        # Empty when everything confirmed. The capture itself went ahead.
+        "unconfirmed": list(handle.unconfirmed[noted_before:]),
     }
 
 
@@ -1176,8 +1233,13 @@ def get_state(handle: ZmartHandle) -> dict:
     microscope = hw.get("Microscope") or {}
     selected = _readers.get_selected_job(handle.client) or {}
     if not selected.get("Name"):
-        raise RuntimeError("could not determine the selected LAS X job")
-    settings = _readers.get_job_settings(handle.client, selected["Name"]) or {}
+        # A reading that fails is unknown, not a stop: the job is reported
+        # as None, and set_state with a job name will select it afresh.
+        log.warning("could not determine the selected LAS X job")
+        selected = {}
+    settings = (
+        _readers.get_job_settings(handle.client, selected["Name"]) if selected.get("Name") else {}
+    ) or {}
     try:
         geometry = _parse_tile_geometry(settings)
         pixel_x = float(geometry["pixel_w_um"])
@@ -1204,7 +1266,7 @@ def get_state(handle: ZmartHandle) -> dict:
     normal, autofocus = _job_catalog(handle)
     limits = _gate.describe(handle.client)
     return {
-        "changeable": {"job": selected["Name"]},
+        "changeable": {"job": selected.get("Name")},
         "observed": {
             "vendor": "leica",
             "microscope": handle.connection.get("microscope"),
@@ -1227,6 +1289,10 @@ def get_state(handle: ZmartHandle) -> dict:
             # (every mutating command underneath is then refusing).
             "limits": limits,
             "setup": _setup_readiness(handle, active_objective, limits),
+            # Changes this session sent that were accepted but never
+            # confirmed by a readback, newest last. The driver carried on;
+            # a workflow that cares can look here.
+            "unconfirmed": list(handle.unconfirmed),
         },
     }
 
@@ -1243,7 +1309,10 @@ def set_state(handle: ZmartHandle, state: dict) -> dict:
     """
     _require_open(handle)
     applied: dict[str, Any] = {}
+    noted_before = len(handle.unconfirmed)
     job = (state.get("changeable") or {}).get("job")
+    # When the selected job cannot be read, the one asked for is selected
+    # anyway: selecting is harmless to repeat.
     if job and job != _selected_job_name(handle):
         normal, autofocus = _job_catalog(handle)
         names = [j.get("Name") for j in normal if j.get("Name")]
@@ -1259,8 +1328,12 @@ def set_state(handle: ZmartHandle, state: dict) -> dict:
         result = _commands.select_job(handle.client, job)
         if not result.get("success"):
             raise RuntimeError(f"select_job('{job}') failed: {result}")
+        if not result.get("confirmed"):
+            _note_unconfirmed(handle, f"set_state: select_job('{job}')", result)
         applied["job"] = job
-    return {"applied": applied}
+    # What was applied, and what was sent but could not be confirmed by a
+    # readback (the selection went ahead; the workflow is told, not stopped).
+    return {"applied": applied, "unconfirmed": list(handle.unconfirmed[noted_before:])}
 
 
 def get_procedures(handle: ZmartHandle) -> dict:
@@ -1307,7 +1380,8 @@ def _zero_z_galvo(handle: ZmartHandle) -> dict:
     (limits) aborts with nothing moved — and only then does the galvo
     drive to 0. The frame z is unchanged by construction, and the galvo's
     full travel becomes available for whatever comes next. Both legs go
-    through the checked ``move_z`` door; raises unless each confirms.
+    through the checked ``move_z`` door; a refused or failed leg raises, a
+    leg that could not be confirmed is recorded and the procedure carries on.
     """
     snap = _hardware_snapshot(handle)
     offset = snap["z_galvo_um"]
@@ -1315,10 +1389,10 @@ def _zero_z_galvo(handle: ZmartHandle) -> dict:
         return {"transferred_um": 0.0}
     for z_mode, target in (("zwide", snap["z_wide_um"] + offset), ("galvo", 0.0)):
         result = _commands.move_z(handle.client, snap["job"], target, unit="um", z_mode=z_mode)
-        if not result.get("success") or not result.get("confirmed"):
-            raise RuntimeError(
-                f"zero_z_galvo: move_z ({z_mode}) failed or was unconfirmed: {result}"
-            )
+        if not result.get("success"):
+            raise RuntimeError(f"zero_z_galvo: move_z ({z_mode}) failed: {result}")
+        if not result.get("confirmed"):
+            _note_unconfirmed(handle, f"zero_z_galvo: move_z ({z_mode}) to {target}", result)
     return {"transferred_um": offset}
 
 
@@ -1350,16 +1424,22 @@ def _run_autofocus(handle: ZmartHandle, procedure: dict) -> dict:
         selected = _commands.select_job(handle.client, job)
         if not selected.get("success"):
             raise RuntimeError(f"select_job('{job}') failed: {selected}")
+        if not selected.get("confirmed"):
+            _note_unconfirmed(handle, f"autofocus: select_job('{job}')", selected)
     try:
         acq = _capture.acquire(handle.client, job)
         # Read the focus result BEFORE restoring the selection: restoring
         # could reposition (jobs own objective state).
         snap = _hardware_snapshot(handle)
     finally:
-        if job != original:
+        if original is None:
+            log.warning("the job selected before autofocus was unknown, so none is restored")
+        elif job != original:
             restored = _commands.select_job(handle.client, original)
             if not restored.get("success"):
                 log.warning("could not restore job %r after autofocus: %s", original, restored)
+            elif not restored.get("confirmed"):
+                _note_unconfirmed(handle, f"autofocus: restore select_job('{original}')", restored)
     focus = snap["z_wide_um"] + snap["z_galvo_um"]
     dt = _delta_or_warn(handle, snap)
     return {
@@ -1400,7 +1480,10 @@ def _scan_field(handle: ZmartHandle, *, default_job_name: str) -> dict | None:
         confirm_path=Path(templates_dir) / _scanfields.TEMPLATE_RGN,
     )
     if not saved:
-        raise RuntimeError("save_experiment did not confirm; the template on disk may be stale")
+        # The template on disk may be stale, so its positions are not
+        # reported rather than reported wrong; get_info still answers.
+        _note_unconfirmed(handle, "get_info: save_experiment (scan-field positions)", saved)
+        return None
     parsed = _scanfields.parse_scan_positions(
         templates_dir,
         _scanfields.TEMPLATE_BASE,
