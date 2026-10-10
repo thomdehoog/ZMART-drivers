@@ -222,3 +222,15 @@ Decided 2026-10-10:
 - **Every reading keeps racing the API against the log**, a backup for each, because what the log shows can differ between machines and LAS X versions. The job list alone stays API-only (the log's list is incomplete). The age limits stay: trusting that the last line written on change is still true would rely on nothing having changed without a line (a manual click, a LAS X restart, a line beyond the tail the reader reads), which the driver cannot verify.
 - **The idle check before a command asks the API only**: whether a command fires is the API's to decide. So a log-only run no longer fails its moves (the log-only simulator step then passed with no failures).
 - **In a log-only run, confirmations that read the job's settings wait the full 12 s** (every setting, Z moves, objective changes): LAS X writes a job's settings to the log only when the API is asked for them, which a log-only run never does (24 of 24 changes on the simulator). That run is a test of reading the log, not a way to run the microscope; with both sources the same changes confirm at once. Still to decide: how freshness should work for state the log writes only on change. The log-only setting readbacks after a change (eleven settings unconfirmed after 12 s each in the log-only CI step) belong to the same question.
+
+## 12. Still open
+
+1. **`drivers.json` on both PCs.** The hardware runs registered the driver with the controller, so
+   `C:\ProgramData\zmart-microscopy\zmart-controller\drivers.json` points `stellaris` at the test
+   checkout: on the LAS X simulator PC at `D:\claude-scratch\zmart-drivers-leica-anatomy`, on the
+   STELLARIS PC at `C:\Users\t.de\conda\home\ZMART-drivers`. Anything that connects by name loads
+   that checkout until the entry is changed. Keep it, or set it back.
+2. **The z readback for a job with a z-stack.** For the drive that runs a job's z-stack, LAS X does
+   not refresh the z position in the job settings, so the driver saves the experiment and reads
+   `ZPosition` from the `.lrp` (`actions/derived.py`, `_z_um_from_saved_experiment`). That save waits
+   up to 5 s (`scanfields/files.py`, `save_and_read_lrp`): the last save wait outside the rule.
