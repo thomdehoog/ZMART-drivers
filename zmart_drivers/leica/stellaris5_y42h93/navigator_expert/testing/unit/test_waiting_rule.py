@@ -237,20 +237,14 @@ def test_an_old_log_answer_never_wins():
             assert readers.get_xy(new_client(), mode="hybrid") is None
 
 
-def test_the_scanner_status_is_an_api_only_reading():
-    """Nothing decides on the log's scanner status, so the driver does not read it.
+def test_the_scanner_status_races_the_api_against_the_log():
+    """Every reading races both sources, a backup for each (decided 2026-10-10).
 
-    The idle check and the end-of-acquisition wait both ask the API, which
-    answers on demand. The log writes ``Acquire/AcquisitionState`` only when
-    the state changes, so it went stale half a second after every scan
-    (decided 2026-10-10). Like the job list, the scanner status has no log leg.
+    What the log shows can differ between machines and LAS X versions, so
+    the scanner status keeps its log leg like every other reading.
     """
-    assert capabilities.spec("scan_status").log_fn is None
-    assert profiles.StateReaderProfile().scan_status_mode == "api"
-    assert not hasattr(profiles.StateReaderProfile(), "scan_status_log_max_age_s")
-    assert not hasattr(readers.log_reader, "get_scan_status")
-    reading = readers.get_scan_status(new_client(), mode="log", diagnostics=True)
-    assert isinstance(reading.error, capabilities.UnsupportedSource)
+    assert capabilities.spec("scan_status").log_fn is not None
+    assert profiles.StateReaderProfile().scan_status_mode == "hybrid"
 
 
 def test_the_idle_check_asks_the_api_even_in_a_log_only_run():
@@ -264,7 +258,7 @@ def test_the_idle_check_asks_the_api_even_in_a_log_only_run():
     profiles.STATE_READERS = profiles.StateReaderProfile(
         **{
             field: "log"
-            for field in ("xy_mode", "job_settings_mode", "selected_job_mode")
+            for field in ("xy_mode", "job_settings_mode", "selected_job_mode", "scan_status_mode")
         }
     )
     with patch.object(readers.api_reader, "get_scan_status", return_value="eScanIdle") as api:

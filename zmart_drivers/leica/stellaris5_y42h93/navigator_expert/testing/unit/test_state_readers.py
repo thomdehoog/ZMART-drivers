@@ -34,17 +34,15 @@ class TestStateReaders(unittest.TestCase):
     def test_default_profile_uses_hybrid_readers(self):
         # Maintainer decision (docs/reviews/MAINTAINER_DECISIONS.md §1):
         # hybrid is the default for routed cold reads; api/log stay selectable
-        # per datum. Exceptions: `jobs` is API-pinned because the log only sees
-        # the active job, so its list is incomplete (bench 2026-07-06), and
-        # `scan_status` because the log writes it only when it changes and the
-        # API decides whether a command fires (2026-10-10).
+        # per datum. Exception: `jobs` is API-pinned because the log only sees
+        # the active job, so its list is incomplete (bench 2026-07-06).
         profile = profiles.STATE_READERS
         self.assertEqual(profile.xy_mode, "hybrid")
         self.assertEqual(profile.job_settings_mode, "hybrid")
         self.assertEqual(profile.jobs_mode, "api")
         self.assertEqual(profile.selected_job_mode, "hybrid")
         self.assertEqual(profile.hardware_info_mode, "hybrid")
-        self.assertEqual(profile.scan_status_mode, "api")
+        self.assertEqual(profile.scan_status_mode, "hybrid")
 
     def test_default_xy_hybrid_degrades_to_api_without_fresh_log(self):
         expected = {"x_um": 1.0, "y_um": 2.0}

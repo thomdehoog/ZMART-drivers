@@ -46,6 +46,8 @@ READER_SOURCE_POLICY_MODULES = {
     Path("procedures/calibration_common.py"),
     # The stage limits are saved for good too: the corners are read from the API.
     Path("procedures/measure_limits.py"),
+    # Whether a command may fire is the API's to decide: the idle check.
+    Path("dispatcher/prechecks.py"),
 }
 EXPLICIT_READER_MODE = re.compile(r"\bmode\s*=\s*['\"](?:api|log|hybrid)['\"]")
 LOW_LEVEL_READER_CALL = re.compile(r"(?<!\w)_?(?:api_reader|log_reader)\.")

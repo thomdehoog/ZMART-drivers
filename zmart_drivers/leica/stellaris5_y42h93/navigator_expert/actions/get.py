@@ -136,11 +136,12 @@ DATUMS = {
     "scan_status": DatumSpec(
         mode_attr="scan_status_mode",
         success=scan_status_known,
-        # API only: the LAS X log writes the scanner status only when it
-        # changes, so its last "idle" went stale half a second after every
-        # scan, and nothing decides on it: the idle check and the end of an
-        # acquisition both ask the API (decided 2026-10-10). No log_fn.
         api_fn=lambda client, **kw: api_reader.get_scan_status(client),
+        log_fn=lambda snapshot, *, max_age_s: log_reader.get_scan_status(
+            snapshot, max_age_s=max_age_s
+        ),
+        log_max_age_attr="scan_status_log_max_age_s",
+        age_key="scan_status",
     ),
     "job_settings": DatumSpec(
         mode_attr="job_settings_mode",
