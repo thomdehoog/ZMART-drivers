@@ -307,19 +307,11 @@ def phase_readonly(v: vh.Validator, sess: Any, args: argparse.Namespace) -> None
                     Path(info["output_root"]).is_dir(),
                     True,
                 )
-            tiles = info.get("tile_positions") or []
-            if tiles:
-                v.compare(
-                    "get_info: tile positions carry tile_size",
-                    all(bool(tile.get("tile_size")) for tile in tiles),
-                    True,
-                )
-            else:
-                v.skip("get_info: tile positions available", "no tiles in the live template")
-            if not info.get("focus_positions"):
-                v.skip(
-                    "get_info: focus positions available", "no focus points in the live template"
-                )
+            v.compare(
+                "get_info: reports no template positions",
+                "tile_positions" in info or "focus_positions" in info,
+                False,
+            )
 
 
 def _within(value: float, lo: float, hi: float) -> bool:

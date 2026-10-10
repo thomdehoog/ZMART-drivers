@@ -150,8 +150,7 @@ def test_full_mock_run_move_and_acquire(tmp_path):
     assert adapter._machine.MACHINE.latest_snapshot("origin") is None
     assert by_name["zgalvo: frame z"]["status"] == "PASS"
     assert by_name["zwide: frame z is additive (z-wide + z-galvo)"]["status"] == "PASS"
-    assert by_name["get_info: tile positions available"]["status"] == "SKIP"
-    assert by_name["get_info: focus positions available"]["status"] == "SKIP"
+    assert by_name["get_info: reports no template positions"]["status"] == "PASS"
     # Acquire needs real LAS X export files, so it is skipped under the mock.
     assert by_name["phase: acquire"]["status"] == "SKIP"
 
