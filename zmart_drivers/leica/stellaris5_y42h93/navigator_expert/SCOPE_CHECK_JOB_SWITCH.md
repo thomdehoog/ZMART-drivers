@@ -180,3 +180,68 @@ No driver code was changed. The obvious places to look, for Thom to decide: let 
 check `stop` before each parse and skip the parse when the API has already won; share one parsed
 snapshot between concurrent log legs (one parse per `POLL_S`, not one per leg); or make
 `_tail_lines` read far less than 4 MB, since the readings only need the last few seconds of the log.
+
+---
+
+## The fix, and what to check on the microscope
+
+Built on 2026-10-11 from the places listed above. Measured on the LAS X simulator, not yet on the
+microscope.
+
+### What changed
+
+- **One parse of the log at a time, shared by readers asking together** (`log_reader.SharedParse`).
+  However many readings race, only one parse runs at any moment; readers that ask while it runs wait
+  for it to end and share the next one. A reader only ever gets a parse begun after it asked: a first
+  version that reused a snapshot for 0.1 s handed out the position from just before a move, fresh by
+  its line's age, and it won the race (the simulator's adapter step read 0 instead of 25 um after a
+  move). A snapshot counts only for the two log files it was parsed from. The tail the reader reads
+  stays 4 MB: job settings and the job list can be older than the last few seconds.
+- **A race that is already won starts no new parse** (`_log_worker` checks before each one).
+- **A question already sent to LAS X is seen through** to its answer or the window's end, even when
+  the log wins meanwhile. With the shared snapshot the log wins most races at once, and abandoning
+  the API question just sent, every time, made the simulator drop the next question under a burst:
+  one reading in a few then waited a whole window, 5 s. Once a race is won, no new question is sent.
+
+### Measured on the simulator
+
+`probe_switch_after_moves.py --yes`: ten small XY moves, then a job switch, then back.
+
+| | Threads alive after the burst | Switch after the burst | Switch back |
+|---|---:|---:|---:|
+| before the fix, 3 runs | 4, 73, 66 | 1.05 s, **9.34 s**, **11.62 s** | 1.0 to 1.3 s |
+| after the fix, 3 runs | 2 | 0.75 to 0.88 s | 1.09 to 1.17 s |
+
+After the fix no reading took a second or more, and no question to LAS X went unanswered. The
+adapter validator passed with 70 checks, its `set_state: switch job` in 1.0 s.
+
+### On the microscope
+
+The stage must be clear: the probe moves the stage by 25 um and back, and a job switch can move it
+to keep the sample point. Nothing is acquired. From the repository root, LAS X running:
+
+```powershell
+git pull
+python zmart_drivers\leica\stellaris5_y42h93\navigator_expert\testing\hardware\probe_switch_after_moves.py --yes
+```
+
+Run it three times. On the microscope it showed, before the fix: about sixty threads alive after the
+burst, and the switch after it taking 8 to 11 s. What to look for now:
+
+- `threads alive` after `moves done`: a handful, not sixty;
+- the switch after the burst: about a second, like the switch back;
+- no `SLOW` line naming `_selected_job_name_from_log` or `parse_log`.
+
+Then the quick acceptance, which runs the same switch straight after its own move phase:
+
+```powershell
+python zmart_drivers\leica\stellaris5_y42h93\navigator_expert\testing\run_ci.py --hardware
+```
+
+It should pass all eight acceptance points, with `set_state: switch job` in the adapter step taking
+about a second instead of 10 to 12 s.
+
+### What to send back
+
+- the three probe runs' lines for `moves done`, the two switches, and any `SLOW` line;
+- the time of `set_state: switch job` in the `run_ci.py --hardware` run, and its result.

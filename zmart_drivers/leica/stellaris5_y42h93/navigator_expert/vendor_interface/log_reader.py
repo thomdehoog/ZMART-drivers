@@ -57,6 +57,7 @@ Dependency direction:
 import json
 import logging
 import re
+import threading
 import time
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
@@ -245,7 +246,80 @@ class Snapshot:
     pending_dialog_ts: float | None = None
 
 
+class SharedParse:
+    """One parse of the live LAS X logs at a time, shared by readers asking together.
+
+    Every look at the log is a full parse of the last ``_LOG_TAIL_BYTES`` of
+    ``lcsCommand.log``: about 0.1 s of CPU under the GIL. When every reading's
+    race parsed on its own, a burst of moves on the STELLARIS (2026-10-10)
+    left about sixty parses running at once, each slowing the others, and a
+    job switch's own log read waited 8 to 12 s behind them.
+
+    Here only one parse runs at a time. A reader gets a parse begun after it
+    asked, never an older one: a snapshot from just before a move's
+    confirmation still holds the old position, fresh by its line's age, and
+    would win the race (LAS X simulator, 2026-10-11). Readers that ask while
+    a parse is running wait for it to end and share the next one. A snapshot
+    counts only for the two log files it was parsed from, so a reader pointed
+    at other files (the ``--mock`` validators point it at files that do not
+    exist) never gets the old ones. A parse that fails is not shared: its
+    error goes to the reader that ran it, and the next reader parses.
+    """
+
+    def __init__(self):
+        self._changed = threading.Condition()
+        self._snapshot = None
+        self._files = None
+        self._began = None
+        self._parsing = False
+
+    def snapshot(self):
+        """The live logs as a :class:`Snapshot`, from a parse begun after this call."""
+        asked = time.monotonic()
+        profile = _profile()
+        files = (profile.lcs_log_path, profile.msgbox_log_path)
+        with self._changed:
+            while True:
+                if (
+                    self._snapshot is not None
+                    and self._files == files
+                    and self._began >= asked
+                ):
+                    return self._snapshot
+                if not self._parsing:
+                    self._parsing = True
+                    began = time.monotonic()
+                    break
+                self._changed.wait()
+        snapshot = None
+        try:
+            snapshot = parse_files(*files)
+            return snapshot
+        finally:
+            with self._changed:
+                if snapshot is not None:
+                    self._snapshot, self._files, self._began = snapshot, files, began
+                self._parsing = False
+                self._changed.notify_all()
+
+
+LIVE_LOG = SharedParse()
+
+
 def parse_log(lcs_path=None, msgbox_path=None, now=None, lines=None):
+    """The LAS X logs as a :class:`Snapshot`.
+
+    With no arguments this is the live logs, through :data:`LIVE_LOG`: one
+    parse at a time, begun after the call, shared by readers asking together.
+    Naming the files,
+    the lines or the time (tests, offline tools) parses directly.
+    """
+    if lcs_path is None and msgbox_path is None and now is None and lines is None:
+        return LIVE_LOG.snapshot()
+    return parse_files(lcs_path, msgbox_path, now, lines)
+
+
+def parse_files(lcs_path=None, msgbox_path=None, now=None, lines=None):
     """Parse the LAS X logs into a :class:`Snapshot` (single forward pass).
 
     Latin-1 decode (preserves the µ byte; never utf-8 replacement).
