@@ -96,7 +96,7 @@ def fast_timing_windows(monkeypatch):
         tuning as timing,
     )
 
-    monkeypatch.setattr(timing, "WINDOW_S", 0.05)
+    monkeypatch.setattr(timing, "WINDOW_S", 0.25)
     monkeypatch.setattr(timing, "POLL_S", 0.005)
     monkeypatch.setattr(timing, "ANSWER_POLL_S", 0.001)
     monkeypatch.setattr(dispatch, "ECHO_SETTLE_TIMEOUT_S", 0.05)

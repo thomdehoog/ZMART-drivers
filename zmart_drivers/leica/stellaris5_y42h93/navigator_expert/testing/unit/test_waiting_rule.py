@@ -48,6 +48,20 @@ def short_windows(monkeypatch):
     monkeypatch.setattr(profiles, "STATE_READERS", profiles.StateReaderProfile())
 
 
+_CLIENTS = []
+
+
+def new_client():
+    """A client of its own, kept for the whole module, like a real session's.
+
+    The API takes one request at a time per connection, keyed by the client;
+    keeping every test's client alive means no two tests can ever share a turn.
+    """
+    client = object()
+    _CLIENTS.append(client)
+    return client
+
+
 def settings(job="HiRes", slot=3):
     """Complete job settings: the job's name, an objective slot, and geometry."""
     return {
@@ -90,7 +104,7 @@ def test_a_busy_api_is_waited_for_not_skipped():
     The reading must wait for the API to be free and ask, not come back empty
     at once because the log has nothing fresh for the job.
     """
-    client = object()
+    client = new_client()
     release = threading.Event()
     earlier_started = threading.Event()
     calls = []
@@ -131,7 +145,7 @@ def test_an_incomplete_answer_does_not_win():
 
     with Patched(fresh_log({"get_job_settings": incomplete})):
         with patch.object(readers.api_reader, "get_job_settings", side_effect=slow_api):
-            reading = readers.get_job_settings(object(), "HiRes", diagnostics=True)
+            reading = readers.get_job_settings(new_client(), "HiRes", diagnostics=True)
     assert reading.source == "api"
     assert reading.value["objective"]["slotIndex"] == 3
 
@@ -142,7 +156,7 @@ def test_settings_for_another_job_do_not_win():
         with patch.object(
             readers.api_reader, "get_job_settings", return_value=settings("Overview")
         ):
-            assert readers.get_job_settings(object(), "HiRes") is None
+            assert readers.get_job_settings(new_client(), "HiRes") is None
 
 
 def test_no_head_start_for_the_log():
@@ -159,7 +173,7 @@ def test_no_head_start_for_the_log():
             patch.object(readers.api_reader, "get_xy", return_value=api_value),
         ):
             t0 = time.monotonic()
-            reading = readers.get_xy(object(), diagnostics=True)
+            reading = readers.get_xy(new_client(), diagnostics=True)
             elapsed = time.monotonic() - t0
     assert reading.source == "api"
     assert reading.value == api_value
@@ -178,7 +192,7 @@ def test_four_windows_then_unknown():
     with Patched(fresh_log({"get_xy": None})):
         with patch.object(readers.api_reader, "get_xy", side_effect=unanswered):
             t0 = time.monotonic()
-            assert readers.get_xy(object()) is None
+            assert readers.get_xy(new_client()) is None
             elapsed = time.monotonic() - t0
     assert 4 * WINDOW_S <= elapsed < 4 * WINDOW_S + 1.0
     assert len(calls) == 4
@@ -200,7 +214,7 @@ def test_an_unanswered_read_is_requested_again_at_the_next_window():
 
     with Patched(fresh_log({"get_xy": None})):
         with patch.object(readers.api_reader, "get_xy", side_effect=drops_first):
-            assert readers.get_xy(object()) == value
+            assert readers.get_xy(new_client()) == value
     assert len(calls) >= 2
     assert calls[1] - calls[0] >= WINDOW_S * 0.9
 
@@ -212,7 +226,7 @@ def test_an_answer_that_is_not_a_success_is_requested_again_within_the_window():
     with Patched(fresh_log({"get_xy": None})):
         with patch.object(readers.api_reader, "get_xy", side_effect=lambda *a, **k: next(answers)):
             t0 = time.monotonic()
-            assert readers.get_xy(object()) == {"x_um": 1.0, "y_um": 2.0}
+            assert readers.get_xy(new_client()) == {"x_um": 1.0, "y_um": 2.0}
             assert time.monotonic() - t0 < WINDOW_S / 2
 
 
@@ -220,7 +234,7 @@ def test_an_old_log_answer_never_wins():
     """The log reader refuses an answer older than its freshness limit; nothing else answers."""
     with Patched(fresh_log({"get_xy": None})):
         with patch.object(readers.api_reader, "get_xy", return_value=None):
-            assert readers.get_xy(object(), mode="hybrid") is None
+            assert readers.get_xy(new_client(), mode="hybrid") is None
 
 
 def test_the_scanner_status_is_an_api_only_reading():
@@ -235,7 +249,7 @@ def test_the_scanner_status_is_an_api_only_reading():
     assert profiles.StateReaderProfile().scan_status_mode == "api"
     assert not hasattr(profiles.StateReaderProfile(), "scan_status_log_max_age_s")
     assert not hasattr(readers.log_reader, "get_scan_status")
-    reading = readers.get_scan_status(object(), mode="log", diagnostics=True)
+    reading = readers.get_scan_status(new_client(), mode="log", diagnostics=True)
     assert isinstance(reading.error, capabilities.UnsupportedSource)
 
 
@@ -254,14 +268,14 @@ def test_the_idle_check_asks_the_api_even_in_a_log_only_run():
         }
     )
     with patch.object(readers.api_reader, "get_scan_status", return_value="eScanIdle") as api:
-        assert prechecks.check_idle(object())["success"] is True
+        assert prechecks.check_idle(new_client())["success"] is True
     api.assert_called()
 
 
 def test_the_idle_check_fails_after_four_windows_of_a_busy_scanner():
     with patch.object(readers.api_reader, "get_scan_status", return_value="eScanRunning"):
         t0 = time.monotonic()
-        result = prechecks.check_idle(object())
+        result = prechecks.check_idle(new_client())
         elapsed = time.monotonic() - t0
     assert result["success"] is False
     assert 4 * WINDOW_S <= elapsed < 4 * WINDOW_S + 1.0
@@ -269,7 +283,7 @@ def test_the_idle_check_fails_after_four_windows_of_a_busy_scanner():
 
 def test_a_job_switch_keeps_its_objective_while_the_api_is_busy():
     """objective_shift reads the new job's slot after the switch, with the API still busy."""
-    client = object()
+    client = new_client()
     release = threading.Event()
     held = threading.Event()
 
