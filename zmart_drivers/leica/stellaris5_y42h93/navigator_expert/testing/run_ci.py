@@ -7,7 +7,8 @@ microscope PC)::
 
     python run_ci.py             # MOCK/OFFLINE (default): lint + offline tests + coverage
     python run_ci.py --mock      # explicit spelling of the default
-    python run_ci.py --hardware  # LIVE: LAS X validators + acquire smoke
+    python run_ci.py --hardware         # LIVE: the quick acceptance against LAS X (simulator or scope)
+    python run_ci.py --hardware --full  # LIVE: plus the reader probe, parity, and the api/log routes
 
 Design goals (matching the suite's standard):
 
@@ -37,7 +38,7 @@ import sys
 import time
 from pathlib import Path
 
-DRIVER_ROOT = Path(__file__).resolve().parent  # .../navigator_expert
+DRIVER_ROOT = Path(__file__).resolve().parents[1]  # .../navigator_expert
 REPO_ROOT = DRIVER_ROOT.parents[3]  # the repository root (import root of zmart_drivers)
 REPORT_DIR = DRIVER_ROOT / "testing" / "_report"
 TEST_PATHS = [DRIVER_ROOT / "testing"]
@@ -107,8 +108,19 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         description="Navigator Expert driver CI (offline suite + coverage + reports)."
     )
     parser.add_argument("--mock", action="store_true", help="run the mock/offline suite (default)")
-    parser.add_argument("--hardware", action="store_true", help="run the live LAS X hardware suite")
+    parser.add_argument(
+        "--hardware",
+        action="store_true",
+        help="the quick acceptance against LAS X (simulator or scope), about five minutes",
+    )
+    parser.add_argument(
+        "--full",
+        action="store_true",
+        help="with --hardware: also the reader probe, the parity check and the api and log routes",
+    )
     args = parser.parse_args(argv)
+    if args.full and not args.hardware:
+        parser.error("--full goes with --hardware")
     if args.mock and args.hardware:
         parser.error("--mock and --hardware are mutually exclusive")
     return args
@@ -175,7 +187,7 @@ def main(argv: list[str] | None = None) -> int:
         if cov_available:
             pytest_cmd += [
                 "--cov=zmart_drivers.leica.stellaris5_y42h93.navigator_expert",
-                f"--cov-config={DRIVER_ROOT / '.coveragerc'}",
+                f"--cov-config={DRIVER_ROOT / 'testing' / '.coveragerc'}",
                 "--cov-report=term-missing:skip-covered",
                 f"--cov-report=xml:{REPORT_DIR / 'coverage.xml'}",
                 f"--cov-report=html:{REPORT_DIR / 'htmlcov'}",
@@ -230,21 +242,24 @@ def main(argv: list[str] | None = None) -> int:
             run_hardware = False  # skip the whole hardware block below
 
     if run_hardware:
+        # The quick acceptance, the same command on the simulator and on the
+        # scope: the driver as it is installed and connected by name, every
+        # command, the limits gate, one move, one acquisition; then the
+        # settings through the production reader route (hybrid). Each step
+        # restores what it changed.
         hardware_steps = [
             (
-                "hardware: passive readers (api / log / hybrid)",
-                [sys.executable, str(hw / "probe_four_readers.py"), "--read-only"],
-                True,
-            ),
-            (
-                "hardware: reader parity + routed modes",
+                "hardware: installed driver (register folder, connect by name)",
                 [
                     sys.executable,
-                    str(hw / "validate_readers_side_by_side.py"),
+                    str(hw / "validate_installed_driver.py"),
                     "--yes",
+                    "--allow-move",
+                    "--allow-acquire",
+                    f"--output={REPORT_DIR / 'installed_driver_validate.jsonl'}",
                     f"--report-dir={REPORT_DIR}",
                 ],
-                False,
+                True,
             ),
             (
                 "hardware: zmart adapter (move/state/acquire)",
@@ -262,10 +277,30 @@ def main(argv: list[str] | None = None) -> int:
                 True,
             ),
         ]
-        # End-to-end driver validation once per reader route. The production
-        # surface is hybrid, so only hybrid is fatal; api/log runs stay
-        # diagnostic and document bench-specific reader disagreements.
-        for mode in ("api", "log", "hybrid"):
+        # The full set adds the diagnostics: the passive reader probe, the
+        # api/log parity check, and the end-to-end validator through the two
+        # other reader routes. Once per release, or after a change to the
+        # readers; the api and log routes stay diagnostic, hybrid is fatal.
+        if args.full:
+            hardware_steps = [
+                (
+                    "hardware: passive readers (api / log / hybrid)",
+                    [sys.executable, str(hw / "probe_four_readers.py"), "--read-only"],
+                    True,
+                ),
+                (
+                    "hardware: reader parity + routed modes",
+                    [
+                        sys.executable,
+                        str(hw / "validate_readers_side_by_side.py"),
+                        "--yes",
+                        f"--report-dir={REPORT_DIR}",
+                    ],
+                    False,
+                ),
+                *hardware_steps,
+            ]
+        for mode in ("api", "log", "hybrid") if args.full else ("hybrid",):
             hardware_steps.append(
                 (
                     f"hardware: end-to-end validator [{mode} reader]",
@@ -310,6 +345,9 @@ def main(argv: list[str] | None = None) -> int:
             print("    htmlcov/index.html  browsable coverage report")
     if run_hardware:
         print(
+            "    installed_driver_validate.jsonl  the driver as installed and connected by name"
+        )
+        print(
             "    hardware_validate_{api,log,hybrid}.jsonl  end-to-end checks; hybrid is the fatal production route"
         )
     print("    ci_summary.json   this step summary")
@@ -322,6 +360,18 @@ def main(argv: list[str] | None = None) -> int:
             for p in REPORT_DIR.glob("hardware_run_report_*.md")
             if p.stat().st_mtime >= run_reports_since
         )
+        installed = sorted(
+            p
+            for p in REPORT_DIR.glob("hardware_run_report_*.md")
+            if p.stat().st_mtime >= run_reports_since
+            and "validate_installed_driver" in p.read_text(encoding="utf-8")[:2000]
+        )
+        if installed:
+            print("\n  ACCEPTANCE (from the installed-driver run; all PASS on the simulator,")
+            print("  then all PASS on the scope, is production ready):")
+            for line in installed[-1].read_text(encoding="utf-8").splitlines():
+                if line.startswith(("- PASS: ", "- FAIL: ", "- SKIP: ")):
+                    print(f"    {line[2:]}")
         print("\n  markdown run reports (every attempted instrument change):")
         if run_reports:
             for p in run_reports:

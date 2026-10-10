@@ -55,7 +55,7 @@ from typing import Any
 _HERE = Path(__file__).resolve()
 _NAV_ROOT = _HERE.parents[2]  # navigator_expert/
 _REPO_ROOT = _HERE.parents[6]  # the repository root, which holds zmart_drivers/
-_HELPERS = _NAV_ROOT / "tests" / "helpers"
+_HELPERS = _NAV_ROOT / "testing" / "helpers"
 for _p in (str(_HERE.parent), str(_REPO_ROOT), str(_HELPERS)):
     if _p not in sys.path:
         sys.path.insert(0, _p)
