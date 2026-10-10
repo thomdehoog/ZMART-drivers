@@ -36,7 +36,7 @@ jobs:
         include:
           - driver: leica
             extras: leica,test
-            run: python zmart_drivers/leica/stellaris5_y42h93/navigator_expert/run_ci.py
+            run: python zmart_drivers/leica/stellaris5_y42h93/navigator_expert/testing/run_ci.py
           - driver: nikon
             extras: test
             # -P keeps the working folder off the search path, as the run_ci
