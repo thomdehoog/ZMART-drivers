@@ -23,6 +23,11 @@ if TYPE_CHECKING:
 log = logging.getLogger(__name__)
 
 
+# How long a file may sit WITHOUT GROWING before the wait gives up on it. A
+# file that is still being written is never timed out: every change in size
+# restarts this budget, so a large export takes as long as it takes. Only a
+# file that stops changing yet never becomes readable (stuck, still locked)
+# exhausts it.
 DEFAULT_FILE_STABILITY_TIMEOUT_S = 120
 # Detection window: how long to wait for native AutoSave to produce ANY output
 # (a project directory or OME-TIFF) after the scan completes before concluding
@@ -80,16 +85,17 @@ def _relative_posix(path: Path, base: Path, *, fallback_to_str: bool) -> str | N
 
 
 def wait_all_stable(files, *, timeout=60, poll_interval=0.5, stable_readings=3):
-    """Block until every file in *files* is unlocked and size-stable."""
+    """Block until every file in *files* is unlocked and size-stable.
+
+    ``timeout`` is the no-progress budget per file (see
+    :func:`_wait_file_stable`): a file that keeps growing is waited for
+    as long as it grows.
+    """
     t0 = time.perf_counter()
     unstable = []
 
     for f in files:
-        remaining = timeout - (time.perf_counter() - t0)
-        if remaining <= 0:
-            unstable.append(f)
-            continue
-        if not _wait_file_stable(f, remaining, poll_interval, stable_readings):
+        if not _wait_file_stable(f, timeout, poll_interval, stable_readings):
             unstable.append(f)
 
     if unstable:
@@ -142,14 +148,18 @@ def _wait_file_stable(path, timeout, poll_interval=0.5, stable_readings=3):
     exists, has non-zero size, the size hasn't changed, and the file
     is not locked.
 
-    Returns True if stable, False on timeout.
+    ``timeout`` is a no-progress budget, not a total: it restarts every
+    time the file's size changes, so a file that is still being written
+    is never given up on, however long the export takes. The wait only
+    returns False when the file has gone ``timeout`` seconds without
+    growing and still is not readable (absent, empty, or locked).
     """
     path = Path(path)
-    t0 = time.perf_counter()
+    since_progress = time.perf_counter()
     consecutive = 0
     last_size = -1
 
-    while (time.perf_counter() - t0) < timeout:
+    while (time.perf_counter() - since_progress) < timeout:
         try:
             if not path.is_file():
                 consecutive = 0
@@ -166,6 +176,8 @@ def _wait_file_stable(path, timeout, poll_interval=0.5, stable_readings=3):
             else:
                 consecutive = 0
 
+            if size != last_size:
+                since_progress = time.perf_counter()  # still growing: the budget restarts
             last_size = size
         except OSError:
             consecutive = 0
