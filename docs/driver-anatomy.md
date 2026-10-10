@@ -231,7 +231,7 @@ sorting what kind of problem this is, and then follow the rule.
 | Outcome unknown | The reply never came, after the request was sent | – | Reads back first; never sends again blindly | `False` and a message, if the readback does not show the target |
 | Refused by limits | A target outside the travel range | – | Stops before anything is sent | Raises `ValueError` |
 | Unknown reading | A stale log entry; a read that timed out | Returns "unknown" with the reason | Counts as "not confirmed yet" | – |
-| Unconfirmed | The action was accepted, but the readback never matched | – | Sends again, then gives up softly | `False` and a message saying what could not be confirmed |
+| Unconfirmed | The action was accepted, but the readback never matched | – | Sends again, then gives up softly | `True`, with the change recorded as unconfirmed; `False` only when a readback contradicts it |
 | Stopped by user | See "Stop" under open questions | – | Stops waiting | To be decided |
 
 The first four kinds are how the vendor software can fail, and the sorting
@@ -317,12 +317,11 @@ steps:
 6. **Send again** if the confirmation did not succeed, up to a set number of
    attempts.
 7. **Give up softly** if it is still not confirmed: hand back an outcome that
-   says the action is unconfirmed and why, instead of raising. The
-   `ZmartDriver` method then decides what that means for the command (part
-   7): a setting that could not be confirmed is answered as a failure that
-   names the setting, and a move that could not be confirmed is answered as a
-   failure that says where the stage is, because carrying on at an unknown
-   position is never safe.
+   says the action is unconfirmed and why, instead of raising. The driver
+   has done its best to confirm; what it could not confirm it writes down,
+   and the command goes on. Not confirmed is not the same as contradicted:
+   a readback that shows a *different* value is a failure, a readback that
+   never arrived is not. Part 7 says what the workflow sees.
 
 In the Leica driver this engine exists today as `confirm_and_fire` in
 `commands/dispatch.py`.
@@ -645,14 +644,20 @@ how the kinds from the errors table reach the experiment:
   setting that is not listed, a procedure name that `get_procedures` does
   not list. The limits gate's refusal (part 2) is such a `ValueError`; the
   method lets it through.
-- **A change that could not be confirmed is a failure, `False` and a
-  message.** It is never `True` with a flag. The set dispatcher gave up
-  softly (part 2); the method says plainly what did not take. For `set_state`
-  that is which setting, so the workflow can decide whether to carry on. For
-  `set_xyz` that is where the stage is, and the workflow should stop, because
-  the sample is not where the experiment thinks it is. For `acquire` it is a
-  capture that never produced a complete file, answered with empty `files`
-  and `planes`.
+- **A change that could not be confirmed is recorded, and the workflow
+  carries on.** The driver confirms what it can: it reads back, re-sends,
+  and gives one more look before giving up. When the readback never came,
+  the change is not known to have failed, only not known to have happened,
+  so the method answers `True`, writes the change down as unconfirmed (in
+  the command log, in a warning, and under `observed` in `get_state`, so a
+  workflow that cares can look), and goes on. A move answers with the
+  position read back from the microscope, so the workflow sees where the
+  stage really is. The answer is `False` only when something contradicts
+  the change: the readback showed a different value, the vendor refused, or
+  the connection dropped. A workflow that must not go on without proof reads
+  `get_state`; the driver never stops it on its own. This rule came from a
+  real run: a job selection whose readback lagged stopped a whole experiment
+  that would have been fine.
 - **Anything unsafe is never answered as a success.** A lost connection, a
   permanent fault, a read that timed out while a move was in flight: these
   raise, and the workflow sees `success: False`.
@@ -825,11 +830,12 @@ by any other part of the driver. The Leica driver already works this way.
 
 ## Settled since the first version
 
-- **Unconfirmed results.** A change that could not be confirmed is answered
-  as a failure, `False` and a message, never as a success with a flag. The
-  controller's contract says so, and the mock does it (part 7). The Leica
-  driver still reports `success: True` with `confirmed: False` and must be
-  brought in line.
+- **Unconfirmed results.** A change that could not be confirmed is recorded
+  and the workflow carries on; only a contradicted, refused or lost change is
+  a failure (part 7). The mock and the Leica driver both do this, and the
+  controller's guide says so. An earlier version of this document had it
+  the other way round, with every unconfirmed change a failure, and that
+  rule stopped a real experiment on a job selection whose readback lagged.
 - **Limits in raw coordinates.** The limits are stored and checked in raw
   stage coordinates, so that recording a new origin cannot move the safe
   travel range. The mock's limits gate works this way, and the Leica driver's
@@ -894,8 +900,8 @@ by any other part of the driver. The Leica driver already works this way.
 4. **What a review of the four drivers found**, in October 2026, which the
    dispatcher fixes once for all of them. Each driver copied Leica's adapter
    and each drifted the same way: a limits refusal is raised as
-   `RuntimeError` instead of `ValueError`; an unconfirmed change is answered
-   as a success; a malformed origin file is ignored instead of refused; a
+   `RuntimeError` instead of `ValueError`; an unconfirmed change was a
+   silent success, with nothing written down; a malformed origin file is ignored instead of refused; a
    repeated label overwrites the earlier picture; no command log is kept; the
    vendor software version is reported but never checked. The three strains
    the review found in several drivers at once, a send that already waits, a
