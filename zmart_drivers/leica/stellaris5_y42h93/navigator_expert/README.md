@@ -434,11 +434,9 @@ there only in case the two accounts disagree.
 in place, preserving byte formatting; `output/ome_canonical.py` writes clean canonical ZMART OME;
 `save(..., fix_ome=True)` validates/repairs each written file.
 
-**Acquiring empties the scanning template by default.** Through the zmart adapter, every `acquire()`
-(and the autofocus procedure) applies the `strip_scan_fields` acquisition setting: operator-drawn scan
-fields, regions, and focus points vanish from LAS X. The strip is sidecar-backed — restore with
-`restore_template` — but read `get_info()["tile_positions"]` and `focus_positions`
-*before* the first acquire, or pass `acquisition_settings={"strip_scan_fields": False}`.
+**Acquiring never touches the scanning template.** Positions are never made in the Navigator Expert:
+they come from the ZMART interface. `acquire()` and the autofocus procedure capture at the current
+position and leave the LAS X template alone.
 
 **Extra in-place backlash rounds are off by default.** The acquisition setting
 `backlash_rounds` defaults to `0`; pass a positive whole number to opt in for a
