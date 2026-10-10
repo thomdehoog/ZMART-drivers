@@ -596,7 +596,7 @@ class TestAcquire(unittest.TestCase):
         self.assertEqual(opts["backlash_rounds"]["active"], 0)
         self.assertEqual(adapter.ACQUISITION_BACKLASH_DEFAULT_ROUNDS, 0)
         self.assertEqual(opts["backlash_rounds"]["options"], "int >= 0")
-        self.assertEqual(opts["strip_scan_fields"]["active"], True)  # default on
+        self.assertNotIn("strip_scan_fields", opts)  # positions never come from the Navigator
         self.assertEqual(opts["format"]["active"], "ome-tiff")
         self.assertEqual(opts["cleanup_source"]["active"], False)
 
@@ -1226,15 +1226,20 @@ class TestAcquire(unittest.TestCase):
         self.assertEqual(record["settle"], "direct")
         self.assertEqual(record["backlash_rounds"], 0)
 
-    def _acquire_with_template_state(self, state, strip_result=None, options=None):
-        """Run acquire with the scanfield layer patched; returns the calls list."""
+    def _acquire_with_template_touch_forbidden(self, options=None):
+        """Run acquire with every template entry point failing loudly; returns the calls."""
         h = _handle(connection={**adapter.CONNECTION, "output_root": "/tmp/out"})
         calls = []
         patches = _patch_position(job="Overview")
+        forbidden = AssertionError("acquire touched the scanning template")
         with (
             patch.object(adapter._readers, "get_jobs", return_value=self._jobs()),
             patch.object(adapter._commands, "select_job", return_value={"success": True}),
-            patch.object(adapter._motion, "correct_backlash", lambda client, **k: {"success": True, "confirmed": True}),
+            patch.object(
+                adapter._motion,
+                "correct_backlash",
+                lambda client, **k: {"success": True, "confirmed": True},
+            ),
             patch.object(
                 adapter._capture,
                 "acquire",
@@ -1247,37 +1252,21 @@ class TestAcquire(unittest.TestCase):
                 "save",
                 return_value=SimpleNamespace(image_paths={}, xml_paths={}, naming=None),
             ),
-            patch.object(adapter._scanfields, "get_template_state", return_value=state),
-            patch.object(
-                adapter._scanfields,
-                "strip_template",
-                side_effect=lambda client, **k: calls.append("strip") or strip_result,
-            ),
+            patch.object(adapter._scanfields, "get_template_state", side_effect=forbidden),
+            patch.object(adapter._scanfields, "strip_template", side_effect=forbidden),
+            patch.object(adapter._scanfields, "save_experiment", side_effect=forbidden),
             patches[2],
         ):
             adapter.acquire(h, position_label="1", acquisition_settings=options)
         return calls
 
-    def test_acquire_strips_an_unstripped_template_before_capturing(self):
-        calls = self._acquire_with_template_state("unstripped", strip_result={"success": True})
-        self.assertEqual(calls, ["strip", "capture"])
+    def test_acquire_never_touches_the_scanning_template(self):
+        """Positions are never made in the Navigator Expert, so nothing is stripped."""
+        self.assertEqual(self._acquire_with_template_touch_forbidden(), ["capture"])
 
-    def test_acquire_skips_the_strip_when_already_stripped(self):
-        self.assertEqual(self._acquire_with_template_state("stripped"), ["capture"])
-
-    def test_acquire_strip_can_be_opted_out(self):
-        calls = self._acquire_with_template_state(
-            "unstripped", options={"strip_scan_fields": False}
-        )
-        self.assertEqual(calls, ["capture"])
-
-    def test_acquire_refuses_an_unreadable_template(self):
-        with self.assertRaisesRegex(RuntimeError, "unreadable"):
-            self._acquire_with_template_state("unreadable")
-
-    def test_acquire_refuses_when_the_strip_fails(self):
-        with self.assertRaisesRegex(RuntimeError, "could not strip"):
-            self._acquire_with_template_state("unstripped", strip_result=None)
+    def test_strip_scan_fields_is_not_an_acquisition_setting(self):
+        with self.assertRaisesRegex(ValueError, "unknown acquisition setting 'strip_scan_fields'"):
+            self._acquire_with_template_touch_forbidden({"strip_scan_fields": False})
 
 
 class TestStateAndProcedures(unittest.TestCase):
@@ -1449,10 +1438,10 @@ class TestStateAndProcedures(unittest.TestCase):
         self.assertEqual(result["frame_z_um"], 43.5)  # all-zero origin
         self.assertEqual(result["duration_s"], 2.5)
 
-    def test_autofocus_strips_an_unstripped_template_first(self):
+    def test_autofocus_never_touches_the_scanning_template(self):
         h = _handle()
         p = self._state_patches()
-        strip = MagicMock(return_value={"success": True})
+        forbidden = AssertionError("autofocus touched the scanning template")
         position = _patch_position()
         with (
             p[2],
@@ -1460,8 +1449,8 @@ class TestStateAndProcedures(unittest.TestCase):
             position[1],
             position[2],
             position[3],
-            patch.object(adapter._scanfields, "get_template_state", return_value="unstripped"),
-            patch.object(adapter._scanfields, "strip_template", strip),
+            patch.object(adapter._scanfields, "get_template_state", side_effect=forbidden),
+            patch.object(adapter._scanfields, "strip_template", side_effect=forbidden),
             patch.object(adapter._commands, "select_job", return_value={"success": True}),
             patch.object(
                 adapter._capture,
@@ -1469,8 +1458,8 @@ class TestStateAndProcedures(unittest.TestCase):
                 return_value=SimpleNamespace(job="AF Job", started_at=0.0, finished_at=1.0),
             ),
         ):
-            adapter.run_procedure(h, {"name": "autofocus"})
-        strip.assert_called_once()
+            result = adapter.run_procedure(h, {"name": "autofocus"})
+        self.assertEqual(result["ran"], "autofocus")
 
     def test_autofocus_rejects_a_normal_job(self):
         h = _handle()

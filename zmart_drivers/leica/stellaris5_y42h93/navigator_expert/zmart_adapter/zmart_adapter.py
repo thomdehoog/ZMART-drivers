@@ -884,10 +884,10 @@ def get_acquisition_settings(handle: ZmartHandle) -> dict:
     selected one active; ``cleanup_source`` is forwarded
     to the driver's ``save()``; ``backlash_correction`` runs an XY slack
     takeup before capture and optional ``backlash_rounds`` controls its pass
-    count (default ``0``, which skips it); ``strip_scan_fields``
-    (Leica-specific, default on)
-    empties the scanning template before the capture so LAS X acquires the
-    single current position, never a stored scan-field pattern.
+    count (default ``0``, which skips it).
+
+    The scanning template is never touched: positions are never made in the
+    Navigator Expert, so LAS X acquires the single current position.
     """
     _require_open(handle)
     normal, _ = _job_catalog(handle)
@@ -909,7 +909,6 @@ def get_acquisition_settings(handle: ZmartHandle) -> dict:
             "options": "int >= 0",
             "active": ACQUISITION_BACKLASH_DEFAULT_ROUNDS,
         },
-        "strip_scan_fields": {"options": [True, False], "active": True},
         "format": {"options": ["ome-tiff"], "active": "ome-tiff"},
         "cleanup_source": {"options": [True, False], "active": False},
     }
@@ -959,27 +958,6 @@ def _next_acquisition_hash(handle: ZmartHandle) -> str:
             handle.acquisition_hashes.add(value)
             return value
     raise RuntimeError("could not mint a unique acquisition-position hash")
-
-
-def _ensure_scan_fields_stripped(handle: ZmartHandle) -> None:
-    """Empty the scanning template before a capture.
-
-    A template carrying scan fields makes LAS X acquire the stored pattern
-    instead of the single current position. Sidecar strip only (never
-    in-place): the operator's canonical template files stay on disk and
-    ``drv.restore_template`` can bring the fields back. Cheap when there is
-    nothing to do — "stripped" and "fresh" return immediately.
-    """
-    state = _scanfields.get_template_state()
-    if state in ("stripped", "fresh"):
-        return
-    if state == "unreadable":
-        raise RuntimeError(
-            "scanning template is unreadable; cannot verify the scan field is empty — "
-            "fix or remove the template, or pass acquisition_settings={'strip_scan_fields': False}"
-        )
-    if not _scanfields.strip_template(handle.client):
-        raise RuntimeError("could not strip the scanning template before acquiring")
 
 
 def _next_position_label(handle: ZmartHandle) -> str:
@@ -1079,11 +1057,6 @@ def acquire(
         raise RuntimeError(
             "no LAS X job selected and none passed via acquisition_settings['job']"
         )
-
-    # Strip BEFORE selecting: stripping reloads the experiment, which could
-    # otherwise undo the selection.
-    if resolved["strip_scan_fields"]:
-        _ensure_scan_fields_stripped(handle)
 
     noted_before = len(handle.unconfirmed)
     # When the selected job cannot be read, select the one asked for anyway:
@@ -1402,9 +1375,8 @@ def _run_autofocus(handle: ZmartHandle, procedure: dict) -> dict:
     ``job`` names the autofocus job; it may be omitted when the instrument
     has exactly one. Nothing is saved — the result is the focus readback
     right after the run (before the selection is restored), in both
-    hardware and frame terms. The scanning template is stripped first,
-    like every capture (an autofocus must run at the current position,
-    never a stored pattern).
+    hardware and frame terms. Like every capture it never touches the
+    scanning template: positions are never made in the Navigator Expert.
     """
     _, autofocus = _job_catalog(handle)
     names = [j["Name"] for j in autofocus if j.get("Name")]
@@ -1418,7 +1390,6 @@ def _run_autofocus(handle: ZmartHandle, procedure: dict) -> dict:
     elif job not in names:
         raise ValueError(f"{job!r} is not an autofocus job (available: {names})")
 
-    _ensure_scan_fields_stripped(handle)
     original = _selected_job_name(handle)
     if job != original:
         selected = _commands.select_job(handle.client, job)

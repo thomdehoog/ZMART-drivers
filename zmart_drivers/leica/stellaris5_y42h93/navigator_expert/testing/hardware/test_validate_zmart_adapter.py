@@ -223,10 +223,7 @@ def test_acquire_backlash_rounds_through_the_controller_seam(tmp_path, rounds, c
     use live) and only patches the I/O boundary (``_capture``/``_save``) that a
     mock CAM cannot satisfy -- so the seam decision #3 cares about (Session ->
     ops table -> adapter) is what is actually exercised for both the default
-    and a positive ``backlash_rounds`` acquisition setting. ``strip_scan_fields``
-    is passed as ``False`` for the same reason: stripping needs ``PyApiSaveExperiment``,
-    which ``MockLasxClient`` does not implement, and scan-field handling is
-    unrelated to what this test verifies.
+    and a positive ``backlash_rounds`` acquisition setting.
     """
     from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.actions import profiles
 
@@ -257,7 +254,7 @@ def test_acquire_backlash_rounds_through_the_controller_seam(tmp_path, rounds, c
             patch.object(adapter._capture, "acquire", fake_capture),
             patch.object(adapter._save, "save", fake_save),
         ):
-            options = {"backlash_correction": True, "strip_scan_fields": False}
+            options = {"backlash_correction": True}
             if rounds is not None:
                 options["backlash_rounds"] = rounds
             record = session.acquire(
