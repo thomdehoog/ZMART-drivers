@@ -84,7 +84,6 @@ except Exception:  # noqa: BLE001 -- best-effort provenance
     _DRIVER_VERSION = None
 
 from .. import connect as _session
-from .. import scanfields as _scanfields
 from ..actions import acquire as _capture
 from ..actions import set as _commands
 from ..actions.derived import z_um_from_settings as _z_um_from_settings
@@ -138,11 +137,6 @@ UNIT = "micrometer"
 
 # controller actuator name -> driver move_z z_mode
 _Z_MODES = {"z-wide": "zwide", "z-galvo": "galvo"}
-
-# How long get_info waits (seconds) for LAS X to flush the live experiment
-# to disk before parsing its scan fields. A read that needs a save first is
-# quirky but unavoidable: the on-disk template is the only complete source.
-EXPERIMENT_FLUSH_TIMEOUT_S = 60
 
 # Routine backlash take-up remains explicitly available, but ordinary
 # controller acquisitions do not add in-place correction cycles unless the
@@ -1427,128 +1421,20 @@ def _run_autofocus(handle: ZmartHandle, procedure: dict) -> dict:
 # =============================================================================
 
 
-def _scan_field(handle: ZmartHandle, *, default_job_name: str) -> dict | None:
-    """Positions and focus points the operator stored in the scanning template.
-
-    Saves the experiment first (the parsers read the on-disk template; a
-    load alone does not flush it), then reports every stored position as a
-    typed entry in BOTH coordinate spaces — grid positions name the region
-    group they belong to. Template z values are treated as focus positions
-    (the same convention as the frame's z axis). None when this machine has
-    no LAS X scanning-templates profile.
-
-    Read this BEFORE acquiring: the default ``strip_scan_fields``
-    acquisition setting empties the template.
-    """
-    templates_dir = _scanfields.find_scanning_templates_dir()
-    if templates_dir is None:
-        return None
-    saved = _scanfields.save_experiment(
-        handle.client,
-        _scanfields.TEMPLATE_XML,
-        templates_dir,
-        timeout=EXPERIMENT_FLUSH_TIMEOUT_S,
-        confirm_path=Path(templates_dir) / _scanfields.TEMPLATE_RGN,
-    )
-    if not saved:
-        # The template on disk may be stale, so its positions are not
-        # reported rather than reported wrong; get_info still answers.
-        _note_unconfirmed(handle, "get_info: save_experiment (scan-field positions)", saved)
-        return None
-    parsed = _scanfields.parse_scan_positions(
-        templates_dir,
-        _scanfields.TEMPLATE_BASE,
-        client=handle.client,
-        default_job_name=default_job_name,
-    )
-    dt = _delta_or_warn(handle, _hardware_snapshot(handle))
-    origin = handle.origin
-
-    def entry(kind: str, x_um: float, y_um: float, z_um: float | None, **meta: Any) -> dict:
-        return {
-            "kind": kind,
-            "frame": {
-                "x_um": x_um - origin["x_um"] - dt[0],
-                "y_um": y_um - origin["y_um"] - dt[1],
-                "z_um": None if z_um is None else z_um - origin["z_focus_um"] - dt[2],
-            },
-            "stage": {"x_um": x_um, "y_um": y_um, "z_um": z_um},
-            **meta,
-        }
-
-    positions = []
-    for region_key, region in (parsed.get("acquisition_positions") or {}).items():
-        geometry_id = region.get("geometry_id")
-        geometry = (parsed.get("geometries") or {}).get(geometry_id, {})
-        # Unassigned LAS X point shapes are operator markers.  They are
-        # exposed below as ``marker`` entries, never duplicated as tiles.
-        if region.get("source") == "geometry_plan" and geometry.get("type") == "Point":
-            continue
-        for tile in region.get("positions") or []:
-            positions.append(
-                entry(
-                    "grid",
-                    tile["x_um"],
-                    tile["y_um"],
-                    tile.get("z_um"),
-                    group={"region": region_key, "row": tile.get("row"), "col": tile.get("col")},
-                    job=region.get("job_name"),
-                    tile_size={
-                        "x": region.get("tile_size_um"),
-                        "y": region.get("tile_size_um"),
-                    },
-                )
-            )
-    for kind, points in (
-        ("focus-point", parsed.get("focus_points") or []),
-        ("autofocus-point", parsed.get("autofocus_points") or []),
-    ):
-        for point in points:
-            positions.append(
-                entry(
-                    kind,
-                    point["x_um"],
-                    point["y_um"],
-                    point.get("z_um"),
-                    id=point.get("identifier"),
-                    enabled=point.get("enabled", True),
-                )
-            )
-    for geometry in (parsed.get("geometries") or {}).values():
-        center = geometry.get("center_um") or {}
-        if geometry.get("type") == "Point" and center.get("x_um") is not None:
-            positions.append(
-                entry("marker", center["x_um"], center["y_um"], None, label=geometry.get("label"))
-            )
-    return {
-        "coordinate_spaces": {
-            "frame": "um from the origin, objective-compensated (what set_xyz accepts)",
-            "stage": "absolute stage um (what LAS X stores)",
-        },
-        "template_state": _scanfields.get_template_state(templates_dir),
-        "positions": positions,
-    }
-
-
 def get_info(handle: ZmartHandle) -> dict:
-    """Read the operator-authored setup and resolved output root live.
+    """Read the session's setup and resolved output root live.
 
-    ``tile_positions`` are the tiles currently placed in the LAS X scanning
-    template, not the microscope's physical position (read that with
-    :func:`get_xyz`). Reading the template flushes the live experiment to
-    disk before parsing it, so this truthful snapshot can block briefly and
-    raises when a configured template cannot be read safely.
+    The LAS X scanning template is never read: positions are never made in
+    the Navigator Expert, so there are no tile or focus positions to report,
+    and answering never saves the experiment.
     """
     _require_open(handle)
     selected = _selected_job_name(handle)
-    scan_field = _scan_field(handle, default_job_name=selected)
     root = _info.output_root(handle, _save.save_source_root)
     return {
         "output_root": str(root),
         "description": _described(handle),
         "selected_job": selected,
-        "tile_positions": _info.tile_positions(scan_field),
-        "focus_positions": _info.focus_positions(scan_field),
         "client": handle.connection.get("client"),
         "session_hash6": handle.hash6,
         "canvas": _canvas(handle),

@@ -21,6 +21,7 @@ from limits_fixtures import (
     provision_machine_limits,
 )
 
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert import scanfields
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher import (
     checks as limits_checks,
 )
@@ -650,7 +651,6 @@ class TestAcquire(unittest.TestCase):
             with (
                 patch.object(adapter._save, "save_source_root", return_value=autosave),
                 patch.object(adapter, "_selected_job_name", return_value="Overview"),
-                patch.object(adapter, "_scan_field", return_value=None),
             ):
                 result = adapter.get_info(h)
                 root = Path(result["output_root"])
@@ -661,7 +661,6 @@ class TestAcquire(unittest.TestCase):
         h = _handle(connection={**adapter.CONNECTION, "output_root": "/chosen/zmart"})
         with (
             patch.object(adapter, "_selected_job_name", return_value="Overview"),
-            patch.object(adapter, "_scan_field", return_value=None),
             patch.object(
                 adapter._save,
                 "save_source_root",
@@ -689,7 +688,6 @@ class TestAcquire(unittest.TestCase):
             patch.object(adapter._motion, "correct_backlash", lambda client, **k: {"success": True, "confirmed": True}),
             patch.object(adapter._capture, "acquire", lambda c, j, **k: SimpleNamespace(job=j)),
             patch.object(adapter._save, "save", fake_save),
-            patch.object(adapter._scanfields, "get_template_state", return_value="fresh"),
             # Where to save is otherwise discovered from LAS X native AutoSave
             # on this PC, which only the author's PC has.
             patch.object(adapter._info, "output_root", return_value=Path("/tmp/out")),
@@ -726,7 +724,6 @@ class TestAcquire(unittest.TestCase):
         patches = _patch_position(x_um=1_000.0, y_um=500.0, z_wide_um=100.0)
         with (
             patch.object(adapter, "_selected_job_name", return_value="Overview"),
-            patch.object(adapter, "_scan_field", return_value=None),
             patch.object(adapter._info, "output_root", return_value=Path("/runs")),
             patch.object(adapter._readers, "ping", return_value=True),
             # As it is really called: no client, it reads the startup .lcf.
@@ -780,7 +777,6 @@ class TestAcquire(unittest.TestCase):
             patch.object(adapter._motion, "correct_backlash", lambda client, **k: {"success": True, "confirmed": True}),
             patch.object(adapter._capture, "acquire", fake_capture),
             patch.object(adapter._save, "save", fake_save),
-            patch.object(adapter._scanfields, "get_template_state", return_value="fresh"),
             patches[0],
             patches[1],
             patches[2],
@@ -862,7 +858,6 @@ class TestAcquire(unittest.TestCase):
                 patch.object(adapter._motion, "correct_backlash", lambda client, **k: {"success": True, "confirmed": True}),
                 patch.object(adapter._capture, "acquire", lambda client, job, **k: SimpleNamespace(job=job)),
                 patch.object(adapter._save, "save", fake_save),
-                patch.object(adapter._scanfields, "get_template_state", return_value="fresh"),
                 patches[0], patches[1], patches[2], patches[3],
             ):
                 record = adapter.acquire(
@@ -981,7 +976,6 @@ class TestAcquire(unittest.TestCase):
                     adapter._capture, "acquire", lambda client, job, **k: SimpleNamespace(job=job)
                 ),
                 patch.object(adapter._save, "save", fake_save),
-                patch.object(adapter._scanfields, "get_template_state", return_value="fresh"),
                 patches[0],
                 patches[1],
                 patches[2],
@@ -1021,7 +1015,6 @@ class TestAcquire(unittest.TestCase):
                 adapter._capture, "acquire", lambda client, job, **k: SimpleNamespace(job=job)
             ),
             patch.object(adapter._save, "save", fake_save),
-            patch.object(adapter._scanfields, "get_template_state", return_value="fresh"),
             patches[0],
             patches[1],
             patches[2],
@@ -1044,7 +1037,6 @@ class TestAcquire(unittest.TestCase):
             env[7],
             env[8],
             env[9],
-            env[10],
             patch.object(adapter, "run_hash", side_effect=["0000a1", "0000a2"]),
         ):
             record0 = adapter.acquire(h)
@@ -1139,7 +1131,6 @@ class TestAcquire(unittest.TestCase):
             env[7],
             env[8],
             env[9],
-            env[10],
         ):
             adapter.acquire(h, position_label="named")  # must not bump the counter
             record = adapter.acquire(h)  # still gets 000000
@@ -1176,7 +1167,6 @@ class TestAcquire(unittest.TestCase):
             patch.object(adapter._motion, "correct_backlash", fake_correct_backlash),
             patch.object(adapter._capture, "acquire", fake_capture),
             patch.object(adapter._save, "save", fake_save),
-            patch.object(adapter._scanfields, "get_template_state", return_value="fresh"),
             patches[2],
         ):
             record = adapter.acquire(
@@ -1214,7 +1204,6 @@ class TestAcquire(unittest.TestCase):
                 "save",
                 return_value=SimpleNamespace(image_paths={}, xml_paths={}, naming=None),
             ),
-            patch.object(adapter._scanfields, "get_template_state", return_value="fresh"),
             patches[2],
         ):
             record = adapter.acquire(
@@ -1252,9 +1241,9 @@ class TestAcquire(unittest.TestCase):
                 "save",
                 return_value=SimpleNamespace(image_paths={}, xml_paths={}, naming=None),
             ),
-            patch.object(adapter._scanfields, "get_template_state", side_effect=forbidden),
-            patch.object(adapter._scanfields, "strip_template", side_effect=forbidden),
-            patch.object(adapter._scanfields, "save_experiment", side_effect=forbidden),
+            patch.object(scanfields, "get_template_state", side_effect=forbidden),
+            patch.object(scanfields, "strip_template", side_effect=forbidden),
+            patch.object(scanfields, "save_experiment", side_effect=forbidden),
             patches[2],
         ):
             adapter.acquire(h, position_label="1", acquisition_settings=options)
@@ -1410,7 +1399,6 @@ class TestStateAndProcedures(unittest.TestCase):
             position[1],
             position[2],
             position[3],
-            patch.object(adapter._scanfields, "get_template_state", return_value="fresh"),
             patch.object(
                 adapter._commands,
                 "select_job",
@@ -1449,8 +1437,8 @@ class TestStateAndProcedures(unittest.TestCase):
             position[1],
             position[2],
             position[3],
-            patch.object(adapter._scanfields, "get_template_state", side_effect=forbidden),
-            patch.object(adapter._scanfields, "strip_template", side_effect=forbidden),
+            patch.object(scanfields, "get_template_state", side_effect=forbidden),
+            patch.object(scanfields, "strip_template", side_effect=forbidden),
             patch.object(adapter._commands, "select_job", return_value={"success": True}),
             patch.object(
                 adapter._capture,
@@ -1483,194 +1471,29 @@ class TestStateAndProcedures(unittest.TestCase):
                 adapter.run_procedure(h, {"name": "autofocus"})
 
 
-class TestScanFieldInfo(unittest.TestCase):
-    """get_info().scan_field: template positions, typed, in both spaces."""
+class TestGetInfoLeavesTheTemplateAlone(unittest.TestCase):
+    """get_info never reads the LAS X scanning template.
 
-    _PARSED = {
-        "acquisition_positions": {
-            "0": {
-                "job_name": "HiRes",
-                "tile_size_um": 100.0,
-                "positions": [
-                    {"row": 0, "col": 0, "x_um": 1100.0, "y_um": 2200.0, "z_um": 40.0},
-                    {"row": 0, "col": 1, "x_um": 1150.0, "y_um": 2200.0, "z_um": 41.0},
-                ],
-            }
-        },
-        "focus_points": [
-            {"identifier": "F1", "x_um": 1500.0, "y_um": 2500.0, "z_um": 33.0, "enabled": True}
-        ],
-        "autofocus_points": [
-            {"identifier": "AF1", "x_um": 1600.0, "y_um": 2600.0, "z_um": 35.0, "enabled": True}
-        ],
-        "geometries": {
-            "g1": {"type": "Point", "center_um": {"x_um": 1050.0, "y_um": 2050.0}, "label": "A"},
-            "g2": {"type": "Rectangle", "center_um": {"x_um": 9.0, "y_um": 9.0}},
-        },
-    }
+    Positions are never made in the Navigator Expert, so there are no tile or
+    focus positions to report, and connecting no longer saves the experiment.
+    """
 
-    def _info(
-        self,
-        parsed=None,
-        save_result=None,
-        templates_dir="X:/tpl",
-        calls=None,
-        parse_kwargs=None,
-    ):
-        h = _handle(origin=_origin(x_um=1000.0, y_um=2000.0, z_wide_um=30.0, z_focus_um=30.0))
+    def test_get_info_never_touches_the_template_and_reports_no_positions(self):
+        h = _handle()
         h.connection["output_root"] = "/tmp/zmart-test"
-        calls = [] if calls is None else calls
-        position = _patch_position()
-        save_result = {"success": True} if save_result is None else save_result
-
-        def fake_parse(*args, **kwargs):
-            calls.append("parse")
-            if parse_kwargs is not None:
-                parse_kwargs.update(kwargs)
-            return dict(parsed if parsed is not None else self._PARSED)
-
-        with (
-            position[0],
-            position[1],
-            position[2],
-            position[3],
-            patch.object(
-                adapter._scanfields,
-                "find_scanning_templates_dir",
-                return_value=None if templates_dir is None else Path(templates_dir),
-            ),
-            patch.object(
-                adapter._scanfields,
-                "save_experiment",
-                side_effect=lambda *a, **k: calls.append("save") or save_result,
-            ),
-            patch.object(
-                adapter._scanfields,
-                "parse_scan_positions",
-                side_effect=fake_parse,
-            ),
-            patch.object(adapter._scanfields, "get_template_state", return_value="unstripped"),
-        ):
-            return adapter.get_info(h), calls
-
-    def test_positions_are_typed_and_in_both_spaces(self):
-        parse_kwargs = {}
-        info, calls = self._info(parse_kwargs=parse_kwargs)
-        self.assertEqual(calls, ["save", "parse"])  # always flush before parsing
-        self.assertEqual(parse_kwargs["default_job_name"], info["selected_job"])
-        tiles = info["tile_positions"]
-        first = tiles[0]
-        self.assertEqual(first["group"], {"region": "0", "row": 0, "col": 0})
-        self.assertEqual(first["job"], "HiRes")
-        self.assertEqual(first["tile_size"], {"x": 100.0, "y": 100.0})
-        self.assertEqual(
-            {k: first[k] for k in ("x", "y", "z")}, {"x": 100.0, "y": 200.0, "z": 10.0}
-        )
-        self.assertEqual(len(tiles), 2)
-        focus = info["focus_positions"]
-        self.assertEqual(focus[0]["id"], "F1")
-        self.assertEqual(focus[0]["z"], 3.0)
-        self.assertEqual(focus[1]["id"], "AF1")
-
-    def test_unassigned_point_geometries_remain_markers_not_tiles(self):
-        parsed = {
-            "acquisition_positions": {
-                "0": {
-                    "job_name": "Overview",
-                    "tile_size_um": 100.0,
-                    "source": "geometry_plan",
-                    "geometry_id": "point",
-                    "positions": [{"row": 0, "col": 0, "x_um": 1100.0, "y_um": 2200.0}],
-                },
-                "1": {
-                    "job_name": "Overview",
-                    "tile_size_um": 100.0,
-                    "source": "geometry_plan",
-                    "geometry_id": "rectangle",
-                    "positions": [{"row": 0, "col": 0, "x_um": 1200.0, "y_um": 2300.0}],
-                },
-            },
-            "focus_points": [],
-            "autofocus_points": [],
-            "geometries": {
-                "point": {
-                    "type": "Point",
-                    "center_um": {"x_um": 1100.0, "y_um": 2200.0},
-                    "label": "P1",
-                },
-                "rectangle": {"type": "Rectangle"},
-            },
-        }
-
-        info, _ = self._info(parsed=parsed)
-
-        self.assertEqual(len(info["tile_positions"]), 1)
-        self.assertEqual(info["tile_positions"][0]["group"]["region"], "1")
-
-    def test_no_templates_profile_reports_none(self):
-        info, calls = self._info(templates_dir=None)
-        self.assertEqual(info["tile_positions"], [])
-        self.assertEqual(info["focus_positions"], [])
-        self.assertEqual(calls, [])  # nothing saved, nothing parsed
-
-    def test_get_info_rereads_tile_positions_instead_of_caching(self):
-        h = _handle(connection={**adapter.CONNECTION, "output_root": "/tmp/zmart-test"})
-        fields = [
-            {"positions": []},
-            {
-                "positions": [
-                    {
-                        "kind": "grid",
-                        "frame": {"x_um": 1.0, "y_um": 2.0, "z_um": 3.0},
-                        "tile_size": {"x": 10.0, "y": 20.0},
-                    }
-                ]
-            },
-        ]
+        forbidden = AssertionError("get_info touched the scanning template")
         with (
             patch.object(adapter, "_selected_job_name", return_value="Overview"),
-            patch.object(adapter, "_scan_field", side_effect=fields) as read,
+            patch.object(scanfields, "find_scanning_templates_dir", side_effect=forbidden),
+            patch.object(scanfields, "save_experiment", side_effect=forbidden),
+            patch.object(scanfields, "parse_scan_positions", side_effect=forbidden),
+            patch.object(scanfields, "get_template_state", side_effect=forbidden),
         ):
-            self.assertEqual(adapter.get_info(h)["tile_positions"], [])
-            self.assertEqual(len(adapter.get_info(h)["tile_positions"]), 1)
-        self.assertEqual(read.call_count, 2)
-
-    def test_tile_positions_reject_missing_nonfinite_or_nonpositive_sizes(self):
-        for bad in (None, 0.0, -1.0, float("nan"), float("inf"), "wide"):
-            with self.subTest(bad=bad):
-                field = {
-                    "positions": [
-                        {
-                            "kind": "grid",
-                            "frame": {"x_um": 1.0, "y_um": 2.0, "z_um": 3.0},
-                            "tile_size": {"x": bad, "y": 10.0},
-                        }
-                    ]
-                }
-                with self.assertRaisesRegex(RuntimeError, "tile_size.x"):
-                    adapter._info.tile_positions(field)
-
-    def test_tile_positions_reject_nonfinite_coordinates(self):
-        field = {
-            "positions": [
-                {
-                    "kind": "grid",
-                    "frame": {"x_um": float("nan"), "y_um": 2.0, "z_um": 3.0},
-                    "tile_size": {"x": 10.0, "y": 10.0},
-                }
-            ]
-        }
-        with self.assertRaisesRegex(RuntimeError, "position.x"):
-            adapter._info.tile_positions(field)
-
-    def test_unconfirmed_save_reports_no_positions_instead_of_stale_ones(self):
-        """The template on disk may be stale, so no positions are reported; get_info
-        still answers, and the unconfirmed save is written down."""
-        calls = []
-        info, calls = self._info(save_result=False, calls=calls)
-        self.assertEqual(calls, ["save"])  # nothing parsed from a stale file
-        self.assertEqual(info["tile_positions"], [])
-        self.assertEqual(info["focus_positions"], [])
+            info = adapter.get_info(h)
+        self.assertNotIn("tile_positions", info)
+        self.assertNotIn("focus_positions", info)
+        self.assertFalse(hasattr(adapter, "_scanfields"))  # the adapter does not import it
+        self.assertEqual(info["selected_job"], "Overview")
 
 
 class TestObjectiveCompensation(unittest.TestCase):
