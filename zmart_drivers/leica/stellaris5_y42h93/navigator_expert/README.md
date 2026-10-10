@@ -536,8 +536,13 @@ candidate's, so that the move can be reviewed and tested on hardware on its own.
 changes the anatomy asks for next, each in a commit of its own because each changes what a
 workflow sees:
 
-- An unconfirmed change is answered as a failure (`False` and a message); today the adapter
-  answers `success: True` with `confirmed: False`.
+- Done since the move: an unconfirmed change no longer stops anything. The driver confirms what
+  it can (the send is retried, the readback is retried, a move gets one more look), and a change
+  that was sent and accepted but never confirmed is written down under `unconfirmed` in
+  `get_state`, in a warning and in the acquisition's answer, while the command carries on. Only a
+  refused, failed or contradicted change is a failure. A reading that fails, such as the selected
+  job, is unknown rather than a stop. Acquisition stays the one exception the other way: sent
+  once, never re-sent, and waited for as long as the scan needs.
 - A limits refusal raises `ValueError`; today parts of the gate raise `RuntimeError`.
 - The limits gate moves inside the set dispatcher, so that no action calls it itself.
 - The coordinate arithmetic (origin, orientation, objective offsets) leaves `zmart_adapter/` for

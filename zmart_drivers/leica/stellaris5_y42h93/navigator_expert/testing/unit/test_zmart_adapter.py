@@ -504,7 +504,9 @@ class TestFrame(unittest.TestCase):
         # target focus = 30 + 10 = 40; the parked galvo offset (4) is kept
         self.assertEqual(moves["z"], (36.0, "zwide"))
 
-    def test_unconfirmed_z_move_raises(self):
+    def test_unconfirmed_z_move_is_recorded_and_the_position_is_read_back(self):
+        """A leg that was accepted but never confirmed does not stop the workflow:
+        it is written down, and the answer is what the microscope reads back."""
         h = _handle()
         patches = _patch_position()
         with (
@@ -516,15 +518,42 @@ class TestFrame(unittest.TestCase):
             patch.object(
                 adapter._commands,
                 "move_z",
-                return_value={"success": True, "confirmed": False},
+                return_value={"success": True, "confirmed": False, "message": "no readback"},
             ),
             patches[0],
             patches[1],
             patches[2],
             patches[3],
-            self.assertRaises(RuntimeError),
+        ):
+            answer = adapter.set_xyz(h, 0.0, 0.0, 0.0)
+        self.assertEqual(sorted(answer), ["objective_translation_um", "x", "y", "z"])
+        self.assertEqual(len(h.unconfirmed), 1)
+        self.assertIn("set_xyz: z", h.unconfirmed[0]["what"])
+        self.assertEqual(h.unconfirmed[0]["message"], "no readback")
+
+    def test_failed_z_move_still_raises(self):
+        """A leg LAS X refused or that failed is a real failure, not an unconfirmed one."""
+        h = _handle()
+        patches = _patch_position()
+        with (
+            patch.object(
+                adapter._motion,
+                "arrive_xy",
+                return_value={"success": True, "confirmed": True},
+            ),
+            patch.object(
+                adapter._commands,
+                "move_z",
+                return_value={"success": False, "confirmed": None, "message": "refused"},
+            ),
+            patches[0],
+            patches[1],
+            patches[2],
+            patches[3],
+            self.assertRaisesRegex(RuntimeError, "failed"),
         ):
             adapter.set_xyz(h, 0.0, 0.0, 0.0)
+        self.assertEqual(h.unconfirmed, [])
 
     def test_unknown_actuator_rejected(self):
         h = _handle()
@@ -657,7 +686,7 @@ class TestAcquire(unittest.TestCase):
             patch.object(adapter._readers, "get_jobs", return_value=self._jobs()),
             patch.object(adapter._readers, "get_hardware_info", return_value={}),
             patch.object(adapter._commands, "select_job", lambda c, j, **k: {"success": True}),
-            patch.object(adapter._motion, "correct_backlash", lambda client, **k: None),
+            patch.object(adapter._motion, "correct_backlash", lambda client, **k: {"success": True, "confirmed": True}),
             patch.object(adapter._capture, "acquire", lambda c, j, **k: SimpleNamespace(job=j)),
             patch.object(adapter._save, "save", fake_save),
             patch.object(adapter._scanfields, "get_template_state", return_value="fresh"),
@@ -748,7 +777,7 @@ class TestAcquire(unittest.TestCase):
             patch.object(adapter._readers, "get_jobs", return_value=self._jobs()),
             patch.object(adapter._readers, "get_hardware_info", return_value={}),
             patch.object(adapter._commands, "select_job", fake_select_job),
-            patch.object(adapter._motion, "correct_backlash", lambda client, **k: None),
+            patch.object(adapter._motion, "correct_backlash", lambda client, **k: {"success": True, "confirmed": True}),
             patch.object(adapter._capture, "acquire", fake_capture),
             patch.object(adapter._save, "save", fake_save),
             patch.object(adapter._scanfields, "get_template_state", return_value="fresh"),
@@ -830,7 +859,7 @@ class TestAcquire(unittest.TestCase):
                 patch.object(adapter._readers, "get_jobs", return_value=self._jobs()),
                 patch.object(adapter._readers, "get_hardware_info", return_value={}),
                 patch.object(adapter._commands, "select_job", lambda *a, **k: {"success": True}),
-                patch.object(adapter._motion, "correct_backlash", lambda client, **k: None),
+                patch.object(adapter._motion, "correct_backlash", lambda client, **k: {"success": True, "confirmed": True}),
                 patch.object(adapter._capture, "acquire", lambda client, job, **k: SimpleNamespace(job=job)),
                 patch.object(adapter._save, "save", fake_save),
                 patch.object(adapter._scanfields, "get_template_state", return_value="fresh"),
@@ -947,7 +976,7 @@ class TestAcquire(unittest.TestCase):
                 patch.object(
                     adapter._commands, "select_job", lambda client, job, **k: {"success": True}
                 ),
-                patch.object(adapter._motion, "correct_backlash", lambda client, **k: None),
+                patch.object(adapter._motion, "correct_backlash", lambda client, **k: {"success": True, "confirmed": True}),
                 patch.object(
                     adapter._capture, "acquire", lambda client, job, **k: SimpleNamespace(job=job)
                 ),
@@ -983,7 +1012,10 @@ class TestAcquire(unittest.TestCase):
             patch.object(
                 adapter._motion,
                 "correct_backlash",
-                side_effect=lambda client, **k: calls.setdefault("backlash", []).append(k["passes"]),
+                side_effect=lambda client, **k: (
+                    calls.setdefault("backlash", []).append(k["passes"])
+                    or {"success": True, "confirmed": True}
+                ),
             ),
             patch.object(
                 adapter._capture, "acquire", lambda client, job, **k: SimpleNamespace(job=job)
@@ -1039,6 +1071,59 @@ class TestAcquire(unittest.TestCase):
             self.assertEqual(adapter._next_acquisition_hash(h), "0000a2")
         self.assertEqual(h.acquisition_hashes, {"0000a1", "0000a2"})
 
+    def test_acquire_selects_the_job_when_the_selected_one_cannot_be_read(self):
+        """A reading that fails is unknown, not a stop: the job asked for is selected
+        anyway, and the capture goes ahead."""
+        h = _handle(connection={**adapter.CONNECTION, "output_root": "/tmp/out"})
+        selected = []
+        with (
+            self._capturing(),
+            patch.object(adapter._readers, "get_selected_job", return_value=None),
+            patch.object(
+                adapter._commands,
+                "select_job",
+                lambda c, j, **k: selected.append(j) or {"success": True, "confirmed": True},
+            ),
+        ):
+            answer = adapter.acquire(
+                h, position_label="A1", acquisition_settings={"job": "Overview"}
+            )
+        self.assertEqual(selected, ["Overview"])
+        self.assertEqual(answer["unconfirmed"], [])
+
+    def test_an_unconfirmed_job_selection_is_recorded_and_the_capture_goes_ahead(self):
+        h = _handle(connection={**adapter.CONNECTION, "output_root": "/tmp/out"})
+        with (
+            self._capturing(),
+            patch.object(adapter._readers, "get_selected_job", return_value={"Name": "HiRes"}),
+            patch.object(
+                adapter._commands,
+                "select_job",
+                lambda c, j, **k: {"success": True, "confirmed": False, "message": "no proof"},
+            ),
+        ):
+            answer = adapter.acquire(
+                h, position_label="A1", acquisition_settings={"job": "Overview"}
+            )
+        self.assertEqual(len(answer["unconfirmed"]), 1)
+        self.assertEqual(answer["unconfirmed"][0]["what"], "acquire: select_job('Overview')")
+        self.assertEqual(answer["unconfirmed"][0]["message"], "no proof")
+        self.assertTrue(answer["files"])  # the capture went ahead
+
+    def test_a_refused_job_selection_still_fails_the_acquisition(self):
+        h = _handle(connection={**adapter.CONNECTION, "output_root": "/tmp/out"})
+        with (
+            self._capturing(),
+            patch.object(adapter._readers, "get_selected_job", return_value={"Name": "HiRes"}),
+            patch.object(
+                adapter._commands,
+                "select_job",
+                lambda c, j, **k: {"success": False, "confirmed": None, "message": "refused"},
+            ),
+            self.assertRaisesRegex(RuntimeError, "select_job\\('Overview'\\) failed"),
+        ):
+            adapter.acquire(h, position_label="A1", acquisition_settings={"job": "Overview"})
+
     def test_explicit_label_does_not_consume_counter(self):
         h = _handle(connection={**adapter.CONNECTION, "output_root": "/tmp/out"})
         calls = {}
@@ -1071,6 +1156,7 @@ class TestAcquire(unittest.TestCase):
 
         def fake_correct_backlash(client, **kwargs):
             order.append(("backlash", client, kwargs["passes"]))
+            return {"success": True, "confirmed": True}
 
         def fake_capture(client, job, **kwargs):
             order.append(("capture", job))
@@ -1148,7 +1234,7 @@ class TestAcquire(unittest.TestCase):
         with (
             patch.object(adapter._readers, "get_jobs", return_value=self._jobs()),
             patch.object(adapter._commands, "select_job", return_value={"success": True}),
-            patch.object(adapter._motion, "correct_backlash", lambda client, **k: None),
+            patch.object(adapter._motion, "correct_backlash", lambda client, **k: {"success": True, "confirmed": True}),
             patch.object(
                 adapter._capture,
                 "acquire",
@@ -1314,7 +1400,7 @@ class TestStateAndProcedures(unittest.TestCase):
         self.assertNotIn("get_positions", procedures)
         self.assertNotIn("get_focus_points", procedures)
         self.assertEqual(procedures["autofocus"]["jobs"], ["AF Job"])
-        with patch.object(adapter._motion, "correct_backlash", lambda client, **k: None):
+        with patch.object(adapter._motion, "correct_backlash", lambda client, **k: {"success": True, "confirmed": True}):
             self.assertEqual(
                 adapter.run_procedure(h, {"name": "backlash_takeup"})["ran"]["name"],
                 "backlash_takeup",
@@ -1588,11 +1674,14 @@ class TestScanFieldInfo(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "position.x"):
             adapter._info.tile_positions(field)
 
-    def test_unconfirmed_save_raises_instead_of_returning_stale_info(self):
+    def test_unconfirmed_save_reports_no_positions_instead_of_stale_ones(self):
+        """The template on disk may be stale, so no positions are reported; get_info
+        still answers, and the unconfirmed save is written down."""
         calls = []
-        with self.assertRaisesRegex(RuntimeError, "did not confirm"):
-            self._info(save_result=False, calls=calls)
-        self.assertEqual(calls, ["save"])
+        info, calls = self._info(save_result=False, calls=calls)
+        self.assertEqual(calls, ["save"])  # nothing parsed from a stale file
+        self.assertEqual(info["tile_positions"], [])
+        self.assertEqual(info["focus_positions"], [])
 
 
 class TestObjectiveCompensation(unittest.TestCase):
