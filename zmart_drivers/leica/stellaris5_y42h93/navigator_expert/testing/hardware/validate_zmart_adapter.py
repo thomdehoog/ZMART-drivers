@@ -702,14 +702,18 @@ def phase_acquire(v: vh.Validator, sess: Any, args: argparse.Namespace) -> None:
     with v.phase("acquire (capture + save)"):
         # The live LAS X session decides where it writes; save collects from
         # the single native AutoSave path.
-        settings: dict[str, Any] = {"folder": "adapter-smoke", "backlash_correction": True}
+        settings: dict[str, Any] = {
+            "folder": "adapter-smoke",
+            "backlash_correction": True,
+            "backlash_rounds": 1,
+        }
         rec = v.callable(
             "acquire: capture + save",
             lambda: sess.acquire(
                 position_label="1",
                 acquisition_settings=settings,
             ),
-            context={"backlash_correction": True},
+            context={"backlash_correction": True, "backlash_rounds": 1},
             mutating=True,
         )
         if not rec:
