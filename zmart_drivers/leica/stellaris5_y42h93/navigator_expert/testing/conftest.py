@@ -80,14 +80,14 @@ def _clean_limits_gate():
 
 @pytest.fixture(autouse=True)
 def fast_timing_windows(monkeypatch):
-    """Shrink the real-time confirm/echo poll windows for the offline suite.
+    """Shrink the rule's real-time windows for the offline suite.
 
-    The shipped defaults (``timing.CONFIRM_POLL_S = 3`` s per confirm attempt,
-    ``dispatch.ECHO_SETTLE_TIMEOUT_S = 1`` s per fire) are real hardware
-    windows; against mocks they are pure sleep (~35 s of the suite, LT-03).
-    The consumers read both values at call time, so patching here reaches
-    every poll loop. Shipped values are unchanged; a test that needs a
-    specific window passes an explicit ``poll_window=``/``timeout=``.
+    The shipped values (``tuning.WINDOW_S = 3`` s per window, ``POLL_S`` and
+    ``ANSWER_POLL_S`` between looks, ``change.ECHO_SETTLE_TIMEOUT_S = 1`` s
+    per fire) are real hardware timing; against mocks they are pure sleep.
+    The consumers read them at call time, so patching here reaches every
+    wait. Shipped values are unchanged; a test that needs a specific window
+    patches it itself (``test_waiting_rule``).
     """
     from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher import (
         change as dispatch,
@@ -96,7 +96,9 @@ def fast_timing_windows(monkeypatch):
         tuning as timing,
     )
 
-    monkeypatch.setattr(timing, "CONFIRM_POLL_S", 0.05)
+    monkeypatch.setattr(timing, "WINDOW_S", 0.05)
+    monkeypatch.setattr(timing, "POLL_S", 0.005)
+    monkeypatch.setattr(timing, "ANSWER_POLL_S", 0.001)
     monkeypatch.setattr(dispatch, "ECHO_SETTLE_TIMEOUT_S", 0.05)
 
 

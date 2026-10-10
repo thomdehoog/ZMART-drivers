@@ -1,11 +1,22 @@
-"""Routed LAS X state readers.
+"""Routed LAS X state readers: one way to wait for an answer.
 
-Public functions keep the old reader return shapes by default. The backend is
-a profile-controlled implementation detail: ``api``, ``log``, or ``hybrid``.
-Which legs a datum offers is declared once in :mod:`capabilities`; asking a
-family for a leg the datum does not have fails closed with an
-``UnsupportedSource`` diagnostic. When callers need source/timestamp
-diagnostics, pass ``diagnostics=True`` to receive a :class:`Reading`.
+Every reading follows the one rule in :mod:`tuning`: four windows of three
+seconds. Within a window both sources the profile allows are watched, the
+CAM API and the LAS X log, and the first answer that counts as a success
+wins, from whichever source gives it; no source is preferred. What counts as
+a success is declared once per datum in :mod:`capabilities` (``success``),
+and a caller can narrow it with ``accept``. A read the API did not answer in
+a window is requested again at the next one. After four windows the reading
+is unknown.
+
+The source family (``api``, ``log``, ``hybrid``) is profile policy and says
+which sources take part, never how long to wait. Asking a family for a leg
+the datum does not have fails closed at once with ``UnsupportedSource``.
+
+Public functions keep the plain return shapes by default; pass
+``diagnostics=True`` to receive a :class:`Reading` with its source and age.
+A caller that already runs its own window, such as a command confirmation,
+passes ``deadline=`` to watch only until then.
 """
 
 from __future__ import annotations
@@ -22,11 +33,9 @@ from ..actions.derived import (
     stack_z_wide_um,  # noqa: F401  re-exported, as the readers package did
 )
 from ..vendor_interface import api_reader, log_reader
+from . import tuning
 
 log = logging.getLogger(__name__)
-
-_API_IN_FLIGHT = set()
-_API_IN_FLIGHT_LOCK = threading.Lock()
 
 
 @dataclass(frozen=True)
@@ -64,95 +73,67 @@ def _plain_or_diagnostic(reading, diagnostics):
     return None if reading is None else reading.value
 
 
+# =============================================================================
+# One API request at a time per connection
+# =============================================================================
+
+
+class _ApiTurns:
+    """Who may talk to the CAM API on each connection, one request at a time.
+
+    LAS X answers a request by writing into a shared reply field with no
+    request/response correlation, so two requests in flight on one
+    connection can read each other's reply. A request holds the connection's
+    turn until its own check for the answer ends. A reader that finds the
+    turn taken waits for it, until its own deadline, instead of giving up:
+    giving up was how a reading came back empty in 0.06 s right after a job
+    switch whose confirmation request was still running.
+    """
+
+    def __init__(self):
+        self._busy = set()
+        self._changed = threading.Condition()
+
+    def take(self, key, *, until, stop):
+        """Wait for the turn on *key* until *until* (monotonic); True when taken."""
+        with self._changed:
+            while key in self._busy:
+                remaining = until - time.monotonic()
+                if remaining <= 0 or stop.is_set():
+                    return False
+                self._changed.wait(min(remaining, tuning.POLL_S))
+            if stop.is_set():
+                return False
+            self._busy.add(key)
+            return True
+
+    def give_back(self, key):
+        with self._changed:
+            self._busy.discard(key)
+            self._changed.notify_all()
+
+
+_API_TURNS = _ApiTurns()
+
+
+def _client_api_key(client):
+    return id(client)
+
+
+# =============================================================================
+# The two sources
+# =============================================================================
+
+
 def _api_read(fn) -> Reading:
     try:
         value = fn()
         # API has no independent freshness timestamp. observed_at/age_s mark
         # call completion, not proof that LAS X returned newly-produced state.
-        observed_at = time.time()
-        return Reading(
-            value=value,
-            source="api",
-            observed_at=observed_at,
-            age_s=0.0,
-            error=None,
-        )
+        return Reading(value=value, source="api", observed_at=time.time(), age_s=0.0)
     except Exception as exc:
         log.debug("api reader failed", exc_info=True)
-        return Reading(
-            value=None,
-            source="api",
-            observed_at=time.time(),
-            age_s=None,
-            error=exc,
-        )
-
-
-def _fire_api_read(fn, api_key):
-    """Start one capped API read; return its result queue, or ``None`` when
-    another read is already in flight on this client.
-
-    This is the only way a concurrent API read starts. The worker thread
-    holds the in-flight claim until the CAM call actually returns, even if
-    the caller stops waiting - a hung read must keep blocking further API
-    attempts on this client, not pile up threads behind it.
-    """
-    if not _claim_api_read(api_key):
-        return None
-    results = queue.Queue()
-
-    def run():
-        try:
-            results.put(_api_read(fn))
-        finally:
-            _release_api_read(api_key)
-
-    threading.Thread(target=run, name="lasx-api-read", daemon=True).start()
-    return results
-
-
-def _capped_api_read(api_fn, api_key, timeout_s):
-    """One CAM read through the capped worker, bounded by *timeout_s*.
-
-    Waits for the in-flight slot if another read holds it, then for the
-    result. Returns the Reading, or ``None`` when the slot or the result
-    did not arrive in time — a hung CAM call (modal dialog) parks in the
-    daemon worker instead of blocking the caller forever.
-    """
-    deadline = time.monotonic() + timeout_s
-    results = _fire_api_read(api_fn, api_key)
-    while results is None:
-        if time.monotonic() >= deadline:
-            log.warning("api read not started: another read in flight past %.1fs", timeout_s)
-            return None
-        time.sleep(0.005)
-        results = _fire_api_read(api_fn, api_key)
-    try:
-        return results.get(timeout=max(0.0, deadline - time.monotonic()))
-    except queue.Empty:
-        log.warning("api read timed out after %.1fs", timeout_s)
-        return None
-
-
-def _claim_api_read(api_key):
-    if api_key is None:
-        return True
-    with _API_IN_FLIGHT_LOCK:
-        if api_key in _API_IN_FLIGHT:
-            return False
-        _API_IN_FLIGHT.add(api_key)
-        return True
-
-
-def _release_api_read(api_key):
-    if api_key is None:
-        return
-    with _API_IN_FLIGHT_LOCK:
-        _API_IN_FLIGHT.discard(api_key)
-
-
-def _client_api_key(client):
-    return id(client)
+        return Reading(value=None, source="api", observed_at=time.time(), age_s=None, error=exc)
 
 
 def _snapshot_read(spec, *, max_age_s, job_name=None) -> Reading:
@@ -166,22 +147,10 @@ def _snapshot_read(spec, *, max_age_s, job_name=None) -> Reading:
             snapshot, age_key=spec.age_key, job_name=job_name, max_age_s=max_age_s
         )
         observed_at = None if age_s is None else snapshot.now - age_s
-        return Reading(
-            value=value,
-            source="log",
-            observed_at=observed_at,
-            age_s=age_s,
-            error=None,
-        )
+        return Reading(value=value, source="log", observed_at=observed_at, age_s=age_s)
     except Exception as exc:
         log.debug("log reader failed", exc_info=True)
-        return Reading(
-            value=None,
-            source="log",
-            observed_at=time.time(),
-            age_s=None,
-            error=exc,
-        )
+        return Reading(value=None, source="log", observed_at=time.time(), age_s=None, error=exc)
 
 
 def _unsupported(mode, datum) -> Reading:
@@ -194,158 +163,211 @@ def _unsupported(mode, datum) -> Reading:
     )
 
 
-def _routed(datum, client, *, mode, diagnostics, api_kwargs=None, job_name=None):
-    spec = capabilities.spec(datum)
-    profile = _profile()
-    mode = mode if mode is not None else getattr(profile, spec.mode_attr)
-    api_fn = None
-    if spec.api_fn is not None:
-        kwargs = api_kwargs or {}
-        api_fn = lambda: spec.api_fn(client, **kwargs)  # noqa: E731
-    log_fn = None
-    if spec.log_fn is not None:
-        max_age_s = (
-            None if spec.log_max_age_attr is None else getattr(profile, spec.log_max_age_attr)
-        )
-        log_fn = lambda: _snapshot_read(  # noqa: E731
-            spec, max_age_s=max_age_s, job_name=job_name
-        )
-    reading = _route_read(
-        mode,
-        datum=datum,
-        api_fn=api_fn,
-        log_fn=log_fn,
-        trust=spec.trust,
-        timeout_s=getattr(profile, spec.timeout_attr),
-        api_key=_client_api_key(client),
-    )
-    return _plain_or_diagnostic(reading, diagnostics)
-
-
-def _route_read(mode, *, datum, api_fn, log_fn, trust, timeout_s, api_key):
-    # Failed reads return the error-carrying Reading (value=None) rather than
-    # bare None, so diagnostics=True callers can see *why* — plain callers
-    # still receive None via _plain_or_diagnostic. Untrusted (stale) log
-    # readings stay None: their value must never leak to a plain caller.
+def _legs(spec, datum, mode):
+    """Which sources take part for *mode*; an ``UnsupportedSource`` reading if none can."""
     if mode == "api":
-        if api_fn is None:
-            return _unsupported("api", datum)
-        reading = _capped_api_read(api_fn, api_key, timeout_s)
-        if reading is None:
-            return None
-        return reading if reading.error is None else reading._replace_value_none()
+        return ("api",) if spec.api_fn is not None else _unsupported("api", datum)
     if mode == "log":
-        if log_fn is None:
-            return _unsupported("log", datum)
-        reading = log_fn()
-        if trust(reading):
-            return reading
-        return reading._replace_value_none() if reading.error is not None else None
+        return ("log",) if spec.log_fn is not None else _unsupported("log", datum)
     if mode == "hybrid":
-        if api_fn is None and log_fn is None:
-            return _unsupported("hybrid", datum)
-        if log_fn is None:
-            log.debug("hybrid: datum %r has no log leg; api only", datum)
-            reading = _capped_api_read(api_fn, api_key, timeout_s)
-            if reading is None:
-                return None
-            return reading if reading.error is None else reading._replace_value_none()
-        if api_fn is None:
-            log.debug("hybrid: datum %r has no api leg; log only", datum)
-            reading = log_fn()
-            if trust(reading):
-                return reading
-            return reading._replace_value_none() if reading.error is not None else None
-        return _log_rescue_concurrent(
-            api_fn=api_fn,
-            log_fn=log_fn,
-            trust_api=trust,
-            trust_log=trust,
-            timeout_s=timeout_s,
-            log_grace_s=_profile().hybrid_log_grace_s,
-            api_key=api_key,
+        legs = tuple(
+            leg
+            for leg, fn in (("api", spec.api_fn), ("log", spec.log_fn))
+            if fn is not None
         )
+        return legs or _unsupported("hybrid", datum)
     raise ValueError(f"unknown state-reader mode {mode!r}")
 
 
-def _log_rescue_concurrent(
-    *,
-    api_fn,
-    log_fn,
-    trust_api,
-    trust_log,
-    timeout_s,
-    log_grace_s,
-    api_key,
-):
-    """Race both passive legs, log-preferred within a grace window.
+def _api_worker(spec, client, api_kwargs, *, deadline, stop, answers):
+    """Request the read, and request it again every ``POLL_S`` until stopped or the window ends.
 
-    A trustworthy fresh log wins (immediately if it arrives first, or within
-    ``log_grace_s`` of a trusted API reading); otherwise the API reading is
-    the fallback. Fail-closed ``None`` when neither leg can vouch for a
-    value within ``timeout_s``.
+    One request at a time per connection: a busy connection is waited for,
+    never skipped. The request's own check for its answer ends at the window's
+    end or as soon as the watch stops, so an abandoned request frees the
+    connection promptly.
     """
-    log_results = queue.Queue()
-
-    def run_log():
-        log_results.put(log_fn())
-
-    threading.Thread(target=run_log, name="lasx-log-reader", daemon=True).start()
-    api_results = _fire_api_read(api_fn, api_key)
-
-    deadline = time.monotonic() + timeout_s
-    api_candidate = None
-    grace_deadline = None
-    log_pending = True
-    api_pending = api_results is not None
-    while log_pending or api_pending:
-        active_deadline = deadline if grace_deadline is None else min(deadline, grace_deadline)
-        if time.monotonic() >= active_deadline:
-            break
-        if log_pending:
-            try:
-                reading = log_results.get_nowait()
-            except queue.Empty:
-                pass
-            else:
-                log_pending = False
-                if trust_log(reading):
-                    return reading
-                if api_candidate is not None:
-                    return api_candidate
-        if api_pending:
-            try:
-                reading = api_results.get_nowait()
-            except queue.Empty:
-                pass
-            else:
-                api_pending = False
-                if trust_api(reading):
-                    if not log_pending:
-                        return reading
-                    api_candidate = reading
-                    grace_deadline = time.monotonic() + log_grace_s
-        if log_pending or api_pending:
-            time.sleep(0.005)
-    # Deadline hit: a result that landed during the final sleep is already
-    # in its queue — drain once instead of dropping it.
-    if log_pending:
+    key = _client_api_key(client)
+    while not stop.is_set() and time.monotonic() < deadline:
+        if not _API_TURNS.take(key, until=deadline, stop=stop):
+            return
         try:
-            reading = log_results.get_nowait()
-        except queue.Empty:
-            pass
-        else:
-            if trust_log(reading):
+            reading = _api_read(
+                lambda: spec.api_fn(
+                    client, deadline=deadline, should_stop=stop.is_set, **api_kwargs
+                )
+            )
+        finally:
+            _API_TURNS.give_back(key)
+        answers.put(reading)
+        if stop.wait(tuning.POLL_S):
+            return
+
+
+def _log_worker(spec, job_name, max_age_s, *, deadline, stop, answers):
+    """Read the LAS X log, and again every ``POLL_S`` until stopped or the window ends."""
+    while True:
+        answers.put(_snapshot_read(spec, max_age_s=max_age_s, job_name=job_name))
+        if stop.wait(tuning.POLL_S) or time.monotonic() >= deadline:
+            return
+
+
+def _counts(reading, succeeded, observed_after):
+    """Whether *reading* is an answer that counts as a success."""
+    if reading.error is not None or reading.value is None:
+        return False
+    if observed_after is not None and (
+        reading.observed_at is None or reading.observed_at <= observed_after
+    ):
+        return False
+    try:
+        return bool(succeeded(reading.value))
+    except Exception:
+        log.debug("success check raised", exc_info=True)
+        return False
+
+
+def _watch(datum, client, *, mode, succeeded, deadline, job_name, observed_after, api_kwargs):
+    """Watch one window: the first answer that counts, from either source, or no answer.
+
+    Returns the winning Reading; when nothing counted by *deadline*, the
+    latest error-carrying reading with its value stripped (so diagnostics
+    show why), else None. An ``UnsupportedSource`` reading comes back at
+    once. Workers post every answer to one queue; this function blocks on
+    the queue, so it needs no interval of its own.
+    """
+    spec = capabilities.spec(datum)
+    legs = _legs(spec, datum, mode)
+    if isinstance(legs, Reading):
+        return legs
+    answers = queue.Queue()
+    stop = threading.Event()
+    if "api" in legs:
+        threading.Thread(
+            target=_api_worker,
+            args=(spec, client, api_kwargs),
+            kwargs=dict(deadline=deadline, stop=stop, answers=answers),
+            name=f"lasx-{datum}-api",
+            daemon=True,
+        ).start()
+    if "log" in legs:
+        max_age_s = (
+            None if spec.log_max_age_attr is None else getattr(_profile(), spec.log_max_age_attr)
+        )
+        threading.Thread(
+            target=_log_worker,
+            args=(spec, job_name, max_age_s),
+            kwargs=dict(deadline=deadline, stop=stop, answers=answers),
+            name=f"lasx-{datum}-log",
+            daemon=True,
+        ).start()
+    failed = None
+    try:
+        while True:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                break
+            try:
+                reading = answers.get(timeout=remaining)
+            except queue.Empty:
+                break
+            if _counts(reading, succeeded, observed_after):
                 return reading
-    if api_pending and api_results is not None:
-        try:
-            reading = api_results.get_nowait()
-        except queue.Empty:
-            pass
-        else:
-            if trust_api(reading) and api_candidate is None:
-                api_candidate = reading
-    return api_candidate
+            if reading.error is not None:
+                failed = reading._replace_value_none()
+    finally:
+        stop.set()
+    return failed
+
+
+def _success_for(datum, job_name, accept):
+    spec = capabilities.spec(datum)
+
+    def succeeded(value):
+        if not spec.success(value, job_name=job_name):
+            return False
+        return accept is None or bool(accept(value))
+
+    return succeeded
+
+
+def wait_for(
+    datum,
+    client,
+    *,
+    accept=None,
+    job_name=None,
+    observed_after=None,
+    mode=None,
+    deadline=None,
+    api_kwargs=None,
+):
+    """Wait for a reading by the one rule; return the winning Reading, or a failure.
+
+    Args:
+        datum: A row of the readings table in :mod:`capabilities`.
+        client: The connected LAS X API client.
+        accept: Optional ``accept(value) -> bool`` that narrows the datum's
+            own success rule for this caller (a target value, a field the
+            caller needs). Applied on top of the rule, never instead of it.
+        job_name: The job a per-job datum is about.
+        observed_after: Reject answers observed at or before this wall-clock
+            time; a confirmation passes the moment its command was sent.
+        mode: ``api`` / ``log`` / ``hybrid``; None takes the profile's.
+        deadline: A ``time.monotonic()`` time to watch until, for a caller
+            that runs its own window (a command confirmation). None means
+            the rule: ``WINDOWS`` windows of ``WINDOW_S``, requesting an
+            unanswered read again at each new window.
+        api_kwargs: Extra keyword arguments for the API leg (``job_name``).
+
+    Returns:
+        The winning :class:`Reading`; else the latest error-carrying reading
+        with its value stripped; else None.
+    """
+    spec = capabilities.spec(datum)
+    mode = mode if mode is not None else getattr(_profile(), spec.mode_attr)
+    succeeded = _success_for(datum, job_name, accept)
+    kwargs = dict(
+        mode=mode,
+        succeeded=succeeded,
+        job_name=job_name,
+        observed_after=observed_after,
+        api_kwargs=api_kwargs or {},
+    )
+    if deadline is not None:
+        return _watch(datum, client, deadline=deadline, **kwargs)
+    failed = None
+    for window in range(1, tuning.WINDOWS + 1):
+        reading = _watch(datum, client, deadline=time.monotonic() + tuning.WINDOW_S, **kwargs)
+        if reading is not None and reading.error is None:
+            return reading
+        if reading is not None:
+            if isinstance(reading.error, capabilities.UnsupportedSource):
+                return reading
+            failed = reading
+        log.debug("%s: no answer counted in window %d/%d", datum, window, tuning.WINDOWS)
+    log.warning(
+        "%s%s: no answer counted as a success in %d windows of %ss",
+        datum,
+        f" for '{job_name}'" if job_name else "",
+        tuning.WINDOWS,
+        tuning.WINDOW_S,
+    )
+    return failed
+
+
+def _routed(datum, client, *, mode, diagnostics, deadline=None, accept=None, job_name=None):
+    api_kwargs = {} if job_name is None else {"job_name": job_name}
+    reading = wait_for(
+        datum,
+        client,
+        accept=accept,
+        job_name=job_name,
+        mode=mode,
+        deadline=deadline,
+        api_kwargs=api_kwargs,
+    )
+    return _plain_or_diagnostic(reading, diagnostics)
 
 
 def _derive(reading, value):
@@ -360,8 +382,15 @@ def _derive(reading, value):
     )
 
 
-def get_scan_status(client, *, mode=None, diagnostics=False):
-    return _routed("scan_status", client, mode=mode, diagnostics=diagnostics)
+# =============================================================================
+# The readers
+# =============================================================================
+
+
+def get_scan_status(client, *, mode=None, diagnostics=False, deadline=None, accept=None):
+    return _routed(
+        "scan_status", client, mode=mode, diagnostics=diagnostics, deadline=deadline, accept=accept
+    )
 
 
 def ping(client):
@@ -369,154 +398,84 @@ def ping(client):
 
 
 def get_job_settings(
-    client,
-    job_name,
-    timeout=1.0,
-    poll_interval=0.01,
-    max_retries=3,
-    *,
-    mode=None,
-    diagnostics=False,
+    client, job_name, *, mode=None, diagnostics=False, deadline=None, accept=None
 ):
     return _routed(
         "job_settings",
         client,
         mode=mode,
         diagnostics=diagnostics,
-        api_kwargs=dict(
-            job_name=job_name,
-            timeout=timeout,
-            poll_interval=poll_interval,
-            max_retries=max_retries,
-        ),
+        deadline=deadline,
+        accept=accept,
         job_name=job_name,
     )
 
 
-def get_hardware_info(
-    client,
-    timeout=1.0,
-    poll_interval=0.01,
-    max_retries=3,
-    *,
-    mode=None,
-    diagnostics=False,
-):
-    return _routed(
-        "hardware_info",
-        client,
-        mode=mode,
-        diagnostics=diagnostics,
-        api_kwargs=dict(
-            timeout=timeout,
-            poll_interval=poll_interval,
-            max_retries=max_retries,
-        ),
-    )
+def get_hardware_info(client, *, mode=None, diagnostics=False, deadline=None):
+    return _routed("hardware_info", client, mode=mode, diagnostics=diagnostics, deadline=deadline)
 
 
-def get_xy(
-    client,
-    timeout=1.0,
-    poll_interval=0.01,
-    max_retries=3,
-    *,
-    mode=None,
-    diagnostics=False,
-):
+def get_xy(client, *, mode=None, diagnostics=False, deadline=None, accept=None):
     return _routed(
-        "xy",
-        client,
-        mode=mode,
-        diagnostics=diagnostics,
-        api_kwargs=dict(
-            timeout=timeout,
-            poll_interval=poll_interval,
-            max_retries=max_retries,
-        ),
+        "xy", client, mode=mode, diagnostics=diagnostics, deadline=deadline, accept=accept
     )
 
 
 def read_zwide_um(client, job_name, *, mode=None):
     """Z-wide position (um) from the job settings, or None when unreadable.
 
-    Returns None only when the job settings cannot be read at all. Readable
-    but incomplete settings raise: ``derived.zwide_um_from_settings`` raises
-    ``RuntimeError`` when ``zPosition``/z-wide is missing, and its settings
-    normalization can raise ``ValueError`` on a schema mismatch — unlike the
-    routed readers, which never raise.
+    Waits for settings that carry ``zPosition``. Returns None only when no
+    such settings arrive within the rule's four windows. Readable but
+    incomplete settings raise: ``derived.zwide_um_from_settings`` raises
+    ``RuntimeError`` when z-wide is missing, and its settings normalization
+    can raise ``ValueError`` on a schema mismatch — unlike the routed
+    readers, which never raise.
     """
-    settings = get_job_settings(client, job_name, mode=mode)
+    settings = get_job_settings(
+        client, job_name, mode=mode, accept=lambda s: s.get("zPosition") is not None
+    )
     if not settings:
         log.warning("read_zwide_um: could not read job settings for '%s'", job_name)
         return None
     return derived.zwide_um_from_settings(settings, client=client, job_name=job_name)
 
 
-def get_jobs(
-    client,
-    timeout=1.0,
-    poll_interval=0.01,
-    max_retries=3,
-    *,
-    mode=None,
-    diagnostics=False,
-):
+def get_jobs(client, *, mode=None, diagnostics=False, deadline=None, accept=None):
     return _routed(
-        "jobs",
-        client,
-        mode=mode,
-        diagnostics=diagnostics,
-        api_kwargs=dict(
-            timeout=timeout,
-            poll_interval=poll_interval,
-            max_retries=max_retries,
-        ),
+        "jobs", client, mode=mode, diagnostics=diagnostics, deadline=deadline, accept=accept
     )
 
 
-def get_job_by_name(client, job_name, *, mode=None, diagnostics=False, **kwargs):
-    jobs_reading = get_jobs(
-        client,
-        mode=mode,
-        diagnostics=True,
-        **kwargs,
-    )
+def get_job_by_name(client, job_name, *, mode=None, diagnostics=False, deadline=None):
+    jobs_reading = get_jobs(client, mode=mode, diagnostics=True, deadline=deadline)
     value = None if jobs_reading is None else derived.job_by_name(jobs_reading.value, job_name)
     reading = _derive(jobs_reading, value)
     return _plain_or_diagnostic(reading, diagnostics)
 
 
-def get_selected_job(client, *, mode=None, diagnostics=False, **kwargs):
+def get_selected_job(client, *, mode=None, diagnostics=False, deadline=None, accept=None):
     return _routed(
         "selected_job",
         client,
         mode=mode,
         diagnostics=diagnostics,
-        api_kwargs=kwargs,
+        deadline=deadline,
+        accept=accept,
     )
 
 
-def get_fov(client, job_name, *, mode=None, diagnostics=False, **kwargs):
+def get_fov(client, job_name, *, mode=None, diagnostics=False, deadline=None):
     settings_reading = get_job_settings(
-        client,
-        job_name,
-        mode=mode,
-        diagnostics=True,
-        **kwargs,
+        client, job_name, mode=mode, diagnostics=True, deadline=deadline
     )
     value = None if settings_reading is None else derived.fov_from_settings(settings_reading.value)
     reading = _derive(settings_reading, value)
     return _plain_or_diagnostic(reading, diagnostics)
 
 
-def get_base_fov(client, job_name, *, mode=None, diagnostics=False, **kwargs):
+def get_base_fov(client, job_name, *, mode=None, diagnostics=False, deadline=None):
     settings_reading = get_job_settings(
-        client,
-        job_name,
-        mode=mode,
-        diagnostics=True,
-        **kwargs,
+        client, job_name, mode=mode, diagnostics=True, deadline=deadline
     )
     value = (
         None if settings_reading is None else derived.base_fov_from_settings(settings_reading.value)
@@ -542,44 +501,3 @@ def get_pending_dialog(*, diagnostics=False):
         error=None,
     )
     return _plain_or_diagnostic(reading, diagnostics)
-
-
-def get_job_settings_bounded(client, job_name, *, deadline_s, api_timeout=0.25):
-    """A ``get_job_settings`` read with a hard wall-clock deadline.
-
-    The CAM transport can block past any polling timeout (native interop),
-    so the read runs on a daemon worker thread; when ``deadline_s`` passes
-    the thread is abandoned (never joined) and ``None`` is returned. Use
-    this where a slow read must degrade gracefully instead of stalling the
-    caller — e.g. metadata generation during save. Source selection remains
-    owned by ``StateReaderProfile``; this helper adds only the outer deadline.
-
-    Returns the settings dict, or ``None`` on any failure or timeout.
-    """
-    from threading import Event, Thread
-
-    if client is None or not job_name:
-        return None
-
-    done = Event()
-    result = {}
-
-    def _worker():
-        try:
-            result["settings"] = get_job_settings(
-                client,
-                job_name,
-                timeout=api_timeout,
-                poll_interval=0.01,
-                max_retries=1,
-            )
-        except Exception as e:  # pragma: no cover - defensive boundary
-            result["error"] = e
-        finally:
-            done.set()
-
-    Thread(target=_worker, daemon=True).start()
-    if not done.wait(max(0.0, float(deadline_s))):
-        return None
-    settings = result.get("settings")
-    return settings if isinstance(settings, dict) else None

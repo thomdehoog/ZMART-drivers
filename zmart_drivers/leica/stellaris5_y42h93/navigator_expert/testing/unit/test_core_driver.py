@@ -515,7 +515,7 @@ class TestRetryBackoff(unittest.TestCase):
                     else None
                 ),
             ),
-            patch.object(dispatch, "_fire_with_receipt", return_value=True),
+            patch.object(dispatch, "deliver", return_value=True),
             patch.object(dispatch, "_await_echo_result", return_value=True),
         ):
             r = dispatch._fire_block(
@@ -552,7 +552,7 @@ class TestRetryBackoff(unittest.TestCase):
                     else None
                 ),
             ),
-            patch.object(dispatch, "_fire_with_receipt", return_value=True),
+            patch.object(dispatch, "deliver", return_value=True),
             patch.object(dispatch, "_await_echo_result", return_value=True),
         ):
             r = dispatch._fire_block(
@@ -588,7 +588,7 @@ class TestRetryBackoff(unittest.TestCase):
                     else None
                 ),
             ),
-            patch.object(dispatch, "_fire_with_receipt", return_value=True),
+            patch.object(dispatch, "deliver", return_value=True),
             patch.object(dispatch, "_await_echo_result", return_value=True),
         ):
             r = dispatch._fire_block(
@@ -629,7 +629,7 @@ class TestRetryBackoff(unittest.TestCase):
                     else None
                 ),
             ),
-            patch.object(dispatch, "_fire_with_receipt", return_value=True),
+            patch.object(dispatch, "deliver", return_value=True),
             patch.object(dispatch, "_await_echo_result", return_value=True),
         ):
             r = dispatch._fire_block(
@@ -665,7 +665,7 @@ class TestRetryBackoff(unittest.TestCase):
                     else None
                 ),
             ),
-            patch.object(dispatch, "_fire_with_receipt", return_value=True),
+            patch.object(dispatch, "deliver", return_value=True),
             patch.object(dispatch, "_await_echo_result", return_value=True),
         ):
             dispatch._fire_block(
@@ -700,7 +700,7 @@ class TestRetryBackoff(unittest.TestCase):
                     else None
                 ),
             ),
-            patch.object(dispatch, "_fire_with_receipt", return_value=True),
+            patch.object(dispatch, "deliver", return_value=True),
             patch.object(dispatch, "_await_echo_result", return_value=True),
         ):
             r = dispatch._fire_block(
@@ -857,14 +857,14 @@ class TestRetryBackoff(unittest.TestCase):
         # retries, re-fire,
         # unconfirmed-not-fail, the shared poll window.
         self.assertEqual(profiles.ZOOM.max_confirm_attempts, 4)
-        self.assertEqual(profiles.ZOOM.confirm_poll_s, profiles.CONFIRM_POLL_S)
+        self.assertEqual(profiles.ZOOM.confirm_poll_s, profiles.WINDOW_S)
         self.assertTrue(profiles.ZOOM.refire_on_unconfirmed)
         self.assertTrue(profiles.ZOOM.success_on_unconfirmed)
 
         # OBJECTIVE and MOVE_Z used to deviate (single attempt / hard-fail);
         # they now match the uniform posture.
         self.assertEqual(profiles.OBJECTIVE.max_confirm_attempts, 4)
-        self.assertEqual(profiles.OBJECTIVE.confirm_poll_s, profiles.CONFIRM_POLL_S)
+        self.assertEqual(profiles.OBJECTIVE.confirm_poll_s, profiles.WINDOW_S)
         self.assertTrue(profiles.OBJECTIVE.success_on_unconfirmed)
         self.assertEqual(profiles.MOVE_Z.max_confirm_attempts, 4)
         self.assertTrue(profiles.MOVE_Z.success_on_unconfirmed)
@@ -896,7 +896,7 @@ class TestRetryBackoff(unittest.TestCase):
         # the per-attempt window is the shared confirm_poll_s (CONFIRM_POLL_S),
         # over max_confirm_attempts attempts, re-fire between.
         self.assertIsNone(profiles.SELECT_JOB.poll_timeout)
-        self.assertEqual(profiles.SELECT_JOB.confirm_poll_s, profiles.CONFIRM_POLL_S)
+        self.assertEqual(profiles.SELECT_JOB.confirm_poll_s, profiles.WINDOW_S)
         self.assertEqual(profiles.SELECT_JOB.max_confirm_attempts, 4)
 
 
@@ -1335,9 +1335,7 @@ class TestConfirmFunctions(unittest.TestCase):
                 "get_job_settings",
                 side_effect=fake_get_job_settings,
             ):
-                result = confirmations._confirm_scan_resonant(
-                    object(), "J", True, poll_window=0.01, poll_interval=0.001
-                )
+                result = confirmations._confirm_scan_resonant(object(), "J", True, poll_window=0.01)
         finally:
             profiles.STATE_READERS = prior
 
@@ -2141,13 +2139,13 @@ class TestReadback(unittest.TestCase):
             "activeSettings": [],
         }
         with patch.object(readers, "get_job_settings", return_value=settings):
-            ch = drv._readback(None, "HiRes")
+            ch = drv._readback(None, "HiRes", deadline=time.monotonic() + 1.0)
         self.assertIsNotNone(ch)
         self.assertEqual(ch["zoom"]["current"], 5.0)
 
     def test_failure(self):
         with patch.object(readers, "get_job_settings", return_value=None):
-            self.assertIsNone(drv._readback(None, "HiRes"))
+            self.assertIsNone(drv._readback(None, "HiRes", deadline=time.monotonic() + 1.0))
 
     def test_rejects_reading_from_before_command(self):
         reading = readers.Reading(
@@ -2162,7 +2160,7 @@ class TestReadback(unittest.TestCase):
             age_s=0.0,
         )
         with patch.object(readers, "get_job_settings", return_value=reading):
-            self.assertIsNone(drv._readback(None, "HiRes", observed_after=10.0))
+            self.assertIsNone(drv._readback(None, "HiRes", deadline=time.monotonic() + 1.0, observed_after=10.0))
 
     def test_accepts_reading_from_after_command(self):
         reading = readers.Reading(
@@ -2177,7 +2175,7 @@ class TestReadback(unittest.TestCase):
             age_s=0.0,
         )
         with patch.object(readers, "get_job_settings", return_value=reading):
-            result = drv._readback(None, "HiRes", observed_after=10.0)
+            result = drv._readback(None, "HiRes", deadline=time.monotonic() + 1.0, observed_after=10.0)
         self.assertEqual(result["zPosition"]["z-wide"], 100.0)
 
 
@@ -2187,60 +2185,42 @@ class TestReadback(unittest.TestCase):
 
 
 class TestCheckIdle(unittest.TestCase):
+    """check_idle is an ordinary scanner-status reading under the one rule."""
+
+    def setUp(self):
+        self._prior = profiles.STATE_READERS
+        profiles.STATE_READERS = profiles.StateReaderProfile(scan_status_mode="api")
+
+    def tearDown(self):
+        profiles.STATE_READERS = self._prior
+
+    def _statuses(self, *values):
+        remaining = list(values)
+        return lambda client: remaining.pop(0) if len(remaining) > 1 else remaining[0]
+
     def test_idle_returns_immediately(self):
-        with patch.object(readers, "get_scan_status", return_value="eScanIdle"):
-            result = prechecks.check_idle(None, timeout=5.0)
+        with patch.object(readers.api_reader, "get_scan_status", return_value="eScanIdle"):
+            result = prechecks.check_idle(None)
         self.assertTrue(result["success"])
         self.assertIsInstance(result["logs"], list)
 
-    def test_check_idle_uses_configured_reader_mode(self):
-        prior = profiles.STATE_READERS
-        calls = []
-
-        def mock_status(client, **kwargs):
-            calls.append(kwargs)
-            return "eScanIdle"
-
-        profiles.STATE_READERS = profiles.StateReaderProfile(scan_status_mode="hybrid")
-        try:
-            with patch.object(readers, "get_scan_status", side_effect=mock_status):
-                result = prechecks.check_idle(None, timeout=5.0)
-        finally:
-            profiles.STATE_READERS = prior
-
-        self.assertTrue(result["success"])
-        self.assertNotIn("mode", calls[0])
-
-    def test_check_idle_treats_none_as_not_idle(self):
-        values = [None, "eScanIdle"]
-
-        def mock_status(client, **_kwargs):
-            return values.pop(0)
-
-        with patch.object(readers, "get_scan_status", side_effect=mock_status), patch("time.sleep"):
-            result = prechecks.check_idle(None, timeout=None)
-
+    def test_unknown_is_not_idle(self):
+        statuses = self._statuses("Unknown", "Unknown", "eScanIdle")
+        with patch.object(readers.api_reader, "get_scan_status", side_effect=statuses):
+            result = prechecks.check_idle(None)
         self.assertTrue(result["success"])
 
-    def test_timeout_returns_failure(self):
-        with (
-            patch.object(readers, "get_scan_status", return_value="eScanRunning"),
-            patch("time.sleep"),
-        ):
-            result = prechecks.check_idle(None, timeout=0.01)
+    def test_waits_until_idle(self):
+        statuses = self._statuses("eScanRunning", "eScanRunning", "eScanRunning", "eScanIdle")
+        with patch.object(readers.api_reader, "get_scan_status", side_effect=statuses):
+            result = prechecks.check_idle(None)
+        self.assertTrue(result["success"])
+
+    def test_busy_through_four_windows_fails(self):
+        with patch.object(readers.api_reader, "get_scan_status", return_value="eScanRunning"):
+            result = prechecks.check_idle(None)
         self.assertFalse(result["success"])
-        self.assertTrue(any("timeout" in e["msg"].lower() for e in result["logs"]))
-
-    def test_none_timeout_waits_until_idle(self):
-        call_count = [0]
-
-        def mock_status(client, **_kwargs):
-            call_count[0] += 1
-            return "eScanIdle" if call_count[0] > 3 else "eScanRunning"
-
-        with patch.object(readers, "get_scan_status", side_effect=mock_status), patch("time.sleep"):
-            result = prechecks.check_idle(None, timeout=None)
-        self.assertTrue(result["success"])
+        self.assertTrue(any("not idle" in e["msg"] for e in result["logs"]))
 
 
 # =============================================================================
@@ -2262,7 +2242,7 @@ class TestMoveXYConsistency(unittest.TestCase):
             z_wide_max=8000,
         )
         with (
-            patch.object(readers, "get_scan_status", return_value="eScanIdle"),
+            patch.object(readers.api_reader, "get_scan_status", return_value="eScanIdle"),
             patch.object(errors, "_check_api_error", return_value=None),
             patch.object(
                 readers,
@@ -2529,7 +2509,7 @@ class TestConfirmSelectJob(unittest.TestCase):
         jobs = [{"Name": "HiRes", "IsSelected": True}]
         with patch.object(readers, "get_jobs", return_value=jobs), patch("time.sleep"):
             result = confirm_select_job.confirm_select_job(
-                None, job_name="HiRes", timeout=1.0, poll_interval=0.001
+                None, job_name="HiRes", timeout=1.0
             )
         self.assertTrue(result["success"])
 
@@ -2538,7 +2518,7 @@ class TestConfirmSelectJob(unittest.TestCase):
         jobs = [{"Name": "Other", "IsSelected": True}]
         with patch.object(readers, "get_jobs", return_value=jobs), patch("time.sleep"):
             result = confirm_select_job.confirm_select_job(
-                None, job_name="HiRes", timeout=0.01, poll_interval=0.001
+                None, job_name="HiRes", timeout=0.01
             )
         self.assertFalse(result["success"])
 
@@ -2550,7 +2530,7 @@ class TestConfirmSelectJob(unittest.TestCase):
             patch("time.sleep"),
         ):
             result = confirm_select_job.confirm_select_job(
-                None, job_name="HiRes", timeout=1.0, poll_interval=0.001, command_started_at=100.0
+                None, job_name="HiRes", timeout=1.0, command_started_at=100.0
             )
 
         self.assertTrue(result["success"])
@@ -2622,34 +2602,27 @@ class TestConfirmSelectJob(unittest.TestCase):
             {"Name": "Overview", "IsSelected": False},
             {"Name": "HiRes", "IsSelected": False},
         ]
-        bounded_calls = []
+        primed = []
 
         def fake_api_jobs(client, profile):
             return jobs, "ok"
 
-        def fake_bounded(client, fn, *, timeout_s):
-            bounded_calls.append(timeout_s)
-            return {"jobName": f"job-{len(bounded_calls)}"}, "ok"
+        def fake_settings(client, job_name, **kwargs):
+            primed.append((job_name, kwargs.get("mode")))
+            return {"jobName": job_name}
 
         dispatched = {"success": True, "confirmed": True, "message": "sent"}
         with (
             patch.object(profiles, "STATE_READERS", profile),
             patch.object(confirm_select_job, "_selected_job_name_from_log", return_value=None),
             patch.object(confirm_select_job, "_selected_job_api_jobs", side_effect=fake_api_jobs),
-            patch.object(confirm_select_job, "_bounded_api_read", side_effect=fake_bounded),
+            patch.object(confirm_select_job._readers, "get_job_settings", side_effect=fake_settings),
             patch.object(commands, "_dispatch", return_value=dispatched) as dispatch_mock,
         ):
             result = commands.select_job(client, "Overview")
 
         self.assertEqual(result, dispatched)
-        self.assertEqual(
-            bounded_calls,
-            [
-                profile.job_settings_timeout_s,
-                profile.job_settings_timeout_s,
-                profile.job_settings_timeout_s,
-            ],
-        )
+        self.assertEqual(primed, [("AF Job", "api"), ("Overview", "api"), ("HiRes", "api")])
         self.assertIsNone(dispatch_mock.call_args.kwargs["confirm_fn"])
         log_leg = dispatch_mock.call_args.kwargs["log_confirm_fn"]
         self.assertIsNotNone(log_leg)
@@ -2709,11 +2682,7 @@ class TestHybridSelectJobApiLegEndToEnd(unittest.TestCase):
             reason="timeout",
             diagnostics={"last_reason": "timeout"},
         )
-        profile = profiles.StateReaderProfile(
-            selected_job_confirm_source="hybrid",
-            selected_job_log_confirm_timeout_s=0.05,
-            jobs_timeout_s=0.5,
-        )
+        profile = profiles.StateReaderProfile(selected_job_confirm_source="hybrid")
         with (
             patch.object(profiles, "STATE_READERS", profile),
             patch.object(readers.api_reader, "get_jobs", side_effect=raw_get_jobs),
@@ -2724,7 +2693,7 @@ class TestHybridSelectJobApiLegEndToEnd(unittest.TestCase):
                 return_value=silent_log,
             ),
         ):
-            result = commands.select_job(client, "HiRes", poll_timeout=1.0)
+            result = commands.select_job(client, "HiRes")
 
         self.assertTrue(result["success"])
         self.assertTrue(

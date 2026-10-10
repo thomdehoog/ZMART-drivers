@@ -170,7 +170,7 @@ class TestApiLegRoutedReads(unittest.TestCase):
 
     def setUp(self):
         self._profile = profiles.STATE_READERS
-        profiles.STATE_READERS = profiles.StateReaderProfile(jobs_timeout_s=0.5)
+        profiles.STATE_READERS = profiles.StateReaderProfile()
         self.addCleanup(self._restore)
 
     def _restore(self):
@@ -197,9 +197,8 @@ class TestApiLegRoutedReads(unittest.TestCase):
     def _wait_claim_clear(self, api_key, timeout=2.0):
         deadline = time.monotonic() + timeout
         while time.monotonic() < deadline:
-            with router._API_IN_FLIGHT_LOCK:
-                if api_key not in router._API_IN_FLIGHT:
-                    return
+            if api_key not in router._API_TURNS._busy:
+                return
             time.sleep(0.01)
 
     def test_api_leg_routed_read_reaches_client_and_wins(self):
@@ -234,8 +233,10 @@ class TestApiLegRoutedReads(unittest.TestCase):
         leg proceeds instead of having been skipped for the whole race."""
         client = object()
         api_key = router._client_api_key(client)
-        self.assertTrue(router._claim_api_read(api_key))
-        self.addCleanup(router._release_api_read, api_key)
+        self.assertTrue(
+            router._API_TURNS.take(api_key, until=time.monotonic() + 1.0, stop=threading.Event())
+        )
+        self.addCleanup(router._API_TURNS.give_back, api_key)
 
         raw_calls = []
 
@@ -248,7 +249,7 @@ class TestApiLegRoutedReads(unittest.TestCase):
         def release_later():
             time.sleep(0.2)
             raw_calls_while_held.extend(raw_calls)
-            router._release_api_read(api_key)
+            router._API_TURNS.give_back(api_key)
 
         with patch.object(router.api_reader, "get_jobs", side_effect=raw_get_jobs):
             threading.Thread(target=release_later, daemon=True).start()
@@ -291,8 +292,7 @@ class TestApiLegRoutedReads(unittest.TestCase):
 
             release.set()  # the hung CAM read finally returns
             self._wait_claim_clear(api_key)
-            with router._API_IN_FLIGHT_LOCK:
-                self.assertNotIn(api_key, router._API_IN_FLIGHT)
+            self.assertNotIn(api_key, router._API_TURNS._busy)
 
             second = confirmations.race_confirmations(
                 api_leg=self._make_api_leg(client),

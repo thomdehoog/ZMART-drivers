@@ -22,6 +22,7 @@ for _p in (_HERE, _HELPERS, _REPO_ROOT):
 
 import validate_readers_side_by_side as sxs
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.actions import profiles
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher import tuning
 
 
 def _run_mock(tmp_path, *extra):
@@ -33,26 +34,13 @@ def _run_mock(tmp_path, *extra):
         profiles.STATE_READERS = original_profile
 
 
-def test_poll_params_come_from_real_profile_fields():
-    """FD-12 regression: the poll knobs must exist on StateReaderProfile.
-
-    The script once read ``profiles.LOG_READER.poll_timeout`` /
-    ``.poll_interval``, which never existed on LogReaderProfile, so the
-    live-changes phase crashed with AttributeError before touching the scope.
-    """
+def test_poll_params_come_from_the_rule():
+    """A post-change readback waits by the driver's one rule (dispatcher.tuning)."""
     assert not hasattr(profiles.LOG_READER, "poll_timeout")
     assert not hasattr(profiles.LOG_READER, "poll_interval")
-
-    window, interval = sxs._change_poll_params()
-    assert window == max(
-        profiles.STATE_READERS.job_settings_timeout_s,
-        profiles.STATE_READERS.selected_job_log_poll_timeout_s,
-    )
-    assert interval == profiles.STATE_READERS.selected_job_log_poll_interval_s
-
-    window, interval = sxs._select_poll_params()
-    assert window == profiles.STATE_READERS.selected_job_log_poll_timeout_s
-    assert interval == profiles.STATE_READERS.selected_job_log_poll_interval_s
+    expected = (tuning.WINDOWS * tuning.WINDOW_S, tuning.POLL_S)
+    assert sxs._change_poll_params() == expected
+    assert sxs._select_poll_params() == expected
 
 
 def test_full_mock_run_all_phases(tmp_path, capsys):

@@ -262,7 +262,7 @@ def test_expected_tolerances_are_exact_values():
 
 
 def _readback_returning(value):
-    return lambda client, job_name: value
+    return lambda client, job_name, **_window: value
 
 
 @pytest.mark.parametrize("name", sorted(CONFIRM_SPECS))
@@ -281,7 +281,6 @@ def test_generic_confirms_matching_readback(name, monkeypatch):
         errors=spec.errors,
         tolerance=spec.default_tolerance,
         poll_window=1.0,
-        poll_interval=0.001,
     )
     # Confirmed immediately on the first poll: no logs accumulated.
     assert result == {"success": True, "logs": []}
@@ -303,7 +302,6 @@ def test_generic_rejects_non_matching_readback(name, monkeypatch):
         errors=spec.errors,
         tolerance=spec.default_tolerance,
         poll_window=0.02,
-        poll_interval=0.001,
     )
     assert result["success"] is False
     # Exactly one warning entry, naming the setting and the timeout.
@@ -327,13 +325,13 @@ def test_public_wrapper_confirms_match_and_rejects_miss(name, monkeypatch):
 
     monkeypatch.setattr(confirmations, "_readback", _readback_returning(s["ch"](s["match"])))
     ok = wrapper(
-        object(), "JOB", target=s["target"], poll_window=1.0, poll_interval=0.001, **s["params"]
+        object(), "JOB", target=s["target"], poll_window=1.0, **s["params"]
     )
     assert ok == {"success": True, "logs": []}
 
     monkeypatch.setattr(confirmations, "_readback", _readback_returning(s["ch"](s["miss"])))
     bad = wrapper(
-        object(), "JOB", target=s["target"], poll_window=0.02, poll_interval=0.001, **s["params"]
+        object(), "JOB", target=s["target"], poll_window=0.02, **s["params"]
     )
     assert bad["success"] is False
     assert bad["logs"][0]["level"] == "warning"
@@ -353,7 +351,6 @@ def test_extraction_error_is_swallowed_until_timeout(monkeypatch):
         compare=spec.compare,
         errors=spec.errors,
         poll_window=0.02,
-        poll_interval=0.001,
     )
     assert result["success"] is False
     assert result["logs"][0]["level"] == "warning"

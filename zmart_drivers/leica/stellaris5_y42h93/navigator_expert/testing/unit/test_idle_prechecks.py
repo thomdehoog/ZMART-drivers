@@ -1,9 +1,10 @@
-"""Idle-before-anything policy (operator decision, 2026-06-11).
+"""Idle-before-anything policy.
 
 Commands that touch the scope's physical/acquisition state must SEE the
-scanner idle before firing, and must wait for it indefinitely - a long
-acquisition is the natural synchronization point, never a timeout. The
-wait stays observable through check_idle's heartbeat; it is fail-closed
+scanner idle before firing. The wait is an ordinary scanner-status reading
+under the one rule in ``dispatcher.tuning`` (operator decision, 2026-10-10,
+replacing the unbounded wait of 2026-06-11): four windows of ``WINDOW_S``,
+after which the command fails instead of waiting forever. It is fail-closed
 against Unknown status (Unknown is not idle).
 """
 
@@ -23,37 +24,40 @@ IDLE_GUARDED = [
 
 
 class TestIdlePrecheckPolicy(unittest.TestCase):
-    def test_physical_commands_wait_for_idle_without_timeout(self):
-        for name in IDLE_GUARDED:
-            profile = getattr(profiles, name)
-            with self.subTest(profile=name):
-                self.assertIsNotNone(profile.pre_check_fn, f"{name} must see idle before firing")
-                self.assertIsNone(
-                    profile.pre_check_fn.keywords.get("timeout", "missing"),
-                    f"{name} idle wait must be unbounded (timeout=None)",
-                )
+    def setUp(self):
+        self._prior = profiles.STATE_READERS
+        profiles.STATE_READERS = profiles.StateReaderProfile(scan_status_mode="api")
 
-    def test_check_idle_waits_through_long_busy_phase(self):
-        statuses = iter(["eScanRunning"] * 50 + ["eScanIdle"])
-        with (
-            patch.object(
-                prechecks._readers, "get_scan_status", side_effect=lambda c, **k: next(statuses)
-            ),
-            patch("time.sleep"),
-        ):
-            result = prechecks.check_idle(object(), timeout=None)
+    def tearDown(self):
+        profiles.STATE_READERS = self._prior
+
+    def _statuses(self, values):
+        remaining = list(values)
+        return lambda client: remaining.pop(0) if len(remaining) > 1 else remaining[0]
+
+    def test_physical_commands_see_idle_before_firing(self):
+        for name in IDLE_GUARDED:
+            with self.subTest(profile=name):
+                self.assertIs(getattr(profiles, name).pre_check_fn, prechecks.check_idle)
+
+    def test_check_idle_waits_through_a_busy_phase_within_the_windows(self):
+        statuses = self._statuses(["eScanRunning"] * 10 + ["eScanIdle"])
+        with patch.object(prechecks._readers.api_reader, "get_scan_status", side_effect=statuses):
+            result = prechecks.check_idle(object())
         self.assertTrue(result["success"])
 
     def test_check_idle_unknown_is_not_idle(self):
-        statuses = iter(["Unknown", None, "eScanIdle"])
-        with (
-            patch.object(
-                prechecks._readers, "get_scan_status", side_effect=lambda c, **k: next(statuses)
-            ),
-            patch("time.sleep"),
-        ):
-            result = prechecks.check_idle(object(), timeout=None)
+        statuses = self._statuses(["Unknown", "Unknown", "eScanIdle"])
+        with patch.object(prechecks._readers.api_reader, "get_scan_status", side_effect=statuses):
+            result = prechecks.check_idle(object())
         self.assertTrue(result["success"])  # waited through Unknown, not past it
+
+    def test_check_idle_fails_when_busy_through_all_four_windows(self):
+        with patch.object(
+            prechecks._readers.api_reader, "get_scan_status", return_value="eScanRunning"
+        ):
+            result = prechecks.check_idle(object())
+        self.assertFalse(result["success"])
 
 
 if __name__ == "__main__":

@@ -35,11 +35,12 @@ Job enumeration and selection draw on three log sources, in priority order:
 Freshness is per-source: :func:`ages` exposes ``job_list`` (matrix summary),
 per-job settings age, ``current_block`` and ``selected`` separately, so a caller
 can apply a different staleness policy to the slow-changing job list than to
-volatile state like XY or scan status.
+volatile state like XY.
 
 Not provided here on purpose: ``ping`` (log mtime is not liveness - keep it
 on the API) and any API fallback (that would re-introduce the hang path).
-``get_scan_status`` maps the numeric ``AcquisitionState`` to a state string.
+The scanner status is not read here: LAS X writes ``Acquire/AcquisitionState``
+only when it changes, and the driver asks the API for it (decided 2026-10-10).
 
 The routed public reader layer may use this module for passive ``log`` or
 ``hybrid`` reads, and dispatch uses it as a dialog diagnostic when the CAM API is
@@ -86,7 +87,6 @@ def _profile():
 _RE_TS = re.compile(r"^(\d{4}-\d\d-\d\d \d\d:\d\d:\d\d\.\d+)")
 _RE_XY = re.compile(r'GetStageHwPosition\s+\'<Result HwStagePosX="([^"]+)" HwStagePosY="([^"]+)"')
 _RE_SEL = re.compile(r'SetCurrentSelectedElementID"\s+ElementID="(\d+)"')
-_RE_ACQ = re.compile(r"AcquisitionState = (\d+)")
 _RE_CURRENT_BLOCK_NAME = re.compile(r"CurrentBlock/Name = (.*?)\s+'")
 _RE_CURRENT_BLOCK_ID = re.compile(r"CurrentBlock/BlockID = (\d+)")
 _RE_MSGBOX = re.compile(r"MessageBox : (.+)")
@@ -239,8 +239,6 @@ class Snapshot:
     current_block_ts: float | None = None
     hw_info: dict | None = None
     hw_ts: float | None = None
-    scan_state: int | None = None
-    scan_ts: float | None = None
     pending_dialog: str | None = None  # open modal dialog text (blocks the CAM API), or None
     pending_dialog_ts: float | None = None
 
@@ -308,7 +306,7 @@ def parse_log(lcs_path=None, msgbox_path=None, now=None, lines=None):
 
 
 def parse_msgbox_log(msgbox_path=None, now=None):
-    """Parse only the NavigatorExpert log entries used for scan/dialog state."""
+    """Parse only the NavigatorExpert log entries used for dialog and current-block state."""
     profile = _profile()
     snap = Snapshot(now=now if now is not None else time.time())
     _read_msgbox_state(snap, msgbox_path or profile.msgbox_log_path)
@@ -316,15 +314,11 @@ def parse_msgbox_log(msgbox_path=None, now=None):
 
 
 def _read_msgbox_state(snap, msgbox_path):
-    # scan status + modal-dialog state live in the NavigatorExpert log.
+    # Modal-dialog and current-block state live in the NavigatorExpert log.
     # Dialog open/close is decided by LINE ORDER (not timestamps, which can tie).
     dialog_open, dialog_text, dialog_ts = False, None, None
     try:
         for ln in _tail_lines(msgbox_path):
-            m = _RE_ACQ.search(ln)
-            if m:
-                snap.scan_state, snap.scan_ts = int(m.group(1)), _parse_ts(ln)
-                continue
             m = _RE_CURRENT_BLOCK_NAME.search(ln)
             if m:
                 snap.current_block_name = m.group(1).strip()
@@ -420,7 +414,6 @@ def ages(snapshot=None):
     return {
         "xy": age(s.xy_ts),
         "job_list": age(s.matrix_jobs_ts),
-        "scan_status": age(s.scan_ts),
         "hardware_info": age(s.hw_ts),
         "selected": age(s.selected_ts),
         "current_block": age(s.current_block_ts),
@@ -578,16 +571,6 @@ def get_hardware_info(snapshot=None, *, max_age_s=None):
     if s.hw_info is None or _too_old(s.hw_ts, s.now, max_age_s=max_age_s):
         return None
     return s.hw_info
-
-
-# AcquisitionState -> driver scan-status string. 0 = idle (confirmed on sim);
-# any non-zero acquisition state maps to a running string. Re-confirm the
-# non-idle codes on real hardware. Returns "Unknown" if absent or too old.
-def get_scan_status(snapshot=None, *, max_age_s=None):
-    s = snapshot or parse_log()
-    if s.scan_state is None or _too_old(s.scan_ts, s.now, max_age_s=max_age_s):
-        return "Unknown"
-    return "eScanIdle" if s.scan_state == 0 else "eScanRunning"
 
 
 def get_pending_dialog(snapshot=None):

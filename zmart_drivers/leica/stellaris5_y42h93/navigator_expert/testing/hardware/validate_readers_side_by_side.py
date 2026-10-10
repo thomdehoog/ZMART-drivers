@@ -61,6 +61,7 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.actions import profi
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher import (
     read as readers,
 )
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher import tuning
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface import (
     log_reader as L,
 )
@@ -281,28 +282,20 @@ def _settings_diffs(af, lf):
     ]
 
 
-# --- FD-12 fix: profile-sourced polling knobs --------------------------------
+# --- polling: the one rule in dispatcher.tuning ------------------------------
 #
-# The original script referenced profiles.LOG_READER.poll_timeout and
-# .poll_interval, which have NEVER existed on LogReaderProfile (that profile
-# only holds log paths + freshness windows), so the live-changes phase died
-# with AttributeError before touching the instrument. The intended knobs -- a
-# bounded wait window for an expected value to appear, plus a poll interval --
-# live on profiles.STATE_READERS: the per-datum ``*_timeout_s`` read budgets
-# and the ``selected_job_log_poll_*`` fields used by readers/log_wait.py.
+# A post-change readback waits for the expected value by the same rule as the
+# driver: at most WINDOWS windows of WINDOW_S, looking again every POLL_S.
 
 
 def _change_poll_params():
     """(wait_window_s, poll_interval_s) for a post-change settings readback."""
-    sr = profiles.STATE_READERS
-    window = max(sr.job_settings_timeout_s, sr.selected_job_log_poll_timeout_s)
-    return window, sr.selected_job_log_poll_interval_s
+    return tuning.WINDOWS * tuning.WINDOW_S, tuning.POLL_S
 
 
 def _select_poll_params():
     """(wait_window_s, poll_interval_s) for a post-select-job readback."""
-    sr = profiles.STATE_READERS
-    return sr.selected_job_log_poll_timeout_s, sr.selected_job_log_poll_interval_s
+    return tuning.WINDOWS * tuning.WINDOW_S, tuning.POLL_S
 
 
 # --- phases ----------------------------------------------------------------
@@ -376,16 +369,6 @@ def phase_readonly(client, rec):
         api_selected == log_selected,
         f"api={api_selected!r} log={log_selected!r}",
         log_missing=log_selected is None,
-    )
-
-    astat = drv.get_scan_status(client, mode="api")
-    lstat = L.get_scan_status(snap)
-    rec.parity(
-        "get_scan_status (idle-sense)",
-        ("Idle" in str(astat)) == ("Idle" in str(lstat)),
-        f"api={astat!r} log={lstat!r}"
-        + (f" log_age={ag['scan_status']:.0f}s" if ag["scan_status"] else ""),
-        log_missing=lstat in (None, "Unknown"),
     )
 
     ahw, _, _ = _timed(lambda: drv.get_hardware_info(client, mode="api"))

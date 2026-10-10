@@ -21,9 +21,7 @@ from types import SimpleNamespace
 import pytest
 from limits_fixtures import install_permissive_limits
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher.tuning import (
-    RECEIPT_TIMEOUT,
-)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher import tuning
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.scanfields import files
 
 # Content with no operator objects: no ScanFieldData in the XML, empty
@@ -229,7 +227,7 @@ class TestSaveExperiment:
         assert result["confirmed"] is True
         assert result["message"] == f"SaveExperiment '{files.TEMPLATE_XML}'"
         assert client.PyApiSaveExperiment.Model.ExperimentName == files.TEMPLATE_XML
-        assert client.receipt_timeouts == [RECEIPT_TIMEOUT]
+        assert client.receipt_timeouts == [tuning.WINDOW_S]
 
     def test_confirms_creation_of_previously_missing_file(self, tmp_path):
         watch = tmp_path / files.TEMPLATE_XML
@@ -292,13 +290,13 @@ class TestSaveExperiment:
         assert result is not None and result["success"] is True
         assert client.receipt_calls == 2
 
-    def test_receipt_fails_twice_returns_none(self, tmp_path):
-        client = _SaveClient(receipts=(False, False))
+    def test_not_received_after_four_tries_returns_none(self, tmp_path):
+        client = _SaveClient(receipts=(False, False, False, False))
         result = files.save_experiment(
             client, files.TEMPLATE_XML, tmp_path, timeout=1, poll_interval=0.01
         )
         assert result is None
-        assert client.receipt_calls == 2
+        assert client.receipt_calls == tuning.WINDOWS
 
     def test_client_exception_returns_none(self, tmp_path):
         client = _SaveClient(receipts=(RuntimeError("COM fault"),))
@@ -329,10 +327,10 @@ class TestLoadExperiment:
         assert result is not None and result["success"] is True
         assert client.receipt_calls == 2
 
-    def test_receipt_fails_twice_returns_none(self):
-        client = _LoadClient(receipts=(False, False))
+    def test_not_received_after_four_tries_returns_none(self):
+        client = _LoadClient(receipts=(False, False, False, False))
         assert files.load_experiment(client, files.TEMPLATE_XML) is None
-        assert client.receipt_calls == 2
+        assert client.receipt_calls == tuning.WINDOWS
 
     def test_client_exception_returns_none(self):
         client = _LoadClient(receipts=(RuntimeError("COM fault"),))

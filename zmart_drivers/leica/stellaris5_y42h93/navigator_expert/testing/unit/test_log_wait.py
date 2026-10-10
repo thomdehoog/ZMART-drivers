@@ -3,6 +3,7 @@
 import unittest
 
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.actions import profiles
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher import tuning
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface import (
     log_reader,
 )
@@ -169,11 +170,7 @@ class TestLogWait(unittest.TestCase):
         self.assertEqual(result.matched_at, 3701.0)
         self.assertEqual(result.diagnostics["current_block_name"], "Overview")
 
-    def test_selected_job_poll_uses_profile_defaults(self):
-        profiles.STATE_READERS = profiles.StateReaderProfile(
-            selected_job_log_poll_timeout_s=0.0,
-            selected_job_log_poll_interval_s=0.25,
-        )
+    def test_selected_job_poll_uses_the_rule_by_default(self):
         snap = _snapshot(
             now=102.0,
             selected=1,
@@ -188,7 +185,8 @@ class TestLogWait(unittest.TestCase):
         )
 
         self.assertTrue(result.success)
-        self.assertEqual(result.diagnostics["poll_interval_s"], 0.25)
+        self.assertEqual(result.diagnostics["timeout_s"], tuning.WINDOW_S)
+        self.assertEqual(result.diagnostics["poll_interval_s"], tuning.POLL_S)
 
 
 if __name__ == "__main__":

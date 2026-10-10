@@ -283,16 +283,6 @@ class TestLogReader(unittest.TestCase):
             profiles.LOG_READER = profiles.LogReaderProfile(max_age_s=60.0)
             self.assertIsNone(L.get_xy(s))
             self.assertIsNone(L.get_job_settings("AF Job", s))
-            self.assertEqual(
-                L.get_scan_status(
-                    L.Snapshot(
-                        scan_state=0,
-                        scan_ts=BASE.timestamp(),
-                        now=(BASE + timedelta(seconds=600)).timestamp(),
-                    )
-                ),
-                "Unknown",
-            )
         finally:
             profiles.LOG_READER = old
 
@@ -388,11 +378,6 @@ class TestLogReader(unittest.TestCase):
             self.assertAlmostEqual(fov[0] * 1e6, 290.63, places=1)
         finally:
             os.remove(path)
-
-    def test_scan_status_mapping(self):
-        self.assertEqual(L.get_scan_status(L.Snapshot(scan_state=0)), "eScanIdle")
-        self.assertEqual(L.get_scan_status(L.Snapshot(scan_state=4)), "eScanRunning")
-        self.assertEqual(L.get_scan_status(L.Snapshot(scan_state=None)), "Unknown")
 
     def _write_msgbox(self, lines):
         fd, path = tempfile.mkstemp(suffix=".log")

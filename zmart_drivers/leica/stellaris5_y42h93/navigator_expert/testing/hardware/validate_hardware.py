@@ -1430,12 +1430,6 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "dumps a complete ATL job-name cluster to the log",
     )
     p.add_argument(
-        "--log-select-confirm-timeout-s",
-        dest="log_select_confirm_timeout_s",
-        type=float,
-        help="log confirmation window before API fallback",
-    )
-    p.add_argument(
         "--log-select-cluster-max-age-s",
         type=float,
         help="max age for the log job-name cluster; default uses "
@@ -1507,7 +1501,6 @@ def _apply_state_reader_mode(mode: str | None, log: logging.Logger) -> None:
         jobs_mode=mode,
         selected_job_mode=mode,
         hardware_info_mode=mode,
-        scan_status_mode=mode,
     )
     log.info("state-reader mode override: %s", mode)
 
@@ -1532,7 +1525,6 @@ def _apply_log_select_confirmation(args: argparse.Namespace, log: logging.Logger
         log.info("select-job confirmation source implied by --state-reader-mode: %s", source)
     if not (
         source is not None
-        or args.log_select_confirm_timeout_s is not None
         or args.log_select_cluster_max_age_s is not None
         or args.prime_log_select_cluster
     ):
@@ -1545,16 +1537,13 @@ def _apply_log_select_confirmation(args: argparse.Namespace, log: logging.Logger
         ),
         "selected_job_log_prime_cluster": args.prime_log_select_cluster,
     }
-    if args.log_select_confirm_timeout_s is not None:
-        updates["selected_job_log_confirm_timeout_s"] = args.log_select_confirm_timeout_s
     if args.log_select_cluster_max_age_s is not None:
         updates["selected_job_log_cluster_max_age_s"] = args.log_select_cluster_max_age_s
     profiles.STATE_READERS = replace(profiles.STATE_READERS, **updates)
     log.info(
-        "select-job confirmation source=%s prime_cluster=%s timeout=%s cluster_max_age=%s",
+        "select-job confirmation source=%s prime_cluster=%s cluster_max_age=%s",
         profiles.STATE_READERS.selected_job_confirm_source,
         profiles.STATE_READERS.selected_job_log_prime_cluster,
-        profiles.STATE_READERS.selected_job_log_confirm_timeout_s,
         profiles.STATE_READERS.selected_job_log_cluster_max_age_s,
     )
 
