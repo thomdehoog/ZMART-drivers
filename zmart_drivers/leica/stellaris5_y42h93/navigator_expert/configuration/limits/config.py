@@ -25,7 +25,6 @@ from __future__ import annotations
 
 import json
 import math
-import shutil
 from datetime import datetime, timezone
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -225,7 +224,6 @@ def adopt_limits(
     machine: Any = None,
     moment: datetime | None = None,
     notebook_paths: Any = (),
-    template_paths: Any = (),
 ) -> dict:
     """Validate and publish the notebook's flat ``limits.json``.
 
@@ -241,15 +239,12 @@ def adopt_limits(
         machine: ``MachineProfile`` to publish into; ``None`` uses the global one.
         moment: Snapshot timestamp; ``None`` uses ``datetime.now(timezone.utc)``.
         notebook_paths: Saved notebook(s) to archive in the snapshot. Each
-            archived copy receives the snapshot datetime in its filename.
-        template_paths: The saved LAS X ``.xml``, ``.rgn``, and ``.lrp``
-            experiment files to archive with the notebook. The archived trio
-            is renamed to ``limits_<snapshot-datetime>`` while preserving each
-            suffix.
+            archived copy receives the snapshot datetime in its filename. The
+            notebook's output carries the four recorded corners, so it is the
+            measurement's own record.
 
     Returns:
-        Snapshot path, limits path, timestamped notebook paths, and template
-        paths.
+        Snapshot path, limits path, and timestamped notebook paths.
     """
     if set(limits) == set(_REQUIRED_AXES):
         payload = build_limits_payload(limits)
@@ -265,29 +260,13 @@ def adopt_limits(
         moment = datetime.now(timezone.utc)
 
     notebook_paths = tuple(Path(path) for path in notebook_paths)
-    template_paths = tuple(Path(path) for path in template_paths)
-    if notebook_paths and not template_paths:
-        raise ValueError(
-            "publishing a limits notebook requires its .xml, .rgn, and .lrp template files"
-        )
-    if template_paths:
-        missing = [str(path) for path in template_paths if not path.is_file()]
-        if missing:
-            raise FileNotFoundError(f"template archive files do not exist: {missing}")
-        suffixes = [path.suffix.lower() for path in template_paths]
-        if len(template_paths) != 3 or set(suffixes) != {".xml", ".rgn", ".lrp"}:
-            raise ValueError("template_paths must contain exactly one .xml, .rgn, and .lrp file")
-        if len({path.stem for path in template_paths}) != 1:
-            raise ValueError("template archive files must share one experiment filename stem")
 
     archived_notebook_relpaths: list[Path] = []
-    archived_template_relpaths: list[Path] = []
-    if notebook_paths or template_paths:
+    if notebook_paths:
         from ..store import format_snapshot_name
 
         stamp = format_snapshot_name(moment)
         with TemporaryDirectory(prefix="zmart_limits_data_") as temp_dir:
-            data_dir = Path(temp_dir) / "data"
             for notebook in notebook_paths:
                 from ..notebook_support import archive_notebook
 
@@ -298,18 +277,9 @@ def adopt_limits(
                     directory="notebook",
                 )
                 archived_notebook_relpaths.append(destination.relative_to(Path(temp_dir)))
-            for template in template_paths:
-                template_dir = data_dir / "template"
-                template_dir.mkdir(parents=True, exist_ok=True)
-                destination = template_dir / f"limits_{stamp}{template.suffix.lower()}"
-                shutil.copy2(template, destination)
-                archived_template_relpaths.append(destination.relative_to(Path(temp_dir)))
-            archive_dirs = [
-                directory
-                for directory in (Path(temp_dir) / "data", Path(temp_dir) / "notebook")
-                if directory.is_dir()
-            ]
-            snapshot = machine.publish_snapshot(moment, limits=payload, archive_paths=archive_dirs)
+            snapshot = machine.publish_snapshot(
+                moment, limits=payload, archive_paths=[Path(temp_dir) / "notebook"]
+            )
     else:
         snapshot = machine.publish_snapshot(moment, limits=payload)
 
@@ -317,5 +287,4 @@ def adopt_limits(
         "snapshot": str(snapshot),
         "limits_path": str(snapshot / "limits.json"),
         "notebook_paths": [str(snapshot / relative) for relative in archived_notebook_relpaths],
-        "template_paths": [str(snapshot / relative) for relative in archived_template_relpaths],
     }

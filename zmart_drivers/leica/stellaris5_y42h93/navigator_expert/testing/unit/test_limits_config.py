@@ -83,18 +83,12 @@ def test_adopt_limits_archives_the_saved_notebook_with_the_snapshot_timestamp(tm
     m = MachineProfile(programdata_root=tmp_path / "programdata")
     notebook = tmp_path / "set_limits.ipynb"
     notebook.write_text('{"cells": [{"saved": true}]}', encoding="utf-8")
-    templates = []
-    for suffix in (".xml", ".rgn", ".lrp"):
-        template = tmp_path / f"{{ScanningTemplate}}_PythonInspect{suffix}"
-        template.write_text(f"saved {suffix}", encoding="utf-8")
-        templates.append(template)
 
     out = limits_config.adopt_limits(
         _ENV_B,
         machine=m,
         moment=_ADOPT_MOMENT,
         notebook_paths=[notebook],
-        template_paths=templates,
     )
 
     snapshot = m.latest_snapshot("limits")
@@ -103,16 +97,8 @@ def test_adopt_limits_archives_the_saved_notebook_with_the_snapshot_timestamp(tm
     assert out["notebook_paths"] == [str(archived)]
     assert not (snapshot / notebook.name).exists()
     assert not (snapshot / "data" / "notebook").exists()
-    stamp = format_snapshot_name(_ADOPT_MOMENT)
-    archived_templates = sorted((snapshot / "data" / "template").iterdir())
-    assert [path.name for path in archived_templates] == [
-        f"limits_{stamp}.lrp",
-        f"limits_{stamp}.rgn",
-        f"limits_{stamp}.xml",
-    ]
-    assert out["template_paths"] == [
-        str(snapshot / "data" / "template" / f"limits_{stamp}{path.suffix}") for path in templates
-    ]
+    assert not (snapshot / "data" / "template").exists()  # the corners are in the notebook
+    assert "template_paths" not in out
 
 
 def test_adopt_limits_writes_stage_ranges_before_optional_setters(tmp_path):
@@ -123,19 +109,13 @@ def test_adopt_limits_writes_stage_ranges_before_optional_setters(tmp_path):
     assert list(payload)[:4] == ["x_um", "y_um", "z_galvo_um", "z_wide_um"]
 
 
-def test_adopt_limits_refuses_a_notebook_without_its_template_trio(tmp_path):
+def test_adopt_limits_takes_no_template_files(tmp_path):
+    """The limits come from four corners recorded at the stage, not a LAS X template."""
     m = MachineProfile(programdata_root=tmp_path / "programdata")
-    notebook = tmp_path / "set_limits.ipynb"
-    notebook.write_text('{"cells": []}', encoding="utf-8")
-
-    with pytest.raises(ValueError, match="requires its .xml, .rgn, and .lrp"):
+    with pytest.raises(TypeError, match="template_paths"):
         limits_config.adopt_limits(
-            _ENV_B,
-            machine=m,
-            moment=_ADOPT_MOMENT,
-            notebook_paths=[notebook],
+            _ENV_B, machine=m, moment=_ADOPT_MOMENT, template_paths=[tmp_path / "x.xml"]
         )
-
     assert m.latest_snapshot("limits") is None
 
 
@@ -311,10 +291,13 @@ def test_limits_notebook_publishes_the_exact_flat_template():
     assert "validated_limits," in source
     assert "import zmart_drivers.leica.stellaris5_y42h93.navigator_expert as drv" in source
     assert "drv.connect_microscope(load_calibration=False)" in source
-    assert "captured_xy = capture_adaptive_xy_limits(client)" in source
-    assert "remove_markers" not in source
+    assert "corners = CornerRecorder(client)" in source
+    for number in (1, 2, 3, 4):
+        assert f"corners.record({number})" in source
+    assert "captured_xy = corners.limits()" in source
     assert 'LIMITS.update(captured_xy["limits"])' in source
-    assert 'template_paths=captured_xy["template_paths"]' in source
+    assert "template" not in source.lower()
+    assert "capture_adaptive_xy_limits" not in source
     assert "validated_limits = validate_limits(LIMITS)" in source
     assert source.index("validate_limits(LIMITS)") < source.index("save_and_adopt")
     assert "# Save and Adopt" in source

@@ -22,7 +22,11 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.notebo
 NOTEBOOK = NotebookCheckpoint(
     NOTEBOOK_PATH,
     required_code=(
-        "captured_xy = capture_adaptive_xy_limits(client)",
+        "corners.record(1)",
+        "corners.record(2)",
+        "corners.record(3)",
+        "corners.record(4)",
+        "captured_xy = corners.limits()",
         "validated_limits = validate_limits(LIMITS)",
     ),
 )
