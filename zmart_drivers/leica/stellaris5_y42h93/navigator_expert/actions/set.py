@@ -34,8 +34,7 @@ fire (no limits handshake / invalid machine-local limits / constraint
 violation all refuse with a result dict). See ``commands/gate.py``.
 
 Import restrictions: only command helpers, runtime profiles/utilities, limits,
-the gate, readers, and confirmations. The ``prechecks`` import is used in
-``_dispatch`` for the ``pre_check_timeout`` override.
+the gate, readers, and confirmations.
 """
 
 import logging
@@ -48,7 +47,6 @@ from ..dispatcher import gate as _gate
 from ..dispatcher.change import confirm_and_fire
 from ..dispatcher.checks import check_xy, check_z
 from ..dispatcher.envelope import _make_log_entry, _make_timing
-from ..dispatcher.prechecks import check_idle
 from ..vendor_interface.errors import _check_api_error, _is_transient_error
 from ..vendor_interface.parsing import _hw_get, parse_format
 from . import objective_shift as _objective_shift
@@ -163,7 +161,6 @@ def _dispatch(
     retry_backoff=None,
     retry_escalate=None,
     max_confirm_attempts=None,
-    pre_check_timeout=None,
     error_check_fn=None,
 ):
     """Call confirm_and_fire with a profile's settings.
@@ -203,10 +200,6 @@ def _dispatch(
             uses the profile default.
         max_confirm_attempts: Override for the profile's max_confirm_attempts.
             None uses the profile default.
-        pre_check_timeout: Override idle-wait timeout (seconds). None
-            uses the profile's pre_check_fn as-is. When provided,
-            replaces the profile's pre_check_fn with a fresh
-            ``check_idle`` using this timeout.
         error_check_fn: Override for the profile's API echo error check.
             Use only for command-specific LAS X echo semantics.
 
@@ -231,13 +224,7 @@ def _dispatch(
         def effective_confirm(c, _f=_inner, _t=_poll_window):
             return _f(c, poll_window=_t)
 
-    # Resolve pre_check_fn: timeout override > profile default > None
-    if pre_check_timeout is not None and profile.pre_check_fn is not None:
-        heartbeat = getattr(profile.pre_check_fn, "keywords", {}).get("heartbeat", 30.0)
-
-        def pre_check_fn():
-            return check_idle(client, timeout=pre_check_timeout, heartbeat=heartbeat)
-    elif profile.pre_check_fn is not None:
+    if profile.pre_check_fn is not None:
 
         def pre_check_fn():
             return profile.pre_check_fn(client)
@@ -285,7 +272,6 @@ def _dispatch_setting(
     confirm_fn,
     *,
     max_retries=None,
-    pre_check_timeout=None,
 ):
     """Fire a pure field-write setting command through the backbone.
 
@@ -313,7 +299,6 @@ def _dispatch_setting(
         setup_fn=setup,
         confirm_fn=confirm_fn,
         max_retries=max_retries,
-        pre_check_timeout=pre_check_timeout,
     )
 
 
@@ -356,7 +341,7 @@ def _scan_resonant_error_check(client, *, job_name, target, timeout=None):
 # =============================================================================
 
 
-def set_zoom(client, job_name, value, *, max_retries=None, pre_check_timeout=None, tolerance=None):
+def set_zoom(client, job_name, value, *, max_retries=None, tolerance=None):
     """Set zoom level for the specified job.
 
     Args:
@@ -364,7 +349,6 @@ def set_zoom(client, job_name, value, *, max_retries=None, pre_check_timeout=Non
         job_name: Target job name.
         value: Desired zoom level.
         max_retries: Transient error retry ceiling.
-        pre_check_timeout: Idle-wait timeout (seconds). None = profile default.
         tolerance: Readback confirmation tolerance.
     """
     refused = _limits_refusal(client, "set_zoom", {"job_name": job_name, "value": value})
@@ -383,11 +367,10 @@ def set_zoom(client, job_name, value, *, max_retries=None, pre_check_timeout=Non
             tolerance=_profile_value(ZOOM, "confirm_tolerance", tolerance),
         ),
         max_retries=max_retries,
-        pre_check_timeout=pre_check_timeout,
     )
 
 
-def set_scan_speed(client, job_name, value, *, max_retries=None, pre_check_timeout=None):
+def set_scan_speed(client, job_name, value, *, max_retries=None):
     """Set scan speed for the specified job."""
     refused = _limits_refusal(client, "set_scan_speed", {"job_name": job_name, "value": value})
     if refused:
@@ -400,11 +383,10 @@ def set_scan_speed(client, job_name, value, *, max_retries=None, pre_check_timeo
         SCAN_SPEED,
         partial(_confirm_scan_speed, job_name=job_name, target=value),
         max_retries=max_retries,
-        pre_check_timeout=pre_check_timeout,
     )
 
 
-def set_scan_resonant(client, job_name, enable, *, max_retries=None, pre_check_timeout=None):
+def set_scan_resonant(client, job_name, enable, *, max_retries=None):
     """Enable or disable resonant scanning for the specified job."""
     refused = _limits_refusal(client, "set_scan_resonant", {"job_name": job_name, "value": enable})
     if refused:
@@ -429,11 +411,10 @@ def set_scan_resonant(client, job_name, enable, *, max_retries=None, pre_check_t
             timeout=SCAN_RESONANT.confirm_poll_s,
         ),
         max_retries=max_retries,
-        pre_check_timeout=pre_check_timeout,
     )
 
 
-def set_scan_mode(client, job_name, mode, *, max_retries=None, pre_check_timeout=None):
+def set_scan_mode(client, job_name, mode, *, max_retries=None):
     """Set scan mode (e.g. 'xyz', 'xyzt') for the specified job."""
     refused = _limits_refusal(client, "set_scan_mode", {"job_name": job_name, "value": mode})
     if refused:
@@ -446,11 +427,10 @@ def set_scan_mode(client, job_name, mode, *, max_retries=None, pre_check_timeout
         SCAN_MODE,
         partial(_confirm_scan_mode, job_name=job_name, target=mode),
         max_retries=max_retries,
-        pre_check_timeout=pre_check_timeout,
     )
 
 
-def set_sequential_mode(client, job_name, mode, *, max_retries=None, pre_check_timeout=None):
+def set_sequential_mode(client, job_name, mode, *, max_retries=None):
     """Set sequential mode ('Line', 'Frame', or 'Stack') for the specified job."""
     refused = _limits_refusal(client, "set_sequential_mode", {"job_name": job_name, "value": mode})
     if refused:
@@ -500,12 +480,11 @@ def set_sequential_mode(client, job_name, mode, *, max_retries=None, pre_check_t
         setup_fn=setup,
         confirm_fn=partial(_confirm_sequential_mode, job_name=job_name, target=mode),
         max_retries=max_retries,
-        pre_check_timeout=pre_check_timeout,
     )
 
 
 def set_scan_field_rotation(
-    client, job_name, angle, *, max_retries=None, pre_check_timeout=None, tolerance=None
+    client, job_name, angle, *, max_retries=None, tolerance=None
 ):
     """Set scan field rotation angle (degrees) for the specified job."""
     refused = _limits_refusal(
@@ -526,11 +505,10 @@ def set_scan_field_rotation(
             tolerance=_profile_value(SCAN_FIELD_ROTATION, "confirm_tolerance", tolerance),
         ),
         max_retries=max_retries,
-        pre_check_timeout=pre_check_timeout,
     )
 
 
-def set_image_format(client, job_name, format_str, *, max_retries=None, pre_check_timeout=None):
+def set_image_format(client, job_name, format_str, *, max_retries=None):
     """Set image dimensions for the specified job.
 
     Args:
@@ -565,7 +543,6 @@ def set_image_format(client, job_name, format_str, *, max_retries=None, pre_chec
         setup_fn=setup,
         confirm_fn=partial(_confirm_image_format, job_name=job_name, w=w, h=h),
         max_retries=max_retries,
-        pre_check_timeout=pre_check_timeout,
     )
 
 
@@ -602,7 +579,6 @@ def set_objective(
     *,
     compensate=None,
     max_retries=None,
-    pre_check_timeout=None,
 ):
     """Set objective by slot index, name, or magnification.
 
@@ -697,7 +673,6 @@ def set_objective(
             confirm_objective, job_name=job_name, target_slot=slot, target_name=target_name
         ),
         max_retries=max_retries,
-        pre_check_timeout=pre_check_timeout,
     )
     if before is not None and result.get("success"):
         result = _objective_shift.merge_into_result(
@@ -721,7 +696,6 @@ def set_z_stack_definition(
     old_end_um=None,
     *,
     max_retries=None,
-    pre_check_timeout=None,
     tolerance=None,
 ):
     """Set z-stack begin/end positions (micrometers).
@@ -785,12 +759,11 @@ def set_z_stack_definition(
             tolerance=_profile_value(Z_STACK_DEFINITION, "confirm_tolerance", tolerance),
         ),
         max_retries=max_retries,
-        pre_check_timeout=pre_check_timeout,
     )
 
 
 def set_z_stack_step_size(
-    client, job_name, step_size_um, *, max_retries=None, pre_check_timeout=None, tolerance=None
+    client, job_name, step_size_um, *, max_retries=None, tolerance=None
 ):
     """Set z-stack step size (micrometers)."""
     refused = _limits_refusal(
@@ -817,12 +790,11 @@ def set_z_stack_step_size(
             tolerance=_profile_value(Z_STACK_STEP_SIZE, "confirm_tolerance", tolerance),
         ),
         max_retries=max_retries,
-        pre_check_timeout=pre_check_timeout,
     )
 
 
 def set_z_stack_size(
-    client, job_name, size_um, *, max_retries=None, pre_check_timeout=None, tolerance=None
+    client, job_name, size_um, *, max_retries=None, tolerance=None
 ):
     """Set z-stack total size (micrometers).
 
@@ -851,7 +823,6 @@ def set_z_stack_size(
             tolerance=_profile_value(Z_STACK_SIZE, "confirm_tolerance", tolerance),
         ),
         max_retries=max_retries,
-        pre_check_timeout=pre_check_timeout,
     )
 
 
@@ -861,7 +832,7 @@ def set_z_stack_size(
 
 
 def set_frame_accumulation(
-    client, job_name, setting_index, value, *, max_retries=None, pre_check_timeout=None
+    client, job_name, setting_index, value, *, max_retries=None
 ):
     """Set frame accumulation count for a specific setting index."""
     refused = _limits_refusal(
@@ -877,12 +848,11 @@ def set_frame_accumulation(
         FRAME_ACCUMULATION,
         partial(_confirm_frame_accumulation, job_name=job_name, si=setting_index, target=value),
         max_retries=max_retries,
-        pre_check_timeout=pre_check_timeout,
     )
 
 
 def set_frame_average(
-    client, job_name, setting_index, value, *, max_retries=None, pre_check_timeout=None
+    client, job_name, setting_index, value, *, max_retries=None
 ):
     """Set frame average count for a specific setting index."""
     refused = _limits_refusal(client, "set_frame_average", {"job_name": job_name, "value": value})
@@ -896,12 +866,11 @@ def set_frame_average(
         FRAME_AVERAGE,
         partial(_confirm_frame_average, job_name=job_name, si=setting_index, target=value),
         max_retries=max_retries,
-        pre_check_timeout=pre_check_timeout,
     )
 
 
 def set_line_accumulation(
-    client, job_name, setting_index, value, *, max_retries=None, pre_check_timeout=None
+    client, job_name, setting_index, value, *, max_retries=None
 ):
     """Set line accumulation count for a specific setting index."""
     refused = _limits_refusal(
@@ -917,12 +886,11 @@ def set_line_accumulation(
         LINE_ACCUMULATION,
         partial(_confirm_line_accumulation, job_name=job_name, si=setting_index, target=value),
         max_retries=max_retries,
-        pre_check_timeout=pre_check_timeout,
     )
 
 
 def set_line_average(
-    client, job_name, setting_index, value, *, max_retries=None, pre_check_timeout=None
+    client, job_name, setting_index, value, *, max_retries=None
 ):
     """Set line average count for a specific setting index."""
     refused = _limits_refusal(client, "set_line_average", {"job_name": job_name, "value": value})
@@ -936,7 +904,6 @@ def set_line_average(
         LINE_AVERAGE,
         partial(_confirm_line_average, job_name=job_name, si=setting_index, target=value),
         max_retries=max_retries,
-        pre_check_timeout=pre_check_timeout,
     )
 
 
@@ -947,7 +914,6 @@ def set_pinhole_airy(
     value,
     *,
     max_retries=None,
-    pre_check_timeout=None,
     tolerance=None,
 ):
     """Set pinhole size in Airy units for a specific setting index."""
@@ -968,7 +934,6 @@ def set_pinhole_airy(
             tolerance=_profile_value(PINHOLE_AIRY, "confirm_tolerance", tolerance),
         ),
         max_retries=max_retries,
-        pre_check_timeout=pre_check_timeout,
     )
 
 
@@ -985,7 +950,6 @@ def set_detector_gain(
     value,
     *,
     max_retries=None,
-    pre_check_timeout=None,
     tolerance=None,
 ):
     """Set detector gain for a specific detector identified by beam route."""
@@ -1012,7 +976,6 @@ def set_detector_gain(
             tolerance=_profile_value(DETECTOR_GAIN, "confirm_tolerance", tolerance),
         ),
         max_retries=max_retries,
-        pre_check_timeout=pre_check_timeout,
     )
 
 
@@ -1030,7 +993,6 @@ def set_laser_intensity(
     value,
     *,
     max_retries=None,
-    pre_check_timeout=None,
     tolerance=None,
 ):
     """Set laser intensity (0.0-1.0) for a specific laser line."""
@@ -1060,7 +1022,6 @@ def set_laser_intensity(
             tolerance=_profile_value(LASER_INTENSITY, "confirm_tolerance", tolerance),
         ),
         max_retries=max_retries,
-        pre_check_timeout=pre_check_timeout,
     )
 
 
@@ -1072,7 +1033,6 @@ def set_laser_shutter(
     activate,
     *,
     max_retries=None,
-    pre_check_timeout=None,
 ):
     """Open or close laser shutter for a specific beam route."""
     refused = _limits_refusal(
@@ -1100,7 +1060,6 @@ def set_laser_shutter(
             target=activate,
         ),
         max_retries=max_retries,
-        pre_check_timeout=pre_check_timeout,
     )
 
 
@@ -1118,7 +1077,6 @@ def set_filter_wheel_slot(
     slot_index,
     *,
     max_retries=None,
-    pre_check_timeout=None,
 ):
     """Set filter wheel to a specific slot."""
     refused = _limits_refusal(
@@ -1155,7 +1113,6 @@ def set_filter_wheel_slot(
             target=slot_index,
         ),
         max_retries=max_retries,
-        pre_check_timeout=pre_check_timeout,
     )
 
 
@@ -1168,7 +1125,6 @@ def set_filter_wheel_spectrum(
     position,
     *,
     max_retries=None,
-    pre_check_timeout=None,
     tolerance=None,
 ):
     """Set filter wheel spectrum position (nm)."""
@@ -1207,7 +1163,6 @@ def set_filter_wheel_spectrum(
             tolerance=_profile_value(FILTER_WHEEL_SPECTRUM, "confirm_tolerance", tolerance),
         ),
         max_retries=max_retries,
-        pre_check_timeout=pre_check_timeout,
     )
 
 
@@ -1216,7 +1171,7 @@ def set_filter_wheel_spectrum(
 # =============================================================================
 
 
-def move_xy(client, x, y, unit="um", *, max_retries=None, pre_check_timeout=None, tolerance=None):
+def move_xy(client, x, y, unit="um", *, max_retries=None, tolerance=None):
     """Move XY stage to absolute position.
 
     Args:
@@ -1299,7 +1254,6 @@ def move_xy(client, x, y, unit="um", *, max_retries=None, pre_check_timeout=None
             tolerance=_profile_value(MOVE_XY, "confirm_tolerance", tolerance),
         ),
         max_retries=max_retries,
-        pre_check_timeout=pre_check_timeout,
     )
 
     # Target position (not a readback - check r["confirmed"] for verification status)
@@ -1450,7 +1404,6 @@ def move_z(
     z_mode="galvo",
     *,
     max_retries=None,
-    pre_check_timeout=None,
     tolerance=None,
 ):
     """Move Z drive to an absolute position (galvo or zwide).
@@ -1548,7 +1501,6 @@ def move_z(
             observed_after=command_started_at,
         ),
         max_retries=max_retries,
-        pre_check_timeout=pre_check_timeout,
     )
 
 
@@ -1564,7 +1516,6 @@ def acquire(
     poll_timeout=None,
     heartbeat_interval=None,
     start_timeout=None,
-    pre_check_timeout=None,
 ):
     """Trigger acquisition and block until scan completes.
 
@@ -1608,7 +1559,6 @@ def acquire(
             timeout=_profile_value(ACQUIRE, "poll_timeout", poll_timeout),
             poll_interval=_profile_value(ACQUIRE, "poll_interval", poll_interval),
         ),
-        pre_check_timeout=pre_check_timeout,
     )
 
 
@@ -1617,11 +1567,12 @@ def acquire(
 # =============================================================================
 
 
-def select_job(client, job_name, poll_timeout=None, poll_interval=None, *, compensate=None):
+def select_job(client, job_name, *, compensate=None):
     """Select a job by name.
 
     Routes through the backbone. The SELECT_JOB profile pre-checks scanner
-    idle before firing (``check_idle`` with no timeout). Source policy
+    idle before firing (``check_idle``), and confirms like every command:
+    four windows of ``WINDOW_S``, fired again between. Source policy
     (api / log / hybrid) lives entirely
     in the confirmation layer: ``prepare_select_job`` owns the
     "already selected" decision and the api baseline, and
@@ -1631,8 +1582,6 @@ def select_job(client, job_name, poll_timeout=None, poll_interval=None, *, compe
     Args:
         client: LAS X API client.
         job_name: Name of job to select.
-        poll_timeout: Max seconds to wait for job switch confirmation.
-        poll_interval: Seconds between get_jobs polls.
         compensate: A job change can swap the objective with it; this
             controls the calibrated stage move that keeps the sample point
             afterwards. ``None`` (default) follows the session's
@@ -1682,11 +1631,7 @@ def select_job(client, job_name, poll_timeout=None, poll_interval=None, *, compe
         job_name,
         command_started_at=command_started_at,
         api_baseline_name=context["api_baseline_name"],
-        # The per-attempt confirm window is the shared profile knob
-        # (confirm_poll_s = CONFIRM_POLL_S), same 4x3 as every other command;
-        # an explicit poll_timeout arg still overrides for a one-off call.
-        timeout=poll_timeout if poll_timeout is not None else SELECT_JOB.confirm_poll_s,
-        poll_interval=_profile_value(SELECT_JOB, "poll_interval", poll_interval),
+        timeout=SELECT_JOB.confirm_poll_s,
     )
     result = _dispatch(
         client,

@@ -24,8 +24,8 @@ from pathlib import Path
 
 from ..dispatcher import gate as _gate
 from ..dispatcher.envelope import _make_timing
-from ..dispatcher.tuning import RECEIPT_TIMEOUT
 from ..output.files import _wait_file_stable
+from ..vendor_interface.delivery import deliver
 from .lrp import parse_lrp
 
 log = logging.getLogger(__name__)
@@ -153,7 +153,7 @@ def save_experiment(
 ):
     """Save the active experiment and wait for file-based confirmation.
 
-    Fires ``PyApiSaveExperiment.UpdateAwaitReceipt``, then polls
+    Delivers ``PyApiSaveExperiment`` (``vendor_interface.delivery``), then polls
     *confirm_path* (default: the XML) for an mtime change followed by
     3 consecutive stable size readings at *poll_interval*.
 
@@ -182,11 +182,9 @@ def save_experiment(
         old_mtime = watch_path.stat().st_mtime if watch_path.is_file() else 0
 
         client.PyApiSaveExperiment.Model.ExperimentName = name
-        if not client.PyApiSaveExperiment.UpdateAwaitReceipt(RECEIPT_TIMEOUT):
-            log.warning("Save receipt failed for '%s', retrying once", name)
-            if not client.PyApiSaveExperiment.UpdateAwaitReceipt(RECEIPT_TIMEOUT):
-                log.error("Save receipt failed twice for '%s'", name)
-                return None
+        if not deliver(client.PyApiSaveExperiment, label=f"SaveExperiment '{name}'"):
+            log.error("Save not received for '%s'", name)
+            return None
 
         fire_t = time.perf_counter() - t0
 
@@ -256,11 +254,9 @@ def load_experiment(client, name):
     t0 = time.perf_counter()
     try:
         client.PyApiLoadExperiment.Model.ExperimentName = name
-        if not client.PyApiLoadExperiment.UpdateAwaitReceipt(RECEIPT_TIMEOUT):
-            log.warning("Load receipt failed for '%s', retrying once", name)
-            if not client.PyApiLoadExperiment.UpdateAwaitReceipt(RECEIPT_TIMEOUT):
-                log.error("Load receipt failed twice for '%s'", name)
-                return None
+        if not deliver(client.PyApiLoadExperiment, label=f"LoadExperiment '{name}'"):
+            log.error("Load not received for '%s'", name)
+            return None
 
         total_t = time.perf_counter() - t0
         log.debug("Loaded '%s' in %.2fs", name, total_t)

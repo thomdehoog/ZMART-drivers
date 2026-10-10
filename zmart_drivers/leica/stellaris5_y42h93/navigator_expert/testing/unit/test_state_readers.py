@@ -34,15 +34,17 @@ class TestStateReaders(unittest.TestCase):
     def test_default_profile_uses_hybrid_readers(self):
         # Maintainer decision (docs/reviews/MAINTAINER_DECISIONS.md §1):
         # hybrid is the default for routed cold reads; api/log stay selectable
-        # per datum. Exception: `jobs` is API-pinned because the log only sees
-        # the active job, so its list is incomplete (bench 2026-07-06).
+        # per datum. Exceptions: `jobs` is API-pinned because the log only sees
+        # the active job, so its list is incomplete (bench 2026-07-06), and
+        # `scan_status` because the log writes it only when it changes and the
+        # API decides whether a command fires (2026-10-10).
         profile = profiles.STATE_READERS
         self.assertEqual(profile.xy_mode, "hybrid")
         self.assertEqual(profile.job_settings_mode, "hybrid")
         self.assertEqual(profile.jobs_mode, "api")
         self.assertEqual(profile.selected_job_mode, "hybrid")
         self.assertEqual(profile.hardware_info_mode, "hybrid")
-        self.assertEqual(profile.scan_status_mode, "hybrid")
+        self.assertEqual(profile.scan_status_mode, "api")
 
     def test_default_xy_hybrid_degrades_to_api_without_fresh_log(self):
         expected = {"x_um": 1.0, "y_um": 2.0}
@@ -115,7 +117,6 @@ class TestStateReaders(unittest.TestCase):
         profiles.STATE_READERS = profiles.StateReaderProfile(
             xy_mode="hybrid",
             xy_log_max_age_s=1.0,
-            xy_timeout_s=1.0,
         )
         snapshot = SimpleNamespace(now=100.0)
         expected = {"x_um": 5.0, "y_um": 6.0}
@@ -134,12 +135,12 @@ class TestStateReaders(unittest.TestCase):
         self.assertEqual(reading.source, "log")
         self.assertEqual(reading.value, expected)
 
-    def test_hybrid_prefers_fresh_log_over_faster_api(self):
+    def test_hybrid_takes_the_first_success_not_the_log(self):
+        # No source is preferred: the faster API answer wins over a fresh log
+        # answer that arrives later (the old 0.25 s log head start is gone).
         profiles.STATE_READERS = profiles.StateReaderProfile(
             xy_mode="hybrid",
             xy_log_max_age_s=1.0,
-            xy_timeout_s=1.0,
-            hybrid_log_grace_s=0.25,
         )
         snapshot = SimpleNamespace(now=100.0)
         api_value = {"x_um": 100.0, "y_um": 200.0}
@@ -156,14 +157,13 @@ class TestStateReaders(unittest.TestCase):
             patch.object(router.log_reader, "ages", return_value={"xy": 0.1}),
         ):
             reading = readers.get_xy(object(), diagnostics=True)
-        self.assertEqual(reading.source, "log")
-        self.assertEqual(reading.value, log_value)
+        self.assertEqual(reading.source, "api")
+        self.assertEqual(reading.value, api_value)
 
     def test_hybrid_ignores_untrustworthy_log_and_returns_api(self):
         profiles.STATE_READERS = profiles.StateReaderProfile(
             xy_mode="hybrid",
             xy_log_max_age_s=1.0,
-            xy_timeout_s=1.0,
         )
         snapshot = SimpleNamespace(now=100.0)
         expected = {"x_um": 7.0, "y_um": 8.0}
@@ -181,7 +181,6 @@ class TestStateReaders(unittest.TestCase):
         profiles.STATE_READERS = profiles.StateReaderProfile(
             xy_mode="hybrid",
             xy_log_max_age_s=1.0,
-            xy_timeout_s=1.0,
         )
         client = object()
         snapshot = SimpleNamespace(now=100.0)
@@ -287,7 +286,6 @@ class TestStateReaders(unittest.TestCase):
                 object(),
                 job_name="Overview",
                 timeout=1.0,
-                poll_interval=0.001,
             )
         self.assertTrue(result["success"])
 
@@ -312,7 +310,6 @@ class TestStateReaders(unittest.TestCase):
                 object(),
                 job_name="Overview",
                 timeout=1.0,
-                poll_interval=0.001,
             )
 
         self.assertTrue(result["success"])
@@ -373,7 +370,7 @@ class TestApiModeCappedWorker(unittest.TestCase):
         profiles.STATE_READERS = self._state_profile
 
     def test_api_mode_hung_read_returns_none_after_timeout(self):
-        profiles.STATE_READERS = profiles.StateReaderProfile(xy_timeout_s=0.2)
+        profiles.STATE_READERS = profiles.StateReaderProfile()
         release = threading.Event()
 
         def hung_api(*_args, **_kwargs):
@@ -391,7 +388,7 @@ class TestApiModeCappedWorker(unittest.TestCase):
             release.set()
 
     def test_api_mode_respects_in_flight_cap(self):
-        profiles.STATE_READERS = profiles.StateReaderProfile(xy_timeout_s=0.2)
+        profiles.STATE_READERS = profiles.StateReaderProfile()
         release = threading.Event()
         client = object()
 
@@ -582,7 +579,7 @@ class TestRoutedErrorAndDiagnosticShapes(unittest.TestCase):
         self.assertIn("no hybrid leg", str(reading.error))
 
     def test_hybrid_api_only_hung_read_returns_none_after_timeout(self):
-        profiles.STATE_READERS = profiles.StateReaderProfile(xy_timeout_s=0.1)
+        profiles.STATE_READERS = profiles.StateReaderProfile()
         api_only = dataclasses.replace(capabilities.spec("xy"), log_fn=None)
         release = threading.Event()
 
@@ -611,76 +608,13 @@ class TestRoutedErrorAndDiagnosticShapes(unittest.TestCase):
         self.assertIsInstance(reading.error, RuntimeError)
 
 
-class TestHybridGraceWindow(unittest.TestCase):
-    """Log wins within the grace window; API wins once it expires."""
-
-    def setUp(self):
-        self._state_profile = profiles.STATE_READERS
-
-    def tearDown(self):
-        profiles.STATE_READERS = self._state_profile
-
-    def test_api_wins_after_grace_expires_without_a_log_result(self):
-        profiles.STATE_READERS = profiles.StateReaderProfile(
-            xy_mode="hybrid",
-            xy_log_max_age_s=1.0,
-            xy_timeout_s=5.0,
-            hybrid_log_grace_s=0.05,
-        )
-        api_value = {"x_um": 100.0, "y_um": 200.0}
-
-        def slow_log(*_args, **_kwargs):
-            time.sleep(1.0)  # never lands inside the grace window
-            return {"x_um": 5.0, "y_um": 6.0}
-
-        snapshot = SimpleNamespace(now=100.0)
-        with (
-            patch.object(router.api_reader, "get_xy", return_value=api_value),
-            patch.object(router.log_reader, "parse_log", return_value=snapshot),
-            patch.object(router.log_reader, "get_xy", side_effect=slow_log),
-            patch.object(router.log_reader, "ages", return_value={"xy": 0.1}),
-        ):
-            t0 = time.monotonic()
-            reading = readers.get_xy(object(), diagnostics=True)
-            elapsed = time.monotonic() - t0
-        self.assertEqual(reading.source, "api")
-        self.assertEqual(reading.value, api_value)
-        self.assertLess(elapsed, 0.9)  # bounded by the grace window, not the log
-
-    def test_untrusted_log_after_api_candidate_returns_api_before_grace_expires(self):
-        profiles.STATE_READERS = profiles.StateReaderProfile(
-            xy_mode="hybrid",
-            xy_log_max_age_s=1.0,
-            xy_timeout_s=5.0,
-            hybrid_log_grace_s=2.0,
-        )
-        api_value = {"x_um": 7.0, "y_um": 8.0}
-
-        def stale_log(*_args, **_kwargs):
-            time.sleep(0.05)
-            return None  # untrustworthy: no fresh evidence
-
-        snapshot = SimpleNamespace(now=100.0)
-        with (
-            patch.object(router.api_reader, "get_xy", return_value=api_value),
-            patch.object(router.log_reader, "parse_log", return_value=snapshot),
-            patch.object(router.log_reader, "get_xy", side_effect=stale_log),
-            patch.object(router.log_reader, "ages", return_value={"xy": 9.0}),
-        ):
-            t0 = time.monotonic()
-            reading = readers.get_xy(object(), diagnostics=True)
-            elapsed = time.monotonic() - t0
-        self.assertEqual(reading.source, "api")
-        self.assertEqual(reading.value, api_value)
-        self.assertLess(elapsed, 1.5)  # untrusted log releases the grace wait
-
-
 class TestDerivedReaderFamilies(unittest.TestCase):
     """get_job_by_name / get_fov / get_base_fov / read_zwide_um /
     get_pending_dialog derive values while preserving the underlying
     reading's provenance."""
 
     _SETTINGS = {
+        "objective": {"slotIndex": 3},
         "imageSize": "100.0 um x 100.0 um",
         "format": "512 x 512",
         "zoom": {"current": 2.0},

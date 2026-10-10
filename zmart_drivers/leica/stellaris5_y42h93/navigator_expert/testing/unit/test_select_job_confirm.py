@@ -59,7 +59,6 @@ class TestHybridAdmissibility(SelectJobCase):
         produces no post-command event -> hybrid must NOT confirm."""
         self._use(
             selected_job_confirm_source="hybrid",
-            selected_job_log_confirm_timeout_s=0.05,
         )
         api_leg, log_leg, budget = confirm_select_job.select_job_confirm_legs(
             "AF Job",
@@ -96,7 +95,6 @@ class TestHybridAdmissibility(SelectJobCase):
         not admissible evidence."""
         self._use(
             selected_job_confirm_source="hybrid",
-            selected_job_log_confirm_timeout_s=0.05,
         )
         api_leg, log_leg, budget = confirm_select_job.select_job_confirm_legs(
             "AF Job",
@@ -130,13 +128,11 @@ class TestHybridAdmissibility(SelectJobCase):
     def test_log_wins_while_api_stale(self):
         self._use(
             selected_job_confirm_source="hybrid",
-            selected_job_log_confirm_timeout_s=1.0,
         )
         api_leg, log_leg, budget = confirm_select_job.select_job_confirm_legs(
             "HiRes",
             command_started_at=100.0,
             timeout=0.3,
-            poll_interval=0.01,
             api_baseline_name="AF Job",
         )
         stale_jobs = [{"Name": "AF Job", "IsSelected": True}]
@@ -166,13 +162,11 @@ class TestHybridAdmissibility(SelectJobCase):
     def test_api_wins_while_log_silent(self):
         self._use(
             selected_job_confirm_source="hybrid",
-            selected_job_log_confirm_timeout_s=0.05,
         )
         api_leg, log_leg, budget = confirm_select_job.select_job_confirm_legs(
             "HiRes",
             command_started_at=100.0,
             timeout=1.0,
-            poll_interval=0.01,
             api_baseline_name="Overview",
         )
         switched = [{"Name": "HiRes", "IsSelected": True}]
@@ -216,7 +210,6 @@ class TestLegsBuilder(SelectJobCase):
             "AF Job",
             command_started_at=100.0,
             timeout=0.5,
-            poll_interval=0.01,
             api_baseline_name="AF Job",
         )
         self.assertIsNone(log_leg)
@@ -229,7 +222,6 @@ class TestLegsBuilder(SelectJobCase):
     def test_log_source_builds_log_leg_only(self):
         self._use(
             selected_job_confirm_source="log",
-            selected_job_log_confirm_timeout_s=0.25,
         )
         api_leg, log_leg, budget = confirm_select_job.select_job_confirm_legs(
             "HiRes", command_started_at=100.0
@@ -252,7 +244,6 @@ class TestLegsBuilder(SelectJobCase):
     def test_log_leg_fails_closed_when_log_misses(self):
         self._use(
             selected_job_confirm_source="log",
-            selected_job_log_confirm_timeout_s=0.25,
         )
         _, log_leg, _ = confirm_select_job.select_job_confirm_legs(
             "HiRes", command_started_at=100.0
@@ -279,8 +270,8 @@ class TestLegsBuilder(SelectJobCase):
         self.assertEqual(budget, 5.0)
         self.assertEqual(api_leg.keywords["timeout"], 5.0)
 
-    def test_hybrid_window_defaults_to_confirm_poll_s(self):
-        """With no explicit timeout the window is the shared CONFIRM_POLL_S --
+    def test_hybrid_window_defaults_to_the_rule_window(self):
+        """With no explicit timeout the window is the shared ``WINDOW_S`` --
         the same 4x3 window every command uses."""
         self._use(selected_job_confirm_source="hybrid")
         api_leg, _, budget = confirm_select_job.select_job_confirm_legs(
@@ -288,7 +279,7 @@ class TestLegsBuilder(SelectJobCase):
         )
         # Read the live module constant the code reads (a conftest patches it
         # down for suite speed), not the import-time value.
-        expected = confirm_select_job._timing.CONFIRM_POLL_S
+        expected = confirm_select_job._timing.WINDOW_S
         self.assertEqual(budget, expected)
         self.assertEqual(api_leg.keywords["timeout"], expected)
 
@@ -312,7 +303,6 @@ class TestLegsBuilder(SelectJobCase):
     def test_refires_reuse_the_original_command_timestamp(self):
         self._use(
             selected_job_confirm_source="log",
-            selected_job_log_confirm_timeout_s=0.25,
         )
         _, log_leg, _ = confirm_select_job.select_job_confirm_legs(
             "HiRes", command_started_at=123.456

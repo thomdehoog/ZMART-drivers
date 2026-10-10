@@ -35,15 +35,14 @@ class TestValidateHardwareCli(unittest.TestCase):
             enable_log_select_confirm=False,
             mock=False,
             state_reader_mode=None,
-            log_select_confirm_timeout_s=1.5,
-            log_select_cluster_max_age_s=None,
+            log_select_cluster_max_age_s=4.0,
             prime_log_select_cluster=False,
         )
 
         validator._apply_log_select_confirmation(args, logging.getLogger("validate-hardware-test"))
 
         self.assertEqual(profiles.STATE_READERS.selected_job_confirm_source, "hybrid")
-        self.assertEqual(profiles.STATE_READERS.selected_job_log_confirm_timeout_s, 1.5)
+        self.assertEqual(profiles.STATE_READERS.selected_job_log_cluster_max_age_s, 4.0)
 
 
 if __name__ == "__main__":

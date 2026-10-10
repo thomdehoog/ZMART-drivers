@@ -120,64 +120,46 @@ def race_confirmations(api_leg=None, log_leg=None, *, label="", budget_s=None):
                     f"{label} | {tag} confirmation leg returned "
                     f"{type(outcome).__name__}, expected dict",
                 )
-        results.put(outcome)
+        results.put((tag, outcome))
 
     def run_race():
-        api_results = queue.Queue()
-        log_results = queue.Queue()
-        threading.Thread(
-            target=_run_leg,
-            args=("api", api_leg, api_results),
-            name="lasx-confirm-api",
-            daemon=True,
-        ).start()
-        threading.Thread(
-            target=_run_leg,
-            args=("log", log_leg, log_results),
-            name="lasx-confirm-log",
-            daemon=True,
-        ).start()
+        results = queue.Queue()
+        for tag, leg in (("api", api_leg), ("log", log_leg)):
+            threading.Thread(
+                target=_run_leg,
+                args=(tag, leg, results),
+                name=f"lasx-confirm-{tag}",
+                daemon=True,
+            ).start()
 
         started = time.monotonic()
         deadline = started + budget_s
         outcomes = {}
         winner = None
         while len(outcomes) < 2:
-            now = time.monotonic()
-            if now >= deadline:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
                 break
-            if "api" not in outcomes:
-                try:
-                    outcomes["api"] = api_results.get_nowait()
-                except queue.Empty:
-                    pass
-                else:
-                    if outcomes["api"].get("success"):
-                        winner = "api"
-                        break
-            if "log" not in outcomes:
-                try:
-                    outcomes["log"] = log_results.get_nowait()
-                except queue.Empty:
-                    pass
-                else:
-                    if outcomes["log"].get("success"):
-                        winner = "log"
-                        break
-            if len(outcomes) < 2:
-                time.sleep(min(0.005, max(0.0, deadline - now)))
+            try:
+                tag, outcome = results.get(timeout=remaining)
+            except queue.Empty:
+                break
+            outcomes[tag] = outcome
+            if outcome.get("success"):
+                winner = tag
+                break
 
         if winner is not None:
             loser = "log" if winner == "api" else "api"
-            if loser not in outcomes:
-                # The loser may have finished in the instant between our last
-                # poll and the win — one bounded drain so a completed leg is
-                # reported as disagreement, not misreported as abandoned.
-                pending_q = log_results if loser == "log" else api_results
+            # The loser may have finished in the instant before the win: take
+            # it if it is already there, so a completed leg is reported as
+            # disagreement, not misreported as abandoned.
+            while loser not in outcomes:
                 try:
-                    outcomes[loser] = pending_q.get(timeout=0.05)
+                    tag, outcome = results.get_nowait()
                 except queue.Empty:
-                    pass
+                    break
+                outcomes[tag] = outcome
 
         elapsed = time.monotonic() - started
         logs = []
@@ -224,19 +206,19 @@ def race_confirmations(api_leg=None, log_leg=None, *, label="", budget_s=None):
 # =============================================================================
 
 
-def _readback(client, job_name, *, observed_after=None, mode=None):
-    """Read job settings, using the configured mode when *mode* is None."""
-    # Reader budget is its own profile knob, distinct from the confirm poll
-    # window: this is a genuine "how long may one job-settings read block"
-    # value. Deferred import — profiles imports this module.
-    from .profiles import STATE_READERS
+def _readback(client, job_name, *, deadline, observed_after=None, mode=None):
+    """Watch the job's settings until *deadline* (``time.monotonic()``); a copy, or None.
 
+    One look in a confirmation's window: both sources the profile allows, the
+    first complete settings from either. The caller compares them with its
+    target and looks again after ``POLL_S`` while they do not match.
+    """
     reading = _readers.get_job_settings(
         client,
         job_name,
-        timeout=STATE_READERS.job_settings_timeout_s,
         mode=mode,
         diagnostics=True,
+        deadline=deadline,
     )
     if reading is None:
         return None
@@ -289,7 +271,6 @@ def _confirm_readback(
     errors,
     tolerance=None,
     poll_window=None,
-    poll_interval=0.01,
 ):
     """Poll a job-settings readback until one value matches ``target``.
 
@@ -311,20 +292,19 @@ def _confirm_readback(
             absolute-tolerance.
         errors: Exception tuple to swallow during extraction/comparison.
         tolerance: Acceptable deviation (ignored by exact comparators).
-        poll_window: Hard ceiling in seconds. None uses CONFIRM_POLL_S.
-        poll_interval: Seconds between readback polls.
+        poll_window: Hard ceiling in seconds. None uses ``WINDOW_S``.
 
     Returns:
         {"success": bool, "logs": [...]}
     """
     if poll_window is None:
-        poll_window = _timing.CONFIRM_POLL_S
+        poll_window = _timing.WINDOW_S
     logs = []
-    t_start = time.perf_counter()
+    t_start = time.monotonic()
     deadline = t_start + poll_window
 
-    while time.perf_counter() < deadline:
-        ch = _readback(client, job_name)
+    while time.monotonic() < deadline:
+        ch = _readback(client, job_name, deadline=deadline)
         if ch is not None:
             try:
                 actual = extract(ch)
@@ -333,9 +313,9 @@ def _confirm_readback(
                 log.debug("%s confirm: target=%s actual=%s", label, target, actual)
             except errors:
                 pass
-        time.sleep(poll_interval)
+        time.sleep(_timing.POLL_S)
 
-    msg = f"{label} timeout after {time.perf_counter() - t_start:.1f}s — target={target}"
+    msg = f"{label} timeout after {time.monotonic() - t_start:.1f}s — target={target}"
     log.warning(msg)
     logs.append(_make_log_entry("warning", msg))
     return {"success": False, "logs": logs}
@@ -349,7 +329,6 @@ def _run_spec(
     *,
     tolerance=None,
     poll_window=None,
-    poll_interval=0.01,
     **params,
 ):
     """Run ``_confirm_readback`` against one ``CONFIRM_SPECS`` row.
@@ -368,7 +347,6 @@ def _run_spec(
         errors=spec.errors,
         tolerance=tolerance,
         poll_window=poll_window,
-        poll_interval=poll_interval,
     )
 
 
@@ -387,7 +365,6 @@ def confirm_move_z(
     target_um,
     tolerance=1.0,
     poll_window=None,
-    poll_interval=0.01,
     observed_after=None,
 ):
     """Poll until Z drive position is within tolerance, or until timeout.
@@ -401,8 +378,7 @@ def confirm_move_z(
         z_mode: Drive type — "galvo" or "zwide".
         target_um: Expected Z position in micrometers.
         tolerance: Acceptable deviation in micrometers.
-        poll_window: Hard ceiling in seconds. None uses CONFIRM_POLL_S.
-        poll_interval: Seconds between position polls.
+        poll_window: Hard ceiling in seconds. None uses ``WINDOW_S``.
         observed_after: Reject reader observations at or before this wall-clock
             timestamp. Move commands bind their pre-command timestamp here so
             a stale log entry cannot confirm the move.
@@ -411,16 +387,17 @@ def confirm_move_z(
         {"success": bool, "logs": [...]}
     """
     if poll_window is None:
-        poll_window = _timing.CONFIRM_POLL_S
+        poll_window = _timing.WINDOW_S
     logs = []
     key = ZMODE_KEY[z_mode]
-    t_start = time.perf_counter()
+    t_start = time.monotonic()
     deadline = t_start + poll_window
 
-    while time.perf_counter() < deadline:
+    while time.monotonic() < deadline:
         ch = _readback(
             client,
             job_name,
+            deadline=deadline,
             observed_after=observed_after,
         )
         if ch is not None:
@@ -441,10 +418,10 @@ def confirm_move_z(
             except (KeyError, TypeError, RuntimeError, ValueError):
                 pass
 
-        time.sleep(poll_interval)
+        time.sleep(_timing.POLL_S)
 
     msg = (
-        f"MoveZ timeout after {time.perf_counter() - t_start:.1f}s — "
+        f"MoveZ timeout after {time.monotonic() - t_start:.1f}s — "
         f"target={target_um:.1f} um ({z_mode})"
     )
     log.warning(msg)
@@ -452,7 +429,7 @@ def confirm_move_z(
     return {"success": False, "logs": logs}
 
 
-def _confirm_zoom(client, job_name, target, tolerance=0.1, poll_window=None, poll_interval=0.01):
+def _confirm_zoom(client, job_name, target, tolerance=0.1, poll_window=None):
     """Poll until zoom matches target within tolerance, or until timeout.
 
     Args:
@@ -460,21 +437,20 @@ def _confirm_zoom(client, job_name, target, tolerance=0.1, poll_window=None, pol
         job_name: Target job name.
         target: Expected zoom value.
         tolerance: Acceptable deviation.
-        poll_window: Hard ceiling in seconds. None uses CONFIRM_POLL_S.
-        poll_interval: Seconds between readback polls.
+        poll_window: Hard ceiling in seconds. None uses ``WINDOW_S``.
 
     Returns:
         {"success": bool, "logs": [...]}
     """
     if poll_window is None:
-        poll_window = _timing.CONFIRM_POLL_S
+        poll_window = _timing.WINDOW_S
     logs = []
-    t_start = time.perf_counter()
+    t_start = time.monotonic()
     deadline = t_start + poll_window
 
     last_actual = None
-    while time.perf_counter() < deadline:
-        ch = _readback(client, job_name)
+    while time.monotonic() < deadline:
+        ch = _readback(client, job_name, deadline=deadline)
         if ch is not None:
             try:
                 actual = ch["zoom"]["current"]
@@ -484,10 +460,10 @@ def _confirm_zoom(client, job_name, target, tolerance=0.1, poll_window=None, pol
                 log.debug("Zoom confirm: target=%s actual=%s", target, actual)
             except (KeyError, TypeError):
                 pass
-        time.sleep(poll_interval)
+        time.sleep(_timing.POLL_S)
 
     msg = (
-        f"Zoom timeout after {time.perf_counter() - t_start:.1f}s "
+        f"Zoom timeout after {time.monotonic() - t_start:.1f}s "
         f"— target={target}, last_actual={last_actual}"
     )
     log.warning(msg)
@@ -496,7 +472,7 @@ def _confirm_zoom(client, job_name, target, tolerance=0.1, poll_window=None, pol
 
 
 def _confirm_scan_field_rotation(
-    client, job_name, target, tolerance=0.5, poll_window=None, poll_interval=0.01
+    client, job_name, target, tolerance=0.5, poll_window=None
 ):
     """Poll until scan field rotation matches target within tolerance (degrees)."""
     return _run_spec(
@@ -506,7 +482,6 @@ def _confirm_scan_field_rotation(
         target,
         tolerance=tolerance,
         poll_window=poll_window,
-        poll_interval=poll_interval,
     )
 
 
@@ -532,7 +507,7 @@ def _quantised_candidates(centre, raw_size, step):
 
 
 def _confirm_z_stack_definition(
-    client, job_name, begin_um, end_um, tolerance=1.0, poll_window=None, poll_interval=0.01
+    client, job_name, begin_um, end_um, tolerance=1.0, poll_window=None
 ):
     """Poll until z-stack begin/end positions match within tolerance (micrometers).
 
@@ -550,20 +525,19 @@ def _confirm_z_stack_definition(
         begin_um: Expected begin position (um), or None to skip.
         end_um: Expected end position (um), or None to skip.
         tolerance: Acceptable deviation in micrometers.
-        poll_window: Hard ceiling in seconds. None uses CONFIRM_POLL_S.
-        poll_interval: Seconds between readback polls.
+        poll_window: Hard ceiling in seconds. None uses ``WINDOW_S``.
 
     Returns:
         {"success": bool, "logs": [...]}
     """
     if poll_window is None:
-        poll_window = _timing.CONFIRM_POLL_S
+        poll_window = _timing.WINDOW_S
     logs = []
-    t_start = time.perf_counter()
+    t_start = time.monotonic()
     deadline = t_start + poll_window
 
-    while time.perf_counter() < deadline:
-        ch = _readback(client, job_name)
+    while time.monotonic() < deadline:
+        ch = _readback(client, job_name, deadline=deadline)
         if ch is not None:
             try:
                 actual_begin = ch["stack"]["begin"]
@@ -604,10 +578,10 @@ def _confirm_z_stack_definition(
                 log.debug("Z-stack def confirm: no candidate matched")
             except (KeyError, TypeError) as e:
                 log.debug("Z-stack def confirm: exception %s, stack=%s", e, ch.get("stack"))
-        time.sleep(poll_interval)
+        time.sleep(_timing.POLL_S)
 
     msg = (
-        f"Z-stack def timeout after {time.perf_counter() - t_start:.1f}s — "
+        f"Z-stack def timeout after {time.monotonic() - t_start:.1f}s — "
         f"target=({begin_um}, {end_um})"
     )
     log.warning(msg)
@@ -616,7 +590,7 @@ def _confirm_z_stack_definition(
 
 
 def _confirm_z_stack_step_size(
-    client, job_name, target, tolerance=0.5, poll_window=None, poll_interval=0.01
+    client, job_name, target, tolerance=0.5, poll_window=None
 ):
     """Poll until z-stack step size matches within tolerance (micrometers)."""
     return _run_spec(
@@ -626,12 +600,11 @@ def _confirm_z_stack_step_size(
         target,
         tolerance=tolerance,
         poll_window=poll_window,
-        poll_interval=poll_interval,
     )
 
 
 def _confirm_z_stack_size(
-    client, job_name, target_um, tolerance=1.5, poll_window=None, poll_interval=0.01
+    client, job_name, target_um, tolerance=1.5, poll_window=None
 ):
     """Poll until z-stack total size matches within tolerance (micrometers).
 
@@ -645,20 +618,19 @@ def _confirm_z_stack_size(
         job_name: Target job name.
         target_um: Expected total stack size in micrometers.
         tolerance: Acceptable deviation in micrometers.
-        poll_window: Hard ceiling in seconds. None uses CONFIRM_POLL_S.
-        poll_interval: Seconds between readback polls.
+        poll_window: Hard ceiling in seconds. None uses ``WINDOW_S``.
 
     Returns:
         {"success": bool, "logs": [...]}
     """
     if poll_window is None:
-        poll_window = _timing.CONFIRM_POLL_S
+        poll_window = _timing.WINDOW_S
     logs = []
-    t_start = time.perf_counter()
+    t_start = time.monotonic()
     deadline = t_start + poll_window
 
-    while time.perf_counter() < deadline:
-        ch = _readback(client, job_name)
+    while time.monotonic() < deadline:
+        ch = _readback(client, job_name, deadline=deadline)
         if ch is not None:
             try:
                 actual = ch["stack"]["size"]
@@ -687,16 +659,16 @@ def _confirm_z_stack_size(
                 log.debug("Z-stack size confirm: no match")
             except (KeyError, TypeError) as e:
                 log.debug("Z-stack size confirm: exception %s, stack=%s", e, ch.get("stack"))
-        time.sleep(poll_interval)
+        time.sleep(_timing.POLL_S)
 
-    msg = f"Z-stack size timeout after {time.perf_counter() - t_start:.1f}s — target={target_um}"
+    msg = f"Z-stack size timeout after {time.monotonic() - t_start:.1f}s — target={target_um}"
     log.warning(msg)
     logs.append(_make_log_entry("warning", msg))
     return {"success": False, "logs": logs}
 
 
 def _confirm_pinhole_airy(
-    client, job_name, si, target, tolerance=0.05, poll_window=None, poll_interval=0.01
+    client, job_name, si, target, tolerance=0.05, poll_window=None
 ):
     """Poll until pinhole size matches within tolerance (Airy units)."""
     return _run_spec(
@@ -706,13 +678,12 @@ def _confirm_pinhole_airy(
         target,
         tolerance=tolerance,
         poll_window=poll_window,
-        poll_interval=poll_interval,
         si=si,
     )
 
 
 def _confirm_detector_gain(
-    client, job_name, si, beam_route, target, tolerance=1.0, poll_window=None, poll_interval=0.01
+    client, job_name, si, beam_route, target, tolerance=1.0, poll_window=None
 ):
     """Poll until detector gain matches within tolerance."""
     return _run_spec(
@@ -722,7 +693,6 @@ def _confirm_detector_gain(
         target,
         tolerance=tolerance,
         poll_window=poll_window,
-        poll_interval=poll_interval,
         si=si,
         beam_route=beam_route,
     )
@@ -737,7 +707,6 @@ def _confirm_laser_intensity(
     target,
     tolerance=0.005,
     poll_window=None,
-    poll_interval=0.01,
 ):
     """Poll until laser intensity matches within tolerance (fraction)."""
     return _run_spec(
@@ -747,7 +716,6 @@ def _confirm_laser_intensity(
         target,
         tolerance=tolerance,
         poll_window=poll_window,
-        poll_interval=poll_interval,
         si=si,
         beam_route=beam_route,
         line_index=line_index,
@@ -763,7 +731,6 @@ def _confirm_filter_wheel_spectrum(
     target,
     tolerance=1,
     poll_window=None,
-    poll_interval=0.01,
 ):
     """Poll until filter wheel spectrum position matches within tolerance (nm)."""
     return _run_spec(
@@ -773,7 +740,6 @@ def _confirm_filter_wheel_spectrum(
         target,
         tolerance=tolerance,
         poll_window=poll_window,
-        poll_interval=poll_interval,
         si=si,
         beam_route=beam_route,
         fw_type=fw_type,
@@ -785,14 +751,14 @@ def _confirm_filter_wheel_spectrum(
 # =============================================================================
 
 
-def _confirm_scan_speed(client, job_name, target, poll_window=None, poll_interval=0.01):
+def _confirm_scan_speed(client, job_name, target, poll_window=None):
     """Poll until scan speed matches exactly (discrete integer)."""
     return _run_spec(
-        "scan_speed", client, job_name, target, poll_window=poll_window, poll_interval=poll_interval
+        "scan_speed", client, job_name, target, poll_window=poll_window
     )
 
 
-def _confirm_scan_resonant(client, job_name, target, poll_window=None, poll_interval=0.01):
+def _confirm_scan_resonant(client, job_name, target, poll_window=None):
     """Poll until resonant scanner state matches exactly."""
     return _run_spec(
         "scan_resonant",
@@ -800,18 +766,17 @@ def _confirm_scan_resonant(client, job_name, target, poll_window=None, poll_inte
         job_name,
         target,
         poll_window=poll_window,
-        poll_interval=poll_interval,
     )
 
 
-def _confirm_scan_mode(client, job_name, target, poll_window=None, poll_interval=0.01):
+def _confirm_scan_mode(client, job_name, target, poll_window=None):
     """Poll until scan mode matches exactly (enum string)."""
     return _run_spec(
-        "scan_mode", client, job_name, target, poll_window=poll_window, poll_interval=poll_interval
+        "scan_mode", client, job_name, target, poll_window=poll_window
     )
 
 
-def _confirm_sequential_mode(client, job_name, target, poll_window=None, poll_interval=0.01):
+def _confirm_sequential_mode(client, job_name, target, poll_window=None):
     """Poll until sequential mode matches exactly (enum string)."""
     return _run_spec(
         "sequential_mode",
@@ -819,11 +784,10 @@ def _confirm_sequential_mode(client, job_name, target, poll_window=None, poll_in
         job_name,
         target,
         poll_window=poll_window,
-        poll_interval=poll_interval,
     )
 
 
-def _confirm_image_format(client, job_name, w, h, poll_window=None, poll_interval=0.01):
+def _confirm_image_format(client, job_name, w, h, poll_window=None):
     """Poll until image format matches exactly (pixel dimensions).
 
     Args:
@@ -831,20 +795,19 @@ def _confirm_image_format(client, job_name, w, h, poll_window=None, poll_interva
         job_name: Target job name.
         w: Expected width in pixels.
         h: Expected height in pixels.
-        poll_window: Hard ceiling in seconds. None uses CONFIRM_POLL_S.
-        poll_interval: Seconds between readback polls.
+        poll_window: Hard ceiling in seconds. None uses ``WINDOW_S``.
 
     Returns:
         {"success": bool, "logs": [...]}
     """
     if poll_window is None:
-        poll_window = _timing.CONFIRM_POLL_S
+        poll_window = _timing.WINDOW_S
     logs = []
-    t_start = time.perf_counter()
+    t_start = time.monotonic()
     deadline = t_start + poll_window
 
-    while time.perf_counter() < deadline:
-        ch = _readback(client, job_name)
+    while time.monotonic() < deadline:
+        ch = _readback(client, job_name, deadline=deadline)
         if ch is not None:
             try:
                 actual = ch["format"]
@@ -853,16 +816,16 @@ def _confirm_image_format(client, job_name, w, h, poll_window=None, poll_interva
                 log.debug("ImageFormat confirm: target='%s x %s' actual='%s'", w, h, actual)
             except (KeyError, TypeError):
                 pass
-        time.sleep(poll_interval)
+        time.sleep(_timing.POLL_S)
 
-    msg = f"ImageFormat timeout after {time.perf_counter() - t_start:.1f}s — target='{w} x {h}'"
+    msg = f"ImageFormat timeout after {time.monotonic() - t_start:.1f}s — target='{w} x {h}'"
     log.warning(msg)
     logs.append(_make_log_entry("warning", msg))
     return {"success": False, "logs": logs}
 
 
 def confirm_objective(
-    client, *, job_name, target_slot, target_name=None, poll_window=None, poll_interval=0.01
+    client, *, job_name, target_slot, target_name=None, poll_window=None
 ):
     """Poll until the active objective's slot matches *target_slot*.
 
@@ -875,21 +838,20 @@ def confirm_objective(
         job_name: Target job name.
         target_slot: Expected objective slot index.
         target_name: Objective name (for log messages only).
-        poll_window: Hard ceiling in seconds. None uses CONFIRM_POLL_S.
-        poll_interval: Seconds between readback polls.
+        poll_window: Hard ceiling in seconds. None uses ``WINDOW_S``.
 
     Returns:
         {"success": bool, "logs": [...]}
     """
     if poll_window is None:
-        poll_window = _timing.CONFIRM_POLL_S
+        poll_window = _timing.WINDOW_S
     logs = []
-    t_start = time.perf_counter()
+    t_start = time.monotonic()
     deadline = t_start + poll_window
     label = target_name or f"slot {target_slot}"
 
-    while time.perf_counter() < deadline:
-        ch = _readback(client, job_name)
+    while time.monotonic() < deadline:
+        ch = _readback(client, job_name, deadline=deadline)
         if ch is not None:
             try:
                 actual_slot = ch["objective"]["slotIndex"]
@@ -901,10 +863,10 @@ def confirm_objective(
             except (KeyError, TypeError, AttributeError):
                 pass
 
-        time.sleep(poll_interval)
+        time.sleep(_timing.POLL_S)
 
     msg = (
-        f"Objective timeout after {time.perf_counter() - t_start:.1f}s — "
+        f"Objective timeout after {time.monotonic() - t_start:.1f}s — "
         f"target={label} (slot {target_slot})"
     )
     log.warning(msg)
@@ -912,7 +874,7 @@ def confirm_objective(
     return {"success": False, "logs": logs}
 
 
-def _confirm_frame_accumulation(client, job_name, si, target, poll_window=None, poll_interval=0.01):
+def _confirm_frame_accumulation(client, job_name, si, target, poll_window=None):
     """Poll until frame accumulation matches exactly."""
     return _run_spec(
         "frame_accumulation",
@@ -920,12 +882,11 @@ def _confirm_frame_accumulation(client, job_name, si, target, poll_window=None, 
         job_name,
         target,
         poll_window=poll_window,
-        poll_interval=poll_interval,
         si=si,
     )
 
 
-def _confirm_frame_average(client, job_name, si, target, poll_window=None, poll_interval=0.01):
+def _confirm_frame_average(client, job_name, si, target, poll_window=None):
     """Poll until frame average matches exactly."""
     return _run_spec(
         "frame_average",
@@ -933,12 +894,11 @@ def _confirm_frame_average(client, job_name, si, target, poll_window=None, poll_
         job_name,
         target,
         poll_window=poll_window,
-        poll_interval=poll_interval,
         si=si,
     )
 
 
-def _confirm_line_accumulation(client, job_name, si, target, poll_window=None, poll_interval=0.01):
+def _confirm_line_accumulation(client, job_name, si, target, poll_window=None):
     """Poll until line accumulation matches exactly."""
     return _run_spec(
         "line_accumulation",
@@ -946,12 +906,11 @@ def _confirm_line_accumulation(client, job_name, si, target, poll_window=None, p
         job_name,
         target,
         poll_window=poll_window,
-        poll_interval=poll_interval,
         si=si,
     )
 
 
-def _confirm_line_average(client, job_name, si, target, poll_window=None, poll_interval=0.01):
+def _confirm_line_average(client, job_name, si, target, poll_window=None):
     """Poll until line average matches exactly."""
     return _run_spec(
         "line_average",
@@ -959,13 +918,12 @@ def _confirm_line_average(client, job_name, si, target, poll_window=None, poll_i
         job_name,
         target,
         poll_window=poll_window,
-        poll_interval=poll_interval,
         si=si,
     )
 
 
 def _confirm_laser_shutter(
-    client, job_name, si, beam_route, target, poll_window=None, poll_interval=0.01
+    client, job_name, si, beam_route, target, poll_window=None
 ):
     """Poll until laser shutter state matches exactly."""
     return _run_spec(
@@ -974,14 +932,13 @@ def _confirm_laser_shutter(
         job_name,
         target,
         poll_window=poll_window,
-        poll_interval=poll_interval,
         si=si,
         beam_route=beam_route,
     )
 
 
 def _confirm_filter_wheel_slot(
-    client, job_name, si, beam_route, fw_type, target, poll_window=None, poll_interval=0.01
+    client, job_name, si, beam_route, fw_type, target, poll_window=None
 ):
     """Poll until filter wheel slot matches exactly."""
     return _run_spec(
@@ -990,7 +947,6 @@ def _confirm_filter_wheel_slot(
         job_name,
         target,
         poll_window=poll_window,
-        poll_interval=poll_interval,
         si=si,
         beam_route=beam_route,
         fw_type=fw_type,
@@ -1003,35 +959,33 @@ def _confirm_filter_wheel_slot(
 
 
 def confirm_move_xy(
-    client, *, target_x_um, target_y_um, tolerance=20.0, poll_window=None, poll_interval=0.1
+    client, *, target_x_um, target_y_um, tolerance=20.0, poll_window=None
 ):
     """Poll until XY stage position is within tolerance, or until timeout.
 
-    Calls ``get_xy`` reader with 0.1s between calls to avoid
-    overwhelming the API.
+    Looks at the stage position every ``POLL_S``, through the API.
 
     Args:
         client: The connected LAS X API client.
         target_x_um: Expected X position in micrometers.
         target_y_um: Expected Y position in micrometers.
         tolerance: Acceptable deviation in micrometers per axis.
-        poll_window: Hard ceiling in seconds. None uses CONFIRM_POLL_S.
-        poll_interval: Seconds between get_xy calls.
+        poll_window: Hard ceiling in seconds. None uses ``WINDOW_S``.
 
     Returns:
         {"success": bool, "logs": [...]}
     """
     if poll_window is None:
-        poll_window = _timing.CONFIRM_POLL_S
+        poll_window = _timing.WINDOW_S
     logs = []
     observed_after = time.time()
-    t_start = time.perf_counter()
+    t_start = time.monotonic()
     deadline = t_start + poll_window
     last_position = None
 
-    while time.perf_counter() < deadline:
+    while time.monotonic() < deadline:
         pos = _reading_value_after(
-            _readers.get_xy(client, mode="api", diagnostics=True),
+            _readers.get_xy(client, mode="api", diagnostics=True, deadline=deadline),
             observed_after,
         )
         if pos is not None:
@@ -1051,10 +1005,10 @@ def confirm_move_xy(
             if dx < tolerance and dy < tolerance:
                 return {"success": True, "logs": logs, "last_position": last_position}
 
-        time.sleep(poll_interval)
+        time.sleep(_timing.POLL_S)
 
     msg = (
-        f"MoveXY timeout after {time.perf_counter() - t_start:.1f}s — "
+        f"MoveXY timeout after {time.monotonic() - t_start:.1f}s — "
         f"target=({target_x_um:.1f}, {target_y_um:.1f})"
     )
     log.warning(msg)
@@ -1112,7 +1066,9 @@ def confirm_acquire(
 
     while time.perf_counter() < deadline:
         status = _reading_value_after(
-            _readers.get_scan_status(client, mode="api", diagnostics=True),
+            _readers.get_scan_status(
+                client, mode="api", diagnostics=True, deadline=time.monotonic() + poll_interval
+            ),
             observed_after,
         )
         elapsed = time.perf_counter() - t_start

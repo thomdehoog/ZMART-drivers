@@ -13,12 +13,10 @@ Nothing from command wrappers.
 """
 
 import logging
-import queue
 import time
 from functools import partial
 
 from ..dispatcher import read as _readers
-from ..dispatcher import read as _router
 from ..dispatcher import tuning as _timing
 from ..dispatcher.envelope import _make_log_entry
 from ..vendor_interface import log_wait
@@ -39,7 +37,6 @@ def confirm_select_job(
     *,
     job_name,
     timeout=None,
-    poll_interval=0.01,
     command_started_at=None,
     inadmissible_baseline=None,
     require_transition_witness=False,
@@ -49,8 +46,7 @@ def confirm_select_job(
     Args:
         client: The connected LAS X API client.
         job_name: Name of the job expected to become selected.
-        timeout: Hard ceiling in seconds. None uses CONFIRM_POLL_S.
-        poll_interval: Seconds between get_jobs polls.
+        timeout: This confirmation window in seconds. None uses ``WINDOW_S``.
         command_started_at: Wall-clock timestamp captured before the select
             command was fired.
         inadmissible_baseline: The API's pre-command selected-job name, set
@@ -68,7 +64,7 @@ def confirm_select_job(
         {"success": bool, "logs": [...]}
     """
     if timeout is None:
-        timeout = _timing.CONFIRM_POLL_S
+        timeout = _timing.WINDOW_S
     logs = []
     if require_transition_witness and inadmissible_baseline is None:
         msg = (
@@ -97,11 +93,11 @@ def confirm_select_job(
             "reason": "inadmissible_no_transition",
         }
     observed_after = command_started_at if command_started_at is not None else time.time()
-    deadline = time.perf_counter() + timeout
+    deadline = time.monotonic() + timeout
 
-    while time.perf_counter() < deadline:
+    while time.monotonic() < deadline:
         jobs = _reading_value_after(
-            _readers.get_jobs(client, mode="api", diagnostics=True),
+            _readers.get_jobs(client, mode="api", diagnostics=True, deadline=deadline),
             observed_after,
         )
         if jobs:
@@ -109,7 +105,7 @@ def confirm_select_job(
                 if j.get("Name") == job_name and j.get("IsSelected"):
                     return {"success": True, "logs": logs}
 
-        time.sleep(poll_interval)
+        time.sleep(_timing.POLL_S)
 
     msg = f"Job selection timeout after {timeout:.1f}s for '{job_name}'"
     log.warning(msg)
@@ -127,14 +123,11 @@ def _confirm_select_job_log(job_name, command_started_at, *, timeout=None):
         log.warning(msg)
         logs.append(_make_log_entry("warning", msg))
         return {"success": False, "logs": logs, "source": "log"}
-    log_timeout = profile.selected_job_log_confirm_timeout_s
-    if timeout is not None:
-        log_timeout = min(log_timeout, max(0.0, timeout))
+    log_timeout = _timing.WINDOW_S if timeout is None else max(0.0, timeout)
     log_result = log_wait.wait_for_selected_job_log(
         job_name,
         command_started_at=command_started_at,
         timeout_s=log_timeout,
-        poll_interval_s=profile.selected_job_log_poll_interval_s,
         max_age_s=profile.selected_job_log_cluster_max_age_s,
     )
     if log_result.success:
@@ -165,7 +158,7 @@ def _confirm_select_job_log(job_name, command_started_at, *, timeout=None):
 
 
 def select_job_confirm_legs(
-    job_name, *, command_started_at, api_baseline_name=None, timeout=None, poll_interval=0.01
+    job_name, *, command_started_at, api_baseline_name=None, timeout=None
 ):
     """Build select_job's confirmation legs for the profile's source policy.
 
@@ -175,14 +168,14 @@ def select_job_confirm_legs(
     - ``log``: the post-command ``CurrentBlock`` wait alone.
     - ``hybrid``: both legs race for one confirm window (first admissible
       evidence wins); the api leg gets the transition-admissibility gate fed
-      by *api_baseline_name*. Both legs poll for the whole window
-      (``CONFIRM_POLL_S``); an abandoned api read is bounded by that window
-      and cannot stack into the next attempt because the shared in-flight
-      CAM cap (CF-01) serialises reads.
+      by *api_baseline_name*. Both legs watch for the whole window
+      (``WINDOW_S``), each looking again every ``POLL_S``; an abandoned api
+      request ends with the window and cannot stack into the next attempt,
+      because the API takes one request at a time per connection.
 
     The dispatcher runs this leg-set once per confirm attempt
-    (``max_confirm_attempts``), re-firing between: the uniform 4x3 posture
-    (``CONFIRM_POLL_S`` per attempt, N attempts) shared with every command.
+    (``max_confirm_attempts``), re-firing between: the one 4x3 rule
+    (``WINDOWS`` windows of ``WINDOW_S``) shared with every command.
 
     Returns ``(api_confirm_fn, log_leg, budget_s)`` where ``api_confirm_fn``
     takes ``client`` (dispatch binds it), ``log_leg`` is zero-arg, and
@@ -195,7 +188,7 @@ def select_job_confirm_legs(
         raise ValueError(
             f"unknown selected-job confirmation source {source!r}; expected api, log, or hybrid"
         )
-    window_s = _timing.CONFIRM_POLL_S if timeout is None else timeout
+    window_s = _timing.WINDOW_S if timeout is None else timeout
     api_confirm = None
     log_leg = None
     budget_s = window_s if source == "hybrid" else None
@@ -204,7 +197,6 @@ def select_job_confirm_legs(
             confirm_select_job,
             job_name=job_name,
             timeout=window_s,
-            poll_interval=poll_interval,
             command_started_at=command_started_at,
             inadmissible_baseline=(api_baseline_name if source == "hybrid" else None),
             require_transition_witness=(source == "hybrid"),
@@ -214,33 +206,16 @@ def select_job_confirm_legs(
     return api_confirm, log_leg, budget_s
 
 
-def _bounded_api_read(client, fn, *, timeout_s):
-    """Run a pre-command API read through the shared in-flight cap."""
-    api_queue = _router._fire_api_read(fn, _router._client_api_key(client))
-    if api_queue is None:
-        return None, "api_in_flight"
-    try:
-        reading = api_queue.get(timeout=timeout_s)
-    except queue.Empty:
+def _selected_job_api_jobs(client, profile):
+    """The pre-command job list from the API, by the one rule; ``(jobs, reason)``."""
+    reading = _readers.get_jobs(client, mode="api", diagnostics=True)
+    if reading is None:
         return None, "api_timeout"
     if reading.error is not None:
         return None, f"api_error:{type(reading.error).__name__}"
+    if not reading.value:
+        return None, "api_no_jobs"
     return reading.value, "ok"
-
-
-def _selected_job_api_jobs(client, profile):
-    jobs, reason = _bounded_api_read(
-        client,
-        lambda: _router.api_reader.get_jobs(
-            client,
-            timeout=profile.jobs_timeout_s,
-            max_retries=1,
-        ),
-        timeout_s=profile.jobs_timeout_s,
-    )
-    if not jobs:
-        return None, reason if reason != "ok" else "api_no_jobs"
-    return jobs, "ok"
 
 
 def _selected_job_api_baseline(client, profile):
@@ -273,16 +248,7 @@ def _prime_selected_job_log_cluster(client, jobs):
         if not name:
             continue
         try:
-            _bounded_api_read(
-                client,
-                lambda n=name: _router.api_reader.get_job_settings(
-                    client,
-                    n,
-                    timeout=profile.job_settings_timeout_s,
-                    max_retries=1,
-                ),
-                timeout_s=profile.job_settings_timeout_s,
-            )
+            _readers.get_job_settings(client, name, mode="api")
         except Exception:
             log.debug("Could not prime log job cluster for %r", name, exc_info=True)
 

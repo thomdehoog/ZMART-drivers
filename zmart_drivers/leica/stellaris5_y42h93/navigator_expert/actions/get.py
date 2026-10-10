@@ -7,44 +7,88 @@ Either leg may be absent; a family asked for a leg the datum does not
 have fails closed with ``UnsupportedSource``, and ``hybrid`` degrades to
 the legs that exist.
 
-The table holds *capabilities* (facts about what a source can prove), not
-preferences. Policy - which family is the default - lives in
-``profiles.StateReaderProfile``.
+The table holds *capabilities* (facts about what a source can prove) and
+what counts as an answer, not preferences. Policy - which family is the
+default - lives in ``profiles.StateReaderProfile``.
 """
 
 from __future__ import annotations
 
+import math
 from collections.abc import Callable
 from dataclasses import dataclass
 
 from ..vendor_interface import api_reader, log_reader
+from . import derived
 
 
 class UnsupportedSource(RuntimeError):
     """The requested source family has no leg for this datum."""
 
 
-def trust_present(reading) -> bool:
-    return reading.error is None and reading.value is not None
+def _finite(value) -> bool:
+    try:
+        return math.isfinite(float(value))
+    except (TypeError, ValueError):
+        return False
 
 
-def trust_status(reading) -> bool:
-    return trust_present(reading) and reading.value != "Unknown"
+def scan_status_known(value, *, job_name=None) -> bool:
+    """A scanner status LAS X actually reported; ``Unknown`` is no answer."""
+    return isinstance(value, str) and value not in ("", "Unknown")
+
+
+def hardware_info_present(value, *, job_name=None) -> bool:
+    return isinstance(value, dict) and bool(value)
+
+
+def xy_present(value, *, job_name=None) -> bool:
+    """Both stage coordinates, as finite numbers."""
+    return isinstance(value, dict) and _finite(value.get("x_um")) and _finite(value.get("y_um"))
+
+
+def jobs_listed(value, *, job_name=None) -> bool:
+    """A job list whose every entry names its job; an empty list is a real answer."""
+    return isinstance(value, list) and all(isinstance(j, dict) and j.get("Name") for j in value)
+
+
+def selected_job_named(value, *, job_name=None) -> bool:
+    return isinstance(value, dict) and bool(value.get("Name"))
+
+
+def job_settings_complete(value, *, job_name=None) -> bool:
+    """Settings for the job asked about, with an objective slot and image geometry.
+
+    The objective slot is what a job or objective change reads to keep the
+    sample point; settings without it once let a job switch be refused after
+    LAS X had confirmed it. Settings naming another job are a stray reply to
+    an earlier request. Blank geometry is LAS X still repopulating after a
+    zoom or format change.
+    """
+    if not isinstance(value, dict):
+        return False
+    if job_name is not None and value.get("jobName") not in (None, job_name):
+        return False
+    objective = value.get("objective")
+    if not isinstance(objective, dict) or objective.get("slotIndex") is None:
+        return False
+    return derived.settings_geometry_ready(value)
 
 
 @dataclass(frozen=True)
 class DatumSpec:
-    """Source capabilities for one datum.
+    """Source capabilities for one datum, and what counts as its answer.
 
-    Passive legs are optional callables. ``*_attr`` fields name
-    ``StateReaderProfile`` attributes so every tunable stays in the
-    profile.
+    Passive legs are optional callables. ``mode_attr`` and
+    ``log_max_age_attr`` name ``StateReaderProfile`` attributes, so every
+    choice stays in the profile. ``success(value, *, job_name)`` says when an
+    answer from either source counts; the first answer that does, wins. How
+    long to wait is not per datum: it is the one rule in ``dispatcher.tuning``.
     """
 
     mode_attr: str
-    timeout_attr: str
-    trust: Callable = trust_present
-    api_fn: Callable | None = None  # (client, **kwargs) -> raw value
+    success: Callable
+    api_fn: Callable | None = None  # (client, *, deadline, should_stop) -> raw value
     log_fn: Callable | None = None  # (snapshot, *, max_age_s[, job_name])
     log_max_age_attr: str | None = None
     age_key: str | None = None  # key for age_for_snapshot()
@@ -91,18 +135,16 @@ def age_for_snapshot(snapshot, *, age_key=None, job_name=None, max_age_s=None):
 DATUMS = {
     "scan_status": DatumSpec(
         mode_attr="scan_status_mode",
-        timeout_attr="scan_status_timeout_s",
-        trust=trust_status,
+        success=scan_status_known,
+        # API only: the LAS X log writes the scanner status only when it
+        # changes, so its last "idle" went stale half a second after every
+        # scan, and nothing decides on it: the idle check and the end of an
+        # acquisition both ask the API (decided 2026-10-10). No log_fn.
         api_fn=lambda client, **kw: api_reader.get_scan_status(client),
-        log_fn=lambda snapshot, *, max_age_s: log_reader.get_scan_status(
-            snapshot, max_age_s=max_age_s
-        ),
-        log_max_age_attr="scan_status_log_max_age_s",
-        age_key="scan_status",
     ),
     "job_settings": DatumSpec(
         mode_attr="job_settings_mode",
-        timeout_attr="job_settings_timeout_s",
+        success=job_settings_complete,
         api_fn=lambda client, job_name, **kw: api_reader.get_job_settings(client, job_name, **kw),
         log_fn=lambda snapshot, *, max_age_s, job_name: log_reader.get_job_settings(
             job_name, snapshot, max_age_s=max_age_s
@@ -111,7 +153,7 @@ DATUMS = {
     ),
     "hardware_info": DatumSpec(
         mode_attr="hardware_info_mode",
-        timeout_attr="hardware_info_timeout_s",
+        success=hardware_info_present,
         api_fn=lambda client, **kw: api_reader.get_hardware_info(client, **kw),
         log_fn=lambda snapshot, *, max_age_s: log_reader.get_hardware_info(
             snapshot, max_age_s=max_age_s
@@ -121,7 +163,7 @@ DATUMS = {
     ),
     "xy": DatumSpec(
         mode_attr="xy_mode",
-        timeout_attr="xy_timeout_s",
+        success=xy_present,
         api_fn=lambda client, **kw: api_reader.get_xy(client, **kw),
         log_fn=lambda snapshot, *, max_age_s: log_reader.get_xy(snapshot, max_age_s=max_age_s),
         log_max_age_attr="xy_log_max_age_s",
@@ -129,7 +171,7 @@ DATUMS = {
     ),
     "jobs": DatumSpec(
         mode_attr="jobs_mode",
-        timeout_attr="jobs_timeout_s",
+        success=jobs_listed,
         # API only: there is no log source for the full job LIST. The log
         # stream reports only the ACTIVE job (that is the `selected_job`
         # datum, which keeps its log/hybrid legs); its job-list derivation is
@@ -139,7 +181,7 @@ DATUMS = {
     ),
     "selected_job": DatumSpec(
         mode_attr="selected_job_mode",
-        timeout_attr="selected_job_timeout_s",
+        success=selected_job_named,
         api_fn=lambda client, **kw: api_reader.get_selected_job(client, **kw),
         log_fn=lambda snapshot, *, max_age_s: log_reader.get_selected_job(
             snapshot, max_age_s=max_age_s

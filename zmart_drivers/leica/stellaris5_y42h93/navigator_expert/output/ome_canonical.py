@@ -6,9 +6,8 @@ use this module as the output metadata contract.
 Contract with ``ome.py``: that module owns TIFF tag-270 access
 (:func:`ome.read_tiff_tag_270`) and the validate/patch side; this module
 GENERATES metadata and only ever reads existing OME through that public
-function. How long generation waits for a live settings read is policy
-owned here (``JOB_SETTINGS_READ_TIMEOUT_S``); the bounded-read mechanism
-itself lives in ``readers.get_job_settings_bounded``.
+function. The live settings read follows the one rule in
+``dispatcher.tuning``, like every other reading.
 """
 
 from __future__ import annotations
@@ -31,8 +30,6 @@ log = logging.getLogger(__name__)
 OME_NS = "http://www.openmicroscopy.org/Schemas/OME/2016-06"
 XSI_NS = "http://www.w3.org/2001/XMLSchema-instance"
 MICROMETER = "\u00b5m"
-JOB_SETTINGS_READ_TIMEOUT_S = 1.0
-JOB_SETTINGS_API_TIMEOUT_S = 0.25
 
 # Namespace + annotation IDs for the embedded machine/software state block.
 STATE_NS = "https://zmart-microscopy/state"
@@ -122,27 +119,24 @@ def metadata_with_job_physical_sizes(
     metadata: AcquisitionMetadata,
     client: Any,
     job_name: str,
-    *,
-    read_timeout_s: float = JOB_SETTINGS_READ_TIMEOUT_S,
 ) -> AcquisitionMetadata:
     """Prefer live job geometry for physical sizes, falling back to vendor OME.
 
     Vendor OME can be internally valid but semantically wrong. LAS X native
     AutoSave has been observed to write ``PhysicalSizeZ`` as range/sections
     instead of the OME inter-plane spacing. The job settings are the
-    authoritative source for physical sampling when they can be read quickly.
+    authoritative source for physical sampling, so the read waits for them by
+    the one rule (four windows of ``WINDOW_S``) rather than giving up early
+    and keeping a Z spacing known to be wrong.
     """
-    settings = _readers.get_job_settings_bounded(
-        client, job_name, deadline_s=read_timeout_s, api_timeout=JOB_SETTINGS_API_TIMEOUT_S
-    )
+    settings = None
+    if client is not None and job_name:
+        settings = _readers.get_job_settings(client, job_name)
     if not isinstance(settings, dict):
-        # A transient slow read silently keeps the vendor values — including
-        # the known-wrong native-AutoSave PhysicalSizeZ. Say so out loud.
         log.warning(
-            "job settings for '%s' unavailable within %.1fs; keeping vendor "
-            "OME physical sizes (native-AutoSave Z spacing may be wrong)",
+            "job settings for '%s' unavailable; keeping vendor OME physical "
+            "sizes (native-AutoSave Z spacing may be wrong)",
             job_name,
-            read_timeout_s,
         )
         return metadata
 

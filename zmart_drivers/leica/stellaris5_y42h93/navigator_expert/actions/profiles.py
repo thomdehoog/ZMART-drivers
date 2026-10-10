@@ -27,10 +27,9 @@ and stdlib. Nothing from dispatch or command wrappers.
 
 from collections.abc import Callable
 from dataclasses import dataclass
-from functools import partial
 
 from ..dispatcher.prechecks import check_idle
-from ..dispatcher.tuning import CONFIRM_POLL_S, RECEIPT_TIMEOUT
+from ..dispatcher.tuning import WINDOW_S, WINDOWS
 from ..vendor_interface.errors import _default_error_check
 from .confirmations import (
     _confirm_detector_gain,
@@ -80,17 +79,18 @@ class StateReaderProfile:
     produce persisted or foundational correctness artifacts still use this
     policy. Callers never pin a backend; source availability belongs to the
     capability table and source preference belongs here.
-    """
 
-    hybrid_log_grace_s: float = 0.25
+    Nothing here says how long to wait or how often to look: that is the one
+    rule in ``dispatcher.tuning``. A mode says which sources take part; a
+    ``*_log_max_age_s`` says how old a log answer may be and still count,
+    because each kind of state goes stale at its own pace.
+    """
 
     xy_mode: str = "hybrid"
     xy_log_max_age_s: float = 1.0
-    xy_timeout_s: float = 2.0
 
     job_settings_mode: str = "hybrid"
     job_settings_log_max_age_s: float = 2.0
-    job_settings_timeout_s: float = 2.0
 
     # jobs is API-pinned, NOT hybrid: the log stream only reports the ACTIVE
     # job, so its list is incomplete (a job not re-dumped this session is
@@ -99,35 +99,28 @@ class StateReaderProfile:
     # is exactly what the log can see.
     jobs_mode: str = "api"
     jobs_log_max_age_s: float = 2.0
-    jobs_timeout_s: float = 2.0
 
     selected_job_mode: str = "hybrid"
     selected_job_log_max_age_s: float = 2.0
-    selected_job_timeout_s: float = 2.0
     # Selected-job confirmation source: "api" | "log" | "hybrid".
     # hybrid races the api leg (transition-admissible: a stale API readback
     # cannot witness a transition to a target it already read pre-command)
     # against the log leg (post-command CurrentBlock event). The race runs for
-    # one confirm window (the shared CONFIRM_POLL_S), so the whole confirmation
-    # is the uniform 4x3: the initial window plus three retries and
-    # CONFIRM_POLL_S per attempt.
+    # one window (``tuning.WINDOW_S``), and the dispatcher runs four of them
+    # with the command fired again between: the one 4x3 rule.
     # Default hybrid: the api confirm is measured-wrong on the real scope
     # (stale 15 s+, wrong job) and log-only is insufficient on the
     # simulator; hybrid fits both without environment detection.
     selected_job_confirm_source: str = "hybrid"
     selected_job_log_prime_cluster: bool = False
-    selected_job_log_confirm_timeout_s: float = 2.0
-    selected_job_log_poll_timeout_s: float = 5.0
-    selected_job_log_poll_interval_s: float = 0.1
     selected_job_log_cluster_max_age_s: float | None = None
 
     hardware_info_mode: str = "hybrid"
     hardware_info_log_max_age_s: float = 2.0
-    hardware_info_timeout_s: float = 2.0
 
-    scan_status_mode: str = "hybrid"
-    scan_status_log_max_age_s: float = 0.5
-    scan_status_timeout_s: float = 2.0
+    # scan_status is API-only like jobs: the log writes it only when it
+    # changes, and only the API decides whether a command may fire.
+    scan_status_mode: str = "api"
 
 
 LOG_READER = LogReaderProfile()
@@ -182,23 +175,24 @@ class CommandProfile:
         confirm_fn: Readback confirmation. ``callable(client) -> result``.
             None to skip confirmation. Declarative only - commands always
             override this with a target-bound partial at call time.
-        max_retries: Transient error retries inside the fire block.
-        max_confirm_attempts: Confirm wrapper re-attempt ceiling.
+        max_retries: Transient error retries inside the fire block. The
+            default gives ``WINDOWS`` tries in all, like every send-again.
+        max_confirm_attempts: Confirmation windows; ``WINDOWS`` by the rule.
         refire_on_unconfirmed: If True, an unconfirmed readback causes
             the command to be sent again before the next confirmation
             attempt. If False, the dispatcher retries readback only.
             Leica setting commands normally re-fire because the API may
             accept a command while LAS X later settles to a different
             state, or an operator may change the setting manually.
-        confirm_poll_s: Per-attempt readback poll window (seconds). NOT a
-            timeout - the readback is polled for this long, then the command
-            re-fires and polls again up to ``max_confirm_attempts``; exhaustion
-            returns unconfirmed, never a hard fail. Defaults to the shared
-            ``CONFIRM_POLL_S``; set per command only for a stated reason.
+        confirm_poll_s: One confirmation window (seconds), ``WINDOW_S`` by
+            the rule. NOT a timeout - the readback is watched for this long,
+            then the command re-fires and is watched again up to
+            ``max_confirm_attempts``; exhaustion returns unconfirmed, never a
+            hard fail.
         confirm_tolerance: Numeric tolerance passed to target readback
             confirmations. None means exact-match or function default.
-        poll_interval: Poll interval for command-specific long-running
-            confirmations such as acquire and select-job.
+        poll_interval: Status-check interval for the acquisition watch,
+            which stays outside the window rule (it is never sent again).
         poll_timeout: Poll deadline for long-running confirmations.
             None means the confirmation waits until LAS X completes.
         start_timeout: Acquisition-start deadline before the acquire
@@ -213,9 +207,6 @@ class CommandProfile:
             Use for commands where a dedicated confirm_fn (e.g. scan
             status polling) is the authoritative completion signal and
             echo waiting is redundant overhead.
-        receipt_timeout: Seconds for UpdateAwaitReceipt transport ACK.
-            None uses the module-level RECEIPT_TIMEOUT default.
-            Ignored when fire_async is True.
         fire_async: If True, use UpdateAsync instead of UpdateAwaitReceipt.
             Use for hardware commands (e.g. stage moves, acquisitions)
             where confirm_fn is the authoritative completion signal.
@@ -229,10 +220,10 @@ class CommandProfile:
     pre_check_fn: Callable[..., dict] | None = None
     error_check_fn: Callable[..., dict] | None = _default_error_check
     confirm_fn: Callable[..., dict] | None = None
-    max_retries: int = 3
-    max_confirm_attempts: int = 4
+    max_retries: int = WINDOWS - 1
+    max_confirm_attempts: int = WINDOWS
     refire_on_unconfirmed: bool = True
-    confirm_poll_s: float = CONFIRM_POLL_S  # Per-attempt readback poll window (s).
+    confirm_poll_s: float = WINDOW_S
     confirm_tolerance: float | None = None
     poll_interval: float | None = None
     poll_timeout: float | None = None
@@ -241,7 +232,6 @@ class CommandProfile:
     retry_backoff: float | None = None
     retry_escalate: bool = False
     skip_echo: bool = False
-    receipt_timeout: float = RECEIPT_TIMEOUT  # UpdateAwaitReceipt ACK deadline (s).
     fire_async: bool = False
     success_on_unconfirmed: bool = True
 
@@ -312,7 +302,7 @@ IMAGE_FORMAT = _leica_setting_profile(
 )
 
 OBJECTIVE = CommandProfile(
-    pre_check_fn=partial(check_idle, timeout=None),
+    pre_check_fn=check_idle,
     confirm_fn=confirm_objective,
     # Uniform posture: 3 confirm windows, re-fire between them, unconfirmed-not-
     # fail. A slow turret change is absorbed by the idle-wait before each re-fire.
@@ -408,7 +398,7 @@ FILTER_WHEEL_SPECTRUM = _leica_setting_profile(
 # =============================================================================
 
 MOVE_XY = CommandProfile(
-    pre_check_fn=partial(check_idle, timeout=None),
+    pre_check_fn=check_idle,
     confirm_fn=confirm_move_xy,
     error_check_fn=None,  # async fire blanks the echo; nothing to error-check
     confirm_tolerance=20.0,
@@ -418,7 +408,7 @@ MOVE_XY = CommandProfile(
 )
 
 MOVE_Z = CommandProfile(
-    pre_check_fn=partial(check_idle, timeout=None),
+    pre_check_fn=check_idle,
     confirm_fn=confirm_move_z,
     confirm_tolerance=1.0,
     # Uniform posture (was single-attempt hard-fail): 3 windows, re-fire,
@@ -431,7 +421,7 @@ MOVE_Z = CommandProfile(
 # =============================================================================
 
 ACQUIRE = CommandProfile(
-    pre_check_fn=partial(check_idle, timeout=None),
+    pre_check_fn=check_idle,
     confirm_fn=confirm_acquire,
     error_check_fn=None,
     # ACQUIRE is the one command that must never re-send: re-firing starts a
@@ -451,15 +441,11 @@ ACQUIRE = CommandProfile(
 )
 
 SELECT_JOB = CommandProfile(
-    pre_check_fn=partial(check_idle, timeout=None),
+    pre_check_fn=check_idle,
     # select_job's confirmation legs are built per call by
     # confirm_select_job.select_job_confirm_legs (api / log / hybrid policy from
     # StateReaderProfile.selected_job_confirm_source), not by this profile.
-    # Same 4x3 posture as every other command: max_confirm_attempts confirm
-    # windows of confirm_poll_s seconds each (the shared CONFIRM_POLL_S), re-fire
-    # between, unconfirmed-not-fail. No bespoke poll_timeout — the window comes
-    # from the profile like every setting command.
+    # The one 4x3 rule like every other command: four confirmation windows of
+    # ``WINDOW_S``, fired again between, unconfirmed-not-fail.
     confirm_fn=None,
-    max_confirm_attempts=4,
-    poll_interval=0.01,
 )

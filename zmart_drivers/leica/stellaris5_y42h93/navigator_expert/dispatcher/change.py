@@ -35,27 +35,29 @@ acts on their result dicts. The only sleeping it does is backoff delay
 between transient error retries (configurable via ``retry_backoff``
 and ``retry_escalate``).
 
-``_fire_with_receipt`` is the transport helper for UpdateAwaitReceipt
-delivery. ``_await_echo_result`` polls the echo model after transport
+Delivery goes through ``vendor_interface.delivery.deliver`` (the one rule:
+``WINDOWS`` tries of ``WINDOW_S``). ``_await_echo_result`` polls the echo model after transport
 delivery, waiting for LAS X to finish processing before the error
 check reads the echo fields.
 
 Import restrictions: only runtime errors/utilities, ``readers.log_reader``,
-and stdlib. Nothing from command wrappers, profiles, prechecks, or confirmations.
+``vendor_interface.delivery``, and stdlib. Nothing from command wrappers, profiles, prechecks, or confirmations.
 """
 
 import logging
 import time
 
 from ..vendor_interface import log_reader as _log_reader
+from ..vendor_interface.delivery import deliver
 from . import tuning as _timing
 from .envelope import _make_log_entry, _make_timing
 
 log = logging.getLogger(__name__)
 
-# Echo settle window (seconds): how long ``_await_echo_result`` polls the echo
-# model after transport delivery before giving up. Read at call time (like
-# ``timing.RECEIPT_TIMEOUT``/``CONFIRM_POLL_S``) so tests can shrink it.
+#: How long ``_await_echo_result`` checks the echo after delivery before giving
+#: up: LAS X filling in whether the command raised an error. It stays outside
+#: the window rule in ``tuning`` by decision; read at call time so tests can
+#: shrink it.
 ECHO_SETTLE_TIMEOUT_S = 1.0
 
 
@@ -101,37 +103,12 @@ def _append_dialog_warning(logs, command_started_at, description):
 # =============================================================================
 
 
-def _fire_with_receipt(api_obj, receipt_timeout=None, max_attempts=3, retry_delay=0.5):
-    """Dispatch command via UpdateAwaitReceipt with transport retry.
-
-    Args:
-        api_obj: API object (e.g. client.PyApiSetZoomByJobName).
-        receipt_timeout: Seconds for UpdateAwaitReceipt. None uses
-            the module-level RECEIPT_TIMEOUT default.
-        max_attempts: Total transport delivery attempts.
-        retry_delay: Seconds between transport retries.
-
-    Returns:
-        True if delivered, False if transport failed after all attempts.
-    """
-    if receipt_timeout is None:
-        receipt_timeout = _timing.RECEIPT_TIMEOUT
-    for attempt in range(max_attempts):
-        receipt = api_obj.UpdateAwaitReceipt(receipt_timeout)
-        if receipt:
-            return True
-        log.warning("Transport failure (attempt %d/%d)", attempt + 1, max_attempts)
-        if attempt < max_attempts - 1:
-            time.sleep(retry_delay)
-    return False
-
-
 # =============================================================================
 # Echo settlement poll
 # =============================================================================
 
 
-def _await_echo_result(client, timeout=None, poll_interval=0.01):
+def _await_echo_result(client, timeout=None):
     """Poll echo model until LAS X finishes processing.
 
     After UpdateAwaitReceipt confirms transport delivery, LAS X still
@@ -147,7 +124,10 @@ def _await_echo_result(client, timeout=None, poll_interval=0.01):
         client: LAS X API client.
         timeout: Max seconds to wait for echo settlement. None uses the
             module-level ECHO_SETTLE_TIMEOUT_S default.
-        poll_interval: Seconds between polls.
+
+    The echo is checked every ``ANSWER_POLL_S``: it is the answer to a
+    command already sent. Its one-second limit stays outside the window rule
+    on purpose.
 
     Returns:
         True if the echo settled (ready for error check),
@@ -174,7 +154,7 @@ def _await_echo_result(client, timeout=None, poll_interval=0.01):
         if time.perf_counter() >= deadline:
             return False
 
-        time.sleep(poll_interval)
+        time.sleep(_timing.ANSWER_POLL_S)
 
 
 # =============================================================================
@@ -207,7 +187,6 @@ def _fire_block(
     retry_backoff=None,
     retry_escalate=None,
     skip_echo=None,
-    receipt_timeout=None,
     fire_async=None,
 ):
     """Execute the four-step fire pipeline with transient retry.
@@ -215,7 +194,7 @@ def _fire_block(
     Steps:
         1. Pre-check - call ``pre_check_fn()`` (zero-arg, returns result dict).
         2. Setup - call ``setup_fn(api_obj.Model)`` to write parameters.
-        3. Fire - clear echo, ``_fire_with_receipt(api_obj)``.
+        3. Fire - clear echo, ``deliver(api_obj)``.
         4. Error check - call ``error_check_fn()`` (zero-arg, returns result dict).
 
     Steps 1-4 repeat on transient API errors, up to ``max_retries`` + 1
@@ -243,8 +222,6 @@ def _fire_block(
             If False, use a fixed delay. Ignored when retry_backoff is None.
         skip_echo: If True, skip the echo error check step entirely (the
             confirm_fn is then the authoritative completion signal).
-        receipt_timeout: Optional override for the profile's transport ACK
-            deadline. Ignored when fire_async is True.
         fire_async: If True, fire via UpdateAsync (blanking the echo) instead
             of UpdateAwaitReceipt.
 
@@ -263,7 +240,6 @@ def _fire_block(
         retry_backoff=retry_backoff,
         retry_escalate=retry_escalate,
         skip_echo=skip_echo,
-        receipt_timeout=receipt_timeout,
         fire_async=fire_async,
     )
     t_pre_check = 0.0
@@ -341,10 +317,7 @@ def _fire_block(
                 api_obj.UpdateAsync()
                 delivered = True
             else:
-                delivered = _fire_with_receipt(
-                    api_obj,
-                    receipt_timeout=profile.receipt_timeout,
-                )
+                delivered = deliver(api_obj, label=description)
             if delivered and not profile.skip_echo and not profile.fire_async:
                 if not _await_echo_result(client):
                     # The echo never settled: a LAS X rejection arriving
@@ -376,7 +349,7 @@ def _fire_block(
         if not delivered:
             msg = (
                 f"{description} | Transport failure: "
-                f"UpdateAwaitReceipt returned False after retries"
+                f"not received after {_timing.WINDOWS} tries of {_timing.WINDOW_S}s"
             )
             log.error(msg)
             all_logs.append(_make_log_entry("error", msg))
@@ -504,7 +477,6 @@ def confirm_and_fire(
     retry_backoff=None,
     retry_escalate=None,
     skip_echo=None,
-    receipt_timeout=None,
     fire_async=None,
     success_on_unconfirmed=None,
 ):
@@ -571,7 +543,6 @@ def confirm_and_fire(
         retry_backoff=retry_backoff,
         retry_escalate=retry_escalate,
         skip_echo=skip_echo,
-        receipt_timeout=receipt_timeout,
         fire_async=fire_async,
         success_on_unconfirmed=success_on_unconfirmed,
     )

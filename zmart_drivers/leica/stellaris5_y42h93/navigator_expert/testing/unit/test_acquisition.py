@@ -231,7 +231,6 @@ class TestAcquire:
             poll_timeout=None,
             heartbeat_interval=None,
             start_timeout=None,
-            pre_check_timeout=None,
         )
         assert isinstance(result, drv.AcquisitionResult)
         assert result.job == "HiRes"
@@ -337,34 +336,16 @@ class TestCanonicalPhysicalMetadataAuthority:
 
         assert out.physical_size_z_um is None
 
-    def test_job_settings_read_timeout_falls_back_to_vendor_metadata(self):
+    def test_job_settings_unavailable_falls_back_to_vendor_metadata(self):
+        """The read waits by the one rule; when no settings arrive, vendor values stay."""
         metadata = replace(
             _metadata(),
             physical_size_x_um=9.0,
             physical_size_y_um=9.0,
             physical_size_z_um=9.0,
         )
-
-        def _slow_settings(*_args, **_kwargs):
-            time.sleep(0.2)
-            return _job_settings(
-                stack={"begin": 0.0, "end": 4.0, "sections": 3},
-            )
-
-        with patch.object(
-            readers_router,
-            "get_job_settings",
-            side_effect=_slow_settings,
-        ):
-            start = time.perf_counter()
-            out = ome_canonical.metadata_with_job_physical_sizes(
-                metadata,
-                "client",
-                "Overview",
-                read_timeout_s=0.01,
-            )
-
-        assert time.perf_counter() - start < 0.15
+        with patch.object(readers_router, "get_job_settings", return_value=None):
+            out = ome_canonical.metadata_with_job_physical_sizes(metadata, "client", "Overview")
         assert out == metadata
 
 

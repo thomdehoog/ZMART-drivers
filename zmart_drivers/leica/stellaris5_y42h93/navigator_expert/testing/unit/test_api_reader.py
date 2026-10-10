@@ -1,27 +1,28 @@
 """
-Unit tests for readers.api_reader (offline, no driver, no hardware).
-=====================================================================
-Exercises the flush-fire-poll retry/accept skeleton (`_flush_fire_poll`)
-directly, plus the four public readers built on it (get_xy, get_jobs,
-get_hardware_info, get_job_settings), using small hand-built fakes -- no
-real CAM client, no threads, no wall-clock races. Every test scripts
-exactly what a poll loop sees on each read via a property, so the
-scenario is deterministic regardless of real timing.
+Unit tests for vendor_interface.api_reader (offline, no driver, no hardware).
+===========================================================================
+Exercises the one-request skeleton (``_request``) directly, plus the four
+public readers built on it (get_xy, get_jobs, get_hardware_info,
+get_job_settings), using small hand-built fakes -- no real CAM client, no
+threads. Every test scripts exactly what a check for the answer sees on each
+read via a property, so the scenario is deterministic regardless of timing.
 
-This is the LC-09 hazard from the review, made concrete: LAS X delivers
-read results by writing into a shared model with no request/response
-correlation, so a delayed response to an *earlier* fire can still land
-during a *later* fire's poll window. `get_job_settings` has a validate
-hook that catches this (its payload carries `jobName`, a natural
-correlating field, echoing the request); `get_xy`/`get_jobs`/
-`get_hardware_info` do not (their payloads carry nothing that says which
-fire they answer), so they accept a stale response as if it were fresh.
+Each call makes ONE request. Asking again is the routed readers' business
+(``dispatcher.read``, the one rule in ``dispatcher.tuning``), so the stray-
+reply hazard shows up across two calls: LAS X delivers read results by
+writing into a shared model with no request/response correlation, so a
+delayed reply to an *earlier* request can still land during a *later*
+request's check (LC-09). ``get_job_settings`` has a validate hook that
+catches this (its payload carries ``jobName``, a natural correlating field);
+``get_xy``/``get_jobs``/``get_hardware_info`` do not, so they accept a stray
+reply as if it were fresh.
 
     python -m pytest test_api_reader.py
 """
 
 import json
 import math
+import time
 import unittest
 from types import SimpleNamespace
 
@@ -29,11 +30,16 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface imp
     api_reader as A,
 )
 
+SHORT = 0.03
+
+
+def _soon():
+    return time.monotonic() + SHORT
+
 
 def _client(**extra):
-    """A fake CAM client with the PyApiCommand dispatch channel
-    _flush_fire_poll touches directly, plus whichever reader-specific
-    channel(s) a test needs."""
+    """A fake CAM client with the PyApiCommand request channel _request
+    touches directly, plus whichever reader-specific channel(s) a test needs."""
     return SimpleNamespace(
         PyApiCommand=SimpleNamespace(
             Model=SimpleNamespace(Command=""),
@@ -43,69 +49,65 @@ def _client(**extra):
     )
 
 
-class TestFlushFirePollCore(unittest.TestCase):
-    """The shared retry/accept skeleton, exercised directly with scripted
-    flush/read callables -- no reader-shaped client needed for these two."""
+class TestRequestCore(unittest.TestCase):
+    """The one-request skeleton, exercised directly with scripted flush/read."""
 
-    def test_without_a_validate_hook_a_stale_response_is_silently_accepted(self):
-        """Reproduces the hazard for get_xy/get_jobs/get_hardware_info's
-        shape: no validate hook means a straggler from an earlier, timed-out
-        fire is indistinguishable from a genuinely fresh answer."""
-        attempt = {"n": 0}
-
-        def flush(client):
-            attempt["n"] += 1
-
-        def read(client):
-            if attempt["n"] == 1:
-                return None  # attempt 1 times out: nothing ever arrives
-            return "stale-answer-from-fire-1"  # attempt 2's first read
-
-        value = A._flush_fire_poll(
-            _client(),
-            command="Whatever",
-            flush=flush,
-            read=read,
-            validate=None,
-            timeout=0.02,
-            poll_interval=0.001,
-            max_retries=2,
+    def test_an_answer_is_returned_at_once(self):
+        value = A._request(
+            _client(), command="Whatever", flush=lambda c: None, read=lambda c: 7, deadline=_soon()
         )
-        self.assertEqual(value, "stale-answer-from-fire-1")
+        self.assertEqual(value, 7)
 
-    def test_with_a_validate_hook_a_stale_response_is_rejected_and_the_fresh_one_is_accepted(self):
-        """The same race, but with a correlating validate hook (mirrors
-        get_job_settings' jobName check) -- proves the mechanism works when
-        a correlating field exists to check against."""
-        attempt = {"n": 0}
-        reads_this_attempt = {"n": 0}
-
-        def flush(client):
-            attempt["n"] += 1
-            reads_this_attempt["n"] = 0
-
-        def read(client):
-            if attempt["n"] == 1:
-                return None
-            reads_this_attempt["n"] += 1
-            # First read of attempt 2 is fire 1's late, tagged answer;
-            # the second is fire 2's genuine one.
-            return {"fired_in_attempt": 1 if reads_this_attempt["n"] == 1 else 2}
-
-        def validate(value, attempt_no):
-            return A._ACCEPT if value["fired_in_attempt"] == attempt_no else A._STALE
-
-        value = A._flush_fire_poll(
+    def test_no_answer_by_the_deadline_is_none(self):
+        t0 = time.monotonic()
+        value = A._request(
             _client(),
             command="Whatever",
-            flush=flush,
-            read=read,
+            flush=lambda c: None,
+            read=lambda c: None,
+            deadline=_soon(),
+        )
+        self.assertIsNone(value)
+        self.assertGreaterEqual(time.monotonic() - t0, SHORT * 0.9)
+
+    def test_a_request_not_received_is_none_without_checking(self):
+        reads = []
+        client = _client()
+        client.PyApiCommand.UpdateAwaitReceipt = lambda timeout: False
+        value = A._request(
+            client, command="Whatever", flush=lambda c: None, read=reads.append, deadline=_soon()
+        )
+        self.assertIsNone(value)
+        self.assertEqual(reads, [])
+
+    def test_the_check_ends_as_soon_as_the_caller_stops_watching(self):
+        t0 = time.monotonic()
+        value = A._request(
+            _client(),
+            command="Whatever",
+            flush=lambda c: None,
+            read=lambda c: None,
+            deadline=time.monotonic() + 5.0,
+            should_stop=lambda: time.monotonic() - t0 > 0.01,
+        )
+        self.assertIsNone(value)
+        self.assertLess(time.monotonic() - t0, 1.0)
+
+    def test_with_a_validate_hook_a_stray_reply_is_skipped_and_the_fresh_one_accepted(self):
+        reads = iter([{"for": "earlier"}, {"for": "this"}])
+
+        def validate(value):
+            return A._ACCEPT if value["for"] == "this" else A._STALE
+
+        value = A._request(
+            _client(),
+            command="Whatever",
+            flush=lambda c: None,
+            read=lambda c: next(reads),
             validate=validate,
-            timeout=0.05,
-            poll_interval=0.001,
-            max_retries=2,
+            deadline=_soon(),
         )
-        self.assertEqual(value, {"fired_in_attempt": 2})
+        self.assertEqual(value, {"for": "this"})
 
 
 class TestGetHardwareInfo(unittest.TestCase):
@@ -122,11 +124,10 @@ class TestGetHardwareInfo(unittest.TestCase):
                 pass  # flush()'s sentinel reset; ignored, a fresh answer is always ready
 
         client = _client(PyApiGetConfocalHardwareInfo=SimpleNamespace(Model=_Model()))
-        result = A.get_hardware_info(client, timeout=0.05, poll_interval=0.001, max_retries=1)
-        self.assertEqual(result, payload)
+        self.assertEqual(A.get_hardware_info(client, deadline=_soon()), payload)
 
-    def test_has_no_correlating_field_so_a_stale_response_is_silently_accepted(self):
-        stale_payload = {"Microscope": {"name": "STALE-FROM-AN-EARLIER-FIRE"}}
+    def test_has_no_correlating_field_so_a_stray_reply_is_silently_accepted(self):
+        stale_payload = {"Microscope": {"name": "STALE-FROM-AN-EARLIER-REQUEST"}}
 
         class _Model:
             def __init__(self):
@@ -138,12 +139,13 @@ class TestGetHardwareInfo(unittest.TestCase):
 
             @HWInfo.setter
             def HWInfo(self, value):
-                if value is None:  # flush()'s sentinel reset marks a new attempt
+                if value is None:  # flush()'s sentinel reset marks a new request
                     self.resets += 1
 
         client = _client(PyApiGetConfocalHardwareInfo=SimpleNamespace(Model=_Model()))
-        result = A.get_hardware_info(client, timeout=0.02, poll_interval=0.001, max_retries=2)
-        self.assertEqual(result, stale_payload)  # accepted -- nothing marks it as stale
+        self.assertIsNone(A.get_hardware_info(client, deadline=_soon()))
+        result = A.get_hardware_info(client, deadline=_soon())
+        self.assertEqual(result, stale_payload)  # accepted -- nothing marks it as stray
 
 
 class TestGetXY(unittest.TestCase):
@@ -166,13 +168,13 @@ class TestGetXY(unittest.TestCase):
                 pass
 
         client = _client(PyApiGetXY=SimpleNamespace(Model=_Model()))
-        result = A.get_xy(client, timeout=0.05, poll_interval=0.001, max_retries=1)
+        result = A.get_xy(client, deadline=_soon())
         self.assertAlmostEqual(result["x_um"], 50.0)
         self.assertAlmostEqual(result["y_um"], 30.0)
 
-    def test_has_no_correlating_field_so_a_stale_response_is_silently_accepted(self):
+    def test_has_no_correlating_field_so_a_stray_reply_is_silently_accepted(self):
         """Concretely, this is the correct_backlash hazard (LC-09): its
-        A -> B -> A move revisits the same coordinate, so a stale reading
+        A -> B -> A move revisits the same coordinate, so a stray reading
         from the *first* visit to A can satisfy a check meant to confirm
         the *second* -- the values are identical, and get_xy has nothing to
         tell the two apart."""
@@ -197,10 +199,11 @@ class TestGetXY(unittest.TestCase):
 
             @YPosition.setter
             def YPosition(self, value):
-                pass  # attempt already counted by the XPosition reset in the same flush()
+                pass  # request already counted by the XPosition reset in the same flush()
 
         client = _client(PyApiGetXY=SimpleNamespace(Model=_Model()))
-        result = A.get_xy(client, timeout=0.02, poll_interval=0.001, max_retries=2)
+        self.assertIsNone(A.get_xy(client, deadline=_soon()))
+        result = A.get_xy(client, deadline=_soon())
         self.assertAlmostEqual(result["x_um"], stale_x_um)
         self.assertAlmostEqual(result["y_um"], stale_y_um)
 
@@ -219,11 +222,10 @@ class TestGetJobs(unittest.TestCase):
                 pass
 
         client = _client(PyApiGetJobsInformation=SimpleNamespace(Model=_Model()))
-        result = A.get_jobs(client, timeout=0.05, poll_interval=0.001, max_retries=1)
-        self.assertEqual(result, jobs)
+        self.assertEqual(A.get_jobs(client, deadline=_soon()), jobs)
 
-    def test_has_no_correlating_field_so_a_stale_response_is_silently_accepted(self):
-        stale_jobs = [{"Name": "STALE-FROM-AN-EARLIER-FIRE", "IsSelected": True}]
+    def test_has_no_correlating_field_so_a_stray_reply_is_silently_accepted(self):
+        stale_jobs = [{"Name": "STALE-FROM-AN-EARLIER-REQUEST", "IsSelected": True}]
 
         class _Model:
             def __init__(self):
@@ -239,16 +241,23 @@ class TestGetJobs(unittest.TestCase):
                     self.resets += 1
 
         client = _client(PyApiGetJobsInformation=SimpleNamespace(Model=_Model()))
-        result = A.get_jobs(client, timeout=0.02, poll_interval=0.001, max_retries=2)
-        self.assertEqual(result, stale_jobs)
+        self.assertIsNone(A.get_jobs(client, deadline=_soon()))
+        self.assertEqual(A.get_jobs(client, deadline=_soon()), stale_jobs)
 
 
 class TestGetJobSettingsCorrelationGuard(unittest.TestCase):
     """The one reader with a real correlating field: the response carries
-    jobName, so its validate hook can tell a straggler from an earlier fire
-    apart from the answer to the job actually being asked about now."""
+    jobName, so its validate hook can tell a stray reply to an earlier
+    request apart from the answer to the job actually being asked about now."""
 
-    def test_rejects_a_stale_response_for_a_different_job_and_returns_the_fresh_one(self):
+    def _client_with(self, model, *, job_name_received=True):
+        return _client(
+            PyApiGetJobSettingsByName=SimpleNamespace(
+                Model=model, UpdateAwaitReceipt=lambda timeout: job_name_received
+            )
+        )
+
+    def test_rejects_a_stray_reply_for_a_different_job_and_returns_the_fresh_one(self):
         stale = json.dumps({"jobName": "OLD_JOB", "imageSize": "100.0 um x 100.0 um"})
         fresh = json.dumps({"jobName": "NEW_JOB", "imageSize": "200.0 um x 200.0 um"})
 
@@ -266,18 +275,11 @@ class TestGetJobSettingsCorrelationGuard(unittest.TestCase):
             def Settings(self, value):
                 pass
 
-        client = _client(
-            PyApiGetJobSettingsByName=SimpleNamespace(
-                Model=_Model(), UpdateAwaitReceipt=lambda timeout: True
-            )
-        )
-        result = A.get_job_settings(
-            client, "NEW_JOB", timeout=0.05, poll_interval=0.001, max_retries=1
-        )
+        result = A.get_job_settings(self._client_with(_Model()), "NEW_JOB", deadline=_soon())
         self.assertIsNotNone(result)
         self.assertEqual(result["jobName"], "NEW_JOB")
 
-    def test_all_responses_stale_falls_closed_to_none_not_a_wrong_value(self):
+    def test_all_replies_stray_falls_closed_to_none_not_a_wrong_value(self):
         stale = json.dumps({"jobName": "OLD_JOB"})
 
         class _Model:
@@ -292,15 +294,19 @@ class TestGetJobSettingsCorrelationGuard(unittest.TestCase):
             def Settings(self, value):
                 pass
 
-        client = _client(
-            PyApiGetJobSettingsByName=SimpleNamespace(
-                Model=_Model(), UpdateAwaitReceipt=lambda timeout: True
-            )
+        self.assertIsNone(
+            A.get_job_settings(self._client_with(_Model()), "NEW_JOB", deadline=_soon())
         )
-        result = A.get_job_settings(
-            client, "NEW_JOB", timeout=0.02, poll_interval=0.001, max_retries=1
-        )
-        self.assertIsNone(result)
+
+    def test_a_job_name_handover_not_received_leaves_the_request_unanswered(self):
+        fresh = json.dumps({"jobName": "NEW_JOB", "imageSize": "200.0 um x 200.0 um"})
+
+        class _Model:
+            JobName = ""
+            Settings = fresh
+
+        client = self._client_with(_Model(), job_name_received=False)
+        self.assertIsNone(A.get_job_settings(client, "NEW_JOB", deadline=_soon()))
 
 
 if __name__ == "__main__":

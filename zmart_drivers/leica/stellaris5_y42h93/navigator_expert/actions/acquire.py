@@ -36,7 +36,6 @@ def acquire(
     poll_timeout=None,
     heartbeat_interval=None,
     start_timeout=None,
-    pre_check_timeout=None,
 ) -> AcquisitionResult:
     """Acquire a named LAS X job and return save-agnostic context.
 
@@ -51,7 +50,6 @@ def acquire(
         poll_timeout=poll_timeout,
         heartbeat_interval=heartbeat_interval,
         start_timeout=start_timeout,
-        pre_check_timeout=pre_check_timeout,
     )
     finished_at = time.time()
     if not result or not result.get("success"):

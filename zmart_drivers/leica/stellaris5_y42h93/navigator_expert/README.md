@@ -279,9 +279,23 @@ permanent error, failed pre-check) and `confirmed` is `None`.
 `timeout`, …); unknown → permanent (conservative). Transient errors retry up to `max_retries`.
 
 **Reading state — api / log / hybrid** (`dispatcher/read.py`, over `vendor_interface/api_reader.py` and `log_reader.py`, chosen per datum by `StateReaderProfile`;
-default `hybrid` for all routed datums): `api` (one CAM read in a capped worker thread), `log`
-(parse LAS X logs — never blocks the CAM API, can be stale), `hybrid` (race them, first
-*admissible* evidence wins — the legs' staleness profiles are complementary, so one usually delivers). **Freshness rule:** a fresh-by-age
+default `hybrid` for all routed datums): `api` (CAM read requests, one at a time per connection), `log`
+(parse LAS X logs — never blocks the CAM API, can be stale), `hybrid` (watch both, the first answer
+that counts as a success wins — no source is preferred; the legs' staleness profiles are
+complementary, so one usually delivers). What counts as a success is declared once per datum in
+`actions/get.py` (job settings, for example, must name the job asked about and carry an objective
+slot and image geometry).
+
+**Waiting on LAS X — one rule** (`dispatcher/tuning.py`): every reading, confirmation and delivery
+waits **four windows of three seconds**. Within a window both sources are watched; between windows
+something is sent again — a command is fired again, an unanswered read is requested again, a
+message is delivered again. The driver looks again every `POLL_S` (0.1 s) and checks for an answer
+already requested every `ANSWER_POLL_S` (0.01 s). After four windows a reading is unknown, a change
+unconfirmed, a delivery failed. The idle check before a command is an ordinary reading under the same
+rule. The scanner status is API-only, like the job list: the log writes it only when it changes, and
+the API decides whether a command fires. Outside the rule, by decision: acquisition (sent once, never again, watched for as long as the
+scan takes), the one-second wait for LAS X's error report after a command, and waits on files being
+written. **Freshness rule:** a fresh-by-age
 *log* value must never decide whether a command fires, how it is parameterized, whether it confirms,
 or what metadata/calibration is persisted — those must use the API leg. The CAM API can hang; the log
 mirror is the hang-proof fallback.
@@ -291,8 +305,7 @@ positions are mixed: `get_xy` and `move_xy`'s `position` carry raw meters under 
 use the `*_um` keys.
 
 **Common per-call overrides** (`None` = use the profile): `max_retries` (transient-retry ceiling),
-`pre_check_timeout` (idle-wait when the profile pre-checks), `tolerance` (readback tolerance, numeric
-commands).
+`tolerance` (readback tolerance, numeric commands). How long to wait is never a per-call choice.
 
 **Logging:** `logging.getLogger("navigator_expert").setLevel(logging.DEBUG)` — the same trace also
 travels in each result's `logs`.
@@ -377,7 +390,7 @@ driver-added aliases for stable access.
 
 ### Stage & motion
 ```python
-move_xy(client, x, y, unit="um", *, max_retries=None, pre_check_timeout=None, tolerance=None) -> dict  # tol 20 µm; result has "position"
+move_xy(client, x, y, unit="um", *, max_retries=None, tolerance=None) -> dict                           # tol 20 µm; result has "position"
 move_z(client, job_name, z, unit="um", z_mode="galvo", ...) -> dict                                     # z_mode "galvo"|"zwide"; tol 1 µm
 move_galvo_to_pixel(client, px, py, ...) -> dict                                                        # pan galvo to a pixel (no stage move)
 set_stage_limits(*, x_min, x_max, y_min, y_max, z_galvo_min, z_galvo_max, z_wide_min, z_wide_max) -> None
@@ -386,9 +399,9 @@ get_stage_limits() -> dict ; apply_stage_limits_from_config(stage_cfg) -> None
 
 ### Acquisition & job selection
 ```python
-select_job(client, job_name, poll_timeout=None, poll_interval=None) -> dict     # confirm defaults to hybrid
+select_job(client, job_name, *, compensate=None) -> dict                         # confirm defaults to hybrid
 acquire(client, job, *, poll_interval=None, poll_timeout=None, heartbeat_interval=None,
-        start_timeout=None, pre_check_timeout=None) -> AcquisitionResult          # RAISES on failure
+        start_timeout=None) -> AcquisitionResult                                  # RAISES on failure
 save(client, acq, output_root, naming, *, lineage=None, fix_ome=True,
      cleanup_source=False) -> SavedAcquisition                                    # image_paths / xml_paths / naming
 ```
@@ -560,10 +573,10 @@ callables + retry/confirm tuning). Tuning a command = editing its profile; nothi
 @dataclass(frozen=True)
 class CommandProfile:
     pre_check_fn=None ; error_check_fn=_default_error_check ; confirm_fn=None
-    max_retries=3 ; max_confirm_attempts=4 ; refire_on_unconfirmed=True
-    confirm_poll_s=CONFIRM_POLL_S ; confirm_tolerance=None
+    max_retries=WINDOWS-1 ; max_confirm_attempts=WINDOWS ; refire_on_unconfirmed=True
+    confirm_poll_s=WINDOW_S ; confirm_tolerance=None
     success_on_unconfirmed=True                # exhausted readback -> unconfirmed, never hard-fail
-    # + poll/heartbeat/backoff/receipt/async knobs
+    # + acquisition watch / backoff / async knobs
 ```
 
 Posture is uniform: retry the fire, re-fire between confirm windows, return *unconfirmed* rather than
