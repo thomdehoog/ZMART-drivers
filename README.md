@@ -157,7 +157,7 @@ folder of this repository:
 pip install -e ".[leica,zeiss,test]"
 pip install -r zmart_drivers/zeiss/zenapi/requirements.txt   # ZEISS's zen_api, for the fake-gateway tests
 
-python zmart_drivers/leica/stellaris5_y42h93/navigator_expert/run_ci.py
+python zmart_drivers/leica/stellaris5_y42h93/navigator_expert/testing/run_ci.py
 python -P -m pytest zmart_drivers/nikon/nis_elements_6_10
 python zmart_drivers/zeiss/zenapi/run_ci.py --no-lint
 python zmart_drivers/mesospim/run_ci.py
