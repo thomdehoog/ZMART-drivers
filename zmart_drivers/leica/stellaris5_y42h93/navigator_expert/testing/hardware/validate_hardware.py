@@ -413,7 +413,7 @@ def _bootstrap() -> tuple[Any, type]:
     here = Path(__file__).resolve()
     nav_root = here.parents[2]  # navigator_expert/
     repo_root = here.parents[6]  # the repository root, which holds zmart_drivers/
-    helpers = nav_root / "tests" / "helpers"
+    helpers = nav_root / "testing" / "helpers"
     for p in (str(repo_root), str(helpers)):
         if p not in sys.path:
             sys.path.insert(0, p)

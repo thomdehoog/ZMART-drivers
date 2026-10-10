@@ -1,29 +1,57 @@
-# Hardware validation — how to run today's validation on the scope
+# Hardware validation: the same command on the simulator and on the scope
 
-Canonical bench entry point is **run_ci** (the individual `validate_*.py`
+The bench entry point is `testing/run_ci.py` (the individual `validate_*.py`
 scripts stay directly runnable for debugging):
 
 ```powershell
 cd zmart_drivers/leica/stellaris5_y42h93/navigator_expert
 
-# Mock/offline gate: no microscope, no LAS X
-python run_ci.py
+# Offline, no LAS X: the whole suite against the LAS X mock
+python testing/run_ci.py
 
-# Hardware gate: live LAS X validators, reversible moves/settings, and acquire smoke
-python run_ci.py --hardware
+# Live, about five minutes: the quick acceptance against LAS X (simulator or scope)
+python testing/run_ci.py --hardware
+
+# Live, 15 to 30 minutes: the quick set plus the reader diagnostics
+python testing/run_ci.py --hardware --full
 ```
 
-`--hardware` runs, in order: **first a mock limits self-check** (the fail-closed
-limits gate proven against the in-process mock, in THIS install, before LAS X
-is touched — if it fails the run **hard-aborts and no hardware validator
-runs**, so a broken limits gate can never reach the stage), then the passive
-reader probe (api/log/hybrid), the side-by-side reader parity + routed
-reader-mode validator, the zmart_controller↔adapter move/state/acquire
-round-trip, and the
-end-to-end driver validator once per reader route (`--state-reader-mode api`,
-`log`, and `hybrid` explicitly), each with an acquire command.
-Hardware validation uses only production driver modules — nothing under
-`experimental/` (maintainer decision).
+The validators do not know whether LAS X is in simulator mode or driving
+real optics; that is LAS X's own switch. Run `--hardware` against the
+simulator first, then the same command on the microscope. All green on the
+simulator, then all green on the scope, is the definition of production
+ready.
+
+**`--hardware`, the quick acceptance**, runs in order:
+
+1. **The limits self-check**, against the in-process mock, in this install,
+   before LAS X is touched. If it fails the run hard-aborts and no hardware
+   validator runs, so a broken limits gate can never reach the stage.
+2. **The installed driver** (`validate_installed_driver.py`): the path an
+   experiment takes. It registers this folder with the controller
+   (`register_driver`), connects by name (`connect("stellaris")`), lets the
+   controller's own `validate_driver` check every `get_*` answer, asks every
+   command, proves that the limits gate refuses a far move before anything
+   moves, makes one small move and back, and takes one acquisition that the
+   controller's `check_acquire_answer` accepts. Its report ends with the
+   **acceptance checklist**, one line per point, which `run_ci` prints in
+   its summary.
+3. **The adapter round-trip** (`validate_zmart_adapter.py`): first the
+   four-axis CI baseline, then `set_origin` and `set_xyz`, the state
+   round-trip, and an acquire through LAS X native AutoSave.
+4. **The end-to-end validator in the hybrid reader route**
+   (`validate_hardware.py`): every reversible setting, the XY pattern, the
+   z-galvo round-trip, and an acquire. Hybrid is the production route, so
+   this step is fatal.
+
+**`--hardware --full`** adds the diagnostics, once per release or after a
+change to the readers: the passive reader probe (api / log / hybrid), the
+side-by-side reader parity check, and the end-to-end validator through the
+api and log routes as well. Those two routes stay diagnostic: they document
+bench-specific reader disagreements without failing the run.
+
+Hardware validation uses only production driver modules, nothing under
+`experimental/`.
 
 Before the first stage-moving validator, hardware CI enforces and verifies the raw
 four-axis baseline **X = 63,500 um, Y = 41,500 um, Z-wide = 0 um, Z-galvo =
@@ -56,7 +84,7 @@ commands a negative Z-wide target and restores it to 0 um.
   (`motion.limits.STAGE_BACKSTOP_UM`). Run the three setup notebooks on the rig
   to replace defaults with measured values. (`--mock` uses a hermetic
   ProgramData root and exercises the same real handshake.)
-- Driver requirements installed (`pip install -r requirements-dev.txt`).
+- Driver requirements installed (`pip install -r testing/requirements-dev.txt`).
 
 ## What `--hardware` changes on the instrument (all restored in `finally`)
 
@@ -89,10 +117,10 @@ success+UNCONFIRMED / FAILED result, attempt counts, and timing.
 
 ## Expected duration
 
-- `python run_ci.py`: mock/offline, no LAS X required.
-- `python run_ci.py --hardware`: ~15–30 min against a live LAS X session
-  (dominated by per-command confirmation
-  polling: up to 3 × 3 s readback windows per setting write, × 3 reader
+- `python testing/run_ci.py`: mock/offline, no LAS X required.
+- `python testing/run_ci.py --hardware`: about five minutes against a live LAS X
+  session. `--full`: 15 to 30 minutes, dominated by per-command confirmation
+  polling (up to 3 × 3 s readback windows per setting write, × 3 reader
   routes). Against the in-process mock the same paths run in seconds.
 
 ## Where the results land
@@ -125,7 +153,7 @@ the report for which leg confirmed, and how fast.)
 
 ## Offline gates (no LAS X)
 
-Normal CI (`python run_ci.py`, default offline mode) keeps the hardware
+Normal CI (`python testing/run_ci.py`, default offline mode) keeps the hardware
 suite's health checked via the mock-backed wrappers, which also assert the
 run report is produced:
 

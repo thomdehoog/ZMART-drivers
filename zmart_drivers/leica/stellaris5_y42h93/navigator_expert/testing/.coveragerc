@@ -6,8 +6,7 @@
 [run]
 branch = True
 omit =
-    */tests/*
-    */run_ci.py
+    */testing/*
 
 [report]
 # Coverage floor (LT-04). The full offline suite (tests/unit + calibration/tests)

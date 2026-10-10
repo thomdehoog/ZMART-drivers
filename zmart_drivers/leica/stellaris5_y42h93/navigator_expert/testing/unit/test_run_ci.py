@@ -7,7 +7,7 @@ import pytest
 
 
 def _load_run_ci():
-    path = Path(__file__).resolve().parents[2] / "run_ci.py"
+    path = Path(__file__).resolve().parents[1] / "run_ci.py"
     spec = importlib.util.spec_from_file_location("run_ci_under_test", path)
     module = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = module
@@ -22,14 +22,17 @@ def test_run_ci_exposes_only_mock_and_hardware_modes():
     assert run_ci.parse_args(["--mock"]).mock is True
     assert run_ci.parse_args(["--hardware"]).hardware is True
 
+    assert run_ci.parse_args(["--hardware", "--full"]).full is True
+
     with pytest.raises(SystemExit):
         run_ci.parse_args(["--mock", "--hardware"])
+    with pytest.raises(SystemExit):
+        run_ci.parse_args(["--full"])  # --full goes with --hardware
     with pytest.raises(SystemExit):
         run_ci.parse_args(["--no-cov"])
 
 
-def test_hardware_mode_requires_lasx_and_runs_acquire_smoke(monkeypatch, tmp_path):
-    run_ci = _load_run_ci()
+def _capture_steps(run_ci, monkeypatch, tmp_path, argv):
     captured: list[tuple[str, list[str], bool]] = []
 
     monkeypatch.setattr(run_ci, "REPORT_DIR", tmp_path)
@@ -53,12 +56,24 @@ def test_hardware_mode_requires_lasx_and_runs_acquire_smoke(monkeypatch, tmp_pat
         }
 
     monkeypatch.setattr(run_ci, "run_step", fake_run_step)
+    assert run_ci.main(argv) == 0
+    return captured
 
-    assert run_ci.main(["--hardware"]) == 0
+
+def test_the_quick_hardware_run_is_the_acceptance(monkeypatch, tmp_path):
+    """--hardware: the limits self-check, the installed driver, the adapter, hybrid; nothing mocked."""
+    run_ci = _load_run_ci()
+    captured = _capture_steps(run_ci, monkeypatch, tmp_path, ["--hardware"])
 
     commands = {name: cmd for name, cmd, _fatal in captured}
     assert "limits: mock self-check (fail-closed gate proven before any hardware)" in commands
     fatal_by_name = {name: fatal for name, _cmd, fatal in captured}
+
+    installed_cmd = _command_for(captured, "validate_installed_driver.py")
+    assert "--allow-move" in installed_cmd
+    assert "--allow-acquire" in installed_cmd
+    assert "--mock" not in installed_cmd
+    assert fatal_by_name["hardware: installed driver (register folder, connect by name)"] is True
 
     adapter_cmd = _command_for(captured, "validate_zmart_adapter.py")
     assert "--allow-acquire" in adapter_cmd
@@ -67,14 +82,31 @@ def test_hardware_mode_requires_lasx_and_runs_acquire_smoke(monkeypatch, tmp_pat
     assert fatal_by_name["hardware: zmart adapter (move/state/acquire)"] is True
 
     hardware_cmds = _commands_for(captured, "validate_hardware.py")
+    assert len(hardware_cmds) == 1
+    assert "hybrid" in hardware_cmds[0]
+    assert "--allow-acquire" in hardware_cmds[0]
+    assert fatal_by_name["hardware: end-to-end validator [hybrid reader]"] is True
+
+    assert not _commands_for(captured, "probe_four_readers.py")
+    assert not _commands_for(captured, "validate_readers_side_by_side.py")
+
+
+def test_the_full_hardware_run_adds_the_diagnostics(monkeypatch, tmp_path):
+    """--hardware --full: the quick set plus the reader probe, parity, and the api and log routes."""
+    run_ci = _load_run_ci()
+    captured = _capture_steps(run_ci, monkeypatch, tmp_path, ["--hardware", "--full"])
+    fatal_by_name = {name: fatal for name, _cmd, fatal in captured}
+
+    assert _command_for(captured, "validate_installed_driver.py")
+    assert _command_for(captured, "probe_four_readers.py")
+    assert "--mock" not in _command_for(captured, "validate_readers_side_by_side.py")
+    assert fatal_by_name["hardware: reader parity + routed modes"] is False
+
+    hardware_cmds = _commands_for(captured, "validate_hardware.py")
     assert len(hardware_cmds) == 3
     for cmd in hardware_cmds:
         assert "--allow-acquire" in cmd
-        assert "--allow-missing-lasx" not in cmd
         assert "--mock" not in cmd
-
-    assert "--mock" not in _command_for(captured, "validate_readers_side_by_side.py")
-    assert fatal_by_name["hardware: reader parity + routed modes"] is False
     assert fatal_by_name["hardware: end-to-end validator [api reader]"] is False
     assert fatal_by_name["hardware: end-to-end validator [log reader]"] is False
     assert fatal_by_name["hardware: end-to-end validator [hybrid reader]"] is True

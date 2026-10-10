@@ -505,7 +505,7 @@ zmart_drivers/leica/stellaris5_y42h93/navigator_expert/
 ├── testing/            unit/ (offline) · calibration/ (the calibration suites) · hardware/
 │                       (validate_*.py live scripts + mock-backed test_* gates) · helpers/ (the
 │                       LAS X mock) · data/
-└── run_ci.py · pytest.ini   (package root)
+└── (the driver's CI, pytest.ini, .coveragerc and requirements-dev.txt live in testing/)
 ```
 
 **Two-layer dispatch backbone** (`dispatcher/change.py` → `confirm_and_fire`):
@@ -585,9 +585,10 @@ python -P -m pytest -q zmart_drivers/leica/stellaris5_y42h93/navigator_expert/te
 python -P -m pytest -q zmart_drivers/leica/stellaris5_y42h93/navigator_expert/testing/calibration
 
 # Self-contained gates
-python zmart_drivers/leica/stellaris5_y42h93/navigator_expert/run_ci.py             # mock/offline (default)
-python zmart_drivers/leica/stellaris5_y42h93/navigator_expert/run_ci.py --mock      # explicit mock/offline
-python zmart_drivers/leica/stellaris5_y42h93/navigator_expert/run_ci.py --hardware  # live LAS X validators + acquire smoke
+python zmart_drivers/leica/stellaris5_y42h93/navigator_expert/testing/run_ci.py             # mock/offline (default)
+python zmart_drivers/leica/stellaris5_y42h93/navigator_expert/testing/run_ci.py --mock      # explicit mock/offline
+python zmart_drivers/leica/stellaris5_y42h93/navigator_expert/testing/run_ci.py --hardware         # live: the quick acceptance (about five minutes)
+python zmart_drivers/leica/stellaris5_y42h93/navigator_expert/testing/run_ci.py --hardware --full  # live: plus the reader probe, parity, and the api/log routes
 ```
 
 `testing/unit/` is offline against committed synthetic fixtures (template parsing, strip/restore,
@@ -595,7 +596,7 @@ position parsers, stage/limits, log & state readers, acquisition, runtime loadin
 TDD practice: add a failing offline test first, and assert real values, not just shapes.
 
 **Live hardware validation** (requires a live LAS X — simulator or scope) runs through the
-`validate_*.py` *scripts* in `testing/hardware/`, invoked directly or via `run_ci.py --hardware` —
+`validate_*.py` *scripts* in `testing/hardware/`, invoked directly or via `testing/run_ci.py --hardware` —
 not through pytest. Everything pytest collects is mock-backed and offline, including the
 `test_*.py` files in `testing/hardware/`, which drive the same validators against
 `MockLasxClient`. (The `hardware`/`slow` markers registered in `pytest.ini` are used by zero
