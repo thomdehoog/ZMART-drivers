@@ -14,9 +14,11 @@ file, and they move the stage only to where it already stands.
 
 ## Before the session
 
-1. **Update all three** on the microscope PC, in the local clones in the home folder (not from Z:):
-   `ZMART-drivers`, `ZMART-interface` and `ZMART-viewer`, each to `release-candidate`. They go
-   together: the interface reads the driver's stores and the viewer reads the driver's projections.
+1. **Update all four** on the microscope PC, in the local clones in the home folder (not from Z:):
+   `ZMART-controller`, `ZMART-drivers`, `ZMART-interface` and `ZMART-viewer`, each to
+   `release-candidate`. They go together: the controller's `get_info` now says where the
+   microscope saves and what is set up on it, the interface reads the driver's stores, and the
+   viewer reads the driver's projections.
 2. **Set the data location once**: open
    `configuration/data_location/notebooks/set_data_location.ipynb`, write the folder (a local disk,
    for example `D:\ZMART-data`) and run it. Without it the driver saves nothing and says so.
