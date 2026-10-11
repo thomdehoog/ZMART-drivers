@@ -387,3 +387,15 @@ def test_the_log_is_written_beside_data(tmp_path):
 
     assert path == tmp_path / "out" / "high-res" / "log" / "high-res_000001_A1.log.json"
     assert json.loads(path.read_text(encoding="utf-8")) == {"job": "HiRes", "µ": "µm"}
+
+
+def test_the_description_holds_no_empty_values(hires, tmp_path):
+    """A browser viewer refuses an axis whose unit is null ("Unsupported unit: null"); an absent unit is left out."""
+    root, _ = hires
+
+    saved = save_as_zarr(root, tmp_path, "HiRes", placement=at(0.0, 0.0, {0: 0.0}))
+
+    text = (saved.image_paths[PlaneIndex(0, 0, 0)] / "zarr.json").read_text(encoding="utf-8")
+    assert "null" not in text
+    axes = json.loads(text)["attributes"]["ome"]["multiscales"][0]["axes"]
+    assert axes[1] == {"name": "c", "type": "channel"}

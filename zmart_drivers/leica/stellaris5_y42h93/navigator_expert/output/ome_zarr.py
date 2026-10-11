@@ -34,7 +34,7 @@ from __future__ import annotations
 
 import os
 import uuid
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, replace
 from pathlib import Path
 
@@ -230,7 +230,10 @@ def write_store(capture: Capture, store: Path, *, state: dict | None = None) -> 
     group = image.to_zarr(zarr.storage.LocalStore(str(writing)), path="")
     group["0"][...] = volume
     deepest = (1 << (metadata.significant_bits or volume.dtype.itemsize * 8)) - 1
-    ome = dict(group.attrs["ome"])
+    # The models write an absent value as null (a channel axis's unit, a
+    # multiscale's metadata); a browser viewer refuses "unit": null, so what
+    # is absent is left out, as the specification has it.
+    ome = _without_empty(dict(group.attrs["ome"]))
     ome["omero"] = {
         "channels": [
             {
@@ -247,6 +250,15 @@ def write_store(capture: Capture, store: Path, *, state: dict | None = None) -> 
     (writing / "OME" / "METADATA.ome.xml").write_bytes(canonical.image_xml(metadata, image_name=store.name, state=state))
     os.replace(writing, store)
     return store
+
+
+def _without_empty(value):
+    """*value* with every null entry left out of its dictionaries, at any depth."""
+    if isinstance(value, Mapping):
+        return {key: _without_empty(item) for key, item in value.items() if item is not None}
+    if isinstance(value, (list, tuple)):
+        return [_without_empty(item) for item in value]
+    return value
 
 
 def _window(pixels: np.ndarray, deepest: int) -> dict:
