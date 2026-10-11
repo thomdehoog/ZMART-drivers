@@ -26,13 +26,16 @@ classifiers = [
 # microscope, for example: pip install -e ".[leica]". The Nikon and mesoSPIM
 # drivers need nothing extra.
 [project.optional-dependencies]
-# The Leica driver: images and their metadata (numpy, tifffile), the setup
+# The Leica driver: images and their metadata (numpy, tifffile; zarr and
+# OME's ome-zarr-models for saving a capture as OME-Zarr 0.5), the setup
 # notebooks for orientation and objective calibration (scipy, scikit-image,
 # opencv, matplotlib, pillow, ipython), and pythonnet, which loads Leica's
 # LAS X interface. LAS X runs on Windows only, so pythonnet is installed there.
 leica = [
     "numpy>=1.24",
     "tifffile>=2024.1",
+    "zarr>=3",
+    "ome-zarr-models>=1.7",
     "scipy>=1.10",
     "scikit-image>=0.21",
     "opencv-python-headless>=4.8",

@@ -6,8 +6,8 @@ Public workflow:
     saved = save(client, acq, output_root, naming)
 
 ``save`` owns persistence only. The pixels are collected from one of two
-sources (``SOURCES``): LAS X's Data Container cache
-(``lasx_data_container``) or LAS X's own AutoSave files
+sources (``SOURCES``): ``"cache"``, LAS X's Data Container cache
+(``lasx_data_container``), or ``"autosave"``, LAS X's own AutoSave files
 (``lasx_native_autosave``); either way the same OME-TIFFs are written. OME
 checks live in ``ome``.
 """
@@ -18,6 +18,7 @@ import hashlib
 import json
 import logging
 import os
+from collections.abc import Callable
 from dataclasses import replace
 from pathlib import Path
 from typing import Any
@@ -26,6 +27,7 @@ from ..actions.acquire import AcquisitionResult
 from ..configuration.image_stage_registration import Orientation
 from . import files as _files
 from . import materialize as _materialize
+from . import ome_zarr
 from .files import (
     DEFAULT_EXPORT_COMPLETION_POLL_INTERVAL_S,
     DEFAULT_EXPORT_COMPLETION_TIMEOUT_S,
@@ -49,9 +51,14 @@ from .product import ExportedAcquisition, PlaneIndex, SavedAcquisition
 
 log = logging.getLogger(__name__)
 
-#: Where ``save`` can collect the pixels from: LAS X's Data Container cache,
-#: read as LAS X writes it, or the OME-TIFF LAS X's AutoSave writes.
-SOURCES = ("lasx_data_container", "lasx_native_autosave")
+#: Where ``save`` can collect the pixels from: ``"cache"``, LAS X's Data
+#: Container cache read as LAS X writes it (``lasx_data_container``), or
+#: ``"autosave"``, the OME-TIFF LAS X's AutoSave writes (``lasx_native_autosave``).
+SOURCES = ("cache", "autosave")
+
+#: What ``save`` writes the capture as: one OME-TIFF a plane, or one OME-Zarr
+#: image (``ome_zarr``). Only the one chosen is written.
+FORMATS = ("ome-tiff", "ome-zarr")
 
 
 def save_source_root() -> Path:
@@ -83,6 +90,8 @@ def save(
     export_completion_poll_interval_s: float = (DEFAULT_EXPORT_COMPLETION_POLL_INTERVAL_S),
     source: str | None = None,
     cache_root: str | Path | None = None,
+    format: str | None = None,
+    placement: Callable[[list[int]], Callable[[int], dict]] | None = None,
 ) -> SavedAcquisition:
     """Persist the files produced for *acq* into *output_root*.
 
@@ -98,17 +107,25 @@ def save(
     *source* is one of ``SOURCES`` and defaults to the profile's
     (``IMAGE_SAVE.source``); *cache_root* names the Data Container cache
     folder when it is not the one the registry gives.
+
+    *format* is one of ``FORMATS`` and defaults to the profile's
+    (``IMAGE_SAVE.format``). With ``"ome-zarr"`` the capture becomes one
+    image store; *placement*, handed the planes' z numbers, answers where on
+    the sample each was taken, and places the store there.
     """
     from ..actions.profiles import IMAGE_SAVE
 
     source = IMAGE_SAVE.source if source is None else source
     if source not in SOURCES:
         raise ValueError(f"unknown image source {source!r}; the sources are {SOURCES}")
+    format = IMAGE_SAVE.format if format is None else format
+    if format not in FORMATS:
+        raise ValueError(f"unknown image format {format!r}; the formats are {FORMATS}")
     if orientation is None:
         from ..configuration.image_stage_registration import rig_orientation
 
         orientation = rig_orientation() if IMAGE_SAVE.apply_orientation else Orientation()
-    if source == "lasx_data_container":
+    if source == "cache":
         exported = collect_lasx_data_container(
             client,
             acq,
@@ -124,6 +141,16 @@ def save(
             export_completion_timeout=export_completion_timeout_s,
             export_completion_poll_interval=export_completion_poll_interval_s,
         )
+    if format == "ome-zarr":
+        return _persist_store(
+            exported,
+            Path(output_root),
+            naming,
+            lineage=lineage,
+            state=state,
+            orientation=orientation,
+            placement=placement,
+        )
     return _persist_export(
         exported,
         Path(output_root),
@@ -133,6 +160,49 @@ def save(
         orientation=orientation,
         fix_ome=fix_ome,
         cleanup_source=cleanup_source,
+    )
+
+
+def _persist_store(
+    exported: ExportedAcquisition,
+    output_root: Path,
+    naming: Naming,
+    *,
+    lineage: dict | None,
+    state: dict | None,
+    orientation: Orientation,
+    placement: Callable[[list[int]], Callable[[int], dict]] | None,
+) -> SavedAcquisition:
+    """The capture as one OME-Zarr image in ``data``, beside the vendor's metadata and the state."""
+    vendor_records = _persist_vendor_metadata(exported, output_root, naming)
+    indices = [index for position in exported.positions for index in position.planes]
+    where = placement(sorted({index.z for index in indices})) if placement is not None else None
+    store = data_dir(output_root, naming.folder) / f"{naming.folder}_{naming.hash6}_{naming.position_label}.ome.zarr"
+    ome_zarr.write_position_store(exported, store, orientation=orientation, where=where, state=state)
+    printed = _print_state(state, output_root, naming)
+
+    summary_path = output_root / "summary.json"
+    summary = _load_summary(summary_path)
+    _upsert_summary_record(
+        summary,
+        {
+            "naming": _naming_to_dict(naming),
+            "image_path": _rel_posix(store, output_root),
+            "format": "ome-zarr",
+            "source": _rel_posix(exported.source_dir, exported.source_root),
+            "source_exporter": exported.source_exporter,
+            "canonical_metadata": True,
+            "vendor_metadata": vendor_records,
+            "physical_size_um": _physical_size_record(exported.metadata),
+            "lineage": lineage,
+        },
+    )
+    _write_json_atomic(summary_path, summary)
+    return SavedAcquisition(
+        image_paths={index: store for index in sorted(indices)},
+        naming=naming,
+        vendor_metadata_paths=tuple(output_root / record["path"] for record in vendor_records),
+        state_paths=(printed,) if printed is not None else (),
     )
 
 

@@ -151,14 +151,18 @@ class ImageSaveProfile:
     measurement is the only workflow that explicitly requests raw pixels.
 
     ``source`` is where the pixels are collected from (``output.save.SOURCES``):
-    ``"lasx_native_autosave"``, the OME-TIFF LAS X's AutoSave writes, or
-    ``"lasx_data_container"``, LAS X's own cache, read as the picture is
+    ``"autosave"``, the OME-TIFF LAS X's AutoSave writes, or
+    ``"cache"``, LAS X's own cache, read as the picture is
     taken. The cache does not wait for AutoSave; it stays the second choice
     until it has run on the microscope itself.
     """
 
     apply_orientation: bool = True
-    source: str = "lasx_native_autosave"
+    source: str = "autosave"
+    #: What a capture is saved as (``output.save.FORMATS``): ``"ome-tiff"``,
+    #: one file a plane, or ``"ome-zarr"``, one image store. Only the one
+    #: chosen is written.
+    format: str = "ome-tiff"
 
 
 IMAGE_SAVE = ImageSaveProfile()

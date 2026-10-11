@@ -909,7 +909,7 @@ def get_acquisition_settings(handle: ZmartHandle) -> dict:
             "options": "int >= 0",
             "active": ACQUISITION_BACKLASH_DEFAULT_ROUNDS,
         },
-        "format": {"options": ["ome-tiff"], "active": "ome-tiff"},
+        "format": {"options": list(_save.FORMATS), "active": IMAGE_SAVE.format},
         "cleanup_source": {"options": [True, False], "active": False},
         "source": {"options": list(_save.SOURCES), "active": IMAGE_SAVE.source},
     }
@@ -1113,6 +1113,10 @@ def acquire(
         orientation=_loaded_orientation(handle),
         cleanup_source=resolved["cleanup_source"],
         source=resolved["source"],
+        format=resolved["format"],
+        # Where on the sample each plane was taken, the same answer the
+        # acquisition gives below, so a store lies where its planes say.
+        placement=lambda plane_z: _where_the_planes_are(handle, job, plane_z),
     )
 
     written = sorted(saved.image_paths.items())

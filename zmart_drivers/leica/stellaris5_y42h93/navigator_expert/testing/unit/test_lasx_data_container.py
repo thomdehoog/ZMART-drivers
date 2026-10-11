@@ -319,7 +319,7 @@ class TestSaving:
             acquisition_of("HiRes"),
             tmp_path / "out",
             naming,
-            source="lasx_data_container",
+            source="cache",
             cache_root=cache,
         )
 
@@ -337,7 +337,7 @@ class TestSaving:
     def test_an_unknown_source_is_refused(self, cache, tmp_path):
         naming = Naming(folder="high-res", hash6="000001", position_label="000003")
 
-        with pytest.raises(ValueError, match="lasx_data_container"):
+        with pytest.raises(ValueError, match="cache"):
             acquisition.save(
                 None, acquisition_of("HiRes"), tmp_path / "out", naming, source="elsewhere"
             )

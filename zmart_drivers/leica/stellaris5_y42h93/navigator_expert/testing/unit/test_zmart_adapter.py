@@ -599,12 +599,11 @@ class TestAcquire(unittest.TestCase):
         self.assertEqual(adapter.ACQUISITION_BACKLASH_DEFAULT_ROUNDS, 0)
         self.assertEqual(opts["backlash_rounds"]["options"], "int >= 0")
         self.assertNotIn("strip_scan_fields", opts)  # positions never come from the Navigator
-        self.assertEqual(opts["format"]["active"], "ome-tiff")
+        self.assertEqual(opts["format"], {"options": ["ome-tiff", "ome-zarr"], "active": "ome-tiff"})
         self.assertEqual(opts["cleanup_source"]["active"], False)
         self.assertEqual(
             opts["source"],
-            {"options": ["lasx_data_container", "lasx_native_autosave"],
-             "active": "lasx_native_autosave"},
+            {"options": ["cache", "autosave"], "active": "autosave"},
         )
 
     def test_unknown_or_invalid_option_rejected(self):
@@ -883,13 +882,31 @@ class TestAcquire(unittest.TestCase):
         with self._capturing() as calls:
             adapter.acquire(
                 h, position_label="A1",
-                acquisition_settings={"source": "lasx_data_container"},
+                acquisition_settings={"source": "cache"},
             )
-        self.assertEqual(calls["save"]["source"], "lasx_data_container")
+        self.assertEqual(calls["save"]["source"], "cache")
 
         with self._capturing() as calls:
             adapter.acquire(h, position_label="A2")
-        self.assertEqual(calls["save"]["source"], "lasx_native_autosave")
+        self.assertEqual(calls["save"]["source"], "autosave")
+
+    def test_the_capture_is_saved_in_the_format_asked_for_and_placed(self):
+        """With "ome-zarr" the store is placed where the answer says its planes are."""
+        h = _handle()
+        h.driven_to = {"x": 10.0, "y": 20.0, "z": 100.0, "z_wide_um": 1000.0, "z_galvo_um": 0.0}
+        with self._capturing() as calls, patch.object(
+            adapter._readers, "get_job_settings",
+            return_value={"stack": {"begin": -10.0, "end": 10.0, "sections": 3, "mode": "z-galvo"}},
+        ):
+            adapter.acquire(h, position_label="A1", acquisition_settings={"format": "ome-zarr"})
+            where = calls["save"]["placement"]([0, 1, 2])
+            placed = [where(z) for z in (0, 2)]
+
+        self.assertEqual(calls["save"]["format"], "ome-zarr")
+        self.assertEqual(placed, [
+            {"x_um": 10.0, "y_um": 20.0, "z_um": 90.0},
+            {"x_um": 10.0, "y_um": 20.0, "z_um": 110.0},
+        ])
 
     def test_a_plane_says_where_on_the_sample_it_was_taken(self):
         """The place the last confirmed move put the stage, in the frame.

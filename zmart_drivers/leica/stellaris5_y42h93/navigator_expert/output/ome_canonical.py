@@ -229,6 +229,22 @@ def companion_xml(
     )
 
 
+def image_xml(metadata: AcquisitionMetadata, *, image_name: str, state: dict | None = None) -> bytes:
+    """OME XML for a whole capture whose pixels live elsewhere (an OME-Zarr store).
+
+    Every channel and every plane, with the pixels declared absent from the
+    XML itself (``MetadataOnly``): the store beside it holds them.
+    """
+    return _ome_xml(
+        metadata,
+        image_name=image_name,
+        channels=metadata.channels,
+        tiff_entries=[],
+        planes=sorted(metadata.planes.items()),
+        state=state,
+    )
+
+
 def extract_embedded_ome_xml(tiff_src: Path) -> bytes:
     """Return raw OME-XML from TIFF ImageDescription tag 270."""
     try:
@@ -329,6 +345,8 @@ def _ome_xml(
 
     for channel in channels:
         _append_channel(pixels, channel)
+    if not tiff_entries:
+        ET.SubElement(pixels, _tag("MetadataOnly"))
     for first_t, first_z, first_c, filename in tiff_entries:
         tiff_data = ET.SubElement(
             pixels,
