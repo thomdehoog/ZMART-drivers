@@ -200,13 +200,12 @@ class ZmartHandle:
             "objective": None,
         }
     )
-    #: Where the last :func:`set_xyz` sent the stage: the frame position
-    #: asked for, and the absolute z-wide it was realized at. Remembered
-    #: rather than re-read, so that the capture path holds no extra call that
-    #: can hang. The move is absolute, and a leg that was not confirmed is
-    #: recorded under ``unconfirmed``. The z-wide rides along because a job
-    #: states its stack in absolute z-wide, and without the anchor those
-    #: slices cannot be put in the frame.
+    #: Where :func:`get_xyz` last read the stage (and :func:`set_xyz` ends by
+    #: reading it): the frame position, with the z-wide and galvo readings.
+    #: Remembered rather than re-read, so that the capture path holds no extra
+    #: call that can hang. The drives ride along because a job states its stack
+    #: in its drive's own positions, and without them those slices cannot be
+    #: put in the frame.
     driven_to: dict[str, float] | None = None
     position_counter: int = 0
     acquisition_hashes: set[str] = field(default_factory=set)
@@ -778,6 +777,7 @@ def get_xyz(handle: ZmartHandle, *, with_actuators: dict | None = None) -> dict:
         for axis in ("x", "y", "z")
     }
     result["objective_translation_um"] = list(dt)
+    handle.driven_to = {**frame, "z_wide_um": snap["z_wide_um"], "z_galvo_um": snap["z_galvo_um"]}
     return result
 
 
@@ -871,19 +871,6 @@ def set_xyz(
         if not z_result.get("confirmed"):
             _note_unconfirmed(handle, f"set_xyz: z ({z_mode}) to {target}", z_result)
 
-    # Remembered for acquire, which labels every saved plane with the frame
-    # position it was asked to go to (see _where_the_planes_are).
-    handle.driven_to = {
-        "x": x,
-        "y": y,
-        "z": z,
-        "z_wide_um": next(
-            (target for mode, target in z_targets if mode == "zwide"), snap["z_wide_um"]
-        ),
-        "z_galvo_um": next(
-            (target for mode, target in z_targets if mode == "galvo"), snap["z_galvo_um"]
-        ),
-    }
     # Read back from the microscope, so the answer is where the stage is now.
     return get_xyz(handle, with_actuators=with_actuators)
 
@@ -1109,6 +1096,14 @@ def acquire(
             "no LAS X job selected and none passed via acquisition_settings['job']"
         )
 
+    # Where the stage stands, as last read, taken before anything moves: every
+    # plane is placed from it (the state printed below reads it again, after).
+    at = handle.driven_to
+    if at is None:
+        raise RuntimeError(
+            "the driver does not know where the stage is: read it with get_xyz or move it "
+            "with set_xyz before acquiring"
+        )
     noted_before = len(handle.unconfirmed)
     # What the capture's log says it did, step by step (see output/command_log.py).
     steps: dict = {}
@@ -1169,23 +1164,24 @@ def acquire(
         projection=resolved["projection"],
         # Where on the sample each plane was taken, the same answer the
         # acquisition gives below, so a store lies where its planes say.
-        placement=lambda plane_z: _where_the_planes_are(handle, job, plane_z),
+        placement=lambda plane_z: _where_the_planes_are(handle, at, job, plane_z),
     )
 
     written = sorted(saved.image_paths.items())
-    taken_at = _where_the_planes_are(
-        handle, job, [int(getattr(index, "z", ordinal)) for ordinal, (index, _path) in enumerate(written)]
-    )
+    depths = [int(getattr(index, "z", ordinal)) for ordinal, (index, _path) in enumerate(written)]
+    taken_at = _where_the_planes_are(handle, at, job, depths)
+    # Depth 0 is the lowest slice, as in a store, whichever way LAS X swept.
+    upward = sorted(set(depths), key=lambda z: taken_at(z)["z_um"])
     planes = [
         {
             "t": int(getattr(index, "t", 0)),
-            "z": int(getattr(index, "z", 0)),
+            "z": upward.index(depths[ordinal]),
             "c": int(getattr(index, "c", ordinal)),
             # Where the pixels are, and where inside them. A flat OME-TIFF
             # holds exactly the one plane t/c/z name; were this a store, the
             # same three would index into it and only the path would change.
             "path": str(path),
-            **taken_at(int(getattr(index, "z", ordinal))),
+            **taken_at(depths[ordinal]),
         }
         for ordinal, (index, path) in enumerate(written)
     ]
@@ -1261,7 +1257,7 @@ def _when(seconds: float | None) -> str | None:
 # =============================================================================
 
 
-def _where_the_planes_are(handle: ZmartHandle, job: str, plane_z: list[int]):
+def _where_the_planes_are(handle: ZmartHandle, at: dict, job: str, plane_z: list[int]):
     """Answer, per plane number in z, where on the sample it was captured.
 
     In the frame :func:`set_xyz` takes, so a position handed back can be
@@ -1271,26 +1267,26 @@ def _where_the_planes_are(handle: ZmartHandle, job: str, plane_z: list[int]):
     drive arrived -- z-wide for a z-wide stack, the galvo for a z-galvo one.
     The channels of a plane share its height, so the stack is matched against
     the planes in z, not against the files. Nothing is assumed about where in
-    its stack the drive stands. No stack, a stack that does not say its
-    drive, or one that does not describe the planes that came back, leaves
-    every plane at the drive's height -- a guessed spread is worse than none.
+    its stack the drive stands. A stack whose settings do not place its
+    slices is refused: every plane says where it is, and a guessed height is
+    worse than none. *at* is where the stage stood, as :func:`get_xyz` read it.
     """
-    at = handle.driven_to
     settings = _readers.get_job_settings(handle.client, job) or {}
     numbers = sorted(set(plane_z))
     slices = _readers.stack_slices_um(settings, len(numbers))
-    drive = _readers.stack_drive(settings)
-    standing = None
-    if at is not None:
-        standing = {"z-wide": at.get("z_wide_um"), "z-galvo": at.get("z_galvo_um")}.get(drive)
+    standing = {"z-wide": at.get("z_wide_um"), "z-galvo": at.get("z_galvo_um")}.get(
+        _readers.stack_drive(settings)
+    )
+    if slices is None or standing is None:
+        if len(numbers) > 1:
+            raise RuntimeError(
+                f"the {len(numbers)} slices of job {job!r} cannot be placed: its stack settings "
+                "do not say where they are or which drive made them"
+            )
+        slices, standing = [0.0], 0.0
 
     def where(z: int) -> dict:
-        if at is None:
-            return {"x_um": None, "y_um": None, "z_um": None}
-        height = at["z"]
-        if slices is not None and standing is not None:
-            height += slices[numbers.index(z)] - standing
-        return {"x_um": at["x"], "y_um": at["y"], "z_um": height}
+        return {"x_um": at["x"], "y_um": at["y"], "z_um": at["z"] + slices[numbers.index(z)] - standing}
 
     return where
 

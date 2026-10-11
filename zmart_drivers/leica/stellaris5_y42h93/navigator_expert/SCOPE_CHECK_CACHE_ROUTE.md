@@ -6,7 +6,7 @@ of the capture in it, a max projection beside a stack, and a log of what the dri
 LAS X simulator every check passed (11 October 2026), including 40 captures in a row, a
 2048 × 2048 image and an 84-plane stack, all identical to AutoSave's files.
 
-The simulator could not show eight things. This sheet runs them on the STELLARIS. Each test is one
+The simulator could not show nine things. This sheet runs them on the STELLARIS. Each test is one
 command and one report; the commands only select a job, capture, and read. They never edit a LAS X
 file, and they move the stage only to where it already stands.
 
@@ -44,6 +44,7 @@ python <driver>\testing\hardware\check_cache_route.py --job "<job>" --label <lab
 | 3 | A job with **2 channels and a z-stack** | `--job <job> --label two-channel-stack` | Identical to AutoSave; in `planes`, both channels of a plane have the same canvas z, and `dt s` grows plane by plane |
 | 4a | A stack made by **z-galvo**, with z-wide at its usual height | `--label galvo-stack` | In each plane's `drives`: z-wide stays at LAS X's z-wide position, z-galvo runs from the stack's begin to its end; the canvas z steps by the stack's step |
 | 4b | The same stack made by **z-wide** | `--label wide-stack` | z-wide runs from begin to end, z-galvo stays put; the canvas z steps the same way |
+| 4c | The same stack set up **top-down** (begin above end) | `--label stack-top-down` | In `planes`, depth 0 has the lowest canvas z and each depth is higher, as in 4b; the store's first slice is the lowest |
 | 5 | A job with **two sequential settings** (different lasers or detectors) | `--label sequential` | Each channel's laser, detector, gain and detection band are those of its own setting in LAS X |
 | 6 | **Switch AutoSave off** in LAS X | `--job HiRes --label autosave-off` | All checks pass; `identical to AutoSave's file` says `not compared: AutoSave is off`. The capture is saved without AutoSave |
 | 7 | — (any report) | — | `laser power, as LAS X writes it`: does `OutputPowerWatt` hold real numbers on this system, and in which unit? |
@@ -68,5 +69,5 @@ the plane heights.
 ## What to send back
 
 The `check_cache_route_*.json` reports, and for any test whose values do not match LAS X, what LAS X
-showed. With all eight passing, two decisions follow: make `"cache"` the default source
+showed. With all nine passing, two decisions follow: make `"cache"` the default source
 (`actions/profiles.py`, `IMAGE_SAVE.source`), and promote the three repositories to `main`.

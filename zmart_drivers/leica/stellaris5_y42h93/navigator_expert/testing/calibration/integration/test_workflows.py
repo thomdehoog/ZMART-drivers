@@ -86,7 +86,7 @@ def test_calibration_capture_explicitly_passes_active_orientation(monkeypatch, t
     monkeypatch.setattr(cm._orientation, "rig_orientation", lambda: expected)
     monkeypatch.setattr(cm.drv, "acquire", lambda client, job: acquisition)
 
-    def _save(client, result, output_root, naming, *, orientation):
+    def _save(client, result, output_root, naming, *, orientation, **_settings):
         received["orientation"] = orientation
         return saved
 

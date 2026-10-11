@@ -54,8 +54,10 @@ def _handle(gate_constraints=None, gated=True, **overrides):
     ``gate_constraints`` bounds the ``set_xyz`` key (e.g.
     ``{"x_um": {"min": 0, "max": 100}}``); ``gated=False`` leaves the client
     without any gate state (the fail-closed posture of a failed handshake).
+    The stage stands at the origin, as a get_xyz after connecting would read.
     """
     h = adapter.ZmartHandle(client=object(), connection=dict(adapter.CONNECTION), hash6="000abc")
+    h.driven_to = {"x": 0.0, "y": 0.0, "z": 0.0, "z_wide_um": 0.0, "z_galvo_um": 0.0}
     if gated:
         install_permissive_limits(h.client, **(gate_constraints or {}))
     for key, value in overrides.items():
@@ -451,6 +453,8 @@ class TestFrame(unittest.TestCase):
         for axis in ("x", "y", "z"):
             self.assertEqual(pos[axis]["unit"], "micrometer")
         self.assertNotIn("hardware", pos)
+        # What it read is what a capture is labelled with, so a capture asks nothing more.
+        self.assertEqual(h.driven_to, {"x": 10.0, "y": -10.0, "z": 5.0, "z_wide_um": 32.0, "z_galvo_um": 3.0})
 
     def test_get_xyz_names_every_motor_get_actuators_lists(self):
         """The motors reported per axis are exactly the menu, so a workflow can
@@ -877,14 +881,12 @@ class TestAcquire(unittest.TestCase):
             [Path(p) for p in record["files"]], [Path("/tmp/out/img.ome.tif"), *map(Path, record["log"])]
         )
         self.assertNotIn("images", record)
-        # Nothing has driven this handle, so the acquisition says it does not
-        # know where it was taken rather than naming a place nobody went.
         self.assertEqual(
             record["planes"],
             [{
                 "t": 0, "z": 0, "c": 0,
                 "path": str(Path("/tmp/out/img.ome.tif")),
-                "x_um": None, "y_um": None, "z_um": None,
+                "x_um": 0.0, "y_um": 0.0, "z_um": 0.0,
             }],
         )
 
@@ -1118,15 +1120,30 @@ class TestAcquire(unittest.TestCase):
             [(0, 0, 100.0), (0, 1, 110.0), (0, 2, 120.0), (1, 0, 100.0), (1, 1, 110.0), (1, 2, 120.0)],
         )
 
-    def test_a_stack_that_does_not_say_its_drive_is_not_spread(self):
-        """Which drive made the stack decides what its slices mean; unsaid, nothing is guessed."""
+    def test_a_stack_that_does_not_say_its_drive_is_refused(self):
+        """Which drive made the stack decides what its slices mean; unsaid, the capture fails."""
         h = _handle()
         h.driven_to = {"x": 0.0, "y": 0.0, "z": 100.0, "z_wide_um": 1000.0, "z_galvo_um": 0.0}
         planes = {PlaneIndex(t=0, z=i, c=0): Path(f"/tmp/out/img_z{i}.ome.tif") for i in range(3)}
 
-        heights = self._heights(h, planes, {"begin": 1000.0, "end": 1020.0, "sections": 3})
+        with self.assertRaisesRegex(RuntimeError, "cannot be placed"):
+            self._heights(h, planes, {"begin": 1000.0, "end": 1020.0, "sections": 3})
 
-        self.assertEqual([z_um for _c, _z, z_um in heights], [100.0, 100.0, 100.0])
+    def test_a_stack_swept_downwards_counts_upwards(self):
+        """Depth 0 is the lowest slice, as in the store, whichever way LAS X swept."""
+        h = _handle()
+        h.driven_to = {"x": 0.0, "y": 0.0, "z": 100.0, "z_wide_um": 1000.0, "z_galvo_um": 0.0}
+        planes = {PlaneIndex(t=0, z=i, c=0): Path(f"/tmp/out/img_z{i}.ome.tif") for i in range(3)}
+
+        heights = self._heights(h, planes, {"begin": 1020.0, "end": 1000.0, "sections": 3, "mode": "z-wide"})
+
+        self.assertEqual(sorted((z, z_um) for _c, z, z_um in heights), [(0, 100.0), (1, 110.0), (2, 120.0)])
+
+    def test_a_capture_before_the_stage_was_read_is_refused(self):
+        """Every plane says where it is; with no position read or set yet, there is none to say."""
+        h = _handle(driven_to=None)
+        with self._capturing(), self.assertRaisesRegex(RuntimeError, "where the stage is"):
+            adapter.acquire(h, position_label="A1")
 
     def test_acquire_applies_the_rigs_measured_orientation(self):
         """The microscope's measured turn reaches ``save``, so saved planes are

@@ -236,6 +236,7 @@ def test_acquire_backlash_rounds_through_the_controller_seam(tmp_path, rounds, c
     try:
         session = validate_zmart_adapter._connect_session(args, adapter, str(tmp_path))
         active_job = session.get_state()["changeable"]["job"]
+        session.get_xyz()  # where the stage stands, which every saved plane is placed from
 
         def fake_correct_backlash(client, **kwargs):
             order.append(("backlash", client))
@@ -243,7 +244,7 @@ def test_acquire_backlash_rounds_through_the_controller_seam(tmp_path, rounds, c
 
         def fake_capture(client, job, **kwargs):
             order.append(("capture", job))
-            return SimpleNamespace(job=job)
+            return SimpleNamespace(job=job, started_at=None, finished_at=None)
 
         def fake_save(client, acq, output_root, naming, **kwargs):
             return SimpleNamespace(image_paths={}, xml_paths={}, naming=naming)
