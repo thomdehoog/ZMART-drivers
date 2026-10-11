@@ -53,6 +53,9 @@ REGISTRY_VALUE = "Data Port"
 
 DESCRIPTION = re.compile(r"V2LMSDC_OBJ(\d+)_([0-9a-fA-F]+)\.tmp")
 
+#: The job a picture's description says made it.
+JOB = re.compile(r'<LDM_Block_Sequential\b[^>]*\bBlockName="([^"]*)"')
+
 
 
 def collect_lasx_data_container(
@@ -140,7 +143,10 @@ def pictures_of(root: Path, acq: AcquisitionResult) -> list[tuple[Path, str, str
 
     A picture is named after its job with a number behind it; the copies LAS
     X makes for its own display (``_pmd_<level>``, ``_histo``) and the
-    ``TileScan`` copy are named otherwise and are passed over.
+    ``TileScan`` copy are named otherwise and are passed over. The name alone
+    is not enough: job "HiRes2" makes "HiRes2001", which reads as "HiRes"
+    with a number too. So the job the description says made the picture
+    (``BlockName``) must be *acq*'s job as well.
     """
     own_name = re.compile(re.escape(acq.job) + r"\d+")
     since = acq.started_at - MTIME_SKEW_ALLOWANCE_S
@@ -158,8 +164,12 @@ def pictures_of(root: Path, acq: AcquisitionResult) -> list[tuple[Path, str, str
         if name is None or not own_name.fullmatch(name):
             continue
         xml = first_text(records[1])
-        if xml is not None:
-            found.append((path, name, xml))
+        if xml is None:
+            continue
+        made_by = JOB.search(xml)
+        if made_by is not None and made_by.group(1) != acq.job:
+            continue
+        found.append((path, name, xml))
     return found
 
 

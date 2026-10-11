@@ -46,7 +46,7 @@ def text_field(text: str) -> bytes:
     return b"*" + struct.pack("<i", len(text)) + text.encode("utf-16-le")
 
 
-def description_xml(*, channels, dims, time_stamps) -> str:
+def description_xml(*, channels, dims, time_stamps, job=None) -> str:
     channel_xml = "".join(
         f'<ChannelDescription DataType="0" ChannelTag="0" Resolution="{bits}" '
         f'LUTName="{lut}" BytesInc="{start}" BitInc="0"/>'
@@ -64,7 +64,8 @@ def description_xml(*, channels, dims, time_stamps) -> str:
         f'</ImageDescription><TimeStampList NumberOfTimeStamps="{time_stamps}">{stamps}'
         '</TimeStampList><Attachment Name="HardwareSetting" SystemTypeName="SIMULATOR">'
         '<ATLConfocalSettingDefinition StagePosX="0.0635" StagePosY="0.0415"/>'
-        "</Attachment></Image></Data>"
+        + (f'<LDM_Block_Sequential BlockName="{job}"/>' if job else "")
+        + "</Attachment></Image></Data>"
     )
 
 
@@ -205,6 +206,20 @@ class TestFindingThePicture:
         )
 
         assert exported.relative_path == f"V2LMSDC_MMF746_0_{PID}.tmp"
+
+    def test_a_job_whose_name_starts_the_same_is_not_mistaken_for_it(self, cache):
+        """LAS X names a capture job + number: "HiRes2" makes "HiRes2001", which "HiRes" + digits matches too."""
+        pixels = np.zeros((3, 4), np.uint8)
+        for number, name, job in ((746, "HiRes2001", "HiRes2"), (790, "HiRes003", "HiRes")):
+            write_pixels(cache, number, pixels)
+            xml = description_xml(
+                channels=[(8, "Gray", 0)], dims=[(1, 4, 1e-5, 1), (2, 3, 1e-5, 4)], time_stamps=1, job=job
+            )
+            write_description(cache, number, name, xml)
+
+        exported = container.collect_lasx_data_container(None, acquisition_of("HiRes"), cache_root=cache)
+
+        assert exported.relative_path == f"V2LMSDC_MMF790_0_{PID}.tmp"
 
     def test_a_picture_from_before_the_acquisition_is_never_taken(self, cache):
         two_channel_12_bit(cache)
