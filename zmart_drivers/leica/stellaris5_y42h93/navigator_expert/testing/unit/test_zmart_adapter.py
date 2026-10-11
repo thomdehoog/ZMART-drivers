@@ -599,7 +599,7 @@ class TestAcquire(unittest.TestCase):
         self.assertEqual(adapter.ACQUISITION_BACKLASH_DEFAULT_ROUNDS, 0)
         self.assertEqual(opts["backlash_rounds"]["options"], "int >= 0")
         self.assertNotIn("strip_scan_fields", opts)  # positions never come from the Navigator
-        self.assertEqual(opts["format"], {"options": ["ome-tiff", "ome-zarr"], "active": "ome-tiff"})
+        self.assertEqual(opts["format"], {"options": ["ome-tiff", "ome-zarr"], "active": "ome-zarr"})
         self.assertEqual(opts["cleanup_source"]["active"], False)
         self.assertEqual(
             opts["source"],

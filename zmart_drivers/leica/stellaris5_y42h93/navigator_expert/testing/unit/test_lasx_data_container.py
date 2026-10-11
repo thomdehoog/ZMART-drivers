@@ -321,6 +321,7 @@ class TestSaving:
             naming,
             source="cache",
             cache_root=cache,
+            format="ome-tiff",
         )
 
         assert len(saved.image_paths) == 2

@@ -34,6 +34,16 @@ def _identity_rig_orientation(monkeypatch):
     monkeypatch.setattr("zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.image_stage_registration.rig_orientation", Orientation)
 
 
+@pytest.fixture(autouse=True)
+def saves_as_ome_tiff(monkeypatch):
+    """These tests are about the OME-TIFF output: the profile's format is OME-TIFF here."""
+    from dataclasses import replace as replaced
+
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.actions import profiles
+
+    monkeypatch.setattr(profiles, "IMAGE_SAVE", replaced(profiles.IMAGE_SAVE, format="ome-tiff"))
+
+
 @pytest.fixture
 def naming() -> Naming:
     return Naming(

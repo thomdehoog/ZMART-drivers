@@ -162,7 +162,7 @@ class ImageSaveProfile:
     #: What a capture is saved as (``output.save.FORMATS``): ``"ome-tiff"``,
     #: one file a plane, or ``"ome-zarr"``, one image store. Only the one
     #: chosen is written.
-    format: str = "ome-tiff"
+    format: str = "ome-zarr"
 
 
 IMAGE_SAVE = ImageSaveProfile()

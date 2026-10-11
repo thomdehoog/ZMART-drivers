@@ -129,6 +129,9 @@ def write_position_store(
         volume,
         chunk_grid={"name": "regular", "configuration": {"chunk_shape": [1, 1, 1, min(PIECE, ny), min(PIECE, nx)]}},
         dimension_names=list(AXES),
+        # Said outright: newer zarr refuses a multi-byte array whose byte
+        # order is left to a default.
+        codecs=[{"name": "bytes", "configuration": {"endian": "little"}}],
     )
     image = Image.new(
         array_specs=[spec],
