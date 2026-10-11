@@ -63,11 +63,13 @@ def settings_geometry_ready(settings):
     return bool(settings.get("imageSize"))
 
 
-def stack_z_wide_um(settings, expected: int) -> list[float] | None:
-    """Where each slice of the job's z-stack sits, in absolute z-wide um.
+def stack_slices_um(settings, expected: int) -> list[float] | None:
+    """Where each slice of the job's z-stack sits, in um of the drive that made it.
 
     ``begin``/``end``/``sections``, evenly spaced, which keeps a reversed
-    stack. ``stepSize`` is not used: LAS X rounds it for display.
+    stack. ``stepSize`` is not used: LAS X rounds it for display. The
+    slices are positions of the stack's own drive (:func:`stack_drive`):
+    absolute z-wide for a z-wide stack, galvo heights for a z-galvo one.
 
     ``None`` when the job takes no stack, or when what it says does not
     describe the *expected* planes that came back -- a guessed position would
@@ -96,6 +98,19 @@ def stack_z_wide_um(settings, expected: int) -> list[float] | None:
         return [begin]
     step = (end - begin) / (sections - 1)
     return [begin + step * index for index in range(sections)]
+
+
+def stack_drive(settings) -> str | None:
+    """Which z drive makes the job's stack: ``"z-wide"``, ``"z-galvo"``, or None when unsaid."""
+    from ..vendor_interface.parsing import make_changeable_copy
+
+    try:
+        stack = (make_changeable_copy(settings) or {}).get("stack") or {}
+    except Exception:  # noqa: BLE001 — a settings shape we cannot read says nothing
+        stack = {}
+    raw = (settings.get("stack") if isinstance(settings, dict) else None) or {}
+    drive = stack.get("zDrive") or raw.get("mode")
+    return drive if drive in ("z-wide", "z-galvo") else None
 
 
 #: What a stack block must carry before it can say where a slice was taken.

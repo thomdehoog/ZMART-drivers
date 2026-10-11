@@ -857,6 +857,9 @@ def set_xyz(
         "z_wide_um": next(
             (target for mode, target in z_targets if mode == "zwide"), snap["z_wide_um"]
         ),
+        "z_galvo_um": next(
+            (target for mode, target in z_targets if mode == "galvo"), snap["z_galvo_um"]
+        ),
     }
     # Read back from the microscope, so the answer is where the stage is now.
     return get_xyz(handle, with_actuators=with_actuators)
@@ -1113,7 +1116,9 @@ def acquire(
     )
 
     written = sorted(saved.image_paths.items())
-    taken_at = _where_the_planes_are(handle, job, len(written))
+    taken_at = _where_the_planes_are(
+        handle, job, [int(getattr(index, "z", ordinal)) for ordinal, (index, _path) in enumerate(written)]
+    )
     planes = [
         {
             "t": int(getattr(index, "t", 0)),
@@ -1123,7 +1128,7 @@ def acquire(
             # holds exactly the one plane t/c/z name; were this a store, the
             # same three would index into it and only the path would change.
             "path": str(path),
-            **taken_at(ordinal),
+            **taken_at(int(getattr(index, "z", ordinal))),
         }
         for ordinal, (index, path) in enumerate(written)
     ]
@@ -1160,28 +1165,35 @@ def acquire(
 # =============================================================================
 
 
-def _where_the_planes_are(handle: ZmartHandle, job: str, count: int):
-    """Answer, per plane, where on the sample it was captured.
+def _where_the_planes_are(handle: ZmartHandle, job: str, plane_z: list[int]):
+    """Answer, per plane number in z, where on the sample it was captured.
 
     In the frame :func:`set_xyz` takes, so a position handed back can be
     handed straight back in. A saved file cannot say this and neither can the
-    drive alone: the job states its stack in absolute z-wide, so each height
-    is the frame the drive was sent to, displaced by how far that slice sits
-    from the z-wide the drive was realized at. Nothing is assumed about where
-    in its stack the drive stands. No stack, or one that does not describe the
-    planes that came back, leaves every plane at the drive's height -- a
-    guessed spread is worse than none.
+    drive alone: each slice is the frame the drive was sent to, displaced by
+    how far the slice sits from where the stack's own drive stood when the
+    drive arrived -- z-wide for a z-wide stack, the galvo for a z-galvo one.
+    The channels of a plane share its height, so the stack is matched against
+    the planes in z, not against the files. Nothing is assumed about where in
+    its stack the drive stands. No stack, a stack that does not say its
+    drive, or one that does not describe the planes that came back, leaves
+    every plane at the drive's height -- a guessed spread is worse than none.
     """
     at = handle.driven_to
-    slices = _readers.stack_z_wide_um(
-        _readers.get_job_settings(handle.client, job) or {}, count
-    )
-    def where(ordinal: int) -> dict:
+    settings = _readers.get_job_settings(handle.client, job) or {}
+    numbers = sorted(set(plane_z))
+    slices = _readers.stack_slices_um(settings, len(numbers))
+    drive = _readers.stack_drive(settings)
+    standing = None
+    if at is not None:
+        standing = {"z-wide": at.get("z_wide_um"), "z-galvo": at.get("z_galvo_um")}.get(drive)
+
+    def where(z: int) -> dict:
         if at is None:
             return {"x_um": None, "y_um": None, "z_um": None}
         height = at["z"]
-        if slices is not None:
-            height += slices[ordinal] - at["z_wide_um"]
+        if slices is not None and standing is not None:
+            height += slices[numbers.index(z)] - standing
         return {"x_um": at["x"], "y_um": at["y"], "z_um": height}
 
     return where

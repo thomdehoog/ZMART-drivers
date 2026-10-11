@@ -13,7 +13,7 @@ import unittest
 from contextlib import contextmanager
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 from limits_fixtures import (
     DEFAULT_STAGE_UM,
@@ -22,6 +22,7 @@ from limits_fixtures import (
 )
 
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert import scanfields
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.output.product import PlaneIndex
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher import (
     checks as limits_checks,
 )
@@ -923,7 +924,7 @@ class TestAcquire(unittest.TestCase):
         planes = {i: Path(f"/tmp/out/img_z{i}.ome.tif") for i in range(5)}
         with self._capturing(image_paths=planes) as calls, patch.object(
             adapter._readers, "get_job_settings",
-            return_value={"stack": {"begin": 990.0, "end": 1010.0, "sections": 5}},
+            return_value={"stack": {"begin": 990.0, "end": 1010.0, "sections": 5, "mode": "z-wide"}},
         ):
             record = adapter.acquire(h, position_label="A1")
 
@@ -946,11 +947,72 @@ class TestAcquire(unittest.TestCase):
         planes = {i: Path(f"/tmp/out/img_z{i}.ome.tif") for i in range(3)}
         with self._capturing(image_paths=planes), patch.object(
             adapter._readers, "get_job_settings",
-            return_value={"stack": {"begin": 1000.0, "end": 1020.0, "sections": 3}},
+            return_value={"stack": {"begin": 1000.0, "end": 1020.0, "sections": 3, "mode": "z-wide"}},
         ):
             record = adapter.acquire(h, position_label="A1")
 
         self.assertEqual([p["z_um"] for p in record["planes"]], [100.0, 110.0, 120.0])
+
+    def _heights(self, h, planes, stack):
+        with self._capturing(image_paths=planes), patch.object(
+            adapter._readers, "get_job_settings", return_value={"stack": stack},
+        ):
+            record = adapter.acquire(h, position_label="A1")
+        return [(p["c"], p["z"], p["z_um"]) for p in record["planes"]]
+
+    def test_a_stack_made_by_the_galvo_is_measured_from_the_galvo(self):
+        """A z-galvo stack's slices are galvo heights, not z-wide ones.
+
+        Measured from z-wide they came out a whole z-wide away (here 1000 um
+        below the sample). The galvo stood at 0 when the drive arrived, so
+        a slice at -10 um is 10 um below where the drive stood.
+        """
+        h = _handle()
+        h.driven_to = {"x": 0.0, "y": 0.0, "z": 100.0, "z_wide_um": 1000.0, "z_galvo_um": 0.0}
+        planes = {PlaneIndex(t=0, z=i, c=0): Path(f"/tmp/out/img_z{i}.ome.tif") for i in range(5)}
+
+        heights = self._heights(h, planes, {"begin": -10.0, "end": 10.0, "sections": 5, "mode": "z-galvo"})
+
+        self.assertEqual([z_um for _c, _z, z_um in heights], [90.0, 95.0, 100.0, 105.0, 110.0])
+
+    def test_a_galvo_stack_is_measured_from_where_the_galvo_stood(self):
+        h = _handle()
+        h.driven_to = {"x": 0.0, "y": 0.0, "z": 100.0, "z_wide_um": 1000.0, "z_galvo_um": 5.0}
+        planes = {PlaneIndex(t=0, z=i, c=0): Path(f"/tmp/out/img_z{i}.ome.tif") for i in range(3)}
+
+        heights = self._heights(h, planes, {"begin": -10.0, "end": 10.0, "sections": 3, "mode": "z-galvo"})
+
+        self.assertEqual([z_um for _c, _z, z_um in heights], [85.0, 95.0, 105.0])
+
+    def test_every_channel_of_a_plane_is_at_that_plane(self):
+        """Two channels and three planes are six files, but three heights.
+
+        Counting files against the stack's sections found 6 against 3, gave
+        up, and put every plane at the drive's height.
+        """
+        h = _handle()
+        h.driven_to = {"x": 0.0, "y": 0.0, "z": 100.0, "z_wide_um": 1000.0, "z_galvo_um": 0.0}
+        planes = {
+            PlaneIndex(t=0, z=z, c=c): Path(f"/tmp/out/img_z{z}_c{c}.ome.tif")
+            for z in range(3) for c in range(2)
+        }
+
+        heights = self._heights(h, planes, {"begin": 1000.0, "end": 1020.0, "sections": 3, "mode": "z-wide"})
+
+        self.assertEqual(
+            sorted(heights),
+            [(0, 0, 100.0), (0, 1, 110.0), (0, 2, 120.0), (1, 0, 100.0), (1, 1, 110.0), (1, 2, 120.0)],
+        )
+
+    def test_a_stack_that_does_not_say_its_drive_is_not_spread(self):
+        """Which drive made the stack decides what its slices mean; unsaid, nothing is guessed."""
+        h = _handle()
+        h.driven_to = {"x": 0.0, "y": 0.0, "z": 100.0, "z_wide_um": 1000.0, "z_galvo_um": 0.0}
+        planes = {PlaneIndex(t=0, z=i, c=0): Path(f"/tmp/out/img_z{i}.ome.tif") for i in range(3)}
+
+        heights = self._heights(h, planes, {"begin": 1000.0, "end": 1020.0, "sections": 3})
+
+        self.assertEqual([z_um for _c, _z, z_um in heights], [100.0, 100.0, 100.0])
 
     def test_acquire_applies_the_rigs_measured_orientation(self):
         """The microscope's measured turn reaches ``save``, so saved planes are

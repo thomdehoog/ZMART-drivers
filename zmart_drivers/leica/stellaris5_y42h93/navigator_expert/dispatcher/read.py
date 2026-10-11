@@ -29,8 +29,9 @@ from dataclasses import dataclass
 
 from ..actions import derived
 from ..actions import get as capabilities
-from ..actions.derived import (
-    stack_z_wide_um,  # noqa: F401  re-exported, as the readers package did
+from ..actions.derived import (  # noqa: F401  re-exported, as the readers package did
+    stack_drive,
+    stack_slices_um,
 )
 from ..vendor_interface import api_reader, log_reader
 from . import tuning
