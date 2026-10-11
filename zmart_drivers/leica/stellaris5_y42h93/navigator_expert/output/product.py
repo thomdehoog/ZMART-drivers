@@ -44,6 +44,21 @@ class PlaneSource:
 
 
 @dataclass(frozen=True)
+class RawPlaneSource:
+    """One image plane held as raw, uncompressed pixels inside a larger file.
+
+    LAS X's Data Container cache keeps a picture's pixels with no header: the
+    plane is ``shape_yx`` pixels of ``dtype`` (little-endian), its rows packed
+    one after the other, starting ``offset`` bytes into ``path``.
+    """
+
+    path: Path
+    offset: int
+    shape_yx: tuple[int, int]
+    dtype: str
+
+
+@dataclass(frozen=True)
 class ChannelMetadata:
     """Minimal reusable channel metadata for canonical ZMART OME."""
 
@@ -67,6 +82,9 @@ class AcquisitionMetadata:
     physical_size_y_um: float | None = None
     physical_size_z_um: float | None = None
     channels: tuple[ChannelMetadata, ...] = ()
+    #: The bits the detector filled (8, 12 or 16 on a STELLARIS); a 12-bit
+    #: picture is kept in 16-bit pixels, and this says that only 12 are used.
+    significant_bits: int | None = None
 
     def channel(self, index: int) -> ChannelMetadata:
         for channel in self.channels:
@@ -89,7 +107,7 @@ class ExportedPosition:
     """One exported timepoint: canonical plane sources."""
 
     t: int
-    planes: dict[PlaneIndex, PlaneSource]
+    planes: dict[PlaneIndex, PlaneSource | RawPlaneSource]
 
 
 @dataclass(frozen=True)

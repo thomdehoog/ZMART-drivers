@@ -5,8 +5,11 @@ Public workflow:
     acq = acquire(client, job)
     saved = save(client, acq, output_root, naming)
 
-``save`` owns persistence only. Source collection lives in
-``lasx_native_autosave``; OME checks live in ``ome``.
+``save`` owns persistence only. The pixels are collected from one of two
+sources (``SOURCES``): LAS X's Data Container cache
+(``lasx_data_container``) or LAS X's own AutoSave files
+(``lasx_native_autosave``); either way the same OME-TIFFs are written. OME
+checks live in ``ome``.
 """
 
 from __future__ import annotations
@@ -28,6 +31,7 @@ from .files import (
     DEFAULT_EXPORT_COMPLETION_TIMEOUT_S,
     DEFAULT_FILE_STABILITY_TIMEOUT_S,
 )
+from .lasx_data_container import collect_lasx_data_container
 from .lasx_native_autosave import (
     collect_lasx_native_autosave,
     native_autosave_base_folder,
@@ -44,6 +48,10 @@ from .naming import (
 from .product import ExportedAcquisition, PlaneIndex, SavedAcquisition
 
 log = logging.getLogger(__name__)
+
+#: Where ``save`` can collect the pixels from: LAS X's Data Container cache,
+#: read as LAS X writes it, or the OME-TIFF LAS X's AutoSave writes.
+SOURCES = ("lasx_data_container", "lasx_native_autosave")
 
 
 def save_source_root() -> Path:
@@ -73,6 +81,8 @@ def save(
     file_stability_timeout_s: int = DEFAULT_FILE_STABILITY_TIMEOUT_S,
     export_completion_timeout_s: float = DEFAULT_EXPORT_COMPLETION_TIMEOUT_S,
     export_completion_poll_interval_s: float = (DEFAULT_EXPORT_COMPLETION_POLL_INTERVAL_S),
+    source: str | None = None,
+    cache_root: str | Path | None = None,
 ) -> SavedAcquisition:
     """Persist the files produced for *acq* into *output_root*.
 
@@ -84,19 +94,36 @@ def save(
     losslessly with this microscope's active orientation as it is written.
     Pass ``Orientation()`` explicitly only when raw camera pixels are required,
     as in the orientation measurement itself.
+
+    *source* is one of ``SOURCES`` and defaults to the profile's
+    (``IMAGE_SAVE.source``); *cache_root* names the Data Container cache
+    folder when it is not the one the registry gives.
     """
+    from ..actions.profiles import IMAGE_SAVE
+
+    source = IMAGE_SAVE.source if source is None else source
+    if source not in SOURCES:
+        raise ValueError(f"unknown image source {source!r}; the sources are {SOURCES}")
     if orientation is None:
-        from ..actions.profiles import IMAGE_SAVE
         from ..configuration.image_stage_registration import rig_orientation
 
         orientation = rig_orientation() if IMAGE_SAVE.apply_orientation else Orientation()
-    exported = collect_lasx_native_autosave(
-        client,
-        acq,
-        file_stability_timeout_s=file_stability_timeout_s,
-        export_completion_timeout=export_completion_timeout_s,
-        export_completion_poll_interval=export_completion_poll_interval_s,
-    )
+    if source == "lasx_data_container":
+        exported = collect_lasx_data_container(
+            client,
+            acq,
+            cache_root=cache_root,
+            timeout_s=export_completion_timeout_s,
+            poll_interval_s=export_completion_poll_interval_s,
+        )
+    else:
+        exported = collect_lasx_native_autosave(
+            client,
+            acq,
+            file_stability_timeout_s=file_stability_timeout_s,
+            export_completion_timeout=export_completion_timeout_s,
+            export_completion_poll_interval=export_completion_poll_interval_s,
+        )
     return _persist_export(
         exported,
         Path(output_root),

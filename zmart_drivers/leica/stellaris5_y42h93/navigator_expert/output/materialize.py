@@ -11,11 +11,17 @@ from pathlib import Path
 from ..configuration.image_stage_registration import Orientation, reorient_array
 from . import ome as _ome
 from . import ome_canonical as _canonical
-from .product import AcquisitionMetadata, PlaneIndex, PlaneSource, VendorMetadataSource
+from .product import (
+    AcquisitionMetadata,
+    PlaneIndex,
+    PlaneSource,
+    RawPlaneSource,
+    VendorMetadataSource,
+)
 
 
 def save_image_source_atomic(
-    image_src: PlaneSource,
+    image_src: PlaneSource | RawPlaneSource,
     image_dest: Path,
     *,
     metadata: AcquisitionMetadata,
@@ -107,8 +113,11 @@ def _validate_tiff(image_path: Path, *, fix_ome: bool) -> None:
             raise RuntimeError(f"OME-TIFF validation failed: {image_path} :: {img_check}")
 
 
-def _read_source_plane(image_src: PlaneSource):
+def _read_source_plane(image_src: PlaneSource | RawPlaneSource):
     import tifffile
+
+    if isinstance(image_src, RawPlaneSource):
+        return _read_raw_plane(image_src)
 
     if image_src.page_index is None:
         return tifffile.imread(str(image_src.path))
@@ -118,6 +127,21 @@ def _read_source_plane(image_src: PlaneSource):
                 f"TIFF page index {image_src.page_index} out of range for {image_src.path}"
             )
         return tif.pages[image_src.page_index].asarray()
+
+
+def _read_raw_plane(image_src: RawPlaneSource):
+    """Read one plane of raw pixels, refusing a file that holds fewer than it should."""
+    import numpy as np
+
+    dtype = np.dtype(image_src.dtype).newbyteorder("<")
+    count = image_src.shape_yx[0] * image_src.shape_yx[1]
+    pixels = np.fromfile(str(image_src.path), dtype=dtype, count=count, offset=image_src.offset)
+    if pixels.size != count:
+        raise RuntimeError(
+            f"{image_src.path} holds {pixels.size} of the {count} pixels expected "
+            f"from byte {image_src.offset}"
+        )
+    return pixels.reshape(image_src.shape_yx).astype(dtype.newbyteorder("="))
 
 
 def extract_embedded_ome_xml(tiff_src: Path) -> bytes:

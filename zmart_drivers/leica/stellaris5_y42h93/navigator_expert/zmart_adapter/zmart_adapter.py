@@ -87,6 +87,7 @@ from .. import connect as _session
 from ..actions import acquire as _capture
 from ..actions import set as _commands
 from ..actions.derived import z_um_from_settings as _z_um_from_settings
+from ..actions.profiles import IMAGE_SAVE
 from ..configuration import image_stage_registration as _orientation
 from ..configuration import session_state as _session_state
 from ..configuration import store as _machine
@@ -876,7 +877,9 @@ def get_acquisition_settings(handle: ZmartHandle) -> dict:
 
     Discovered live on every call: ``job`` lists the LAS X jobs with the
     selected one active; ``cleanup_source`` is forwarded
-    to the driver's ``save()``; ``backlash_correction`` runs an XY slack
+    to the driver's ``save()``; ``source`` is where ``save()`` reads the
+    pixels, LAS X's Data Container cache or its AutoSave files (the profile's
+    ``IMAGE_SAVE.source`` is the default); ``backlash_correction`` runs an XY slack
     takeup before capture and optional ``backlash_rounds`` controls its pass
     count (default ``0``, which skips it).
 
@@ -905,6 +908,7 @@ def get_acquisition_settings(handle: ZmartHandle) -> dict:
         },
         "format": {"options": ["ome-tiff"], "active": "ome-tiff"},
         "cleanup_source": {"options": [True, False], "active": False},
+        "source": {"options": list(_save.SOURCES), "active": IMAGE_SAVE.source},
     }
 
 
@@ -1105,6 +1109,7 @@ def acquire(
         # concern from pixel-scale calibration and limits.
         orientation=_loaded_orientation(handle),
         cleanup_source=resolved["cleanup_source"],
+        source=resolved["source"],
     )
 
     written = sorted(saved.image_paths.items())

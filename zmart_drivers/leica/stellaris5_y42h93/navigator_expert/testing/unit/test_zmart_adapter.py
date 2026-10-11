@@ -600,6 +600,11 @@ class TestAcquire(unittest.TestCase):
         self.assertNotIn("strip_scan_fields", opts)  # positions never come from the Navigator
         self.assertEqual(opts["format"]["active"], "ome-tiff")
         self.assertEqual(opts["cleanup_source"]["active"], False)
+        self.assertEqual(
+            opts["source"],
+            {"options": ["lasx_data_container", "lasx_native_autosave"],
+             "active": "lasx_native_autosave"},
+        )
 
     def test_unknown_or_invalid_option_rejected(self):
         h = _handle(connection={**adapter.CONNECTION, "output_root": "/tmp/out"})
@@ -676,8 +681,10 @@ class TestAcquire(unittest.TestCase):
     def _capturing(self, *, image_paths=None):
         """Everything an ``acquire`` needs stood in for, so a test says one thing."""
         written = image_paths or {0: Path("/tmp/out/img.ome.tif")}
+        calls = {}
 
         def fake_save(client, acq, output_root, naming, **kwargs):
+            calls["save"] = kwargs
             return SimpleNamespace(image_paths=dict(written), naming=naming)
 
         patches = _patch_position(job="Overview")
@@ -693,7 +700,7 @@ class TestAcquire(unittest.TestCase):
             patch.object(adapter._info, "output_root", return_value=Path("/tmp/out")),
             patches[0], patches[1], patches[2], patches[3],
         ):
-            yield {}
+            yield calls
 
     def test_get_info_says_how_far_the_stage_can_go_and_what_the_session_stands_on(self):
         """The two things the operator page reads at connect, and the mock invented.
@@ -867,6 +874,21 @@ class TestAcquire(unittest.TestCase):
 
             self.assertEqual(record["files"], [str(image), str(vendor), str(state)])
             self.assertEqual(check_acquire_answer({"success": True, "content": record}), [])
+
+    def test_the_pixels_come_from_the_source_asked_for(self):
+        """The workflow picks where the pixels are read: LAS X's cache or its AutoSave files."""
+        h = _handle()
+        h.driven_to = {"x": 0.0, "y": 0.0, "z": 0.0, "z_wide_um": 0.0}
+        with self._capturing() as calls:
+            adapter.acquire(
+                h, position_label="A1",
+                acquisition_settings={"source": "lasx_data_container"},
+            )
+        self.assertEqual(calls["save"]["source"], "lasx_data_container")
+
+        with self._capturing() as calls:
+            adapter.acquire(h, position_label="A2")
+        self.assertEqual(calls["save"]["source"], "lasx_native_autosave")
 
     def test_a_plane_says_where_on_the_sample_it_was_taken(self):
         """The place the last confirmed move put the stage, in the frame.

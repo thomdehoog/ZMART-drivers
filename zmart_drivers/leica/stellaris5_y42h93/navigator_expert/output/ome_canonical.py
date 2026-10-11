@@ -69,6 +69,7 @@ def metadata_from_ome_xml(
         physical_size_y_um=_physical_um(pixels, "Y"),
         physical_size_z_um=_physical_um(pixels, "Z"),
         channels=tuple(channels),
+        significant_bits=_int_or_none(pixels.attrib.get("SignificantBits")),
     )
     return _ensure_channels(metadata)
 
@@ -278,6 +279,8 @@ def _ome_xml(
         "SizeC": str(metadata.size_c),
         "SizeT": str(metadata.size_t),
     }
+    if metadata.significant_bits is not None:
+        pixels_attrs["SignificantBits"] = str(metadata.significant_bits)
     _add_physical(pixels_attrs, "X", metadata.physical_size_x_um)
     _add_physical(pixels_attrs, "Y", metadata.physical_size_y_um)
     _add_physical(pixels_attrs, "Z", metadata.physical_size_z_um)

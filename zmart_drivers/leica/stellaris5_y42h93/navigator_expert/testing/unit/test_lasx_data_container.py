@@ -1,0 +1,341 @@
+"""Unit tests for collecting pictures from LAS X's Data Container cache.
+
+The cache files are written here in the layout LAS X uses (measured on the
+LAS X simulator, 2026-10-11): a description ``V2LMSDC_OBJ<n>_<pid>.tmp`` made
+of records, and the raw pixels ``V2LMSDC_MMF<n>_0_<pid>.tmp`` beside it.
+"""
+
+from __future__ import annotations
+
+import os
+import struct
+import threading
+import time
+from pathlib import Path
+
+import numpy as np
+import pytest
+import tifffile
+
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.actions import (
+    acquire as capture,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.image_stage_registration import (
+    Orientation,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.output import (
+    lasx_data_container as container,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.output import (
+    save as acquisition,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.output.naming import Naming
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.output.product import (
+    PlaneIndex,
+    RawPlaneSource,
+)
+
+PID = "669c"
+
+
+def record(payload: bytes) -> bytes:
+    return b"p\0\0\0" + struct.pack("<I", len(payload)) + payload
+
+
+def text_field(text: str) -> bytes:
+    return b"*" + struct.pack("<i", len(text)) + text.encode("utf-16-le")
+
+
+def description_xml(*, channels, dims, time_stamps) -> str:
+    channel_xml = "".join(
+        f'<ChannelDescription DataType="0" ChannelTag="0" Resolution="{bits}" '
+        f'LUTName="{lut}" BytesInc="{start}" BitInc="0"/>'
+        for bits, lut, start in channels
+    )
+    dim_xml = "".join(
+        f'<DimensionDescription DimID="{dim_id}" NumberOfElements="{n}" Origin="0" '
+        f'Length="{length_m:e}" Unit="m" BitInc="0" BytesInc="{step}"/>'
+        for dim_id, n, length_m, step in dims
+    )
+    stamps = " ".join("1dd59653d1099d0" for _ in range(time_stamps))
+    return (
+        '<Data><Image TextDescription=""><ImageDescription>'
+        f"<Channels>{channel_xml}</Channels><Dimensions>{dim_xml}</Dimensions>"
+        f'</ImageDescription><TimeStampList NumberOfTimeStamps="{time_stamps}">{stamps}'
+        "</TimeStampList></Image></Data>"
+    )
+
+
+def write_description(cache: Path, number: int, name: str, xml: str) -> Path:
+    path = cache / f"V2LMSDC_OBJ{number}_{PID}.tmp"
+    body = (
+        record(b"*" + struct.pack("<i", 2))
+        + record(text_field(xml))
+        + record(text_field(name) + text_field("LAS AF"))
+        + record(b"*" + struct.pack("<i", 2))
+    )
+    path.write_bytes(body)
+    return path
+
+
+def write_pixels(cache: Path, number: int, pixels: np.ndarray) -> Path:
+    path = cache / f"V2LMSDC_MMF{number}_0_{PID}.tmp"
+    raw = pixels.astype(pixels.dtype.newbyteorder("<")).tobytes()
+    padded = raw + b"\0" * (-len(raw) % 65536)
+    path.write_bytes(padded)
+    return path
+
+
+def two_channel_12_bit(cache: Path, number: int = 746, name: str = "HiRes002", stamps: int = 2):
+    """A 2-channel, 1-plane, 12-bit picture, 4 x 3 pixels, as HiRes002 was."""
+    pixels = np.arange(2 * 3 * 4, dtype=np.uint16).reshape(2, 3, 4) * 100 + 7
+    write_pixels(cache, number, pixels)
+    xml = description_xml(
+        channels=[(12, "Blue", 0), (12, "Green", 24)],
+        dims=[(1, 4, 4 * 2.5e-6, 2), (2, 3, 3 * 2.5e-6, 8), (3, 1, 0.0, 48)],
+        time_stamps=stamps,
+    )
+    write_description(cache, number, name, xml)
+    return pixels
+
+
+def three_plane_8_bit(cache: Path, number: int = 702, name: str = "AF Job001"):
+    """A 1-channel stack of 3 planes 2 um apart, 8-bit, 4 x 3 pixels."""
+    pixels = np.arange(3 * 3 * 4, dtype=np.uint8).reshape(3, 3, 4)
+    write_pixels(cache, number, pixels)
+    xml = description_xml(
+        channels=[(8, "Gray", 0)],
+        dims=[(1, 4, 4 * 2.5e-6, 1), (2, 3, 3 * 2.5e-6, 4), (3, 3, 4.0e-6, 12)],
+        time_stamps=3,
+    )
+    write_description(cache, number, name, xml)
+    return pixels
+
+
+@pytest.fixture
+def cache(tmp_path: Path) -> Path:
+    root = tmp_path / "Temp"
+    root.mkdir()
+    return root
+
+
+def acquisition_of(job: str, *, started: float | None = None) -> capture.AcquisitionResult:
+    started = time.time() - 1 if started is None else started
+    return capture.AcquisitionResult(
+        job=job, started_at=started, finished_at=time.time(), command_result={"success": True}
+    )
+
+
+def plane(source: RawPlaneSource) -> np.ndarray:
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.output import materialize
+
+    return materialize._read_source_plane(source)
+
+
+class TestCollecting:
+    def test_two_channels_are_read_where_the_description_puts_them(self, cache):
+        pixels = two_channel_12_bit(cache)
+
+        exported = container.collect_lasx_data_container(
+            None, acquisition_of("HiRes"), cache_root=cache
+        )
+
+        planes = exported.positions[0].planes
+        assert sorted(planes) == [PlaneIndex(t=0, z=0, c=0), PlaneIndex(t=0, z=0, c=1)]
+        np.testing.assert_array_equal(plane(planes[PlaneIndex(0, 0, 0)]), pixels[0])
+        np.testing.assert_array_equal(plane(planes[PlaneIndex(0, 0, 1)]), pixels[1])
+        assert plane(planes[PlaneIndex(0, 0, 1)]).dtype == np.uint16
+
+    def test_the_description_gives_size_bit_depth_and_pixel_size(self, cache):
+        two_channel_12_bit(cache)
+
+        metadata = container.collect_lasx_data_container(
+            None, acquisition_of("HiRes"), cache_root=cache
+        ).metadata
+
+        assert (metadata.size_x, metadata.size_y, metadata.size_z, metadata.size_c) == (4, 3, 1, 2)
+        assert metadata.size_t == 1
+        assert metadata.pixel_type == "uint16"
+        assert metadata.significant_bits == 12
+        assert metadata.physical_size_x_um == pytest.approx(2.5)
+        assert metadata.physical_size_y_um == pytest.approx(2.5)
+        assert metadata.physical_size_z_um is None
+
+    def test_a_stack_has_one_plane_per_height_and_the_step_between_them(self, cache):
+        pixels = three_plane_8_bit(cache)
+
+        exported = container.collect_lasx_data_container(
+            None, acquisition_of("AF Job"), cache_root=cache
+        )
+
+        planes = exported.positions[0].planes
+        assert sorted(planes) == [PlaneIndex(0, z, 0) for z in range(3)]
+        for z in range(3):
+            np.testing.assert_array_equal(plane(planes[PlaneIndex(0, z, 0)]), pixels[z])
+        assert exported.metadata.pixel_type == "uint8"
+        assert exported.metadata.significant_bits == 8
+        # Three planes over 4 um are 2 um apart: the length spans the steps
+        # between the planes, not the planes themselves.
+        assert exported.metadata.physical_size_z_um == pytest.approx(2.0)
+
+    def test_the_description_is_kept_as_the_vendors_own_account(self, cache):
+        two_channel_12_bit(cache)
+
+        exported = container.collect_lasx_data_container(
+            None, acquisition_of("HiRes"), cache_root=cache
+        )
+
+        assert exported.source_exporter == "lasx_data_container"
+        assert exported.cleanup_source_supported is False
+        [kept] = exported.vendor_metadata_sources
+        assert kept.name == "HiRes002.lasx-description.xml"
+        assert b'Resolution="12"' in kept.data
+
+
+class TestFindingThePicture:
+    def test_the_picture_is_the_one_named_after_the_job(self, cache):
+        three_plane_8_bit(cache, number=700, name="TileScan 4")
+        two_channel_12_bit(cache, number=746, name="HiRes002")
+        two_channel_12_bit(cache, number=748, name="HiRes002_pmd_0")
+
+        exported = container.collect_lasx_data_container(
+            None, acquisition_of("HiRes"), cache_root=cache
+        )
+
+        assert exported.relative_path == f"V2LMSDC_MMF746_0_{PID}.tmp"
+
+    def test_a_picture_from_before_the_acquisition_is_never_taken(self, cache):
+        two_channel_12_bit(cache)
+        old = time.time() - 3600
+        for path in cache.iterdir():
+            os.utime(path, (old, old))
+
+        with pytest.raises(RuntimeError, match="HiRes"):
+            container.collect_lasx_data_container(
+                None, acquisition_of("HiRes"), cache_root=cache, timeout_s=0.3
+            )
+
+    def test_two_new_pictures_of_the_job_are_refused_not_guessed(self, cache):
+        two_channel_12_bit(cache, number=746, name="HiRes002")
+        two_channel_12_bit(cache, number=790, name="HiRes003")
+
+        with pytest.raises(RuntimeError, match="refusing to guess"):
+            container.collect_lasx_data_container(
+                None, acquisition_of("HiRes"), cache_root=cache
+            )
+
+
+class TestWaitingUntilFinished:
+    def test_it_waits_until_every_plane_has_its_time_stamp(self, cache):
+        two_channel_12_bit(cache, stamps=1)
+
+        def finish():
+            time.sleep(0.3)
+            two_channel_12_bit(cache, stamps=2)
+
+        threading.Thread(target=finish).start()
+        started = time.perf_counter()
+        exported = container.collect_lasx_data_container(
+            None, acquisition_of("HiRes"), cache_root=cache, poll_interval_s=0.05
+        )
+
+        assert time.perf_counter() - started >= 0.25
+        assert len(exported.positions[0].planes) == 2
+
+    def test_a_picture_that_never_finishes_is_reported(self, cache):
+        two_channel_12_bit(cache, stamps=1)
+
+        with pytest.raises(RuntimeError, match="1 of 2 planes"):
+            container.collect_lasx_data_container(
+                None,
+                acquisition_of("HiRes"),
+                cache_root=cache,
+                timeout_s=0.3,
+                poll_interval_s=0.05,
+            )
+
+
+class TestRefusing:
+    def test_a_dimension_other_than_x_y_z_is_refused(self, cache):
+        write_pixels(cache, 746, np.zeros((2, 3, 4), np.uint8))
+        xml = description_xml(
+            channels=[(8, "Gray", 0)],
+            dims=[(1, 4, 1e-5, 1), (2, 3, 1e-5, 4), (4, 2, 1.0, 12)],
+            time_stamps=2,
+        )
+        write_description(cache, 746, "HiRes002", xml)
+
+        with pytest.raises(RuntimeError, match="dimension 4"):
+            container.collect_lasx_data_container(
+                None, acquisition_of("HiRes"), cache_root=cache
+            )
+
+    def test_a_bit_depth_above_16_is_refused(self, cache):
+        write_pixels(cache, 746, np.zeros((3, 4), np.uint32))
+        xml = description_xml(
+            channels=[(32, "Gray", 0)],
+            dims=[(1, 4, 1e-5, 4), (2, 3, 1e-5, 16)],
+            time_stamps=1,
+        )
+        write_description(cache, 746, "HiRes002", xml)
+
+        with pytest.raises(RuntimeError, match="32-bit"):
+            container.collect_lasx_data_container(
+                None, acquisition_of("HiRes"), cache_root=cache
+            )
+
+    def test_rows_that_are_not_packed_are_refused(self, cache):
+        write_pixels(cache, 746, np.zeros((3, 8), np.uint8))
+        xml = description_xml(
+            channels=[(8, "Gray", 0)],
+            dims=[(1, 4, 1e-5, 1), (2, 3, 1e-5, 8)],
+            time_stamps=1,
+        )
+        write_description(cache, 746, "HiRes002", xml)
+
+        with pytest.raises(RuntimeError, match="not packed"):
+            container.collect_lasx_data_container(
+                None, acquisition_of("HiRes"), cache_root=cache
+            )
+
+
+class TestSaving:
+    @pytest.fixture(autouse=True)
+    def identity_orientation(self, monkeypatch):
+        monkeypatch.setattr(
+            "zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration."
+            "image_stage_registration.rig_orientation",
+            Orientation,
+        )
+
+    def test_save_writes_one_ome_tiff_per_plane_from_the_cache(self, cache, tmp_path):
+        pixels = two_channel_12_bit(cache)
+        naming = Naming(folder="high-res", hash6="000001", position_label="000003")
+
+        saved = acquisition.save(
+            None,
+            acquisition_of("HiRes"),
+            tmp_path / "out",
+            naming,
+            source="lasx_data_container",
+            cache_root=cache,
+        )
+
+        assert len(saved.image_paths) == 2
+        for c in range(2):
+            path = saved.image_paths[PlaneIndex(0, 0, c)]
+            with tifffile.TiffFile(path) as tif:
+                np.testing.assert_array_equal(tif.asarray(), pixels[c])
+                ome = tif.pages[0].description
+            assert "http://www.openmicroscopy.org/Schemas/OME/2016-06" in ome
+            assert 'SignificantBits="12"' in ome
+            assert 'Type="uint16"' in ome
+            assert 'PhysicalSizeX="2.5"' in ome
+
+    def test_an_unknown_source_is_refused(self, cache, tmp_path):
+        naming = Naming(folder="high-res", hash6="000001", position_label="000003")
+
+        with pytest.raises(ValueError, match="lasx_data_container"):
+            acquisition.save(
+                None, acquisition_of("HiRes"), tmp_path / "out", naming, source="elsewhere"
+            )

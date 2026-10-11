@@ -149,9 +149,16 @@ class ImageSaveProfile:
 
     Normal saves apply the active camera-to-stage orientation. The orientation
     measurement is the only workflow that explicitly requests raw pixels.
+
+    ``source`` is where the pixels are collected from (``output.save.SOURCES``):
+    ``"lasx_native_autosave"``, the OME-TIFF LAS X's AutoSave writes, or
+    ``"lasx_data_container"``, LAS X's own cache, read as the picture is
+    taken. The cache does not wait for AutoSave; it stays the second choice
+    until it has run on the microscope itself.
     """
 
     apply_orientation: bool = True
+    source: str = "lasx_native_autosave"
 
 
 IMAGE_SAVE = ImageSaveProfile()
