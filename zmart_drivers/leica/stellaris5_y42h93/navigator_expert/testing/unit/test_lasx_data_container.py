@@ -62,7 +62,9 @@ def description_xml(*, channels, dims, time_stamps) -> str:
         '<Data><Image TextDescription=""><ImageDescription>'
         f"<Channels>{channel_xml}</Channels><Dimensions>{dim_xml}</Dimensions>"
         f'</ImageDescription><TimeStampList NumberOfTimeStamps="{time_stamps}">{stamps}'
-        "</TimeStampList></Image></Data>"
+        '</TimeStampList><Attachment Name="HardwareSetting" SystemTypeName="SIMULATOR">'
+        '<ATLConfocalSettingDefinition StagePosX="0.0635" StagePosY="0.0415"/>'
+        "</Attachment></Image></Data>"
     )
 
 

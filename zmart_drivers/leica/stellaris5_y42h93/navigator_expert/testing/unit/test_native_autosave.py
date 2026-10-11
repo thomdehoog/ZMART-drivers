@@ -493,3 +493,61 @@ class TestNativeSave:
 
         assert tiff.read_bytes() == source_before
         assert b'Wavelength="0"' in vendor_dest.read_bytes()
+
+
+class TestNativeAutoSaveReadsTheDescription:
+    """AutoSave's ``Metadata/<name>.xlif`` is LAS X's full description of the picture."""
+
+    DESCRIPTION = Path(__file__).resolve().parents[1] / "data" / "lasx_description"
+
+    def project_with_description(self, tmp_path: Path) -> Path:
+        root = tmp_path / "native-root"
+        project = _native_project(root)
+        data = np.zeros((1, 1, 2, 512, 512), dtype=np.uint16)
+        _write_native_ome_tiff(project / "HiRes004.ome.tif", data)
+        image = (self.DESCRIPTION / "hires004-two-channels-12-bit.xml").read_text(encoding="utf-8")
+        (project / "Metadata" / "HiRes004.xlif").write_text(
+            '<LMSDataContainerHeader Version="2"><Element Name="HiRes004">'
+            + image
+            + "</Element></LMSDataContainerHeader>",
+            encoding="utf-8",
+        )
+        return root
+
+    def test_the_full_metadata_comes_from_the_xlif(self, tmp_path, successful_acq):
+        root = self.project_with_description(tmp_path)
+        with (
+            patch.object(native._files, "read_relative_path", return_value=""),
+            patch.object(native._files, "wait_all_stable", return_value={"success": True}),
+        ):
+            exported = native.collect_lasx_native_autosave(
+                None,
+                successful_acq,
+                autosave_root=root,
+                lcf_path=_native_lcf(tmp_path, root),
+                export_completion_timeout=0.01,
+            )
+
+        metadata = exported.metadata
+        assert metadata.physical_size_x_um == 2.2705078125
+        assert metadata.significant_bits == 12
+        assert metadata.channel(1).fluor == "ALEXA 488"
+        assert metadata.instrument.objective.lens_na == 0.4
+        assert metadata.acquisition_date == "2026-10-11T10:06:11.817000Z"
+
+    def test_a_description_that_disagrees_with_the_picture_is_refused(self, tmp_path, successful_acq):
+        root = self.project_with_description(tmp_path)
+        project = next(root.iterdir())
+        _write_native_ome_tiff(project / "HiRes004.ome.tif", np.zeros((1, 1, 3, 512, 512), dtype=np.uint16))
+        with (
+            patch.object(native._files, "read_relative_path", return_value=""),
+            patch.object(native._files, "wait_all_stable", return_value={"success": True}),
+            pytest.raises(RuntimeError, match="does not match"),
+        ):
+            native.collect_lasx_native_autosave(
+                None,
+                successful_acq,
+                autosave_root=root,
+                lcf_path=_native_lcf(tmp_path, root),
+                export_completion_timeout=0.01,
+            )

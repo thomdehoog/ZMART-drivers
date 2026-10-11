@@ -1,0 +1,231 @@
+"""Reading LAS X's description of a picture into OME metadata.
+
+The descriptions under ``testing/data/lasx_description`` are LAS X's own,
+taken from the simulator's Data Container cache on 11 October 2026:
+HiRes004 (two channels, 12 bit) and AF Job002 (a 17-plane stack, 16 bit).
+Beside each lies the OME-XML LAS X's AutoSave wrote for the same picture,
+so every value AutoSave gives can be checked against ours.
+"""
+
+from __future__ import annotations
+
+import math
+import xml.etree.ElementTree as ET
+from pathlib import Path
+
+import pytest
+
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.output import (
+    lasx_description as described,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.output import (
+    ome_canonical as canonical,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.output.product import (
+    AcquisitionMetadata,
+    PlaneIndex,
+)
+
+DATA = Path(__file__).resolve().parents[1] / "data" / "lasx_description"
+HIRES = "hires004-two-channels-12-bit"
+STACK = "af-job002-17-planes-16-bit"
+OME = "{http://www.openmicroscopy.org/Schemas/OME/2016-06}"
+
+
+def metadata_of(name: str) -> AcquisitionMetadata:
+    return described.metadata_from_description((DATA / f"{name}.xml").read_text(encoding="utf-8"))
+
+
+def autosave_pixels(name: str) -> ET.Element:
+    root = ET.fromstring((DATA / f"{name}.autosave.ome.xml").read_text(encoding="utf-8"))
+    return root.find(f".//{OME}Pixels")
+
+
+def in_um(value: str, unit: str) -> float:
+    return float(value) * {"m": 1e6, "mm": 1e3, "µm": 1.0, "nm": 1e-3}[unit]
+
+
+class TestThePicture:
+    def test_size_bit_depth_and_exact_pixel_size(self):
+        metadata = metadata_of(HIRES)
+
+        assert (metadata.size_x, metadata.size_y, metadata.size_z, metadata.size_c) == (512, 512, 1, 2)
+        assert metadata.pixel_type == "uint16"
+        assert metadata.significant_bits == 12
+        # 1.1625 mm over 512 pixels, not the 2.27 the job settings round to.
+        assert metadata.physical_size_x_um == 2.2705078125
+        assert metadata.physical_size_y_um == 2.2705078125
+        assert metadata.physical_size_z_um is None
+
+    def test_the_z_step_is_the_distance_between_planes(self):
+        metadata = metadata_of(STACK)
+
+        assert metadata.size_z == 17
+        assert metadata.physical_size_z_um == pytest.approx(38.55132 / 16)
+
+    def test_the_time_it_was_taken_and_of_every_plane(self):
+        metadata = metadata_of(STACK)
+
+        assert metadata.acquisition_date == "2026-10-11T10:06:32.991000Z"
+        delta = [metadata.planes[PlaneIndex(0, z, 0)].delta_t_s for z in range(17)]
+        assert delta[:4] == pytest.approx([0.0, 1.291, 2.573, 3.866])
+        assert delta == sorted(delta)
+
+    def test_every_plane_says_where_it_was_taken(self):
+        metadata = metadata_of(STACK)
+
+        first, last = metadata.planes[PlaneIndex(0, 0, 0)], metadata.planes[PlaneIndex(0, 16, 0)]
+        assert (first.position_x_um, first.position_y_um) == pytest.approx((63500.0, 41500.0))
+        assert first.position_z_um == pytest.approx(-19.27566)
+        assert last.position_z_um == pytest.approx(-19.27566 + 38.55132)
+
+
+class TestTheChannels:
+    def test_dye_laser_and_detection_band_of_each_channel(self):
+        metadata = metadata_of(HIRES)
+        violet, green = metadata.channel(0), metadata.channel(1)
+
+        assert (violet.name, violet.fluor) == ("ALEXA 405", "ALEXA 405")
+        assert violet.excitation_wavelength_nm == 405
+        assert (green.name, green.excitation_wavelength_nm) == ("ALEXA 488", 497)
+        bands = {f.id: (f.cut_in_nm, f.cut_out_nm) for f in metadata.instrument.filters}
+        assert [bands[i] for i in violet.emission_filter_ids] == [(410, 487)]
+        assert [bands[i] for i in green.emission_filter_ids] == [(502, 779)]
+
+    def test_detector_and_its_settings(self):
+        metadata = metadata_of(HIRES)
+        detectors = {d.id: d for d in metadata.instrument.detectors}
+
+        violet, green = metadata.channel(0), metadata.channel(1)
+        assert detectors[violet.detector_id].model == "HyD 2"
+        assert detectors[green.detector_id].model == "HyD S 3"
+        assert (violet.detector_gain, violet.detector_offset) == (2.5, 0.0)
+
+    def test_the_laser_and_how_much_of_it_reached_the_sample(self):
+        metadata = metadata_of(HIRES)
+        lasers = {laser.id: laser for laser in metadata.instrument.lasers}
+
+        violet, green = metadata.channel(0), metadata.channel(1)
+        assert lasers[violet.laser_id].model == "Laser 405"
+        assert lasers[violet.laser_id].wavelength_nm == 405
+        assert lasers[green.laser_id].model == "WLL"
+        assert lasers[green.laser_id].tuneable is True
+        # An intensity of 1.96 % takes 98.04 % of the light away.
+        assert violet.laser_attenuation == pytest.approx(1 - 0.019607843137254901)
+
+    def test_pinhole_colour_and_mode(self):
+        violet = metadata_of(HIRES).channel(0)
+
+        assert violet.pinhole_um == pytest.approx(398.0125)
+        assert violet.color == 0x0000FFFF
+        assert violet.acquisition_mode == "LaserScanningConfocalMicroscopy"
+
+
+class TestTheInstrument:
+    def test_the_microscope_and_its_objective(self):
+        instrument = metadata_of(HIRES).instrument
+
+        assert instrument.manufacturer == "Leica Microsystems"
+        assert instrument.serial_number == "STELLARIS SIMULATOR"
+        assert instrument.type == "Upright"
+        objective = instrument.objective
+        assert objective.model == "HC PL APO CS 10x/0.40 DRY"
+        assert (objective.magnification, objective.lens_na) == (10.0, 0.4)
+        assert (objective.immersion, objective.correction) == ("Air", "PlanApo")
+        assert objective.refractive_index == 1.0
+
+    def test_only_what_took_part_is_listed(self):
+        instrument = metadata_of(HIRES).instrument
+
+        assert sorted(d.model for d in instrument.detectors) == ["HyD 2", "HyD S 3"]
+        assert sorted(laser.model for laser in instrument.lasers) == ["Laser 405", "WLL"]
+
+
+class TestWhatOmeHasNoFieldFor:
+    def test_the_scan_settings_are_kept_by_name(self):
+        facts = dict(metadata_of(HIRES).annotations)
+
+        assert facts["job"] == "HiRes"
+        assert facts["zoom"] == "1"
+        assert facts["scan speed (Hz)"] == "400"
+        assert facts["pixel dwell time (s)"] == "1.44125e-06"
+        assert facts["line average"] == "1"
+        assert facts["frame accumulation"] == "1"
+        assert facts["pinhole (Airy units)"] == "0.99996859493750412"
+        assert facts["objective order number"] == "506511"
+        assert facts["software"] == "LAS X [ BETA ] 4.9.0.30051"
+        assert facts["filter wheel Notch FW 2"] == "SMD1 NF 405/470"
+        assert facts["channel 0 detector mode"] == "PhotonCounting"
+        assert facts["channel 0 laser intensity (%)"] == "1.9607843137254901"
+        assert facts["z drive of the stack"] == "z-galvo"
+
+
+class TestTheOmeWritten:
+    @pytest.mark.parametrize("name", [HIRES, STACK])
+    def test_every_value_autosave_writes_is_written_the_same(self, name):
+        """Parity: nothing LAS X's own OME-TIFF says is lost or different."""
+        metadata = metadata_of(name)
+        theirs = autosave_pixels(name)
+
+        size_c = int(theirs.get("SizeC"))
+        for plane in theirs.iter(f"{OME}Plane"):
+            index = PlaneIndex(0, int(plane.get("TheZ")), int(plane.get("TheC")))
+            ours = ET.fromstring(
+                canonical.plane_xml(metadata, index=index, filename="p.ome.tif", shape_yx=(512, 512))
+            )
+            pixels = ours.find(f".//{OME}Pixels")
+            for key in ("SizeX", "SizeY", "Type", "SignificantBits"):
+                assert pixels.get(key) == theirs.get(key), key
+            for axis in "XY":
+                assert math.isclose(
+                    float(pixels.get(f"PhysicalSize{axis}")),
+                    in_um(theirs.get(f"PhysicalSize{axis}"), theirs.get(f"PhysicalSize{axis}Unit")),
+                    rel_tol=1e-12,
+                )
+            [our_plane] = ours.iter(f"{OME}Plane")
+            for axis in "XYZ":
+                assert in_um(our_plane.get(f"Position{axis}"), our_plane.get(f"Position{axis}Unit")) == (
+                    pytest.approx(in_um(plane.get(f"Position{axis}"), plane.get(f"Position{axis}Unit")),
+                                  rel=1e-6, abs=1e-6)
+                ), (index, axis)
+        assert size_c == metadata.size_c
+
+    @pytest.mark.parametrize("name", [HIRES, STACK])
+    def test_it_passes_the_ome_2016_06_schema(self, name):
+        ome_types = pytest.importorskip("ome_types")
+        metadata = metadata_of(name)
+
+        for index in (PlaneIndex(0, 0, 0), PlaneIndex(0, metadata.size_z - 1, metadata.size_c - 1)):
+            xml = canonical.plane_xml(
+                metadata, index=index, filename="p.ome.tif", shape_yx=(512, 512),
+                state={"software": {"name": "ZMART"}},
+            )
+            ome = ome_types.from_xml(xml.decode("ascii"), validate=True)
+            image = ome.images[0]
+            assert image.acquisition_date is not None
+            assert image.pixels.channels[0].fluor
+            assert ome.instruments[0].objectives[0].lens_na == 0.4
+
+    def test_the_file_text_is_plain_ascii(self):
+        metadata = metadata_of(HIRES)
+
+        xml = canonical.plane_xml(metadata, index=PlaneIndex(0, 0, 0), filename="p.ome.tif", shape_yx=(512, 512))
+
+        xml.decode("ascii")
+        assert b"&#181;m" in xml
+
+    def test_one_plane_carries_its_own_channel_and_the_instrument(self):
+        metadata = metadata_of(HIRES)
+
+        root = ET.fromstring(
+            canonical.plane_xml(metadata, index=PlaneIndex(0, 0, 1), filename="p.ome.tif", shape_yx=(512, 512))
+        )
+
+        [channel] = root.iter(f"{OME}Channel")
+        assert channel.get("Fluor") == "ALEXA 488"
+        assert channel.get("ExcitationWavelength") == "497"
+        detector_ref = channel.find(f"{OME}DetectorSettings").get("ID")
+        models = {d.get("ID"): d.get("Model") for d in root.iter(f"{OME}Detector")}
+        assert models[detector_ref] == "HyD S 3"
+        facts = {m.get("K"): m.text for m in root.iter(f"{OME}M")}
+        assert facts["zoom"] == "1"

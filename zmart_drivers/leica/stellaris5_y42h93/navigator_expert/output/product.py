@@ -59,13 +59,105 @@ class RawPlaneSource:
 
 
 @dataclass(frozen=True)
+class Objective:
+    """The objective a picture was taken with, in OME's terms.
+
+    ``immersion`` and ``correction`` are OME 2016-06 enumeration values
+    (``Air``, ``Oil``...; ``PlanApo``...), or None when the vendor's own
+    words do not say which.
+    """
+
+    model: str
+    magnification: float | None = None
+    lens_na: float | None = None
+    immersion: str | None = None
+    correction: str | None = None
+    refractive_index: float | None = None
+
+
+@dataclass(frozen=True)
+class Detector:
+    """One detector; ``type`` is an OME DetectorType (``PMT``, ``Other``...)."""
+
+    id: str
+    model: str
+    type: str = "Other"
+
+
+@dataclass(frozen=True)
+class Laser:
+    """One laser; a white-light laser is ``tuneable`` and has no single wavelength."""
+
+    id: str
+    model: str
+    wavelength_nm: float | None = None
+    tuneable: bool = False
+
+
+@dataclass(frozen=True)
+class Filter:
+    """A filter, or a spectral detection band, as the range of light it passes."""
+
+    id: str
+    model: str
+    type: str | None = None
+    cut_in_nm: float | None = None
+    cut_out_nm: float | None = None
+
+
+@dataclass(frozen=True)
+class Instrument:
+    """The microscope, as far as it took part in one acquisition."""
+
+    manufacturer: str | None = None
+    model: str | None = None
+    serial_number: str | None = None
+    #: An OME MicroscopeType: ``Upright`` or ``Inverted``.
+    type: str | None = None
+    objective: Objective | None = None
+    detectors: tuple[Detector, ...] = ()
+    lasers: tuple[Laser, ...] = ()
+    filters: tuple[Filter, ...] = ()
+
+
+@dataclass(frozen=True)
 class ChannelMetadata:
-    """Minimal reusable channel metadata for canonical ZMART OME."""
+    """What one channel is, and how its light was made and caught.
+
+    The ``*_id`` fields point into the acquisition's :class:`Instrument`.
+    ``laser_attenuation`` is OME's fraction of the light taken away (the
+    vendor's intensity of 2 % is an attenuation of 0.98).
+    """
 
     index: int
     name: str | None = None
     color: int | None = None
     wavelength_nm: float | None = None
+    fluor: str | None = None
+    excitation_wavelength_nm: float | None = None
+    pinhole_um: float | None = None
+    acquisition_mode: str | None = None
+    detector_id: str | None = None
+    detector_gain: float | None = None
+    detector_offset: float | None = None
+    laser_id: str | None = None
+    laser_attenuation: float | None = None
+    emission_filter_ids: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class PlaneMetadata:
+    """When and where one plane was taken.
+
+    Positions are the microscope's own stage and focus readings in
+    micrometres, as its software wrote them beside the picture; ZMART's
+    sample frame is in the acquisition's answer and its state.
+    """
+
+    delta_t_s: float | None = None
+    position_x_um: float | None = None
+    position_y_um: float | None = None
+    position_z_um: float | None = None
 
 
 @dataclass(frozen=True)
@@ -85,6 +177,12 @@ class AcquisitionMetadata:
     #: The bits the detector filled (8, 12 or 16 on a STELLARIS); a 12-bit
     #: picture is kept in 16-bit pixels, and this says that only 12 are used.
     significant_bits: int | None = None
+    #: When the first plane was taken, as an ISO 8601 time in UTC.
+    acquisition_date: str | None = None
+    instrument: Instrument | None = None
+    planes: dict[PlaneIndex, PlaneMetadata] = field(default_factory=dict)
+    #: The vendor's facts OME has no field for, as (name, value) pairs.
+    annotations: tuple[tuple[str, str], ...] = ()
 
     def channel(self, index: int) -> ChannelMetadata:
         for channel in self.channels:

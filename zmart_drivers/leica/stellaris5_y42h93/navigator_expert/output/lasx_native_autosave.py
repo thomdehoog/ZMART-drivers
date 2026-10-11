@@ -19,6 +19,7 @@ from typing import Any
 
 from ..actions.acquire import AcquisitionResult
 from . import files as _files
+from . import lasx_description as _described
 from . import ome_canonical as _canonical
 from .files import (
     DEFAULT_EXPORT_COMPLETION_POLL_INTERVAL_S,
@@ -93,11 +94,18 @@ def collect_lasx_native_autosave(
     project_dir = _project_dir_for(anchor, base)
     positions = _positions_from_native_tiff(anchor)
     metadata = _metadata_from_native_tiff(anchor, positions)
-    metadata = _canonical.metadata_with_job_physical_sizes(
-        metadata,
-        client,
-        acq.job,
-    )
+    description = project_dir / "Metadata" / f"{_native_image_stem(anchor)}.xlif"
+    if description.is_file():
+        # LAS X's full description of the picture, the same record its cache
+        # holds: exact sizes and everything about the capture, which the
+        # OME-TIFF beside it leaves out.
+        metadata = _metadata_from_description(description, metadata)
+    else:
+        metadata = _canonical.metadata_with_job_physical_sizes(
+            metadata,
+            client,
+            acq.job,
+        )
 
     return ExportedAcquisition(
         source_root=base,
@@ -382,6 +390,20 @@ def _metadata_from_native_tiff(
         size_c=max(idx.c for idx in all_indices) + 1,
         pixel_type=_canonical.pixel_type_from_dtype(dtype),
     )
+
+
+def _metadata_from_description(description: Path, from_tiff):
+    """The description's metadata, refused when it describes another picture than the TIFF."""
+    metadata = _described.metadata_from_description(
+        description.read_text(encoding="utf-8-sig", errors="replace")
+    )
+    shape = ("size_x", "size_y", "size_z", "size_c", "pixel_type")
+    if any(getattr(metadata, key) != getattr(from_tiff, key) for key in shape):
+        raise RuntimeError(
+            f"LAS X's description {description} does not match the picture beside it: "
+            + ", ".join(f"{key} {getattr(metadata, key)} vs {getattr(from_tiff, key)}" for key in shape)
+        )
+    return metadata
 
 
 def _vendor_metadata_sources(

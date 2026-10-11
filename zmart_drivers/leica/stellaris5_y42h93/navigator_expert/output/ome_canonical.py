@@ -23,7 +23,13 @@ from typing import Any
 from ..dispatcher import read as _readers
 from ..vendor_interface import parsing as _parsing
 from . import ome as _ome
-from .product import AcquisitionMetadata, ChannelMetadata, PlaneIndex
+from .product import (
+    AcquisitionMetadata,
+    ChannelMetadata,
+    Instrument,
+    PlaneIndex,
+    PlaneMetadata,
+)
 
 log = logging.getLogger(__name__)
 
@@ -35,6 +41,15 @@ MICROMETER = "\u00b5m"
 STATE_NS = "https://zmart-microscopy/state"
 STATE_MAP_ID = "Annotation:zmart-state-map"
 STATE_JSON_ID = "Annotation:zmart-state-json"
+
+# The vendor's facts that OME has no field for, kept by name.
+VENDOR_NS = "https://zmart-microscopy/vendor"
+VENDOR_MAP_ID = "Annotation:vendor-facts"
+
+INSTRUMENT_ID = "Instrument:0"
+OBJECTIVE_ID = "Objective:0"
+#: OME's Medium enumeration (ObjectiveSettings); an Immersion outside it is not a medium.
+MEDIA = ("Air", "Oil", "Water", "Glycerol", "Other")
 
 ET.register_namespace("", OME_NS)
 ET.register_namespace("xsi", XSI_NS)
@@ -186,12 +201,14 @@ def plane_xml(
         plane_meta,
         physical_size_z_um=None,
     )
-    channel = _ascii_channel(metadata.channel(index.c))
+    channel = metadata.channel(index.c)
+    plane = metadata.planes.get(index)
     return _ome_xml(
         plane_meta,
         image_name=filename,
         channels=(replace(channel, index=0),),
         tiff_entries=[(0, 0, 0, filename)],
+        planes=[(PlaneIndex(t=0, z=0, c=0), plane)] if plane is not None else [],
         state=state,
     )
 
@@ -260,15 +277,39 @@ def _ome_xml(
     image_name: str,
     channels: tuple[ChannelMetadata, ...],
     tiff_entries: list[tuple[int, int, int, str]],
+    planes: list[tuple[PlaneIndex, PlaneMetadata]] = (),
     state: dict | None = None,
 ) -> bytes:
+    """OME 2016-06 XML for the planes named, in the order the schema requires.
+
+    OME holds Instrument, Image, StructuredAnnotations; Image holds
+    AcquisitionDate, InstrumentRef, ObjectiveSettings, Pixels, AnnotationRef;
+    Pixels holds Channel, TiffData, Plane. The text is plain ASCII, as TIFF
+    tag 270 must be: any other character is written as an XML character
+    reference (``&#181;m``), which every OME reader decodes.
+    """
     root = ET.Element(
         _tag("OME"),
         {
             _tag("schemaLocation", XSI_NS): f"{OME_NS} {OME_NS}/ome.xsd",
         },
     )
+    instrument = metadata.instrument
+    if instrument is not None:
+        _append_instrument(root, instrument)
     image = ET.SubElement(root, _tag("Image"), {"ID": "Image:0", "Name": image_name})
+    if metadata.acquisition_date:
+        ET.SubElement(image, _tag("AcquisitionDate")).text = metadata.acquisition_date
+    if instrument is not None:
+        ET.SubElement(image, _tag("InstrumentRef"), {"ID": INSTRUMENT_ID})
+        objective = instrument.objective
+        if objective is not None:
+            settings = {"ID": OBJECTIVE_ID}
+            if objective.refractive_index is not None:
+                settings["RefractiveIndex"] = _num(objective.refractive_index)
+            if objective.immersion in MEDIA:
+                settings["Medium"] = objective.immersion
+            ET.SubElement(image, _tag("ObjectiveSettings"), settings)
     pixels_attrs = {
         "ID": "Pixels:0",
         "DimensionOrder": "XYZCT",
@@ -287,7 +328,7 @@ def _ome_xml(
     pixels = ET.SubElement(image, _tag("Pixels"), pixels_attrs)
 
     for channel in channels:
-        ET.SubElement(pixels, _tag("Channel"), _channel_attrs(channel))
+        _append_channel(pixels, channel)
     for first_t, first_z, first_c, filename in tiff_entries:
         tiff_data = ET.SubElement(
             pixels,
@@ -302,30 +343,138 @@ def _ome_xml(
         )
         uuid_el = ET.SubElement(tiff_data, _tag("UUID"), {"FileName": filename})
         uuid_el.text = "urn:uuid:" + str(uuid.uuid5(uuid.NAMESPACE_URL, filename))
+    for index, plane in planes:
+        _append_plane(pixels, index, plane)
 
-    if state is not None:
-        _append_state_annotations(root, image, state)
+    if metadata.annotations or state is not None:
+        # AnnotationRefs come AFTER Pixels in the Image element, and the one
+        # StructuredAnnotations block AFTER Image in the OME element.
+        annotations = ET.Element(_tag("StructuredAnnotations"))
+        if metadata.annotations:
+            ET.SubElement(image, _tag("AnnotationRef"), {"ID": VENDOR_MAP_ID})
+            vendor = ET.SubElement(
+                annotations, _tag("MapAnnotation"), {"ID": VENDOR_MAP_ID, "Namespace": VENDOR_NS}
+            )
+            value = ET.SubElement(vendor, _tag("Value"))
+            for key, text in metadata.annotations:
+                ET.SubElement(value, _tag("M"), {"K": key}).text = text
+        if state is not None:
+            _append_state_annotations(annotations, image, state)
+        root.append(annotations)
 
-    return ET.tostring(root, encoding="utf-8", xml_declaration=True)
+    text = ET.tostring(root, encoding="unicode")
+    return b"<?xml version='1.0' encoding='utf-8'?>\n" + text.encode("ascii", "xmlcharrefreplace")
 
 
-def _append_state_annotations(root: ET.Element, image: ET.Element, state: dict) -> None:
+def _append_instrument(root: ET.Element, instrument: Instrument) -> None:
+    """The microscope, its lasers, detectors, objective and filters, in schema order."""
+    element = ET.SubElement(root, _tag("Instrument"), {"ID": INSTRUMENT_ID})
+    microscope = {
+        key: value
+        for key, value in (
+            ("Manufacturer", instrument.manufacturer),
+            ("Model", instrument.model),
+            ("SerialNumber", instrument.serial_number),
+            ("Type", instrument.type),
+        )
+        if value
+    }
+    if microscope:
+        ET.SubElement(element, _tag("Microscope"), microscope)
+    for laser in instrument.lasers:
+        attrs = {"ID": laser.id, "Model": laser.model}
+        if instrument.manufacturer:
+            attrs["Manufacturer"] = instrument.manufacturer
+        if laser.wavelength_nm:
+            attrs["Wavelength"] = _num(laser.wavelength_nm)
+            attrs["WavelengthUnit"] = "nm"
+        if laser.tuneable:
+            attrs["Tuneable"] = "true"
+        ET.SubElement(element, _tag("Laser"), attrs)
+    for detector in instrument.detectors:
+        ET.SubElement(
+            element, _tag("Detector"), {"ID": detector.id, "Model": detector.model, "Type": detector.type}
+        )
+    objective = instrument.objective
+    if objective is not None:
+        attrs = {"ID": OBJECTIVE_ID, "Model": objective.model}
+        if instrument.manufacturer:
+            attrs["Manufacturer"] = instrument.manufacturer
+        if objective.magnification is not None:
+            attrs["NominalMagnification"] = _num(objective.magnification)
+        if objective.lens_na is not None:
+            attrs["LensNA"] = _num(objective.lens_na)
+        if objective.immersion:
+            attrs["Immersion"] = objective.immersion
+        if objective.correction:
+            attrs["Correction"] = objective.correction
+        ET.SubElement(element, _tag("Objective"), attrs)
+    for item in instrument.filters:
+        attrs = {"ID": item.id, "Model": item.model}
+        if item.type:
+            attrs["Type"] = item.type
+        made = ET.SubElement(element, _tag("Filter"), attrs)
+        passes = {}
+        if item.cut_in_nm is not None:
+            passes.update(CutIn=_num(item.cut_in_nm), CutInUnit="nm")
+        if item.cut_out_nm is not None:
+            passes.update(CutOut=_num(item.cut_out_nm), CutOutUnit="nm")
+        if passes:
+            ET.SubElement(made, _tag("TransmittanceRange"), passes)
+
+
+def _append_channel(pixels: ET.Element, channel: ChannelMetadata) -> None:
+    """One Channel with its light source, detector and light path, in schema order."""
+    element = ET.SubElement(pixels, _tag("Channel"), _channel_attrs(channel))
+    if channel.laser_id:
+        attrs = {"ID": channel.laser_id}
+        if channel.laser_attenuation is not None:
+            attrs["Attenuation"] = _num(min(1.0, max(0.0, channel.laser_attenuation)))
+        if channel.excitation_wavelength_nm:
+            attrs["Wavelength"] = _num(channel.excitation_wavelength_nm)
+            attrs["WavelengthUnit"] = "nm"
+        ET.SubElement(element, _tag("LightSourceSettings"), attrs)
+    if channel.detector_id:
+        attrs = {"ID": channel.detector_id}
+        if channel.detector_offset is not None:
+            attrs["Offset"] = _num(channel.detector_offset)
+        if channel.detector_gain is not None:
+            attrs["Gain"] = _num(channel.detector_gain)
+        ET.SubElement(element, _tag("DetectorSettings"), attrs)
+    if channel.emission_filter_ids:
+        path = ET.SubElement(element, _tag("LightPath"))
+        for filter_id in channel.emission_filter_ids:
+            ET.SubElement(path, _tag("EmissionFilterRef"), {"ID": filter_id})
+
+
+def _append_plane(pixels: ET.Element, index: PlaneIndex, plane: PlaneMetadata) -> None:
+    attrs = {"TheZ": str(index.z), "TheT": str(index.t), "TheC": str(index.c)}
+    if plane.delta_t_s is not None:
+        attrs.update(DeltaT=_num(plane.delta_t_s), DeltaTUnit="s")
+    for axis, value in (
+        ("X", plane.position_x_um),
+        ("Y", plane.position_y_um),
+        ("Z", plane.position_z_um),
+    ):
+        if value is not None:
+            # A position has no unit by default in OME 2016-06 ("reference
+            # frame"), so it is always said.
+            attrs[f"Position{axis}"] = _num(value)
+            attrs[f"Position{axis}Unit"] = MICROMETER
+    ET.SubElement(pixels, _tag("Plane"), attrs)
+
+
+def _append_state_annotations(annotations: ET.Element, image: ET.Element, state: dict) -> None:
     """Embed the machine/software state as schema-valid StructuredAnnotations.
 
-    Two annotations under a single ``StructuredAnnotations`` block (the LAST
-    child of the OME root): a ``MapAnnotation`` of flat human-readable
-    highlights and a ``CommentAnnotation`` carrying the full JSON dump. The
-    ``<Image>`` gets an ``AnnotationRef`` (after ``<Pixels>``) to each.
-
-    All emitted text is forced to 7-bit ASCII: the per-plane XML rides in
-    TIFF tag 270, which tifffile requires to be ASCII.
+    Two annotations in the ``StructuredAnnotations`` block: a
+    ``MapAnnotation`` of flat human-readable highlights and a
+    ``CommentAnnotation`` carrying the full JSON dump. The ``<Image>`` gets
+    an ``AnnotationRef`` (after ``<Pixels>``) to each.
     """
-    # AnnotationRefs come AFTER Pixels in the Image element (schema order).
     ET.SubElement(image, _tag("AnnotationRef"), {"ID": STATE_MAP_ID})
     ET.SubElement(image, _tag("AnnotationRef"), {"ID": STATE_JSON_ID})
 
-    # StructuredAnnotations comes AFTER Image in the OME element (schema order).
-    annotations = ET.SubElement(root, _tag("StructuredAnnotations"))
     map_ann = ET.SubElement(
         annotations, _tag("MapAnnotation"), {"ID": STATE_MAP_ID, "Namespace": STATE_NS}
     )
@@ -411,17 +560,17 @@ def _channel_attrs(channel: ChannelMetadata) -> dict[str, str]:
     if channel.wavelength_nm is not None and channel.wavelength_nm > 0:
         attrs["EmissionWavelength"] = _num(channel.wavelength_nm)
         attrs["EmissionWavelengthUnit"] = "nm"
+    if channel.excitation_wavelength_nm:
+        attrs["ExcitationWavelength"] = _num(channel.excitation_wavelength_nm)
+        attrs["ExcitationWavelengthUnit"] = "nm"
+    if channel.pinhole_um is not None:
+        attrs["PinholeSize"] = _num(channel.pinhole_um)
+        attrs["PinholeSizeUnit"] = MICROMETER
+    if channel.fluor:
+        attrs["Fluor"] = channel.fluor
+    if channel.acquisition_mode:
+        attrs["AcquisitionMode"] = channel.acquisition_mode
     return attrs
-
-
-def _ascii_channel(channel: ChannelMetadata) -> ChannelMetadata:
-    name = channel.name
-    if name is not None:
-        try:
-            name.encode("ascii")
-        except UnicodeEncodeError:
-            name = None
-    return replace(channel, name=name)
 
 
 def _channels_from_pixels(

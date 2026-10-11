@@ -26,12 +26,11 @@ from __future__ import annotations
 import re
 import struct
 import time
-import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Any
 
 from ..actions.acquire import AcquisitionResult
-from . import ome_canonical as canonical
+from . import lasx_description as described
 from .files import (
     DEFAULT_EXPORT_COMPLETION_POLL_INTERVAL_S,
     DEFAULT_EXPORT_COMPLETION_TIMEOUT_S,
@@ -39,7 +38,6 @@ from .files import (
 )
 from .product import (
     AcquisitionMetadata,
-    ChannelMetadata,
     ExportedAcquisition,
     ExportedPosition,
     PlaneIndex,
@@ -55,10 +53,6 @@ REGISTRY_VALUE = "Data Port"
 
 DESCRIPTION = re.compile(r"V2LMSDC_OBJ(\d+)_([0-9a-fA-F]+)\.tmp")
 
-#: LAS X's dimension numbers for the axes a picture may have here. A time
-#: series (4) or a tile scan (10) is taken one picture at a time by the
-#: workflow, so any other dimension is refused rather than guessed at.
-X_AXIS, Y_AXIS, Z_AXIS = 1, 2, 3
 
 
 def collect_lasx_data_container(
@@ -76,8 +70,7 @@ def collect_lasx_data_container(
     description carries a time stamp for every plane: LAS X rewrites the
     description once, after the last plane is in. *timeout_s* bounds the
     wait for both, and passing it is reported in words the operator can act
-    on. Physical sizes come from the description, then from the job's live
-    settings where those give them, as for AutoSave's files.
+    on. All metadata comes from the description (see ``lasx_description``).
     """
     root = Path(cache_root) if cache_root is not None else data_container_root()
     deadline = time.perf_counter() + timeout_s
@@ -108,8 +101,10 @@ def collect_lasx_data_container(
     pixels = root / f"V2LMSDC_MMF{number}_0_{pid}.tmp"
     if not pixels.is_file():
         raise RuntimeError(f"LAS X's cache has the description of {name} but not its pixels {pixels}")
+    # The description is the record of the capture itself, exact and from
+    # the moment it was taken, so nothing is taken over from the job's
+    # settings (which round the pixel size to two decimals).
     metadata, planes = layout(xml, pixels)
-    metadata = canonical.metadata_with_job_physical_sizes(metadata, client, acq.job)
     return ExportedAcquisition(
         source_root=root,
         source_dir=root,
@@ -195,94 +190,41 @@ def time_stamps(xml: str) -> int:
 
 def planes_expected(xml: str) -> int:
     """Channels times planes: LAS X stamps every plane of every channel once."""
-    description = image_description(xml)
-    channels = len(description.findall("./Channels/ChannelDescription"))
+    image = described.image_of(xml)
+    channels = len(image.findall("./ImageDescription/Channels/ChannelDescription"))
     planes = 1
-    for dimension in description.findall("./Dimensions/DimensionDescription"):
-        if int(dimension.get("DimID", "0")) not in (X_AXIS, Y_AXIS):
+    for dimension in image.findall("./ImageDescription/Dimensions/DimensionDescription"):
+        if int(dimension.get("DimID", "0")) not in (described.X_AXIS, described.Y_AXIS):
             planes *= int(dimension.get("NumberOfElements", "1"))
     return channels * planes
 
 
-def image_description(xml: str) -> ET.Element:
-    description = ET.fromstring(xml).find("./Image/ImageDescription")
-    if description is None:
-        raise RuntimeError("LAS X's description of the picture has no ImageDescription")
-    return description
-
-
 def layout(xml: str, pixels: Path) -> tuple[AcquisitionMetadata, dict[PlaneIndex, RawPlaneSource]]:
-    """Where every plane is in the pixel file, and what the picture is, from the description.
+    """What the picture is, from its description, and where every plane is in the pixel file.
 
     Every size, step and start is the description's own; anything this
     reader does not know how to lay out is refused, never assumed.
     """
-    description = image_description(xml)
-    dimensions = {}
-    for dimension in description.findall("./Dimensions/DimensionDescription"):
-        dim_id = int(dimension.get("DimID", "0"))
-        if dim_id not in (X_AXIS, Y_AXIS, Z_AXIS):
-            raise RuntimeError(
-                f"the picture has LAS X dimension {dim_id}; only x, y and z (1, 2, 3) are "
-                "read from the cache, a time series or tile scan is taken picture by picture"
-            )
-        dimensions[dim_id] = {
-            "count": int(dimension.get("NumberOfElements")),
-            "length_m": float(dimension.get("Length")),
-            "step": int(dimension.get("BytesInc")),
-            "unit": dimension.get("Unit"),
-        }
-    if X_AXIS not in dimensions or Y_AXIS not in dimensions:
-        raise RuntimeError("LAS X's description of the picture gives no x or no y axis")
-    z = dimensions.get(Z_AXIS, {"count": 1, "length_m": 0.0, "step": 0, "unit": "m"})
-    for axis in dimensions.values():
-        if axis["unit"] != "m":
-            raise RuntimeError(f"LAS X gives an axis in {axis['unit']!r}, not metres")
-
-    channels = description.findall("./Channels/ChannelDescription")
-    if not channels:
-        raise RuntimeError("LAS X's description of the picture lists no channels")
-    bits = {int(channel.get("Resolution")) for channel in channels}
-    if len(bits) != 1:
-        raise RuntimeError(f"the picture's channels have different bit depths: {sorted(bits)}")
-    (significant_bits,) = bits
-    if significant_bits > 16:
-        raise RuntimeError(f"a {significant_bits}-bit picture is not read from the cache (8 to 16 bit are)")
-    dtype = "uint8" if significant_bits <= 8 else "uint16"
-    pixel_bytes = 1 if dtype == "uint8" else 2
-
-    nx, ny = dimensions[X_AXIS]["count"], dimensions[Y_AXIS]["count"]
-    if dimensions[X_AXIS]["step"] != pixel_bytes or dimensions[Y_AXIS]["step"] != nx * pixel_bytes:
+    metadata = described.metadata_from_description(xml)
+    image = described.image_of(xml)
+    dims = described.axes(image)
+    pixel_bytes = 1 if metadata.pixel_type == "uint8" else 2
+    nx, x_step, y_step = metadata.size_x, dims[described.X_AXIS]["step"], dims[described.Y_AXIS]["step"]
+    if x_step != pixel_bytes or y_step != nx * pixel_bytes:
         raise RuntimeError(
             f"the picture's rows are not packed {pixel_bytes}-byte pixels "
-            f"(x step {dimensions[X_AXIS]['step']}, y step {dimensions[Y_AXIS]['step']} bytes "
-            f"for {nx} pixels a row)"
+            f"(x step {x_step}, y step {y_step} bytes for {nx} pixels a row)"
         )
-
+    z_step = dims[described.Z_AXIS]["step"] if described.Z_AXIS in dims else 0
+    channels = image.findall("./ImageDescription/Channels/ChannelDescription")
     planes = {
         PlaneIndex(t=0, z=plane, c=c): RawPlaneSource(
             path=pixels,
-            offset=int(channel.get("BytesInc")) + plane * z["step"],
-            shape_yx=(ny, nx),
-            dtype=dtype,
+            offset=int(channel.get("BytesInc")) + plane * z_step,
+            shape_yx=(metadata.size_y, nx),
+            dtype=metadata.pixel_type,
         )
         for c, channel in enumerate(channels)
-        for plane in range(z["count"])
+        for plane in range(metadata.size_z)
     }
-    metadata = AcquisitionMetadata(
-        size_x=nx,
-        size_y=ny,
-        size_t=1,
-        size_z=z["count"],
-        size_c=len(channels),
-        pixel_type=dtype,
-        # Length over pixels, as LAS X's own OME-TIFF gives the pixel size.
-        physical_size_x_um=dimensions[X_AXIS]["length_m"] / nx * 1e6,
-        physical_size_y_um=dimensions[Y_AXIS]["length_m"] / ny * 1e6,
-        # The z length spans the steps between the planes: 17 planes over
-        # 38.55 um are 2.41 um apart (LAS X's own plane heights say so).
-        physical_size_z_um=(z["length_m"] / (z["count"] - 1) * 1e6 if z["count"] > 1 else None),
-        channels=tuple(ChannelMetadata(index=c) for c in range(len(channels))),
-        significant_bits=significant_bits,
-    )
     return metadata, planes
