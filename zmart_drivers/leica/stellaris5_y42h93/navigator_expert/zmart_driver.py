@@ -67,14 +67,18 @@ class ZmartDriver:
     # --- describing the setup ---------------------------------------------------------
 
     def get_info(self):
-        """``True, description``: the microscope in plain words.
+        """``True, (description, output_root, setup)``.
 
-        The text says what the other commands cannot: what each setting
-        means, in which unit and within which bounds, which objective sits
-        in which slot, and which way +z points. The bounds come from the
-        limits loaded at connect.
+        The description says what the other commands cannot: what each
+        setting means, in which unit and within which bounds, which
+        objective sits in which slot, and which way +z points. The bounds
+        come from the limits loaded at connect. ``output_root`` is where
+        this session saves, None until a data location is set up; ``setup``
+        is each thing set up once on this microscope (limits, orientation,
+        objective calibration, origin, data location), done or not, in words.
         """
-        return True, _adapter.get_info(self._handle)["description"]
+        info = _adapter.get_info(self._handle)
+        return True, (info["description"], info["output_root"], info["setup"])
 
     def get_actuators(self):
         """``True, (x_motors, y_motors, z_motors)``: the motor names per axis.

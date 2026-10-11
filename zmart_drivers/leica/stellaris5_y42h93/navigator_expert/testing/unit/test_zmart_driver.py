@@ -73,7 +73,7 @@ def test_the_class_answers_what_the_module_answers(monkeypatch, tmp_path):
             name: getattr(through_class, name)()["content"]
             for name in ("get_actuators", "get_xyz", "get_state", "get_procedures")
         }
-        description = through_class.get_info()["content"]["description"]
+        class_info = through_class.get_info()["content"]
     finally:
         through_class.disconnect()
     through_module = zmart_controller.ZmartController(plugin, connection)
@@ -89,5 +89,11 @@ def test_the_class_answers_what_the_module_answers(monkeypatch, tmp_path):
     # The module's get_xyz adds one extra on top of the four entries per axis.
     as_module["get_xyz"].pop("objective_translation_um")
     assert as_class == as_module
-    assert description == info["description"]
+    assert class_info["description"] == info["description"]
+    # Where it saves and what is set up reach the controller from the class too.
+    assert class_info["output_root"] == info["output_root"]
+    assert class_info["setup"] == info["setup"]
+    assert set(class_info["setup"]) == {"limits", "orientation", "calibration", "origin", "data_location"}
+    for item in class_info["setup"].values():
+        assert isinstance(item["done"], bool) and item["says"].strip()
     assert as_class["get_xyz"]["z"]["actuators"].keys() == {"z-wide", "z-galvo"}

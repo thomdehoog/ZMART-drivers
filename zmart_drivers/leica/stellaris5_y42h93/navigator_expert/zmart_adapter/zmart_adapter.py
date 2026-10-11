@@ -921,27 +921,36 @@ def get_acquisition_settings(handle: ZmartHandle) -> dict:
         selected = None
     if selected not in names:
         selected = next((j["Name"] for j in normal if j.get("IsSelected")), None)
+    saving = _where_it_saves(handle)
     return {
         "folder": {
             "options": "kebab-case lowercase text, at most 25 characters",
             "active": "scan",
+            "default": "scan",
         },
         "job": {"options": names, "active": selected},
-        "backlash_correction": {"options": [True, False], "active": True},
+        "backlash_correction": {"options": [True, False], "active": True, "default": True},
         "backlash_rounds": {
             "options": "int >= 0",
             "active": ACQUISITION_BACKLASH_DEFAULT_ROUNDS,
+            "default": ACQUISITION_BACKLASH_DEFAULT_ROUNDS,
         },
-        "format": {"options": list(_save.FORMATS), "active": IMAGE_SAVE.format},
-        "cleanup_source": {"options": [True, False], "active": False},
-        "source": {"options": list(_save.SOURCES), "active": IMAGE_SAVE.source},
-        "projection": {"options": list(_save.PROJECTIONS), "active": IMAGE_SAVE.projection},
+        "format": {"options": list(_save.FORMATS), "active": IMAGE_SAVE.format, "default": IMAGE_SAVE.format},
+        "cleanup_source": {"options": [True, False], "active": False, "default": False},
+        "source": {"options": list(_save.SOURCES), "active": IMAGE_SAVE.source, "default": IMAGE_SAVE.source},
+        "projection": {
+            "options": list(_save.PROJECTIONS),
+            "active": IMAGE_SAVE.projection,
+            "default": IMAGE_SAVE.projection,
+        },
+        # Starts at this microscope's set-up data location; a session that
+        # chose its own folder (its output_root) saves there instead.
         "save_to": {
             "options": "a full path to a folder on a local disk this computer can write to",
-            "active": str(saving) if (saving := _where_it_saves(handle)) is not None else None,
+            "active": str(saving) if saving is not None else None,
+            "default": str(handle.data_location) if handle.data_location is not None else None,
         },
     }
-
 
 def _with_defaults(handle: ZmartHandle, settings: dict | None) -> dict:
     """Validate settings against the live menu, filling omissions from actives."""
@@ -1537,6 +1546,7 @@ def get_info(handle: ZmartHandle) -> dict:
     root = _where_it_saves(handle)
     return {
         "output_root": str(root) if root is not None else None,
+        "setup": _setup(handle),
         "description": _described(handle),
         "selected_job": selected,
         "client": handle.connection.get("client"),
@@ -1617,6 +1627,51 @@ def _canvas(handle: ZmartHandle) -> dict | None:
             stage["z_wide"][0] + galvo[0] - origin["z_focus_um"],
             stage["z_wide"][1] + galvo[1] - origin["z_focus_um"],
         ],
+    }
+
+
+def _setup(handle: ZmartHandle) -> dict:
+    """Each thing set up once on this microscope, whether it is done, and in words what it holds or what to do."""
+    limits = _gate.describe(handle.client) or {}
+    loaded = _session_state.get(handle.client)
+    orientation = dict((loaded.orientation_info if loaded is not None else None) or {})
+    calibration = dict((loaded.calibration_info if loaded is not None else None) or {})
+    published = limits.get("source") == "machine" and not limits.get("is_fallback")
+    origin_saved = _try(_machine.MACHINE.read_origin) is not None
+    measured_slots = calibration.get("measured_slots") or []
+    return {
+        "limits": {
+            "done": published,
+            "says": f"published: {limits.get('path')}" if published else (
+                "not published: the bundled defaults govern every move; publish this "
+                "microscope's limits with configuration/limits/notebooks/set_limits.ipynb"
+            ),
+        },
+        "orientation": {
+            "done": bool(orientation.get("measured")),
+            "says": "measured: saved pictures are turned to the stage's axes" if orientation.get("measured") else (
+                "not measured: saved pictures are kept as the camera sees them; run "
+                "configuration/image_stage_registration/notebooks/set_orientation.ipynb"
+            ),
+        },
+        "calibration": {
+            "done": bool(calibration.get("loaded")) and bool(measured_slots),
+            "says": f"{calibration.get('name') or 'loaded'}: measured for objective slots {sorted(measured_slots)}"
+            if calibration.get("loaded") and measured_slots else (
+                "no measured objective calibration: a change of objective cannot keep the "
+                "sample in place; run configuration/optical_calibration/notebooks/calibrate_objective_pair.ipynb"
+            ),
+        },
+        "origin": {
+            "done": origin_saved,
+            "says": "saved: positions count from it" if origin_saved else (
+                "not saved: positions are plain stage coordinates; run the driver's set_origin step"
+            ),
+        },
+        "data_location": {
+            "done": handle.data_location is not None,
+            "says": str(handle.data_location) if handle.data_location is not None else _info.SET_UP,
+        },
     }
 
 

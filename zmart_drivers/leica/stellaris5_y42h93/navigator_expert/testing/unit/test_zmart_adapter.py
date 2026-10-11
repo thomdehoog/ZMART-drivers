@@ -621,12 +621,16 @@ class TestAcquire(unittest.TestCase):
         self.assertEqual(adapter.ACQUISITION_BACKLASH_DEFAULT_ROUNDS, 0)
         self.assertEqual(opts["backlash_rounds"]["options"], "int >= 0")
         self.assertNotIn("strip_scan_fields", opts)  # positions never come from the Navigator
-        self.assertEqual(opts["format"], {"options": ["ome-tiff", "ome-zarr"], "active": "ome-zarr"})
-        self.assertEqual(opts["projection"], {"options": ["max", "none"], "active": "max"})
+        self.assertEqual(
+            opts["format"], {"options": ["ome-tiff", "ome-zarr"], "active": "ome-zarr", "default": "ome-zarr"}
+        )
+        self.assertEqual(opts["projection"], {"options": ["max", "none"], "active": "max", "default": "max"})
+        # Every setting but the job (LAS X's own selection) says what it starts at.
+        self.assertEqual({name for name, spec in opts.items() if "default" not in spec}, {"job"})
         self.assertEqual(opts["cleanup_source"]["active"], False)
         self.assertEqual(
             opts["source"],
-            {"options": ["cache", "autosave"], "active": "autosave"},
+            {"options": ["cache", "autosave"], "active": "autosave", "default": "autosave"},
         )
 
     def test_unknown_or_invalid_option_rejected(self):
@@ -692,6 +696,18 @@ class TestAcquire(unittest.TestCase):
             with self._capturing(output_root=None) as calls:
                 adapter.acquire(h, position_label="A1", acquisition_settings={"save_to": other})
             self.assertEqual(calls["output_root"].parent.parent, Path(other).resolve())
+
+    def test_save_to_starts_at_the_set_up_location_and_a_session_can_choose_another(self):
+        with tempfile.TemporaryDirectory() as tmp, tempfile.TemporaryDirectory() as chosen:
+            h = _handle(data_location=Path(tmp), connection={**adapter.CONNECTION, "output_root": chosen})
+            with (
+                patch.object(adapter._readers, "get_jobs", return_value=self._jobs()),
+                patch.object(adapter._readers, "get_selected_job",
+                             return_value={"Name": "Overview", "IsSelected": True}),
+            ):
+                save_to = adapter.get_acquisition_settings(h)["save_to"]
+        self.assertEqual(Path(save_to["default"]), Path(tmp))
+        self.assertEqual(Path(save_to["active"]), Path(chosen).resolve())
 
     def test_a_folder_that_cannot_hold_the_data_is_refused_before_capturing(self):
         h = _handle(data_location=Path("/elsewhere"))
