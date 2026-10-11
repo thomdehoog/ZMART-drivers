@@ -10,7 +10,7 @@ end-to-end pass through a real controller ``Session``.
 import json
 import tempfile
 import unittest
-from contextlib import contextmanager
+from contextlib import ExitStack, contextmanager
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -661,53 +661,61 @@ class TestAcquire(unittest.TestCase):
                             acquisition_settings={"backlash_rounds": value},
                         )
 
-    def test_missing_output_root_is_a_clear_error(self):
+    def test_without_a_data_location_nothing_is_saved_and_the_notebook_is_named(self):
         h = _handle()
-        with (
-            patch.object(
-                adapter._save, "save_source_root", side_effect=RuntimeError("no autosave")
-            ),
-            self.assertRaisesRegex(RuntimeError, "output_root"),
-        ):
+        with self.assertRaisesRegex(RuntimeError, "set_data_location"):
             adapter.acquire(h, position_label="A1")
 
-    def test_get_info_creates_and_reports_default_workflow_root(self):
-        h = _handle()
+    def test_the_set_up_data_location_is_where_runs_go(self):
         with tempfile.TemporaryDirectory() as tmp:
-            autosave = Path(tmp) / "lasx" / "project"
-            autosave.mkdir(parents=True)
-            with (
-                patch.object(adapter._save, "save_source_root", return_value=autosave),
-                patch.object(adapter, "_selected_job_name", return_value="Overview"),
-            ):
+            h = _handle(data_location=Path(tmp))
+            with patch.object(adapter, "_selected_job_name", return_value="Overview"):
                 result = adapter.get_info(h)
-                root = Path(result["output_root"])
-        self.assertEqual(root, Path(tmp) / "lasx" / "ZMART-microscopy")
-        self.assertEqual(h.connection["output_root"], str(root))
+        self.assertEqual(Path(result["output_root"]), Path(tmp).resolve())
 
-    def test_get_info_resolves_explicit_output_root_without_discovery(self):
-        h = _handle(connection={**adapter.CONNECTION, "output_root": "/chosen/zmart"})
+    def test_a_sessions_own_output_root_wins_over_the_set_up_one(self):
+        h = _handle(connection={**adapter.CONNECTION, "output_root": "/chosen/zmart"}, data_location=Path("/elsewhere"))
+        with patch.object(adapter, "_selected_job_name", return_value="Overview"):
+            self.assertEqual(Path(adapter.get_info(h)["output_root"]), Path("/chosen/zmart").resolve())
+
+    def test_save_to_offers_the_set_up_location_and_takes_another(self):
+        with tempfile.TemporaryDirectory() as tmp, tempfile.TemporaryDirectory() as other:
+            h = _handle(data_location=Path(tmp))
+            with (
+                patch.object(adapter._readers, "get_jobs", return_value=self._jobs()),
+                patch.object(adapter._readers, "get_selected_job",
+                             return_value={"Name": "Overview", "IsSelected": True}),
+            ):
+                opts = adapter.get_acquisition_settings(h)
+            self.assertEqual(Path(opts["save_to"]["active"]), Path(tmp).resolve())
+            h.driven_to = {"x": 0.0, "y": 0.0, "z": 0.0, "z_wide_um": 0.0, "z_galvo_um": 0.0}
+            with self._capturing(output_root=None) as calls:
+                adapter.acquire(h, position_label="A1", acquisition_settings={"save_to": other})
+            self.assertEqual(calls["output_root"].parent.parent, Path(other).resolve())
+
+    def test_a_folder_that_cannot_hold_the_data_is_refused_before_capturing(self):
+        h = _handle(data_location=Path("/elsewhere"))
+        captured = []
         with (
-            patch.object(adapter, "_selected_job_name", return_value="Overview"),
-            patch.object(
-                adapter._save,
-                "save_source_root",
-                side_effect=AssertionError("explicit output must bypass discovery"),
-            ),
+            patch.object(adapter._readers, "get_jobs", return_value=self._jobs()),
+            patch.object(adapter._readers, "get_selected_job", return_value={"Name": "Overview", "IsSelected": True}),
+            patch.object(adapter._capture, "acquire", lambda c, j, **k: captured.append(j)),
+            self.assertRaisesRegex(ValueError, "save_to"),
         ):
-            self.assertEqual(
-                Path(adapter.get_info(h)["output_root"]),
-                Path("/chosen/zmart").resolve(),
+            adapter.acquire(
+                h, position_label="A1", acquisition_settings={"save_to": str(Path("/no/such/folder/zmart"))}
             )
+        self.assertEqual(captured, [])
 
     @contextmanager
-    def _capturing(self, *, image_paths=None, projections=None):
+    def _capturing(self, *, image_paths=None, projections=None, output_root=Path("/tmp/out")):
         """Everything an ``acquire`` needs stood in for, so a test says one thing."""
         written = image_paths or {0: Path("/tmp/out/img.ome.tif")}
         calls = {}
 
         def fake_save(client, acq, output_root, naming, **kwargs):
             calls["save"] = kwargs
+            calls["output_root"] = Path(output_root)
             return SimpleNamespace(
                 image_paths=dict(written), naming=naming, projection_paths=tuple(projections or ()),
             )
@@ -717,19 +725,21 @@ class TestAcquire(unittest.TestCase):
             return Path("/tmp/out/scan/log") / f"{naming.folder}_{naming.hash6}_{naming.position_label}.log.json"
 
         patches = _patch_position(job="Overview")
-        with (
-            patch.object(adapter._readers, "get_jobs", return_value=self._jobs()),
-            patch.object(adapter._readers, "get_hardware_info", return_value={}),
-            patch.object(adapter._commands, "select_job", lambda c, j, **k: {"success": True}),
-            patch.object(adapter._motion, "correct_backlash", lambda client, **k: {"success": True, "confirmed": True}),
-            patch.object(adapter._capture, "acquire", lambda c, j, **k: _a_capture(j)),
-            patch.object(adapter._save, "save", fake_save),
-            patch.object(adapter._log, "write", fake_log),
-            # Where to save is otherwise discovered from LAS X native AutoSave
-            # on this PC, which only the author's PC has.
-            patch.object(adapter._info, "output_root", return_value=Path("/tmp/out")),
-            patches[0], patches[1], patches[2], patches[3],
-        ):
+        with ExitStack() as standing_in:
+            for stand_in in (
+                patch.object(adapter._readers, "get_jobs", return_value=self._jobs()),
+                patch.object(adapter._readers, "get_hardware_info", return_value={}),
+                patch.object(adapter._commands, "select_job", lambda c, j, **k: {"success": True}),
+                patch.object(adapter._motion, "correct_backlash", lambda client, **k: {"success": True, "confirmed": True}),
+                patch.object(adapter._capture, "acquire", lambda c, j, **k: _a_capture(j)),
+                patch.object(adapter._save, "save", fake_save),
+                patch.object(adapter._log, "write", fake_log),
+                *patches,
+            ):
+                standing_in.enter_context(stand_in)
+            # Where to save is otherwise this microscope's set-up data location.
+            if output_root is not None:
+                standing_in.enter_context(patch.object(adapter._info, "output_root", return_value=output_root))
             yield calls
 
     def test_get_info_says_how_far_the_stage_can_go_and_what_the_session_stands_on(self):
@@ -766,7 +776,7 @@ class TestAcquire(unittest.TestCase):
             # As it is really called: no client, it reads the startup .lcf.
             # Handed the client as a path it raised, and the check said
             # "failed" whatever the instrument was set to.
-            patch.object(adapter._save, "native_autosave_enabled",
+            patch.object(adapter._native, "native_autosave_enabled",
                          side_effect=lambda *a, **k: (_ for _ in ()).throw(TypeError()) if a else True),
             patches[0], patches[1], patches[2], patches[3],
         ):

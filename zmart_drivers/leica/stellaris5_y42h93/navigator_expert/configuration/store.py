@@ -29,6 +29,8 @@ microscope API root::
                 configs/
         origin/<datetime>/
             origin.json
+        data_location/<datetime>/
+            data_location.json
 
 The newest timestamp in each subsystem wins independently. Publishing limits
 does not duplicate calibration or orientation, and every origin change keeps
@@ -93,7 +95,8 @@ LIMITS_FILENAME = "limits.json"
 LEGACY_LIMITS_MACHINE_MARKER = ".limits-machine"
 ORIENTATION_FILENAME = "orientation.json"
 ORIGIN_FILENAME = "origin.json"
-SUBSYSTEMS = ("limits", "calibration", "orientation", "origin")
+DATA_LOCATION_FILENAME = "data_location.json"
+SUBSYSTEMS = ("limits", "calibration", "orientation", "origin", "data_location")
 
 # Driver-bundled last-known-good defaults, each owned by its subsystem.
 # The origin has no bundled default: with none set, the frame is absolute
@@ -111,6 +114,7 @@ _BUNDLED_ITEM_FOLDER = {
 }
 _SUBSYSTEM_FILENAME = {subsystem: filename for filename, subsystem in _BUNDLED_SUBSYSTEM.items()}
 _SUBSYSTEM_FILENAME["origin"] = ORIGIN_FILENAME
+_SUBSYSTEM_FILENAME["data_location"] = DATA_LOCATION_FILENAME
 _SEED_SNAPSHOT_MOMENT = datetime(1970, 1, 1, tzinfo=timezone.utc)
 
 _CALIBRATION_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]*$")
@@ -501,22 +505,48 @@ class MachineProfile:
 
     def write_origin(self, payload: dict, *, moment: datetime | None = None) -> Path:
         """Append one timestamped frame-origin record and return its JSON path."""
+        return self._append_record("origin", ORIGIN_FILENAME, payload, moment=moment)
+
+    # --- data location: where this microscope saves its pictures ---------
+    #
+    # Set once with configuration/data_location's notebook, like the limits
+    # and the orientation; the adapter's connect loads the newest record.
+    # It has no bundled default: a microscope that was not told where its
+    # data goes saves nothing, rather than somewhere nobody chose.
+
+    def read_data_location(self) -> dict | None:
+        """The newest saved data location, or None when none has been saved."""
+        self.migrate_flat_snapshots()
+        latest = self.latest_snapshot("data_location")
+        path = latest / DATA_LOCATION_FILENAME if latest else None
+        if path is None or not path.exists():
+            return None
+        return json.loads(path.read_text(encoding="utf-8"))
+
+    def write_data_location(self, payload: dict, *, moment: datetime | None = None) -> Path:
+        """Append one timestamped data-location record and return its JSON path."""
+        return self._append_record("data_location", DATA_LOCATION_FILENAME, payload, moment=moment)
+
+    def _append_record(
+        self, subsystem: str, filename: str, payload: dict, *, moment: datetime | None = None
+    ) -> Path:
+        """One new timestamped record of *subsystem*, written whole; its JSON path."""
         self.migrate_flat_snapshots()
         if moment is None:
             moment = datetime.now(timezone.utc)
-            latest = self.latest_snapshot("origin")
+            latest = self.latest_snapshot(subsystem)
             if latest is not None and format_snapshot_name(moment) <= latest.name:
-                moment = self._next_auto_moment("origin")
-        target = self.new_snapshot_dir(moment, "origin")
+                moment = self._next_auto_moment(subsystem)
+        target = self.new_snapshot_dir(moment, subsystem)
         staging = target.parent / f".{target.name}.partial"
         staging.mkdir(parents=True, exist_ok=False)
         try:
-            _write_json(staging / ORIGIN_FILENAME, payload)
+            _write_json(staging / filename, payload)
             os.replace(staging, target)
         except BaseException:
             shutil.rmtree(staging, ignore_errors=True)
             raise
-        return target / ORIGIN_FILENAME
+        return target / filename
 
     def new_snapshot_dir(self, moment: datetime, subsystem: str) -> Path:
         """Path for a new snapshot, monotonic within one subsystem."""

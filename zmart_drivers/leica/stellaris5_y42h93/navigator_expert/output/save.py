@@ -36,8 +36,6 @@ from .files import (
 from .lasx_data_container import collect_lasx_data_container
 from .lasx_native_autosave import (
     collect_lasx_native_autosave,
-    native_autosave_base_folder,
-    native_autosave_enabled,
 )
 from .naming import (
     Naming,
@@ -65,19 +63,6 @@ FORMATS = ("ome-tiff", "ome-zarr")
 #: What ``save`` projects from a capture with more than one plane, into
 #: ``<acquisition>/projections``: its max over z, or nothing.
 PROJECTIONS = ("max", "none")
-
-
-def save_source_root() -> Path:
-    """Return the LAS X native AutoSave source root.
-
-    Sources come from the native AutoSave base folder in the active
-    LAS X StartUp configuration.
-    """
-    if not native_autosave_enabled():
-        raise RuntimeError(
-            "LAS X native AutoSave is not enabled in the active StartUp configuration."
-        )
-    return native_autosave_base_folder()
 
 
 def save(

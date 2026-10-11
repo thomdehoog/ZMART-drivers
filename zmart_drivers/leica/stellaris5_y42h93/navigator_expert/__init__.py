@@ -126,7 +126,6 @@ __all__ = [
     "PlaneIndex",
     "PositionIndex",
     "SavedAcquisition",
-    "save_source_root",
     "save",
 ]
 
@@ -232,7 +231,7 @@ from .output.product import (
     SavedAcquisition,
     VendorMetadataSource,
 )
-from .output.save import save_source_root, save
+from .output.save import save
 
 # -- experimental/lrp_edits/ - LRP mutation helpers
 from .experimental.lrp_edits.scan import lrp_set_zoom, reset_pan

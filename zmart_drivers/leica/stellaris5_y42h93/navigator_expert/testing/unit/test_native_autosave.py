@@ -346,30 +346,6 @@ class TestCollectNativeAutoSave:
 
 
 class TestNativeSave:
-    def test_default_save_source_root_uses_native_autosave_base(
-        self,
-        tmp_path,
-        monkeypatch,
-    ):
-        root = tmp_path / "native-root"
-        monkeypatch.setattr(acquisition, "native_autosave_enabled", lambda: True)
-        monkeypatch.setattr(
-            acquisition,
-            "native_autosave_base_folder",
-            lambda: root,
-        )
-
-        assert drv.save_source_root() == root
-
-    def test_save_source_root_requires_native_autosave_enabled(
-        self,
-        monkeypatch,
-    ):
-        monkeypatch.setattr(acquisition, "native_autosave_enabled", lambda: False)
-
-        with pytest.raises(RuntimeError, match="native AutoSave is not enabled"):
-            drv.save_source_root()
-
     def test_save_materializes_native_multipage_tiff_to_flat_output(
         self,
         tmp_path,

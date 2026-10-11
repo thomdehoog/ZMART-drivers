@@ -94,10 +94,12 @@ from ..configuration import store as _machine
 from ..dispatcher import gate as _gate
 from ..dispatcher import read as _readers
 from ..output import command_log as _log
+from ..output import lasx_native_autosave as _native
 from ..output import save as _save
 from ..output.naming import Naming, run_hash
 from ..procedures import backlash as _motion
 from ..vendor_interface.parsing import parse_tile_geometry as _parse_tile_geometry
+from ..configuration import data_location as _data_location
 from . import info as _info
 
 log = logging.getLogger(__name__)
@@ -209,6 +211,9 @@ class ZmartHandle:
     position_counter: int = 0
     acquisition_hashes: set[str] = field(default_factory=set)
     translations: dict[int, tuple[float, float, float]] | None = None
+    #: This microscope's data location, set up once and loaded at connect
+    #: (configuration/data_location); None when it was never set up.
+    data_location: Path | None = None
     closed: bool = False
     unconfirmed: list[dict[str, Any]] = field(default_factory=list)
 
@@ -289,6 +294,7 @@ def connect(connection: dict | None = None) -> ZmartHandle:
     """
     connection = {**CONNECTION, **(connection or {})}
     saved_origin = _load_saved_origin() if connection.get("load_origin", True) else None
+    saved_location = _load_data_location()
     client = _session.connect_microscope(
         client_name=connection.get("client", "PythonClient"),
         api_delay_ms=connection.get("api_delay_ms"),
@@ -301,7 +307,23 @@ def connect(connection: dict | None = None) -> ZmartHandle:
     handle.translations = loaded.translations if loaded is not None else None
     if saved_origin is not None:
         handle.origin = saved_origin
+    handle.data_location = saved_location
     return handle
+
+
+def _load_data_location() -> Path | None:
+    """This microscope's set-up data location, or None when it was never set up.
+
+    A record that cannot be read stops the connection with how to fix it,
+    rather than being taken for "not set up".
+    """
+    try:
+        return _data_location.data_location()
+    except (OSError, ValueError) as exc:
+        raise RuntimeError(
+            f"this microscope's saved data location could not be read ({exc}); "
+            "set it again with configuration/data_location/notebooks/set_data_location.ipynb"
+        ) from exc
 
 
 # The values a frame origin must carry. They match what set_origin captures,
@@ -914,6 +936,10 @@ def get_acquisition_settings(handle: ZmartHandle) -> dict:
         "cleanup_source": {"options": [True, False], "active": False},
         "source": {"options": list(_save.SOURCES), "active": IMAGE_SAVE.source},
         "projection": {"options": list(_save.PROJECTIONS), "active": IMAGE_SAVE.projection},
+        "save_to": {
+            "options": "a full path to a folder on a local disk this computer can write to",
+            "active": str(saving) if (saving := _where_it_saves(handle)) is not None else None,
+        },
     }
 
 
@@ -933,6 +959,15 @@ def _with_defaults(handle: ZmartHandle, settings: dict | None) -> dict:
                 )
             Naming(folder=value, hash6="000000", position_label="check")
             resolved[name] = value
+            continue
+        if name == "save_to":
+            # Checked here, before the scan fires, as the data location is
+            # when it is set up: a capture never goes to a folder that
+            # cannot hold it.
+            problems = _data_location.check(value) if isinstance(value, (str, Path)) else ["it is not a path"]
+            if problems:
+                raise ValueError(f"acquisition setting 'save_to' {value!r}: {'; '.join(problems)}")
+            resolved[name] = str(Path(value).resolve())
             continue
         if name == "backlash_rounds":
             if isinstance(value, bool) or not isinstance(value, int) or value < 0:
@@ -1051,9 +1086,13 @@ def acquire(
     detection, or persistence.
     """
     _require_open(handle)
-    workflow_root = _info.output_root(handle, _save.save_source_root)
-    output_root = workflow_root / ".staging" / handle.hash6
     resolved = _with_defaults(handle, acquisition_settings)
+    if not resolved["save_to"]:
+        _info.output_root(handle)  # says how to set one up
+    # Staging lives under the folder saved to, so moving a capture into its
+    # run is a rename on the same disk, never a copy.
+    workflow_root = Path(resolved["save_to"])
+    output_root = workflow_root / ".staging" / handle.hash6
     folder = resolved["folder"]
     job = resolved["job"]
     if not job:
@@ -1495,9 +1534,9 @@ def get_info(handle: ZmartHandle) -> dict:
     """
     _require_open(handle)
     selected = _selected_job_name(handle)
-    root = _info.output_root(handle, _save.save_source_root)
+    root = _where_it_saves(handle)
     return {
-        "output_root": str(root),
+        "output_root": str(root) if root is not None else None,
         "description": _described(handle),
         "selected_job": selected,
         "client": handle.connection.get("client"),
@@ -1581,7 +1620,15 @@ def _canvas(handle: ZmartHandle) -> dict | None:
     }
 
 
-def _connection_status(handle: ZmartHandle, root: Path) -> dict:
+def _where_it_saves(handle: ZmartHandle) -> Path | None:
+    """The folder this session saves under, or None when there is none yet."""
+    try:
+        return _info.output_root(handle)
+    except RuntimeError:
+        return None
+
+
+def _connection_status(handle: ZmartHandle, root: Path | None) -> dict:
     """What a session stands on, from what the driver already holds; a
     failure names itself."""
     limits = _gate.describe(handle.client)
@@ -1606,10 +1653,10 @@ def _connection_status(handle: ZmartHandle, root: Path) -> dict:
         ),
         "stage": _try(stage) or "failed — no reading",
         "autosave": (
-            "enabled" if _try(_save.native_autosave_enabled)
+            "enabled" if _try(_native.native_autosave_enabled)
             else "failed — LAS X will not save what is captured"
         ),
-        "output root": str(root),
+        "output root": str(root) if root is not None else f"not set up: {_info.SET_UP}",
     }
 
 
