@@ -141,6 +141,7 @@ def save(
             export_completion_timeout=export_completion_timeout_s,
             export_completion_poll_interval=export_completion_poll_interval_s,
         )
+    exported = replace(exported, metadata=on_the_canvas(exported.metadata, exported, placement))
     if format == "ome-zarr":
         return _persist_store(
             exported,
@@ -161,6 +162,30 @@ def save(
         fix_ome=fix_ome,
         cleanup_source=cleanup_source,
     )
+
+
+def on_the_canvas(metadata, exported: ExportedAcquisition, placement) -> object:
+    """Every plane's position as its canvas position, the frame the workflow drives in.
+
+    *placement*, handed the planes' z numbers, answers where on the canvas
+    each was taken (the middle of the frame in x and y). What the
+    microscope's own drives read stays beside it, in each plane's
+    actuators. Without a placement no position is claimed at all: the
+    microscope's stage numbers are in another frame, and a file that
+    called them its position would put the picture somewhere else.
+    """
+    indices = [index for position in exported.positions for index in position.planes]
+    where = placement(sorted({index.z for index in indices})) if placement is not None else None
+    planes = {}
+    for index, plane in metadata.planes.items():
+        at = where(index.z) if where is not None else {}
+        planes[index] = replace(
+            plane,
+            position_x_um=at.get("x_um"),
+            position_y_um=at.get("y_um"),
+            position_z_um=at.get("z_um"),
+        )
+    return replace(metadata, planes=planes)
 
 
 def _persist_store(

@@ -224,3 +224,66 @@ def test_a_store_is_written_with_opencv_already_loaded(hires, tmp_path):
 
     level = zarr.open_group(str(saved.image_paths[PlaneIndex(0, 0, 0)]), mode="r")["0"]
     np.testing.assert_array_equal(level[0, 1, 0], pixels[1])
+
+
+class TestEveryFileSaysTheCanvasPosition:
+    """The plane position in every file is its canvas position; the actuators stand beside it."""
+
+    def test_the_tiff_planes_carry_the_canvas_position(self, hires, tmp_path):
+        ome_types = pytest.importorskip("ome_types")
+        import tifffile
+
+        root, _ = hires
+        saved = saving.save(
+            None, acquisition_of("HiRes"), tmp_path / "out",
+            Naming(folder="high-res", hash6="000001", position_label="A1"),
+            source="cache", cache_root=root, format="ome-tiff", orientation=Orientation(),
+            placement=at(1000.0, 2000.0, {0: 50.0}),
+        )
+
+        with tifffile.TiffFile(saved.image_paths[PlaneIndex(0, 0, 1)]) as tif:
+            ome = ome_types.from_xml(tif.pages[0].description, validate=True)
+        [plane] = ome.images[0].pixels.planes
+        assert (plane.position_x, plane.position_y, plane.position_z) == (1000.0, 2000.0, 50.0)
+        drives = {m.k: float(m.value) for a in ome.structured_annotations.map_annotations
+                  if a.id == plane.annotation_refs[0].id for m in a.value.ms}
+        assert drives["stage x (µm)"] == pytest.approx(63500.0)
+
+    def test_the_stores_ome_xml_agrees_with_its_translation(self, stack, tmp_path):
+        ome_types = pytest.importorskip("ome_types")
+        root, _ = stack
+        step = 38.55132 / 16
+        heights = {z: 10.0 + step * z for z in range(17)}
+
+        saved = save_as_zarr(root, tmp_path, "AF Job", placement=at(1000.0, 2000.0, heights))
+
+        store = saved.image_paths[PlaneIndex(0, 0, 0)]
+        ome = ome_types.from_xml((store / "OME" / "METADATA.ome.xml").read_text(encoding="utf-8"))
+        planes = sorted(ome.images[0].pixels.planes, key=lambda p: p.the_z)
+        assert [p.position_z for p in planes] == pytest.approx([heights[z] for z in range(17)])
+        assert {(p.position_x, p.position_y) for p in planes} == {(1000.0, 2000.0)}
+        translation = {t["type"]: t for t in attributes(store)["ome"]["multiscales"][0]["datasets"][0]
+                       ["coordinateTransformations"]}["translation"]["translation"]
+        assert translation[2] == pytest.approx(planes[0].position_z)
+
+    def test_without_a_canvas_position_no_plane_position_is_claimed(self, hires, tmp_path):
+        ome_types = pytest.importorskip("ome_types")
+        import tifffile
+
+        root, _ = hires
+        saved = saving.save(
+            None, acquisition_of("HiRes"), tmp_path / "out",
+            Naming(folder="high-res", hash6="000001", position_label="A1"),
+            source="cache", cache_root=root, format="ome-tiff", orientation=Orientation(),
+        )
+
+        with tifffile.TiffFile(saved.image_paths[PlaneIndex(0, 0, 0)]) as tif:
+            [plane] = ome_types.from_xml(tif.pages[0].description).images[0].pixels.planes
+        assert plane.position_x is None and plane.position_z is None
+        assert plane.annotation_refs, "the actuators are still there"
+
+    def test_a_store_without_a_canvas_position_is_refused(self, hires, tmp_path):
+        root, _ = hires
+
+        with pytest.raises(ValueError, match="canvas"):
+            save_as_zarr(root, tmp_path, "HiRes", placement=None)

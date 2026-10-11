@@ -67,9 +67,9 @@ def write_position_store(
 ) -> Path:
     """Write *exported* as the OME-Zarr image *store*, and return it.
 
-    *where* places the image on the sample; without it, the microscope's own
-    stage and focus readings from the capture's metadata place it. A store
-    that already exists is refused: a capture is never written over another.
+    *where* places the image on the canvas (plane z number -> its canvas x,
+    y, z), and is required. A store that already exists is refused: a
+    capture is never written over another.
     """
     import zarr
     from ome_zarr_models.v05.axes import Axis
@@ -78,19 +78,18 @@ def write_position_store(
 
     if store.exists():
         raise RuntimeError(f"{store} already exists; a capture is never written over another")
+    if where is None:
+        raise ValueError(
+            "an OME-Zarr store is placed by its canvas position, and none was given "
+            "(save's placement); without it the image would lie at an invented place"
+        )
     metadata = exported.metadata
     planes = {index: source for position in exported.positions for index, source in position.planes.items()}
     times = sorted({index.t for index in planes})
     channels = sorted({index.c for index in planes})
     numbers = sorted({index.z for index in planes})
 
-    def height(z: int) -> float | None:
-        if where is not None:
-            return where(z).get("z_um")
-        known = metadata.planes.get(PlaneIndex(t=times[0], z=z, c=channels[0]))
-        return known.position_z_um if known is not None else None
-
-    heights = {z: height(z) for z in numbers}
+    heights = {z: where(z).get("z_um") for z in numbers}
     # Lowest plane first: a voxel size is positive, so a stack swept
     # downwards is turned round on the way in.
     ascending = sorted(numbers, key=lambda z: (heights[z] is None, heights[z] if heights[z] is not None else z))
@@ -110,7 +109,7 @@ def write_position_store(
     if not pixel_x or not pixel_y:
         raise RuntimeError("the capture does not say its pixel size, so the image cannot be placed")
     ny, nx = volume.shape[-2:]
-    centre = where(ascending[0]) if where is not None else _stage_centre(metadata, times[0], ascending[0], channels[0])
+    centre = where(ascending[0])
     lowest = heights[ascending[0]]
     translation = [
         0.0,
@@ -186,14 +185,6 @@ def write_position_store(
     (writing / "OME" / "METADATA.ome.xml").write_bytes(canonical.image_xml(in_store, image_name=store.name, state=state))
     os.replace(writing, store)
     return store
-
-
-def _stage_centre(metadata, t: int, z: int, c: int) -> dict:
-    """Where the microscope's stage stood for a plane, from the capture's own metadata."""
-    plane = metadata.planes.get(PlaneIndex(t=t, z=z, c=c))
-    if plane is None:
-        return {"x_um": None, "y_um": None}
-    return {"x_um": plane.position_x_um, "y_um": plane.position_y_um}
 
 
 def _window(pixels: np.ndarray, deepest: int) -> dict:
