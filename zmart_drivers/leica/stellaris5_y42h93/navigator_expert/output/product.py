@@ -151,13 +151,18 @@ class PlaneMetadata:
 
     Positions are the microscope's own stage and focus readings in
     micrometres, as its software wrote them beside the picture; ZMART's
-    sample frame is in the acquisition's answer and its state.
+    sample frame is in the acquisition's answer and its state. ``x`` and
+    ``y`` are the stage's; ``z`` is the focus height, every z drive
+    together. ``actuators`` names where each drive stood for this plane,
+    as ``(name, micrometres)`` pairs, so the height can always be taken
+    apart again.
     """
 
     delta_t_s: float | None = None
     position_x_um: float | None = None
     position_y_um: float | None = None
     position_z_um: float | None = None
+    actuators: tuple[tuple[str, float], ...] = ()
 
 
 @dataclass(frozen=True)

@@ -343,10 +343,10 @@ def _ome_xml(
         )
         uuid_el = ET.SubElement(tiff_data, _tag("UUID"), {"FileName": filename})
         uuid_el.text = "urn:uuid:" + str(uuid.uuid5(uuid.NAMESPACE_URL, filename))
-    for index, plane in planes:
-        _append_plane(pixels, index, plane)
+    drive_maps = [(_append_plane(pixels, index, plane), plane) for index, plane in planes]
+    drive_maps = [(ref, plane) for ref, plane in drive_maps if ref is not None]
 
-    if metadata.annotations or state is not None:
+    if metadata.annotations or drive_maps or state is not None:
         # AnnotationRefs come AFTER Pixels in the Image element, and the one
         # StructuredAnnotations block AFTER Image in the OME element.
         annotations = ET.Element(_tag("StructuredAnnotations"))
@@ -358,6 +358,11 @@ def _ome_xml(
             value = ET.SubElement(vendor, _tag("Value"))
             for key, text in metadata.annotations:
                 ET.SubElement(value, _tag("M"), {"K": key}).text = text
+        for ref, plane in drive_maps:
+            drives = ET.SubElement(annotations, _tag("MapAnnotation"), {"ID": ref, "Namespace": VENDOR_NS})
+            value = ET.SubElement(drives, _tag("Value"))
+            for name, micrometres in plane.actuators:
+                ET.SubElement(value, _tag("M"), {"K": name}).text = _num(micrometres)
         if state is not None:
             _append_state_annotations(annotations, image, state)
         root.append(annotations)
@@ -447,7 +452,8 @@ def _append_channel(pixels: ET.Element, channel: ChannelMetadata) -> None:
             ET.SubElement(path, _tag("EmissionFilterRef"), {"ID": filter_id})
 
 
-def _append_plane(pixels: ET.Element, index: PlaneIndex, plane: PlaneMetadata) -> None:
+def _append_plane(pixels: ET.Element, index: PlaneIndex, plane: PlaneMetadata) -> str | None:
+    """One Plane; when it names where each drive stood, the ID of the annotation that will say so."""
     attrs = {"TheZ": str(index.z), "TheT": str(index.t), "TheC": str(index.c)}
     if plane.delta_t_s is not None:
         attrs.update(DeltaT=_num(plane.delta_t_s), DeltaTUnit="s")
@@ -461,7 +467,12 @@ def _append_plane(pixels: ET.Element, index: PlaneIndex, plane: PlaneMetadata) -
             # frame"), so it is always said.
             attrs[f"Position{axis}"] = _num(value)
             attrs[f"Position{axis}Unit"] = MICROMETER
-    ET.SubElement(pixels, _tag("Plane"), attrs)
+    element = ET.SubElement(pixels, _tag("Plane"), attrs)
+    if not plane.actuators:
+        return None
+    ref = f"Annotation:drives-t{index.t}-z{index.z}-c{index.c}"
+    ET.SubElement(element, _tag("AnnotationRef"), {"ID": ref})
+    return ref
 
 
 def _append_state_annotations(annotations: ET.Element, image: ET.Element, state: dict) -> None:

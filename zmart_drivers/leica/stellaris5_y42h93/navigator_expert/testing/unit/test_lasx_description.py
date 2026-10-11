@@ -229,3 +229,60 @@ class TestTheOmeWritten:
         assert models[detector_ref] == "HyD S 3"
         facts = {m.get("K"): m.text for m in root.iter(f"{OME}M")}
         assert facts["zoom"] == "1"
+
+
+def with_z_wide_at(name: str, metres: str, *, stack_drive: str | None = None) -> AcquisitionMetadata:
+    """A fixture as if the z-wide drive had stood at *metres* (the simulator keeps it at 0)."""
+    text = (DATA / f"{name}.xml").read_text(encoding="utf-8")
+    text = text.replace('ZUseModeName="z-wide" ZPosition="0"', f'ZUseModeName="z-wide" ZPosition="{metres}"')
+    if stack_drive is not None:
+        text = text.replace('ZUseMode="1" ZUseModeName="z-galvo"', f'ZUseMode="2" ZUseModeName="{stack_drive}"')
+    return described.metadata_from_description(text)
+
+
+class TestEveryPlaneSaysWhereEachDriveStood:
+    def test_stage_and_both_z_drives_per_plane(self):
+        metadata = metadata_of(STACK)
+
+        first = dict(metadata.planes[PlaneIndex(0, 0, 0)].actuators)
+        last = dict(metadata.planes[PlaneIndex(0, 16, 0)].actuators)
+        assert first["stage x (µm)"] == pytest.approx(63500.0)
+        assert first["stage y (µm)"] == pytest.approx(41500.0)
+        # The galvo made the stack: it moved from plane to plane...
+        assert first["z-galvo (µm)"] == pytest.approx(-19.27566)
+        assert last["z-galvo (µm)"] == pytest.approx(19.27566)
+        # ...while z-wide stood still.
+        assert first["z-wide (µm)"] == last["z-wide (µm)"] == 0.0
+
+    def test_the_plane_height_is_both_z_drives_together(self):
+        metadata = with_z_wide_at(STACK, "0.0009")
+
+        first, last = metadata.planes[PlaneIndex(0, 0, 0)], metadata.planes[PlaneIndex(0, 16, 0)]
+        assert dict(first.actuators)["z-wide (µm)"] == pytest.approx(900.0)
+        assert first.position_z_um == pytest.approx(900.0 - 19.27566)
+        assert last.position_z_um == pytest.approx(900.0 + 19.27566)
+
+    def test_a_stack_made_by_z_wide_moves_z_wide_and_keeps_the_galvo(self):
+        metadata = with_z_wide_at(STACK, "0.0009", stack_drive="z-wide")
+
+        first = dict(metadata.planes[PlaneIndex(0, 0, 0)].actuators)
+        last = dict(metadata.planes[PlaneIndex(0, 16, 0)].actuators)
+        assert first["z-wide (µm)"] == pytest.approx(-19.27566)
+        assert last["z-wide (µm)"] == pytest.approx(19.27566)
+        assert first["z-galvo (µm)"] == last["z-galvo (µm)"] == pytest.approx(19.275422269005238)
+
+    def test_the_written_plane_carries_each_drive(self):
+        ome_types = pytest.importorskip("ome_types")
+        metadata = with_z_wide_at(HIRES, "0.0012")
+
+        xml = canonical.plane_xml(metadata, index=PlaneIndex(0, 0, 1), filename="p.ome.tif", shape_yx=(512, 512))
+
+        ome = ome_types.from_xml(xml.decode("ascii"), validate=True)
+        [plane] = ome.images[0].pixels.planes
+        assert plane.position_z == pytest.approx(1200.0, abs=1e-3)
+        [ref] = plane.annotation_refs
+        drives = next(a for a in ome.structured_annotations.map_annotations if a.id == ref.id)
+        values = {m.k: m.value for m in drives.value.ms}
+        assert float(values["z-wide (µm)"]) == pytest.approx(1200.0)
+        assert float(values["stage x (µm)"]) == pytest.approx(63500.0)
+        assert "z-galvo (µm)" in values

@@ -317,7 +317,16 @@ class Reading:
         return when.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
 
     def planes(self, size_c: int, z: dict | None) -> dict[PlaneIndex, PlaneMetadata]:
-        """When and where every plane was taken.
+        """When every plane was taken, and where each drive stood for it.
+
+        The stage gives x and y. For z, the description names the drive that
+        made the stack (``ZUseModeName``): that one moves from the axis's
+        origin by one step a plane, and every other z drive stands where the
+        description says it stood (``AdditionalZPosition``; the drive that
+        moved is recorded there at its last position, so it is not read for
+        the planes). The plane's height is all z drives together. A stack
+        made by z-wide is read the same way, but has not been seen on a
+        microscope yet (only z-galvo stacks, on the simulator).
 
         LAS X stamps every plane of every channel once, in the order the
         pixels are kept: channel inside plane. (Seen on the simulator for
@@ -326,18 +335,34 @@ class Reading:
         stamps = self.time_stamps()
         size_z = z["count"] if z else 1
         step = z["length_m"] / (size_z - 1) if z and size_z > 1 else 0.0
-        origin = z["origin_m"] if z else float(self.setting.get("ZPosition", "nan"))
+        origin = z["origin_m"] if z else number(self.setting.get("ZPosition"))
+        moving = self.setting.get("ZUseModeName")
+        standing = {
+            drive.get("ZUseModeName"): number(drive.get("ZPosition"))
+            for drive in self.setting.findall("./AdditionalZPositionList/AdditionalZPosition")
+            if drive.get("ZUseModeName") and drive.get("ZUseModeName") != moving
+        }
         x_um = number(self.setting.get("StagePosX"), 1e6)
         y_um = number(self.setting.get("StagePosY"), 1e6)
         planes = {}
         for plane in range(size_z):
+            drives = dict(standing)
+            if moving and origin is not None:
+                drives[moving] = origin + plane * step
+            heights = [metres for metres in drives.values() if metres is not None]
+            actuators = [("stage x (µm)", x_um), ("stage y (µm)", y_um)]
+            actuators += [
+                (f"{name} (µm)", metres * 1e6 if metres is not None else None)
+                for name, metres in sorted(drives.items())
+            ]
             for c in range(size_c):
                 stamp = plane * size_c + c
                 planes[PlaneIndex(t=0, z=plane, c=c)] = PlaneMetadata(
                     delta_t_s=(stamps[stamp] - stamps[0]) / 1e7 if stamp < len(stamps) else None,
                     position_x_um=x_um,
                     position_y_um=y_um,
-                    position_z_um=(origin + plane * step) * 1e6 if origin == origin else None,
+                    position_z_um=sum(heights) * 1e6 if heights else None,
+                    actuators=tuple((name, value) for name, value in actuators if value is not None),
                 )
         return planes
 
@@ -361,9 +386,6 @@ class Reading:
             ("objective order number", s.get("ObjectiveNumber")),
             ("z drive of the stack", s.get("ZUseModeName")),
         ]
-        for drive in s.findall("./AdditionalZPositionList/AdditionalZPosition"):
-            if drive.get("ZUseModeName"):
-                named.append((f"{drive.get('ZUseModeName')} position (m)", drive.get("ZPosition")))
         for wheel in s.findall("./FilterWheel/Wheel"):
             if wheel.get("FilterWheelName"):
                 named.append((f"filter wheel {wheel.get('FilterWheelName').strip()}", (wheel.get("FilterName") or "").strip()))
