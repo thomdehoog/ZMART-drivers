@@ -110,6 +110,24 @@ def data_dir(output_root: Path | str, folder: str) -> Path:
     return acquisition_dir(output_root, folder) / "data"
 
 
+def projections_dir(output_root: Path | str, folder: str) -> Path:
+    """``<acquisition>/projections``: what is projected from the captures, beside ``data``."""
+
+    return acquisition_dir(output_root, folder) / "projections"
+
+
+def log_dir(output_root: Path | str, folder: str) -> Path:
+    """``<acquisition>/log``: what the driver was asked for each capture, and what it did."""
+
+    return acquisition_dir(output_root, folder) / "log"
+
+
+def build_projection_name(naming: Naming, method: str) -> str:
+    """The projection of one T/C of a capture, saved as OME-TIFF: the image name with the method for Z."""
+
+    return f"{naming.folder}_{naming.hash6}_{naming.position_label}_T{naming.t:06d}_C{naming.c:02d}_{method}.ome.tiff"
+
+
 def metadata_dir(output_root: Path | str, folder: str) -> Path:
     """Return where an acquisition's printed metadata goes: ``<folder>/data/metadata``."""
 

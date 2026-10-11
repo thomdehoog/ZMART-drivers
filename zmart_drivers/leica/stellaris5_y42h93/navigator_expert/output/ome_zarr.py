@@ -35,7 +35,7 @@ from __future__ import annotations
 import os
 import uuid
 from collections.abc import Callable
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 import numpy as np
@@ -43,9 +43,9 @@ import numpy as np
 from ..configuration.image_stage_registration import Orientation, reorient_array
 from . import materialize
 from . import ome_canonical as canonical
-from .product import ExportedAcquisition, PlaneIndex
+from .product import AcquisitionMetadata, ExportedAcquisition, PlaneIndex
 
-__all__ = ["write_position_store"]
+__all__ = ["Capture", "gather", "max_projection", "write_position_store", "write_store"]
 
 #: The edge of a chunk in y and x: what the run stores the viewer reads use.
 PIECE = 128
@@ -55,6 +55,21 @@ AXES = "tczyx"
 #: Plane z number -> where on the sample that plane was taken (``x_um``,
 #: ``y_um``, ``z_um``), in the frame the workflow drives in.
 Placement = Callable[[int], dict]
+
+
+@dataclass(frozen=True)
+class Capture:
+    """One capture gathered for writing: its pixels and what is said about them.
+
+    ``volume`` is t, c, z, y, x with z ascending and the orientation applied;
+    ``metadata`` describes exactly that volume (its planes renumbered from
+    the lowest up); ``translation`` is where the volume's first voxel lies
+    on the canvas, in t, c, z, y, x.
+    """
+
+    volume: np.ndarray
+    metadata: AcquisitionMetadata
+    translation: list[float]
 
 
 def write_position_store(
@@ -71,25 +86,28 @@ def write_position_store(
     y, z), and is required. A store that already exists is refused: a
     capture is never written over another.
     """
-    import zarr
-    from ome_zarr_models.v05.axes import Axis
-    from ome_zarr_models.v05.image import Image
-    from pydantic_zarr.v3 import ArraySpec
-
-    if store.exists():
-        raise RuntimeError(f"{store} already exists; a capture is never written over another")
     if where is None:
         raise ValueError(
             "an OME-Zarr store is placed by its canvas position, and none was given "
             "(save's placement); without it the image would lie at an invented place"
         )
+    return write_store(gather(exported, orientation=orientation, where=where), store, state=state)
+
+
+def gather(exported: ExportedAcquisition, *, orientation: Orientation, where: Placement | None) -> Capture:
+    """Read every plane of *exported* into one volume, lowest plane first, and place it.
+
+    Without *where* the planes keep the vendor's order and the volume is not
+    placed (its translation is zero): enough for a projection saved as
+    OME-TIFF, never for a store.
+    """
     metadata = exported.metadata
     planes = {index: source for position in exported.positions for index, source in position.planes.items()}
     times = sorted({index.t for index in planes})
     channels = sorted({index.c for index in planes})
     numbers = sorted({index.z for index in planes})
 
-    heights = {z: where(z).get("z_um") for z in numbers}
+    heights = {z: where(z).get("z_um") if where is not None else None for z in numbers}
     # Lowest plane first: a voxel size is positive, so a stack swept
     # downwards is turned round on the way in.
     ascending = sorted(numbers, key=lambda z: (heights[z] is None, heights[z] if heights[z] is not None else z))
@@ -106,10 +124,10 @@ def write_position_store(
     pixel_y, pixel_x = metadata.physical_size_y_um, metadata.physical_size_x_um
     if orientation.swaps_axes:
         pixel_y, pixel_x = pixel_x, pixel_y
-    if not pixel_x or not pixel_y:
+    if where is not None and (not pixel_x or not pixel_y):
         raise RuntimeError("the capture does not say its pixel size, so the image cannot be placed")
     ny, nx = volume.shape[-2:]
-    centre = where(ascending[0])
+    centre = where(ascending[0]) if where is not None else {}
     lowest = heights[ascending[0]]
     translation = [
         0.0,
@@ -118,9 +136,71 @@ def write_position_store(
         centre["y_um"] - ny * pixel_y / 2 if centre.get("y_um") is not None else 0.0,
         centre["x_um"] - nx * pixel_x / 2 if centre.get("x_um") is not None else 0.0,
     ]
+    described = replace(
+        metadata,
+        size_t=len(times),
+        size_c=len(channels),
+        size_z=len(numbers),
+        size_y=ny,
+        size_x=nx,
+        physical_size_x_um=pixel_x,
+        physical_size_y_um=pixel_y,
+        channels=tuple(replace(metadata.channel(c), index=ci) for ci, c in enumerate(channels)),
+        planes={
+            PlaneIndex(t=ti, z=zi, c=ci): metadata.planes[PlaneIndex(t=t, z=z, c=c)]
+            for ti, t in enumerate(times)
+            for ci, c in enumerate(channels)
+            for zi, z in enumerate(ascending)
+            if PlaneIndex(t=t, z=z, c=c) in metadata.planes
+        },
+    )
+    return Capture(volume=volume, metadata=described, translation=translation)
 
-    described = [metadata.channel(c) for c in channels]
-    names = [channel.name or f"channel {c}" for channel, c in zip(described, channels, strict=True)]
+
+def max_projection(capture: Capture) -> Capture:
+    """The brightest of every pixel over z: one plane, lying where the stack starts.
+
+    What it was made from is said beside it: the method, how many planes,
+    and the lowest and highest of them on the canvas. A plane of a
+    projection has no single drive position, so the actuators are left out.
+    """
+    metadata = capture.metadata
+    heights = sorted(
+        plane.position_z_um for plane in metadata.planes.values() if plane.position_z_um is not None
+    )
+    flat = {
+        PlaneIndex(t=index.t, z=0, c=index.c): replace(plane, actuators=())
+        for index, plane in metadata.planes.items()
+        if index.z == 0
+    }
+    facts = [("projection", "max over z"), ("projected planes", str(metadata.size_z))]
+    if heights:
+        facts += [("lowest plane z (µm)", canonical._num(heights[0])), ("highest plane z (µm)", canonical._num(heights[-1]))]
+    return Capture(
+        volume=capture.volume.max(axis=2, keepdims=True),
+        metadata=replace(
+            metadata,
+            size_z=1,
+            physical_size_z_um=None,
+            planes=flat,
+            annotations=(*metadata.annotations, *facts),
+        ),
+        translation=list(capture.translation),
+    )
+
+
+def write_store(capture: Capture, store: Path, *, state: dict | None = None) -> Path:
+    """Write one gathered capture as the OME-Zarr image *store*, whole, and return it."""
+    import zarr
+    from ome_zarr_models.v05.axes import Axis
+    from ome_zarr_models.v05.image import Image
+    from pydantic_zarr.v3 import ArraySpec
+
+    if store.exists():
+        raise RuntimeError(f"{store} already exists; a capture is never written over another")
+    volume, metadata = capture.volume, capture.metadata
+    ny, nx = volume.shape[-2:]
+    names = [channel.name or f"channel {channel.index}" for channel in metadata.channels]
 
     writing = store.with_name(f".{store.name}.{uuid.uuid4().hex[:8]}.writing")
     store.parent.mkdir(parents=True, exist_ok=True)
@@ -142,8 +222,8 @@ def write_position_store(
             Axis(name="y", type="space", unit="micrometer"),
             Axis(name="x", type="space", unit="micrometer"),
         ],
-        scales=[[1.0, 1.0, metadata.physical_size_z_um or 1.0, pixel_y, pixel_x]],
-        translations=[translation],
+        scales=[[1.0, 1.0, metadata.physical_size_z_um or 1.0, metadata.physical_size_y_um, metadata.physical_size_x_um]],
+        translations=[capture.translation],
         name=store.name,
         multiscale_type="mean",
     )
@@ -159,30 +239,12 @@ def write_position_store(
                 "window": _window(volume[:, index], deepest),
                 "active": True,
             }
-            for index, (name, channel) in enumerate(zip(names, described, strict=True))
+            for index, (name, channel) in enumerate(zip(names, metadata.channels, strict=True))
         ]
     }
     group.attrs["ome"] = ome
-
-    in_store = replace(
-        metadata,
-        size_t=len(times),
-        size_c=len(channels),
-        size_z=len(numbers),
-        size_y=ny,
-        size_x=nx,
-        physical_size_x_um=pixel_x,
-        physical_size_y_um=pixel_y,
-        planes={
-            PlaneIndex(t=ti, z=zi, c=ci): metadata.planes[PlaneIndex(t=t, z=z, c=c)]
-            for ti, t in enumerate(times)
-            for ci, c in enumerate(channels)
-            for zi, z in enumerate(ascending)
-            if PlaneIndex(t=t, z=z, c=c) in metadata.planes
-        },
-    )
     (writing / "OME").mkdir()
-    (writing / "OME" / "METADATA.ome.xml").write_bytes(canonical.image_xml(in_store, image_name=store.name, state=state))
+    (writing / "OME" / "METADATA.ome.xml").write_bytes(canonical.image_xml(metadata, image_name=store.name, state=state))
     os.replace(writing, store)
     return store
 

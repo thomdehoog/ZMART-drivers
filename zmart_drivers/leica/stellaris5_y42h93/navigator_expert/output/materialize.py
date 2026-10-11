@@ -39,25 +39,38 @@ def save_image_source_atomic(
     self-consistent. A mirror preserves dimensions; a 90/270 turn swaps
     SizeX/SizeY via the transformed shape and PhysicalSizeX/Y below.
     """
+    arr = _read_source_plane(image_src)
+    if arr.ndim != 2:
+        raise RuntimeError(
+            f"Expected a single 2-D image plane, got shape {arr.shape} from {image_src.path}"
+        )
+    if orientation is not None and not orientation.is_identity:
+        arr = reorient_array(arr, orientation)
+        if orientation.swaps_axes:
+            # 90/270 transposes the grid: SizeX/SizeY follow the rotated
+            # shape_yx below; swap the physical pixel sizes to match.
+            metadata = replace(
+                metadata,
+                physical_size_x_um=metadata.physical_size_y_um,
+                physical_size_y_um=metadata.physical_size_x_um,
+            )
+    write_plane_atomic(arr, image_dest, metadata=metadata, index=index, fix_ome=fix_ome, state=state)
+
+
+def write_plane_atomic(
+    arr,
+    image_dest: Path,
+    *,
+    metadata: AcquisitionMetadata,
+    index: PlaneIndex,
+    fix_ome: bool = False,
+    state: dict | None = None,
+) -> None:
+    """Write one 2-D plane, already oriented, as a canonical ZMART OME-TIFF, whole."""
+    import tifffile
+
     image_tmp = _with_tmp_suffix(image_dest)
     try:
-        import tifffile
-
-        arr = _read_source_plane(image_src)
-        if arr.ndim != 2:
-            raise RuntimeError(
-                f"Expected a single 2-D image plane, got shape {arr.shape} from {image_src.path}"
-            )
-        if orientation is not None and not orientation.is_identity:
-            arr = reorient_array(arr, orientation)
-            if orientation.swaps_axes:
-                # 90/270 transposes the grid: SizeX/SizeY follow the rotated
-                # shape_yx below; swap the physical pixel sizes to match.
-                metadata = replace(
-                    metadata,
-                    physical_size_x_um=metadata.physical_size_y_um,
-                    physical_size_y_um=metadata.physical_size_x_um,
-                )
         xml = _canonical.plane_xml(
             metadata,
             index=index,

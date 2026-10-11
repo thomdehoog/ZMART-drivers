@@ -93,6 +93,7 @@ from ..configuration import session_state as _session_state
 from ..configuration import store as _machine
 from ..dispatcher import gate as _gate
 from ..dispatcher import read as _readers
+from ..output import command_log as _log
 from ..output import save as _save
 from ..output.naming import Naming, run_hash
 from ..procedures import backlash as _motion
@@ -912,6 +913,7 @@ def get_acquisition_settings(handle: ZmartHandle) -> dict:
         "format": {"options": list(_save.FORMATS), "active": IMAGE_SAVE.format},
         "cleanup_source": {"options": [True, False], "active": False},
         "source": {"options": list(_save.SOURCES), "active": IMAGE_SAVE.source},
+        "projection": {"options": list(_save.PROJECTIONS), "active": IMAGE_SAVE.projection},
     }
 
 
@@ -1060,11 +1062,13 @@ def acquire(
         )
 
     noted_before = len(handle.unconfirmed)
+    # What the capture's log says it did, step by step (see output/command_log.py).
+    steps: dict = {}
     # When the selected job cannot be read, select the one asked for anyway:
     # selecting is harmless to repeat, and a reading that fails is unknown,
     # not a reason to stop.
     if job != _selected_job_name(handle):
-        select = _commands.select_job(handle.client, job)
+        select = steps["select_job"] = _commands.select_job(handle.client, job)
         if not select.get("success"):
             raise RuntimeError(f"select_job('{job}') failed: {select}")
         if not select.get("confirmed"):
@@ -1073,7 +1077,7 @@ def acquire(
     backlash_rounds = resolved["backlash_rounds"]
     apply_backlash = resolved["backlash_correction"] and backlash_rounds > 0
     if apply_backlash:
-        settled = _motion.correct_backlash(handle.client, passes=backlash_rounds)
+        settled = steps["backlash"] = _motion.correct_backlash(handle.client, passes=backlash_rounds)
         if not settled.get("confirmed"):
             _note_unconfirmed(handle, "acquire: backlash takeup", settled)
 
@@ -1114,6 +1118,7 @@ def acquire(
         cleanup_source=resolved["cleanup_source"],
         source=resolved["source"],
         format=resolved["format"],
+        projection=resolved["projection"],
         # Where on the sample each plane was taken, the same answer the
         # acquisition gives below, so a store lies where its planes say.
         placement=lambda plane_z: _where_the_planes_are(handle, job, plane_z),
@@ -1138,6 +1143,26 @@ def acquire(
     ]
     vendor_metadata = [str(path) for path in getattr(saved, "vendor_metadata_paths", ())]
     printed = [str(path) for path in getattr(saved, "state_paths", ())]
+    projections = [str(path) for path in getattr(saved, "projection_paths", ())]
+    files = list(dict.fromkeys([*(plane["path"] for plane in planes), *projections, *vendor_metadata, *printed]))
+    unconfirmed = list(handle.unconfirmed[noted_before:])
+    log = _log.write(output_root, naming, {
+        "position_label": label,
+        "acquisition_hash": acquisition_hash,
+        "asked": dict(acquisition_settings or {}),
+        "settings": resolved,
+        "steps": steps,
+        "capture": {
+            "started": _when(acq.started_at),
+            "finished": _when(acq.finished_at),
+            "answered": getattr(acq, "command_result", None),
+        },
+        "unconfirmed": unconfirmed,
+        # Paths from where the run starts, so they stay true when the
+        # capture is moved into a run folder of the same shape.
+        "planes": [{**plane, "path": _from(output_root, plane["path"])} for plane in planes],
+        "files": [_from(output_root, path) for path in files],
+    })
     return {
         "position_label": label,
         "folder": folder,
@@ -1149,7 +1174,7 @@ def acquire(
         # Every file this acquisition saved, under the name the ZMART
         # Controller's contract fixes, so a workflow finds them on any
         # microscope: the images, then the vendor's metadata, then the state.
-        "files": list(dict.fromkeys([*(plane["path"] for plane in planes), *vendor_metadata, *printed])),
+        "files": [*files, str(log)],
         # The manifest a workflow needs to tell channels from z and t, and
         # where on the sample each plane was taken.
         "planes": planes,
@@ -1160,8 +1185,27 @@ def acquire(
         # The changes made for this capture that were sent but never
         # confirmed by a readback (the job selection, the backlash takeup).
         # Empty when everything confirmed. The capture itself went ahead.
-        "unconfirmed": list(handle.unconfirmed[noted_before:]),
+        "unconfirmed": unconfirmed,
+        # The driver's log of this capture: what it was asked, and what it did.
+        "log": [str(log)],
+        # Projected from a capture with more than one plane, beside its data.
+        "projections": projections,
     }
+
+
+def _from(root: Path, path: str) -> str:
+    """*path* from *root*, with forward slashes; as it is when it lies elsewhere."""
+    try:
+        return Path(path).relative_to(root).as_posix()
+    except ValueError:
+        return str(path)
+
+
+def _when(seconds: float | None) -> str | None:
+    """A time from the clock as an ISO 8601 moment in UTC; None when there is none."""
+    if not isinstance(seconds, (int, float)):
+        return None
+    return datetime.fromtimestamp(seconds, tz=timezone.utc).isoformat()
 
 
 # =============================================================================

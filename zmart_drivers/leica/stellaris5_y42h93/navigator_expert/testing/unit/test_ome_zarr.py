@@ -287,3 +287,103 @@ class TestEveryFileSaysTheCanvasPosition:
 
         with pytest.raises(ValueError, match="canvas"):
             save_as_zarr(root, tmp_path, "HiRes", placement=None)
+
+
+def save_with_projection(root, tmp_path, job, *, format, placement, projection="max"):
+    return saving.save(
+        None, acquisition_of(job), tmp_path / "out",
+        Naming(folder="high-res", hash6="000001", position_label="A1"),
+        source="cache", cache_root=root, format=format, orientation=Orientation(),
+        placement=placement, projection=projection,
+    )
+
+
+class TestTheProjection:
+    """A stack's max projection, beside the data in ``projections/``, made as the capture lands."""
+
+    STEP = 38.55132 / 16
+
+    def heights(self):
+        return {z: 10.0 + self.STEP * z for z in range(17)}
+
+    def test_a_stack_gets_one_projection_store(self, stack, tmp_path):
+        root, pixels = stack
+
+        saved = save_with_projection(root, tmp_path, "AF Job", format="ome-zarr",
+                                     placement=at(1000.0, 2000.0, self.heights()))
+
+        projections = tmp_path / "out" / "high-res" / "projections"
+        assert [p.name for p in projections.iterdir()] == ["high-res_000001_A1.ome.zarr"]
+        assert saved.projection_paths == (projections / "high-res_000001_A1.ome.zarr",)
+        level = zarr.open_group(str(saved.projection_paths[0]), mode="r")["0"]
+        assert level.shape == (1, 1, 1, 512, 512)
+        np.testing.assert_array_equal(level[0, 0, 0], pixels.max(axis=0))
+
+    def test_the_projection_lies_where_the_stack_starts(self, stack, tmp_path):
+        root, _ = stack
+
+        saved = save_with_projection(root, tmp_path, "AF Job", format="ome-zarr",
+                                     placement=at(1000.0, 2000.0, self.heights()))
+
+        data = attributes(saved.image_paths[PlaneIndex(0, 0, 0)])["ome"]["multiscales"][0]["datasets"][0]
+        flat = attributes(saved.projection_paths[0])["ome"]["multiscales"][0]["datasets"][0]
+        moved = {t["type"]: t["translation"] for t in data["coordinateTransformations"] if t["type"] == "translation"}
+        flat_moved = {t["type"]: t["translation"] for t in flat["coordinateTransformations"] if t["type"] == "translation"}
+        assert flat_moved["translation"] == pytest.approx(moved["translation"])
+        assert flat_moved["translation"][2] == pytest.approx(10.0)
+
+    def test_the_projection_says_what_it_is(self, stack, tmp_path):
+        ome_types = pytest.importorskip("ome_types")
+        root, _ = stack
+
+        saved = save_with_projection(root, tmp_path, "AF Job", format="ome-zarr",
+                                     placement=at(0.0, 0.0, self.heights()))
+
+        ome = ome_types.from_xml(
+            (saved.projection_paths[0] / "OME" / "METADATA.ome.xml").read_text(encoding="utf-8"), validate=True
+        )
+        assert ome.images[0].pixels.size_z == 1
+        facts = {m.k: m.value for a in ome.structured_annotations.map_annotations for m in a.value.ms}
+        assert facts["projection"] == "max over z"
+        assert facts["projected planes"] == "17"
+        assert float(facts["lowest plane z (µm)"]) == pytest.approx(10.0)
+        assert float(facts["highest plane z (µm)"]) == pytest.approx(10.0 + 16 * self.STEP)
+
+    def test_a_single_plane_gets_no_projection(self, hires, tmp_path):
+        root, _ = hires
+
+        saved = save_with_projection(root, tmp_path, "HiRes", format="ome-zarr", placement=at(0.0, 0.0, {0: 0.0}))
+
+        assert saved.projection_paths == ()
+        assert not (tmp_path / "out" / "high-res" / "projections").exists()
+
+    def test_no_projection_when_none_is_asked_for(self, stack, tmp_path):
+        root, _ = stack
+
+        saved = save_with_projection(root, tmp_path, "AF Job", format="ome-zarr",
+                                     placement=at(0.0, 0.0, self.heights()), projection="none")
+
+        assert saved.projection_paths == ()
+
+    def test_a_tiff_stack_gets_one_projection_file_a_channel(self, stack, tmp_path):
+        import tifffile
+
+        root, pixels = stack
+
+        saved = save_with_projection(root, tmp_path, "AF Job", format="ome-tiff",
+                                     placement=at(0.0, 0.0, self.heights()))
+
+        [path] = saved.projection_paths
+        assert path.parent == tmp_path / "out" / "high-res" / "projections"
+        assert path.name == "high-res_000001_A1_T000000_C00_max.ome.tiff"
+        np.testing.assert_array_equal(tifffile.imread(path), pixels.max(axis=0))
+
+
+def test_the_log_is_written_beside_data(tmp_path):
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.output import command_log
+
+    naming = Naming(folder="high-res", hash6="000001", position_label="A1")
+    path = command_log.write(tmp_path / "out", naming, {"job": "HiRes", "µ": "µm"})
+
+    assert path == tmp_path / "out" / "high-res" / "log" / "high-res_000001_A1.log.json"
+    assert json.loads(path.read_text(encoding="utf-8")) == {"job": "HiRes", "µ": "µm"}

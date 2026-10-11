@@ -826,9 +826,9 @@ class TestSave:
     ):
         """What the microscope captured, and everything describing it, in ``data``.
 
-        The acquisition folder holds one thing, so what is made from the
-        capture later -- a stitched view, an analysis -- becomes a folder
-        beside ``data`` and is never confused with it. Inside, the images are
+        What is made from the capture -- its projection (this capture is a
+        stack), later a stitched view or an analysis -- is a folder beside
+        ``data`` and is never confused with it. Inside, the images are
         loose and everything about them is under ``metadata``: ZMART's account
         of the capture, and the vendor's own beneath it.
         """
@@ -838,7 +838,7 @@ class TestSave:
 
         acquisition_folder = output_root / "overview-scan"
         data = acquisition_folder / "data"
-        assert {path.name for path in acquisition_folder.iterdir()} == {"data"}
+        assert {path.name for path in acquisition_folder.iterdir()} == {"data", "projections"}
         assert all(
             path.suffixes == [".ome", ".tiff"] for path in data.iterdir() if path.is_file()
         )

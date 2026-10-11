@@ -42,9 +42,11 @@ from .lasx_native_autosave import (
 from .naming import (
     Naming,
     build_image_name,
+    build_projection_name,
     build_state_name,
     data_dir,
     metadata_dir,
+    projections_dir,
     state_dir,
 )
 from .product import ExportedAcquisition, PlaneIndex, SavedAcquisition
@@ -59,6 +61,10 @@ SOURCES = ("cache", "autosave")
 #: What ``save`` writes the capture as: one OME-TIFF a plane, or one OME-Zarr
 #: image (``ome_zarr``). Only the one chosen is written.
 FORMATS = ("ome-tiff", "ome-zarr")
+
+#: What ``save`` projects from a capture with more than one plane, into
+#: ``<acquisition>/projections``: its max over z, or nothing.
+PROJECTIONS = ("max", "none")
 
 
 def save_source_root() -> Path:
@@ -92,6 +98,7 @@ def save(
     cache_root: str | Path | None = None,
     format: str | None = None,
     placement: Callable[[list[int]], Callable[[int], dict]] | None = None,
+    projection: str | None = None,
 ) -> SavedAcquisition:
     """Persist the files produced for *acq* into *output_root*.
 
@@ -112,6 +119,12 @@ def save(
     (``IMAGE_SAVE.format``). With ``"ome-zarr"`` the capture becomes one
     image store; *placement*, handed the planes' z numbers, answers where on
     the sample each was taken, and places the store there.
+
+    *projection* is one of ``PROJECTIONS`` and defaults to the profile's
+    (``IMAGE_SAVE.projection``). A capture with more than one plane then
+    also gets its max projection, in the same format, in ``projections``;
+    a single plane is its own projection and gets none, so nothing is
+    written twice.
     """
     from ..actions.profiles import IMAGE_SAVE
 
@@ -121,6 +134,9 @@ def save(
     format = IMAGE_SAVE.format if format is None else format
     if format not in FORMATS:
         raise ValueError(f"unknown image format {format!r}; the formats are {FORMATS}")
+    projection = IMAGE_SAVE.projection if projection is None else projection
+    if projection not in PROJECTIONS:
+        raise ValueError(f"unknown projection {projection!r}; the projections are {PROJECTIONS}")
     if orientation is None:
         from ..configuration.image_stage_registration import rig_orientation
 
@@ -143,7 +159,7 @@ def save(
         )
     exported = replace(exported, metadata=on_the_canvas(exported.metadata, exported, placement))
     if format == "ome-zarr":
-        return _persist_store(
+        saved = _persist_store(
             exported,
             Path(output_root),
             naming,
@@ -152,16 +168,61 @@ def save(
             orientation=orientation,
             placement=placement,
         )
-    return _persist_export(
-        exported,
-        Path(output_root),
-        naming,
-        lineage=lineage,
-        state=state,
-        orientation=orientation,
-        fix_ome=fix_ome,
-        cleanup_source=cleanup_source,
-    )
+    else:
+        saved = _persist_export(
+            exported,
+            Path(output_root),
+            naming,
+            lineage=lineage,
+            state=state,
+            orientation=orientation,
+            fix_ome=fix_ome,
+            cleanup_source=cleanup_source,
+        )
+    if projection != "none" and exported.metadata.size_z > 1:
+        saved = replace(saved, projection_paths=_persist_projection(
+            exported, Path(output_root), naming, format=format, orientation=orientation, placement=placement,
+            state=state,
+        ))
+    # Last, once everything made from the source has been made from it.
+    if cleanup_source:
+        for p in exported.source_files:
+            try:
+                p.unlink()
+            except OSError as e:
+                log.warning("cleanup_source failed for %s: %s", p, e)
+    return saved
+
+
+def _persist_projection(
+    exported: ExportedAcquisition,
+    output_root: Path,
+    naming: Naming,
+    *,
+    format: str,
+    orientation: Orientation,
+    placement,
+    state: dict | None,
+) -> tuple[Path, ...]:
+    """The capture's max projection in ``projections``, in the capture's own format."""
+    indices = [index for position in exported.positions for index in position.planes]
+    where = placement(sorted({index.z for index in indices})) if placement is not None else None
+    projected = ome_zarr.max_projection(ome_zarr.gather(exported, orientation=orientation, where=where))
+    folder = projections_dir(output_root, naming.folder)
+    if format == "ome-zarr":
+        store = folder / f"{naming.folder}_{naming.hash6}_{naming.position_label}.ome.zarr"
+        return (ome_zarr.write_store(projected, store, state=state),)
+    folder.mkdir(parents=True, exist_ok=True)
+    written = []
+    for (ti, ci), plane in (
+        ((index.t, index.c), projected.volume[index.t, index.c, 0]) for index in sorted(projected.metadata.planes)
+    ):
+        path = folder / build_projection_name(replace(naming, t=ti, c=ci), "max")
+        _materialize.write_plane_atomic(
+            plane, path, metadata=projected.metadata, index=PlaneIndex(t=ti, z=0, c=ci), state=state
+        )
+        written.append(path)
+    return tuple(written)
 
 
 def on_the_canvas(metadata, exported: ExportedAcquisition, placement) -> object:
@@ -305,13 +366,6 @@ def _persist_export(
     finally:
         if summary_dirty:
             _write_json_atomic(summary_path, summary)
-
-    if cleanup_source:
-        for p in exported.source_files:
-            try:
-                p.unlink()
-            except OSError as e:
-                log.warning("cleanup_source failed for %s: %s", p, e)
 
     return SavedAcquisition(
         image_paths=image_paths,

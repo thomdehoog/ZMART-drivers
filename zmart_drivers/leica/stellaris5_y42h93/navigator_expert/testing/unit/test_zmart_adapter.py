@@ -112,6 +112,28 @@ def _clear_limits():
     limits_checks._stage_limits.update(dict.fromkeys(limits_checks._stage_limits, None))
 
 
+
+def _a_capture(job: str) -> SimpleNamespace:
+    """What a capture answers, as the driver's acquire hands it on: the job and when it ran."""
+    return SimpleNamespace(job=job, started_at=1_760_000_000.0, finished_at=1_760_000_002.5,
+                           command_result={"success": True})
+
+
+_WRITE_THE_LOG = adapter._log.write
+_NO_LOG_ON_DISK = patch.object(
+    adapter._log, "write",
+    lambda output_root, naming, entry: Path("/tmp/out") / naming.folder / "log" / "capture.log.json",
+)
+
+
+def setUpModule():
+    """No test here writes a capture's log to disk; the log's own test does, in a temporary folder."""
+    _NO_LOG_ON_DISK.start()
+
+
+def tearDownModule():
+    _NO_LOG_ON_DISK.stop()
+
 class TestRegistration(unittest.TestCase):
     def test_connection_profile_does_not_select_operator_calibration(self):
         self.assertNotIn("calibration_name", adapter.CONNECTION)
@@ -600,6 +622,7 @@ class TestAcquire(unittest.TestCase):
         self.assertEqual(opts["backlash_rounds"]["options"], "int >= 0")
         self.assertNotIn("strip_scan_fields", opts)  # positions never come from the Navigator
         self.assertEqual(opts["format"], {"options": ["ome-tiff", "ome-zarr"], "active": "ome-zarr"})
+        self.assertEqual(opts["projection"], {"options": ["max", "none"], "active": "max"})
         self.assertEqual(opts["cleanup_source"]["active"], False)
         self.assertEqual(
             opts["source"],
@@ -678,14 +701,20 @@ class TestAcquire(unittest.TestCase):
             )
 
     @contextmanager
-    def _capturing(self, *, image_paths=None):
+    def _capturing(self, *, image_paths=None, projections=None):
         """Everything an ``acquire`` needs stood in for, so a test says one thing."""
         written = image_paths or {0: Path("/tmp/out/img.ome.tif")}
         calls = {}
 
         def fake_save(client, acq, output_root, naming, **kwargs):
             calls["save"] = kwargs
-            return SimpleNamespace(image_paths=dict(written), naming=naming)
+            return SimpleNamespace(
+                image_paths=dict(written), naming=naming, projection_paths=tuple(projections or ()),
+            )
+
+        def fake_log(output_root, naming, entry):
+            calls["log"] = entry
+            return Path("/tmp/out/scan/log") / f"{naming.folder}_{naming.hash6}_{naming.position_label}.log.json"
 
         patches = _patch_position(job="Overview")
         with (
@@ -693,8 +722,9 @@ class TestAcquire(unittest.TestCase):
             patch.object(adapter._readers, "get_hardware_info", return_value={}),
             patch.object(adapter._commands, "select_job", lambda c, j, **k: {"success": True}),
             patch.object(adapter._motion, "correct_backlash", lambda client, **k: {"success": True, "confirmed": True}),
-            patch.object(adapter._capture, "acquire", lambda c, j, **k: SimpleNamespace(job=j)),
+            patch.object(adapter._capture, "acquire", lambda c, j, **k: _a_capture(j)),
             patch.object(adapter._save, "save", fake_save),
+            patch.object(adapter._log, "write", fake_log),
             # Where to save is otherwise discovered from LAS X native AutoSave
             # on this PC, which only the author's PC has.
             patch.object(adapter._info, "output_root", return_value=Path("/tmp/out")),
@@ -765,7 +795,7 @@ class TestAcquire(unittest.TestCase):
 
         def fake_capture(client, job, **kwargs):
             calls["captured"] = job
-            return SimpleNamespace(job=job)
+            return _a_capture(job)
 
         def fake_save(client, acq, output_root, naming, **kwargs):
             calls["saved"] = (str(output_root), naming)
@@ -817,7 +847,9 @@ class TestAcquire(unittest.TestCase):
         self.assertEqual(calls["state"]["provenance"]["position_label"], "well-7")
         self.assertEqual(record["settle"], "direct")
         self.assertEqual(record["acquisition_hash"], naming.hash6)
-        self.assertEqual([Path(p) for p in record["files"]], [Path("/tmp/out/img.ome.tif")])
+        self.assertEqual(
+            [Path(p) for p in record["files"]], [Path("/tmp/out/img.ome.tif"), *map(Path, record["log"])]
+        )
         self.assertNotIn("images", record)
         # Nothing has driven this handle, so the acquisition says it does not
         # know where it was taken rather than naming a place nobody went.
@@ -863,8 +895,10 @@ class TestAcquire(unittest.TestCase):
                 patch.object(adapter._readers, "get_hardware_info", return_value={}),
                 patch.object(adapter._commands, "select_job", lambda *a, **k: {"success": True}),
                 patch.object(adapter._motion, "correct_backlash", lambda client, **k: {"success": True, "confirmed": True}),
-                patch.object(adapter._capture, "acquire", lambda client, job, **k: SimpleNamespace(job=job)),
+                patch.object(adapter._capture, "acquire", lambda client, job, **k: _a_capture(job)),
                 patch.object(adapter._save, "save", fake_save),
+                # This answer is checked for files that exist: the log is written.
+                patch.object(adapter._log, "write", _WRITE_THE_LOG),
                 patches[0], patches[1], patches[2], patches[3],
             ):
                 record = adapter.acquire(
@@ -872,7 +906,7 @@ class TestAcquire(unittest.TestCase):
                     acquisition_settings={"job": "HiRes", "backlash_correction": False},
                 )
 
-            self.assertEqual(record["files"], [str(image), str(vendor), str(state)])
+            self.assertEqual(record["files"], [str(image), str(vendor), str(state), *record["log"]])
             self.assertEqual(check_acquire_answer({"success": True, "content": record}), [])
 
     def test_the_pixels_come_from_the_source_asked_for(self):
@@ -907,6 +941,43 @@ class TestAcquire(unittest.TestCase):
             {"x_um": 10.0, "y_um": 20.0, "z_um": 90.0},
             {"x_um": 10.0, "y_um": 20.0, "z_um": 110.0},
         ])
+
+    def test_the_projection_is_asked_for_and_listed_with_the_files(self):
+        h = _handle()
+        h.driven_to = {"x": 0.0, "y": 0.0, "z": 0.0, "z_wide_um": 0.0, "z_galvo_um": 0.0}
+        projection = Path("/tmp/out/scan/projections/scan_x_A1.ome.zarr")
+        with self._capturing(projections=[projection]) as calls:
+            record = adapter.acquire(h, position_label="A1", acquisition_settings={"projection": "max"})
+
+        self.assertEqual(calls["save"]["projection"], "max")
+        self.assertEqual(record["projections"], [str(projection)])
+        self.assertIn(str(projection), record["files"])
+
+    def test_every_capture_leaves_a_log_of_what_was_asked_and_done(self):
+        h = _handle()
+        h.driven_to = {"x": 5.0, "y": 6.0, "z": 7.0, "z_wide_um": 0.0, "z_galvo_um": 0.0}
+        image = Path("/tmp/out/.staging") / h.hash6 / "scan" / "data" / "img.ome.tif"
+        with self._capturing(image_paths={0: image}) as calls:
+            record = adapter.acquire(h, position_label="A1", acquisition_settings={"format": "ome-tiff"})
+
+        entry = calls["log"]
+        self.assertEqual(entry["asked"], {"format": "ome-tiff"})
+        self.assertEqual(entry["settings"]["format"], "ome-tiff")
+        self.assertEqual(entry["settings"]["job"], "Overview")
+        self.assertIn("started", entry["capture"])
+        self.assertIn("finished", entry["capture"])
+        self.assertEqual(
+            [{k: v for k, v in plane.items() if k != "path"} for plane in entry["planes"]],
+            [{k: v for k, v in plane.items() if k != "path"} for plane in record["planes"]],
+        )
+        # Paths from the run's start, so the log stays true when the run is moved.
+        self.assertEqual(entry["planes"][0]["path"], "scan/data/img.ome.tif")
+        self.assertEqual(entry["files"], ["scan/data/img.ome.tif"])
+        self.assertEqual(entry["unconfirmed"], [])
+        [log] = record["log"]
+        self.assertTrue(log.endswith(".log.json"))
+        self.assertIn(log, record["files"])
+        self.assertNotIn(log, entry["files"], "the log lists what the capture saved, not itself")
 
     def test_a_plane_says_where_on_the_sample_it_was_taken(self):
         """The place the last confirmed move put the stage, in the frame.
@@ -1074,7 +1145,7 @@ class TestAcquire(unittest.TestCase):
                 ),
                 patch.object(adapter._motion, "correct_backlash", lambda client, **k: {"success": True, "confirmed": True}),
                 patch.object(
-                    adapter._capture, "acquire", lambda client, job, **k: SimpleNamespace(job=job)
+                    adapter._capture, "acquire", lambda client, job, **k: _a_capture(job)
                 ),
                 patch.object(adapter._save, "save", fake_save),
                 patches[0],
@@ -1113,7 +1184,7 @@ class TestAcquire(unittest.TestCase):
                 ),
             ),
             patch.object(
-                adapter._capture, "acquire", lambda client, job, **k: SimpleNamespace(job=job)
+                adapter._capture, "acquire", lambda client, job, **k: _a_capture(job)
             ),
             patch.object(adapter._save, "save", fake_save),
             patches[0],
@@ -1252,7 +1323,7 @@ class TestAcquire(unittest.TestCase):
 
         def fake_capture(client, job, **kwargs):
             order.append(("capture", job))
-            return SimpleNamespace(job=job)
+            return _a_capture(job)
 
         def fake_save(client, acq, output_root, naming, **kwargs):
             return SimpleNamespace(
@@ -1298,7 +1369,7 @@ class TestAcquire(unittest.TestCase):
             patch.object(
                 adapter._capture,
                 "acquire",
-                return_value=SimpleNamespace(job="Overview"),
+                return_value=_a_capture("Overview"),
             ),
             patch.object(
                 adapter._save,
@@ -1334,7 +1405,7 @@ class TestAcquire(unittest.TestCase):
                 adapter._capture,
                 "acquire",
                 side_effect=lambda client, job, **k: (
-                    calls.append("capture") or SimpleNamespace(job=job)
+                    calls.append("capture") or _a_capture(job)
                 ),
             ),
             patch.object(
