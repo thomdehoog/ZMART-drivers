@@ -170,7 +170,12 @@ def save(
             state=state,
         ))
     # Last, once everything made from the source has been made from it.
-    if cleanup_source:
+    if cleanup_source and exported.release is not None:
+        try:
+            exported.release()
+        except Exception as e:  # noqa: BLE001 -- the capture is saved; letting go is the owner's
+            log.warning("cleanup_source failed for %s: %s", exported.relative_path, e)
+    elif cleanup_source:
         for p in exported.source_files:
             try:
                 p.unlink()

@@ -189,7 +189,6 @@ class TestCollecting:
         )
 
         assert exported.source_exporter == "lasx_data_container"
-        assert exported.cleanup_source_supported is False
         [kept] = exported.vendor_metadata_sources
         assert kept.name == "HiRes002.lasx-description.xml"
         assert b'Resolution="12"' in kept.data
@@ -270,6 +269,58 @@ class TestWaitingUntilFinished:
                 timeout_s=0.3,
                 poll_interval_s=0.05,
             )
+
+
+class TestLettingGo:
+    """Once saved, the picture is let go of through LAS X's Data Container, never by deleting files."""
+
+    def test_the_picture_read_is_the_one_let_go_of(self, cache, monkeypatch):
+        two_channel_12_bit(cache)
+        asked = []
+        monkeypatch.setattr(container, "delete", lambda number, name: asked.append((number, name)))
+
+        exported = container.collect_lasx_data_container(None, acquisition_of("HiRes"), cache_root=cache)
+        exported.release()
+
+        assert exported.cleanup_source_supported is True
+        assert asked == [(746, "HiRes002")]
+
+    def test_the_element_is_deleted_when_it_is_still_the_picture(self, monkeypatch):
+        element = FakeElement("HiRes002")
+        monkeypatch.setattr(container, "connected_data_container", lambda: FakeFactory({746: element}))
+
+        container.delete(746, "HiRes002")
+
+        assert element.deleted
+
+    def test_an_element_that_is_no_longer_the_picture_is_not_deleted(self, monkeypatch):
+        element = FakeElement("HiRes003")
+        monkeypatch.setattr(container, "connected_data_container", lambda: FakeFactory({746: element}))
+
+        with pytest.raises(RuntimeError, match="is 'HiRes003', not 'HiRes002'"):
+            container.delete(746, "HiRes002")
+        assert not element.deleted
+
+
+class FakeElement:
+    """A Data Container element: its name, and whether it was deleted."""
+
+    def __init__(self, name):
+        self.name, self.deleted = name, False
+
+    def GetName(self):
+        return self.name
+
+    def Delete(self):
+        self.deleted = True
+
+
+class FakeFactory:
+    def __init__(self, elements):
+        self.elements = elements
+
+    def GetElement(self, number):
+        return self.elements[number]
 
 
 class TestRefusing:

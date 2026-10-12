@@ -526,6 +526,26 @@ class TestSave:
         assert all(not p.is_file() for p in patched_export["image_paths"])
         assert not patched_export["xml_path"].is_file()
 
+    def test_cleanup_lets_go_of_a_source_that_says_how(
+        self,
+        patched_export,
+        tmp_path,
+        successful_acq,
+        naming,
+    ):
+        """A source LAS X holds (its cache) is let go of through LAS X, its files left alone."""
+        release = Mock()
+        patched_export["collect"].return_value = replace(patched_export["exported"], release=release)
+        drv.save(
+            None,
+            successful_acq,
+            tmp_path / "run_000001",
+            naming,
+            cleanup_source=True,
+        )
+        release.assert_called_once_with()
+        assert all(p.is_file() for p in patched_export["image_paths"])
+
     def test_save_embeds_state_in_plane_ome_xml_when_provided(
         self,
         patched_export,

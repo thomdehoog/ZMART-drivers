@@ -7,6 +7,7 @@ output manifest (state is embedded per-plane; there is no sidecar XML).
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -226,6 +227,9 @@ class ExportedAcquisition:
     source_exporter: str = "lasx_native_autosave"
     cleanup_source_supported: bool = True
     vendor_metadata_sources: tuple[VendorMetadataSource, ...] = ()
+    #: How a source its owner holds is let go of once saved (LAS X's cache:
+    #: through LAS X); None when its files are simply deleted.
+    release: Callable[[], None] | None = None
 
     @property
     def image_files(self) -> list[Path]:

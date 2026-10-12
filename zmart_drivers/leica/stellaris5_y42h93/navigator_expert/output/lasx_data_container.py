@@ -18,11 +18,14 @@ stack), so this collector gives ``save`` the same product without waiting
 for AutoSave.
 
 The cache belongs to LAS X and is only ever read: deleting or changing a file
-in it corrupts LAS X projects (only LAS X's own delete is clean).
+in it corrupts LAS X projects. Once the picture is saved, LAS X itself can be
+asked to let go of it (:func:`delete`), which is clean.
 """
 
 from __future__ import annotations
 
+import functools
+import os
 import re
 import struct
 import time
@@ -116,11 +119,50 @@ def collect_lasx_data_container(
         method="lasx_data_container",
         relative_path=pixels.name,
         source_exporter="lasx_data_container",
-        cleanup_source_supported=False,
+        release=functools.partial(delete, int(number), name),
         vendor_metadata_sources=(
             VendorMetadataSource(name=f"{name}.lasx-description.xml", data=xml.encode("utf-8")),
         ),
     )
+
+
+def delete(number: int, name: str) -> None:
+    """Have LAS X delete the picture *name*, its Data Container element *number*.
+
+    It is the delete in LAS X's own window: the Data Container releases the
+    picture from its cache, and LAS X's I/O manager takes it out of the
+    project, with the file AutoSave wrote of it. Refused, with nothing
+    deleted, when the element is no longer that picture.
+    """
+    element = connected_data_container().GetElement(number)
+    if element.GetName() != name:
+        raise RuntimeError(f"LAS X's element {number} is {element.GetName()!r}, not {name!r}; nothing deleted")
+    element.Delete()
+
+
+@functools.cache
+def connected_data_container() -> Any:
+    """LAS X's Data Container, through LAS X's own .NET client, as one more of its clients.
+
+    Connected as the Windows user, who owns LAS X's pictures; any other name
+    is refused access to them. Returns the factory its elements are got from.
+    """
+    from ..actions import profiles
+
+    root = profiles.LASX_API.runtime_root
+    os.environ["PATH"] = root + os.pathsep + os.environ["PATH"]
+    import clr  # type: ignore[import-not-found]
+    import System  # type: ignore[import-not-found]
+
+    System.Reflection.Assembly.LoadFile(str(Path(root) / "LMSDataContainerWrapper.dll"))
+    from LMSDataContainerWrapper import (
+        DataContainerClient,
+        DMObjectFactory,
+    )
+
+    if not DataContainerClient.CreateAndInitInstance(System.Environment.UserName, "ZMART"):
+        raise RuntimeError("LAS X's Data Container did not accept the connection")
+    return DMObjectFactory()
 
 
 def data_container_root() -> Path:
