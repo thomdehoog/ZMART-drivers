@@ -436,6 +436,13 @@ there only in case the two accounts disagree.
 in place, preserving byte formatting; `output/ome_canonical.py` writes clean canonical ZMART OME;
 `save(..., fix_ome=True)` validates/repairs each written file.
 
+**LAS X's cache can be let go of once a capture is saved.** Every picture LAS X takes stays in its
+Data Container cache (`D:\Temp`) until LAS X restarts, so a long time course fills the disk twice.
+With `source="cache"` and `cleanup_source=True`, the save's last step asks LAS X itself to delete the
+picture it was read from: the delete of LAS X's own window, so the cache's files go and the project
+stays whole (`output/lasx_cache_release.py` says how). It runs only once the copy is written and
+read back identical. Off by default. Each capture's hidden Navigator copy is not let go of yet.
+
 **Acquiring never touches the scanning template.** Positions are never made in the Navigator Expert:
 they come from the ZMART interface. `acquire()` and the autofocus procedure capture at the current
 position and leave the LAS X template alone.
