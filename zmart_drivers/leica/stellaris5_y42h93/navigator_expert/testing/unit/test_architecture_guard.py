@@ -62,6 +62,12 @@ def _driver_sources():
         yield rel, path.read_text(encoding="utf-8")
 
 
+#: Where native stage motion may be named. ``direct/translations.py`` only
+#: translates the motion ``actions/set.py`` fires after its limit checks, for
+#: the direct route's delivery; it never starts a move of its own.
+MOTION_DOORS = {Path("actions/set.py"), Path("direct/translations.py")}
+
+
 def test_native_stage_motion_fires_only_from_the_actions():
     """The native CAM motion functions are the stage's real door.
 
@@ -72,7 +78,7 @@ def test_native_stage_motion_fires_only_from_the_actions():
     offenders = [
         str(rel)
         for rel, text in _driver_sources()
-        if "PyApiMoveHardware" in text and rel != Path("actions/set.py")
+        if "PyApiMoveHardware" in text and rel not in MOTION_DOORS
     ]
     assert offenders == [], (
         f"native stage motion referenced outside actions/set.py: {offenders}; "
@@ -181,6 +187,7 @@ ALLOWED = {
     },
     "scanfields": {"vendor_interface", "dispatcher", "output"},
     "experimental": {"scanfields"},
+    "direct": {"vendor_interface", "dispatcher", "actions", "configuration"},
     "connect": {"vendor_interface", "dispatcher", "actions", "configuration"},
     "zmart_adapter": {
         "vendor_interface", "dispatcher", "actions", "procedures", "output",

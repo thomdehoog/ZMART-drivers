@@ -13,10 +13,14 @@ Dependency direction:
 """
 
 import logging
+import time
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
-from ..dispatcher.read import get_selected_job
+from ..dispatcher import tuning
+from ..dispatcher.read import get_jobs, get_selected_job
+from ..vendor_interface.hardware_server import HardwareServerUnavailable
+from ..vendor_interface.state_tree import job_sequence
 from .files import find_scanning_templates_dir, load_experiment, save_experiment
 
 log = logging.getLogger(__name__)
@@ -49,7 +53,9 @@ def reorder_jobs(lrp_path, first_job):
     """
     lrp_path = Path(lrp_path)
     raw = lrp_path.read_text(encoding="utf-8")
-    root = ET.fromstring(raw, parser=ET.XMLParser(target=ET.TreeBuilder(insert_comments=True)))
+    root = ET.fromstring(
+        raw, parser=ET.XMLParser(target=ET.TreeBuilder(insert_comments=True))
+    )
 
     el_list = root.find(".//LDM_Block_Sequence_Element_List")
     block_list = root.find(".//LDM_Block_Sequence_Block_List")
@@ -71,7 +77,9 @@ def reorder_jobs(lrp_path, first_job):
     target_el = next((e for e in el_list if e.get("BlockID") == block_id), None)
     if target_el is None:
         log.error(
-            "reorder_jobs: no sequence element for job '%s' (BlockID=%s)", first_job, block_id
+            "reorder_jobs: no sequence element for job '%s' (BlockID=%s)",
+            first_job,
+            block_id,
         )
         return False
 
@@ -93,7 +101,9 @@ def reorder_jobs(lrp_path, first_job):
     # a locale-encoded write would corrupt non-ASCII job names.
     root_start = raw.find(f"<{root.tag}")
     prolog = raw[:root_start] if root_start > 0 else '<?xml version="1.0"?>'
-    lrp_path.write_text(prolog + ET.tostring(root, encoding="unicode"), encoding="utf-8")
+    lrp_path.write_text(
+        prolog + ET.tostring(root, encoding="unicode"), encoding="utf-8"
+    )
     log.info("reorder_jobs: moved '%s' to first position", first_job)
     return True
 
@@ -101,6 +111,36 @@ def reorder_jobs(lrp_path, first_job):
 # =============================================================================
 # LRP edit backbone
 # =============================================================================
+
+
+def job_ids_out_of_step(client):
+    """Why the CAM API and LAS X disagree on the job ids after a load, or None.
+
+    Loading an experiment gives LAS X's jobs new ids. On the simulator
+    (2026-10-13) the CAM API once kept the old ones (HiRes 145 while LAS X had
+    152): every CAM job read then failed and every save timed out until LAS X
+    was restarted. The CAM API's job list is compared with the job sequence in
+    LAS X's state tree, read from its hardware server, for the usual windows.
+    Without the hardware server nothing can be compared, and None is returned.
+    """
+    deadline = time.monotonic() + tuning.WINDOWS * tuning.WINDOW_S
+    while True:
+        try:
+            las_x = {name: job.block_id for name, job in job_sequence().jobs.items()}
+        except HardwareServerUnavailable as why:
+            log.warning(
+                "apply_lrp_change: job ids not compared after the load (%s)", why
+            )
+            return None
+        cam = {job.get("Name"): job.get("ID") for job in get_jobs(client) or []}
+        if cam == las_x:
+            return None
+        if time.monotonic() >= deadline:
+            return (
+                f"after the load the CAM API's job ids {cam} do not match LAS X's {las_x}; "
+                f"the CAM API is out of step with LAS X - restart LAS X before going on"
+            )
+        time.sleep(tuning.POLL_S)
 
 
 def apply_lrp_change(
@@ -158,7 +198,9 @@ def apply_lrp_change(
         # 0/None covers both "already at target" and "job/attribute not
         # found" — the edit fns log which. Surface it here because without
         # a verify_fn the caller would otherwise see success=True.
-        log.warning("apply_lrp_change: edit reported no changes (edit_result=%r)", edit_result)
+        log.warning(
+            "apply_lrp_change: edit reported no changes (edit_result=%r)", edit_result
+        )
 
     if current_job_name:
         reorder_jobs(lrp_path, current_job_name)
@@ -166,6 +208,11 @@ def apply_lrp_change(
     r = load_experiment(client, xml_name)
     if r is None:
         log.error("apply_lrp_change: load failed")
+        return None
+
+    out_of_step = job_ids_out_of_step(client)
+    if out_of_step:
+        log.error("apply_lrp_change: %s", out_of_step)
         return None
 
     for attempt, save_timeout in enumerate(confirm_delays, 1):

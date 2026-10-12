@@ -332,10 +332,13 @@ shown; `read_zwide_um` takes only `(client, job_name, *, mode=None)` — no `dia
 schema-mismatched (it returns `None` only when the settings cannot be read at all).
 
 Z has no hardware readback through CAM. The settings' `zPosition` is the job's stored setpoint
-and it stops refreshing for the drive that carries the job's z-stack; for that drive the Z
-extractor (`actions/derived.py::z_um_from_settings`) saves the experiment and reads the job's
-`ZPosition` from the `.lrp` instead (~0.4 s), transparently to every caller — reader,
-`confirm_move_z`, the adapter. The free drive is read from the settings at no extra cost.
+and it stops refreshing for the drive that carries the job's z-stack. For that drive the Z
+extractor (`actions/derived.py::z_um_from_settings`) asks LAS X's hardware server (`LCS.EXE`,
+`vendor_interface/hardware_server.py`, read-only) where the drive truly is. When the hardware
+server cannot be reached, it saves the experiment and reads the job's `ZPosition` from the
+`.lrp` instead (~0.4 s; the last command through the job, not a measured position). Both are
+transparent to every caller — reader, `confirm_move_z`, the adapter. The free drive is read
+from the settings at no extra cost.
 `docs/design/z-readback-stacked-drive.md` has the measurements and the open items.
 
 | Function | Call | Returns |

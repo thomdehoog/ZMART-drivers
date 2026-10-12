@@ -2,7 +2,12 @@
 
 from __future__ import annotations
 
+import logging
+
+from ..vendor_interface.hardware_server import HardwareServerUnavailable, read_hardware_z_um
 from ..vendor_interface.parsing import parse_tile_geometry
+
+log = logging.getLogger(__name__)
 
 
 def job_by_name(jobs, job_name):
@@ -124,14 +129,17 @@ def z_um_from_settings(settings, key, *, client=None, job_name=None):
     it current for a drive that carries no z-stack and stops refreshing it
     for the drive the job's stack is on (measured on the simulator
     2026-08-25/26; the CAM API offers no other Z readout). So for that one
-    drive the value here is stale by construction, and this function falls
-    back to the saved experiment instead: ``PyApiSaveExperiment`` makes
-    LAS X write the ``.lrp`` from its live block, and the job's Master
-    setting carries ``ZPosition`` for the drive its ``ZUseModeName`` names.
-    That costs one save (~0.4 s) and needs *client* and *job_name*; the
-    free drive costs nothing extra — the decision is a lookup on the
-    ``stack`` block already in *settings*. A stacked drive asked for
-    without a client refuses rather than returning the stale number.
+    drive the value here is stale by construction, and this function reads
+    it elsewhere. First from LAS X's hardware server (``LCS.EXE``), which
+    reports where the drive truly is, in milliseconds. When that server
+    cannot be reached, from the saved experiment: ``PyApiSaveExperiment``
+    makes LAS X write the ``.lrp`` from its live block, and the job's Master
+    setting carries ``ZPosition`` for the drive its ``ZUseModeName`` names —
+    the last command through the job, not a measured position. That costs
+    one save (~0.4 s) and needs *client* and *job_name*. The free drive
+    costs nothing extra — the decision is a lookup on the ``stack`` block
+    already in *settings*. A stacked drive that neither source can read
+    refuses rather than returning the stale number.
 
     Canonical home of the z-readback shape quirk: LAS X sometimes nests the
     value as ``{'position': ...}`` rather than a bare float, so after
@@ -145,6 +153,10 @@ def z_um_from_settings(settings, key, *, client=None, job_name=None):
 
     ch = make_changeable_copy(settings)
     if ch and (ch.get("stack") or {}).get("zDrive") == key:
+        try:
+            return read_hardware_z_um(key)
+        except HardwareServerUnavailable as why:
+            log.info("%s carries the z-stack; reading the saved experiment instead (%s)", key, why)
         return _z_um_from_saved_experiment(client, job_name, key)
     if not ch or "zPosition" not in ch:
         raise RuntimeError("zPosition not in job settings - LAS X version mismatch?")

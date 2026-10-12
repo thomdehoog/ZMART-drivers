@@ -113,9 +113,11 @@ def lrp_set_z_stack_active(lrp_path, enable, job_name):
 # Z use mode (z-galvo / z-wide)
 # =============================================================================
 
+#: As LAS X writes them: ZUseMode 1 with ZUseModeName z-galvo, 2 with z-wide
+#: (every saved experiment in the test data; SetZPosition's ZUseMode too).
 Z_USE_MODES = {
-    0: "z-wide",
     1: "z-galvo",
+    2: "z-wide",
 }
 
 
@@ -124,7 +126,7 @@ def lrp_set_z_use_mode(lrp_path, mode, job_name):
 
     Args:
         lrp_path: Path to the ``.lrp`` file.
-        mode: ``0`` for z-wide, ``1`` for z-galvo.
+        mode: ``1`` for z-galvo, ``2`` for z-wide.
             Also accepts string names: ``"z-wide"``, ``"z-galvo"``.
         job_name: Name of the job to modify.
 
@@ -139,7 +141,7 @@ def lrp_set_z_use_mode(lrp_path, mode, job_name):
             return 0
     mode = int(mode)
     if mode not in Z_USE_MODES:
-        log.error("lrp_set_z_use_mode: invalid mode %r (expected 0 or 1)", mode)
+        log.error("lrp_set_z_use_mode: invalid mode %r (expected 1 or 2)", mode)
         return 0
     name = Z_USE_MODES[mode]
     count = 0

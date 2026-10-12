@@ -150,6 +150,10 @@ _DEFAULT_JOBS = {
     },
 }
 
+#: Each job's id in LAS X (the job list's ``ID``, the hardware server's
+#: ``BlockId``); on the simulator AF Job was 140 and HiRes 142.
+JOB_IDS = {"AF Job": 140, "Overview": 141, "HiRes": 142}
+
 _DEFAULT_HARDWARE = {
     "Microscope": {
         "objectives": [
@@ -565,6 +569,7 @@ class MockLasxClient:
             jobs_list.append(
                 {
                     "Name": name,
+                    "ID": JOB_IDS.get(name),
                     # mirrors the simulator's catalog: "AF Job" is the AF job
                     "IsAutofocus": name == "AF Job",
                     "IsSelected": name == self._selected_job,

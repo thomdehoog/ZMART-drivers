@@ -39,45 +39,14 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.zmart_adapter import
     zmart_adapter as adapter,
 )
 
+from z_readback_settings import raw_settings, saved
+
 TEST_DATA = Path(__file__).resolve().parents[1] / "data"
 SAVED = TEST_DATA / "z_readback"
 # Saved from the simulator with "AF Job 01" selected: its stack on the galvo
 # (galvo at 0 µm, ZUseMode 1) and on z-wide (z-wide at 4999.5 µm, ZUseMode 2).
 SAVED_GALVO_STACK = SAVED / "_ScanningTemplate_galvo_stack.lrp"
 SAVED_ZWIDE_STACK = SAVED / "_ScanningTemplate_zwide_stack.lrp"
-
-
-def raw_settings(*, galvo_um=0.0, wide_um=4999.5, stack_on=None):
-    """Raw job settings as ``get_job_settings`` returns them (LAS X nests each
-    drive's value as ``{"position": ...}``)."""
-    settings = {
-        "zoom": {"current": 1.0},
-        "scanSpeed": {"value": 400, "isResonant": False},
-        "activeSettings": [],
-        "scanMode": "xyz",
-        "zPosition": {"z-galvo": {"position": galvo_um}, "z-wide": {"position": wide_um}},
-    }
-    if stack_on is not None:
-        settings["stack"] = {
-            "begin": -10.0,
-            "end": 10.0,
-            "stepSize": 1.0,
-            "size": 20.0,
-            "sections": 21,
-            "mode": stack_on,
-        }
-    return settings
-
-
-def saved(job_name, drive, z_um):
-    """Parsed-.lrp shaped data with one job's Master ZPosition (metres)."""
-    return {
-        "sequence_name": "collecting pattern",
-        "sequence_elements": [],
-        "jobs": {
-            job_name: {"Master": {"attrs": {"ZPosition": repr(z_um * 1e-6), "ZUseModeName": drive}}}
-        },
-    }
 
 
 class TestFreeDrive:

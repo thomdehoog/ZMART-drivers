@@ -189,6 +189,20 @@ def uninstall(client: Any) -> None:
     _GATE_STATE.pop(id(client), None)
 
 
+def share(client: Any, other: Any) -> None:
+    """Govern *other* by *client*'s gate state: the same instrument, reached another way.
+
+    Used by the direct route, a client that sends through LAS X's hardware
+    server instead of the CAM API. A *client* that never handshook leaves
+    *other* without a state too, so both refuse fail-closed alike.
+    """
+    state = _state_for(client)
+    if state is None:
+        uninstall(other)
+    else:
+        _install(other, state)
+
+
 def _state_for(client: Any) -> GateState | None:
     entry = _GATE_STATE.get(id(client))
     return entry[1] if entry is not None else None

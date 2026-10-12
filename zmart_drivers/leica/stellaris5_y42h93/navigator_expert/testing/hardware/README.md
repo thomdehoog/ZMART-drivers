@@ -168,3 +168,21 @@ The limits enforcement itself has a permanent adversarial gate in normal CI
 NaN/inf targets, unset-envelope refusals, backstop containment, and
 gate-bypass attempts through every entry point (commands, adapter,
 controller). It must stay green before any bench run.
+
+## Comparing the CAM route and the direct route (`compare_routes.py`)
+
+The direct route (`direct/`) sends the driver's commands to LAS X's hardware
+server instead of the CAM API. `compare_routes.py` runs each setting through
+both routes on the live instrument, one small step from its current value, and
+puts every write back; moves, the objective, the lasers and the z-stack only
+with their own flags. It is not part of `--hardware`.
+
+```powershell
+python testing/hardware/compare_routes.py --job HiRes --label stellaris-settings
+python testing/hardware/compare_routes.py --job HiRes --label stellaris-all --allow-moves --allow-objective
+```
+
+It exits non-zero when the routes answer differently. On the simulator
+(2026-10-12) they did only on a refused value: the CAM route missed LAS X's
+refusal of zoom 100 in 3 of 6 runs (four sends, "success, unconfirmed"); the
+direct route reported it every time.
