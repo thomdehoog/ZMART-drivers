@@ -67,6 +67,7 @@ def write_plane_atomic(
     state: dict | None = None,
 ) -> None:
     """Write one 2-D plane, already oriented, as a canonical ZMART OME-TIFF, whole."""
+    import numpy as np
     import tifffile
 
     image_tmp = _with_tmp_suffix(image_dest)
@@ -80,6 +81,8 @@ def write_plane_atomic(
         )
         tifffile.imwrite(str(image_tmp), arr, description=xml.decode("utf-8"))
         _validate_tiff(image_tmp, fix_ome=fix_ome)
+        if not np.array_equal(tifffile.imread(str(image_tmp)), arr):
+            raise RuntimeError(f"{image_dest.name}: the pixels read back from disk are not those written; not saved")
     except BaseException:
         try:
             image_tmp.unlink(missing_ok=True)

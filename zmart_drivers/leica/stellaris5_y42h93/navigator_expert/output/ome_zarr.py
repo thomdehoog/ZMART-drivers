@@ -33,6 +33,7 @@ import at all.
 from __future__ import annotations
 
 import os
+import shutil
 import uuid
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, replace
@@ -229,6 +230,9 @@ def write_store(capture: Capture, store: Path, *, state: dict | None = None) -> 
     )
     group = image.to_zarr(zarr.storage.LocalStore(str(writing)), path="")
     group["0"][...] = volume
+    if not np.array_equal(group["0"][...], volume):
+        shutil.rmtree(writing, ignore_errors=True)
+        raise RuntimeError(f"{store.name}: the pixels read back from disk are not those written; not saved")
     deepest = (1 << (metadata.significant_bits or volume.dtype.itemsize * 8)) - 1
     # The models write an absent value as null (a channel axis's unit, a
     # multiscale's metadata); a browser viewer refuses "unit": null, so what

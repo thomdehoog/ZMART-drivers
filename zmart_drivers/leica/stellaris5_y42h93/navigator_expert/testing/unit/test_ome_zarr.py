@@ -123,6 +123,23 @@ class TestOneCopy:
         assert [p.name for p in data.iterdir() if p.name not in ("metadata",)] == ["high-res_000001_A1.ome.zarr"]
 
 
+    @pytest.mark.parametrize("format", ["ome-zarr", "ome-tiff"])
+    def test_a_copy_that_does_not_read_back_as_written_is_not_saved(self, hires, tmp_path, monkeypatch, format):
+        """Nothing counts as saved, so nothing of LAS X's is let go of, unless it reads back exactly."""
+        root, _ = hires
+        monkeypatch.setattr(np, "array_equal", lambda *_, **__: False)
+
+        with pytest.raises(RuntimeError, match="read back"):
+            saving.save(
+                None, acquisition_of("HiRes"), tmp_path / "out",
+                Naming(folder="high-res", hash6="000001", position_label="A1"),
+                source="cache", cache_root=root, format=format, placement=at(0.0, 0.0, {0: 0.0}),
+            )
+
+        data = tmp_path / "out" / "high-res" / "data"
+        assert not data.is_dir() or [p.name for p in data.iterdir() if p.name != "metadata"] == []
+
+
 class TestTheStore:
     def test_it_is_a_valid_ome_zarr_0_5_image(self, hires, tmp_path):
         models = pytest.importorskip("ome_zarr_models.v05.image")
