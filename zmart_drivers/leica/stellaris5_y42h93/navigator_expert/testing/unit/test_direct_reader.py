@@ -17,11 +17,21 @@ from limits_fixtures import install_permissive_limits
 from mock_lasx_api import MockLasxClient
 from state_tree_stand_in import StandInNodes
 
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.actions import (
+    get as capabilities,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.actions.objectives import (
+    objective_by_slot,
+)
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface import (
     api_reader,
     direct_reader,
     hardware_server,
     state_tree,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.parsing import (
+    make_changeable_copy,
+    parse_tile_geometry,
 )
 
 #: The jobs' block and element ids as on the simulator (2026-10-13).
@@ -75,7 +85,7 @@ class TestParityWithTheApiReader:
         assert direct_reader.get_selected_job()["Name"] == api_reader.get_selected_job(client)["Name"]
 
     def test_the_selected_job_carries_its_live_block_id(self, client, tree):
-        assert direct_reader.get_selected_job() == {"Name": "HiRes", "ID": 152, "IsSelected": True}
+        assert direct_reader.get_selected_job() == {"Name": "HiRes", "ID": 152, "IsSelected": True, "IsAutofocus": False}
 
     @pytest.mark.parametrize("job", ["HiRes", "Overview", "AF Job"])
     def test_the_jobs_and_their_selection_are_the_api_readers(self, client, tree, job):
@@ -86,10 +96,14 @@ class TestParityWithTheApiReader:
 class TestJobs:
     def test_every_job_in_sequence_order_with_its_live_block_id(self, client, tree):
         assert direct_reader.get_jobs() == [
-            {"Name": "AF Job", "ID": 156, "IsSelected": False},
-            {"Name": "Overview", "ID": 154, "IsSelected": False},
-            {"Name": "HiRes", "ID": 152, "IsSelected": True},
+            {"Name": "AF Job", "ID": 156, "IsSelected": False, "IsAutofocus": False},
+            {"Name": "Overview", "ID": 154, "IsSelected": False, "IsAutofocus": False},
+            {"Name": "HiRes", "ID": 152, "IsSelected": True, "IsAutofocus": False},
         ]
+
+    def test_an_autofocus_job_as_the_log_reader_marks_it(self, client, tree):
+        tree.autofocus_on_start = {"AF Job"}
+        assert [j["Name"] for j in direct_reader.get_jobs() if j["IsAutofocus"]] == ["AF Job"]
 
     def test_a_reloaded_experiment_gives_the_new_ids(self, client, tree):
         tree.jobs = lambda: {"AF Job": (166, 1), "Overview": (164, 2), "HiRes": (162, 3)}
@@ -102,6 +116,7 @@ class TestJobs:
             "Name": "Overview",
             "ID": 154,
             "IsSelected": False,
+            "IsAutofocus": False,
         }
         assert direct_reader.get_job_by_name("No such job") is None
 
@@ -372,6 +387,78 @@ class TestTheRest:
             direct_reader.get_active_settings()
 
 
+class TestTheJobSettings:
+    """The selected job's settings, whole, as the API and log readers give them."""
+
+    def test_the_driver_reads_them_as_it_reads_the_api_readers(self, client, tree):
+        settings = direct_reader.get_job_settings("HiRes")
+        assert capabilities.job_settings_complete(settings, job_name="HiRes")
+        geometry = parse_tile_geometry(settings)
+        assert geometry["tile_w_um"] == pytest.approx(1162.5)
+        assert geometry["pixel_w_um"] == pytest.approx(2.2705, rel=1e-4)
+        assert (geometry["pixels_x"], geometry["pixels_y"]) == (512, 512)
+        assert geometry["bbox"]["x_min"] == pytest.approx(50000.0 - 1162.5 / 2)
+        flat = make_changeable_copy(settings)
+        assert flat["zoom"]["current"] == 1.0
+        assert flat["activeSettings"][0]["activeDetectors"][0]["name"] == "HyD 2"
+        assert flat["objective"]["slotIndex"] == 0
+        assert flat["stack"]["sections"] is None  # an xyz scan without a stack, as the parser marks it
+
+    def test_they_name_the_job_and_its_live_id(self, client, tree):
+        settings = direct_reader.get_job_settings("HiRes")
+        assert (settings["jobName"], settings["id"]) == ("HiRes", 152)
+        assert settings["autoFocus"] == {"isActive": False}
+
+    def test_both_z_drives_where_they_truly_are(self, client, tree):
+        client._hardware_z_um.update({"z-galvo": -2.5, "z-wide": 4999.5})
+        flat = make_changeable_copy(direct_reader.get_job_settings("HiRes"))
+        assert flat["zPosition"] == pytest.approx({"z-galvo": -2.5, "z-wide": 4999.5})
+
+    def test_a_z_stack_comes_with_them(self, client, tree):
+        tree.live.update(
+            {
+                ("Acquire", "AcquireZStackInfo", "BeginValue"): -10e-6,
+                ("Acquire", "AcquireZStackInfo", "EndValue"): 10e-6,
+                ("Acquire", "AcquireZStackInfo", "SectionsCount"): 21,
+                ("Acquire", "AcquireZStackInfo", "StepSize"): 1e-6,
+                ("Acquire", "ZStackUseMode"): 1,
+            }
+        )
+        flat = make_changeable_copy(direct_reader.get_job_settings("HiRes"))
+        assert (flat["stack"]["sections"], flat["stack"]["zDrive"]) == (21, "z-galvo")
+
+    def test_another_jobs_settings_are_not_in_the_tree(self, client, tree):
+        with pytest.raises(hardware_server.HardwareServerUnavailable, match="selected"):
+            direct_reader.get_job_settings("Overview")
+
+
+class TestTheHardwareInfo:
+    """The instrument, whole, as the API and log readers give it."""
+
+    def test_the_turret_as_the_driver_reads_it(self, tree):
+        assert sorted(objective_by_slot(direct_reader.get_hardware_info())) == [0, 1]
+
+    def test_what_the_adapter_reads(self, tree):
+        info = direct_reader.get_hardware_info()
+        assert info["SerialNumber"] == "STELLARIS SIMULATOR"
+        assert info["Microscope"]["name"] == "DM Manual-6"
+        assert info["Microscope"]["AfcInstalled"] is False
+        assert info["ScanSpeed"] == {"Min": 1, "Max": 2600, "ResonantSpeed": 12000}
+        assert "SystemType" not in info
+
+    def test_detectors_grouped_by_where_the_light_goes(self, tree):
+        sinks = direct_reader.get_hardware_info()["LightSinks"]
+        assert [(s["BeamRoute"], [u["Name"] for u in s["DetectionUnits"]]) for s in sinks] == [
+            ("40", ["HyD 2", "HyD S 3"]),
+            ("10", ["Trans PMT"]),
+        ]
+
+    def test_light_sources_and_filter_wheels(self, tree):
+        info = direct_reader.get_hardware_info()
+        assert [s["name"] for s in info["LightSources"]] == ["UV", "Visible Light", "SuperContVisible Light"]
+        assert {"Type": 140, "FilterNames": ["--- ", "Substrate ", "Mirror "]} in info["FilterWheels"]
+
+
 class TestWhatItReads:
     def test_only_what_it_was_agreed_to_read(self):
         assert direct_reader.READS == (
@@ -406,6 +493,8 @@ class TestWhatItReads:
             "base_fov",
             "afc_installed",
             "active_settings",
+            "job_settings",
+            "hardware_info",
         )
 
     def test_without_the_hardware_server_it_raises(self):

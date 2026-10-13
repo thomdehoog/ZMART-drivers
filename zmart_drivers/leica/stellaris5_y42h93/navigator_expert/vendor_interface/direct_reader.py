@@ -91,6 +91,8 @@ READS = (
     "base_fov",
     "afc_installed",
     "active_settings",
+    "job_settings",
+    "hardware_info",
 )
 
 SCANNING = ("Confocal", "ScanningParameter")
@@ -130,9 +132,13 @@ def get_jobs() -> list[dict]:
     """Every job, in the sequence's order, shaped as :func:`log_reader.get_jobs` gives them.
 
     Per job ``Name``, ``ID`` (its live block id, which an experiment load
-    changes while the CAM API's job list keeps the old one) and
-    ``IsSelected``. The CAM API's list also says ``IsAutofocus`` and
-    ``ScanMode``, which the tree's job sequence does not hold.
+    changes while the CAM API's job list keeps the old one), ``IsSelected``
+    and ``IsAutofocus``, from the job's ``IsAutoFocusOnStart`` as the log
+    reader takes it from the same field. On the simulator (2026-10-13) the
+    tree had it unset for every job, the AF job too, which the CAM API's
+    list marked as autofocus when the mock was modelled on it: to be
+    compared once the CAM API answers again. The CAM API's ``ScanMode`` per
+    job is not in the job sequence.
     """
     sequence = job_sequence()
     ordered = sorted(sequence.jobs.items(), key=lambda item: item[1].element_id)
@@ -141,6 +147,7 @@ def get_jobs() -> list[dict]:
             "Name": name,
             "ID": job.block_id,
             "IsSelected": job.element_id == sequence.selected_element,
+            "IsAutofocus": job.autofocus_on_start,
         }
         for name, job in ordered
     ]
@@ -580,6 +587,21 @@ DETECTOR_FIELDS = (
     "CanDoPhotonCounting",
 )
 
+#: What :func:`get_detectors` reads of each detector in use.
+ACTIVE_DETECTOR_FIELDS = (
+    "Name",
+    "BeamRoute",
+    "WaveLengthBegin",
+    "WaveLengthEnd",
+    "DyeName",
+    "HighVoltage",
+    "HighVoltageMin",
+    "HighVoltageMax",
+    "Offset",
+)
+#: What :func:`get_detection_units` reads of every detector.
+INSTALLED_DETECTOR_FIELDS = ("Name", "BeamRoute", "Type", "CanDoPhotonCounting", "WaveLengthRangeMin")
+
 
 def detection_layout(nodes, node, kids):
     """Per detector, every spectrophotometer's in order: the value node of each of :data:`DETECTOR_FIELDS`."""
@@ -594,12 +616,12 @@ def detection_layout(nodes, node, kids):
     ]
 
 
-def all_detectors(nodes):
-    """Every detector's :data:`DETECTOR_FIELDS`, read."""
-    return [
-        {field: node_value(nodes, value) for field, value in unit.items()}
-        for unit in layout(nodes, DETECTION, detection_layout)
-    ]
+def all_detectors(nodes, fields=DETECTOR_FIELDS, *, active_only=False):
+    """Every detector's *fields*, read; with *active_only* only those in use, whose flag is read first."""
+    units = layout(nodes, DETECTION, detection_layout)
+    if active_only:
+        units = [unit for unit in units if node_value(nodes, unit["IsActive"])]
+    return [{field: node_value(nodes, unit[field]) for field in fields} for unit in units]
 
 
 def get_detectors() -> list[dict]:
@@ -628,8 +650,7 @@ def get_detectors() -> list[dict]:
                 },
                 "offset": unit["Offset"],
             }
-            for unit in all_detectors(nodes)
-            if unit["IsActive"]
+            for unit in all_detectors(nodes, ACTIVE_DETECTOR_FIELDS, active_only=True)
         ]
 
     return read("the detectors", reading)
@@ -652,7 +673,7 @@ def get_detection_units() -> list[dict]:
                 "CanDoPhotonCounting": unit["CanDoPhotonCounting"],
                 "MinDetectionBandpassWidth": unit["WaveLengthRangeMin"],
             }
-            for unit in all_detectors(nodes)
+            for unit in all_detectors(nodes, INSTALLED_DETECTOR_FIELDS)
         ]
 
     return read("the detection units", reading)
@@ -809,3 +830,86 @@ def get_active_settings() -> list[dict]:
             "pinholeAiry": get_pinhole()["airy"],
         }
     ]
+
+
+def micrometres_by_micrometres(width_m, height_m):
+    """``"W µm x H µm"``, the form of the job settings' ``imageSize`` and ``pixelSize``, at 0.1 nm."""
+    return f"{width_m * 1e6:.4f} µm x {height_m * 1e6:.4f} µm"
+
+
+def get_job_settings(job_name) -> dict:
+    """The settings of *job_name*, whole, as the API and log readers' ``get_job_settings`` give them.
+
+    Only the selected job's: the tree holds the settings LAS X scans with
+    now, so another job raises :class:`HardwareServerUnavailable` and the
+    routed readers ask the API and the log instead. So does a job whose
+    sequential settings are several (:func:`get_active_settings`).
+
+    Beside the API's and log's: ``imageSize`` and ``pixelSize`` in µm to
+    0.1 nm where they round to 10 µm; ``zPosition`` where each drive truly
+    is, also the drive that carries the job's z-stack, whose settings stop
+    refreshing; ``autoFocus`` from the job's ``IsAutoFocusOnStart`` (:func:`get_jobs`).
+    """
+    selected = get_selected_job()
+    if selected is None or selected["Name"] != job_name:
+        raise HardwareServerUnavailable(
+            f"the state tree holds the selected job's settings "
+            f"({selected['Name'] if selected else 'none'}), not {job_name!r}'s"
+        )
+    xy = get_xy()
+    width, height = get_fov()
+    pixel_w, pixel_h = get_pixel_size()
+    settings = {
+        "jobName": job_name,
+        "id": selected["ID"],
+        "autoFocus": {"isActive": selected["IsAutofocus"]},
+        "activeSettings": get_active_settings(),
+        "format": get_format(),
+        "imageSize": micrometres_by_micrometres(width, height),
+        "pixelSize": micrometres_by_micrometres(pixel_w, pixel_h),
+        "objective": get_objective(),
+        "scanFieldRotation": get_scan_field_rotation(),
+        "scanMode": get_scan_mode(),
+        "scanSpeed": get_scan_speed(),
+        "sequentialMode": get_sequential_mode(),
+        "xyStage": {"posX": xy["x_um"], "posY": xy["y_um"], "unit": "µm"},
+        "zoom": get_zoom(),
+        "zPosition": {
+            drive: {"position": read_z_um(drive), "unit": "µm"} for drive in Z_USE_MODE
+        },
+    }
+    stack = get_z_stack()
+    if stack is not None:
+        settings["stack"] = stack
+    return settings
+
+
+def get_hardware_info() -> dict:
+    """The instrument, whole, as the API and log readers' ``get_hardware_info`` give it.
+
+    ``Microscope`` (``name``, ``AfcInstalled``, ``objectives``),
+    ``SerialNumber``, ``ScanSpeed``, ``LightSources``, ``LightSinks`` (the
+    detectors, grouped by the first part of their beam route, without the
+    sinks' names, which the tree does not hold) and ``FilterWheels``
+    (``Type``, ``FilterNames``; LAS X's internal wheels too). No
+    ``SystemType``: the tree's is a code (100 on the simulator) with no
+    name known for it yet.
+    """
+    sinks = {}
+    for unit in get_detection_units():
+        route = unit["BeamRoute"].split(";")[0]
+        sinks.setdefault(route, {"BeamRoute": route, "DetectionUnits": []})["DetectionUnits"].append(unit)
+    return {
+        "Microscope": {
+            "name": get_microscope_stand(),
+            "AfcInstalled": get_afc_installed(),
+            "objectives": get_objectives(),
+        },
+        "SerialNumber": get_serial_number(),
+        "ScanSpeed": get_scan_speed_range(),
+        "LightSources": get_light_sources(),
+        "LightSinks": list(sinks.values()),
+        "FilterWheels": [
+            {"Type": wheel["type"], "FilterNames": wheel["filterNames"]} for wheel in get_filter_wheels()
+        ],
+    }

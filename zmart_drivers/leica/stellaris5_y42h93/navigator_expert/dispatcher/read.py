@@ -163,15 +163,15 @@ def _snapshot_read(spec, *, max_age_s, job_name=None) -> Reading:
         return Reading(value=None, source="log", observed_at=time.time(), age_s=None, error=exc)
 
 
-def direct_read(spec) -> Reading:
+def direct_read(spec, direct_kwargs) -> Reading:
     try:
-        value = spec.direct_fn()
+        value = spec.direct_fn(**direct_kwargs)
         return Reading(value=value, source="direct", observed_at=time.time(), age_s=0.0)
     except HardwareServerUnavailable as exc:
         return Reading(value=None, source="direct", observed_at=time.time(), age_s=None, error=exc)
 
 
-def watch_direct(spec, *, succeeded, deadline, observed_after):
+def watch_direct(spec, *, succeeded, deadline, observed_after, direct_kwargs):
     """Ask the direct reader every ``POLL_S`` until an answer counts, or *deadline*.
 
     Returns the winning Reading; an error-carrying one at once when the
@@ -179,7 +179,7 @@ def watch_direct(spec, *, succeeded, deadline, observed_after):
     counted in time.
     """
     while True:
-        reading = direct_read(spec)
+        reading = direct_read(spec, direct_kwargs)
         if reading.error is not None or _counts(reading, succeeded, observed_after):
             return reading
         if time.monotonic() + tuning.POLL_S >= deadline:
@@ -375,7 +375,11 @@ def wait_for(
                 else time.monotonic() + tuning.WINDOWS * tuning.WINDOW_S
             )
             reading = watch_direct(
-                spec, succeeded=succeeded, deadline=until, observed_after=observed_after
+                spec,
+                succeeded=succeeded,
+                deadline=until,
+                observed_after=observed_after,
+                direct_kwargs=api_kwargs or {},
             )
             if reading is None or reading.error is None:
                 return reading

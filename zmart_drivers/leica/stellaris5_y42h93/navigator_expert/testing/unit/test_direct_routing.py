@@ -78,7 +78,7 @@ class TestFromTheTree:
     def test_selected_job(self, client, tree):
         reading = readers.get_selected_job(client, diagnostics=True)
         assert reading.source == "direct"
-        assert reading.value == {"Name": "HiRes", "ID": 152, "IsSelected": True}
+        assert reading.value == {"Name": "HiRes", "ID": 152, "IsSelected": True, "IsAutofocus": False}
 
     def test_both_z_drives_in_micrometres(self, client, tree):
         client._hardware_z_um.update({"z-galvo": 2.5, "z-wide": 4999.5})
@@ -145,3 +145,33 @@ class TestSuccessChecks:
         result = commands.select_job(client, "HiRes")
         assert result["success"] is True
         assert "already selected" in result["message"]
+
+
+class TestEveryDatumDirectly:
+    """Asked for the direct reader, every routed datum answers from it, or falls back when it cannot."""
+
+    def test_scan_status(self, client, tree):
+        reading = readers.get_scan_status(client, mode="direct", diagnostics=True)
+        assert (reading.source, reading.value) == ("direct", "eScanIdle")
+
+    def test_jobs(self, client, tree):
+        reading = readers.get_jobs(client, mode="direct", diagnostics=True)
+        assert reading.source == "direct"
+        assert [j["Name"] for j in reading.value] == ["AF Job", "Overview", "HiRes"]
+
+    def test_hardware_info(self, client, tree):
+        reading = readers.get_hardware_info(client, mode="direct", diagnostics=True)
+        assert reading.source == "direct"
+        assert reading.value["SerialNumber"] == "STELLARIS SIMULATOR"
+
+    def test_the_selected_jobs_settings(self, client, tree):
+        reading = readers.get_job_settings(client, "HiRes", mode="direct", diagnostics=True)
+        assert (reading.source, reading.value["jobName"]) == ("direct", "HiRes")
+
+    def test_the_field_of_view_through_the_settings(self, client, tree):
+        assert readers.get_fov(client, "HiRes", mode="direct") == pytest.approx((0.0011625, 0.0011625))
+
+    def test_another_jobs_settings_fall_back(self, client, tree):
+        reading = readers.get_job_settings(client, "Overview", mode="direct", diagnostics=True)
+        assert reading.source in ("api", "log")
+        assert reading.value["objective"]["slotIndex"] is not None

@@ -92,7 +92,7 @@ class DatumSpec:
     log_fn: Callable | None = None  # (snapshot, *, max_age_s[, job_name])
     log_max_age_attr: str | None = None
     age_key: str | None = None  # key for age_for_snapshot()
-    direct_fn: Callable | None = None  # () -> value, from the direct reader
+    direct_fn: Callable | None = None  # ([job_name]) -> value, from the direct reader
 
 
 def age_for_snapshot(snapshot, *, age_key=None, job_name=None, max_age_s=None):
@@ -138,6 +138,7 @@ DATUMS = {
         mode_attr="scan_status_mode",
         success=scan_status_known,
         api_fn=lambda client, **kw: api_reader.get_scan_status(client),
+        direct_fn=direct_reader.get_scan_status,
         log_fn=lambda snapshot, *, max_age_s: log_reader.get_scan_status(
             snapshot, max_age_s=max_age_s
         ),
@@ -148,6 +149,7 @@ DATUMS = {
         mode_attr="job_settings_mode",
         success=job_settings_complete,
         api_fn=lambda client, job_name, **kw: api_reader.get_job_settings(client, job_name, **kw),
+        direct_fn=direct_reader.get_job_settings,
         log_fn=lambda snapshot, *, max_age_s, job_name: log_reader.get_job_settings(
             job_name, snapshot, max_age_s=max_age_s
         ),
@@ -157,6 +159,7 @@ DATUMS = {
         mode_attr="hardware_info_mode",
         success=hardware_info_present,
         api_fn=lambda client, **kw: api_reader.get_hardware_info(client, **kw),
+        direct_fn=direct_reader.get_hardware_info,
         log_fn=lambda snapshot, *, max_age_s: log_reader.get_hardware_info(
             snapshot, max_age_s=max_age_s
         ),
@@ -179,8 +182,11 @@ DATUMS = {
         # stream reports only the ACTIVE job (that is the `selected_job`
         # datum, which keeps its log/hybrid legs); its job-list derivation is
         # a passive cluster that omits jobs not re-dumped this session, so it
-        # is incomplete. Confirmed on the bench (2026-07-06). No log_fn.
+        # is incomplete. Confirmed on the bench (2026-07-06). No log_fn. The
+        # direct reader lists every job of the sequence, without the API's
+        # IsAutofocus and ScanMode.
         api_fn=lambda client, **kw: api_reader.get_jobs(client, **kw),
+        direct_fn=direct_reader.get_jobs,
     ),
     "selected_job": DatumSpec(
         mode_attr="selected_job_mode",
