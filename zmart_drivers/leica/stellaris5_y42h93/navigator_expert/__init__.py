@@ -25,7 +25,7 @@ this repository)::
     - testing/            the mock LAS X API, the offline suite, the hardware validators
 """
 
-__version__ = "6.0.0rc1"
+__version__ = "7.0.0rc1"
 
 __all__ = [
     # logging

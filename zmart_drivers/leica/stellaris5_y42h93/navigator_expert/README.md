@@ -8,10 +8,12 @@ notebooks keep the thin 1–3-line invocation style used across the ZMART driver
 
 - **Author:** Thom de Hoog (ZMB, University of Zurich) · thom.dehoog@zmb.uzh.ch · thomdehoog@gmail.com
 - **License:** see the repository root [`LICENSE`](../../../../LICENSE).
-- **Status:** **Release candidate (`6.0.0rc1`), not yet released.** The driver has been tested on the
-  LAS X simulator and on a real STELLARIS. The latest full run on the microscope is recorded in
-  [`SCOPE_RUN_2026-10-10.md`](SCOPE_RUN_2026-10-10.md). Before it is released for unattended use,
-  the findings in [`RELEASE_CANDIDATE_REVIEW.md`](RELEASE_CANDIDATE_REVIEW.md) need to be fixed.
+- **Status:** **Release candidate (`7.0.0rc1`), not yet released.** Version 7 reads LAS X's state
+  first from LAS X's hardware server, and from the CAM API and the log when that fails. This has been
+  tested on the LAS X simulator; it has not yet run on a real STELLARIS. The latest full run on the
+  microscope, of version 6, is recorded in [`SCOPE_RUN_2026-10-10.md`](SCOPE_RUN_2026-10-10.md).
+  Before it is released for unattended use, the findings in
+  [`RELEASE_CANDIDATE_REVIEW.md`](RELEASE_CANDIDATE_REVIEW.md) need to be fixed.
 
 ## Contents
 
