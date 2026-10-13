@@ -394,29 +394,30 @@ def confirm_move_z(
     deadline = t_start + poll_window
 
     while time.monotonic() < deadline:
-        ch = _readback(
-            client,
-            job_name,
-            deadline=deadline,
-            observed_after=observed_after,
-        )
-        if ch is not None:
+        # The readers make the Z number; this only compares. LAS X's state
+        # tree first, where the drive truly is; else the job settings, whose
+        # reader knows they do not refresh for the drive carrying the job's
+        # z-stack and reads that one elsewhere.
+        actual = _readers.z_um_from_tree(key)
+        if actual is None:
+            ch = _readback(client, job_name, deadline=deadline, observed_after=observed_after)
             try:
-                # The reader makes the Z number; this only compares. (It is
-                # the reader that knows the settings do not refresh for the
-                # drive carrying the job's z-stack, and reads the saved
-                # experiment for that one.)
-                actual = z_um_from_settings(ch, key, client=client, job_name=job_name)
-                log.debug(
-                    "MoveZ confirm: target=%.2f actual=%.2f delta=%.3f um",
-                    target_um,
-                    actual,
-                    abs(actual - target_um),
+                actual = (
+                    None
+                    if ch is None
+                    else z_um_from_settings(ch, key, client=client, job_name=job_name)
                 )
-                if abs(actual - target_um) < tolerance:
-                    return {"success": True, "logs": logs}
             except (KeyError, TypeError, RuntimeError, ValueError):
-                pass
+                actual = None
+        if actual is not None:
+            log.debug(
+                "MoveZ confirm: target=%.2f actual=%.2f delta=%.3f um",
+                target_um,
+                actual,
+                abs(actual - target_um),
+            )
+            if abs(actual - target_um) < tolerance:
+                return {"success": True, "logs": logs}
 
         time.sleep(_timing.POLL_S)
 
@@ -958,12 +959,25 @@ def _confirm_filter_wheel_slot(
 # =============================================================================
 
 
+def xy_confirm_mode():
+    """The state tree when the profile reads XY from it, else the CAM API.
+
+    A stage move is confirmed from a reading taken after the command; the
+    log's XY can predate it, so without the tree the confirmation keeps to
+    the CAM API, and the tree falls back to it too.
+    """
+    from . import profiles
+
+    return "tree" if profiles.STATE_READERS.xy_mode == "tree" else "api"
+
+
 def confirm_move_xy(
     client, *, target_x_um, target_y_um, tolerance=20.0, poll_window=None
 ):
     """Poll until XY stage position is within tolerance, or until timeout.
 
-    Looks at the stage position every ``POLL_S``, through the API.
+    Looks at the stage position every ``POLL_S``, from LAS X's state tree
+    or through the API (:func:`xy_confirm_mode`).
 
     Args:
         client: The connected LAS X API client.
@@ -985,7 +999,9 @@ def confirm_move_xy(
 
     while time.monotonic() < deadline:
         pos = _reading_value_after(
-            _readers.get_xy(client, mode="api", diagnostics=True, deadline=deadline),
+            _readers.get_xy(
+                client, mode=xy_confirm_mode(), fallback="api", diagnostics=True, deadline=deadline
+            ),
             observed_after,
         )
         if pos is not None:

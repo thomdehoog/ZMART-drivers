@@ -84,9 +84,18 @@ class StateReaderProfile:
     rule in ``dispatcher.tuning``. A mode says which sources take part; a
     ``*_log_max_age_s`` says how old a log answer may be and still count,
     because each kind of state goes stale at its own pace.
+
+    ``tree`` reads LAS X's hardware server's state tree, and the hybrid
+    reader (CAM API and log) answers when the hardware server cannot be
+    reached; the reading names its source. Measured on the simulator,
+    2026-10-13: XY from the tree in 1.1 ms against the CAM API's 20 ms (worst
+    57 ms), and a new stage position seen 3.3-4.2 ms after a move against
+    22-58 ms. Leica agreed (2026-10-13) to the driver reading the stage, the
+    selected job and the z drives this way; the scan status stays on the CAM
+    API and the log.
     """
 
-    xy_mode: str = "hybrid"
+    xy_mode: str = "tree"
     xy_log_max_age_s: float = 1.0
 
     job_settings_mode: str = "hybrid"
@@ -95,12 +104,12 @@ class StateReaderProfile:
     # jobs is API-pinned, NOT hybrid: the log stream only reports the ACTIVE
     # job, so its list is incomplete (a job not re-dumped this session is
     # absent) — only the API enumerates the full job list. Confirmed on the
-    # bench (2026-07-06). selected_job (which job is active) stays hybrid: that
-    # is exactly what the log can see.
+    # bench (2026-07-06). selected_job (which job is active) reads the state
+    # tree, and hybrid without it: that is exactly what the log can see.
     jobs_mode: str = "api"
     jobs_log_max_age_s: float = 2.0
 
-    selected_job_mode: str = "hybrid"
+    selected_job_mode: str = "tree"
     selected_job_log_max_age_s: float = 2.0
     # Selected-job confirmation source: "api" | "log" | "hybrid".
     # hybrid races the api leg (transition-admissible: a stale API readback
@@ -114,6 +123,11 @@ class StateReaderProfile:
     selected_job_confirm_source: str = "hybrid"
     selected_job_log_prime_cluster: bool = False
     selected_job_log_cluster_max_age_s: float | None = None
+
+    # Where a z drive is: "tree", or "hybrid" for the job settings (and, for
+    # the drive carrying the job's z-stack, the reads of
+    # ``derived.z_um_from_settings``).
+    z_mode: str = "tree"
 
     hardware_info_mode: str = "hybrid"
     hardware_info_log_max_age_s: float = 2.0

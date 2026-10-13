@@ -36,11 +36,15 @@ class TestStateReaders(unittest.TestCase):
         # hybrid is the default for routed cold reads; api/log stay selectable
         # per datum. Exception: `jobs` is API-pinned because the log only sees
         # the active job, so its list is incomplete (bench 2026-07-06).
+        # Since 2026-10-13 XY, the selected job and the z drives read LAS X's
+        # state tree first (Thom's decision, with Leica's agreement), and
+        # hybrid when the hardware server cannot be reached.
         profile = profiles.STATE_READERS
-        self.assertEqual(profile.xy_mode, "hybrid")
+        self.assertEqual(profile.xy_mode, "tree")
         self.assertEqual(profile.job_settings_mode, "hybrid")
         self.assertEqual(profile.jobs_mode, "api")
-        self.assertEqual(profile.selected_job_mode, "hybrid")
+        self.assertEqual(profile.selected_job_mode, "tree")
+        self.assertEqual(profile.z_mode, "tree")
         self.assertEqual(profile.hardware_info_mode, "hybrid")
         self.assertEqual(profile.scan_status_mode, "hybrid")
 

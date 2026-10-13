@@ -9,9 +9,16 @@ and a caller can narrow it with ``accept``. A read the API did not answer in
 a window is requested again at the next one. After four windows the reading
 is unknown.
 
-The source family (``api``, ``log``, ``hybrid``) is profile policy and says
-which sources take part, never how long to wait. Asking a family for a leg
-the datum does not have fails closed at once with ``UnsupportedSource``.
+The source family (``api``, ``log``, ``hybrid``, ``tree``) is profile policy
+and says which sources take part, never how long to wait. Asking a family for
+a leg the datum does not have fails closed at once with ``UnsupportedSource``.
+
+``tree`` is LAS X's hardware server's state tree, read in the caller's own
+thread (its COM connection belongs to the thread that made it) and looked at
+again every ``POLL_S`` until an answer counts. It is not raced: when the
+hardware server cannot be reached, or the datum has no tree leg, the
+*fallback* family answers instead (``hybrid`` unless the caller says), within
+the same window.
 
 Public functions keep the plain return shapes by default; pass
 ``diagnostics=True`` to receive a :class:`Reading` with its source and age.
@@ -33,7 +40,8 @@ from ..actions.derived import (  # noqa: F401  re-exported, as the readers packa
     stack_drive,
     stack_slices_um,
 )
-from ..vendor_interface import api_reader, log_reader
+from ..vendor_interface import api_reader, log_reader, state_tree
+from ..vendor_interface.hardware_server import HardwareServerUnavailable
 from . import tuning
 
 log = logging.getLogger(__name__)
@@ -152,6 +160,30 @@ def _snapshot_read(spec, *, max_age_s, job_name=None) -> Reading:
     except Exception as exc:
         log.debug("log reader failed", exc_info=True)
         return Reading(value=None, source="log", observed_at=time.time(), age_s=None, error=exc)
+
+
+def tree_read(spec) -> Reading:
+    try:
+        value = spec.tree_fn()
+        return Reading(value=value, source="tree", observed_at=time.time(), age_s=0.0)
+    except HardwareServerUnavailable as exc:
+        return Reading(value=None, source="tree", observed_at=time.time(), age_s=None, error=exc)
+
+
+def watch_tree(spec, *, succeeded, deadline, observed_after):
+    """Look at the state tree every ``POLL_S`` until an answer counts, or *deadline*.
+
+    Returns the winning Reading; an error-carrying one at once when the
+    hardware server cannot be reached; None when it answered but nothing
+    counted in time.
+    """
+    while True:
+        reading = tree_read(spec)
+        if reading.error is not None or _counts(reading, succeeded, observed_after):
+            return reading
+        if time.monotonic() + tuning.POLL_S >= deadline:
+            return None
+        time.sleep(tuning.POLL_S)
 
 
 def _unsupported(mode, datum) -> Reading:
@@ -305,6 +337,7 @@ def wait_for(
     mode=None,
     deadline=None,
     api_kwargs=None,
+    fallback="hybrid",
 ):
     """Wait for a reading by the one rule; return the winning Reading, or a failure.
 
@@ -317,12 +350,14 @@ def wait_for(
         job_name: The job a per-job datum is about.
         observed_after: Reject answers observed at or before this wall-clock
             time; a confirmation passes the moment its command was sent.
-        mode: ``api`` / ``log`` / ``hybrid``; None takes the profile's.
+        mode: ``api`` / ``log`` / ``hybrid`` / ``tree``; None takes the profile's.
         deadline: A ``time.monotonic()`` time to watch until, for a caller
             that runs its own window (a command confirmation). None means
             the rule: ``WINDOWS`` windows of ``WINDOW_S``, requesting an
             unanswered read again at each new window.
         api_kwargs: Extra keyword arguments for the API leg (``job_name``).
+        fallback: The family that answers in ``tree`` mode when the hardware
+            server cannot be reached or the datum has no tree leg.
 
     Returns:
         The winning :class:`Reading`; else the latest error-carrying reading
@@ -331,6 +366,20 @@ def wait_for(
     spec = capabilities.spec(datum)
     mode = mode if mode is not None else getattr(_profile(), spec.mode_attr)
     succeeded = _success_for(datum, job_name, accept)
+    if mode == "tree":
+        if spec.tree_fn is not None:
+            until = (
+                deadline
+                if deadline is not None
+                else time.monotonic() + tuning.WINDOWS * tuning.WINDOW_S
+            )
+            reading = watch_tree(
+                spec, succeeded=succeeded, deadline=until, observed_after=observed_after
+            )
+            if reading is None or reading.error is None:
+                return reading
+            log.debug("%s: %s; the %s reader answers", datum, reading.error, fallback)
+        mode = fallback
     kwargs = dict(
         mode=mode,
         succeeded=succeeded,
@@ -360,7 +409,17 @@ def wait_for(
     return failed
 
 
-def _routed(datum, client, *, mode, diagnostics, deadline=None, accept=None, job_name=None):
+def _routed(
+    datum,
+    client,
+    *,
+    mode,
+    diagnostics,
+    deadline=None,
+    accept=None,
+    job_name=None,
+    fallback="hybrid",
+):
     api_kwargs = {} if job_name is None else {"job_name": job_name}
     reading = wait_for(
         datum,
@@ -370,6 +429,7 @@ def _routed(datum, client, *, mode, diagnostics, deadline=None, accept=None, job
         mode=mode,
         deadline=deadline,
         api_kwargs=api_kwargs,
+        fallback=fallback,
     )
     return _plain_or_diagnostic(reading, diagnostics)
 
@@ -419,29 +479,66 @@ def get_hardware_info(client, *, mode=None, diagnostics=False, deadline=None):
     return _routed("hardware_info", client, mode=mode, diagnostics=diagnostics, deadline=deadline)
 
 
-def get_xy(client, *, mode=None, diagnostics=False, deadline=None, accept=None):
+def get_xy(
+    client, *, mode=None, diagnostics=False, deadline=None, accept=None, fallback="hybrid"
+):
     return _routed(
-        "xy", client, mode=mode, diagnostics=diagnostics, deadline=deadline, accept=accept
+        "xy",
+        client,
+        mode=mode,
+        diagnostics=diagnostics,
+        deadline=deadline,
+        accept=accept,
+        fallback=fallback,
     )
+
+
+def z_um_from_tree(drive, *, mode=None):
+    """Where one z drive truly is (um), from LAS X's state tree; None when the tree does not answer.
+
+    The tree is read in ``tree`` mode (the profile's ``z_mode`` unless
+    *mode* says); None also when the hardware server cannot be reached, so
+    the caller reads the job settings instead.
+    """
+    mode = mode if mode is not None else _profile().z_mode
+    if mode != "tree":
+        return None
+    try:
+        return state_tree.read_z_um(drive)
+    except HardwareServerUnavailable as why:
+        log.debug("%s: %s; the job settings answer", drive, why)
+        return None
+
+
+def read_z_um(client, job_name, drive, *, mode=None):
+    """Where one z drive is (um), *drive* ``"z-galvo"`` or ``"z-wide"``; None when unreadable.
+
+    From LAS X's state tree (:func:`z_um_from_tree`); otherwise from
+    *job_name*'s settings: it waits for settings that carry ``zPosition``
+    and returns None only when none arrive within the rule's four windows.
+    Readable but incomplete settings raise: ``derived.z_um_from_settings``
+    raises ``RuntimeError`` when the drive is missing, and its settings
+    normalization can raise ``ValueError`` on a schema mismatch — unlike the
+    routed readers, which never raise.
+    """
+    from_tree = z_um_from_tree(drive, mode=mode)
+    if from_tree is not None:
+        return from_tree
+    settings = get_job_settings(
+        client,
+        job_name,
+        mode=None if mode == "tree" else mode,
+        accept=lambda s: s.get("zPosition") is not None,
+    )
+    if not settings:
+        log.warning("read_z_um: could not read job settings for '%s'", job_name)
+        return None
+    return derived.z_um_from_settings(settings, drive, client=client, job_name=job_name)
 
 
 def read_zwide_um(client, job_name, *, mode=None):
-    """Z-wide position (um) from the job settings, or None when unreadable.
-
-    Waits for settings that carry ``zPosition``. Returns None only when no
-    such settings arrive within the rule's four windows. Readable but
-    incomplete settings raise: ``derived.zwide_um_from_settings`` raises
-    ``RuntimeError`` when z-wide is missing, and its settings normalization
-    can raise ``ValueError`` on a schema mismatch — unlike the routed
-    readers, which never raise.
-    """
-    settings = get_job_settings(
-        client, job_name, mode=mode, accept=lambda s: s.get("zPosition") is not None
-    )
-    if not settings:
-        log.warning("read_zwide_um: could not read job settings for '%s'", job_name)
-        return None
-    return derived.zwide_um_from_settings(settings, client=client, job_name=job_name)
+    """Z-wide position (um), or None when unreadable; see :func:`read_z_um`."""
+    return read_z_um(client, job_name, "z-wide", mode=mode)
 
 
 def get_jobs(client, *, mode=None, diagnostics=False, deadline=None, accept=None):
@@ -457,7 +554,9 @@ def get_job_by_name(client, job_name, *, mode=None, diagnostics=False, deadline=
     return _plain_or_diagnostic(reading, diagnostics)
 
 
-def get_selected_job(client, *, mode=None, diagnostics=False, deadline=None, accept=None):
+def get_selected_job(
+    client, *, mode=None, diagnostics=False, deadline=None, accept=None, fallback="hybrid"
+):
     return _routed(
         "selected_job",
         client,
@@ -465,6 +564,7 @@ def get_selected_job(client, *, mode=None, diagnostics=False, deadline=None, acc
         diagnostics=diagnostics,
         deadline=deadline,
         accept=accept,
+        fallback=fallback,
     )
 
 

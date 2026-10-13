@@ -1,4 +1,4 @@
-"""LAS X's job sequence, read from its hardware server's state tree.
+"""Where the stage and the z drives are, and which job is selected, from LAS X's state tree.
 
 The hardware server keeps LAS X's state as a tree of named nodes, reached
 through ``ServerNodes``: ``GetNode(id)`` gives a node's name, parent and
@@ -11,6 +11,15 @@ selecting a job by its element needs.
 The ids here are live: after an experiment load LAS X gave the jobs new ids
 (HiRes 145 -> 152) while the CAM API's own job list kept the old ones.
 
+The stage is ``Stage/PositionX`` and ``Stage/PositionY``, each z drive an
+``Acquire/ZDriveList/ZDrive`` named by its ``ZUseMode`` (1 z-galvo, 2 z-wide)
+with ``CurrentHardwarePosition``, where the drive truly is; all in metres.
+
+Walking the tree by name costs about 270 ms; a node read by its id about
+0.5 ms. So the ids found are remembered, and each use first checks that the
+node still carries the name it had (one ``GetNode``); a node that does not is
+looked up afresh, which is what an experiment load or a LAS X restart needs.
+
 This module only reads. ``RegisterNode`` also subscribes the connection to
 the node's updates; nothing listens, and the subscription ends with the
 connection. ``ChangeNodes``, which writes, is never called.
@@ -18,6 +27,7 @@ connection. ``ChangeNodes``, which writes, is never called.
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field
 
 from .hardware_server import (
@@ -27,6 +37,14 @@ from .hardware_server import (
 )
 
 SEQUENCE_PATH = ("Acquire", "ATL", "CurrentSequenceList")
+STAGE_PATHS = {"x": ("Stage", "PositionX"), "y": ("Stage", "PositionY")}
+Z_DRIVES_PATH = ("Acquire", "ZDriveList")
+
+#: The driver's name for each z drive, by the ``ZUseMode`` LAS X gives it.
+Z_USE_MODE = {"z-galvo": 1, "z-wide": 2}
+
+#: Node ids found so far, by path; a path is a tuple of names from the root.
+remembered = {}
 
 
 @dataclass(frozen=True)
@@ -83,6 +101,113 @@ def child_named(nodes, node_id, name):
     )
 
 
+def forget_nodes():
+    """Forget every remembered node id, so the next read looks each up afresh."""
+    remembered.clear()
+
+
+def still_named(nodes, node_id, name):
+    """Whether *node_id* still exists under *name*: the check of a remembered id."""
+    return nodes.GetNode(node_id)[0] == name
+
+
+def node_at(nodes, path):
+    """The id of the node at *path*: the remembered one if it still fits, else found by name."""
+    known = remembered.get(path)
+    if known is not None and still_named(nodes, known, path[-1]):
+        return known
+    node = 1
+    for depth, name in enumerate(path, start=1):
+        found = child_named(nodes, node, name)
+        if found is None:
+            raise HardwareServerUnavailable(
+                f"the state tree has no {'/'.join(path)} (missing {name!r})"
+            )
+        node = found
+        remembered[path[:depth]] = node
+    return node
+
+
+def z_drive_node(nodes, drive):
+    """The ``CurrentHardwarePosition`` node of one z drive, remembered by the drive's name."""
+    path = (*Z_DRIVES_PATH, drive, "CurrentHardwarePosition")
+    known = remembered.get(path)
+    if known is not None and still_named(nodes, known, path[-1]):
+        return known
+    for candidate in children(nodes, node_at(nodes, Z_DRIVES_PATH)):
+        if nodes.GetNode(candidate)[0] != "ZDrive":
+            continue
+        if int(child_value(nodes, candidate, "ZUseMode")) == Z_USE_MODE[drive]:
+            found = child_named(nodes, candidate, "CurrentHardwarePosition")
+            if found is not None:
+                remembered[path] = found
+                return found
+    raise HardwareServerUnavailable(f"the state tree has no {drive} under {'/'.join(Z_DRIVES_PATH)}")
+
+
+def read(what, reading):
+    """Run *reading* on the state tree; anything that goes wrong is ``HardwareServerUnavailable``.
+
+    A failed read drops the connection and the remembered ids, so the next
+    read attaches and looks up afresh (LAS X may have restarted).
+    """
+    try:
+        return reading(connected_server().ServerNodes)
+    except HardwareServerUnavailable:
+        raise
+    except Exception as why:
+        forget_connection()
+        forget_nodes()
+        raise HardwareServerUnavailable(
+            f"the hardware server's state tree did not answer {what}: {why}"
+        ) from why
+
+
+def metres(value, what):
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
+        raise HardwareServerUnavailable(f"the state tree answered {what} = {value!r}")
+    return float(value)
+
+
+def get_xy() -> dict:
+    """The stage position, shaped as the CAM API reader gives it: metres and micrometres."""
+
+    def reading(nodes):
+        x = metres(node_value(nodes, node_at(nodes, STAGE_PATHS["x"])), "Stage/PositionX")
+        y = metres(node_value(nodes, node_at(nodes, STAGE_PATHS["y"])), "Stage/PositionY")
+        return {"x": x, "y": y, "x_um": x * 1e6, "y_um": y * 1e6}
+
+    return read("the stage position", reading)
+
+
+def read_z_um(drive: str) -> float:
+    """Where one z drive truly is, in micrometres; *drive* is ``"z-galvo"`` or ``"z-wide"``.
+
+    ``CurrentHardwarePosition``, in the same frame as the job settings'
+    ``zPosition``, and current also for the drive that carries a job's
+    z-stack, whose job settings stop refreshing.
+    """
+    if drive not in Z_USE_MODE:
+        raise ValueError(f"no z drive {drive!r}; the state tree knows {sorted(Z_USE_MODE)}")
+
+    def reading(nodes):
+        return metres(node_value(nodes, z_drive_node(nodes, drive)), drive) * 1e6
+
+    return read(f"where {drive} is", reading)
+
+
+def get_selected_job() -> dict | None:
+    """The selected job, shaped as the log reader gives it: ``Name``, ``ID`` (its live block id), ``IsSelected``.
+
+    None when the tree names no selected job.
+    """
+    sequence = job_sequence()
+    name = sequence.selected_job
+    if name is None:
+        return None
+    return {"Name": name, "ID": sequence.jobs[name].block_id, "IsSelected": True}
+
+
 def child_value(nodes, node_id, name):
     found = child_named(nodes, node_id, name)
     if found is None:
@@ -93,19 +218,13 @@ def child_value(nodes, node_id, name):
 def job_sequence() -> JobSequence:
     """The jobs, their live block and element ids, and which is selected.
 
-    Raises :class:`HardwareServerUnavailable` when the server cannot be
+    The per-job nodes are looked up each time: an experiment load renumbers
+    them. Raises :class:`HardwareServerUnavailable` when the server cannot be
     reached or its tree lacks the sequence.
     """
-    try:
-        nodes = connected_server().ServerNodes
-        node = 1
-        for name in SEQUENCE_PATH:
-            found = child_named(nodes, node, name)
-            if found is None:
-                raise HardwareServerUnavailable(
-                    f"the state tree has no {'/'.join(SEQUENCE_PATH)} (missing {name!r})"
-                )
-            node = found
+
+    def reading(nodes):
+        node = node_at(nodes, SEQUENCE_PATH)
         jobs = {}
         for info in children(nodes, node):
             if nodes.GetNode(info)[0] == "SequenceBlockInfo":
@@ -118,13 +237,8 @@ def job_sequence() -> JobSequence:
             selected_element=int(child_value(nodes, node, "CurrentSelectedElementID")),
             jobs=jobs,
         )
-    except HardwareServerUnavailable:
-        raise
-    except Exception as why:
-        forget_connection()
-        raise HardwareServerUnavailable(
-            f"the hardware server's state tree did not answer: {why}"
-        ) from why
+
+    return read("the job sequence", reading)
 
 
 #: The scan states of the node ``Acquire/AcquisitionState``, by value; the same

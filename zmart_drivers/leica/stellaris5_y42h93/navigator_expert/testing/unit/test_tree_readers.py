@@ -1,11 +1,13 @@
 """
-Unit tests: X, Y, z, the selected job and the scan state, read from LAS X's state tree first.
+Unit tests: X, Y, z and the selected job, read from LAS X's state tree first.
 ================================================================================
 LAS X's hardware server keeps its live state as a tree of named nodes. The
 readers read it first (the profile's ``tree`` source) and fall back to the
 hybrid reader (CAM API and LAS X log) when the hardware server cannot be
-reached. Measured on the simulator, 2026-10-13: XY from the tree in 1.1 ms
-(CAM API 20 ms, worst 57 ms); after a stage move the tree had the new
+reached. Leica agreed to these reads (2026-10-13); the scan status is not
+among them and stays on the CAM API and the log. Measured on the simulator,
+2026-10-13: XY from the tree in 1.1 ms (CAM API 20 ms, worst 57 ms); after
+a stage move the tree had the new
 position in 3.3-4.2 ms, the CAM API in 22-58 ms. The command confirmations
 read through these readers, so they confirm from the tree too.
 
@@ -67,11 +69,10 @@ class TestFromTheTree:
         assert reading.source == "tree"
         assert reading.value == {"x": 0.05, "y": 0.03, "x_um": 50000.0, "y_um": 30000.0}
 
-    def test_scan_status(self, client, tree):
-        assert readers.get_scan_status(client, diagnostics=True).source == "tree"
-        assert readers.get_scan_status(client) == "eScanIdle"
-        tree.status = {"AcquisitionState": 3}
-        assert readers.get_scan_status(client) == "eScanSeries"
+    def test_the_scan_status_is_not_read_from_the_tree(self, client, tree):
+        reading = readers.get_scan_status(client, diagnostics=True)
+        assert reading.source in ("api", "log")
+        assert reading.value == "eScanIdle"
 
     def test_selected_job(self, client, tree):
         reading = readers.get_selected_job(client, diagnostics=True)

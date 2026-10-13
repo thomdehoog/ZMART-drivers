@@ -19,7 +19,8 @@ from functools import partial
 from ..dispatcher import read as _readers
 from ..dispatcher import tuning as _timing
 from ..dispatcher.envelope import _make_log_entry
-from ..vendor_interface import log_wait
+from ..vendor_interface import log_wait, state_tree
+from ..vendor_interface.hardware_server import HardwareServerUnavailable
 from .confirmations import _reading_value_after
 
 log = logging.getLogger(__name__)
@@ -30,6 +31,55 @@ def _state_reader_profile():
     from . import profiles
 
     return profiles.STATE_READERS
+
+
+def selected_job_in_tree():
+    """The selected job's name from LAS X's state tree; None when the tree is not read or not reachable.
+
+    The tree is read when the profile's ``selected_job_mode`` is ``tree``.
+    It holds LAS X's live selection, so unlike the CAM API's job list it
+    cannot be stale, and unlike the log it answers without a new event.
+    """
+    if _state_reader_profile().selected_job_mode != "tree":
+        return None
+    try:
+        selected = state_tree.get_selected_job()
+    except HardwareServerUnavailable as why:
+        log.debug("selected job: %s", why)
+        return None
+    return selected["Name"] if selected else None
+
+
+def confirm_select_job_from_tree(client, *, job_name, timeout=None, otherwise=None):
+    """Tree confirmation leg: look every ``POLL_S`` until LAS X's state tree has *job_name* selected.
+
+    The tree's selection is LAS X's live one, so a match is the switch
+    itself, with no transition witness needed. When the hardware server
+    cannot be reached, *otherwise* (the API leg the profile would run
+    without the tree) confirms instead; without one, the leg fails.
+
+    Returns:
+        {"success": bool, "logs": [...], "source": "tree"}, or *otherwise*'s result.
+    """
+    if timeout is None:
+        timeout = _timing.WINDOW_S
+    logs = []
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        try:
+            selected = state_tree.get_selected_job()
+        except HardwareServerUnavailable as why:
+            log.debug("SelectJob '%s' | state tree: %s", job_name, why)
+            if otherwise is None:
+                return {"success": False, "logs": logs, "source": "tree"}
+            return otherwise(client)
+        if selected and selected["Name"] == job_name:
+            return {"success": True, "logs": logs, "source": "tree"}
+        time.sleep(_timing.POLL_S)
+    msg = f"Job selection timeout after {timeout:.1f}s for '{job_name}' (state tree)"
+    log.warning(msg)
+    logs.append(_make_log_entry("warning", msg))
+    return {"success": False, "logs": logs, "source": "tree"}
 
 
 def confirm_select_job(
@@ -166,6 +216,9 @@ def select_job_confirm_legs(
 
     - ``api``: the API poll alone, exactly today's semantics.
     - ``log``: the post-command ``CurrentBlock`` wait alone.
+    - with the profile's ``selected_job_mode`` ``tree``, LAS X's state tree
+      takes the api leg's place (``api`` / ``hybrid``), and that api leg
+      confirms when the hardware server cannot be reached.
     - ``hybrid``: both legs race for one confirm window (first admissible
       evidence wins); the api leg gets the transition-admissibility gate fed
       by *api_baseline_name*. Both legs watch for the whole window
@@ -203,6 +256,10 @@ def select_job_confirm_legs(
         )
     if source in ("log", "hybrid"):
         log_leg = partial(_confirm_select_job_log, job_name, command_started_at, timeout=window_s)
+    if profile.selected_job_mode == "tree" and api_confirm is not None:
+        api_confirm = partial(
+            confirm_select_job_from_tree, job_name=job_name, timeout=window_s, otherwise=api_confirm
+        )
     return api_confirm, log_leg, budget_s
 
 
@@ -294,6 +351,16 @@ def prepare_select_job(client, job_name):
         "api_baseline_reason": "not_attempted",
         "api_said_selected": False,
     }
+
+    # LAS X's state tree holds the live selection: when it is read and names
+    # the target, that proves the no-op whatever the other sources say.
+    if selected_job_in_tree() == job_name:
+        return {
+            "success": True,
+            "confirmed": True,
+            "message": f"'{job_name}' already selected",
+            "logs": [_make_log_entry("info", "selected job already confirmed from LAS X's state tree")],
+        }, context
 
     if source == "api":
         try:
