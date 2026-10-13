@@ -80,7 +80,7 @@ class TestFromTheTree:
     def test_selected_job(self, client, tree):
         reading = readers.get_selected_job(client, diagnostics=True)
         assert reading.source == "direct"
-        assert reading.value == {"Name": "HiRes", "ID": 152, "IsSelected": True, "IsAutofocus": False}
+        assert reading.value == {"Name": "HiRes", "ID": 152, "IsSelected": True}
 
     def test_both_z_drives_in_micrometres(self, client, tree):
         client._hardware_z_um.update({"z-galvo": 2.5, "z-wide": 4999.5})
@@ -156,10 +156,16 @@ class TestEveryDatumDirectly:
         reading = readers.get_scan_status(client, mode="direct", diagnostics=True)
         assert (reading.source, reading.value) == ("direct", "eScanIdle")
 
-    def test_jobs(self, client, tree):
+    def test_the_job_list_has_no_direct_leg(self):
+        # The adapter keeps autofocus jobs apart, and the tree does not say which
+        # jobs are autofocus jobs; the direct reader's job list serves only its
+        # own selected-job reading.
+        assert capabilities.spec("jobs").direct_fn is None
+
+    def test_jobs_come_from_the_api_which_says_which_are_autofocus_jobs(self, client, tree):
         reading = readers.get_jobs(client, mode="direct", diagnostics=True)
-        assert reading.source == "direct"
-        assert [j["Name"] for j in reading.value] == ["AF Job", "Overview", "HiRes"]
+        assert reading.source == "api"
+        assert [j["Name"] for j in reading.value if j["IsAutofocus"]] == ["AF Job"]
 
     def test_hardware_info(self, client, tree):
         reading = readers.get_hardware_info(client, mode="direct", diagnostics=True)
@@ -184,7 +190,7 @@ class TestDirectByDefault:
 
     def test_every_reading_asks_the_direct_reader_first(self, client, tree):
         assert readers.get_scan_status(client, diagnostics=True).source == "direct"
-        assert readers.get_jobs(client, diagnostics=True).source == "direct"
+        assert readers.get_jobs(client, diagnostics=True).source == "api"  # see test_jobs_come_from_the_api...
         assert readers.get_hardware_info(client, diagnostics=True).source == "direct"
         assert readers.get_job_settings(client, "HiRes", diagnostics=True).source == "direct"
         assert readers.get_xy(client, diagnostics=True).source == "direct"

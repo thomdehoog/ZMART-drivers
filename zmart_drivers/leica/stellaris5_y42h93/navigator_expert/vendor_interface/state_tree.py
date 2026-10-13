@@ -51,7 +51,6 @@ remembered = {}
 class Job:
     block_id: int
     element_id: int
-    autofocus_on_start: bool = False
 
 
 @dataclass(frozen=True)
@@ -229,17 +228,12 @@ def of_name(nodes, kids, name):
 
 
 def sequence_layout(nodes, node, kids):
-    """``(sequence block id node, selected element node, [(name, block id, element id, autofocus-on-start node) per job])``."""
+    """``(sequence block id node, selected element node, [(name, block id, element id node) per job])``."""
     return (
         named(nodes, node, "CurrentSequenceBlockID"),
         named(nodes, node, "CurrentSelectedElementID"),
         [
-            (
-                named(nodes, info, "Name"),
-                named(nodes, info, "BlockID"),
-                named(nodes, info, "ElementID"),
-                named(nodes, info, "IsAutoFocusOnStart"),
-            )
+            (named(nodes, info, "Name"), named(nodes, info, "BlockID"), named(nodes, info, "ElementID"))
             for info in of_name(nodes, kids, "SequenceBlockInfo")
         ],
     )
@@ -258,9 +252,8 @@ def job_sequence() -> JobSequence:
             str(node_value(nodes, name)): Job(
                 block_id=int(node_value(nodes, block_id)),
                 element_id=int(node_value(nodes, element_id)),
-                autofocus_on_start=bool(node_value(nodes, autofocus)),
             )
-            for name, block_id, element_id, autofocus in per_job
+            for name, block_id, element_id in per_job
         }
         return JobSequence(
             block_id=int(node_value(nodes, block)),

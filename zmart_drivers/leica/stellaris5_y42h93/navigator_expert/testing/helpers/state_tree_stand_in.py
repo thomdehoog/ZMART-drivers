@@ -213,7 +213,6 @@ class StandInNodes:
         self.selected = selected  # () -> selected job name
         self.stage = stage  # () -> (x_m, y_m)
         self.zdrives = zdrives  # () -> {z_use_mode: metres}
-        self.autofocus_on_start = set()  # job names whose IsAutoFocusOnStart is set; none on the simulator
         self.status = {}  # AcquisitionState, CurrentRunningBlockID, ... overriding rest values
         self.live = dict(SIMULATOR_SETTINGS)  # path -> value, the current setting's nodes
         self.objectives = [dict(o) for o in SIMULATOR_OBJECTIVES]  # Microscope/ObjectiveList, by slot
@@ -265,12 +264,11 @@ class StandInNodes:
         node = 1000 + 1000 * self.generation
         for name, (block, element) in self.jobs().items():
             info = node
-            add(info, "SequenceBlockInfo", 4, children=(info + 1, info + 2, info + 3, info + 4, info + 5))
+            add(info, "SequenceBlockInfo", 4, children=(info + 1, info + 2, info + 3, info + 4))
             add(info + 1, "Name", info, name)
             add(info + 2, "Type", info, 1)
             add(info + 3, "BlockID", info, block)
             add(info + 4, "ElementID", info, element)
-            add(info + 5, "IsAutoFocusOnStart", info, name in self.autofocus_on_start)
             if name == selected_name:
                 values[6] = element
             children.append(info)

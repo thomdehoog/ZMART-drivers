@@ -132,13 +132,14 @@ def get_jobs() -> list[dict]:
     """Every job, in the sequence's order, shaped as :func:`log_reader.get_jobs` gives them.
 
     Per job ``Name``, ``ID`` (its live block id, which an experiment load
-    changes while the CAM API's job list keeps the old one), ``IsSelected``
-    and ``IsAutofocus``, from the job's ``IsAutoFocusOnStart`` as the log
-    reader takes it from the same field. On the simulator (2026-10-13) the
-    tree had it unset for every job, the AF job too, which the CAM API's
-    list marked as autofocus when the mock was modelled on it: to be
-    compared once the CAM API answers again. The CAM API's ``ScanMode`` per
-    job is not in the job sequence.
+    changes while the CAM API's job list keeps the old one) and
+    ``IsSelected``. Not which jobs are autofocus jobs (the CAM API's
+    ``IsAutofocus``, which follows a saved experiment's
+    ``IsAutofocusActive`` on the job's settings): the job sequence's
+    ``IsAutoFocusOnStart`` is "run an autofocus before this job", unset on
+    the simulator for the AF job too (2026-10-13). So the routed job list
+    keeps to the API; this list serves the selected job. Nor the CAM API's
+    ``ScanMode`` per job.
     """
     sequence = job_sequence()
     ordered = sorted(sequence.jobs.items(), key=lambda item: item[1].element_id)
@@ -147,7 +148,6 @@ def get_jobs() -> list[dict]:
             "Name": name,
             "ID": job.block_id,
             "IsSelected": job.element_id == sequence.selected_element,
-            "IsAutofocus": job.autofocus_on_start,
         }
         for name, job in ordered
     ]
@@ -848,7 +848,7 @@ def get_job_settings(job_name) -> dict:
     Beside the API's and log's: ``imageSize`` and ``pixelSize`` in µm to
     0.1 nm where they round to 10 µm; ``zPosition`` where each drive truly
     is, also the drive that carries the job's z-stack, whose settings stop
-    refreshing; ``autoFocus`` from the job's ``IsAutoFocusOnStart`` (:func:`get_jobs`).
+    refreshing; no ``autoFocus``, which the tree does not hold for a job.
     """
     selected = get_selected_job()
     if selected is None or selected["Name"] != job_name:
@@ -862,7 +862,6 @@ def get_job_settings(job_name) -> dict:
     settings = {
         "jobName": job_name,
         "id": selected["ID"],
-        "autoFocus": {"isActive": selected["IsAutofocus"]},
         "activeSettings": get_active_settings(),
         "format": get_format(),
         "imageSize": micrometres_by_micrometres(width, height),

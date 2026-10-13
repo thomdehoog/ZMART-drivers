@@ -85,7 +85,7 @@ class TestParityWithTheApiReader:
         assert direct_reader.get_selected_job()["Name"] == api_reader.get_selected_job(client)["Name"]
 
     def test_the_selected_job_carries_its_live_block_id(self, client, tree):
-        assert direct_reader.get_selected_job() == {"Name": "HiRes", "ID": 152, "IsSelected": True, "IsAutofocus": False}
+        assert direct_reader.get_selected_job() == {"Name": "HiRes", "ID": 152, "IsSelected": True}
 
     @pytest.mark.parametrize("job", ["HiRes", "Overview", "AF Job"])
     def test_the_jobs_and_their_selection_are_the_api_readers(self, client, tree, job):
@@ -96,14 +96,16 @@ class TestParityWithTheApiReader:
 class TestJobs:
     def test_every_job_in_sequence_order_with_its_live_block_id(self, client, tree):
         assert direct_reader.get_jobs() == [
-            {"Name": "AF Job", "ID": 156, "IsSelected": False, "IsAutofocus": False},
-            {"Name": "Overview", "ID": 154, "IsSelected": False, "IsAutofocus": False},
-            {"Name": "HiRes", "ID": 152, "IsSelected": True, "IsAutofocus": False},
+            {"Name": "AF Job", "ID": 156, "IsSelected": False},
+            {"Name": "Overview", "ID": 154, "IsSelected": False},
+            {"Name": "HiRes", "ID": 152, "IsSelected": True},
         ]
 
-    def test_an_autofocus_job_as_the_log_reader_marks_it(self, client, tree):
-        tree.autofocus_on_start = {"AF Job"}
-        assert [j["Name"] for j in direct_reader.get_jobs() if j["IsAutofocus"]] == ["AF Job"]
+    def test_it_does_not_say_which_jobs_are_autofocus_jobs(self, client, tree):
+        # The tree's per-job IsAutoFocusOnStart is "run an autofocus before this job",
+        # not "this is an autofocus job" (the setting's IsAutofocusActive in a saved
+        # experiment, which the CAM API's IsAutofocus follows): unset for the AF job too.
+        assert all("IsAutofocus" not in job for job in direct_reader.get_jobs())
 
     def test_a_reloaded_experiment_gives_the_new_ids(self, client, tree):
         tree.jobs = lambda: {"AF Job": (166, 1), "Overview": (164, 2), "HiRes": (162, 3)}
@@ -116,7 +118,6 @@ class TestJobs:
             "Name": "Overview",
             "ID": 154,
             "IsSelected": False,
-            "IsAutofocus": False,
         }
         assert direct_reader.get_job_by_name("No such job") is None
 
@@ -407,7 +408,7 @@ class TestTheJobSettings:
     def test_they_name_the_job_and_its_live_id(self, client, tree):
         settings = direct_reader.get_job_settings("HiRes")
         assert (settings["jobName"], settings["id"]) == ("HiRes", 152)
-        assert settings["autoFocus"] == {"isActive": False}
+        assert "autoFocus" not in settings
 
     def test_both_z_drives_where_they_truly_are(self, client, tree):
         client._hardware_z_um.update({"z-galvo": -2.5, "z-wide": 4999.5})

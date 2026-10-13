@@ -101,8 +101,9 @@ class StateReaderProfile:
     job_settings_mode: str = "direct"
     job_settings_log_max_age_s: float = 2.0
 
-    # Without the direct reader, jobs comes from the API alone: the log
-    # stream only reports the ACTIVE job, so its list is incomplete (a job
+    # The job list has no direct leg (the tree does not say which jobs are
+    # autofocus jobs; see actions.get), so it comes from the API alone: the
+    # log stream only reports the ACTIVE job, so its list is incomplete (a job
     # not re-dumped this session is absent) — only the API enumerates the
     # full job list. Confirmed on the bench (2026-07-06). selected_job (which
     # job is active) is what the log can see, so its fallback is hybrid.

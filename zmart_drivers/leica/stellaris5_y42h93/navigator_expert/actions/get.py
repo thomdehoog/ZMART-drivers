@@ -182,11 +182,11 @@ DATUMS = {
         # stream reports only the ACTIVE job (that is the `selected_job`
         # datum, which keeps its log/hybrid legs); its job-list derivation is
         # a passive cluster that omits jobs not re-dumped this session, so it
-        # is incomplete. Confirmed on the bench (2026-07-06). No log_fn. The
-        # direct reader lists every job of the sequence, without the API's
-        # IsAutofocus and ScanMode.
+        # is incomplete. Confirmed on the bench (2026-07-06). No log_fn. No
+        # direct_fn either: the state tree does not say which jobs are
+        # autofocus jobs (its per-job IsAutoFocusOnStart is "autofocus before
+        # this job"), which the adapter needs to keep them apart (2026-10-13).
         api_fn=lambda client, **kw: api_reader.get_jobs(client, **kw),
-        direct_fn=direct_reader.get_jobs,
     ),
     "selected_job": DatumSpec(
         mode_attr="selected_job_mode",
