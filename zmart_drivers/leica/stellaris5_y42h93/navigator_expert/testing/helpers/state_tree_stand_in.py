@@ -18,6 +18,8 @@ can move the stage, select a job or reload the experiment between reads.
 loaded. ``node_calls`` counts ``GetNode`` calls, to see whether a reader walks.
 """
 
+import copy
+
 
 #: The current setting's nodes as read on the LAS X simulator, 2026-10-13
 #: (HiRes selected, no z-stack), by path from the root.
@@ -43,11 +45,134 @@ SIMULATOR_SETTINGS = {
     ("Confocal", "ScanningParameter", "LineAccu"): 1,
     ("Confocal", "ScanningParameter", "FrameAverage"): 1,
     ("Confocal", "ScanningParameter", "FrameAccumulation"): 1,
+    ("Confocal", "ScanningParameter", "LineAverageSequentialList"): (1,),
     ("Confocal", "HWParameter", "Pinhole"): 0.0003977875,
     ("Confocal", "HWParameter", "PinholeAU"): 0.9994033038125747,
     ("Confocal", "HWParameter", "PinholeAUMin"): 0.251240499968595,
     ("Confocal", "HWParameter", "PinholeAUMax"): 2.5124049996859497,
     ("Microscope", "SlotPosition"): 0,
+    ("Microscope", "CurrentMicStandName"): "DM Manual-6",
+    ("Confocal", "ScanningParameter", "Resolution"): 8,
+    ("Confocal", "ScanningParameter", "SpeedMin"): 1,
+    ("Confocal", "ScanningParameter", "SpeedMax"): 2600,
+    ("Confocal", "ScanningParameter", "IsSequentialEnabled"): True,
+    ("Confocal", "ScanningParameter", "SequentialMode"): 0,
+    ("Confocal", "HWParameter", "ScanRotationAngle"): 0.0,
+    ("Confocal", "HWParameter", "ScanRotationAngleMin"): -100.0,
+    ("Confocal", "HWParameter", "ScanRotationAngleMax"): 100.0,
+    ("Acquire", "ActiveDataSource", "CurrentSerialNumber"): "STELLARIS SIMULATOR",
+    ("Confocal", "HWParameter", "CurrentMultiFunctionPortPos"): 1,
+    ("Confocal", "HWParameter", "MultiFunctionPortNameList"): ("--- ", "Substrate ", "SD 470", "DD 470/640", "--- "),
+    ("Confocal", "FastLiveParametersResonant", "ScanSpeedMax"): 12000,
+    ("Confocal", "ServiceOnlyParameter", "CanDoAFC"): False,
+    ("Microscope", "CurrentMotCorrPos"): 0.0,
+    ("Stage", "DynamicLimitXmin"): 0.0,
+    ("Stage", "DynamicLimitXmax"): 0.127,
+    ("Stage", "DynamicLimitYmin"): 0.0,
+    ("Stage", "DynamicLimitYmax"): 0.083,
+}
+
+
+def aotf_line(wavelength, index, intensity):
+    return {"WaveLength": wavelength, "IsLineChecked": True, "LineIndex": index, "Intensity": intensity}
+
+
+#: The simulator's light sources (Confocal/LightSourceList), 2026-10-13: the UV
+#: laser's 405 at 1.96 % and the white-light laser's 497 at 2.0 % are on.
+def laser(name, low, high):
+    return {"LaserName": name, "WavelengthMin": low, "WavelengthMax": high}
+
+
+SIMULATOR_LIGHT_SOURCES = [
+    {
+        "LightSourceName": "UV",
+        "BeamRoute": (30,),
+        "LaserList": {"Laser": [laser("Laser 405", 405.0, 405.0)]},
+        "Shutter": {"IsShutterActive": True},
+        "AOTF": {"AotfLine": [aotf_line(405.0, 0, 1.9607843137254901)]},
+    },
+    {
+        "LightSourceName": "Visible Light",
+        "BeamRoute": (10, 30),
+        "LaserList": {
+            "Laser": [
+                laser("Laser 488", 488.0, 488.0),
+                laser("Laser 638", 638.0, 638.0),
+                laser("Laser 730", 730.0, 730.0),
+            ]
+        },
+        "Shutter": {"IsShutterActive": True},
+        "AOTF": {
+            "AotfLine": [aotf_line(488.0, 0, 0.0), aotf_line(638.0, 1, 0.0), aotf_line(730.0, 2, 0.0)]
+        },
+    },
+    {
+        "LightSourceName": "SuperContVisible Light",
+        "BeamRoute": (10, 10),
+        "LaserList": {"Laser": [laser("WLL", 485.0, 685.0)]},
+        "Shutter": {"IsShutterActive": True},
+        "AOTF": {"AotfLine": [aotf_line(497.0, 0, 2.000135222048726), aotf_line(681.0, 1, 0.0)]},
+    },
+]
+
+
+def detector(route, name, kind, begin, end, active, dye, gain, *, photon_counting=True):
+    return {
+        "BeamRoute": route,
+        "Name": name,
+        "WaveLengthBegin": begin,
+        "WaveLengthEnd": end,
+        "WaveLengthRangeMin": 5.0,
+        "Type": kind,
+        "IsActive": active,
+        "DyeName": dye,
+        "HighVoltage": gain,
+        "HighVoltageMin": 2.5,
+        "HighVoltageMax": 500.0,
+        "Offset": 0.0,
+        "CanDoPhotonCounting": photon_counting,
+    }
+
+
+#: The simulator's detectors (Confocal/SpectralDetection), 2026-10-13: HyD 2 and
+#: HyD S 3 are in use. Two of the internal five, and the transmitted-light PMT.
+SIMULATOR_DETECTION = {
+    "Spectrophotometer": [
+        {
+            "DetectionUnitList": {
+                "DetectorHWInfo": [
+                    detector((40, 2), "HyD 2", 4, 410.0, 487.0, True, "Leica/ALEXA 405", 2.5),
+                    detector((40, 3), "HyD S 3", 6, 502.0, 779.0, True, "Leica/ALEXA 488", 2.5),
+                ]
+            }
+        },
+        {
+            "DetectionUnitList": {
+                "DetectorHWInfo": [
+                    detector((10, 5), "Trans PMT", 3, 350.0, 800.0, False, "None", 0.0, photon_counting=False)
+                ]
+            }
+        },
+    ]
+}
+
+
+def wheel(kind, slot, names):
+    return {
+        "CurrentSlotPosition": slot,
+        "FilterWheelType": kind,
+        "Filter": [{"FilterName": name} for name in names],
+    }
+
+
+#: Three of the simulator's wheels (Confocal/HWParameter/FilterWheelList), 2026-10-13,
+#: the polarization wheel under its own node name, as LAS X has it.
+SIMULATOR_FILTER_WHEELS = {
+    "FilterWheel": [
+        wheel(200, 0, ["Galvo X Pan Center ", "Galvo X Pan Mirror "]),
+        wheel(140, 2, ["--- ", "Substrate ", "Mirror "]),
+    ],
+    "PolarizationFW": [wheel(130, 0, ["Empty", "NF 448/514/561"])],
 }
 
 #: The first two of the simulator's six objectives (Microscope/ObjectiveList), in slot order.
@@ -91,6 +216,9 @@ class StandInNodes:
         self.status = {}  # AcquisitionState, CurrentRunningBlockID, ... overriding rest values
         self.live = dict(SIMULATOR_SETTINGS)  # path -> value, the current setting's nodes
         self.objectives = [dict(o) for o in SIMULATOR_OBJECTIVES]  # Microscope/ObjectiveList, by slot
+        self.light_sources = copy.deepcopy(SIMULATOR_LIGHT_SOURCES)  # Confocal/LightSourceList
+        self.detection = copy.deepcopy(SIMULATOR_DETECTION)  # Confocal/SpectralDetection
+        self.filter_wheels = copy.deepcopy(SIMULATOR_FILTER_WHEELS)  # Confocal/HWParameter/FilterWheelList
         self.generation = 0
         self.reads = 0
         self.node_calls = 0
@@ -173,6 +301,27 @@ class StandInNodes:
             for name in path:
                 node = child(node, name)
             values[node] = value
+
+        def graft(parent, name, spec):
+            """A dict is a node with children, a list repeats the node, anything else is a value."""
+            if isinstance(spec, list):
+                for each in spec:
+                    graft(parent, name, each)
+                return
+            node = next(fresh)
+            add(node, name, parent)
+            pname, pparent, pchildren = nodes[parent]
+            nodes[parent] = (pname, pparent, (*pchildren, node))
+            if isinstance(spec, dict):
+                for key, inner in spec.items():
+                    graft(node, key, inner)
+            else:
+                values[node] = spec
+
+        confocal = child(1, "Confocal")
+        graft(confocal, "LightSourceList", {"LightSource": self.light_sources})
+        graft(confocal, "SpectralDetection", self.detection)
+        graft(child(confocal, "HWParameter"), "FilterWheelList", self.filter_wheels)
         objective_list = child(child(1, "Microscope"), "ObjectiveList")
         for objective in self.objectives:
             info = next(fresh)

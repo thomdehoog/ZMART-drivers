@@ -173,6 +173,7 @@ class TestTheCurrentSetting:
             "immersion": "DRY",
             "objectiveNumber": 506511,
             "isMotCorr": True,
+            "motCorrPos": 0.0,
         }
 
     def test_another_slot_is_another_objective(self, tree):
@@ -209,6 +210,168 @@ class TestTheCurrentSetting:
         )
 
 
+class TestLightAndScanning:
+    """Shaped as the log reader's job settings give them; simulator values, 2026-10-13."""
+
+    def test_the_laser_lines_that_are_on(self, tree):
+        assert direct_reader.get_laser_lines() == [
+            {"lightSource": "UV", "laserName": "Laser 405", "beamRoute": "30", "lineIndex": 0,
+             "wavelength": 405.0, "intensity": pytest.approx(0.0196, abs=1e-4), "shutterOpen": True},
+            {"lightSource": "SuperContVisible Light", "laserName": "WLL", "beamRoute": "10;10",
+             "lineIndex": 0, "wavelength": 497.0, "intensity": pytest.approx(0.0200, abs=1e-4),
+             "shutterOpen": True},
+        ]
+
+    def test_a_line_turned_down_to_nothing_is_off(self, tree):
+        tree.light_sources = tree.light_sources[:1]
+        tree.light_sources[0]["AOTF"]["AotfLine"][0]["Intensity"] = 0.0
+        assert direct_reader.get_laser_lines() == []
+
+    def test_scan_field_rotation(self, tree):
+        assert direct_reader.get_scan_field_rotation() == {"value": 0.0, "min": -100.0, "max": 100.0}
+
+    def test_sequential_mode(self, tree):
+        assert direct_reader.get_sequential_mode() == "Line"
+
+    def test_a_sequential_mode_not_yet_seen_is_named_so(self, tree):
+        tree.live[("Confocal", "ScanningParameter", "SequentialMode")] = 2
+        assert direct_reader.get_sequential_mode() == "unknown (2)"
+
+    def test_no_sequential_scanning(self, tree):
+        tree.live[("Confocal", "ScanningParameter", "IsSequentialEnabled")] = False
+        assert direct_reader.get_sequential_mode() is None
+
+    def test_pixel_size_in_metres(self, tree):
+        assert direct_reader.get_pixel_size() == pytest.approx((2.2705e-6, 2.2705e-6), rel=1e-4)
+
+    def test_bit_depth(self, tree):
+        assert direct_reader.get_bit_depth() == 8
+
+
+class TestTheInstrument:
+    """Shaped as the log reader's hardware info gives it; simulator values, 2026-10-13."""
+
+    def test_serial_number(self, tree):
+        assert direct_reader.get_serial_number() == "STELLARIS SIMULATOR"
+
+    def test_microscope_stand(self, tree):
+        assert direct_reader.get_microscope_stand() == "DM Manual-6"
+
+    def test_every_objective_by_slot(self, tree):
+        objectives = direct_reader.get_objectives()
+        assert [(o["slotIndex"], o["magnification"], o["objectiveNumber"]) for o in objectives] == [
+            (0, 10.0, 506511),
+            (1, 20.0, 506513),
+        ]
+
+    def test_scan_speed_range(self, tree):
+        assert direct_reader.get_scan_speed_range() == {"Min": 1, "Max": 2600, "ResonantSpeed": 12000}
+
+    def test_stage_limits_in_metres(self, tree):
+        assert direct_reader.get_stage_limits() == {
+            "x_min": 0.0,
+            "x_max": 0.127,
+            "y_min": 0.0,
+            "y_max": 0.083,
+        }
+
+
+class TestDetectionAndFilters:
+    """Shaped as the log reader gives them; simulator values, 2026-10-13."""
+
+    def test_the_detectors_in_use(self, tree):
+        assert direct_reader.get_detectors() == [
+            {"name": "HyD 2", "beamRoute": "40;2", "detectionBegin": 410.0, "detectionEnd": 487.0,
+             "detectionUnit": "nm", "dye": "Leica/ALEXA 405",
+             "gain": {"value": 2.5, "min": 2.5, "max": 500.0}, "offset": 0.0},
+            {"name": "HyD S 3", "beamRoute": "40;3", "detectionBegin": 502.0, "detectionEnd": 779.0,
+             "detectionUnit": "nm", "dye": "Leica/ALEXA 488",
+             "gain": {"value": 2.5, "min": 2.5, "max": 500.0}, "offset": 0.0},
+        ]
+
+    def test_the_installed_detectors_as_the_hardware_info_names_them(self, tree):
+        assert direct_reader.get_detection_units() == [
+            {"Name": "HyD 2", "BeamRoute": "40;2", "Type": "HyD",
+             "CanDoPhotonCounting": True, "MinDetectionBandpassWidth": 5.0},
+            {"Name": "HyD S 3", "BeamRoute": "40;3", "Type": "SiPM",
+             "CanDoPhotonCounting": True, "MinDetectionBandpassWidth": 5.0},
+            {"Name": "Trans PMT", "BeamRoute": "10;5", "Type": "PMT",
+             "CanDoPhotonCounting": False, "MinDetectionBandpassWidth": 5.0},
+        ]
+
+    def test_a_detector_type_not_yet_seen_is_named_by_its_code(self, tree):
+        tree.detection["Spectrophotometer"][1]["DetectionUnitList"]["DetectorHWInfo"][0]["Type"] = 9
+        assert direct_reader.get_detection_units()[-1]["Type"] == "type 9"
+
+    def test_every_filter_wheel_and_the_multi_function_port(self, tree):
+        assert direct_reader.get_filter_wheels() == [
+            {"type": 200, "filterIndex": 0, "filterName": "Galvo X Pan Center ",
+             "filterNames": ["Galvo X Pan Center ", "Galvo X Pan Mirror "]},
+            {"type": 140, "filterIndex": 2, "filterName": "Mirror ",
+             "filterNames": ["--- ", "Substrate ", "Mirror "]},
+            {"type": 130, "filterIndex": 0, "filterName": "Empty",
+             "filterNames": ["Empty", "NF 448/514/561"]},
+            {"type": 180, "filterIndex": 1, "filterName": "Substrate ",
+             "filterNames": ["--- ", "Substrate ", "SD 470", "DD 470/640", "--- "]},
+        ]
+
+    def test_the_installed_light_sources_as_the_hardware_info_names_them(self, tree):
+        sources = direct_reader.get_light_sources()
+        assert [(s["name"], s["BeamRoute"]) for s in sources] == [
+            ("UV", "30"),
+            ("Visible Light", "10;30"),
+            ("SuperContVisible Light", "10;10"),
+        ]
+        assert sources[1]["LaserLines"] == [
+            {"LaserName": "Laser 488", "Index": 0, "MinWavelength": 488.0, "MaxWavelength": 488.0},
+            {"LaserName": "Laser 638", "Index": 1, "MinWavelength": 638.0, "MaxWavelength": 638.0},
+            {"LaserName": "Laser 730", "Index": 2, "MinWavelength": 730.0, "MaxWavelength": 730.0},
+        ]
+
+    def test_a_tunable_laser_gives_each_of_its_lines(self, tree):
+        lines = direct_reader.get_light_sources()[2]["LaserLines"]
+        assert lines == [
+            {"LaserName": "WLL", "Index": 0, "MinWavelength": 485.0, "MaxWavelength": 685.0},
+            {"LaserName": "WLL", "Index": 1, "MinWavelength": 485.0, "MaxWavelength": 685.0},
+        ]
+
+
+class TestTheRest:
+    def test_the_field_of_view_at_zoom_one(self, tree):
+        tree.live.update(
+            {
+                ("Confocal", "ScanningParameter", "Zoom"): 2.0,
+                ("Acquire", "AcquireImageSizeInfo", "ImageSizeX"): 0.0011625 / 2,
+                ("Acquire", "AcquireImageSizeInfo", "ImageSizeY"): 0.0011625 / 2,
+            }
+        )
+        assert direct_reader.get_base_fov() == pytest.approx((0.0011625, 0.0011625))
+
+    def test_afc_installed(self, tree):
+        assert direct_reader.get_afc_installed() is False
+
+    def test_ping(self, tree):
+        assert direct_reader.ping() is True
+
+    def test_ping_without_the_hardware_server(self):
+        assert direct_reader.ping() is False
+
+    def test_the_active_setting(self, tree):
+        settings = direct_reader.get_active_settings()
+        assert len(settings) == 1
+        setting = settings[0]
+        assert setting["activeLaserLines"] == direct_reader.get_laser_lines()
+        assert setting["activeDetectors"] == direct_reader.get_detectors()
+        assert setting["filterWheels"] == direct_reader.get_filter_wheels()
+        assert setting["pinholeAiry"] == direct_reader.get_pinhole()["airy"]
+        assert {k: setting[k] for k in direct_reader.get_averaging()} == direct_reader.get_averaging()
+
+    def test_several_sequential_settings_are_not_read_yet(self, tree):
+        tree.live[("Confocal", "ScanningParameter", "LineAverageSequentialList")] = (1, 2)
+        with pytest.raises(hardware_server.HardwareServerUnavailable, match="2 sequential settings"):
+            direct_reader.get_active_settings()
+
+
 class TestWhatItReads:
     def test_only_what_it_was_agreed_to_read(self):
         assert direct_reader.READS == (
@@ -226,6 +389,23 @@ class TestWhatItReads:
             "objective",
             "fov",
             "z_stack",
+            "laser_lines",
+            "scan_field_rotation",
+            "sequential_mode",
+            "pixel_size",
+            "bit_depth",
+            "serial_number",
+            "microscope_stand",
+            "objectives",
+            "scan_speed_range",
+            "stage_limits",
+            "detectors",
+            "detection_units",
+            "filter_wheels",
+            "light_sources",
+            "base_fov",
+            "afc_installed",
+            "active_settings",
         )
 
     def test_without_the_hardware_server_it_raises(self):

@@ -196,36 +196,47 @@ def remembered_child(nodes, node_id, name, key):
     return found
 
 
-def sequence_layout(nodes, node):
-    """The value nodes of the job sequence at *node*, remembered while its children stay the same.
+def named(nodes, parent, name):
+    """The child *name* of *parent*; raises when there is none."""
+    found = child_named(nodes, parent, name)
+    if found is None:
+        raise HardwareServerUnavailable(f"state tree node {parent} has no {name!r}")
+    return found
 
-    ``(sequence block id node, selected element node, [(name, block id,
-    element id node) per job])``. An experiment load renumbers the per-job
-    nodes, which changes the sequence's children, so the layout is looked up
-    afresh then.
+
+def layout(nodes, path, build):
+    """The value nodes under *path*, as ``build(nodes, node, kids)`` finds them, remembered while its children stay the same.
+
+    For parts of the tree with repeated nodes (jobs, objectives, light
+    sources), which a path of names cannot pick out. An experiment load
+    renumbers the per-job nodes, which changes the sequence's children, so
+    its layout is found afresh then.
     """
+    node = node_at(nodes, path)
     kids = tuple(children(nodes, node))
-    known = remembered.get(("layout", *SEQUENCE_PATH))
+    known = remembered.get(("layout", *path))
     if known is not None and known[0] == kids:
         return known[1]
+    found = build(nodes, node, kids)
+    remembered[("layout", *path)] = (kids, found)
+    return found
 
-    def named(parent, name):
-        found = child_named(nodes, parent, name)
-        if found is None:
-            raise HardwareServerUnavailable(f"state tree node {parent} has no {name!r}")
-        return found
 
-    layout = (
-        named(node, "CurrentSequenceBlockID"),
-        named(node, "CurrentSelectedElementID"),
+def of_name(nodes, kids, name):
+    """The nodes among *kids* named *name*, in their order."""
+    return [kid for kid in kids if nodes.GetNode(kid)[0] == name]
+
+
+def sequence_layout(nodes, node, kids):
+    """``(sequence block id node, selected element node, [(name, block id, element id node) per job])``."""
+    return (
+        named(nodes, node, "CurrentSequenceBlockID"),
+        named(nodes, node, "CurrentSelectedElementID"),
         [
-            (named(info, "Name"), named(info, "BlockID"), named(info, "ElementID"))
-            for info in kids
-            if nodes.GetNode(info)[0] == "SequenceBlockInfo"
+            (named(nodes, info, "Name"), named(nodes, info, "BlockID"), named(nodes, info, "ElementID"))
+            for info in of_name(nodes, kids, "SequenceBlockInfo")
         ],
     )
-    remembered[("layout", *SEQUENCE_PATH)] = (kids, layout)
-    return layout
 
 
 def job_sequence() -> JobSequence:
@@ -236,7 +247,7 @@ def job_sequence() -> JobSequence:
     """
 
     def reading(nodes):
-        block, selected, per_job = sequence_layout(nodes, node_at(nodes, SEQUENCE_PATH))
+        block, selected, per_job = layout(nodes, SEQUENCE_PATH, sequence_layout)
         jobs = {
             str(node_value(nodes, name)): Job(
                 block_id=int(node_value(nodes, block_id)),
