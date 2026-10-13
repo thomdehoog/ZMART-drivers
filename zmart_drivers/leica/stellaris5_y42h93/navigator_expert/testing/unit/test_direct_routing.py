@@ -1,15 +1,12 @@
 """
-Unit tests: X, Y, z and the selected job, read by the direct reader first.
+Unit tests: every reading asks the direct reader first.
 ================================================================================
 LAS X's hardware server keeps its live state as a tree of named nodes, which
 the direct reader reads. The routed readers ask it first (the profile's
-``direct`` source) and fall back to the
-hybrid reader (CAM API and LAS X log) when the hardware server cannot be
-reached. Leica agreed to these reads (2026-10-13); the scan status is not
-among them and stays on the CAM API and the log. Measured on the simulator,
-2026-10-13: XY from the tree in 1.1 ms (CAM API 20 ms, worst 57 ms); after
-a stage move the tree had the new
-position in 3.3-4.2 ms, the CAM API in 22-58 ms. The command confirmations
+``direct`` source) and fall back to the hybrid reader (CAM API and LAS X
+log) when it fails. Measured on the simulator, 2026-10-13: XY from the tree
+in 1.1 ms (CAM API 20 ms, worst 57 ms); after a stage move the tree had the
+new position in 3.3-4.2 ms, the CAM API in 22-58 ms. The command confirmations
 read through these readers, so they confirm from the tree too.
 
 A stand-in tree mirrors the behavioural mock: its stage, the true position
@@ -17,18 +14,28 @@ of each z drive (the mock's ``_hardware_z_um``, which moves even for the
 drive whose job settings freeze) and the selected job.
 """
 
+import dataclasses
+import time
+
 import pytest
 from limits_fixtures import install_permissive_limits
 from mock_lasx_api import MockLasxClient
 from state_tree_stand_in import StandInNodes
 
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.actions import (
+    get as capabilities,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.actions import (
     set as commands,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher import (
+    prechecks,
 )
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher import (
     read as readers,
 )
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface import (
+    direct_reader,
     hardware_server,
     state_tree,
 )
@@ -69,11 +76,6 @@ class TestFromTheTree:
         reading = readers.get_xy(client, diagnostics=True)
         assert reading.source == "direct"
         assert reading.value == {"x": 0.05, "y": 0.03, "x_um": 50000.0, "y_um": 30000.0}
-
-    def test_the_scan_status_is_not_read_directly(self, client, tree):
-        reading = readers.get_scan_status(client, diagnostics=True)
-        assert reading.source in ("api", "log")
-        assert reading.value == "eScanIdle"
 
     def test_selected_job(self, client, tree):
         reading = readers.get_selected_job(client, diagnostics=True)
@@ -175,3 +177,65 @@ class TestEveryDatumDirectly:
         reading = readers.get_job_settings(client, "Overview", mode="direct", diagnostics=True)
         assert reading.source in ("api", "log")
         assert reading.value["objective"]["slotIndex"] is not None
+
+
+class TestDirectByDefault:
+    """The direct reader answers every reading by default; the API and the log when it fails."""
+
+    def test_every_reading_asks_the_direct_reader_first(self, client, tree):
+        assert readers.get_scan_status(client, diagnostics=True).source == "direct"
+        assert readers.get_jobs(client, diagnostics=True).source == "direct"
+        assert readers.get_hardware_info(client, diagnostics=True).source == "direct"
+        assert readers.get_job_settings(client, "HiRes", diagnostics=True).source == "direct"
+        assert readers.get_xy(client, diagnostics=True).source == "direct"
+        assert readers.get_selected_job(client, diagnostics=True).source == "direct"
+
+    def test_an_unexpected_error_falls_back(self, client, tree, monkeypatch):
+        # Another LAS X version could lay the tree out differently: any error is a fallback, not a crash.
+        def changed_tree():
+            raise KeyError("Stage")
+
+        monkeypatch.setattr(direct_reader, "get_xy", changed_tree)
+        monkeypatch.setitem(
+            capabilities.DATUMS,
+            "xy",
+            dataclasses.replace(capabilities.DATUMS["xy"], direct_fn=changed_tree),
+        )
+        reading = readers.get_xy(client, diagnostics=True)
+        assert reading.source in ("api", "log")
+        assert reading.value["x_um"] == pytest.approx(50000.0)
+
+    def test_an_answer_that_does_not_count_falls_back_at_once(self, client, tree):
+        tree.status = {"AcquisitionState": 9}  # a scan state this reader does not know
+        started = time.monotonic()
+        reading = readers.get_scan_status(client, diagnostics=True)
+        assert reading.source in ("api", "log")
+        assert reading.value == "eScanIdle"
+        assert time.monotonic() - started < 1.0
+
+    def test_z_falls_back_on_an_unexpected_error(self, client, tree, monkeypatch):
+        def changed_tree(drive):
+            raise TypeError("ZDriveList")
+
+        monkeypatch.setattr(direct_reader, "read_z_um", changed_tree)
+        client._jobs["HiRes"]["zPosition"]["z-wide"]["position"] = 123.0
+        assert readers.read_z_um(client, "HiRes", "z-wide") == pytest.approx(123.0)
+
+    def test_the_idle_check_before_a_command_asks_the_direct_reader(self, client, tree, monkeypatch):
+        asked = []
+        monkeypatch.setattr(readers.api_reader, "get_scan_status", lambda c: asked.append(c) or "eScanIdle")
+        assert prechecks.check_idle(client)["success"] is True
+        assert asked == []
+
+    def test_the_idle_check_falls_back_to_the_api_alone(self, client, monkeypatch):
+        # No hardware server (the suite's conftest): the API decides, never the log, whose idle goes stale.
+        monkeypatch.setattr(readers.log_reader, "parse_log", lambda: pytest.fail("the log was asked"))
+        assert prechecks.check_idle(client)["success"] is True
+
+    def test_the_selected_job_check_falls_back_on_an_unexpected_error(self, client, tree, monkeypatch):
+        def changed_tree():
+            raise ValueError("CurrentSequenceList")
+
+        monkeypatch.setattr(direct_reader, "get_selected_job", changed_tree)
+        result = commands.select_job(client, "Overview")
+        assert (result["success"], client._selected_job) == (True, "Overview")

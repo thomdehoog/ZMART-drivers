@@ -47,6 +47,9 @@ def selected_job_direct():
     except HardwareServerUnavailable as why:
         log.debug("selected job: %s", why)
         return None
+    except Exception as why:
+        log.warning("the direct reader failed on the selected job (%s: %s)", type(why).__name__, why)
+        return None
     return selected["Name"] if selected else None
 
 
@@ -54,8 +57,8 @@ def confirm_select_job_direct(client, *, job_name, timeout=None, otherwise=None)
     """Direct confirmation leg: ask the direct reader every ``POLL_S`` until *job_name* is selected.
 
     The direct reader's selection is LAS X's live one, so a match is the switch
-    itself, with no transition witness needed. When the hardware server
-    cannot be reached, *otherwise* (the API leg the profile would run
+    itself, with no transition witness needed. When the direct reader fails
+    (the hardware server not reachable, a tree it does not know), *otherwise* (the API leg the profile would run
     without the direct reader) confirms instead; without one, the leg fails.
 
     Returns:
@@ -68,8 +71,8 @@ def confirm_select_job_direct(client, *, job_name, timeout=None, otherwise=None)
     while time.monotonic() < deadline:
         try:
             selected = direct_reader.get_selected_job()
-        except HardwareServerUnavailable as why:
-            log.debug("SelectJob '%s' | direct reader: %s", job_name, why)
+        except Exception as why:
+            log.debug("SelectJob '%s' | direct reader: %s: %s", job_name, type(why).__name__, why)
             if otherwise is None:
                 return {"success": False, "logs": logs, "source": "direct"}
             return otherwise(client)

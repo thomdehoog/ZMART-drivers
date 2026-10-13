@@ -959,25 +959,13 @@ def _confirm_filter_wheel_slot(
 # =============================================================================
 
 
-def xy_confirm_mode():
-    """The direct reader when the profile reads XY with it, else the CAM API.
-
-    A stage move is confirmed from a reading taken after the command; the
-    log's XY can predate it, so without the direct reader the confirmation
-    keeps to the CAM API, and the direct reader falls back to it too.
-    """
-    from . import profiles
-
-    return "direct" if profiles.STATE_READERS.xy_mode == "direct" else "api"
-
-
 def confirm_move_xy(
     client, *, target_x_um, target_y_um, tolerance=20.0, poll_window=None
 ):
     """Poll until XY stage position is within tolerance, or until timeout.
 
     Looks at the stage position every ``POLL_S``, with the direct reader
-    or through the API (:func:`xy_confirm_mode`).
+    or through the API (:func:`dispatcher.read.on_demand_mode`).
 
     Args:
         client: The connected LAS X API client.
@@ -1000,7 +988,7 @@ def confirm_move_xy(
     while time.monotonic() < deadline:
         pos = _reading_value_after(
             _readers.get_xy(
-                client, mode=xy_confirm_mode(), fallback="api", diagnostics=True, deadline=deadline
+                client, mode=_readers.on_demand_mode("xy"), fallback="api", diagnostics=True, deadline=deadline
             ),
             observed_after,
         )

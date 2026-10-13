@@ -77,6 +77,17 @@ def _profile():
     return profiles.STATE_READERS
 
 
+def on_demand_mode(datum):
+    """The direct reader when the profile reads *datum* directly, else the API: the sources that answer on demand.
+
+    For readings a command waits on (whether the scanner is idle, where the
+    stage went), which the log cannot settle: it writes a value only when it
+    changes, so it can still show the state from before. Pair it with
+    ``fallback="api"``.
+    """
+    return "direct" if getattr(_profile(), capabilities.spec(datum).mode_attr) == "direct" else "api"
+
+
 def _plain_or_diagnostic(reading, diagnostics):
     if diagnostics:
         return reading
@@ -163,25 +174,49 @@ def _snapshot_read(spec, *, max_age_s, job_name=None) -> Reading:
         return Reading(value=None, source="log", observed_at=time.time(), age_s=None, error=exc)
 
 
+class DirectAnswerDidNotCount(RuntimeError):
+    """The direct reader answered, but not with an answer that counts for the datum."""
+
+
 def direct_read(spec, direct_kwargs) -> Reading:
+    """One answer from the direct reader; any error it raises is carried, never raised.
+
+    The hardware server not reachable is expected wherever LAS X is not
+    running; any other error means the tree is not as this reader knows it
+    (another LAS X version, another instrument), which is worth a warning.
+    Either way the fallback answers.
+    """
     try:
         value = spec.direct_fn(**direct_kwargs)
         return Reading(value=value, source="direct", observed_at=time.time(), age_s=0.0)
     except HardwareServerUnavailable as exc:
         return Reading(value=None, source="direct", observed_at=time.time(), age_s=None, error=exc)
+    except Exception as exc:
+        log.warning("the direct reader failed (%s: %s); its fallback answers", type(exc).__name__, exc)
+        return Reading(value=None, source="direct", observed_at=time.time(), age_s=None, error=exc)
 
 
-def watch_direct(spec, *, succeeded, deadline, observed_after, direct_kwargs):
-    """Ask the direct reader every ``POLL_S`` until an answer counts, or *deadline*.
+def watch_direct(spec, *, succeeded, deadline, observed_after, direct_kwargs, waiting):
+    """Ask the direct reader until an answer counts; a carried error at once when it fails.
 
-    Returns the winning Reading; an error-carrying one at once when the
-    hardware server cannot be reached; None when it answered but nothing
-    counted in time.
+    A caller *waiting* for a change (a confirmation's ``accept`` or
+    ``observed_after``) is asked again every ``POLL_S`` until *deadline*,
+    and gets None when nothing counted in time. Any other caller gets one
+    answer: one that does not count is a failure, so the fallback answers
+    at once instead of after the whole wait.
     """
     while True:
         reading = direct_read(spec, direct_kwargs)
         if reading.error is not None or _counts(reading, succeeded, observed_after):
             return reading
+        if not waiting:
+            return Reading(
+                value=None,
+                source="direct",
+                observed_at=reading.observed_at,
+                age_s=None,
+                error=DirectAnswerDidNotCount(f"the direct reader answered {reading.value!r}"),
+            )
         if time.monotonic() + tuning.POLL_S >= deadline:
             return None
         time.sleep(tuning.POLL_S)
@@ -380,6 +415,7 @@ def wait_for(
                 deadline=until,
                 observed_after=observed_after,
                 direct_kwargs=api_kwargs or {},
+                waiting=accept is not None or observed_after is not None,
             )
             if reading is None or reading.error is None:
                 return reading
@@ -456,9 +492,17 @@ def _derive(reading, value):
 # =============================================================================
 
 
-def get_scan_status(client, *, mode=None, diagnostics=False, deadline=None, accept=None):
+def get_scan_status(
+    client, *, mode=None, diagnostics=False, deadline=None, accept=None, fallback="hybrid"
+):
     return _routed(
-        "scan_status", client, mode=mode, diagnostics=diagnostics, deadline=deadline, accept=accept
+        "scan_status",
+        client,
+        mode=mode,
+        diagnostics=diagnostics,
+        deadline=deadline,
+        accept=accept,
+        fallback=fallback,
     )
 
 
@@ -499,7 +543,7 @@ def get_xy(
 
 
 def z_um_direct(drive, *, mode=None):
-    """Where one z drive truly is (um), from the direct reader; None when it does not answer.
+    """Where one z drive truly is (um), from the direct reader; None when it does not answer or fails.
 
     It is asked in ``direct`` mode (the profile's ``z_mode`` unless
     *mode* says); None also when the hardware server cannot be reached, so
@@ -512,7 +556,9 @@ def z_um_direct(drive, *, mode=None):
         return direct_reader.read_z_um(drive)
     except HardwareServerUnavailable as why:
         log.debug("%s: %s; the job settings answer", drive, why)
-        return None
+    except Exception as why:
+        log.warning("the direct reader failed on %s (%s: %s); the job settings answer", drive, type(why).__name__, why)
+    return None
 
 
 def read_z_um(client, job_name, drive, *, mode=None):

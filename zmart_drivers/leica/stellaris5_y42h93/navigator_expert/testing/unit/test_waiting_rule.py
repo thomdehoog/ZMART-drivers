@@ -241,10 +241,12 @@ def test_the_scanner_status_races_the_api_against_the_log():
     """Every reading races both sources, a backup for each (decided 2026-10-10).
 
     What the log shows can differ between machines and LAS X versions, so
-    the scanner status keeps its log leg like every other reading.
+    the scanner status keeps its log leg like every other reading. Since
+    2026-10-13 the direct reader answers first, and the race of both is the
+    fallback when it fails.
     """
     assert capabilities.spec("scan_status").log_fn is not None
-    assert profiles.StateReaderProfile().scan_status_mode == "hybrid"
+    assert profiles.StateReaderProfile().scan_status_mode == "direct"
 
 
 def test_the_idle_check_asks_the_api_even_in_a_log_only_run():

@@ -31,22 +31,21 @@ class TestStateReaders(unittest.TestCase):
     def tearDown(self):
         profiles.STATE_READERS = self._state_profile
 
-    def test_default_profile_uses_hybrid_readers(self):
+    def test_default_profile_reads_directly_first(self):
         # Maintainer decision (docs/reviews/MAINTAINER_DECISIONS.md §1):
         # hybrid is the default for routed cold reads; api/log stay selectable
         # per datum. Exception: `jobs` is API-pinned because the log only sees
         # the active job, so its list is incomplete (bench 2026-07-06).
-        # Since 2026-10-13 XY, the selected job and the z drives are read by
-        # the direct reader first (Thom's decision, with Leica's agreement), and
-        # hybrid when the hardware server cannot be reached.
+        # Since 2026-10-13 every reading asks the direct reader first (Thom's
+        # decision), and the API and the log when it fails.
         profile = profiles.STATE_READERS
         self.assertEqual(profile.xy_mode, "direct")
-        self.assertEqual(profile.job_settings_mode, "hybrid")
-        self.assertEqual(profile.jobs_mode, "api")
+        self.assertEqual(profile.job_settings_mode, "direct")
+        self.assertEqual(profile.jobs_mode, "direct")
         self.assertEqual(profile.selected_job_mode, "direct")
         self.assertEqual(profile.z_mode, "direct")
-        self.assertEqual(profile.hardware_info_mode, "hybrid")
-        self.assertEqual(profile.scan_status_mode, "hybrid")
+        self.assertEqual(profile.hardware_info_mode, "direct")
+        self.assertEqual(profile.scan_status_mode, "direct")
 
     def test_default_xy_hybrid_degrades_to_api_without_fresh_log(self):
         expected = {"x_um": 1.0, "y_um": 2.0}
