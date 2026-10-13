@@ -121,9 +121,112 @@ class TestZ:
             direct_reader.read_z_um("z-piezo")
 
 
+class TestTheCurrentSetting:
+    """What LAS X is set to now, shaped as the log reader's job settings give it.
+
+    The expected values are the simulator's, read on 2026-10-13 from the
+    state tree and, where the log has them, equal to the log's job settings
+    for the selected job (HiRes).
+    """
+
+    def test_scan_status(self, tree):
+        assert direct_reader.get_scan_status() == "eScanIdle"
+        tree.status = {"AcquisitionState": 3}
+        assert direct_reader.get_scan_status() == "eScanSeries"
+
+    def test_an_unknown_scan_state_is_no_answer(self, tree):
+        tree.status = {"AcquisitionState": 9}
+        assert direct_reader.get_scan_status() == "Unknown"
+
+    def test_scan_mode(self, tree):
+        assert direct_reader.get_scan_mode() == "xyz"
+
+    def test_zoom(self, tree):
+        assert direct_reader.get_zoom() == {"current": 1.0, "min": 0.75, "max": 48.0}
+
+    def test_scan_speed(self, tree):
+        assert direct_reader.get_scan_speed() == {"value": 400, "unit": "Hz", "isResonant": False}
+
+    def test_format(self, tree):
+        assert direct_reader.get_format() == "512 x 512"
+
+    def test_averaging_and_accumulation(self, tree):
+        tree.live[("Confocal", "ScanningParameter", "FrameAverage")] = 4
+        assert direct_reader.get_averaging() == {
+            "lineAverage": 1,
+            "lineAccumulation": 1,
+            "frameAverage": 4,
+            "frameAccumulation": 1,
+        }
+
+    def test_pinhole(self, tree):
+        pinhole = direct_reader.get_pinhole()
+        assert pinhole["airy"] == pytest.approx({"value": 0.9994, "min": 0.2512, "max": 2.5124}, abs=1e-4)
+        assert pinhole["metres"] == pytest.approx(397.7875e-6)
+
+    def test_the_objective_in_the_light_path(self, tree):
+        assert direct_reader.get_objective() == {
+            "slotIndex": 0,
+            "name": "HC PL APO  CS    10x/0.40 DRY ",
+            "magnification": 10.0,
+            "numericalAperture": 0.4,
+            "immersion": "DRY",
+            "objectiveNumber": 506511,
+            "isMotCorr": True,
+        }
+
+    def test_another_slot_is_another_objective(self, tree):
+        tree.live[("Microscope", "SlotPosition")] = 1
+        objective = direct_reader.get_objective()
+        assert (objective["slotIndex"], objective["magnification"]) == (1, 20.0)
+
+    def test_an_empty_slot_is_refused(self, tree):
+        tree.live[("Microscope", "SlotPosition")] = 5
+        with pytest.raises(hardware_server.HardwareServerUnavailable, match="slot 5"):
+            direct_reader.get_objective()
+
+    def test_the_field_of_view_in_metres_as_the_api_reader_gives_it(self, tree):
+        assert direct_reader.get_fov() == pytest.approx((0.0011625, 0.0011625))
+
+    def test_no_z_stack(self, tree):
+        assert direct_reader.get_z_stack() is None
+
+    def test_a_z_stack_in_micrometres(self, tree):
+        stack = ("Acquire", "AcquireZStackInfo")
+        tree.live.update(
+            {
+                (*stack, "BeginValue"): -10e-6,
+                (*stack, "EndValue"): 10e-6,
+                (*stack, "SectionsCount"): 21,
+                (*stack, "StepSize"): 1e-6,
+                ("Acquire", "ZStackUseMode"): 2,
+            }
+        )
+        stack = direct_reader.get_z_stack()
+        assert stack.pop("mode") == "z-wide"
+        assert stack == pytest.approx(
+            {"begin": -10.0, "end": 10.0, "stepSize": 1.0, "size": 20.0, "sections": 21}
+        )
+
+
 class TestWhatItReads:
-    def test_only_what_leica_agreed_to(self):
-        assert direct_reader.READS == ("xy", "z", "selected_job", "jobs")
+    def test_only_what_it_was_agreed_to_read(self):
+        assert direct_reader.READS == (
+            "xy",
+            "z",
+            "selected_job",
+            "jobs",
+            "scan_status",
+            "scan_mode",
+            "zoom",
+            "scan_speed",
+            "format",
+            "averaging",
+            "pinhole",
+            "objective",
+            "fov",
+            "z_stack",
+        )
 
     def test_without_the_hardware_server_it_raises(self):
         # The suite's conftest makes the hardware server unreachable.

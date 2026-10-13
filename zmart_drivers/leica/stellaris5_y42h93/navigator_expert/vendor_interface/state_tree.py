@@ -32,6 +32,7 @@ from dataclasses import dataclass, field
 from .hardware_server import (
     HardwareServerUnavailable,
     connected_server,
+    connections,
     forget_connection,
 )
 
@@ -144,6 +145,20 @@ def z_drive_node(nodes, drive):
     raise HardwareServerUnavailable(f"the state tree has no {drive} under {'/'.join(Z_DRIVES_PATH)}")
 
 
+def server_nodes():
+    """This thread's ``ServerNodes``, kept with its connection.
+
+    Asking the connection for it costs about 4 ms, a node read by its id
+    0.6 ms (simulator, 2026-10-13), so it is asked for once per connection.
+    """
+    server = connected_server()
+    kept = getattr(connections, "nodes", None)
+    if kept is None or kept[0] is not server:
+        kept = (server, server.ServerNodes)
+        connections.nodes = kept
+    return kept[1]
+
+
 def read(what, reading):
     """Run *reading* on the state tree; anything that goes wrong is ``HardwareServerUnavailable``.
 
@@ -151,7 +166,7 @@ def read(what, reading):
     read attaches and looks up afresh (LAS X may have restarted).
     """
     try:
-        return reading(connected_server().ServerNodes)
+        return reading(server_nodes())
     except HardwareServerUnavailable:
         raise
     except Exception as why:
@@ -169,26 +184,69 @@ def child_value(nodes, node_id, name):
     return node_value(nodes, found)
 
 
+def remembered_child(nodes, node_id, name, key):
+    """The child *name* of *node_id*, remembered under *key* while it still carries that name."""
+    known = remembered.get(key)
+    if known is not None and still_named(nodes, known, name):
+        return known
+    found = child_named(nodes, node_id, name)
+    if found is None:
+        raise HardwareServerUnavailable(f"state tree node {node_id} has no {name!r}")
+    remembered[key] = found
+    return found
+
+
+def sequence_layout(nodes, node):
+    """The value nodes of the job sequence at *node*, remembered while its children stay the same.
+
+    ``(sequence block id node, selected element node, [(name, block id,
+    element id node) per job])``. An experiment load renumbers the per-job
+    nodes, which changes the sequence's children, so the layout is looked up
+    afresh then.
+    """
+    kids = tuple(children(nodes, node))
+    known = remembered.get(("layout", *SEQUENCE_PATH))
+    if known is not None and known[0] == kids:
+        return known[1]
+
+    def named(parent, name):
+        found = child_named(nodes, parent, name)
+        if found is None:
+            raise HardwareServerUnavailable(f"state tree node {parent} has no {name!r}")
+        return found
+
+    layout = (
+        named(node, "CurrentSequenceBlockID"),
+        named(node, "CurrentSelectedElementID"),
+        [
+            (named(info, "Name"), named(info, "BlockID"), named(info, "ElementID"))
+            for info in kids
+            if nodes.GetNode(info)[0] == "SequenceBlockInfo"
+        ],
+    )
+    remembered[("layout", *SEQUENCE_PATH)] = (kids, layout)
+    return layout
+
+
 def job_sequence() -> JobSequence:
     """The jobs, their live block and element ids, and which is selected.
 
-    The per-job nodes are looked up each time: an experiment load renumbers
-    them. Raises :class:`HardwareServerUnavailable` when the server cannot be
+    Raises :class:`HardwareServerUnavailable` when the server cannot be
     reached or its tree lacks the sequence.
     """
 
     def reading(nodes):
-        node = node_at(nodes, SEQUENCE_PATH)
-        jobs = {}
-        for info in children(nodes, node):
-            if nodes.GetNode(info)[0] == "SequenceBlockInfo":
-                jobs[str(child_value(nodes, info, "Name"))] = Job(
-                    block_id=int(child_value(nodes, info, "BlockID")),
-                    element_id=int(child_value(nodes, info, "ElementID")),
-                )
+        block, selected, per_job = sequence_layout(nodes, node_at(nodes, SEQUENCE_PATH))
+        jobs = {
+            str(node_value(nodes, name)): Job(
+                block_id=int(node_value(nodes, block_id)),
+                element_id=int(node_value(nodes, element_id)),
+            )
+            for name, block_id, element_id in per_job
+        }
         return JobSequence(
-            block_id=int(child_value(nodes, node, "CurrentSequenceBlockID")),
-            selected_element=int(child_value(nodes, node, "CurrentSelectedElementID")),
+            block_id=int(node_value(nodes, block)),
+            selected_element=int(node_value(nodes, selected)),
             jobs=jobs,
         )
 
@@ -228,7 +286,7 @@ def acquisition_status() -> AcquisitionStatus:
     """
     sequence = job_sequence()
     try:
-        nodes = connected_server().ServerNodes
+        nodes = server_nodes()
         acquire = child_named(nodes, 1, "Acquire")
         atl = child_named(nodes, acquire, "ATL")
         sequence_node = child_named(nodes, atl, "CurrentSequenceList")

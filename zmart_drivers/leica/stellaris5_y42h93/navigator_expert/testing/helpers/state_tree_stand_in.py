@@ -19,6 +19,58 @@ loaded. ``node_calls`` counts ``GetNode`` calls, to see whether a reader walks.
 """
 
 
+#: The current setting's nodes as read on the LAS X simulator, 2026-10-13
+#: (HiRes selected, no z-stack), by path from the root.
+SIMULATOR_SETTINGS = {
+    ("Acquire", "ScanDimensionList", "ScanModeName"): "xyz",
+    ("Acquire", "AcquireImageSizeInfo", "ImageSizeX"): 0.0011625,
+    ("Acquire", "AcquireImageSizeInfo", "ImageSizeY"): 0.0011625,
+    ("Acquire", "AcquireZStackInfo", "BeginValue"): -2.384185222837308e-10,
+    ("Acquire", "AcquireZStackInfo", "EndValue"): -2.384185222837308e-10,
+    ("Acquire", "AcquireZStackInfo", "SectionsCount"): 1,
+    ("Acquire", "AcquireZStackInfo", "StepSize"): 0.0,
+    ("Acquire", "ZStackUseMode"): 1,
+    ("Confocal", "ScanningParameter", "IsResonantConfocalScanner"): False,
+    ("Confocal", "ScanningParameter", "Speed"): 400,
+    ("Confocal", "ScanningParameter", "SpeedUnit"): "Hz",
+    ("Confocal", "ScanningParameter", "CurrentFormat"): "512 x 512",
+    ("Confocal", "ScanningParameter", "FormatX"): 512,
+    ("Confocal", "ScanningParameter", "FormatY"): 512,
+    ("Confocal", "ScanningParameter", "Zoom"): 1.0,
+    ("Confocal", "ScanningParameter", "ZoomMin"): 0.75,
+    ("Confocal", "ScanningParameter", "ZoomMax"): 48.0,
+    ("Confocal", "ScanningParameter", "LineAverage"): 1,
+    ("Confocal", "ScanningParameter", "LineAccu"): 1,
+    ("Confocal", "ScanningParameter", "FrameAverage"): 1,
+    ("Confocal", "ScanningParameter", "FrameAccumulation"): 1,
+    ("Confocal", "HWParameter", "Pinhole"): 0.0003977875,
+    ("Confocal", "HWParameter", "PinholeAU"): 0.9994033038125747,
+    ("Confocal", "HWParameter", "PinholeAUMin"): 0.251240499968595,
+    ("Confocal", "HWParameter", "PinholeAUMax"): 2.5124049996859497,
+    ("Microscope", "SlotPosition"): 0,
+}
+
+#: The first two of the simulator's six objectives (Microscope/ObjectiveList), in slot order.
+SIMULATOR_OBJECTIVES = [
+    {
+        "Name": "HC PL APO  CS    10x/0.40 DRY ",
+        "Magnification": 10.0,
+        "NumericalAperture": 0.4,
+        "Immersion": "DRY",
+        "OrderNumber": 506511,
+        "IsMotCorrApplicable": True,
+    },
+    {
+        "Name": "HC PL APO CS  20.0x0.70 UV",
+        "Magnification": 20.0,
+        "NumericalAperture": 0.7,
+        "Immersion": "DRY",
+        "OrderNumber": 506513,
+        "IsMotCorrApplicable": True,
+    },
+]
+
+
 class StandInNodes:
     """``GetNode(id) -> (name, rights, parent, children)``; ``RegisterNode(id, out) -> value``."""
 
@@ -37,6 +89,8 @@ class StandInNodes:
         self.stage = stage  # () -> (x_m, y_m)
         self.zdrives = zdrives  # () -> {z_use_mode: metres}
         self.status = {}  # AcquisitionState, CurrentRunningBlockID, ... overriding rest values
+        self.live = dict(SIMULATOR_SETTINGS)  # path -> value, the current setting's nodes
+        self.objectives = [dict(o) for o in SIMULATOR_OBJECTIVES]  # Microscope/ObjectiveList, by slot
         self.generation = 0
         self.reads = 0
         self.node_calls = 0
@@ -102,6 +156,31 @@ class StandInNodes:
         }
         for name, value in self.status.items():
             values[by_name[name]] = value
+
+        fresh = iter(range(20000, 30000))
+
+        def child(parent, name):
+            found = next((c for c in nodes[parent][2] if nodes[c][0] == name), None)
+            if found is None:
+                found = next(fresh)
+                add(found, name, parent)
+                pname, pparent, pchildren = nodes[parent]
+                nodes[parent] = (pname, pparent, (*pchildren, found))
+            return found
+
+        for path, value in self.live.items():
+            node = 1
+            for name in path:
+                node = child(node, name)
+            values[node] = value
+        objective_list = child(child(1, "Microscope"), "ObjectiveList")
+        for objective in self.objectives:
+            info = next(fresh)
+            add(info, "ObjectiveInfo", objective_list)
+            name, parent, kids = nodes[objective_list]
+            nodes[objective_list] = (name, parent, (*kids, info))
+            for key, value in objective.items():
+                values[child(info, key)] = value
         return nodes, values
 
     def GetNode(self, node_id):
