@@ -394,11 +394,11 @@ def confirm_move_z(
     deadline = t_start + poll_window
 
     while time.monotonic() < deadline:
-        # The readers make the Z number; this only compares. LAS X's state
-        # tree first, where the drive truly is; else the job settings, whose
+        # The readers make the Z number; this only compares. The direct
+        # reader first, where the drive truly is; else the job settings, whose
         # reader knows they do not refresh for the drive carrying the job's
         # z-stack and reads that one elsewhere.
-        actual = _readers.z_um_from_tree(key)
+        actual = _readers.z_um_direct(key)
         if actual is None:
             ch = _readback(client, job_name, deadline=deadline, observed_after=observed_after)
             try:
@@ -960,15 +960,15 @@ def _confirm_filter_wheel_slot(
 
 
 def xy_confirm_mode():
-    """The state tree when the profile reads XY from it, else the CAM API.
+    """The direct reader when the profile reads XY with it, else the CAM API.
 
     A stage move is confirmed from a reading taken after the command; the
-    log's XY can predate it, so without the tree the confirmation keeps to
-    the CAM API, and the tree falls back to it too.
+    log's XY can predate it, so without the direct reader the confirmation
+    keeps to the CAM API, and the direct reader falls back to it too.
     """
     from . import profiles
 
-    return "tree" if profiles.STATE_READERS.xy_mode == "tree" else "api"
+    return "direct" if profiles.STATE_READERS.xy_mode == "direct" else "api"
 
 
 def confirm_move_xy(
@@ -976,7 +976,7 @@ def confirm_move_xy(
 ):
     """Poll until XY stage position is within tolerance, or until timeout.
 
-    Looks at the stage position every ``POLL_S``, from LAS X's state tree
+    Looks at the stage position every ``POLL_S``, with the direct reader
     or through the API (:func:`xy_confirm_mode`).
 
     Args:

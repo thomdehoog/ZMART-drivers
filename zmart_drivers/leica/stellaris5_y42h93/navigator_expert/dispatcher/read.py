@@ -9,14 +9,15 @@ and a caller can narrow it with ``accept``. A read the API did not answer in
 a window is requested again at the next one. After four windows the reading
 is unknown.
 
-The source family (``api``, ``log``, ``hybrid``, ``tree``) is profile policy
+The source family (``api``, ``log``, ``hybrid``, ``direct``) is profile policy
 and says which sources take part, never how long to wait. Asking a family for
 a leg the datum does not have fails closed at once with ``UnsupportedSource``.
 
-``tree`` is LAS X's hardware server's state tree, read in the caller's own
-thread (its COM connection belongs to the thread that made it) and looked at
+``direct`` is the direct reader (LAS X's hardware server's state tree), read
+in the caller's own thread (its COM connection belongs to the thread that
+made it) and looked at
 again every ``POLL_S`` until an answer counts. It is not raced: when the
-hardware server cannot be reached, or the datum has no tree leg, the
+hardware server cannot be reached, or the datum has no direct leg, the
 *fallback* family answers instead (``hybrid`` unless the caller says), within
 the same window.
 
@@ -40,7 +41,7 @@ from ..actions.derived import (  # noqa: F401  re-exported, as the readers packa
     stack_drive,
     stack_slices_um,
 )
-from ..vendor_interface import api_reader, log_reader, state_tree
+from ..vendor_interface import api_reader, direct_reader, log_reader
 from ..vendor_interface.hardware_server import HardwareServerUnavailable
 from . import tuning
 
@@ -162,23 +163,23 @@ def _snapshot_read(spec, *, max_age_s, job_name=None) -> Reading:
         return Reading(value=None, source="log", observed_at=time.time(), age_s=None, error=exc)
 
 
-def tree_read(spec) -> Reading:
+def direct_read(spec) -> Reading:
     try:
-        value = spec.tree_fn()
-        return Reading(value=value, source="tree", observed_at=time.time(), age_s=0.0)
+        value = spec.direct_fn()
+        return Reading(value=value, source="direct", observed_at=time.time(), age_s=0.0)
     except HardwareServerUnavailable as exc:
-        return Reading(value=None, source="tree", observed_at=time.time(), age_s=None, error=exc)
+        return Reading(value=None, source="direct", observed_at=time.time(), age_s=None, error=exc)
 
 
-def watch_tree(spec, *, succeeded, deadline, observed_after):
-    """Look at the state tree every ``POLL_S`` until an answer counts, or *deadline*.
+def watch_direct(spec, *, succeeded, deadline, observed_after):
+    """Ask the direct reader every ``POLL_S`` until an answer counts, or *deadline*.
 
     Returns the winning Reading; an error-carrying one at once when the
     hardware server cannot be reached; None when it answered but nothing
     counted in time.
     """
     while True:
-        reading = tree_read(spec)
+        reading = direct_read(spec)
         if reading.error is not None or _counts(reading, succeeded, observed_after):
             return reading
         if time.monotonic() + tuning.POLL_S >= deadline:
@@ -350,14 +351,14 @@ def wait_for(
         job_name: The job a per-job datum is about.
         observed_after: Reject answers observed at or before this wall-clock
             time; a confirmation passes the moment its command was sent.
-        mode: ``api`` / ``log`` / ``hybrid`` / ``tree``; None takes the profile's.
+        mode: ``api`` / ``log`` / ``hybrid`` / ``direct``; None takes the profile's.
         deadline: A ``time.monotonic()`` time to watch until, for a caller
             that runs its own window (a command confirmation). None means
             the rule: ``WINDOWS`` windows of ``WINDOW_S``, requesting an
             unanswered read again at each new window.
         api_kwargs: Extra keyword arguments for the API leg (``job_name``).
-        fallback: The family that answers in ``tree`` mode when the hardware
-            server cannot be reached or the datum has no tree leg.
+        fallback: The family that answers in ``direct`` mode when the hardware
+            server cannot be reached or the datum has no direct leg.
 
     Returns:
         The winning :class:`Reading`; else the latest error-carrying reading
@@ -366,14 +367,14 @@ def wait_for(
     spec = capabilities.spec(datum)
     mode = mode if mode is not None else getattr(_profile(), spec.mode_attr)
     succeeded = _success_for(datum, job_name, accept)
-    if mode == "tree":
-        if spec.tree_fn is not None:
+    if mode == "direct":
+        if spec.direct_fn is not None:
             until = (
                 deadline
                 if deadline is not None
                 else time.monotonic() + tuning.WINDOWS * tuning.WINDOW_S
             )
-            reading = watch_tree(
+            reading = watch_direct(
                 spec, succeeded=succeeded, deadline=until, observed_after=observed_after
             )
             if reading is None or reading.error is None:
@@ -493,18 +494,18 @@ def get_xy(
     )
 
 
-def z_um_from_tree(drive, *, mode=None):
-    """Where one z drive truly is (um), from LAS X's state tree; None when the tree does not answer.
+def z_um_direct(drive, *, mode=None):
+    """Where one z drive truly is (um), from the direct reader; None when it does not answer.
 
-    The tree is read in ``tree`` mode (the profile's ``z_mode`` unless
+    It is asked in ``direct`` mode (the profile's ``z_mode`` unless
     *mode* says); None also when the hardware server cannot be reached, so
     the caller reads the job settings instead.
     """
     mode = mode if mode is not None else _profile().z_mode
-    if mode != "tree":
+    if mode != "direct":
         return None
     try:
-        return state_tree.read_z_um(drive)
+        return direct_reader.read_z_um(drive)
     except HardwareServerUnavailable as why:
         log.debug("%s: %s; the job settings answer", drive, why)
         return None
@@ -513,7 +514,7 @@ def z_um_from_tree(drive, *, mode=None):
 def read_z_um(client, job_name, drive, *, mode=None):
     """Where one z drive is (um), *drive* ``"z-galvo"`` or ``"z-wide"``; None when unreadable.
 
-    From LAS X's state tree (:func:`z_um_from_tree`); otherwise from
+    From the direct reader (:func:`z_um_direct`); otherwise from
     *job_name*'s settings: it waits for settings that carry ``zPosition``
     and returns None only when none arrive within the rule's four windows.
     Readable but incomplete settings raise: ``derived.z_um_from_settings``
@@ -521,13 +522,13 @@ def read_z_um(client, job_name, drive, *, mode=None):
     normalization can raise ``ValueError`` on a schema mismatch — unlike the
     routed readers, which never raise.
     """
-    from_tree = z_um_from_tree(drive, mode=mode)
-    if from_tree is not None:
-        return from_tree
+    direct = z_um_direct(drive, mode=mode)
+    if direct is not None:
+        return direct
     settings = get_job_settings(
         client,
         job_name,
-        mode=None if mode == "tree" else mode,
+        mode=None if mode == "direct" else mode,
         accept=lambda s: s.get("zPosition") is not None,
     )
     if not settings:

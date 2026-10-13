@@ -1,4 +1,4 @@
-"""Where the stage and the z drives are, and which job is selected, from LAS X's state tree.
+"""LAS X's state tree: how it is reached, walked and read. The direct reader reads through it.
 
 The hardware server keeps LAS X's state as a tree of named nodes, reached
 through ``ServerNodes``: ``GetNode(id)`` gives a node's name, parent and
@@ -27,7 +27,6 @@ connection. ``ChangeNodes``, which writes, is never called.
 
 from __future__ import annotations
 
-import math
 from dataclasses import dataclass, field
 
 from .hardware_server import (
@@ -161,51 +160,6 @@ def read(what, reading):
         raise HardwareServerUnavailable(
             f"the hardware server's state tree did not answer {what}: {why}"
         ) from why
-
-
-def metres(value, what):
-    if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
-        raise HardwareServerUnavailable(f"the state tree answered {what} = {value!r}")
-    return float(value)
-
-
-def get_xy() -> dict:
-    """The stage position, shaped as the CAM API reader gives it: metres and micrometres."""
-
-    def reading(nodes):
-        x = metres(node_value(nodes, node_at(nodes, STAGE_PATHS["x"])), "Stage/PositionX")
-        y = metres(node_value(nodes, node_at(nodes, STAGE_PATHS["y"])), "Stage/PositionY")
-        return {"x": x, "y": y, "x_um": x * 1e6, "y_um": y * 1e6}
-
-    return read("the stage position", reading)
-
-
-def read_z_um(drive: str) -> float:
-    """Where one z drive truly is, in micrometres; *drive* is ``"z-galvo"`` or ``"z-wide"``.
-
-    ``CurrentHardwarePosition``, in the same frame as the job settings'
-    ``zPosition``, and current also for the drive that carries a job's
-    z-stack, whose job settings stop refreshing.
-    """
-    if drive not in Z_USE_MODE:
-        raise ValueError(f"no z drive {drive!r}; the state tree knows {sorted(Z_USE_MODE)}")
-
-    def reading(nodes):
-        return metres(node_value(nodes, z_drive_node(nodes, drive)), drive) * 1e6
-
-    return read(f"where {drive} is", reading)
-
-
-def get_selected_job() -> dict | None:
-    """The selected job, shaped as the log reader gives it: ``Name``, ``ID`` (its live block id), ``IsSelected``.
-
-    None when the tree names no selected job.
-    """
-    sequence = job_sequence()
-    name = sequence.selected_job
-    if name is None:
-        return None
-    return {"Name": name, "ID": sequence.jobs[name].block_id, "IsSelected": True}
 
 
 def child_value(nodes, node_id, name):

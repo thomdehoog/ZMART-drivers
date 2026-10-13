@@ -19,7 +19,7 @@ from functools import partial
 from ..dispatcher import read as _readers
 from ..dispatcher import tuning as _timing
 from ..dispatcher.envelope import _make_log_entry
-from ..vendor_interface import log_wait, state_tree
+from ..vendor_interface import direct_reader, log_wait
 from ..vendor_interface.hardware_server import HardwareServerUnavailable
 from .confirmations import _reading_value_after
 
@@ -33,33 +33,33 @@ def _state_reader_profile():
     return profiles.STATE_READERS
 
 
-def selected_job_in_tree():
-    """The selected job's name from LAS X's state tree; None when the tree is not read or not reachable.
+def selected_job_direct():
+    """The selected job's name from the direct reader; None when it is not asked or not reachable.
 
-    The tree is read when the profile's ``selected_job_mode`` is ``tree``.
-    It holds LAS X's live selection, so unlike the CAM API's job list it
+    It is asked when the profile's ``selected_job_mode`` is ``direct``.
+    It reads LAS X's live selection, so unlike the CAM API's job list it
     cannot be stale, and unlike the log it answers without a new event.
     """
-    if _state_reader_profile().selected_job_mode != "tree":
+    if _state_reader_profile().selected_job_mode != "direct":
         return None
     try:
-        selected = state_tree.get_selected_job()
+        selected = direct_reader.get_selected_job()
     except HardwareServerUnavailable as why:
         log.debug("selected job: %s", why)
         return None
     return selected["Name"] if selected else None
 
 
-def confirm_select_job_from_tree(client, *, job_name, timeout=None, otherwise=None):
-    """Tree confirmation leg: look every ``POLL_S`` until LAS X's state tree has *job_name* selected.
+def confirm_select_job_direct(client, *, job_name, timeout=None, otherwise=None):
+    """Direct confirmation leg: ask the direct reader every ``POLL_S`` until *job_name* is selected.
 
-    The tree's selection is LAS X's live one, so a match is the switch
+    The direct reader's selection is LAS X's live one, so a match is the switch
     itself, with no transition witness needed. When the hardware server
     cannot be reached, *otherwise* (the API leg the profile would run
-    without the tree) confirms instead; without one, the leg fails.
+    without the direct reader) confirms instead; without one, the leg fails.
 
     Returns:
-        {"success": bool, "logs": [...], "source": "tree"}, or *otherwise*'s result.
+        {"success": bool, "logs": [...], "source": "direct"}, or *otherwise*'s result.
     """
     if timeout is None:
         timeout = _timing.WINDOW_S
@@ -67,19 +67,19 @@ def confirm_select_job_from_tree(client, *, job_name, timeout=None, otherwise=No
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         try:
-            selected = state_tree.get_selected_job()
+            selected = direct_reader.get_selected_job()
         except HardwareServerUnavailable as why:
-            log.debug("SelectJob '%s' | state tree: %s", job_name, why)
+            log.debug("SelectJob '%s' | direct reader: %s", job_name, why)
             if otherwise is None:
-                return {"success": False, "logs": logs, "source": "tree"}
+                return {"success": False, "logs": logs, "source": "direct"}
             return otherwise(client)
         if selected and selected["Name"] == job_name:
-            return {"success": True, "logs": logs, "source": "tree"}
+            return {"success": True, "logs": logs, "source": "direct"}
         time.sleep(_timing.POLL_S)
-    msg = f"Job selection timeout after {timeout:.1f}s for '{job_name}' (state tree)"
+    msg = f"Job selection timeout after {timeout:.1f}s for '{job_name}' (direct reader)"
     log.warning(msg)
     logs.append(_make_log_entry("warning", msg))
-    return {"success": False, "logs": logs, "source": "tree"}
+    return {"success": False, "logs": logs, "source": "direct"}
 
 
 def confirm_select_job(
@@ -216,7 +216,7 @@ def select_job_confirm_legs(
 
     - ``api``: the API poll alone, exactly today's semantics.
     - ``log``: the post-command ``CurrentBlock`` wait alone.
-    - with the profile's ``selected_job_mode`` ``tree``, LAS X's state tree
+    - with the profile's ``selected_job_mode`` ``direct``, the direct reader
       takes the api leg's place (``api`` / ``hybrid``), and that api leg
       confirms when the hardware server cannot be reached.
     - ``hybrid``: both legs race for one confirm window (first admissible
@@ -256,9 +256,9 @@ def select_job_confirm_legs(
         )
     if source in ("log", "hybrid"):
         log_leg = partial(_confirm_select_job_log, job_name, command_started_at, timeout=window_s)
-    if profile.selected_job_mode == "tree" and api_confirm is not None:
+    if profile.selected_job_mode == "direct" and api_confirm is not None:
         api_confirm = partial(
-            confirm_select_job_from_tree, job_name=job_name, timeout=window_s, otherwise=api_confirm
+            confirm_select_job_direct, job_name=job_name, timeout=window_s, otherwise=api_confirm
         )
     return api_confirm, log_leg, budget_s
 
@@ -352,14 +352,14 @@ def prepare_select_job(client, job_name):
         "api_said_selected": False,
     }
 
-    # LAS X's state tree holds the live selection: when it is read and names
+    # The direct reader reads the live selection: when it is asked and names
     # the target, that proves the no-op whatever the other sources say.
-    if selected_job_in_tree() == job_name:
+    if selected_job_direct() == job_name:
         return {
             "success": True,
             "confirmed": True,
             "message": f"'{job_name}' already selected",
-            "logs": [_make_log_entry("info", "selected job already confirmed from LAS X's state tree")],
+            "logs": [_make_log_entry("info", "selected job already confirmed by the direct reader")],
         }, context
 
     if source == "api":

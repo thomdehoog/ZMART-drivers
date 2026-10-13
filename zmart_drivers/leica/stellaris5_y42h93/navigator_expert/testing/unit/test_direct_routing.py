@@ -1,8 +1,9 @@
 """
-Unit tests: X, Y, z and the selected job, read from LAS X's state tree first.
+Unit tests: X, Y, z and the selected job, read by the direct reader first.
 ================================================================================
-LAS X's hardware server keeps its live state as a tree of named nodes. The
-readers read it first (the profile's ``tree`` source) and fall back to the
+LAS X's hardware server keeps its live state as a tree of named nodes, which
+the direct reader reads. The routed readers ask it first (the profile's
+``direct`` source) and fall back to the
 hybrid reader (CAM API and LAS X log) when the hardware server cannot be
 reached. Leica agreed to these reads (2026-10-13); the scan status is not
 among them and stays on the CAM API and the log. Measured on the simulator,
@@ -66,17 +67,17 @@ def tree(client, monkeypatch):
 class TestFromTheTree:
     def test_xy(self, client, tree):
         reading = readers.get_xy(client, diagnostics=True)
-        assert reading.source == "tree"
+        assert reading.source == "direct"
         assert reading.value == {"x": 0.05, "y": 0.03, "x_um": 50000.0, "y_um": 30000.0}
 
-    def test_the_scan_status_is_not_read_from_the_tree(self, client, tree):
+    def test_the_scan_status_is_not_read_directly(self, client, tree):
         reading = readers.get_scan_status(client, diagnostics=True)
         assert reading.source in ("api", "log")
         assert reading.value == "eScanIdle"
 
     def test_selected_job(self, client, tree):
         reading = readers.get_selected_job(client, diagnostics=True)
-        assert reading.source == "tree"
+        assert reading.source == "direct"
         assert reading.value == {"Name": "HiRes", "ID": 152, "IsSelected": True}
 
     def test_both_z_drives_in_micrometres(self, client, tree):
@@ -123,7 +124,7 @@ class TestRememberedNodes:
 
 
 class TestSuccessChecks:
-    """move_xy, move_z and select_job confirm from the tree."""
+    """move_xy, move_z and select_job confirm from the direct reader."""
 
     def test_move_xy(self, client, tree):
         result = commands.move_xy(client, 50025.0, 30000.0)

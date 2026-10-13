@@ -1,7 +1,7 @@
 """Per-datum source capabilities - the one table behind the reader families.
 
 Every datum the state readers serve is declared here once, with the
-passive legs each source can provide (``api_fn`` / ``log_fn`` / ``tree_fn``): they
+passive legs each source can provide (``api_fn`` / ``log_fn`` / ``direct_fn``): they
 answer "what is the state now?" for the routed readers in :mod:`router`.
 Either leg may be absent; a family asked for a leg the datum does not
 have fails closed with ``UnsupportedSource``, and ``hybrid`` degrades to
@@ -18,7 +18,7 @@ import math
 from collections.abc import Callable
 from dataclasses import dataclass
 
-from ..vendor_interface import api_reader, log_reader, state_tree
+from ..vendor_interface import api_reader, direct_reader, log_reader
 from . import derived
 
 
@@ -92,7 +92,7 @@ class DatumSpec:
     log_fn: Callable | None = None  # (snapshot, *, max_age_s[, job_name])
     log_max_age_attr: str | None = None
     age_key: str | None = None  # key for age_for_snapshot()
-    tree_fn: Callable | None = None  # () -> value, from LAS X's hardware server's state tree
+    direct_fn: Callable | None = None  # () -> value, from the direct reader
 
 
 def age_for_snapshot(snapshot, *, age_key=None, job_name=None, max_age_s=None):
@@ -170,7 +170,7 @@ DATUMS = {
         log_fn=lambda snapshot, *, max_age_s: log_reader.get_xy(snapshot, max_age_s=max_age_s),
         log_max_age_attr="xy_log_max_age_s",
         age_key="xy",
-        tree_fn=state_tree.get_xy,
+        direct_fn=direct_reader.get_xy,
     ),
     "jobs": DatumSpec(
         mode_attr="jobs_mode",
@@ -191,7 +191,7 @@ DATUMS = {
         ),
         log_max_age_attr="selected_job_log_max_age_s",
         age_key="selected_job",
-        tree_fn=state_tree.get_selected_job,
+        direct_fn=direct_reader.get_selected_job,
     ),
 }
 
