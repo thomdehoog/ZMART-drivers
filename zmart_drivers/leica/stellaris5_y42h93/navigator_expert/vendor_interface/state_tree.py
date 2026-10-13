@@ -184,18 +184,6 @@ def child_value(nodes, node_id, name):
     return node_value(nodes, found)
 
 
-def remembered_child(nodes, node_id, name, key):
-    """The child *name* of *node_id*, remembered under *key* while it still carries that name."""
-    known = remembered.get(key)
-    if known is not None and still_named(nodes, known, name):
-        return known
-    found = child_named(nodes, node_id, name)
-    if found is None:
-        raise HardwareServerUnavailable(f"state tree node {node_id} has no {name!r}")
-    remembered[key] = found
-    return found
-
-
 def named(nodes, parent, name):
     """The child *name* of *parent*; raises when there is none."""
     found = child_named(nodes, parent, name)

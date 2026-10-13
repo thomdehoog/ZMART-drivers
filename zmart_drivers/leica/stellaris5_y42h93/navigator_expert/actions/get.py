@@ -183,9 +183,9 @@ DATUMS = {
         # datum, which keeps its log/hybrid legs); its job-list derivation is
         # a passive cluster that omits jobs not re-dumped this session, so it
         # is incomplete. Confirmed on the bench (2026-07-06). No log_fn. No
-        # direct_fn either: the state tree does not say which jobs are
-        # autofocus jobs (its per-job IsAutoFocusOnStart is "autofocus before
-        # this job"), which the adapter needs to keep them apart (2026-10-13).
+        # direct_fn either: the state tree's job sequence does not say which
+        # jobs are autofocus jobs, which the adapter needs to keep them apart
+        # (see direct_reader.get_jobs, 2026-10-13).
         api_fn=lambda client, **kw: api_reader.get_jobs(client, **kw),
     ),
     "selected_job": DatumSpec(

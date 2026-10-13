@@ -102,9 +102,8 @@ class TestJobs:
         ]
 
     def test_it_does_not_say_which_jobs_are_autofocus_jobs(self, client, tree):
-        # The tree's per-job IsAutoFocusOnStart is "run an autofocus before this job",
-        # not "this is an autofocus job" (the setting's IsAutofocusActive in a saved
-        # experiment, which the CAM API's IsAutofocus follows): unset for the AF job too.
+        # The job sequence's IsAutoFocusOnStart was unset for the AF job too on the
+        # simulator, so this list cannot tell autofocus jobs (see get_jobs).
         assert all("IsAutofocus" not in job for job in direct_reader.get_jobs())
 
     def test_a_reloaded_experiment_gives_the_new_ids(self, client, tree):
@@ -458,6 +457,49 @@ class TestTheHardwareInfo:
         info = direct_reader.get_hardware_info()
         assert [s["name"] for s in info["LightSources"]] == ["UV", "Visible Light", "SuperContVisible Light"]
         assert {"Type": 140, "FilterNames": ["--- ", "Substrate ", "Mirror "]} in info["FilterWheels"]
+
+
+class TestWhatIsReadOnce:
+    """What LAS X fixes for a session is read once, with the layout; what can change, every time."""
+
+    def test_the_installed_hardware_is_read_once(self, tree):
+        first = direct_reader.get_hardware_info()
+        reads = tree.reads
+        assert direct_reader.get_hardware_info() == first
+        assert tree.reads == reads
+
+    def test_what_changes_is_read_every_time(self, client, tree):
+        direct_reader.get_job_settings("HiRes")
+        detector = tree.detection["Spectrophotometer"][0]["DetectionUnitList"]["DetectorHWInfo"][0]
+        detector.update({"HighVoltage": 7.5, "WaveLengthEnd": 470.0, "DyeName": "Leica/DAPI"})
+        tree.light_sources[0]["AOTF"]["AotfLine"][0]["Intensity"] = 5.0
+        tree.filter_wheels["FilterWheel"][1]["CurrentSlotPosition"] = 1
+        tree.live[("Microscope", "SlotPosition")] = 1
+        settings = direct_reader.get_job_settings("HiRes")["activeSettings"][0]
+        hyd = settings["activeDetectors"][0]
+        assert (hyd["gain"]["value"], hyd["detectionEnd"], hyd["dye"]) == (7.5, 470.0, "Leica/DAPI")
+        assert settings["activeLaserLines"][0]["intensity"] == pytest.approx(0.05)
+        assert {"type": 140, "filterIndex": 1, "filterName": "Substrate "}.items() <= next(
+            w for w in settings["filterWheels"] if w["type"] == 140
+        ).items()
+        assert direct_reader.get_objective()["magnification"] == 20.0
+
+    def test_a_detector_switched_on_is_seen(self, tree):
+        assert [d["name"] for d in direct_reader.get_detectors()] == ["HyD 2", "HyD S 3"]
+        tree.detection["Spectrophotometer"][1]["DetectionUnitList"]["DetectorHWInfo"][0]["IsActive"] = True
+        assert [d["name"] for d in direct_reader.get_detectors()] == ["HyD 2", "HyD S 3", "Trans PMT"]
+
+    def test_a_changed_layout_is_read_afresh(self, tree):
+        assert len(direct_reader.get_light_sources()) == 3
+        tree.light_sources = tree.light_sources[:2]
+        assert [s["name"] for s in direct_reader.get_light_sources()] == ["UV", "Visible Light"]
+
+    def test_a_failed_connection_forgets_what_was_read_once(self, tree):
+        direct_reader.get_hardware_info()
+        state_tree.forget_nodes()
+        reads = tree.reads
+        direct_reader.get_hardware_info()
+        assert tree.reads > reads
 
 
 class TestWhatItReads:

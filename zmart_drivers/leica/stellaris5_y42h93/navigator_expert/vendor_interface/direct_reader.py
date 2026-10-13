@@ -53,8 +53,6 @@ from .state_tree import (
     of_name,
     read,
     remembered,
-    remembered_child,
-    still_named,
     z_drive_node,
 )
 
@@ -111,6 +109,18 @@ def settings(what, paths):
     return read(what, reading)
 
 
+def session_facts(what, paths):
+    """Like :func:`settings`, for values LAS X fixes for a session; read once, then remembered.
+
+    Forgotten with the remembered node ids (``state_tree.forget_nodes``),
+    which a failed read does, as after a LAS X restart.
+    """
+    key = ("facts", what)
+    if key not in remembered:
+        remembered[key] = settings(what, paths)
+    return dict(remembered[key])
+
+
 def metres(value, what):
     if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
         raise HardwareServerUnavailable(f"the state tree answered {what} = {value!r}")
@@ -134,12 +144,16 @@ def get_jobs() -> list[dict]:
     Per job ``Name``, ``ID`` (its live block id, which an experiment load
     changes while the CAM API's job list keeps the old one) and
     ``IsSelected``. Not which jobs are autofocus jobs (the CAM API's
-    ``IsAutofocus``, which follows a saved experiment's
-    ``IsAutofocusActive`` on the job's settings): the job sequence's
-    ``IsAutoFocusOnStart`` is "run an autofocus before this job", unset on
-    the simulator for the AF job too (2026-10-13). So the routed job list
-    keeps to the API; this list serves the selected job. Nor the CAM API's
-    ``ScanMode`` per job.
+    ``IsAutofocus``), so the routed job list keeps to the API and this list
+    serves the selected job. What is known (2026-10-13): in Navigator
+    Expert's matrix summary, which the log reader reads, ``IsAutoFocusOnStart``
+    marks the AF job (a capture checked against the API in June 2026); in
+    this job sequence the same-named field was unset for the AF job too on
+    the simulator. ``Acquire/MatrixScreener/AFJobID`` names the AF job in
+    Navigator Expert's own numbering (4), which the tree's id map
+    (``MatrixScreener_MapIDList``, old to new block ids) did not tie to a
+    job on the simulator after an experiment reload. To check on a freshly
+    started LAS X, beside the API. Nor the API's ``ScanMode`` per job.
     """
     sequence = job_sequence()
     ordered = sorted(sequence.jobs.items(), key=lambda item: item[1].element_id)
@@ -266,17 +280,19 @@ def get_objective() -> dict:
 
     ``Microscope/SlotPosition`` is its slot, counted from 0 like the job
     settings' ``slotIndex``; ``Microscope/ObjectiveList`` holds one
-    ``ObjectiveInfo`` per slot, in slot order. Raises
+    ``ObjectiveInfo`` per slot, in slot order, read once (:func:`objective_layout`).
+    ``motCorrPos`` is the correction collar's position now. Raises
     :class:`HardwareServerUnavailable` for a slot the list has no objective for.
     """
 
     def reading(nodes):
         slot = node_value(nodes, node_at(nodes, ("Microscope", "SlotPosition")))
-        info = objective_node(nodes, slot)
-        return {
-            key: node_value(nodes, remembered_child(nodes, info, field, (*OBJECTIVES, slot, field)))
-            for key, field in OBJECTIVE_FIELDS.items()
-        } | {
+        turret = layout(nodes, OBJECTIVES, objective_layout)
+        if not isinstance(slot, int) or not 0 <= slot < len(turret):
+            raise HardwareServerUnavailable(
+                f"the state tree has no objective in slot {slot} ({len(turret)} listed)"
+            )
+        return turret[slot] | {
             "slotIndex": slot,
             "motCorrPos": node_value(nodes, node_at(nodes, ("Microscope", "CurrentMotCorrPos"))),
         }
@@ -295,24 +311,6 @@ OBJECTIVE_FIELDS = {
     "objectiveNumber": "OrderNumber",
     "isMotCorr": "IsMotCorrApplicable",
 }
-
-
-def objective_node(nodes, slot):
-    """The ``ObjectiveInfo`` node of *slot*, remembered while it still is one."""
-    known = remembered.get((*OBJECTIVES, slot))
-    if known is not None and still_named(nodes, known, "ObjectiveInfo"):
-        return known
-    infos = [
-        c
-        for c in children(nodes, node_at(nodes, OBJECTIVES))
-        if nodes.GetNode(c)[0] == "ObjectiveInfo"
-    ]
-    if not isinstance(slot, int) or not 0 <= slot < len(infos):
-        raise HardwareServerUnavailable(
-            f"the state tree has no objective in slot {slot} ({len(infos)} listed)"
-        )
-    remembered[(*OBJECTIVES, slot)] = infos[slot]
-    return infos[slot]
 
 
 def get_fov() -> tuple[float, float]:
@@ -360,32 +358,33 @@ def get_z_stack() -> dict | None:
 
 
 def light_layout(nodes, node, kids):
-    """Per light source, the value nodes: name, beam route, shutter, its lasers and its AOTF lines.
+    """Per light source: what is fixed for a session, read once, and the nodes of what can change.
 
-    ``{"name", "route", "shutter", "lasers": [(name, min, max wavelength)],
-    "lines": [(wavelength, index, intensity)]}``.
+    ``{"name", "route", "lasers": [(name, min, max wavelength)], "shutter":
+    node, "lines": [(wavelength node, index, intensity node)]}``. A tunable
+    laser's line wavelength can change, so it stays a node.
     """
     sources = []
     for source in of_name(nodes, kids, "LightSource"):
         sources.append(
             {
-                "name": named(nodes, source, "LightSourceName"),
-                "route": named(nodes, source, "BeamRoute"),
-                "shutter": named(nodes, named(nodes, source, "Shutter"), "IsShutterActive"),
+                "name": node_value(nodes, named(nodes, source, "LightSourceName")),
+                "route": beam_route(node_value(nodes, named(nodes, source, "BeamRoute"))),
                 "lasers": [
                     (
-                        named(nodes, laser, "LaserName"),
-                        named(nodes, laser, "WavelengthMin"),
-                        named(nodes, laser, "WavelengthMax"),
+                        node_value(nodes, named(nodes, laser, "LaserName")),
+                        node_value(nodes, named(nodes, laser, "WavelengthMin")),
+                        node_value(nodes, named(nodes, laser, "WavelengthMax")),
                     )
                     for laser in of_name(
                         nodes, children(nodes, named(nodes, source, "LaserList")), "Laser"
                     )
                 ],
+                "shutter": named(nodes, named(nodes, source, "Shutter"), "IsShutterActive"),
                 "lines": [
                     (
                         named(nodes, line, "WaveLength"),
-                        named(nodes, line, "LineIndex"),
+                        node_value(nodes, named(nodes, line, "LineIndex")),
                         named(nodes, line, "Intensity"),
                     )
                     for line in of_name(
@@ -421,16 +420,14 @@ def get_laser_lines() -> list[dict]:
     def reading(nodes):
         lines = []
         for source in layout(nodes, LIGHT_SOURCES, light_layout):
-            for wavelength, index, intensity in source["lines"]:
+            for wavelength, line_index, intensity in source["lines"]:
                 percent = node_value(nodes, intensity)
                 if isinstance(percent, (int, float)) and percent > 0:
-                    line_index = node_value(nodes, index)
-                    laser = laser_of_line(source["lasers"], line_index)
                     lines.append(
                         {
-                            "lightSource": node_value(nodes, source["name"]),
-                            "laserName": node_value(nodes, laser[0]),
-                            "beamRoute": beam_route(node_value(nodes, source["route"])),
+                            "lightSource": source["name"],
+                            "laserName": laser_of_line(source["lasers"], line_index)[0],
+                            "beamRoute": source["route"],
                             "lineIndex": line_index,
                             "wavelength": node_value(nodes, wavelength),
                             "intensity": percent / 100.0,
@@ -505,20 +502,20 @@ def get_bit_depth() -> int:
 
 def get_serial_number() -> str:
     """The instrument's serial number, as the hardware info's ``SerialNumber``."""
-    return settings(
+    return session_facts(
         "the serial number", {"serial": ("Acquire", "ActiveDataSource", "CurrentSerialNumber")}
     )["serial"]
 
 
 def get_microscope_stand() -> str:
     """The microscope stand's name, as the hardware info's ``Microscope.name``."""
-    return settings("the microscope stand", {"stand": ("Microscope", "CurrentMicStandName")})["stand"]
+    return session_facts("the microscope stand", {"stand": ("Microscope", "CurrentMicStandName")})["stand"]
 
 
 def objective_layout(nodes, node, kids):
-    """Per slot, in order: the value node of each of :data:`OBJECTIVE_FIELDS`."""
+    """Per slot, in order: each of :data:`OBJECTIVE_FIELDS`, read once (the turret is fixed for a session)."""
     return [
-        {key: named(nodes, info, field) for key, field in OBJECTIVE_FIELDS.items()}
+        {key: node_value(nodes, named(nodes, info, field)) for key, field in OBJECTIVE_FIELDS.items()}
         for info in of_name(nodes, kids, "ObjectiveInfo")
     ]
 
@@ -528,8 +525,8 @@ def get_objectives() -> list[dict]:
 
     def reading(nodes):
         return [
-            {key: node_value(nodes, field) for key, field in fields.items()} | {"slotIndex": slot}
-            for slot, fields in enumerate(layout(nodes, OBJECTIVES, objective_layout))
+            objective | {"slotIndex": slot}
+            for slot, objective in enumerate(layout(nodes, OBJECTIVES, objective_layout))
         ]
 
     return read("the objectives", reading)
@@ -537,7 +534,7 @@ def get_objectives() -> list[dict]:
 
 def get_scan_speed_range() -> dict:
     """The scan speeds, as the hardware info's ``ScanSpeed``: ``Min``, ``Max`` and ``ResonantSpeed`` (Hz)."""
-    return settings(
+    return session_facts(
         "the scan speed range",
         {
             "Min": (*SCANNING, "SpeedMin"),
@@ -570,27 +567,11 @@ DETECTION = ("Confocal", "SpectralDetection")
 #: The detector ``Type`` codes seen on the simulator, by the hardware info's name for them.
 DETECTOR_TYPES = {3: "PMT", 4: "HyD", 6: "SiPM"}
 
-#: Per detector, the ``DetectorHWInfo`` nodes read.
-DETECTOR_FIELDS = (
-    "Name",
-    "BeamRoute",
-    "IsActive",
-    "WaveLengthBegin",
-    "WaveLengthEnd",
-    "WaveLengthRangeMin",
-    "DyeName",
-    "HighVoltage",
-    "HighVoltageMin",
-    "HighVoltageMax",
-    "Offset",
-    "Type",
-    "CanDoPhotonCounting",
-)
+#: Per detector, what is fixed for a session (read once, with the layout).
+FIXED_DETECTOR_FIELDS = ("Name", "BeamRoute", "Type", "CanDoPhotonCounting", "WaveLengthRangeMin")
 
-#: What :func:`get_detectors` reads of each detector in use.
-ACTIVE_DETECTOR_FIELDS = (
-    "Name",
-    "BeamRoute",
+#: Per detector, what can change (read every time): whether it is in use, its band, dye, gain and offset.
+CHANGING_DETECTOR_FIELDS = (
     "WaveLengthBegin",
     "WaveLengthEnd",
     "DyeName",
@@ -599,14 +580,19 @@ ACTIVE_DETECTOR_FIELDS = (
     "HighVoltageMax",
     "Offset",
 )
-#: What :func:`get_detection_units` reads of every detector.
-INSTALLED_DETECTOR_FIELDS = ("Name", "BeamRoute", "Type", "CanDoPhotonCounting", "WaveLengthRangeMin")
 
 
 def detection_layout(nodes, node, kids):
-    """Per detector, every spectrophotometer's in order: the value node of each of :data:`DETECTOR_FIELDS`."""
+    """Per detector, every spectrophotometer's in order: its fixed fields read, the nodes of the rest.
+
+    ``{"fixed": {field: value}, "active": node, "changing": {field: node}}``.
+    """
     return [
-        {field: named(nodes, unit, field) for field in DETECTOR_FIELDS}
+        {
+            "fixed": {field: node_value(nodes, named(nodes, unit, field)) for field in FIXED_DETECTOR_FIELDS},
+            "active": named(nodes, unit, "IsActive"),
+            "changing": {field: named(nodes, unit, field) for field in CHANGING_DETECTOR_FIELDS},
+        }
         for spectrophotometer in of_name(nodes, kids, "Spectrophotometer")
         for unit in of_name(
             nodes,
@@ -614,14 +600,6 @@ def detection_layout(nodes, node, kids):
             "DetectorHWInfo",
         )
     ]
-
-
-def all_detectors(nodes, fields=DETECTOR_FIELDS, *, active_only=False):
-    """Every detector's *fields*, read; with *active_only* only those in use, whose flag is read first."""
-    units = layout(nodes, DETECTION, detection_layout)
-    if active_only:
-        units = [unit for unit in units if node_value(nodes, unit["IsActive"])]
-    return [{field: node_value(nodes, unit[field]) for field in fields} for unit in units]
 
 
 def get_detectors() -> list[dict]:
@@ -635,6 +613,11 @@ def get_detectors() -> list[dict]:
     """
 
     def reading(nodes):
+        in_use = [
+            unit["fixed"] | {field: node_value(nodes, value) for field, value in unit["changing"].items()}
+            for unit in layout(nodes, DETECTION, detection_layout)
+            if node_value(nodes, unit["active"])
+        ]
         return [
             {
                 "name": unit["Name"],
@@ -650,7 +633,7 @@ def get_detectors() -> list[dict]:
                 },
                 "offset": unit["Offset"],
             }
-            for unit in all_detectors(nodes, ACTIVE_DETECTOR_FIELDS, active_only=True)
+            for unit in in_use
         ]
 
     return read("the detectors", reading)
@@ -673,7 +656,7 @@ def get_detection_units() -> list[dict]:
                 "CanDoPhotonCounting": unit["CanDoPhotonCounting"],
                 "MinDetectionBandpassWidth": unit["WaveLengthRangeMin"],
             }
-            for unit in all_detectors(nodes, INSTALLED_DETECTOR_FIELDS)
+            for unit in (each["fixed"] for each in layout(nodes, DETECTION, detection_layout))
         ]
 
     return read("the detection units", reading)
@@ -686,7 +669,7 @@ MULTI_FUNCTION_PORT = 180
 
 
 def wheel_layout(nodes, node, kids):
-    """Per wheel (any child with a ``FilterWheelType``), its type and slot nodes and its filter name nodes."""
+    """Per wheel (any child with a ``FilterWheelType``): its type and filter names, read once, and its slot's node."""
     wheels = []
     for kid in kids:
         kind = child_named(nodes, kid, "FilterWheelType")
@@ -694,15 +677,31 @@ def wheel_layout(nodes, node, kids):
             continue
         wheels.append(
             {
-                "type": kind,
-                "slot": named(nodes, kid, "CurrentSlotPosition"),
+                "type": node_value(nodes, kind),
                 "names": [
-                    named(nodes, each, "FilterName")
+                    node_value(nodes, named(nodes, each, "FilterName"))
                     for each in of_name(nodes, children(nodes, kid), "Filter")
                 ],
+                "slot": named(nodes, kid, "CurrentSlotPosition"),
             }
         )
     return wheels
+
+
+def installed_filter_wheels():
+    """Every wheel's type and filter names, then the multi-function port's: fixed for a session."""
+
+    def reading(nodes):
+        return [{"type": w["type"], "names": w["names"]} for w in layout(nodes, FILTER_WHEELS, wheel_layout)]
+
+    port = session_facts("the multi-function port", {"names": (*HARDWARE, "MultiFunctionPortNameList")})
+    return read("the filter wheels", reading) + [
+        {"type": MULTI_FUNCTION_PORT, "names": list(port["names"] or ())}
+    ]
+
+
+def filter_in_path(names, slot):
+    return names[slot] if isinstance(slot, int) and 0 <= slot < len(names) else None
 
 
 def get_filter_wheels() -> list[dict]:
@@ -716,31 +715,20 @@ def get_filter_wheels() -> list[dict]:
     """
 
     def reading(nodes):
-        wheels = []
-        for wheel in layout(nodes, FILTER_WHEELS, wheel_layout):
-            names = [node_value(nodes, name) for name in wheel["names"]]
-            slot = node_value(nodes, wheel["slot"])
-            wheels.append(
-                {
-                    "type": node_value(nodes, wheel["type"]),
-                    "filterIndex": slot,
-                    "filterName": names[slot] if isinstance(slot, int) and 0 <= slot < len(names) else None,
-                    "filterNames": names,
-                }
-            )
-        port = node_value(nodes, node_at(nodes, (*HARDWARE, "CurrentMultiFunctionPortPos")))
-        port_names = list(node_value(nodes, node_at(nodes, (*HARDWARE, "MultiFunctionPortNameList"))) or ())
-        wheels.append(
-            {
-                "type": MULTI_FUNCTION_PORT,
-                "filterIndex": port,
-                "filterName": port_names[port] if isinstance(port, int) and 0 <= port < len(port_names) else None,
-                "filterNames": port_names,
-            }
-        )
-        return wheels
+        return [node_value(nodes, wheel["slot"]) for wheel in layout(nodes, FILTER_WHEELS, wheel_layout)] + [
+            node_value(nodes, node_at(nodes, (*HARDWARE, "CurrentMultiFunctionPortPos")))
+        ]
 
-    return read("the filter wheels", reading)
+    slots = read("the filter wheels", reading)
+    return [
+        {
+            "type": wheel["type"],
+            "filterIndex": slot,
+            "filterName": filter_in_path(wheel["names"], slot),
+            "filterNames": wheel["names"],
+        }
+        for wheel, slot in zip(installed_filter_wheels(), slots, strict=True)
+    ]
 
 
 def get_light_sources() -> list[dict]:
@@ -755,21 +743,13 @@ def get_light_sources() -> list[dict]:
     def reading(nodes):
         sources = []
         for source in layout(nodes, LIGHT_SOURCES, light_layout):
-            lasers = [tuple(node_value(nodes, part) for part in laser) for laser in source["lasers"]]
             lines = []
-            for _wavelength, index, _intensity in source["lines"]:
-                line_index = node_value(nodes, index)
-                name, low, high = laser_of_line(lasers, line_index)
+            for _wavelength, line_index, _intensity in source["lines"]:
+                name, low, high = laser_of_line(source["lasers"], line_index)
                 lines.append(
                     {"LaserName": name, "Index": line_index, "MinWavelength": low, "MaxWavelength": high}
                 )
-            sources.append(
-                {
-                    "name": node_value(nodes, source["name"]),
-                    "BeamRoute": beam_route(node_value(nodes, source["route"])),
-                    "LaserLines": lines,
-                }
-            )
+            sources.append({"name": source["name"], "BeamRoute": source["route"], "LaserLines": lines})
         return sources
 
     return read("the light sources", reading)
@@ -791,7 +771,7 @@ def get_base_fov() -> tuple[float, float]:
 
 def get_afc_installed() -> bool:
     """Whether the instrument has adaptive focus control, as the hardware info's ``Microscope.AfcInstalled``."""
-    return bool(settings("AFC", {"afc": ("Confocal", "ServiceOnlyParameter", "CanDoAFC")})["afc"])
+    return bool(session_facts("AFC", {"afc": ("Confocal", "ServiceOnlyParameter", "CanDoAFC")})["afc"])
 
 
 def ping() -> bool:
@@ -909,6 +889,6 @@ def get_hardware_info() -> dict:
         "LightSources": get_light_sources(),
         "LightSinks": list(sinks.values()),
         "FilterWheels": [
-            {"Type": wheel["type"], "FilterNames": wheel["filterNames"]} for wheel in get_filter_wheels()
+            {"Type": wheel["type"], "FilterNames": wheel["names"]} for wheel in installed_filter_wheels()
         ],
     }
