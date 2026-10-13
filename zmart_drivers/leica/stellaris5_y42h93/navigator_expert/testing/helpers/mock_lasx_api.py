@@ -394,6 +394,10 @@ class MockLasxClient:
         self._selected_job = "HiRes"
         self._stage_x = 0.05  # meters
         self._stage_y = 0.03  # meters
+        # Where each z drive truly is (um). LAS X's job settings stop refreshing
+        # the drive that carries a job's z-stack; its hardware server's state
+        # tree reports the drives themselves, so moves update this always.
+        self._hardware_z_um = {"z-galvo": 0.0, "z-wide": 0.0}
         self._scan_status = "eScanIdle"
         self._scan_busy_until = 0.0
         # Command-initiated scans guarantee this many observed "scanning"
@@ -888,6 +892,10 @@ class MockLasxClient:
         # carries the job's z-stack (``stack.mode``). The mock does the same,
         # so a readback of that drive has to go through the saved experiment
         # here too, as on the instrument.
+        if z_key in ("galvo", "both"):
+            self._hardware_z_um["z-galvo"] = z_um
+        if z_key in ("zwide", "both"):
+            self._hardware_z_um["z-wide"] = z_um
         frozen = (job.get("stack") or {}).get("mode")
         if z_key == "galvo" and frozen != "z-galvo":
             job["zPosition"]["z-galvo"]["position"] = z_um

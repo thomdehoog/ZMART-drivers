@@ -64,6 +64,27 @@ def pytest_report_header(config):
 
 
 @pytest.fixture(autouse=True)
+def _no_hardware_server(monkeypatch):
+    """Make LAS X's hardware server unreachable for every test.
+
+    The suite runs on microscope PCs with LAS X open, where the real
+    ``LCS.EXE`` would answer and a test would read the instrument's z.
+    Tests that need the server hand in a stand-in through ``attach``.
+    """
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface import (
+        hardware_server,
+    )
+
+    def unreachable():
+        raise hardware_server.HardwareServerUnavailable("no hardware server in the test suite")
+
+    monkeypatch.setattr(hardware_server, "attach", unreachable)
+    hardware_server.forget_connection()
+    yield
+    hardware_server.forget_connection()
+
+
+@pytest.fixture(autouse=True)
 def _clean_limits_gate():
     """Empty the commands-layer limits-gate registry around every test.
 
