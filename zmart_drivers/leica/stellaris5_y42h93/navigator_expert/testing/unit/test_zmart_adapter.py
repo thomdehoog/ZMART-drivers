@@ -897,6 +897,29 @@ class TestAcquire(unittest.TestCase):
         self.assertEqual(calls["save"]["source"], "cache")
         self.assertIs(calls["save"]["cleanup_source"], True)
 
+    def test_a_capture_that_will_be_released_has_the_canvas_shown_first(self):
+        """The canvas is shown while LAS X is idle, before the capture, so the release can clear it after."""
+        h = _handle()
+        h.driven_to = {"x": 0.0, "y": 0.0, "z": 0.0, "z_wide_um": 0.0}
+        order = []
+        releasing = replace(adapter.IMAGE_SAVE, source="cache", cleanup_source=True)
+        with (
+            patch.object(adapter, "IMAGE_SAVE", releasing),
+            self._capturing(),
+            patch.object(adapter._release, "prepare", lambda: order.append("canvas shown")),
+            patch.object(adapter._capture, "acquire", lambda c, j, **k: order.append("captured") or _a_capture(j)),
+        ):
+            adapter.acquire(h, position_label="A1")
+        self.assertEqual(order, ["canvas shown", "captured"])
+
+    def test_a_capture_that_is_kept_leaves_the_screen_alone(self):
+        h = _handle()
+        h.driven_to = {"x": 0.0, "y": 0.0, "z": 0.0, "z_wide_um": 0.0}
+        prepared = []
+        with self._capturing(), patch.object(adapter._release, "prepare", lambda: prepared.append(1)):
+            adapter.acquire(h, position_label="A1")
+        self.assertEqual(prepared, [])
+
     def test_the_profile_lets_go_only_of_what_it_read_from_the_cache(self):
         """AutoSave's files are LAS X's project; letting go of them is refused when the profile is made."""
         with self.assertRaisesRegex(ValueError, "cleanup_source.*cache"):

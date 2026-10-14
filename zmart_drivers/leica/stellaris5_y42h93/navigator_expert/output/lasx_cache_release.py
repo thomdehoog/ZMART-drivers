@@ -33,8 +33,10 @@ Every capture also leaves a hidden copy, ``TileScan <n>`` (the pixels again,
 a zoom pyramid and a histogram: about twice a 512 x 512 capture's pixels),
 which the Navigator canvas holds while it shows the capture's tile. So the
 release also clears the canvas (``vendor_interface.lasx_navigator``), which
-lets go of the hidden copies too (simulator, 2026-10-14). A canvas that
-cannot be cleared is logged; the picture is released all the same.
+lets go of the hidden copies too (simulator, 2026-10-14). The canvas can be
+cleared only while LAS X shows it, so :func:`prepare` shows it before the
+capture, while LAS X is idle. A canvas that cannot be shown or cleared is
+logged; the capture is taken and released all the same.
 """
 
 from __future__ import annotations
@@ -45,6 +47,15 @@ from ..vendor_interface import lasx_navigator
 from ..vendor_interface.data_container import connected_data_container
 
 log = logging.getLogger(__name__)
+
+
+def prepare() -> None:
+    """Show the Navigator canvas before a capture that will be released, so that its Clear can be pressed after."""
+    try:
+        if lasx_navigator.show_canvas():
+            log.info("Navigator Expert's Experiment tab shown, so the canvas can be cleared after the capture")
+    except lasx_navigator.NavigatorUnavailable as why:
+        log.warning("the Navigator canvas could not be shown, so this capture's hidden copy may stay in LAS X's cache: %s", why)
 
 
 def delete(number: int, name: str) -> None:

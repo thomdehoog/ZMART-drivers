@@ -94,6 +94,7 @@ from ..configuration import store as _machine
 from ..dispatcher import gate as _gate
 from ..dispatcher import read as _readers
 from ..output import command_log as _log
+from ..output import lasx_cache_release as _release
 from ..output import lasx_native_autosave as _native
 from ..output import save as _save
 from ..output.naming import Naming, free_stem, run_hash
@@ -1033,6 +1034,8 @@ def acquire(
         settled = steps["backlash"] = _motion.correct_backlash(handle.client, passes=backlash_rounds)
         if not settled.get("confirmed"):
             _note_unconfirmed(handle, "acquire: backlash takeup", settled)
+    if IMAGE_SAVE.cleanup_source:
+        _release.prepare()
 
     acq = _capture.acquire(handle.client, job)
 

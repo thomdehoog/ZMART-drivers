@@ -7,6 +7,24 @@ import pytest
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.output import lasx_cache_release as release
 
 
+class TestPreparing:
+    """Before a capture that will be released, the canvas is shown, so that the release can clear it."""
+
+    def test_the_canvas_is_shown(self, monkeypatch):
+        shown = []
+        monkeypatch.setattr(release.lasx_navigator, "show_canvas", lambda: shown.append(1) or True)
+        release.prepare()
+        assert shown == [1]
+
+    def test_a_canvas_that_cannot_be_shown_is_logged_and_the_capture_goes_ahead(self, monkeypatch, caplog):
+        def unavailable():
+            raise release.lasx_navigator.NavigatorUnavailable("Navigator Expert's Experiment button was not found")
+
+        monkeypatch.setattr(release.lasx_navigator, "show_canvas", unavailable)
+        release.prepare()
+        assert "Experiment button was not found" in caplog.text
+
+
 class TestDeleting:
     @pytest.fixture(autouse=True)
     def canvas(self, monkeypatch):

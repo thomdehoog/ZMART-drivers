@@ -14,9 +14,8 @@ the LAS X simulator (14 October 2026), never yet on the microscope:
 - **The cache release also clears the Navigator canvas.** Every capture leaves a hidden copy
   in LAS X's cache (`TileScan <n>`, 1.3 to 2 times the capture's pixels), held by the Navigator
   canvas. Releasing a capture (`cleanup_source`) now also presses the canvas's Clear button,
-  which lets go of all of them. This only works while LAS X shows the Navigator. With another
-  view shown, the capture is still released and the run keeps its speed, but the hidden copies stay
-  until the canvas is cleared. Releasing is set in the driver's profile (`IMAGE_SAVE`) and stays
+  which lets go of all of them. Clear works only while LAS X shows the canvas (Navigator Expert's
+  Experiment tab), so before each capture the driver shows that tab when another one is shown. Releasing is set in the driver's profile (`IMAGE_SAVE`) and stays
   off until this session has passed; the check scripts below switch it on for their own run.
 - **Saving the experiment waits for the `.lrp` itself**, the file the driver reads the job's
   z-stack from.
@@ -37,23 +36,32 @@ stage already stands.
 3. **The data location** must be set up
    (`configuration/data_location/notebooks/set_data_location.ipynb`), as for
    [`SCOPE_CHECK_CACHE_ROUTE.md`](SCOPE_CHECK_CACHE_ROUTE.md).
-4. **In LAS X:** Navigator Expert open, with **the Navigator view shown**. AutoSave on, into a
-   project of its own.
+4. **In LAS X:** Navigator Expert open on its **Experiment** tab, which shows the Navigator
+   canvas with its Clear button (not the Jobs tab). **AutoSave off**: the cache route is used
+   without it, and steps 1 and 5 check that it is off. Only step 4 switches it on.
 5. **A folder for the reports**, for example `D:\ZMART-check`. Run every command from it, in
    the driver's environment. `<driver>` stands for
    `ZMART-drivers\zmart_drivers\leica\stellaris5_y42h93\navigator_expert`.
 
 ---
 
-## Step 1. The quick acceptance (about 5 minutes)
+## Step 1. The CI against the microscope
 
 ```
 python <driver>\testing\run_ci.py --hardware
 ```
 
+It runs the installed driver, a move and a capture, every reversible setting through the direct
+readers, one capture saved from LAS X's cache and checked, and ten captures let go of from the
+cache with the Navigator canvas cleared, all with AutoSave off. Before each capture the driver
+shows Navigator Expert's Experiment tab by itself, when another tab is shown.
+Add `--job <name>` when the job to capture is not called HiRes.
+
 **Look at:**
 
-- Everything is green.
+- Everything is green. If a cache step fails with "AutoSave is on", switch AutoSave off; if
+  the last step fails with "Experiment button was not found", open Navigator Expert; then run
+  again.
 - The first lines: if they say the machine's `limits.json` "did not validate", the session runs on
   the bundled default limits. Note it; the limits are then published again with
   `configuration/limits/notebooks/set_limits.ipynb`.
@@ -106,7 +114,9 @@ note what was printed.
 
 ## Step 4. Saving straight from the cache (as planned)
 
-Tests 1 to 8 of [`SCOPE_CHECK_CACHE_ROUTE.md`](SCOPE_CHECK_CACHE_ROUTE.md), unchanged.
+Tests 1 to 8 of [`SCOPE_CHECK_CACHE_ROUTE.md`](SCOPE_CHECK_CACHE_ROUTE.md), unchanged. These
+compare each capture with AutoSave's file, so **switch AutoSave on** for them, into a project
+of its own; test 6 switches it off again. Leave it off for step 5.
 
 For a job with a z-stack (tests 3 and 4), the driver reads the stack's z position from the
 experiment it saves, which is the `.lrp` save fix. **Look at:** the output must not contain
@@ -115,10 +125,10 @@ available`.
 
 ## Step 5. Letting go of the cache over many captures (about 5 minutes)
 
-With **the Navigator view shown** in LAS X the whole time:
+With AutoSave off:
 
 ```
-python <driver>\testing\hardware\check_cache_release.py --job HiRes --captures 50 --label hires-50
+python <driver>\testing\hardware\check_cache_release.py --job HiRes --captures 50 --label hires-50 --autosave-off
 ```
 
 Every ten captures it prints how much LAS X's cache grew: in total, the hidden copies, and the
@@ -129,16 +139,16 @@ rest. **Look at:**
 - The hidden copies stay near +0 MB. On the simulator, about 0.2 MB of descriptions per capture
   stays in the cache while LAS X's window holds it; compare the `rest` per capture with that.
 
-Then once with **another view shown** in LAS X (not the Navigator):
+Then once starting from **the Jobs tab** in Navigator Expert:
 
 ```
-python <driver>\testing\hardware\check_cache_release.py --job HiRes --captures 10 --label navigator-hidden
+python <driver>\testing\hardware\check_cache_release.py --job HiRes --captures 10 --label from-jobs-tab --autosave-off
 ```
 
-This one should fail: `FAILED: the canvas cleared at every release`, the hidden copies grow by
-about one capture's size each time, and the reason says the Navigator was not found. The
-captures themselves are saved all the same. Press Clear in the Navigator afterwards to let go
-of them.
+At the first capture the screen switches to the Experiment tab by itself (it did so cleanly on
+the simulator), and the run passes like the first. If it says `FAILED: the canvas cleared at
+every release`, note what the screen showed and what the output says after "could not be
+shown".
 
 ---
 
@@ -148,6 +158,6 @@ of them.
 - `readers.md` and `readers-other.md` from step 2
 - what step 3 printed, and the warning you used
 - the `check_cache_route_*.json` reports (step 4)
-- `check_cache_release_hires-50.json` and `check_cache_release_navigator-hidden.json` (step 5)
+- `check_cache_release_hires-50.json` and `check_cache_release_from-jobs-tab.json` (step 5)
 
 If all of it passes, the branch is ready to go to `release-candidate`.
