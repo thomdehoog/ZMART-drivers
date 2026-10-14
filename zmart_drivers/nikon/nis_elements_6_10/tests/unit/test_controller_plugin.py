@@ -89,7 +89,7 @@ def test_set_xyz_answers_exactly_what_get_xyz_answers(instrument):
 
     assert moved == read
     for axis in ("x", "y", "z"):
-        assert list(moved[axis]) == ["position", "unit", "actuators", "canvas"]
+        assert list(moved[axis]) == ["position", "unit", "actuator", "actuators", "canvas"]
         assert moved[axis]["unit"] == "micrometer"
     assert moved["x"]["position"] == pytest.approx(100.0)
     assert moved["y"]["position"] == pytest.approx(-50.0)
@@ -125,4 +125,4 @@ def test_get_info_describes_the_microscope_in_plain_words(instrument):
         assert f"{objective['position']}: {objective['name']}" in description
     # The canvas is the travel NIS-Elements reports; see the adapter's _canvas.
     assert xyz["x"]["canvas"][1] == pytest.approx(57000.0)
-    assert list(xyz["x"]) == ["position", "unit", "actuators", "canvas"]
+    assert list(xyz["x"]) == ["position", "unit", "actuator", "actuators", "canvas"]

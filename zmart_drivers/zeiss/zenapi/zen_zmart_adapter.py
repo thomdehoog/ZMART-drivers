@@ -274,9 +274,9 @@ def _user_xyz(handle: ZenHandle, raw: dict) -> dict[str, float]:
 
 
 def get_actuators(handle: ZenHandle) -> dict:
-    """The actuator options each axis offers: one motor per axis under ZEN."""
+    """The actuator options each axis offers: one motor per axis under ZEN, which is also the default."""
     _require_open(handle)
-    return {axis: list(opts) for axis, opts in _ACTUATORS.items()}
+    return {axis: {"options": list(opts), "default": opts[0]} for axis, opts in _ACTUATORS.items()}
 
 
 def _resolve_actuators(with_actuators: dict | None) -> dict[str, str]:
@@ -307,7 +307,8 @@ def get_xyz(handle: ZenHandle, *, with_actuators: dict | None = None) -> dict:
     coordinates, so the origin is *not* subtracted there; under ZEN each
     axis has the one motor ``motoric``, so the two numbers differ by the
     origin alone. ``with_actuators`` only checks that the motors named exist;
-    the answer always reports all of them.
+    ``actuator`` says which motor this answer used, and ``actuators`` always
+    reports all of them.
 
     The ``canvas`` is everywhere a picture can show on that axis, ``[min,
     max]`` from the origin. For this driver it is the travel itself: this
@@ -318,13 +319,14 @@ def get_xyz(handle: ZenHandle, *, with_actuators: dict | None = None) -> dict:
     report, so the driver cannot widen the canvas by them.
     """
     _require_open(handle)
-    _resolve_actuators(with_actuators)
+    chosen = _resolve_actuators(with_actuators)
     raw = _raw_xyz(handle.client)
     user = _user_xyz(handle, raw)
     return {
         axis: {
             "position": user[axis],
             "unit": UNIT,
+            "actuator": chosen[axis],
             "actuators": {motor: raw[axis] for motor in _ACTUATORS[axis]},
             "canvas": [
                 handle.limits[axis]["min"] - handle.origin[axis],
@@ -524,18 +526,27 @@ def get_acquisition_settings(handle: ZenHandle) -> dict:
     ``experiment`` chooses the ZEN experiment (the imaging settings), ``mode``
     a single snap or the whole experiment, ``copy_to_output_root`` whether the
     CZI is copied from ZEN's image folder into ``<output_root>/data/``.
+
+    Not yet as controller 0.3.0 intends: these settings still mix how to
+    capture with what is state (a z-stack, the imaging settings) and with how
+    to save. Each says its ``default``, which is the value it starts at.
     """
     _require_open(handle)
+    experiments = _safe(_readers.get_available_experiments, handle.client, default=[])
+    experiment = handle.experiment.name if handle.experiment else None
     return {
-        "folder": {"options": "any text; empty saves straight into data", "active": ""},
+        "folder": {"options": "any text; empty saves straight into data", "default": "", "active": ""},
         "experiment": {
-            "options": _safe(_readers.get_available_experiments, handle.client, default=[]),
-            "active": handle.experiment.name if handle.experiment else None,
+            "options": f"one of the ZEN experiments: {', '.join(experiments) or 'none found'}",
+            "default": experiment,
+            "active": experiment,
         },
-        "mode": {"options": ["snap", "experiment"], "active": "snap"},
-        "format": {"options": ["czi"], "active": "czi"},
-        "copy_to_output_root": {"options": [True, False], "active": True},
-        "timeout_s": {"options": "float > 0 (wait for the CZI to be complete)", "active": 60.0},
+        "mode": {"options": ["snap", "experiment"], "default": "snap", "active": "snap"},
+        "format": {"options": ["czi"], "default": "czi", "active": "czi"},
+        "copy_to_output_root": {"options": [True, False], "default": True, "active": True},
+        "timeout_s": {
+            "options": "float > 0 (wait for the CZI to be complete)", "default": 60.0, "active": 60.0,
+        },
     }
 
 

@@ -46,7 +46,7 @@ def test_get_xyz_answers_position_unit_actuators_and_canvas(handle, fake_api):
     xyz = adapter.get_xyz(handle)
     assert set(xyz) == {"x", "y", "z"}
     for axis in ("x", "y", "z"):
-        assert list(xyz[axis]) == ["position", "unit", "actuators", "canvas"]
+        assert list(xyz[axis]) == ["position", "unit", "actuator", "actuators", "canvas"]
         assert xyz[axis]["unit"] == "micrometer"
     # Without an origin the frame is the raw stage frame, and every motor's
     # reading is the stage's own number: the fake starts with a piezo at 50 um.

@@ -16,9 +16,9 @@ def handle(connection):
 
 def test_piezo_is_a_second_z_actuator(handle, fake_api):
     assert adapter.get_actuators(handle) == {
-        "x": ["motoric"],
-        "y": ["motoric"],
-        "z": ["motoric", "piezo"],
+        "x": {"options": ["motoric"], "default": "motoric"},
+        "y": {"options": ["motoric"], "default": "motoric"},
+        "z": {"options": ["motoric", "piezo"], "default": "motoric"},
     }
     adapter.set_origin(handle)  # focus origin = 500.0, piezo origin = 50.0
     rec = adapter.set_xyz(handle, 10, 0, 7, with_actuators={"z": "piezo"})
@@ -26,7 +26,7 @@ def test_piezo_is_a_second_z_actuator(handle, fake_api):
     assert fake_api.piezo_z == pytest.approx(57.0) and fake_api.position["z"] == 500.0
     # The answer is what get_xyz answers: the height in the frame, whichever
     # motor moved it, and every motor's own raw reading beside it.
-    assert rec == adapter.get_xyz(handle)
+    assert rec == adapter.get_xyz(handle, with_actuators={"z": "piezo"})
     assert rec["z"]["position"] == pytest.approx(7.0)
     assert rec["z"]["actuators"] == {"motoric": 500.0, "piezo": pytest.approx(57.0)}
     # Asking which motor to read changes nothing in the answer.
@@ -52,7 +52,7 @@ def test_the_focus_drive_leaves_room_for_the_piezo(handle, fake_api):
 def test_no_piezo_means_no_piezo_actuator(connection, fake_api):
     fake_api.has_piezo = False
     h = adapter.connect(connection)
-    assert adapter.get_actuators(h)["z"] == ["motoric"]
+    assert adapter.get_actuators(h)["z"] == {"options": ["motoric"], "default": "motoric"}
     with pytest.raises(ValueError, match="unknown actuator"):
         adapter.get_xyz(h, with_actuators={"z": "piezo"})
     adapter.disconnect(h)

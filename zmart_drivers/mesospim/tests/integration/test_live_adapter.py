@@ -70,13 +70,13 @@ def test_info_and_actuators(session):
     assert info["server"]["app"] == "mesoSPIM-control"
     actuators = session.get_actuators()["content"]
     assert set(actuators) == {"x", "y", "z"}
-    assert actuators["x"] == ["motoric"]
+    assert actuators["x"] == {"options": ["motoric"], "default": "motoric"}
 
 
 def test_get_xyz_and_state_shape(session):
     xyz = session.get_xyz()["content"]
     for axis in ("x", "y", "z"):
-        assert list(xyz[axis]) == ["position", "unit", "actuators", "canvas"]
+        assert list(xyz[axis]) == ["position", "unit", "actuator", "actuators", "canvas"]
         assert isinstance(xyz[axis]["position"], (int, float))
         assert xyz[axis]["unit"] == "micrometer"
         # One motor per axis, reporting the stage's own number.
@@ -108,7 +108,7 @@ def test_set_xyz_zero_net_motion_confirms(session):
     result = answer["content"]
     for axis, asked in zip(("x", "y", "z"), (x, y, z)):
         assert result[axis]["position"] == pytest.approx(asked, abs=1.0)
-        assert list(result[axis]) == ["position", "unit", "actuators", "canvas"]
+        assert list(result[axis]) == ["position", "unit", "actuator", "actuators", "canvas"]
 
 
 @pytest.mark.skipif(

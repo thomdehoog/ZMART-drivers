@@ -82,7 +82,7 @@ def test_set_xyz_answers_the_position_read_back(instrument):
     # set_xyz answers exactly what get_xyz answers, read from the microscope.
     assert moved == read
     for axis, expected in (("x", 10.0), ("y", 20.0), ("z", 5.0)):
-        assert list(moved[axis]) == ["position", "unit", "actuators", "canvas"]
+        assert list(moved[axis]) == ["position", "unit", "actuator", "actuators", "canvas"]
         assert moved[axis]["position"] == pytest.approx(expected)
         assert moved[axis]["unit"] == "micrometer"
         # No origin is saved, so the motor's own reading equals the position.
@@ -118,4 +118,4 @@ def test_get_info_describes_the_microscope_in_plain_words(instrument):
     # the frame is the stage itself.
     # The canvas is the travel itself; see the adapter's get_xyz for why.
     assert xyz["x"]["canvas"] == [-60000.0, 60000.0]
-    assert list(xyz["x"]) == ["position", "unit", "actuators", "canvas"]
+    assert list(xyz["x"]) == ["position", "unit", "actuator", "actuators", "canvas"]

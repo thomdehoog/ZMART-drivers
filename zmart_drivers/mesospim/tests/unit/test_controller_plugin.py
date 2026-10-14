@@ -115,4 +115,4 @@ def test_get_info_describes_the_microscope_in_plain_words(instrument):
     assert xyz["x"]["canvas"] == pytest.approx([-half_field, 25000.0 + half_field])
     assert xyz["z"]["canvas"] == pytest.approx([0.0, 25000.0])
     # Each axis carries the four entries the controller fixes, in this order.
-    assert list(xyz["x"]) == ["position", "unit", "actuators", "canvas"]
+    assert list(xyz["x"]) == ["position", "unit", "actuator", "actuators", "canvas"]

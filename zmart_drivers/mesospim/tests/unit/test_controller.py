@@ -43,11 +43,7 @@ def test_context_names_the_driver(session):
 
 
 def test_actuators_and_origin(session):
-    assert session.get_actuators()["content"] == {
-        "x": ["motoric"],
-        "y": ["motoric"],
-        "z": ["motoric"],
-    }
+    assert session.get_actuators()["content"] == {"x": {"options": ["motoric"], "default": "motoric"}, "y": {"options": ["motoric"], "default": "motoric"}, "z": {"options": ["motoric"], "default": "motoric"}}
     # The origin is driver setup, so it is set on the driver handle directly.
     out = adapter.set_origin(session._handle)
     assert "origin" in out
@@ -75,7 +71,7 @@ def test_set_xyz_answers_like_get_xyz(session):
     moved = session.set_xyz(10, 20, 5)["content"]
     assert moved == session.get_xyz()["content"]
     for axis, expected in (("x", 10.0), ("y", 20.0), ("z", 5.0)):
-        assert list(moved[axis]) == ["position", "unit", "actuators", "canvas"]
+        assert list(moved[axis]) == ["position", "unit", "actuator", "actuators", "canvas"]
         assert moved[axis]["position"] == expected
         assert moved[axis]["unit"] == "micrometer"
         assert moved[axis]["actuators"] == {"motoric": expected}  # origin is still 0 here

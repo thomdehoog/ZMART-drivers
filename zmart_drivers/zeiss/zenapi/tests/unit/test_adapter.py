@@ -65,7 +65,7 @@ def test_get_xyz_answers_position_unit_actuators_and_canvas(handle, scope_box):
     xyz = adapter.get_xyz(handle)
     assert set(xyz) == {"x", "y", "z"}
     for axis in ("x", "y", "z"):
-        assert list(xyz[axis]) == ["position", "unit", "actuators", "canvas"]
+        assert list(xyz[axis]) == ["position", "unit", "actuator", "actuators", "canvas"]
         assert xyz[axis]["unit"] == "micrometer"
     # ZEN speaks metres on the wire; the answer is in micrometres throughout.
     assert xyz["x"]["position"] == pytest.approx(1000.0)

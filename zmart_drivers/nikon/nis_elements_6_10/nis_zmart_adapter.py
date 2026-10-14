@@ -283,9 +283,14 @@ def get_actuators(handle: NisHandle) -> dict:
     X and Y are always the motorised stage. Z offers ``"motoric"`` (the
     microscope's focus drive) and, when NIS reports a piezo insert,
     ``"piezo"`` as well. The list is read at connect and kept on the handle.
+    The default, used when a command does not choose, is the first: the
+    focus drive for z.
     """
     _require_open(handle)
-    return {axis: list(opts) for axis, opts in handle.actuators.items()}
+    return {
+        axis: {"options": list(opts), "default": opts[0]}
+        for axis, opts in handle.actuators.items()
+    }
 
 
 def _resolve_actuators(handle: NisHandle, with_actuators: dict | None) -> dict[str, str]:
@@ -327,18 +332,19 @@ def get_xyz(handle: NisHandle, *, with_actuators: dict | None = None) -> dict:
     piezo share the height. ``canvas`` is everywhere a picture can show on
     that axis; see :func:`_canvas`.
 
-    ``with_actuators`` only checks that the motors it names exist, so that an
-    unknown name is refused with a ``ValueError`` here as well as in
-    ``set_xyz``; the answer always reports all motors.
+    ``with_actuators`` names the motor per axis; an unknown name is refused
+    with a ``ValueError`` here as well as in ``set_xyz``. ``actuator`` says
+    which motor this answer used; ``actuators`` always reports all of them.
     """
     _require_open(handle)
-    _resolve_actuators(handle, with_actuators)
+    chosen = _resolve_actuators(handle, with_actuators)
     readings = _readings(handle)
     position = _frame_xyz(handle, readings)
     return {
         axis: {
             "position": position[axis],
             "unit": UNIT,
+            "actuator": chosen[axis],
             "actuators": dict(readings[axis]),
             "canvas": _canvas(handle, axis, position[axis]),
         }
@@ -542,20 +548,26 @@ def get_acquisition_settings(handle: NisHandle) -> dict:
     ``z_end`` turn the acquisition into a Z-stack: give both, and ``z_step``
     sets the spacing. They are in the same frame as ``set_xyz`` (um from the
     origin) and must lie inside the stage limits.
+
+    Not yet as controller 0.3.0 intends: these settings still mix how to
+    capture with what is state (a z-stack, the imaging settings) and with how
+    to save. Each says its ``default``, which is the value it starts at.
     """
     _require_open(handle)
+    exposure_ms = _readers.get_exposure_ms(handle.client)
     return {
-        "folder": {"options": "any text; empty saves straight into data", "active": ""},
-        "format": {"options": list(_cmd.SAVE_FORMATS), "active": "tif"},
+        "folder": {"options": "any text; empty saves straight into data", "default": "", "active": ""},
+        "format": {"options": list(_cmd.SAVE_FORMATS), "default": "tif", "active": "tif"},
         "optical_configuration": {
-            "options": _readers.get_optical_configurations(handle.client),
+            "options": "one of the optical_configurations get_state lists; empty keeps the current one",
+            "default": None,
             "active": None,
         },
-        "exposure_ms": {"options": "float > 0", "active": _readers.get_exposure_ms(handle.client)},
-        "close_after_save": {"options": [True, False], "active": True},
-        "z_start": {"options": "float um (stack only)", "active": None},
-        "z_end": {"options": "float um (stack only)", "active": None},
-        "z_step": {"options": "float um (stack only)", "active": 1.0},
+        "exposure_ms": {"options": "float > 0", "default": exposure_ms, "active": exposure_ms},
+        "close_after_save": {"options": [True, False], "default": True, "active": True},
+        "z_start": {"options": "float um (stack only)", "default": None, "active": None},
+        "z_end": {"options": "float um (stack only)", "default": None, "active": None},
+        "z_step": {"options": "float um (stack only)", "default": 1.0, "active": 1.0},
     }
 
 

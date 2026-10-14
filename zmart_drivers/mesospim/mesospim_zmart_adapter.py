@@ -348,12 +348,12 @@ def _user_xyz(handle: MesospimHandle, pos: dict) -> dict[str, float]:
 
 
 def get_actuators(handle: MesospimHandle) -> dict:
-    """The motors that can move each axis: ``{"x": ["motoric"], "y": ["motoric"], "z": ["motoric"]}``.
+    """The motors that can move each axis, and the default: ``{"x": {"options": ["motoric"], "default": "motoric"}, ...}``.
 
     A mesoSPIM has one motor per linear axis, so there is nothing to choose
     between; the names here are the ones ``get_xyz`` reports a reading for.
     """
-    return {axis: list(opts) for axis, opts in _ACTUATORS.items()}
+    return {axis: {"options": list(opts), "default": opts[0]} for axis, opts in _ACTUATORS.items()}
 
 
 def _validate_actuators(with_actuators: dict | None) -> None:
@@ -371,12 +371,13 @@ def _validate_actuators(with_actuators: dict | None) -> None:
 def get_xyz(handle: MesospimHandle, *, with_actuators: dict | None = None) -> dict:
     """Where the stage is: one entry each for ``x``, ``y`` and ``z``.
 
-    Every axis carries the same four entries, and every number in them is in
+    Every axis carries the same five entries, and every number in them is in
     micrometres:
 
     - ``position``: where the axis is, measured from the origin saved with
       :func:`set_origin` (plain stage coordinates until one is saved).
     - ``unit``: always ``"micrometer"``.
+    - ``actuator``: the motor this answer used, always ``"motoric"``.
     - ``actuators``: each motor of the axis with its own reading, exactly as
       mesoSPIM reports it. The origin is not subtracted here, so these are the
       stage's own numbers. A mesoSPIM has one motor per axis, so this is always
@@ -395,6 +396,7 @@ def get_xyz(handle: MesospimHandle, *, with_actuators: dict | None = None) -> di
         axis: {
             "position": user[axis],
             "unit": _UNIT,
+            "actuator": _ACTUATORS[axis][0],
             "actuators": {motor: raw[axis] for motor in _ACTUATORS[axis]},
             "canvas": _canvas(handle, axis, user[axis]),
         }
@@ -560,19 +562,29 @@ def run_procedure(handle: MesospimHandle, procedure: dict) -> dict:
 
 
 def get_acquisition_settings(handle: MesospimHandle) -> dict:
-    """The acquisition and saving settings this instrument offers, with the active value of each."""
+    """The acquisition and saving settings this instrument offers, with the default and active value of each.
+
+    Not yet as controller 0.3.0 intends: these settings still mix how to
+    capture with what is state (a z-stack, the imaging settings) and with how
+    to save. Each says its ``default``, which is the value it starts at.
+    """
     zooms = [name for name, _px in HARDWARE.zoom_pixel_size_um]
     return {
-        "folder": {"options": "any text; empty saves straight into data", "active": ""},
-        "format": {"options": list(ACQUISITION.formats), "active": ACQUISITION.save_format},
-        "backlash_correction": {"options": [True, False], "active": True},
+        "folder": {"options": "any text; empty saves straight into data", "default": "", "active": ""},
+        "format": {
+            "options": list(ACQUISITION.formats),
+            "default": ACQUISITION.save_format,
+            "active": ACQUISITION.save_format,
+        },
+        "backlash_correction": {"options": [True, False], "default": True, "active": True},
         "shutterconfig": {
             "options": list(HARDWARE.shutter_configs),
+            "default": ACQUISITION.default_shutterconfig,
             "active": ACQUISITION.default_shutterconfig,
         },
-        "zoom": {"options": zooms, "active": ACQUISITION.default_zoom},
-        "planes": {"options": "int >= 1", "active": 1},
-        "z_step": {"options": "float um", "active": 1.0},
+        "zoom": {"options": zooms, "default": ACQUISITION.default_zoom, "active": ACQUISITION.default_zoom},
+        "planes": {"options": "int >= 1", "default": 1, "active": 1},
+        "z_step": {"options": "float um", "default": 1.0, "active": 1.0},
     }
 
 
