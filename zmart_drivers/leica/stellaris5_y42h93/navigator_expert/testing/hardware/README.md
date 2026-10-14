@@ -39,16 +39,28 @@ ready.
 3. **The adapter round-trip** (`validate_zmart_adapter.py`): first the
    four-axis CI baseline, then `set_origin` and `set_xyz`, the state
    round-trip, and an acquire through LAS X native AutoSave.
-4. **The end-to-end validator in the hybrid reader route**
+4. **The end-to-end validator in the direct reader route**
    (`validate_hardware.py`): every reversible setting, the XY pattern, the
-   z-galvo round-trip, and an acquire. Hybrid is the production route, so
-   this step is fatal.
+   z-galvo round-trip, and an acquire. Direct is the driver's default
+   reader route, so this step is fatal.
+5. **Saving from LAS X's cache** (`check_cache_route.py`): one capture of
+   the job (`--job`, default HiRes) saved as one OME-Zarr store and checked,
+   with LAS X's AutoSave off, as the cache route is used; with AutoSave on
+   this step fails and says so. (Run by hand with AutoSave on, the script
+   also compares the store with AutoSave's file, pixel by pixel.)
+6. **Letting go of LAS X's cache** (`check_cache_release.py`): ten captures,
+   AutoSave off, each released once saved, the Navigator canvas cleared after each. Before
+   each capture the driver shows Navigator Expert's Experiment tab, where the
+   canvas is, when another tab is shown.
+
+The captures of steps 5 and 6 go under the reports folder, so the run needs
+no data location.
 
 **`--hardware --full`** adds the diagnostics, once per release or after a
 change to the readers: the passive reader probe (api / log / hybrid), the
 side-by-side reader parity check, and the end-to-end validator through the
-api and log routes as well. Those two routes stay diagnostic: they document
-bench-specific reader disagreements without failing the run.
+api, log and hybrid routes as well. Those routes stay diagnostic: they
+document bench-specific reader disagreements without failing the run.
 
 Hardware validation uses only production driver modules, nothing under
 `experimental/`.

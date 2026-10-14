@@ -20,7 +20,8 @@ capture stays in LAS X's cache. Then it checks and reports:
 
 It never edits a LAS X file: it selects the job, moves the stage to where
 it already stands (so every plane gets its canvas position), and captures.
-A report is written where the script is run, as ``check_cache_route_<label>.json``.
+A report is written where the script is run (or to ``--report-dir``), as
+``check_cache_route_<label>.json``.
 
 Usage, in the driver's environment on the microscope PC::
 
@@ -49,6 +50,12 @@ def main() -> int:
     parser.add_argument("--job", required=True, help="the LAS X job to capture")
     parser.add_argument("--label", required=True, help="a name for this check, e.g. hires-16bit")
     parser.add_argument("--save-to", default=None, help="a folder instead of the set-up data location")
+    parser.add_argument("--report-dir", default=".", help="where the report is written (default: here)")
+    parser.add_argument(
+        "--autosave-off",
+        action="store_true",
+        help="capture only when LAS X's AutoSave is off, the way the cache route is used",
+    )
     asked = parser.parse_args()
 
     import tifffile
@@ -61,13 +68,22 @@ def main() -> int:
 
     report: dict = {"job": asked.job, "label": asked.label, "checks": {}, "metadata": {}}
     checks = report["checks"]
+    if asked.autosave_off:
+        enabled = _try(autosave.native_autosave_enabled)
+        checks["AutoSave is off"] = (
+            True if enabled is False
+            else "NO: AutoSave is on in LAS X; switch it off and run again" if enabled
+            else "NO: whether AutoSave is on could not be read"
+        )
+        if checks["AutoSave is off"] is not True:
+            return _finish(report, Path(asked.report_dir))
     adapter.IMAGE_SAVE = replace(adapter.IMAGE_SAVE, source="cache", format="ome-zarr", cleanup_source=False)
     session = ZmartController(driver, {"output_root": asked.save_to} if asked.save_to else {})
     try:
         chosen = session.set_state({"changeable": {"job": asked.job}})
         if not chosen["success"]:
             report["error"] = f"the job was not selected: {chosen['content']}"
-            return _finish(report)
+            return _finish(report, Path(asked.report_dir))
         state = session.get_state()["content"]
         report["system"] = {k: v for k, v in (state.get("observed") or {}).items() if k in ("serial_number", "system_type", "stand")}
         here = session.get_xyz()["content"]
@@ -83,7 +99,7 @@ def main() -> int:
         checks["captured and saved"] = bool(answer["success"])
         if not answer["success"]:
             report["error"] = str(answer["content"])
-            return _finish(report)
+            return _finish(report, Path(asked.report_dir))
         record = answer["content"]
         stores = sorted({plane["path"] for plane in record["planes"]})
         checks["one store for the capture"] = len(stores) == 1 and stores[0].endswith(".ome.zarr")
@@ -136,7 +152,7 @@ def main() -> int:
             {k: plane.get(k) for k in ("c", "z", "x_um", "y_um", "z_um")} for plane in record["planes"]
         ]
         report["unconfirmed"] = record.get("unconfirmed")
-        return _finish(report)
+        return _finish(report, Path(asked.report_dir))
     finally:
         session.disconnect()
 
@@ -237,10 +253,10 @@ def _try(call):
         return None
 
 
-def _finish(report: dict) -> int:
+def _finish(report: dict, folder: Path) -> int:
     failed = [name for name, result in report["checks"].items() if result is False or str(result).startswith("NO")]
     report["verdict"] = "ALL CHECKS PASSED" if not failed else f"FAILED: {failed}"
-    out = Path.cwd() / f"check_cache_route_{report['label']}.json"
+    out = folder / f"check_cache_route_{report['label']}.json"
     try:
         out.write_text(json.dumps(report, indent=2, ensure_ascii=False, default=str), encoding="utf-8")
     except OSError:

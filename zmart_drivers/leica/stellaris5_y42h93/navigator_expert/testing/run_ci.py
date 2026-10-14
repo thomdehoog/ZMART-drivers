@@ -8,7 +8,7 @@ microscope PC)::
     python run_ci.py             # MOCK/OFFLINE (default): lint + offline tests + coverage
     python run_ci.py --mock      # explicit spelling of the default
     python run_ci.py --hardware         # LIVE: the quick acceptance against LAS X (simulator or scope)
-    python run_ci.py --hardware --full  # LIVE: plus the reader probe, parity, and the api/log routes
+    python run_ci.py --hardware --full  # LIVE: plus the reader probe, parity, and the api/log/hybrid routes
 
 Design goals (matching the suite's standard):
 
@@ -117,6 +117,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--full",
         action="store_true",
         help="with --hardware: also the reader probe, the parity check and the api and log routes",
+    )
+    parser.add_argument(
+        "--job",
+        default="HiRes",
+        help="with --hardware: the LAS X job the cache checks capture (default HiRes)",
     )
     args = parser.parse_args(argv)
     if args.full and not args.hardware:
@@ -245,7 +250,7 @@ def main(argv: list[str] | None = None) -> int:
         # The quick acceptance, the same command on the simulator and on the
         # scope: the driver as it is installed and connected by name, every
         # command, the limits gate, one move, one acquisition; then the
-        # settings through the production reader route (hybrid). Each step
+        # settings through the production reader route (direct). Each step
         # restores what it changed.
         hardware_steps = [
             (
@@ -278,9 +283,10 @@ def main(argv: list[str] | None = None) -> int:
             ),
         ]
         # The full set adds the diagnostics: the passive reader probe, the
-        # api/log parity check, and the end-to-end validator through the two
+        # api/log parity check, and the end-to-end validator through the
         # other reader routes. Once per release, or after a change to the
-        # readers; the api and log routes stay diagnostic, hybrid is fatal.
+        # readers; the api, log and hybrid routes stay diagnostic, the direct
+        # route, the driver's default, is fatal.
         if args.full:
             hardware_steps = [
                 (
@@ -300,7 +306,7 @@ def main(argv: list[str] | None = None) -> int:
                 ),
                 *hardware_steps,
             ]
-        for mode in ("api", "log", "hybrid") if args.full else ("hybrid",):
+        for mode in ("api", "log", "hybrid", "direct") if args.full else ("direct",):
             hardware_steps.append(
                 (
                     f"hardware: end-to-end validator [{mode} reader]",
@@ -316,9 +322,49 @@ def main(argv: list[str] | None = None) -> int:
                         f"--output={REPORT_DIR / f'hardware_validate_{mode}.jsonl'}",
                         f"--report-dir={REPORT_DIR}",
                     ],
-                    mode == "hybrid",
+                    mode == "direct",
                 )
             )
+        # Saving from LAS X's cache, then letting go of it, with AutoSave off
+        # as the cache route is used: one capture saved and checked, then ten
+        # captures released, the Navigator canvas cleared after each. The
+        # second needs LAS X to show the Navigator, and fails saying so. The
+        # captures go under the reports, so the run needs no data location.
+        (REPORT_DIR / "captures").mkdir(parents=True, exist_ok=True)
+        hardware_steps += [
+            (
+                "hardware: saving from LAS X's cache (one capture, checked)",
+                [
+                    sys.executable,
+                    str(hw / "check_cache_route.py"),
+                    "--autosave-off",
+                    "--job",
+                    args.job,
+                    "--label",
+                    "ci",
+                    f"--save-to={REPORT_DIR / 'captures'}",
+                    f"--report-dir={REPORT_DIR}",
+                ],
+                True,
+            ),
+            (
+                "hardware: letting go of LAS X's cache (10 captures, the canvas cleared)",
+                [
+                    sys.executable,
+                    str(hw / "check_cache_release.py"),
+                    "--autosave-off",
+                    "--job",
+                    args.job,
+                    "--captures",
+                    "10",
+                    "--label",
+                    "ci",
+                    f"--save-to={REPORT_DIR / 'captures'}",
+                    f"--report-dir={REPORT_DIR}",
+                ],
+                True,
+            ),
+        ]
         for name, cmd, fatal in hardware_steps:
             steps.append(run_step(name, cmd, env, fatal=fatal))
 
@@ -348,8 +394,9 @@ def main(argv: list[str] | None = None) -> int:
             "    installed_driver_validate.jsonl  the driver as installed and connected by name"
         )
         print(
-            "    hardware_validate_{api,log,hybrid}.jsonl  end-to-end checks; hybrid is the fatal production route"
+            "    hardware_validate_{direct,api,log,hybrid}.jsonl  end-to-end checks; direct is the fatal production route"
         )
+        print("    check_cache_route_ci.json, check_cache_release_ci.json  saving from and letting go of LAS X's cache")
     print("    ci_summary.json   this step summary")
 
     if run_hardware:

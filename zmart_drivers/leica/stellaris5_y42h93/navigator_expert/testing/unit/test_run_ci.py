@@ -61,7 +61,7 @@ def _capture_steps(run_ci, monkeypatch, tmp_path, argv):
 
 
 def test_the_quick_hardware_run_is_the_acceptance(monkeypatch, tmp_path):
-    """--hardware: the limits self-check, the installed driver, the adapter, hybrid; nothing mocked."""
+    """--hardware: the limits self-check, the installed driver, the adapter, the direct route, the cache; nothing mocked."""
     run_ci = _load_run_ci()
     captured = _capture_steps(run_ci, monkeypatch, tmp_path, ["--hardware"])
 
@@ -83,9 +83,23 @@ def test_the_quick_hardware_run_is_the_acceptance(monkeypatch, tmp_path):
 
     hardware_cmds = _commands_for(captured, "validate_hardware.py")
     assert len(hardware_cmds) == 1
-    assert "hybrid" in hardware_cmds[0]
+    assert "direct" in hardware_cmds[0]
     assert "--allow-acquire" in hardware_cmds[0]
-    assert fatal_by_name["hardware: end-to-end validator [hybrid reader]"] is True
+    assert fatal_by_name["hardware: end-to-end validator [direct reader]"] is True
+
+    saving = _command_for(captured, "check_cache_route.py")
+    assert saving[saving.index("--job") + 1] == "HiRes"
+    assert f"--report-dir={tmp_path}" in saving
+    assert f"--save-to={tmp_path / 'captures'}" in saving
+    assert (tmp_path / "captures").is_dir()
+    assert "--autosave-off" in saving  # the cache route as it is used: without AutoSave
+    assert fatal_by_name["hardware: saving from LAS X's cache (one capture, checked)"] is True
+
+    release = _command_for(captured, "check_cache_release.py")
+    assert release[release.index("--captures") + 1] == "10"
+    assert "--autosave-off" in release
+    assert f"--report-dir={tmp_path}" in release
+    assert fatal_by_name["hardware: letting go of LAS X's cache (10 captures, the canvas cleared)"] is True
 
     assert not _commands_for(captured, "probe_four_readers.py")
     assert not _commands_for(captured, "validate_readers_side_by_side.py")
@@ -103,13 +117,22 @@ def test_the_full_hardware_run_adds_the_diagnostics(monkeypatch, tmp_path):
     assert fatal_by_name["hardware: reader parity + routed modes"] is False
 
     hardware_cmds = _commands_for(captured, "validate_hardware.py")
-    assert len(hardware_cmds) == 3
+    assert len(hardware_cmds) == 4
     for cmd in hardware_cmds:
         assert "--allow-acquire" in cmd
         assert "--mock" not in cmd
     assert fatal_by_name["hardware: end-to-end validator [api reader]"] is False
     assert fatal_by_name["hardware: end-to-end validator [log reader]"] is False
-    assert fatal_by_name["hardware: end-to-end validator [hybrid reader]"] is True
+    assert fatal_by_name["hardware: end-to-end validator [hybrid reader]"] is False
+    assert fatal_by_name["hardware: end-to-end validator [direct reader]"] is True
+
+
+def test_the_cache_checks_capture_the_job_asked_for(monkeypatch, tmp_path):
+    run_ci = _load_run_ci()
+    captured = _capture_steps(run_ci, monkeypatch, tmp_path, ["--hardware", "--job", "Overview"])
+    for script in ("check_cache_route.py", "check_cache_release.py"):
+        cmd = _command_for(captured, script)
+        assert cmd[cmd.index("--job") + 1] == "Overview"
 
 
 def _commands_for(captured: list[tuple[str, list[str], bool]], script_name: str) -> list[list[str]]:

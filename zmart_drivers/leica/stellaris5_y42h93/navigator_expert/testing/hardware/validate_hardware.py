@@ -1408,7 +1408,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p.add_argument("--log-level", default="INFO", choices=["DEBUG", "INFO", "WARNING", "ERROR"])
     p.add_argument(
         "--state-reader-mode",
-        choices=["api", "log", "hybrid"],
+        choices=["direct", "api", "log", "hybrid"],
         help="override all profile-routed passive state readers",
     )
     p.add_argument(

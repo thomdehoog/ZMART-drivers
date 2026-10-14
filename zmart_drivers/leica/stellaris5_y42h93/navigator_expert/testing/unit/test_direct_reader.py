@@ -31,7 +31,6 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface imp
 )
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.parsing import (
     make_changeable_copy,
-    parse_tile_geometry,
 )
 
 #: The jobs' block and element ids as on the simulator (2026-10-13).

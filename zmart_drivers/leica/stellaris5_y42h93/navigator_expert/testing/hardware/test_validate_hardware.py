@@ -228,6 +228,19 @@ def test_state_reader_mode_argument_overrides_profile(tmp_path):
         profiles.STATE_READERS = prior
 
 
+def test_the_direct_reader_route_can_be_chosen(caplog):
+    """The direct reader is the driver's default route, so the validator runs on it too."""
+    prior = profiles.STATE_READERS
+    try:
+        args = validate_hardware.parse_args(["--state-reader-mode", "direct"])
+        validate_hardware._apply_state_reader_mode(args.state_reader_mode, validate_hardware.logging.getLogger("t"))
+        assert profiles.STATE_READERS.xy_mode == "direct"
+        assert profiles.STATE_READERS.job_settings_mode == "direct"
+        assert profiles.STATE_READERS.scan_status_mode == "direct"
+    finally:
+        profiles.STATE_READERS = prior
+
+
 def test_explicit_log_mode_treats_empty_job_list_as_expected():
     """The job LIST is API-only (no log leg): a log-mode read returning
     nothing is the declared capability, not a driver fault. phase_readonly

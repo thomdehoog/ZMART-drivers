@@ -11,13 +11,14 @@ after: in total, how much of it is hidden copies, and the rest. It counts the
 captures that failed and the releases whose canvas could not be cleared.
 
 On the LAS X simulator (2026-10-14) a hidden copy took 1.3 to 2 times its
-capture's pixels, and all of them were let go of while the Navigator was shown. Keep
-the Navigator shown in LAS X for the whole run: with another view shown, the
-canvas cannot be cleared and the hidden copies stay.
+capture's pixels, and all of them were let go of at every release. The canvas
+can be cleared only while LAS X shows it, so before each capture the driver
+shows Navigator Expert's Experiment tab, when another one is shown.
 
 It never edits a LAS X file: it selects the job, moves the stage to where it
 already stands (so every capture gets its canvas position), and captures.
-A report is written where the script is run, as ``check_cache_release_<label>.json``.
+A report is written where the script is run (or to ``--report-dir``), as
+``check_cache_release_<label>.json``.
 
 Usage, in the driver's environment on the microscope PC::
 
@@ -95,6 +96,12 @@ def main() -> int:
     parser.add_argument("--captures", type=int, default=50, help="how many captures")
     parser.add_argument("--label", required=True, help="a name for this check, e.g. hires-50")
     parser.add_argument("--save-to", default=None, help="a folder instead of the set-up data location")
+    parser.add_argument("--report-dir", default=".", help="where the report is written (default: here)")
+    parser.add_argument(
+        "--autosave-off",
+        action="store_true",
+        help="capture only when LAS X's AutoSave is off, the way the cache route is used",
+    )
     asked = parser.parse_args()
 
     from zmart_controller import ZmartController
@@ -104,6 +111,12 @@ def main() -> int:
     from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.output import lasx_data_container as container
     from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.zmart_adapter import zmart_adapter as adapter
 
+    if asked.autosave_off:
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.output import lasx_native_autosave as autosave
+
+        if autosave.native_autosave_enabled():
+            print("FAILED: AutoSave is on in LAS X; switch it off and run again")
+            return 1
     releases = Releases()
     logging.getLogger(lasx_cache_release.__name__).addHandler(releases)
     cache = Cache(container.data_container_root())
@@ -150,7 +163,7 @@ def main() -> int:
         "every capture saved": done == asked.captures and not report["errors"],
         "the canvas cleared at every release": releases.not_cleared == 0,
     }
-    out = Path(f"check_cache_release_{re.sub(r'[^A-Za-z0-9_-]', '-', asked.label)}.json")
+    out = Path(asked.report_dir) / f"check_cache_release_{re.sub(r'[^A-Za-z0-9_-]', '-', asked.label)}.json"
     out.write_text(json.dumps(report, indent=1), encoding="utf-8")
     if report["per capture, MB"]:
         per = report["per capture, MB"]
