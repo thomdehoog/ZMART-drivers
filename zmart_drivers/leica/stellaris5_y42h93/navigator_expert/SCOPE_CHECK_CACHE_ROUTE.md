@@ -69,5 +69,6 @@ the plane heights.
 ## What to send back
 
 The `check_cache_route_*.json` reports, and for any test whose values do not match LAS X, what LAS X
-showed. With all nine passing, two decisions follow: make `"cache"` the default source
-(`actions/profiles.py`, `IMAGE_SAVE.source`), and promote the three repositories to `main`.
+showed. `"cache"` is already the default source (`actions/profiles.py`, `IMAGE_SAVE.source`,
+14 October 2026), so AutoSave stays off in normal use; with all nine passing, the repositories
+go to `main`.

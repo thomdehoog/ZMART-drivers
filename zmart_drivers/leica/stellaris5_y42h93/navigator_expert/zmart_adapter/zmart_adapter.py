@@ -1606,7 +1606,8 @@ def _connection_status(handle: ZmartHandle, root: Path | None) -> dict:
         ),
         "stage": _try(stage) or "failed — no reading",
         "autosave": (
-            "enabled" if _try(_native.native_autosave_enabled)
+            "not needed: captures are read from LAS X's cache" if IMAGE_SAVE.source == "cache"
+            else "enabled" if _try(_native.native_autosave_enabled)
             else "failed — LAS X will not save what is captured"
         ),
         "output root": str(root) if root is not None else f"not set up: {_info.SET_UP}",

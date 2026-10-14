@@ -1,8 +1,11 @@
 # On the STELLARIS: the readers, LAS X's warnings, and letting go of the cache
 
-The branch `readers-for-stellaris` brings four changes to the driver. Each was seen working on
+The branch `readers-for-stellaris` brings five changes to the driver. Each was seen working on
 the LAS X simulator (14 October 2026), never yet on the microscope:
 
+- **Captures are read from LAS X's cache by default, so AutoSave stays off.** The driver saves
+  each capture itself, straight from the cache; AutoSave is only switched on to compare with
+  its files (step 4).
 - **The job settings come from LAS X's own JSON answers.** The direct reader now reads every
   job's settings and the hardware information as LAS X writes them for the CAM API, so it also
   reads the settings of jobs other than the selected one, and a filter wheel's spectrum mode.
@@ -15,12 +18,13 @@ the LAS X simulator (14 October 2026), never yet on the microscope:
   in LAS X's cache (`TileScan <n>`, 1.3 to 2 times the capture's pixels), held by the Navigator
   canvas. Releasing a capture (`cleanup_source`) now also presses the canvas's Clear button,
   which lets go of all of them. Clear works only while LAS X shows the canvas (Navigator Expert's
-  Experiment tab), so before each capture the driver shows that tab when another one is shown. Releasing is set in the driver's profile (`IMAGE_SAVE`) and stays
-  off until this session has passed; the check scripts below switch it on for their own run.
+  Experiment tab), so before each capture the driver shows that tab when another one is
+  shown. Releasing is set in the driver's profile (`IMAGE_SAVE.cleanup_source`) and stays off
+  until this session has passed; the check scripts below switch it on for their own run.
 - **Saving the experiment waits for the `.lrp` itself**, the file the driver reads the job's
   z-stack from.
 
-One session of about an hour runs all four. Steps 2, 3 and 5 only read, or capture where the
+One session of about an hour runs all five. Steps 2, 3 and 5 only read, or capture where the
 stage already stands.
 
 ---

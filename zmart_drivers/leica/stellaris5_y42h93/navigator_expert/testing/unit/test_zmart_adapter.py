@@ -757,7 +757,7 @@ class TestAcquire(unittest.TestCase):
 
         checks = info["connection_status"]
         self.assertEqual(checks["api"], "answering")
-        self.assertEqual(checks["autosave"], "enabled")
+        self.assertNotIn("failed", checks["autosave"])  # the cache route needs no AutoSave
         self.assertIn("um", checks["stage"])
         self.assertEqual(checks["output root"], str(Path("/runs")))
         self.assertNotIn("output_root", info)
@@ -919,6 +919,21 @@ class TestAcquire(unittest.TestCase):
         with self._capturing(), patch.object(adapter._release, "prepare", lambda: prepared.append(1)):
             adapter.acquire(h, position_label="A1")
         self.assertEqual(prepared, [])
+
+    def test_captures_are_read_from_the_cache_by_default_so_autosave_can_stay_off(self):
+        """Thom, 2026-10-14: the default is AutoSave off; the driver reads each capture from LAS X's cache."""
+        self.assertEqual(ImageSaveProfile().source, "cache")
+
+    def test_autosave_off_is_a_failure_only_when_the_profile_reads_autosaves_files(self):
+        h = _handle()
+        with patch.object(adapter._native, "native_autosave_enabled", return_value=False):
+            with patch.object(adapter, "IMAGE_SAVE", replace(adapter.IMAGE_SAVE, source="cache")):
+                from_cache = adapter._connection_status(h, Path("/runs"))["autosave"]
+            with patch.object(adapter, "IMAGE_SAVE", replace(adapter.IMAGE_SAVE, source="autosave")):
+                from_autosave = adapter._connection_status(h, Path("/runs"))["autosave"]
+        self.assertNotIn("failed", from_cache)
+        self.assertIn("not needed", from_cache)
+        self.assertIn("failed", from_autosave)
 
     def test_the_profile_lets_go_only_of_what_it_read_from_the_cache(self):
         """AutoSave's files are LAS X's project; letting go of them is refused when the profile is made."""
