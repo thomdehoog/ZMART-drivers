@@ -19,6 +19,8 @@ loaded. ``node_calls`` counts ``GetNode`` calls, to see whether a reader walks.
 """
 
 import copy
+import json
+import re
 
 
 #: The current setting's nodes as read on the LAS X simulator, 2026-10-13
@@ -214,7 +216,7 @@ class StandInNodes:
         self.stage = stage  # () -> (x_m, y_m)
         self.zdrives = zdrives  # () -> {z_use_mode: metres}
         self.status = {}  # AcquisitionState, CurrentRunningBlockID, ... overriding rest values
-        self.live = dict(SIMULATOR_SETTINGS)  # path -> value, the current setting's nodes
+        self.live = dict(SIMULATOR_SETTINGS)  # path -> value (or a function giving it), the current setting's nodes
         self.objectives = [dict(o) for o in SIMULATOR_OBJECTIVES]  # Microscope/ObjectiveList, by slot
         self.light_sources = copy.deepcopy(SIMULATOR_LIGHT_SOURCES)  # Confocal/LightSourceList
         self.detection = copy.deepcopy(SIMULATOR_DETECTION)  # Confocal/SpectralDetection
@@ -300,7 +302,7 @@ class StandInNodes:
             node = 1
             for name in path:
                 node = child(node, name)
-            values[node] = value
+            values[node] = value() if callable(value) else value
 
         def graft(parent, name, spec):
             """A dict is a node with children, a list repeats the node, anything else is a value."""
@@ -342,3 +344,28 @@ class StandInNodes:
         self.reads += 1
         _, values = self.tree()
         return values.get(node_id)
+
+
+JOB_SETTINGS_READ = re.compile(r'<ATL Command="ATL_GetBlockApiInfoAsJsonString" Attribute="(\d+)"/>')
+HARDWARE_INFO_READ = '<Scanner Command="GetConfocalHardwareInfoAsJson"/>'
+
+
+def answer_json_read(xml, client, nodes):
+    """The hardware server's answer to one of the two JSON reads, from the mock; None for anything else.
+
+    ``ATL_GetBlockApiInfoAsJsonString`` (a job's settings, by block id) and
+    ``GetConfocalHardwareInfoAsJson`` are what the CAM API asks the hardware
+    server; the mock's settings and hardware info stand for its answers, as
+    they stand for the CAM API's. A block id the tree does not have is
+    refused, as LAS X refuses it.
+    """
+    settings = JOB_SETTINGS_READ.fullmatch(xml)
+    if settings:
+        by_block = {block: name for name, (block, _) in nodes.jobs().items()}
+        job = by_block.get(int(settings[1]))
+        if job is None or job not in client._jobs:
+            return '<Result Error="1">invalid block identifier</Result>'
+        return f'<Result Error="">{json.dumps(client._jobs[job])}</Result>'
+    if xml == HARDWARE_INFO_READ:
+        return f'<Result Error="">{json.dumps(client._hardware)}</Result>'
+    return None

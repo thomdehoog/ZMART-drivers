@@ -30,8 +30,10 @@ classifiers = [
 # OME's ome-zarr-models for saving a capture as OME-Zarr 0.5), the setup
 # notebooks for orientation and objective calibration (scipy, scikit-image,
 # opencv, matplotlib, pillow, ipython), pythonnet, which loads Leica's
-# LAS X interface, and pywin32, which reads where the z drives are from LAS X's
-# hardware server. LAS X runs on Windows only, so both are installed there.
+# LAS X interface, pywin32, which reads where the z drives are from LAS X's
+# hardware server, and comtypes, through which a LAS X warning that asks only
+# for OK is answered (Windows UI Automation). LAS X runs on Windows only, so
+# these three are installed there.
 leica = [
     "numpy>=1.24",
     "tifffile>=2024.1",
@@ -45,6 +47,7 @@ leica = [
     "ipython>=8",
     "pythonnet>=3; sys_platform == 'win32'",
     "pywin32>=306; sys_platform == 'win32'",
+    "comtypes>=1.4; sys_platform == 'win32'",
 ]
 # The ZEISS driver speaks gRPC through grpclib. ZEISS's own zen_api package is
 # not on PyPI and must match the ZEN version; install it from

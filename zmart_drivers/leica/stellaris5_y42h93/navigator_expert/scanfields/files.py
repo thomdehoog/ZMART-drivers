@@ -282,7 +282,9 @@ def save_and_read_lrp(client, *, timeout=5.0):
 
     Combines :func:`save_experiment` and :func:`parse_lrp` into a
     single call, handling template directory and file path resolution
-    internally.
+    internally. The save is confirmed on the ``.lrp`` it reads: the ``.xml``
+    beside it is Navigator Expert's own (its positions), written with it but
+    not needed here.
 
     Args:
         client: Live LAS X CAM client.
@@ -297,7 +299,7 @@ def save_and_read_lrp(client, *, timeout=5.0):
         log.error("save_and_read_lrp: cannot locate ScanningTemplates dir")
         return None
     lrp_path = os.path.join(tdir, TEMPLATE_LRP)
-    result = save_experiment(client, TEMPLATE_XML, tdir, timeout=timeout)
+    result = save_experiment(client, TEMPLATE_XML, tdir, timeout=timeout, confirm_path=lrp_path)
     if not result:
         # Returning the parse anyway would hand the caller *stale* pre-save
         # hardware settings while claiming they are current.

@@ -13,6 +13,7 @@ import logging
 from typing import Any
 
 from .dispatcher import read as _readers
+from .vendor_interface import lasx_dialogs
 
 _log = logging.getLogger(__name__)
 
@@ -266,6 +267,7 @@ def connect_microscope(
     MACHINE.ensure_layout()
     client = connect_python_client(client_name=client_name, api_delay_ms=api_delay_ms)
     _gate.connect_handshake(client, load=load_limits)
+    lasx_dialogs.keep_watching()
     orientation, orientation_info = _load_rig_orientation()
     translations, calibration_info = _load_objective_calibration(
         calibration_name,

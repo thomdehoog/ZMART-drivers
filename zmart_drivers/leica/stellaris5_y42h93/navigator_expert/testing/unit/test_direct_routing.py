@@ -20,7 +20,7 @@ import time
 import pytest
 from limits_fixtures import install_permissive_limits
 from mock_lasx_api import MockLasxClient
-from state_tree_stand_in import StandInNodes
+from state_tree_stand_in import StandInNodes, answer_json_read
 
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.actions import (
     get as capabilities,
@@ -45,8 +45,17 @@ JOBS = {"AF Job": (156, 1), "Overview": (154, 2), "HiRes": (152, 3)}
 
 
 class StandInServer:
-    def __init__(self, nodes):
+    """LAS X's hardware server: its state tree, and its answers to the two JSON reads."""
+
+    def __init__(self, nodes, client=None):
         self.ServerNodes = nodes
+        self.client = client
+        self.sent = []
+
+    def SendCommand2(self, xml, result):
+        self.sent.append(xml)
+        answer = answer_json_read(xml, self.client, self.ServerNodes)
+        return answer if answer is not None else '<Result Error="1">not a read the stand-in answers</Result>'
 
 
 @pytest.fixture
@@ -65,7 +74,7 @@ def tree(client, monkeypatch):
             2: client._hardware_z_um["z-wide"] * 1e-6,
         },
     )
-    monkeypatch.setattr(hardware_server, "attach", lambda: StandInServer(nodes))
+    monkeypatch.setattr(hardware_server, "attach", lambda: StandInServer(nodes, client))
     hardware_server.forget_connection()
     state_tree.forget_nodes()
     return nodes
@@ -170,19 +179,20 @@ class TestEveryDatumDirectly:
     def test_hardware_info(self, client, tree):
         reading = readers.get_hardware_info(client, mode="direct", diagnostics=True)
         assert reading.source == "direct"
-        assert reading.value["SerialNumber"] == "STELLARIS SIMULATOR"
+        assert reading.value == readers.get_hardware_info(client, mode="api")
 
     def test_the_selected_jobs_settings(self, client, tree):
         reading = readers.get_job_settings(client, "HiRes", mode="direct", diagnostics=True)
-        assert (reading.source, reading.value["jobName"]) == ("direct", "HiRes")
+        assert reading.source == "direct"
+        assert reading.value["zoom"] == readers.get_job_settings(client, "HiRes", mode="api")["zoom"]
 
     def test_the_field_of_view_through_the_settings(self, client, tree):
-        assert readers.get_fov(client, "HiRes", mode="direct") == pytest.approx((0.0011625, 0.0011625))
+        assert readers.get_fov(client, "HiRes", mode="direct") == readers.get_fov(client, "HiRes", mode="api")
 
-    def test_another_jobs_settings_fall_back(self, client, tree):
+    def test_another_jobs_settings_come_directly_too(self, client, tree):
         reading = readers.get_job_settings(client, "Overview", mode="direct", diagnostics=True)
-        assert reading.source in ("api", "log")
-        assert reading.value["objective"]["slotIndex"] is not None
+        assert reading.source == "direct"
+        assert reading.value == readers.get_job_settings(client, "Overview", mode="api")
 
 
 class TestDirectByDefault:

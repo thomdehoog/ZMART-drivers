@@ -47,6 +47,7 @@ Import restrictions: only runtime errors/utilities, ``readers.log_reader``,
 import logging
 import time
 
+from ..vendor_interface import lasx_dialogs
 from ..vendor_interface import log_reader as _log_reader
 from ..vendor_interface.delivery import deliver
 from . import tuning as _timing
@@ -313,11 +314,16 @@ def _fire_block(
                 client.PyApiCommandEcho.Model.Result = 0  # NotDefined
             except Exception:
                 pass  # Some API versions may not allow Result assignment
+            fired_at = time.monotonic()
             if profile.fire_async:
-                api_obj.UpdateAsync()
+                lasx_dialogs.answer_warnings()
+                with lasx_dialogs.watching():
+                    api_obj.UpdateAsync()
                 delivered = True
             else:
                 delivered = deliver(api_obj, label=description)
+            for answered in lasx_dialogs.answered_since(fired_at):
+                all_logs.append(_make_log_entry("warning", answered.message))
             if delivered and not profile.skip_echo and not profile.fire_async:
                 if not _await_echo_result(client):
                     # The echo never settled: a LAS X rejection arriving

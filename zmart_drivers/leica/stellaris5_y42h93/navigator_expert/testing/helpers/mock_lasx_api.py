@@ -150,6 +150,10 @@ _DEFAULT_JOBS = {
     },
 }
 
+#: Each job's id in LAS X (the job list's ``ID``, the hardware server's
+#: ``BlockId``); on the simulator AF Job was 140 and HiRes 142.
+JOB_IDS = {"AF Job": 140, "Overview": 141, "HiRes": 142}
+
 _DEFAULT_HARDWARE = {
     "Microscope": {
         "objectives": [
@@ -451,6 +455,9 @@ class MockLasxClient:
         self.PyApiSelectJobByName = _MockApiObject("SelectJob", self._handle_select_job, latency)
         self.PyApiStartScan = _MockApiObject("StartScan", self._handle_start_scan, latency)
         self.PyApiAcquireJob = _MockApiObject("AcquireJob", self._handle_acquire_job, latency)
+        # Experiment files: acknowledged only; the mock keeps no experiment on disk.
+        self.PyApiSaveExperiment = _MockApiObject("SaveExperiment", self._handle_acknowledge, latency)
+        self.PyApiLoadExperiment = _MockApiObject("LoadExperiment", self._handle_acknowledge, latency)
 
         # Move commands — models need enum-like properties
         self.PyApiMoveHardwareXY = _MockApiObject("MoveStage", self._handle_move_stage, latency)
@@ -569,6 +576,7 @@ class MockLasxClient:
             jobs_list.append(
                 {
                     "Name": name,
+                    "ID": JOB_IDS.get(name),
                     # mirrors the simulator's catalog: "AF Job" is the AF job
                     "IsAutofocus": name == "AF Job",
                     "IsSelected": name == self._selected_job,
@@ -578,6 +586,9 @@ class MockLasxClient:
         model.Jobs = json.dumps(jobs_list)
 
     # ── Action handlers ──
+
+    def _handle_acknowledge(self, model):
+        self._echo.clear()
 
     def _handle_select_job(self, model):
         self._echo.clear()

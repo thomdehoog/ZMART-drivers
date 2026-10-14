@@ -28,41 +28,37 @@ The save calls it last (``cleanup_source``), only once its copy is written and
 read back identical. Seen on the LAS X simulator: the picture's pixels leave
 the cache, the project file is rewritten without it, and LAS X captures on.
 About 0.2 MB of descriptions per picture stays while LAS X's window holds it.
+
+Every capture also leaves a hidden copy, ``TileScan <n>`` (the pixels again,
+a zoom pyramid and a histogram: about twice a 512 x 512 capture's pixels),
+which the Navigator canvas holds while it shows the capture's tile. So the
+release also clears the canvas (``vendor_interface.lasx_navigator``), which
+lets go of the hidden copies too (simulator, 2026-10-14). A canvas that
+cannot be cleared is logged; the picture is released all the same.
 """
 
 from __future__ import annotations
 
-import functools
-import os
-from pathlib import Path
-from typing import Any
+import logging
+
+from ..vendor_interface import lasx_navigator
+from ..vendor_interface.data_container import connected_data_container
+
+log = logging.getLogger(__name__)
 
 
 def delete(number: int, name: str) -> None:
     """Have LAS X delete the picture *name*, its Data Container element *number*.
 
     It is the delete in LAS X's own window. Refused, with nothing deleted,
-    when the element is no longer that picture.
+    when the element is no longer that picture. Then the Navigator canvas is
+    cleared, which lets go of the picture's hidden copy.
     """
     element = connected_data_container().GetElement(number)
     if element.GetName() != name:
         raise RuntimeError(f"LAS X's element {number} is {element.GetName()!r}, not {name!r}; nothing deleted")
     element.Delete()
-
-
-@functools.cache
-def connected_data_container() -> Any:
-    """LAS X's Data Container, as one more of its clients; returns the factory its elements are got from."""
-    from ..actions import profiles
-
-    root = profiles.LASX_API.runtime_root
-    os.environ["PATH"] = root + os.pathsep + os.environ["PATH"]
-    import clr  # type: ignore[import-not-found]
-    import System  # type: ignore[import-not-found]
-
-    System.Reflection.Assembly.LoadFile(str(Path(root) / "LMSDataContainerWrapper.dll"))
-    from LMSDataContainerWrapper import DataContainerClient, DMObjectFactory
-
-    if not DataContainerClient.CreateAndInitInstance(System.Environment.UserName, "ZMART"):
-        raise RuntimeError("LAS X's Data Container did not accept the connection")
-    return DMObjectFactory()
+    try:
+        lasx_navigator.clear_canvas()
+    except lasx_navigator.NavigatorUnavailable as why:
+        log.warning("the Navigator canvas was not cleared, so %r's hidden copy stays in LAS X's cache: %s", name, why)
