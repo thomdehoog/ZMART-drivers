@@ -67,28 +67,27 @@ class ZmartDriver:
     # --- describing the setup ---------------------------------------------------------
 
     def get_info(self):
-        """``True, (description, output_root, setup)``.
+        """``True, (description, setup)``.
 
         The description says what the other commands cannot: what each
         setting means, in which unit and within which bounds, which
         objective sits in which slot, and which way +z points. The bounds
-        come from the limits loaded at connect. ``output_root`` is where
-        this session saves, None until a data location is set up; ``setup``
-        is each thing set up once on this microscope (limits, orientation,
-        objective calibration, origin, data location), done or not, in words.
+        come from the limits loaded at connect. ``setup`` is each thing set
+        up once on this microscope (limits, orientation, objective
+        calibration, origin, data location), done or not, in words.
         """
         info = _adapter.get_info(self._handle)
-        return True, (info["description"], info["output_root"], info["setup"])
+        return True, (info["description"], info["setup"])
 
     def get_actuators(self):
-        """``True, (x_motors, y_motors, z_motors)``: the motor names per axis.
+        """``True, (x, y, z)``: per axis the motors and the default, ``{"options": [...], "default": ...}``.
 
         x and y have one motor each, ``motoric``. z has two: ``z-wide``, the
-        focus drive, and ``z-galvo``, the fast drive for small steps. The
-        first name of each axis is the default when a move does not pick one.
+        focus drive, which is the default, and ``z-galvo``, the fast drive for
+        small steps.
         """
         motors = _adapter.get_actuators(self._handle)
-        return True, tuple(list(motors[axis]) for axis in _AXES)
+        return True, tuple(dict(motors[axis]) for axis in _AXES)
 
     # --- the stage ----------------------------------------------------------------------
 
@@ -99,7 +98,8 @@ class ZmartDriver:
         the focus, the two z drives added together. ``actuators`` gives
         every motor of each axis with its own raw reading, as LAS X reports
         it. ``canvas`` is everywhere a picture can show, in the same frame.
-        ``with_actuators`` only checks that the motors it names exist.
+        ``with_actuators`` names the motor of every axis; the controller has
+        filled in the defaults.
         """
         answer = _adapter.get_xyz(self._handle, with_actuators=with_actuators)
         return True, _xyz(answer)
@@ -139,14 +139,15 @@ class ZmartDriver:
     # --- acquiring ----------------------------------------------------------------------
 
     def get_acquisition_settings(self):
-        """``True, settings``: the choices for one picture, with the value in use."""
+        """``True, settings``: how a capture is triggered, ``full`` and nothing else."""
         return True, _adapter.get_acquisition_settings(self._handle)
 
     def acquire(self, position_label, acquisition_settings=None):
         """Capture here with the selected job, save, and answer ``True, (files, planes)``.
 
-        The files are flat OME-TIFF, one plane per file, named after the
-        position label and never overwriting an earlier picture. Every
+        The files are flat OME-TIFF, one plane per file, each name starting
+        with the position label the workflow gave, and never overwriting an
+        earlier picture. Every
         plane entry carries its file, its channel, depth and time index,
         and the stage position it was taken at, in the sample's frame.
         """

@@ -46,11 +46,7 @@ def saves_as_ome_tiff(monkeypatch):
 
 @pytest.fixture
 def naming() -> Naming:
-    return Naming(
-        folder="overview-scan",
-        hash6="000001",
-        position_label="000003",
-    )
+    return Naming(stem="overview-scan_000001_000003")
 
 
 @pytest.fixture
@@ -386,7 +382,7 @@ class TestNativeSave:
         run_dir = tmp_path / "run_000001"
         for idx, image_path in saved.image_paths.items():
             # Flat write directly under the acquisition-type folder.
-            assert image_path.parent == run_dir / "overview-scan" / "data"
+            assert image_path.parent == run_dir / "data"
             arr = tifffile.imread(str(image_path))
             assert arr.shape == (8, 8)
             assert arr[0, 0] == 10 * idx.z + idx.c

@@ -459,8 +459,8 @@ single call's product has the same shape on every microscope, a standard
 format, named after the position label, never overwriting, with a plane
 table and a log beside it. The workflow organises *the experiment*: where
 acquisitions go, how they group and in which order is the experiment's
-layout, which the driver only receives, as `output_root` and, if the
-workflow wants, a `folder` setting. The analysis engine and the viewer read
+layout, which the driver only receives: the position label, which every
+file name starts with. The analysis engine and the viewer read
 across acquisitions, so that layout has to be one the workflow controls,
 not one each driver invents. For the same reason the kind of acquisition, a
 single image, a z-stack, a time series, is not a folder level: it is
@@ -485,8 +485,8 @@ time series several `t`.
    which planes it holds.
 4. **Name and place** it in the experiment's folder layout, named after the
    position label. A second picture with the same label gets a new name; an
-   earlier one is never overwritten. Any further grouping is the driver's
-   choice, offered as an acquisition setting (the mock offers `folder`).
+   earlier one is never overwritten. The workflow files the capture into
+   its own run afterwards.
 5. **Attach the metadata**: the position in user coordinates, the instrument
    state, and the pixel size.
 6. **Keep the command log**: for each acquisition, what was asked, what
@@ -620,13 +620,13 @@ methods, and each one only puts the parts above to work:
 
 | Method | Built from | Hands back |
 |---|---|---|
-| `get_info` | The machine description and the limits (part 6) | `True, description`: the microscope in plain words, for whoever drives it, a person or a program |
-| `get_actuators` | The machine description | `True, (x_motors, y_motors, z_motors)`: the motors per axis, the first one being the default |
+| `get_info` | The machine description and the limits (part 6) | `True, (description, setup)`: the microscope in plain words, for whoever drives it, a person or a program, and what is set up once on it |
+| `get_actuators` | The machine description | `True, (x, y, z)`: per axis `{"options": [...], "default": ...}`, the motors and the one the driver chooses when a command does not |
 | `get_xyz` | The reading for position (part 3) | `True, (x, y, z, actuators, canvas)`: the position in user coordinates, every motor's raw reading, and everywhere a picture can show |
 | `set_xyz` | The change for position (part 3), then `get_xyz` | The same as `get_xyz`, read from the microscope once the stage has arrived |
 | `get_state` | The readings for the settings | `True, (changeable, observed)`: the settings `set_state` can apply, and what can only be read |
 | `set_state` | One change per setting | `True, applied`: what took |
-| `get_acquisition_settings` | The choices the output part offers (part 5) | `True, {name: {"options": ..., "active": ...}}` |
+| `get_acquisition_settings` | How a capture can be triggered | `True, {name: {"options": ..., "default": ..., "active": ...}}`, usually only `trigger` |
 | `acquire` | The change for acquisition, then the output part | `True, (files, planes)`: where everything was saved |
 | `get_procedures` | The procedures' own descriptions (part 4) | `True, {name: {"description": ...}}` |
 | `run_procedure` | One procedure | `True, name` |

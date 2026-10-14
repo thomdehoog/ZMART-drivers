@@ -178,9 +178,9 @@ def phase_commands(v: vh.Validator, sess: Any) -> dict[str, Any]:
                 "get_actuators: the three axes", sorted(actuators), ["x", "y", "z"]
             )
             v.compare(
-                "get_actuators: z has its two drives",
+                "get_actuators: z has its two drives, z-wide the default",
                 actuators.get("z"),
-                ["z-wide", "z-galvo"],
+                {"options": ["z-wide", "z-galvo"], "default": "z-wide"},
             )
 
         xyz = v.callable("get_xyz", sess.get_xyz)
@@ -188,9 +188,9 @@ def phase_commands(v: vh.Validator, sess: Any) -> dict[str, Any]:
             seen["xyz"] = xyz
             for axis in ("x", "y", "z"):
                 v.compare(
-                    f"get_xyz: {axis} has position, unit, actuators and canvas",
+                    f"get_xyz: {axis} has position, unit, actuator, actuators and canvas",
                     sorted(xyz.get(axis, {})),
-                    ["actuators", "canvas", "position", "unit"],
+                    ["actuator", "actuators", "canvas", "position", "unit"],
                 )
             v.compare(
                 "get_xyz: in micrometres", xyz.get("x", {}).get("unit"), "micrometer"
@@ -221,11 +221,11 @@ def phase_commands(v: vh.Validator, sess: Any) -> dict[str, Any]:
         settings = v.callable("get_acquisition_settings", sess.get_acquisition_settings)
         if settings is not None:
             shaped = all(
-                isinstance(spec, dict) and {"options", "active"} <= spec.keys()
+                isinstance(spec, dict) and {"options", "default", "active"} <= spec.keys()
                 for spec in settings.values()
             )
             v.compare(
-                "get_acquisition_settings: options and active per setting", shaped, True
+                "get_acquisition_settings: options, default and active per setting", shaped, True
             )
 
         procedures = v.callable("get_procedures", sess.get_procedures)
@@ -347,7 +347,7 @@ def phase_acquire(v: vh.Validator, sess: Any, args: argparse.Namespace) -> None:
             "acquire: capture + save",
             lambda: sess._session.acquire(
                 position_label="installed-smoke",
-                acquisition_settings={"folder": "installed-smoke"},
+                acquisition_settings={"trigger": "full"},
             ),
             mutating=True,
         )

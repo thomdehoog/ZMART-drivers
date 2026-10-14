@@ -49,9 +49,9 @@ Scope of v1 (grow as needed):
     - ``get_procedures`` offers backlash takeup, zero-z-galvo (park the
       galvo at 0 with the focus kept), and autofocus (with job
       discovery); ``run_procedure`` runs them.
-    - ``acquire`` selects the job, captures, and saves in one step;
-      the ``folder`` acquisition setting and ``position_label`` map onto
-      the driver's Naming slots and travel verbatim in the save lineage.
+    - ``acquire`` runs the selected job and saves in one step; every file
+      name starts with ``position_label``, which travels verbatim in the
+      save lineage.
 
 Live-validation note: the z model assumes the two drives combine
 *additively with the same sign*. The arithmetic, readback keys/units,
@@ -96,7 +96,7 @@ from ..dispatcher import read as _readers
 from ..output import command_log as _log
 from ..output import lasx_native_autosave as _native
 from ..output import save as _save
-from ..output.naming import Naming, run_hash
+from ..output.naming import Naming, free_stem, run_hash
 from ..procedures import backlash as _motion
 from ..vendor_interface.parsing import parse_tile_geometry as _parse_tile_geometry
 from ..configuration import data_location as _data_location
@@ -208,7 +208,6 @@ class ZmartHandle:
     #: put in the frame.
     driven_to: dict[str, float] | None = None
     position_counter: int = 0
-    acquisition_hashes: set[str] = field(default_factory=set)
     translations: dict[int, tuple[float, float, float]] | None = None
     #: This microscope's data location, set up once and loaded at connect
     #: (configuration/data_location); None when it was never set up.
@@ -701,16 +700,21 @@ def set_origin(handle: ZmartHandle) -> dict:
 
 
 def get_actuators(handle: ZmartHandle) -> dict:
-    """The motors that can move each axis, by name: exactly the names ``with_actuators`` accepts.
+    """The motors that can move each axis, and the one used when none is chosen.
 
-    ``{"x": ["motoric"], "y": ["motoric"], "z": ["z-wide", "z-galvo"]}``.
-    These are also the names under which :func:`get_xyz` reports each
-    motor's own reading. An axis left out of ``with_actuators`` uses the
-    first motor listed here (x and y ``motoric``, z ``z-wide``); a previous
+    ``{"x": {"options": ["motoric"], "default": "motoric"}, ...,
+    "z": {"options": ["z-wide", "z-galvo"], "default": "z-wide"}}``. The
+    options are exactly the names ``with_actuators`` accepts, and the names
+    under which :func:`get_xyz` reports each motor's own reading. An axis left
+    out of ``with_actuators`` uses its default (x and y ``motoric``, z
+    ``z-wide``, the focus drive that reaches the whole travel); a previous
     call's choice is never remembered.
     """
     _require_open(handle)
-    return {axis: list(opts) for axis, opts in _ACTUATORS.items()}
+    return {
+        axis: {"options": list(opts), "default": _DEFAULT_ACTUATORS[axis]}
+        for axis, opts in _ACTUATORS.items()
+    }
 
 
 def _resolve_actuators(with_actuators: dict | None) -> dict[str, str]:
@@ -755,7 +759,7 @@ def get_xyz(handle: ZmartHandle, *, with_actuators: dict | None = None) -> dict:
     ``[x, y, z]``, so an operator can see when a compensation is in play.
     """
     _require_open(handle)
-    _resolve_actuators(with_actuators)  # only to refuse an unknown motor name
+    chosen = _resolve_actuators(with_actuators)
     snap = _hardware_snapshot(handle)
     dt = _delta_or_warn(handle, snap)
     z_focus = snap["z_wide_um"] + snap["z_galvo_um"]
@@ -769,6 +773,7 @@ def get_xyz(handle: ZmartHandle, *, with_actuators: dict | None = None) -> dict:
         axis: {
             "position": frame[axis],
             "unit": UNIT,
+            "actuator": chosen[axis],
             "actuators": {
                 motor: snap[reading] for motor, reading in _MOTOR_READINGS[axis].items()
             },
@@ -881,98 +886,26 @@ def set_xyz(
 
 
 def get_acquisition_settings(handle: ZmartHandle) -> dict:
-    """The acquisition and saving settings this instrument offers, with the active value of each.
+    """How a capture is triggered: ``full``, the whole of the selected LAS X job.
 
-    ``folder`` names the folder the pictures are saved in, and every file
-    name starts with it. The Leica file names always carry one, so it cannot
-    be empty; it defaults to ``"scan"`` and must be kebab-case lowercase (for
-    example ``"overview"`` or ``"high-res"``), at most 25 characters.
-
-    Discovered live on every call: ``job`` lists the LAS X jobs with the
-    selected one active; ``cleanup_source`` is forwarded
-    to the driver's ``save()``; ``source`` is where ``save()`` reads the
-    pixels, LAS X's Data Container cache or its AutoSave files (the profile's
-    ``IMAGE_SAVE.source`` is the default); ``backlash_correction`` runs an XY slack
-    takeup before capture and optional ``backlash_rounds`` controls its pass
-    count (default ``0``, which skips it).
-
-    The scanning template is never touched: positions are never made in the
-    Navigator Expert, so LAS X acquires the single current position.
+    That is the only way this driver captures, so it is the only option and
+    the default. Which job runs is part of the state (``set_state``). How the
+    pictures are saved -- format, where the pixels are read from, the
+    projection -- comes from this microscope's profile (``IMAGE_SAVE``), and
+    where they go from its data location, set up once. Whether the stage's
+    slack is taken up first, and how often, is the driver's own
+    (``ACQUISITION_BACKLASH_DEFAULT_ROUNDS``).
     """
     _require_open(handle)
-    normal, _ = _job_catalog(handle)
-    names = [j["Name"] for j in normal if j.get("Name")]
-    try:
-        selected = _selected_job_name(handle)
-    except RuntimeError:
-        selected = None
-    if selected not in names:
-        selected = next((j["Name"] for j in normal if j.get("IsSelected")), None)
-    saving = _where_it_saves(handle)
-    return {
-        "folder": {
-            "options": "kebab-case lowercase text, at most 25 characters",
-            "active": "scan",
-            "default": "scan",
-        },
-        "job": {"options": names, "active": selected},
-        "backlash_correction": {"options": [True, False], "active": True, "default": True},
-        "backlash_rounds": {
-            "options": "int >= 0",
-            "active": ACQUISITION_BACKLASH_DEFAULT_ROUNDS,
-            "default": ACQUISITION_BACKLASH_DEFAULT_ROUNDS,
-        },
-        "format": {"options": list(_save.FORMATS), "active": IMAGE_SAVE.format, "default": IMAGE_SAVE.format},
-        "cleanup_source": {"options": [True, False], "active": False, "default": False},
-        "source": {"options": list(_save.SOURCES), "active": IMAGE_SAVE.source, "default": IMAGE_SAVE.source},
-        "projection": {
-            "options": list(_save.PROJECTIONS),
-            "active": IMAGE_SAVE.projection,
-            "default": IMAGE_SAVE.projection,
-        },
-        # Starts at this microscope's set-up data location; a session that
-        # chose its own folder (its output_root) saves there instead.
-        "save_to": {
-            "options": "a full path to a folder on a local disk this computer can write to",
-            "active": str(saving) if saving is not None else None,
-            "default": str(handle.data_location) if handle.data_location is not None else None,
-        },
-    }
+    return {"trigger": {"options": ["full"], "default": "full", "active": "full"}}
 
 def _with_defaults(handle: ZmartHandle, settings: dict | None) -> dict:
-    """Validate settings against the live menu, filling omissions from actives."""
+    """Validate settings against the menu, filling omissions from the active values."""
     menu = get_acquisition_settings(handle)
     resolved = {name: spec["active"] for name, spec in menu.items()}
     for name, value in (settings or {}).items():
         if name not in menu:
             raise ValueError(f"unknown acquisition setting {name!r}")
-        if name == "folder":
-            # Checked here, before the scan fires, so a bad name never wastes a
-            # capture. The rules themselves live in Naming, in one place.
-            if not isinstance(value, str):
-                raise ValueError(
-                    f"acquisition setting 'folder' must be text, not {value!r}"
-                )
-            Naming(folder=value, hash6="000000", position_label="check")
-            resolved[name] = value
-            continue
-        if name == "save_to":
-            # Checked here, before the scan fires, as the data location is
-            # when it is set up: a capture never goes to a folder that
-            # cannot hold it.
-            problems = _data_location.check(value) if isinstance(value, (str, Path)) else ["it is not a path"]
-            if problems:
-                raise ValueError(f"acquisition setting 'save_to' {value!r}: {'; '.join(problems)}")
-            resolved[name] = str(Path(value).resolve())
-            continue
-        if name == "backlash_rounds":
-            if isinstance(value, bool) or not isinstance(value, int) or value < 0:
-                raise ValueError(
-                    "invalid value for acquisition setting 'backlash_rounds': "
-                    f"expected a non-negative integer, got {value!r}"
-                )
-            resolved[name] = value
-            continue
         if value not in menu[name]["options"]:
             raise ValueError(
                 f"invalid value {value!r} for acquisition setting {name!r} "
@@ -980,18 +913,6 @@ def _with_defaults(handle: ZmartHandle, settings: dict | None) -> dict:
             )
         resolved[name] = value
     return resolved
-
-
-def _next_acquisition_hash(handle: ZmartHandle) -> str:
-    """Mint a unique driver-owned hash for one acquired position."""
-
-    now = time.time()
-    for offset in range(100):
-        value = run_hash(now + offset)
-        if value not in handle.acquisition_hashes:
-            handle.acquisition_hashes.add(value)
-            return value
-    raise RuntimeError("could not mint a unique acquisition-position hash")
 
 
 def _next_position_label(handle: ZmartHandle) -> str:
@@ -1017,9 +938,7 @@ def _try(fn):
 def _export_state(
     handle: ZmartHandle,
     *,
-    folder: str,
-    position_label: str,
-    acquisition_hash: str,
+    stem: str,
     job: str,
 ) -> dict:
     """A JSON-serialisable snapshot of machine/software state at export time.
@@ -1039,11 +958,9 @@ def _export_state(
         "job_state": (machine_state or {}).get("changeable") if machine_state else None,
         "position": _try(lambda: get_xyz(handle)),
         "provenance": {
-            "folder": folder,
-            "position_label": position_label,
+            "stem": stem,
             "job": job,
             "session_hash6": handle.hash6,
-            "acquisition_hash": acquisition_hash,
             "exported_at": datetime.now(timezone.utc).isoformat(),
         },
     }
@@ -1058,22 +975,23 @@ def acquire(
     """Run the job, wait for the export, and persist the OME-TIFF product.
 
     Args:
-        position_label: Free text naming this position; sanitized into the
-            filename by ``Naming``. When omitted, the next per-session
-            counter value ("000000", "000001", ...) is used (an explicit
-            label does NOT consume a counter value). The label travels
-            verbatim in the lineage record ``save()`` writes to
-            ``summary.json`` and in the embedded per-plane state.
-        acquisition_settings: Values from :func:`get_acquisition_settings`;
-            settings left out use the active defaults, unknown keys/values
-            raise. ``folder`` names the output folder and starts every file
-            name, so it must be kebab-case lowercase (``Naming`` raises a
-            clear ``ValueError`` otherwise). It defaults to ``"scan"``.
+        position_label: What the workflow calls this capture; every file
+            name starts with it, then the time point, channel and plane
+            (``Naming`` makes it safe for a file name). A workflow that keeps
+            the naming convention gives the whole stem,
+            ``{acquisition_type}_{hash6}_{position_label}``. When omitted, the
+            next per-session counter value ("000000", "000001", ...) is used
+            (an explicit label does NOT consume a counter value). A label
+            already used in this session's staging folder gets ``_001``,
+            ``_002``, ... so no capture is ever overwritten.
+        acquisition_settings: Values from :func:`get_acquisition_settings`:
+            the trigger, which is always ``full``. Unknown keys or values
+            raise.
 
-    The driver's helper mints a fresh acquisition-position hash for this
-    capture. The folder itself has no hash. The session hash
-    (``handle.hash6``) rides along only in lineage/provenance. The machine/software state is captured
-    and embedded in each saved plane's OME-XML (no sidecar).
+    The selected LAS X job is what runs; choose it with :func:`set_state`.
+    The session hash (``handle.hash6``) rides along only in lineage and
+    provenance. The machine/software state is captured and embedded in each
+    saved plane's OME-XML (no sidecar).
 
     Returns a record with the resolved job and settings, ``files`` (every file
     saved) and ``planes`` (which file holds which channel, z and t, and where
@@ -1083,17 +1001,18 @@ def acquire(
     """
     _require_open(handle)
     resolved = _with_defaults(handle, acquisition_settings)
-    if not resolved["save_to"]:
-        _info.output_root(handle)  # says how to set one up
     # Staging lives under the folder saved to, so moving a capture into its
-    # run is a rename on the same disk, never a copy.
-    workflow_root = Path(resolved["save_to"])
-    output_root = workflow_root / ".staging" / handle.hash6
-    folder = resolved["folder"]
-    job = resolved["job"]
+    # run is a rename on the same disk, never a copy. Where that is was set
+    # up once on this microscope; without it, this says how to set it up.
+    workflow_root = _info.output_root(handle)
+    output_root = Path(workflow_root) / ".staging" / handle.hash6
+    # The job that runs is the one selected in LAS X: part of the state, chosen
+    # with set_state or in LAS X itself, never by a capture setting.
+    job = _selected_job_name(handle)
     if not job:
         raise RuntimeError(
-            "no LAS X job selected and none passed via acquisition_settings['job']"
+            "which LAS X job is selected could not be read, or none is; "
+            "choose one with set_state({'job': ...}) and capture again"
         )
 
     # Where the stage stands, as last read, taken before anything moves: every
@@ -1107,18 +1026,8 @@ def acquire(
     noted_before = len(handle.unconfirmed)
     # What the capture's log says it did, step by step (see output/command_log.py).
     steps: dict = {}
-    # When the selected job cannot be read, select the one asked for anyway:
-    # selecting is harmless to repeat, and a reading that fails is unknown,
-    # not a reason to stop.
-    if job != _selected_job_name(handle):
-        select = steps["select_job"] = _commands.select_job(handle.client, job)
-        if not select.get("success"):
-            raise RuntimeError(f"select_job('{job}') failed: {select}")
-        if not select.get("confirmed"):
-            _note_unconfirmed(handle, f"acquire: select_job('{job}')", select)
-
-    backlash_rounds = resolved["backlash_rounds"]
-    apply_backlash = resolved["backlash_correction"] and backlash_rounds > 0
+    backlash_rounds = ACQUISITION_BACKLASH_DEFAULT_ROUNDS
+    apply_backlash = backlash_rounds > 0
     if apply_backlash:
         settled = steps["backlash"] = _motion.correct_backlash(handle.client, passes=backlash_rounds)
         if not settled.get("confirmed"):
@@ -1127,30 +1036,18 @@ def acquire(
     acq = _capture.acquire(handle.client, job)
 
     label = position_label if position_label is not None else _next_position_label(handle)
-    acquisition_hash = _next_acquisition_hash(handle)
-    naming = Naming(
-        folder=folder,
-        hash6=acquisition_hash,
-        position_label=label,
-    )
-    state = _export_state(
-        handle,
-        folder=folder,
-        position_label=label,
-        acquisition_hash=acquisition_hash,
-        job=job,
-    )
+    naming = Naming(stem=free_stem(output_root, Naming(stem=label).stem))
+    state = _export_state(handle, stem=naming.stem, job=job)
     saved = _save.save(
         handle.client,
         acq,
         output_root,
         naming,
         lineage={
-            "folder": folder,
             "position_label": label,
+            "stem": naming.stem,
             "job": job,
             "session_hash6": handle.hash6,
-            "acquisition_hash": acquisition_hash,
         },
         state=state,
         # Rig image->stage orientation, applied to the saved planes behind the
@@ -1158,10 +1055,10 @@ def acquire(
         # at connect (from the set_orientation setup notebook's file); a separate
         # concern from pixel-scale calibration and limits.
         orientation=_loaded_orientation(handle),
-        cleanup_source=resolved["cleanup_source"],
-        source=resolved["source"],
-        format=resolved["format"],
-        projection=resolved["projection"],
+        cleanup_source=False,
+        source=IMAGE_SAVE.source,
+        format=IMAGE_SAVE.format,
+        projection=IMAGE_SAVE.projection,
         # Where on the sample each plane was taken, the same answer the
         # acquisition gives below, so a store lies where its planes say.
         placement=lambda plane_z: _where_the_planes_are(handle, at, job, plane_z),
@@ -1192,7 +1089,7 @@ def acquire(
     unconfirmed = list(handle.unconfirmed[noted_before:])
     log = _log.write(output_root, naming, {
         "position_label": label,
-        "acquisition_hash": acquisition_hash,
+        "stem": naming.stem,
         "asked": dict(acquisition_settings or {}),
         "settings": resolved,
         "steps": steps,
@@ -1209,10 +1106,9 @@ def acquire(
     })
     return {
         "position_label": label,
-        "folder": folder,
+        "trigger": resolved["trigger"],
         "job": job,
-        "format": resolved["format"],
-        "acquisition_hash": acquisition_hash,
+        "format": IMAGE_SAVE.format,
         "settle": "backlash-corrected" if apply_backlash else "direct",
         "backlash_rounds": backlash_rounds if apply_backlash else 0,
         # Every file this acquisition saved, under the name the ZMART
@@ -1227,7 +1123,7 @@ def acquire(
         # images in ``data/metadata``. A client moving a record moves this too.
         "metadata": printed,
         # The changes made for this capture that were sent but never
-        # confirmed by a readback (the job selection, the backlash takeup).
+        # confirmed by a readback (the backlash takeup).
         # Empty when everything confirmed. The capture itself went ahead.
         "unconfirmed": unconfirmed,
         # The driver's log of this capture: what it was asked, and what it did.
@@ -1541,7 +1437,6 @@ def get_info(handle: ZmartHandle) -> dict:
     selected = _selected_job_name(handle)
     root = _where_it_saves(handle)
     return {
-        "output_root": str(root) if root is not None else None,
         "setup": _setup(handle),
         "description": _described(handle),
         "selected_job": selected,
@@ -1565,7 +1460,7 @@ Settings (the changeable part of the state): job is the name of a LAS X job. A j
 
 Objectives on the turret, as slot: LAS X objective number: {objectives}.
 
-Acquiring runs a LAS X job and saves what LAS X captured under the output folder, in the folder named by the folder setting ("scan" unless given), with files named by that folder and the position label."""
+Acquiring has one trigger, full: it runs the selected LAS X job and saves what LAS X captured under this microscope's data location, each file named by the position label it was given, then the time point, the channel and the plane."""
 
 
 def _described(handle: ZmartHandle) -> str:
@@ -1666,7 +1561,10 @@ def _setup(handle: ZmartHandle) -> dict:
         },
         "data_location": {
             "done": handle.data_location is not None,
-            "says": str(handle.data_location) if handle.data_location is not None else _info.SET_UP,
+            "says": (
+                f"{handle.data_location}, as {IMAGE_SAVE.format}"
+                if handle.data_location is not None else _info.SET_UP
+            ),
         },
     }
 

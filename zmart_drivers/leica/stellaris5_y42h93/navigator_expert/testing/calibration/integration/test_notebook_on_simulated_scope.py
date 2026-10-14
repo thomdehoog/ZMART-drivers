@@ -196,7 +196,7 @@ def _install_simulator(monkeypatch, machine) -> SimulatedScope:
         output_root = Path(output_root)
         output_root.mkdir(parents=True, exist_ok=True)
         image_paths = {}
-        if naming.folder == "calibration-stack":
+        if naming.stem.startswith("calibration-stack_"):
             positions = np.linspace(
                 float(sim.stack["begin"]),
                 float(sim.stack["end"]),

@@ -9,13 +9,13 @@ from pathlib import Path
 
 EPOCH = 1767225600  # 2026-01-01 00:00:00 UTC
 _ALPHABET = "0123456789abcdefghijklmnopqrstuvwxyz"
-_FOLDER_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
-_HASH_RE = re.compile(r"^[0-9a-z]{6}$")
-_UNSAFE_LABEL_RE = re.compile(r"[^A-Za-z0-9_-]")
+_UNSAFE_STEM_RE = re.compile(r"[^A-Za-z0-9_-]")
+#: The longest stem a capture is named by. The LAS X computers keep Windows'
+#: old limit of 260 characters on a whole path, so a name must leave room for
+#: the folders it is saved in and for ``_T000000_C00_Z00000.ome.tiff``.
+STEM_LIMIT = 80
 _IMAGE_RE = re.compile(
-    r"^(?P<folder>[a-z0-9]+(?:-[a-z0-9]+)*)_(?P<hash>[0-9a-z]{6})"
-    r"_(?P<label>[A-Za-z0-9_-]+)_T(?P<t>\d{6})_C(?P<c>\d{2})_Z(?P<z>\d{5})"
-    r"\.ome\.tiff$"
+    r"^(?P<stem>[A-Za-z0-9_-]+)_T(?P<t>\d{6})_C(?P<c>\d{2})_Z(?P<z>\d{5})\.ome\.tiff$"
 )
 
 
@@ -34,24 +34,26 @@ def run_hash(start_time: float | None = None) -> str:
 
 @dataclass(frozen=True)
 class Naming:
-    """Validated filename values for one Leica OME-TIFF plane."""
+    """The name of one capture's files: the workflow's stem, then which plane.
 
-    folder: str
-    hash6: str
-    position_label: str
+    ``stem`` is what the workflow called the capture, given to ``acquire`` as
+    the position label, for example
+    ``overview_a1b2c3_K00_M000000_G000000_P000001_V00``. The driver adds only
+    the time point, channel and plane (``t``, ``c``, ``z``), so a workflow
+    names its files the same way on every microscope. Characters that cannot
+    be in a file name become ``_``.
+    """
+
+    stem: str
     t: int = 0
     c: int = 0
     z: int = 0
 
     def __post_init__(self) -> None:
-        if not _FOLDER_RE.fullmatch(self.folder):
-            raise ValueError(
-                f"folder must be kebab-case lowercase, got {self.folder!r}"
-            )
-        if len(self.folder) > 25:
-            raise ValueError("folder is longer than 25 characters")
-        if not _HASH_RE.fullmatch(self.hash6):
-            raise ValueError(f"hash6 must be 6 lowercase base36 characters, got {self.hash6!r}")
+        if not isinstance(self.stem, str) or not self.stem:
+            raise ValueError("the stem must be a non-empty text")
+        if len(self.stem) > STEM_LIMIT:
+            raise ValueError(f"the stem is longer than {STEM_LIMIT} characters: {self.stem!r}")
         for field, value, maximum in (
             ("t", self.t, 999_999),
             ("c", self.c, 99),
@@ -59,20 +61,13 @@ class Naming:
         ):
             if isinstance(value, bool) or not isinstance(value, int) or not 0 <= value <= maximum:
                 raise ValueError(f"{field} must be a whole number from 0 through {maximum}")
-        if not isinstance(self.position_label, str) or not self.position_label:
-            raise ValueError("position_label must be a non-empty string")
-        if len(self.position_label) > 40:
-            raise ValueError("position_label is longer than 40 characters")
-        object.__setattr__(self, "position_label", _UNSAFE_LABEL_RE.sub("_", self.position_label))
+        object.__setattr__(self, "stem", _UNSAFE_STEM_RE.sub("_", self.stem))
 
 
 def build_image_name(naming: Naming) -> str:
     """Return the canonical Leica filename for one T/C/Z plane."""
 
-    return (
-        f"{naming.folder}_{naming.hash6}_{naming.position_label}_"
-        f"T{naming.t:06d}_C{naming.c:02d}_Z{naming.z:05d}.ome.tiff"
-    )
+    return f"{naming.stem}_T{naming.t:06d}_C{naming.c:02d}_Z{naming.z:05d}.ome.tiff"
 
 
 def parse_image_name(filename: str) -> Naming | None:
@@ -82,79 +77,83 @@ def parse_image_name(filename: str) -> Naming | None:
     if match is None:
         return None
     return Naming(
-        folder=match.group("folder"),
-        hash6=match.group("hash"),
-        position_label=match.group("label"),
+        stem=match.group("stem"),
         t=int(match.group("t")),
         c=int(match.group("c")),
         z=int(match.group("z")),
     )
 
 
-def acquisition_dir(output_root: Path | str, folder: str) -> Path:
-    """Return the driver's staging directory for one folder of acquisitions."""
+def free_stem(output_root: Path | str, stem: str) -> str:
+    """``stem``, or ``stem_001``, ``stem_002``, ...: the first no earlier capture here used.
 
-    return Path(output_root) / folder
-
-
-def data_dir(output_root: Path | str, folder: str) -> Path:
-    """Return where the images of an acquisition go: ``<folder>/data``.
-
-    An acquisition is a folder with parts, and the pixels the microscope
-    captured are one of them. Giving them their own folder leaves room beside
-    it for what is made from them afterwards -- a stitched view, an analysis --
-    and for the vendor's own copy, without any of those having to be told apart
-    from an image by its name.
+    A capture never overwrites another: a second one under the same name, say
+    a target taken again, gets the next number instead.
     """
 
-    return acquisition_dir(output_root, folder) / "data"
+    taken = data_dir(output_root)
+    candidate, number = stem, 0
+    while (taken / build_image_name(Naming(stem=candidate))).exists() or (
+        taken / f"{Naming(stem=candidate).stem}.ome.zarr"
+    ).exists():
+        number += 1
+        candidate = f"{stem}_{number:03d}"
+    return candidate
 
 
-def projections_dir(output_root: Path | str, folder: str) -> Path:
-    """``<acquisition>/projections``: what is projected from the captures, beside ``data``."""
+def data_dir(output_root: Path | str) -> Path:
+    """Return where the images of a capture go: ``data``.
 
-    return acquisition_dir(output_root, folder) / "projections"
+    The pixels the microscope captured get a folder of their own, which
+    leaves room beside it for what is made from them afterwards -- a
+    projection, an analysis -- and for the vendor's own copy, without any of
+    those having to be told apart from an image by its name.
+    """
+
+    return Path(output_root) / "data"
 
 
-def log_dir(output_root: Path | str, folder: str) -> Path:
-    """``<acquisition>/log``: what the driver was asked for each capture, and what it did."""
+def projections_dir(output_root: Path | str) -> Path:
+    """``projections``: what is projected from the captures, beside ``data``."""
 
-    return acquisition_dir(output_root, folder) / "log"
+    return Path(output_root) / "projections"
+
+
+def log_dir(output_root: Path | str) -> Path:
+    """``log``: what the driver was asked for each capture, and what it did."""
+
+    return Path(output_root) / "log"
 
 
 def build_projection_name(naming: Naming, method: str) -> str:
     """The projection of one T/C of a capture, saved as OME-TIFF: the image name with the method for Z."""
 
-    return f"{naming.folder}_{naming.hash6}_{naming.position_label}_T{naming.t:06d}_C{naming.c:02d}_{method}.ome.tiff"
+    return f"{naming.stem}_T{naming.t:06d}_C{naming.c:02d}_{method}.ome.tiff"
 
 
-def metadata_dir(output_root: Path | str, folder: str) -> Path:
-    """Return where an acquisition's printed metadata goes: ``<folder>/data/metadata``."""
+def metadata_dir(output_root: Path | str) -> Path:
+    """Return where a capture's printed metadata goes: ``data/metadata``."""
 
-    return data_dir(output_root, folder) / "metadata"
+    return data_dir(output_root) / "metadata"
 
 
-def state_dir(output_root: Path | str, folder: str) -> Path:
+def state_dir(output_root: Path | str) -> Path:
     """Return where ZMART's own account of a capture goes.
 
-    ``<folder>/data/metadata/ZMART_state``, beside ``metadata/vendor`` -- one
-    folder per party, so whose account a file is never has to be read off its
-    name.
+    ``data/metadata/ZMART_state``, beside ``metadata/vendor`` -- one folder
+    per party, so whose account a file is never has to be read off its name.
     """
 
-    return metadata_dir(output_root, folder) / "ZMART_state"
+    return metadata_dir(output_root) / "ZMART_state"
 
 
 def build_state_name(naming: Naming) -> str:
-    """Return the filename for one acquisition's printed state.
+    """Return the filename for one capture's printed state.
 
     The image name without the channel and the z-slice, because one state
-    describes every plane of the acquisition it was captured for: those two
-    are what a single capture spans, while a new position or timepoint is a
-    new capture with a state of its own.
+    describes every plane of the capture it was taken for: those two are what
+    a single capture spans, while a new position or timepoint is a new
+    capture with a state of its own.
     """
 
-    return (
-        f"{naming.folder}_{naming.hash6}_{naming.position_label}_"
-        f"T{naming.t:06d}_ZMART_state.json"
-    )
+    return f"{naming.stem}_T{naming.t:06d}_ZMART_state.json"

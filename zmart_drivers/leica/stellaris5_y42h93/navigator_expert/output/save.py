@@ -198,9 +198,9 @@ def _persist_projection(
     indices = [index for position in exported.positions for index in position.planes]
     where = placement(sorted({index.z for index in indices})) if placement is not None else None
     projected = ome_zarr.max_projection(ome_zarr.gather(exported, orientation=orientation, where=where))
-    folder = projections_dir(output_root, naming.folder)
+    folder = projections_dir(output_root)
     if format == "ome-zarr":
-        store = folder / f"{naming.folder}_{naming.hash6}_{naming.position_label}.ome.zarr"
+        store = folder / f"{naming.stem}.ome.zarr"
         return (ome_zarr.write_store(projected, store, state=state),)
     folder.mkdir(parents=True, exist_ok=True)
     written = []
@@ -253,7 +253,7 @@ def _persist_store(
     vendor_records = _persist_vendor_metadata(exported, output_root, naming)
     indices = [index for position in exported.positions for index in position.planes]
     where = placement(sorted({index.z for index in indices})) if placement is not None else None
-    store = data_dir(output_root, naming.folder) / f"{naming.folder}_{naming.hash6}_{naming.position_label}.ome.zarr"
+    store = data_dir(output_root) / f"{naming.stem}.ome.zarr"
     ome_zarr.write_position_store(exported, store, orientation=orientation, where=where, state=state)
     printed = _print_state(state, output_root, naming)
 
@@ -296,7 +296,7 @@ def _persist_export(
     """Shared persistence for stable exported source paths.
 
     Flat: each 2-D plane is written directly under
-    ``data_dir(output_root, folder)`` and its OME-XML is
+    ``data_dir(output_root)`` and its OME-XML is
     embedded (no sidecar companion). *state* is embedded per-plane.
     """
     if cleanup_source and not exported.cleanup_source_supported:
@@ -321,9 +321,7 @@ def _persist_export(
         for pos in exported.positions:
             for idx, image_src in sorted(pos.planes.items()):
                 plane_naming = replace(naming, t=idx.t, c=idx.c, z=idx.z)
-                image_dest = data_dir(
-                    output_root, plane_naming.folder
-                ) / build_image_name(plane_naming)
+                image_dest = data_dir(output_root) / build_image_name(plane_naming)
                 image_dest.parent.mkdir(parents=True, exist_ok=True)
 
                 _materialize.save_image_source_atomic(
@@ -377,7 +375,7 @@ def _print_state(state: dict | None, output_root: Path, naming: Naming) -> Path 
 
     if state is None:
         return None
-    destination = state_dir(output_root, naming.folder) / build_state_name(naming)
+    destination = state_dir(output_root) / build_state_name(naming)
     if not destination.exists():
         _write_json_atomic(destination, state)
     return destination
@@ -394,7 +392,7 @@ def _persist_vendor_metadata(
     # it sits under the same roof rather than beside `data` -- what is beside
     # `data` is what was made from the pixels afterwards, and this was not.
     vendor_dir = (
-        metadata_dir(output_root, naming.folder)
+        metadata_dir(output_root)
         / "vendor"
         / _safe_component(exported.source_exporter)
     )
@@ -458,9 +456,7 @@ def _rel_posix(p: Path, base: Path) -> str:
 
 def _naming_to_dict(n: Naming) -> dict:
     return {
-        "folder": n.folder,
-        "hash6": n.hash6,
-        "position_label": n.position_label,
+        "stem": n.stem,
         "t": n.t,
         "c": n.c,
         "z": n.z,

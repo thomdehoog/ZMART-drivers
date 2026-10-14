@@ -794,11 +794,7 @@ def acquire_validation_image(
         session.client,
         acquisition,
         output_root,
-        Naming(
-            folder="orientation-validation",
-            hash6=run_hash(),
-            position_label="validation",
-        ),
+        Naming(stem=f"orientation-validation_{run_hash()}_validation"),
         orientation=session.orientation,
     )
     if len(saved.image_paths) != 1:

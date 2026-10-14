@@ -229,19 +229,25 @@ def phase_readonly(v: vh.Validator, sess: Any, args: argparse.Namespace) -> None
         act = v.callable("get_actuators", sess.get_actuators)
         if act is not None:
             v.compare(
-                "actuators: expected menu",
+                "actuators: expected menu, with the default named",
                 act,
-                {"x": ["motoric"], "y": ["motoric"], "z": ["z-wide", "z-galvo"]},
+                {
+                    "x": {"options": ["motoric"], "default": "motoric"},
+                    "y": {"options": ["motoric"], "default": "motoric"},
+                    "z": {"options": ["z-wide", "z-galvo"], "default": "z-wide"},
+                },
             )
 
         xyz = v.callable("get_xyz", sess.get_xyz)
         if xyz is not None:
             for axis in ("x", "y", "z"):
                 v.compare(
-                    f"get_xyz: {axis} has position, unit, actuators and canvas",
+                    f"get_xyz: {axis} has position, unit, actuator, actuators and canvas",
                     list(xyz[axis]),
-                    ["position", "unit", "actuators", "canvas"],
+                    ["position", "unit", "actuator", "actuators", "canvas"],
                 )
+                v.compare(f"get_xyz: {axis} used its default motor", xyz[axis]["actuator"],
+                          {"x": "motoric", "y": "motoric", "z": "z-wide"}[axis])
                 v.compare(f"get_xyz: {axis} unit is micrometer", xyz[axis]["unit"], "micrometer")
             # Every motor of each axis reports its own reading, under the
             # names get_actuators lists.
@@ -273,9 +279,15 @@ def phase_readonly(v: vh.Validator, sess: Any, args: argparse.Namespace) -> None
                 bool((state["observed"].get("active_objective") or {}).get("name")),
                 True,
             )
-        if state is not None and opts is not None:
+        if opts is not None:
+            v.compare(
+                "get_acquisition_settings: only how to trigger",
+                opts,
+                {"trigger": {"options": ["full"], "default": "full", "active": "full"}},
+            )
+        if state is not None:
             selected_job = state["changeable"]["job"]
-            normal_jobs = (opts.get("job") or {}).get("options") or []
+            normal_jobs = [job.get("Name") for job in state["observed"].get("jobs", []) if job.get("Name")]
             autofocus_jobs = {
                 job.get("Name")
                 for job in state["observed"].get("autofocus_jobs", [])
@@ -300,13 +312,10 @@ def phase_readonly(v: vh.Validator, sess: Any, args: argparse.Namespace) -> None
         info = v.callable("get_info", sess.get_info)
         if info is not None:
             v.compare("get_info: has session_hash6", bool(info.get("session_hash6")), True)
-            v.compare("get_info: output_root returned", bool(info.get("output_root")), True)
-            if not args.mock and info.get("output_root"):
-                v.compare(
-                    "get_info: run directory exists",
-                    Path(info["output_root"]).is_dir(),
-                    True,
-                )
+            location = (info.get("setup") or {}).get("data_location") or {}
+            v.compare("get_info: says where it saves", bool(location.get("says")), True)
+            if not args.mock:
+                v.compare("get_info: the data location is set up", location.get("done"), True)
             v.compare(
                 "get_info: reports no template positions",
                 "tile_positions" in info or "focus_positions" in info,
@@ -614,7 +623,7 @@ def phase_state(v: vh.Validator, sess: Any) -> None:
         if not captured:
             return
         original = captured["changeable"]["job"]
-        names = (sess.get_acquisition_settings().get("job") or {}).get("options") or []
+        names = [job.get("Name") for job in captured["observed"].get("jobs", []) if job.get("Name")]
         autofocus_names = {
             job.get("Name")
             for job in captured["observed"].get("autofocus_jobs", [])
@@ -693,19 +702,14 @@ def phase_acquire(v: vh.Validator, sess: Any, args: argparse.Namespace) -> None:
         return
     with v.phase("acquire (capture + save)"):
         # The live LAS X session decides where it writes; save collects from
-        # the single native AutoSave path.
-        settings: dict[str, Any] = {
-            "folder": "adapter-smoke",
-            "backlash_correction": True,
-            "backlash_rounds": 1,
-        }
+        # the single native AutoSave path. The selected job runs, whole.
         rec = v.callable(
             "acquire: capture + save",
             lambda: sess.acquire(
-                position_label="1",
-                acquisition_settings=settings,
+                position_label="adapter-smoke_1",
+                acquisition_settings={"trigger": "full"},
             ),
-            context={"backlash_correction": True, "backlash_rounds": 1},
+            context={"trigger": "full"},
             mutating=True,
         )
         if not rec:
@@ -734,7 +738,7 @@ def phase_acquire(v: vh.Validator, sess: Any, args: argparse.Namespace) -> None:
             )
             if embedded is not None:
                 v.compare("acquire: image carries embedded OME-XML", b"<OME" in embedded, True)
-        v.compare("acquire: backlash_correction ran", rec.get("settle"), "backlash-corrected")
+        v.compare("acquire: the whole job ran", rec.get("trigger"), "full")
 
 
 # --- CLI --------------------------------------------------------------------

@@ -79,8 +79,9 @@ def test_get_info_describes_the_microscope_in_plain_words(monkeypatch, tmp_path)
     # The fixture limits allow x 1000..130000 um of stage travel; with no saved
     # origin the frame is the stage itself, so the canvas is exactly that.
     assert xyz["x"]["canvas"] == [1000.0, 130000.0]
-    # Each axis answers the controller's four entries, and the motors are
-    # named exactly as get_actuators lists them.
-    assert list(xyz["x"]) == ["position", "unit", "actuators", "canvas"]
+    # Each axis answers the controller's five entries, says which motor it
+    # used, and names the motors exactly as get_actuators lists them.
+    assert list(xyz["x"]) == ["position", "unit", "actuator", "actuators", "canvas"]
+    assert xyz["z"]["actuator"] == "z-wide"
     assert xyz["z"]["unit"] == "micrometer"
     assert list(xyz["z"]["actuators"]) == ["z-wide", "z-galvo"]

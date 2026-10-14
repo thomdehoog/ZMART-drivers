@@ -90,8 +90,8 @@ def test_the_class_answers_what_the_module_answers(monkeypatch, tmp_path):
     as_module["get_xyz"].pop("objective_translation_um")
     assert as_class == as_module
     assert class_info["description"] == info["description"]
-    # Where it saves and what is set up reach the controller from the class too.
-    assert class_info["output_root"] == info["output_root"]
+    # What is set up, where it saves among it, reaches the controller from the class too.
+    assert "output_root" not in class_info
     assert class_info["setup"] == info["setup"]
     assert set(class_info["setup"]) == {"limits", "orientation", "calibration", "origin", "data_location"}
     for item in class_info["setup"].values():

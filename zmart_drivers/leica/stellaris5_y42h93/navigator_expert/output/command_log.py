@@ -1,6 +1,6 @@
 """The log of one capture: what the driver was asked, and what it did.
 
-One JSON file a capture, ``<acquisition>/log/<folder>_<hash>_<label>.log.json``,
+One JSON file a capture, ``log/<stem>.log.json``,
 beside ``data``: the settings asked for and the ones used, each step the
 driver took (selecting the job, taking up backlash, the capture itself) with
 what LAS X answered, what was sent but never confirmed, when the capture
@@ -22,7 +22,7 @@ __all__ = ["write"]
 
 def write(output_root: Path | str, naming: Naming, entry: dict) -> Path:
     """Write *entry* as the capture's log, whole, and return its path."""
-    path = log_dir(output_root, naming.folder) / f"{naming.folder}_{naming.hash6}_{naming.position_label}.log.json"
+    path = log_dir(output_root) / f"{naming.stem}.log.json"
     path.parent.mkdir(parents=True, exist_ok=True)
     writing = path.with_name(f"{path.name}.{uuid.uuid4().hex[:8]}.writing")
     writing.write_text(json.dumps(entry, indent=2, ensure_ascii=False, default=str), encoding="utf-8")

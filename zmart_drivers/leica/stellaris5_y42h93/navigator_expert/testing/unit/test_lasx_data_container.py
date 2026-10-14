@@ -347,7 +347,7 @@ class TestSaving:
 
     def test_save_writes_one_ome_tiff_per_plane_from_the_cache(self, cache, tmp_path):
         pixels = two_channel_12_bit(cache)
-        naming = Naming(folder="high-res", hash6="000001", position_label="000003")
+        naming = Naming(stem="high-res_000001_000003")
 
         saved = acquisition.save(
             None,
@@ -371,7 +371,7 @@ class TestSaving:
             assert 'PhysicalSizeX="2.5"' in ome
 
     def test_an_unknown_source_is_refused(self, cache, tmp_path):
-        naming = Naming(folder="high-res", hash6="000001", position_label="000003")
+        naming = Naming(stem="high-res_000001_000003")
 
         with pytest.raises(ValueError, match="cache"):
             acquisition.save(

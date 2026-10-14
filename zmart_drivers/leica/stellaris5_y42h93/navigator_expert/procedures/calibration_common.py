@@ -340,11 +340,7 @@ def _capture_for_calibration(
     if orientation is None:
         orientation = _orientation.rig_orientation()
     position_label = f"{len(session.exported_files):06d}"
-    naming = Naming(
-        folder=folder,
-        hash6=run_hash(),
-        position_label=position_label,
-    )
+    naming = Naming(stem=f"{folder}_{run_hash()}_{position_label}")
     if backlash_passes is not None:
         _movement.correct_backlash(session.client, passes=backlash_passes)
     acq = drv.acquire(session.client, session.job_name)

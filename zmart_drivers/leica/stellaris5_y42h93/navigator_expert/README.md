@@ -79,9 +79,9 @@ LAS X.
   Each axis has four entries, and every number in them is in micrometres. For example, with the
   origin saved at stage x 63500, y 41500 and a focus of 2000 (z-wide 2000, z-galvo 0):
   ```python
-  {'x': {'position': 100.0, 'unit': 'micrometer', 'actuators': {'motoric': 63600.0},                 'canvas': [-62500.0, 66500.0]},
-   'y': {'position': 50.0,  'unit': 'micrometer', 'actuators': {'motoric': 41550.0},                 'canvas': [-40500.0, 58500.0]},
-   'z': {'position': 0.0,   'unit': 'micrometer', 'actuators': {'z-wide': 2000.0, 'z-galvo': 0.0},  'canvas': [-2250.0, 6250.0]},
+  {'x': {'position': 100.0, 'unit': 'micrometer', 'actuator': 'motoric', 'actuators': {'motoric': 63600.0},                 'canvas': [-62500.0, 66500.0]},
+   'y': {'position': 50.0,  'unit': 'micrometer', 'actuator': 'motoric', 'actuators': {'motoric': 41550.0},                 'canvas': [-40500.0, 58500.0]},
+   'z': {'position': 0.0,   'unit': 'micrometer', 'actuator': 'z-wide',  'actuators': {'z-wide': 2000.0, 'z-galvo': 0.0},  'canvas': [-2250.0, 6250.0]},
    'objective_translation_um': [0.0, 0.0, 0.0]}
   ```
   - `position` is where the axis is, measured from the saved origin. For z it is the focus: the
@@ -89,6 +89,8 @@ LAS X.
     objective is in place than the one the origin was saved under, the calibrated objective
     translation is subtracted too, so the position names the same point of the sample.
   - `unit` is always `'micrometer'`.
+  - `actuator` is the motor this answer used: the one `with_actuators` chose, or else the default
+    `get_actuators` names (`motoric` for x and y, `z-wide` for z).
   - `actuators` lists every motor of the axis, under the names `get_actuators` gives, each with
     its own reading exactly as LAS X reports it. Nothing is subtracted from these, so they show
     how z-wide and z-galvo share the focus.
@@ -193,7 +195,7 @@ move_xy(client, 65_000, 65_000, unit="um")
 acq = acquire(client, "MyExperiment")                     # -> AcquisitionResult (RAISES on failure)
 
 # 5. Persist with Leica's private naming helper (a separate step from acquire)
-naming = Naming(folder="overview", hash6=run_hash())
+naming = Naming(stem=f"overview_{run_hash()}_K00_M000001_G000001_P000000_V00")
 saved = save(client, acq, output_root="D:/runs/demo", naming=naming)
 print(saved.image_paths)                                  # {PlaneIndex(t,z,c): Path, ...}
 ```
@@ -202,9 +204,9 @@ print(saved.image_paths)                                  # {PlaneIndex(t,z,c): 
 > `{"success": ...}` dict. Saving is a deliberate second step (see §6).
 
 > The explicit `output_root` above is for the low-level driver API. Through
-> `zmart_controller`, the Leica adapter discovers the `ZMART-microscopy` root
-> beside LAS X native AutoSave and reports it through `get_info()["output_root"]`;
-> the workflow creates the experiment/acquisition folders under that root.
+> `zmart_controller`, the Leica adapter saves under this microscope's data location, set up once
+> and reported in `get_info()["setup"]["data_location"]` (or under the connection's
+> `output_root`, when a session gives one); the workflow files each capture into its own run.
 
 > No machine config yet? The first connect seeds ProgramData from the repo defaults so CI and local
 > mock runs work. On the rig, run `configuration/limits/notebooks/set_limits.ipynb`,
@@ -411,19 +413,21 @@ save(client, acq, output_root, naming, *, lineage=None, fix_ome=True,
 ```
 `save()` collects LAS X native AutoSave output into a neutral product and
 writes canonical single-plane OME-TIFFs with OME-XML embedded in each image.
-They land in `<output_root>/<folder>/data/`, so what is made from
+They land in `<output_root>/data/`, so what is made from
 them later (a stitched view, an analysis) becomes a folder beside `data` and is
 never confused with it. Everything describing the capture is under
 `data/metadata`, one folder per party:
 
 ```
-overview/
-  data/
-    overview_<hash6>_K00_M000001_G000001_P000000_V00_T000000_C00_Z00000.ome.tiff
-    metadata/
-      ZMART_state/  overview_<hash6>_..._T000000_ZMART_state.json
-      vendor/       lasx_native_autosave/{source_embedded.ome.xml, *.xlef, metadata_*.xlif}
+data/
+  overview_<hash6>_K00_M000001_G000001_P000000_V00_T000000_C00_Z00000.ome.tiff
+  metadata/
+    ZMART_state/  overview_<hash6>_..._T000000_ZMART_state.json
+    vendor/       lasx_native_autosave/{source_embedded.ome.xml, *.xlef, metadata_*.xlif}
 ```
+
+Every name starts with the stem the workflow gave as the position label; the driver adds only
+the time point, channel and plane.
 
 The `state` passed to `save()` is embedded in every plane's OME-XML **and**
 printed once per acquisition — the image name without the channel and the
@@ -449,17 +453,21 @@ read back identical. Off by default. Each capture's hidden Navigator copy is not
 they come from the ZMART interface. `acquire()` and the autofocus procedure capture at the current
 position and leave the LAS X template alone.
 
-**Extra in-place backlash rounds are off by default.** The acquisition setting
-`backlash_rounds` defaults to `0`; pass a positive whole number to opt in for a
-particular capture. The normal XY move still uses the driver's consistent final
-approach to the requested position.
+**Acquisition settings say only how a capture is triggered.** This driver has one trigger,
+`full`: the whole of the LAS X job that is selected. Which job that is belongs to the state
+(`set_state({"job": ...})`). How a capture is saved -- the format, where the pixels are read from
+(`source`), the projection -- is this microscope's `IMAGE_SAVE` profile, and where it goes is its
+data location, both set up once.
 
-**`Naming` constraints.** The `folder` must be kebab-case lowercase (`"overview"`,
-`"target-scan"`); `Naming` raises `ValueError` on `"Prescan"` or `"target_scan"`. Through the
-adapter, the `folder` acquisition setting (default `"scan"`) is checked before the scan fires, so a
-bad name never wastes a capture. Calling `save()` directly, the raise comes after the capture, so
-validate names before acquiring. The adapter's driver-owned helper gives every
-acquired position a unique hash, and the workflow supplies the `K/M/G/P/V` position label.
+**Extra in-place backlash rounds are off by default.** They are the driver's own setting,
+`ACQUISITION_BACKLASH_DEFAULT_ROUNDS` in the adapter, `0` unless changed there. The normal XY
+move still uses the driver's consistent final approach to the requested position.
+
+**`Naming`.** A capture is named by its stem, the position label the workflow gives: a workflow
+that keeps the naming convention gives `{acquisition_type}_{hash6}_{K/M/G/P/V label}`. Characters
+that cannot be in a file name become `_`, and a stem longer than 80 characters is refused before
+anything is captured, so the whole path stays within Windows' old limit. A stem already used in
+the session's staging folder gets `_001`, `_002`, ..., so no capture is ever overwritten.
 
 ### Templates / scan-fields (offline-capable)
 

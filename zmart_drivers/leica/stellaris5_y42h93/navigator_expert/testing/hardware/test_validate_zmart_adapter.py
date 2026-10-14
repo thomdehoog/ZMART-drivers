@@ -111,7 +111,7 @@ def test_readonly_mock_run(tmp_path):
     assert counts["FAIL"] == 0
     assert counts["WARN"] == 0
     names = {r["name"] for r in records}
-    assert "get_xyz: x has position, unit, actuators and canvas" in names
+    assert "get_xyz: x has position, unit, actuator, actuators and canvas" in names
     assert "get_xyz: actuators name every motor" in names
     assert "get_state: objective has a name" in names
 
@@ -131,7 +131,7 @@ def test_full_mock_run_move_and_acquire(tmp_path):
     by_name = {r["name"]: r for r in records}
     # The controller round-trip, z-focus model, and state round-trip are exercised.
     assert {
-        "get_info: output_root returned",
+        "get_info: says where it saves",
         "set_origin",
         "xy: frame x",
         "zgalvo: frame z",
@@ -169,11 +169,13 @@ def test_full_mock_run_move_and_acquire(tmp_path):
 def test_state_phase_does_not_switch_away_from_autofocus_job():
     captured = {
         "changeable": {"job": "AF Job"},
-        "observed": {"autofocus_jobs": [{"Name": "AF Job"}]},
+        "observed": {
+            "jobs": [{"Name": "Overview"}, {"Name": "HiRes"}],
+            "autofocus_jobs": [{"Name": "AF Job"}],
+        },
     }
     session = SimpleNamespace(
         get_state=Mock(return_value=captured),
-        get_acquisition_settings=Mock(return_value={"job": {"options": ["Overview", "HiRes"]}}),
         set_state=Mock(side_effect=AssertionError("must not switch an autofocus job")),
     )
     validator = SimpleNamespace(
@@ -212,9 +214,9 @@ def test_connect_session_leaves_output_root_for_driver_discovery():
             session.disconnect()
 
 
-@pytest.mark.parametrize(("rounds", "corrects"), [(None, False), (1, True)])
+@pytest.mark.parametrize(("rounds", "corrects"), [(0, False), (1, True)])
 def test_acquire_backlash_rounds_through_the_controller_seam(tmp_path, rounds, corrects):
-    """Default-zero and positive rounds both cross the real Session seam.
+    """The driver's own rounds, zero by default or positive, both cross the real Session seam.
 
     Unlike the adapter-direct unit tests (which patch driver internals and pass
     ``object()`` as the client), this opens a real ``zmart_controller.ZmartController``
@@ -222,7 +224,7 @@ def test_acquire_backlash_rounds_through_the_controller_seam(tmp_path, rounds, c
     use live) and only patches the I/O boundary (``_capture``/``_save``) that a
     mock CAM cannot satisfy -- so the seam decision #3 cares about (Session ->
     ops table -> adapter) is what is actually exercised for both the default
-    and a positive ``backlash_rounds`` acquisition setting.
+    and a positive ``ACQUISITION_BACKLASH_DEFAULT_ROUNDS``, the driver's own setting.
     """
     from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.actions import profiles
 
@@ -250,17 +252,12 @@ def test_acquire_backlash_rounds_through_the_controller_seam(tmp_path, rounds, c
             return SimpleNamespace(image_paths={}, xml_paths={}, naming=naming)
 
         with (
+            patch.object(adapter, "ACQUISITION_BACKLASH_DEFAULT_ROUNDS", rounds),
             patch.object(adapter._motion, "correct_backlash", fake_correct_backlash),
             patch.object(adapter._capture, "acquire", fake_capture),
             patch.object(adapter._save, "save", fake_save),
         ):
-            options = {"backlash_correction": True}
-            if rounds is not None:
-                options["backlash_rounds"] = rounds
-            record = session.acquire(
-                position_label="1",
-                acquisition_settings=options,
-            )
+            record = session.acquire(position_label="1")
     finally:
         adapter._session.connect_python_client = original_connect
         profiles.STATE_READERS = original_profile
@@ -274,4 +271,4 @@ def test_acquire_backlash_rounds_through_the_controller_seam(tmp_path, rounds, c
     else:
         assert order == [("capture", active_job)]
     assert record["settle"] == ("backlash-corrected" if corrects else "direct")
-    assert record["backlash_rounds"] == (rounds or 0)
+    assert record["backlash_rounds"] == rounds

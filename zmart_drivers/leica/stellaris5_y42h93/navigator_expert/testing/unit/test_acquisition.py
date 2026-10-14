@@ -58,18 +58,12 @@ def saves_as_ome_tiff(monkeypatch):
 
 @pytest.fixture
 def naming() -> Naming:
-    return Naming(
-        folder="overview-scan",
-        hash6="000001",
-        position_label="000003",
-    )
+    return Naming(stem="overview-scan_000001_000003")
 
 
 def test_leica_private_naming_round_trips_time_channel_and_z():
     naming = Naming(
-        folder="overview",
-        hash6="abc123",
-        position_label="K00_M000000_G000000_P000000_V00",
+        stem="overview_abc123_K00_M000000_G000000_P000000_V00",
         t=12,
         c=2,
         z=34,
@@ -82,9 +76,7 @@ def test_leica_private_naming_round_trips_time_channel_and_z():
 def test_leica_private_naming_rejects_unrepresentable_plane_indices(field, value):
     with pytest.raises(ValueError, match=field):
         Naming(
-            folder="overview",
-            hash6="abc123",
-            position_label="P0",
+        stem="overview_abc123_P0",
             **{field: value},
         )
 
@@ -434,7 +426,7 @@ class TestSave:
 
         # Flat: one 2-D plane per file in the acquisition's ``data`` folder,
         # no sidecar XML.
-        expected_image = output_root / "overview-scan" / "data" / build_image_name(naming)
+        expected_image = output_root / "data" / build_image_name(naming)
         assert isinstance(result, drv.SavedAcquisition)
         assert set(result.image_paths) == set(patched_export["plane_paths"])
         assert result.image_paths[drv.PlaneIndex(t=0, z=0, c=0)] == expected_image
@@ -447,10 +439,10 @@ class TestSave:
         rec = next(
             r for r in summary["acquisitions"] if r["naming"]["c"] == 0 and r["naming"]["z"] == 0
         )
-        assert rec["image_path"] == ("overview-scan/data/" + build_image_name(naming))
+        assert rec["image_path"] == ("data/" + build_image_name(naming))
         assert "xml_path" not in rec
         assert rec["source_exporter"] == "lasx_native_autosave"
-        assert rec["naming"]["position_label"] == "000003"
+        assert rec["naming"]["stem"] == "overview-scan_000001_000003"
 
     def test_save_does_not_issue_microscope_acquire(
         self,
@@ -641,11 +633,7 @@ class TestSave:
         successful_acq,
         tmp_path,
     ):
-        naming = Naming(
-            folder="overview-scan",
-            hash6="000001",
-            position_label="well_B7",
-        )
+        naming = Naming(stem="overview-scan_000001_well_B7")
 
         saved = drv.save(
             None,
@@ -657,9 +645,7 @@ class TestSave:
         for idx, path in saved.image_paths.items():
             parsed = parse_image_name(path.name)
             assert parsed is not None
-            assert parsed.folder == "overview-scan"
-            assert parsed.hash6 == "000001"
-            assert parsed.position_label == "well_B7"
+            assert parsed.stem == "overview-scan_000001_well_B7"
             assert parsed.z == idx.z
             assert parsed.c == idx.c
 
@@ -739,7 +725,7 @@ class TestSave:
                 cleanup_source=False,
             )
 
-        out_img = next((tmp_path / "out" / "overview-scan" / "data").glob("*.ome.tiff"))
+        out_img = next((tmp_path / "out" / "data").glob("*.ome.tiff"))
         assert image_path.read_bytes() == source_before
         assert b'Wavelength="0"' not in out_img.read_bytes()
         assert fix_ome_tiff.call_count == 0
@@ -856,9 +842,8 @@ class TestSave:
 
         drv.save(None, successful_acq, output_root, naming, state={"software": {}})
 
-        acquisition_folder = output_root / "overview-scan"
-        data = acquisition_folder / "data"
-        assert {path.name for path in acquisition_folder.iterdir()} == {"data", "projections"}
+        data = output_root / "data"
+        assert {path.name for path in output_root.iterdir()} == {"data", "projections", "summary.json"}
         assert all(
             path.suffixes == [".ome", ".tiff"] for path in data.iterdir() if path.is_file()
         )
@@ -891,7 +876,7 @@ class TestSave:
 
         drv.save(None, successful_acq, output_root, naming, state=state)
 
-        metadata = output_root / "overview-scan" / "data" / "metadata" / "ZMART_state"
+        metadata = output_root / "data" / "metadata" / "ZMART_state"
         printed = list(metadata.iterdir())
         assert [path.name for path in printed] == [
             "overview-scan_000001_000003_T000000_ZMART_state.json"
@@ -910,7 +895,7 @@ class TestSave:
 
         drv.save(None, successful_acq, output_root, naming)
 
-        assert not (output_root / "overview-scan" / "data" / "metadata" / "ZMART_state").exists()
+        assert not (output_root / "data" / "metadata" / "ZMART_state").exists()
 
     def test_repeated_save_replaces_summary_record(
         self,

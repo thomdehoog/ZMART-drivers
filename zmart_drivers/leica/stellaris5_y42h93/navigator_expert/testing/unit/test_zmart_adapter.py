@@ -124,7 +124,7 @@ def _a_capture(job: str) -> SimpleNamespace:
 _WRITE_THE_LOG = adapter._log.write
 _NO_LOG_ON_DISK = patch.object(
     adapter._log, "write",
-    lambda output_root, naming, entry: Path("/tmp/out") / naming.folder / "log" / "capture.log.json",
+    lambda output_root, naming, entry: Path("/tmp/out") / "log" / f"{naming.stem}.log.json",
 )
 
 
@@ -264,9 +264,11 @@ class TestFrame(unittest.TestCase):
             pos = adapter.get_xyz(h)
         self.assertEqual(pos["x"]["position"], 0.0)
         self.assertEqual(pos["z"]["position"], 0.0)
-        # Each axis carries the four entries of the controller's contract, in
-        # this order, and names every motor that can move it.
-        self.assertEqual(list(pos["x"]), ["position", "unit", "actuators", "canvas"])
+        # Each axis carries the five entries of the controller's contract, in
+        # this order, says which motor this answer used, and names every motor
+        # that can move it.
+        self.assertEqual(list(pos["x"]), ["position", "unit", "actuator", "actuators", "canvas"])
+        self.assertEqual(pos["z"]["actuator"], "z-wide")
         self.assertEqual(pos["x"]["unit"], "micrometer")
         self.assertEqual(pos["x"]["actuators"], {"motoric": 1000.0})
         self.assertEqual(pos["z"]["actuators"], {"z-wide": 30.0, "z-galvo": 0.0})
@@ -465,11 +467,14 @@ class TestFrame(unittest.TestCase):
             pos = adapter.get_xyz(h)
             menu = adapter.get_actuators(h)
         for axis in ("x", "y", "z"):
-            self.assertEqual(list(pos[axis]["actuators"]), menu[axis])
-        # with_actuators only chooses a motor; the answer still reports all of them
+            self.assertEqual(list(pos[axis]["actuators"]), menu[axis]["options"])
+            self.assertEqual(pos[axis]["actuator"], menu[axis]["default"])
+        # with_actuators only chooses a motor; the answer still reports all of
+        # them, and says which one it used
         with patches[0], patches[1], patches[2], patches[3]:
             pos = adapter.get_xyz(h, with_actuators={"z": "z-galvo"})
         self.assertEqual(list(pos["z"]["actuators"]), ["z-wide", "z-galvo"])
+        self.assertEqual(pos["z"]["actuator"], "z-galvo")
 
     def test_set_xyz_moves_to_absolute_and_maps_z_actuator(self):
         h = _handle(origin=_origin(x_um=1000.0, y_um=2000.0, z_focus_um=30.0))
@@ -499,7 +504,8 @@ class TestFrame(unittest.TestCase):
         self.assertEqual(moves["z"], (3.0, "galvo"))
         # The answer is a fresh get_xyz: the (patched) readings, not the targets.
         self.assertEqual(list(record), ["x", "y", "z", "objective_translation_um"])
-        self.assertEqual(list(record["z"]), ["position", "unit", "actuators", "canvas"])
+        self.assertEqual(list(record["z"]), ["position", "unit", "actuator", "actuators", "canvas"])
+        self.assertEqual(record["z"]["actuator"], "z-galvo")
         self.assertEqual(record["z"]["actuators"], {"z-wide": 32.0, "z-galvo": 3.0})
         self.assertEqual(record["z"]["position"], 5.0)  # (32 + 3) − 30
         # the selection does NOT persist: defaults are fixed, never sticky
@@ -591,10 +597,15 @@ class TestFrame(unittest.TestCase):
             )
 
     def test_actuator_menu(self):
+        """The driver names its default per axis: the focus drive that reaches the whole travel for z."""
         h = _handle()
         self.assertEqual(
             adapter.get_actuators(h),
-            {"x": ["motoric"], "y": ["motoric"], "z": ["z-wide", "z-galvo"]},
+            {
+                "x": {"options": ["motoric"], "default": "motoric"},
+                "y": {"options": ["motoric"], "default": "motoric"},
+                "z": {"options": ["z-wide", "z-galvo"], "default": "z-wide"},
+            },
         )
 
 
@@ -606,36 +617,14 @@ class TestAcquire(unittest.TestCase):
             {"Name": "AF Job", "IsSelected": False, "IsAutofocus": True},
         ]
 
-    def test_options_discovered_from_live_jobs(self):
+    def test_the_only_setting_is_how_a_capture_is_triggered(self):
+        """``full`` runs the whole selected job; the job itself is state, saving is set up."""
         h = _handle()
-        with (
-            patch.object(adapter._readers, "get_jobs", return_value=self._jobs()),
-            patch.object(
-                adapter._readers,
-                "get_selected_job",
-                return_value={"Name": "HiRes", "IsSelected": True},
-            ) as selected,
-        ):
-            opts = adapter.get_acquisition_settings(h)
-        # autofocus jobs are a separate category, never acquisition settings
-        self.assertEqual(opts["job"]["options"], ["Overview", "HiRes"])
-        self.assertEqual(opts["job"]["active"], "HiRes")
-        self.assertNotIn("mode", selected.call_args.kwargs)
-        self.assertEqual(opts["backlash_rounds"]["active"], 0)
+        self.assertEqual(
+            adapter.get_acquisition_settings(h),
+            {"trigger": {"options": ["full"], "default": "full", "active": "full"}},
+        )
         self.assertEqual(adapter.ACQUISITION_BACKLASH_DEFAULT_ROUNDS, 0)
-        self.assertEqual(opts["backlash_rounds"]["options"], "int >= 0")
-        self.assertNotIn("strip_scan_fields", opts)  # positions never come from the Navigator
-        self.assertEqual(
-            opts["format"], {"options": ["ome-tiff", "ome-zarr"], "active": "ome-zarr", "default": "ome-zarr"}
-        )
-        self.assertEqual(opts["projection"], {"options": ["max", "none"], "active": "max", "default": "max"})
-        # Every setting but the job (LAS X's own selection) says what it starts at.
-        self.assertEqual({name for name, spec in opts.items() if "default" not in spec}, {"job"})
-        self.assertEqual(opts["cleanup_source"]["active"], False)
-        self.assertEqual(
-            opts["source"],
-            {"options": ["cache", "autosave"], "active": "autosave", "default": "autosave"},
-        )
 
     def test_unknown_or_invalid_option_rejected(self):
         h = _handle(connection={**adapter.CONNECTION, "output_root": "/tmp/out"})
@@ -653,79 +642,35 @@ class TestAcquire(unittest.TestCase):
                 )
             with self.assertRaisesRegex(ValueError, "invalid value"):
                 adapter.acquire(
-                    h, position_label="A1", acquisition_settings={"job": "Nope"}
+                    h, position_label="A1", acquisition_settings={"trigger": "snap"}
                 )
-            # A folder Naming would refuse is refused before anything is captured.
-            with self.assertRaisesRegex(ValueError, "kebab-case"):
-                adapter.acquire(
-                    h, position_label="A1", acquisition_settings={"folder": "Prescan"}
-                )
-            for value in (-1, 1.5, True, "2"):
-                with self.subTest(backlash_rounds=value):
-                    with self.assertRaisesRegex(ValueError, "non-negative integer"):
-                        adapter.acquire(
-                            h,
-                            position_label="A1",
-                            acquisition_settings={"backlash_rounds": value},
-                        )
+            for gone in ("job", "folder", "format", "save_to", "backlash_rounds"):
+                with self.subTest(gone=gone), self.assertRaisesRegex(ValueError, "unknown acquisition setting"):
+                    adapter.acquire(h, position_label="A1", acquisition_settings={gone: "x"})
 
     def test_without_a_data_location_nothing_is_saved_and_the_notebook_is_named(self):
         h = _handle()
         with self.assertRaisesRegex(RuntimeError, "set_data_location"):
             adapter.acquire(h, position_label="A1")
 
-    def test_the_set_up_data_location_is_where_runs_go(self):
+    def test_the_set_up_data_location_is_where_captures_are_staged(self):
+        """Where this microscope saves is set up once and said in ``setup``, not asked per capture."""
         with tempfile.TemporaryDirectory() as tmp:
             h = _handle(data_location=Path(tmp))
             with patch.object(adapter, "_selected_job_name", return_value="Overview"):
-                result = adapter.get_info(h)
-        self.assertEqual(Path(result["output_root"]), Path(tmp).resolve())
+                info = adapter.get_info(h)
+            self.assertNotIn("output_root", info)
+            self.assertTrue(info["setup"]["data_location"]["done"])
+            self.assertIn(str(Path(tmp)), info["setup"]["data_location"]["says"])
+            with self._capturing(output_root=None) as calls:
+                adapter.acquire(h, position_label="A1")
+            self.assertEqual(calls["output_root"].parent.parent, Path(tmp).resolve())
 
     def test_a_sessions_own_output_root_wins_over_the_set_up_one(self):
         h = _handle(connection={**adapter.CONNECTION, "output_root": "/chosen/zmart"}, data_location=Path("/elsewhere"))
-        with patch.object(adapter, "_selected_job_name", return_value="Overview"):
-            self.assertEqual(Path(adapter.get_info(h)["output_root"]), Path("/chosen/zmart").resolve())
-
-    def test_save_to_offers_the_set_up_location_and_takes_another(self):
-        with tempfile.TemporaryDirectory() as tmp, tempfile.TemporaryDirectory() as other:
-            h = _handle(data_location=Path(tmp))
-            with (
-                patch.object(adapter._readers, "get_jobs", return_value=self._jobs()),
-                patch.object(adapter._readers, "get_selected_job",
-                             return_value={"Name": "Overview", "IsSelected": True}),
-            ):
-                opts = adapter.get_acquisition_settings(h)
-            self.assertEqual(Path(opts["save_to"]["active"]), Path(tmp).resolve())
-            h.driven_to = {"x": 0.0, "y": 0.0, "z": 0.0, "z_wide_um": 0.0, "z_galvo_um": 0.0}
-            with self._capturing(output_root=None) as calls:
-                adapter.acquire(h, position_label="A1", acquisition_settings={"save_to": other})
-            self.assertEqual(calls["output_root"].parent.parent, Path(other).resolve())
-
-    def test_save_to_starts_at_the_set_up_location_and_a_session_can_choose_another(self):
-        with tempfile.TemporaryDirectory() as tmp, tempfile.TemporaryDirectory() as chosen:
-            h = _handle(data_location=Path(tmp), connection={**adapter.CONNECTION, "output_root": chosen})
-            with (
-                patch.object(adapter._readers, "get_jobs", return_value=self._jobs()),
-                patch.object(adapter._readers, "get_selected_job",
-                             return_value={"Name": "Overview", "IsSelected": True}),
-            ):
-                save_to = adapter.get_acquisition_settings(h)["save_to"]
-        self.assertEqual(Path(save_to["default"]), Path(tmp))
-        self.assertEqual(Path(save_to["active"]), Path(chosen).resolve())
-
-    def test_a_folder_that_cannot_hold_the_data_is_refused_before_capturing(self):
-        h = _handle(data_location=Path("/elsewhere"))
-        captured = []
-        with (
-            patch.object(adapter._readers, "get_jobs", return_value=self._jobs()),
-            patch.object(adapter._readers, "get_selected_job", return_value={"Name": "Overview", "IsSelected": True}),
-            patch.object(adapter._capture, "acquire", lambda c, j, **k: captured.append(j)),
-            self.assertRaisesRegex(ValueError, "save_to"),
-        ):
-            adapter.acquire(
-                h, position_label="A1", acquisition_settings={"save_to": str(Path("/no/such/folder/zmart"))}
-            )
-        self.assertEqual(captured, [])
+        with self._capturing(output_root=None) as calls:
+            adapter.acquire(h, position_label="A1")
+        self.assertEqual(calls["output_root"].parent.parent, Path("/chosen/zmart").resolve())
 
     @contextmanager
     def _capturing(self, *, image_paths=None, projections=None, output_root=Path("/tmp/out")):
@@ -742,7 +687,7 @@ class TestAcquire(unittest.TestCase):
 
         def fake_log(output_root, naming, entry):
             calls["log"] = entry
-            return Path("/tmp/out/scan/log") / f"{naming.folder}_{naming.hash6}_{naming.position_label}.log.json"
+            return Path("/tmp/out/log") / f"{naming.stem}.log.json"
 
         patches = _patch_position(job="Overview")
         with ExitStack() as standing_in:
@@ -813,15 +758,12 @@ class TestAcquire(unittest.TestCase):
         self.assertEqual(checks["autosave"], "enabled")
         self.assertIn("um", checks["stage"])
         self.assertEqual(checks["output root"], str(Path("/runs")))
+        self.assertNotIn("output_root", info)
         self.assertNotIn("failed", checks["limits"])
 
 
         h = _handle(connection={**adapter.CONNECTION, "output_root": "/tmp/out"})
         calls = {}
-
-        def fake_select_job(client, job, **kwargs):
-            calls["selected"] = job
-            return {"success": True}
 
         def fake_capture(client, job, **kwargs):
             calls["captured"] = job
@@ -836,11 +778,10 @@ class TestAcquire(unittest.TestCase):
                 naming=naming,
             )
 
-        patches = _patch_position(job="Overview")
+        patches = _patch_position(job="HiRes")
         with (
             patch.object(adapter._readers, "get_jobs", return_value=self._jobs()),
             patch.object(adapter._readers, "get_hardware_info", return_value={}),
-            patch.object(adapter._commands, "select_job", fake_select_job),
             patch.object(adapter._motion, "correct_backlash", lambda client, **k: {"success": True, "confirmed": True}),
             patch.object(adapter._capture, "acquire", fake_capture),
             patch.object(adapter._save, "save", fake_save),
@@ -851,32 +792,26 @@ class TestAcquire(unittest.TestCase):
         ):
             record = adapter.acquire(
                 h,
-                position_label="well-7",
-                acquisition_settings={
-                    "folder": "prescan",
-                    "job": "HiRes",
-                    "backlash_correction": False,
-                },
+                position_label="prescan_a1b2c3_well-7",
+                acquisition_settings={"trigger": "full"},
             )
-        self.assertEqual(calls["selected"], "HiRes")
+        # The selected job is what runs: choosing it is set_state's, not acquire's.
         self.assertEqual(calls["captured"], "HiRes")
         saved_root, naming = calls["saved"]
         self.assertEqual(
             Path(saved_root), Path("/tmp/out").resolve() / ".staging" / h.hash6
         )  # OS-agnostic separators
-        self.assertEqual(naming.folder, "prescan")
-        self.assertEqual(naming.position_label, "well-7")  # explicit label travels verbatim
-        self.assertEqual(calls["lineage"]["position_label"], "well-7")
-        self.assertEqual(calls["lineage"]["folder"], "prescan")
-        # per-acquisition hash: the Naming hash is NOT the session hash
-        self.assertNotEqual(naming.hash6, h.hash6)
-        self.assertEqual(calls["lineage"]["acquisition_hash"], naming.hash6)
+        # Every file name starts with the label as the workflow gave it.
+        self.assertEqual(naming.stem, "prescan_a1b2c3_well-7")
+        self.assertEqual(calls["lineage"]["position_label"], "prescan_a1b2c3_well-7")
+        self.assertEqual(calls["lineage"]["stem"], "prescan_a1b2c3_well-7")
         self.assertEqual(calls["lineage"]["session_hash6"], h.hash6)
         # the machine/software state is captured and threaded into save()
         self.assertIsInstance(calls["state"], dict)
-        self.assertEqual(calls["state"]["provenance"]["position_label"], "well-7")
+        self.assertEqual(calls["state"]["provenance"]["stem"], "prescan_a1b2c3_well-7")
         self.assertEqual(record["settle"], "direct")
-        self.assertEqual(record["acquisition_hash"], naming.hash6)
+        self.assertEqual(record["trigger"], "full")
+        self.assertNotIn("folder", record)
         self.assertEqual(
             [Path(p) for p in record["files"]], [Path("/tmp/out/img.ome.tif"), *map(Path, record["log"])]
         )
@@ -929,42 +864,39 @@ class TestAcquire(unittest.TestCase):
                 patch.object(adapter._log, "write", _WRITE_THE_LOG),
                 patches[0], patches[1], patches[2], patches[3],
             ):
-                record = adapter.acquire(
-                    h, position_label="well-7",
-                    acquisition_settings={"job": "HiRes", "backlash_correction": False},
-                )
+                record = adapter.acquire(h, position_label="well-7")
 
             self.assertEqual(record["files"], [str(image), str(vendor), str(state), *record["log"]])
             self.assertEqual(check_acquire_answer({"success": True, "content": record}), [])
 
-    def test_the_pixels_come_from_the_source_asked_for(self):
-        """The workflow picks where the pixels are read: LAS X's cache or its AutoSave files."""
+    def test_saving_follows_this_microscopes_profile(self):
+        """Where the pixels are read from, the format and the projection are set up once.
+
+        They are this microscope's ``IMAGE_SAVE`` profile, the same for every
+        capture, never a choice made per capture.
+        """
         h = _handle()
         h.driven_to = {"x": 0.0, "y": 0.0, "z": 0.0, "z_wide_um": 0.0}
         with self._capturing() as calls:
-            adapter.acquire(
-                h, position_label="A1",
-                acquisition_settings={"source": "cache"},
-            )
-        self.assertEqual(calls["save"]["source"], "cache")
+            record = adapter.acquire(h, position_label="A1")
+        self.assertEqual(calls["save"]["source"], adapter.IMAGE_SAVE.source)
+        self.assertEqual(calls["save"]["format"], adapter.IMAGE_SAVE.format)
+        self.assertEqual(calls["save"]["projection"], adapter.IMAGE_SAVE.projection)
+        self.assertIs(calls["save"]["cleanup_source"], False)
+        self.assertEqual(record["format"], adapter.IMAGE_SAVE.format)
 
-        with self._capturing() as calls:
-            adapter.acquire(h, position_label="A2")
-        self.assertEqual(calls["save"]["source"], "autosave")
-
-    def test_the_capture_is_saved_in_the_format_asked_for_and_placed(self):
-        """With "ome-zarr" the store is placed where the answer says its planes are."""
+    def test_the_capture_is_placed_where_the_answer_says_its_planes_are(self):
+        """The store is placed where the answer says its planes are."""
         h = _handle()
         h.driven_to = {"x": 10.0, "y": 20.0, "z": 100.0, "z_wide_um": 1000.0, "z_galvo_um": 0.0}
         with self._capturing() as calls, patch.object(
             adapter._readers, "get_job_settings",
             return_value={"stack": {"begin": -10.0, "end": 10.0, "sections": 3, "mode": "z-galvo"}},
         ):
-            adapter.acquire(h, position_label="A1", acquisition_settings={"format": "ome-zarr"})
+            adapter.acquire(h, position_label="A1")
             where = calls["save"]["placement"]([0, 1, 2])
             placed = [where(z) for z in (0, 2)]
 
-        self.assertEqual(calls["save"]["format"], "ome-zarr")
         self.assertEqual(placed, [
             {"x_um": 10.0, "y_um": 20.0, "z_um": 90.0},
             {"x_um": 10.0, "y_um": 20.0, "z_um": 110.0},
@@ -973,25 +905,25 @@ class TestAcquire(unittest.TestCase):
     def test_the_projection_is_asked_for_and_listed_with_the_files(self):
         h = _handle()
         h.driven_to = {"x": 0.0, "y": 0.0, "z": 0.0, "z_wide_um": 0.0, "z_galvo_um": 0.0}
-        projection = Path("/tmp/out/scan/projections/scan_x_A1.ome.zarr")
+        projection = Path("/tmp/out/projections/A1.ome.zarr")
         with self._capturing(projections=[projection]) as calls:
-            record = adapter.acquire(h, position_label="A1", acquisition_settings={"projection": "max"})
+            record = adapter.acquire(h, position_label="A1")
 
-        self.assertEqual(calls["save"]["projection"], "max")
+        self.assertEqual(calls["save"]["projection"], adapter.IMAGE_SAVE.projection)
         self.assertEqual(record["projections"], [str(projection)])
         self.assertIn(str(projection), record["files"])
 
     def test_every_capture_leaves_a_log_of_what_was_asked_and_done(self):
         h = _handle()
         h.driven_to = {"x": 5.0, "y": 6.0, "z": 7.0, "z_wide_um": 0.0, "z_galvo_um": 0.0}
-        image = Path("/tmp/out/.staging") / h.hash6 / "scan" / "data" / "img.ome.tif"
+        image = Path("/tmp/out/.staging") / h.hash6 / "data" / "img.ome.tif"
         with self._capturing(image_paths={0: image}) as calls:
-            record = adapter.acquire(h, position_label="A1", acquisition_settings={"format": "ome-tiff"})
+            record = adapter.acquire(h, position_label="A1", acquisition_settings={"trigger": "full"})
 
         entry = calls["log"]
-        self.assertEqual(entry["asked"], {"format": "ome-tiff"})
-        self.assertEqual(entry["settings"]["format"], "ome-tiff")
-        self.assertEqual(entry["settings"]["job"], "Overview")
+        self.assertEqual(entry["asked"], {"trigger": "full"})
+        self.assertEqual(entry["settings"], {"trigger": "full"})
+        self.assertEqual(entry["stem"], "A1")
         self.assertIn("started", entry["capture"])
         self.assertIn("finished", entry["capture"])
         self.assertEqual(
@@ -999,8 +931,8 @@ class TestAcquire(unittest.TestCase):
             [{k: v for k, v in plane.items() if k != "path"} for plane in record["planes"]],
         )
         # Paths from the run's start, so the log stays true when the run is moved.
-        self.assertEqual(entry["planes"][0]["path"], "scan/data/img.ome.tif")
-        self.assertEqual(entry["files"], ["scan/data/img.ome.tif"])
+        self.assertEqual(entry["planes"][0]["path"], "data/img.ome.tif")
+        self.assertEqual(entry["files"], ["data/img.ome.tif"])
         self.assertEqual(entry["unconfirmed"], [])
         [log] = record["log"]
         self.assertTrue(log.endswith(".log.json"))
@@ -1196,11 +1128,7 @@ class TestAcquire(unittest.TestCase):
                 patches[2],
                 patches[3],
             ):
-                adapter.acquire(
-                    h,
-                    position_label="A1",
-                    acquisition_settings={"backlash_correction": False},
-                )
+                adapter.acquire(h, position_label="A1")
 
         # The measured 90-degree turn was read from the snapshot and threaded
         # into save -- not the shipped "no turn" placeholder.
@@ -1236,129 +1164,62 @@ class TestAcquire(unittest.TestCase):
             patches[3],
         )
 
-    def test_acquire_defaults_to_scan_folder_and_counter_label(self):
+    def test_an_unlabelled_capture_is_named_by_the_session_counter(self):
         h = _handle(connection={**adapter.CONNECTION, "output_root": "/tmp/out"})
         calls = {}
-        env = self._fake_acquire_env(calls)
-        # The driver's helper mints a fresh hash per acquired position.
-        with (
-            env[0],
-            env[1],
-            env[2],
-            env[3],
-            env[4],
-            env[5],
-            env[6],
-            env[7],
-            env[8],
-            env[9],
-            patch.object(adapter, "run_hash", side_effect=["0000a1", "0000a2"]),
-        ):
+        with ExitStack() as standing_in:
+            for stand_in in self._fake_acquire_env(calls):
+                standing_in.enter_context(stand_in)
             record0 = adapter.acquire(h)
             record1 = adapter.acquire(h)
-        self.assertEqual(record0["folder"], "scan")
         self.assertEqual(calls.get("backlash", []), [])
         self.assertEqual(record0["settle"], "direct")
         self.assertEqual(record0["backlash_rounds"], 0)
         # unlabeled acquires consume the per-session counter, zero-padded
         self.assertEqual(record0["position_label"], "000000")
         self.assertEqual(record1["position_label"], "000001")
-        namings = calls["namings"]
-        self.assertEqual(namings[0].position_label, "000000")
-        self.assertEqual(namings[1].position_label, "000001")
-        # the acquisition type stays "scan" while each acquired position is unique
-        self.assertEqual(namings[0].hash6, "0000a1")
-        self.assertEqual(namings[1].hash6, "0000a2")
-        self.assertNotEqual(record0["acquisition_hash"], record1["acquisition_hash"])
+        self.assertEqual([naming.stem for naming in calls["namings"]], ["000000", "000001"])
 
-    def test_position_hash_helper_avoids_same_second_collision(self):
-        h = _handle()
-        h.acquisition_hashes.add("0000a1")
-        with patch.object(adapter, "run_hash", side_effect=["0000a1", "0000a2"]):
-            self.assertEqual(adapter._next_acquisition_hash(h), "0000a2")
-        self.assertEqual(h.acquisition_hashes, {"0000a1", "0000a2"})
+    def test_a_label_already_staged_gets_the_next_free_stem(self):
+        """No capture is ever overwritten: the same label again gets ``_001``."""
+        with tempfile.TemporaryDirectory() as tmp:
+            h = _handle(connection={**adapter.CONNECTION, "output_root": tmp})
+            staged = Path(tmp).resolve() / ".staging" / h.hash6 / "data"
+            staged.mkdir(parents=True)
+            (staged / "A1_T000000_C00_Z00000.ome.tiff").write_bytes(b"the first capture")
+            calls = {}
+            with ExitStack() as standing_in:
+                for stand_in in self._fake_acquire_env(calls):
+                    standing_in.enter_context(stand_in)
+                adapter.acquire(h, position_label="A1")
+        self.assertEqual(calls["namings"][0].stem, "A1_001")
 
-    def test_acquire_selects_the_job_when_the_selected_one_cannot_be_read(self):
-        """A reading that fails is unknown, not a stop: the job asked for is selected
-        anyway, and the capture goes ahead."""
+    def test_without_a_selected_job_nothing_is_captured(self):
+        """The job is state: a capture runs the selected one, and refuses when none can be read."""
         h = _handle(connection={**adapter.CONNECTION, "output_root": "/tmp/out"})
-        selected = []
         with (
             self._capturing(),
             patch.object(adapter._readers, "get_selected_job", return_value=None),
-            patch.object(
-                adapter._commands,
-                "select_job",
-                lambda c, j, **k: selected.append(j) or {"success": True, "confirmed": True},
-            ),
+            self.assertRaisesRegex(RuntimeError, "set_state"),
         ):
-            answer = adapter.acquire(
-                h, position_label="A1", acquisition_settings={"job": "Overview"}
-            )
-        self.assertEqual(selected, ["Overview"])
-        self.assertEqual(answer["unconfirmed"], [])
-
-    def test_an_unconfirmed_job_selection_is_recorded_and_the_capture_goes_ahead(self):
-        h = _handle(connection={**adapter.CONNECTION, "output_root": "/tmp/out"})
-        with (
-            self._capturing(),
-            patch.object(adapter._readers, "get_selected_job", return_value={"Name": "HiRes"}),
-            patch.object(
-                adapter._commands,
-                "select_job",
-                lambda c, j, **k: {"success": True, "confirmed": False, "message": "no proof"},
-            ),
-        ):
-            answer = adapter.acquire(
-                h, position_label="A1", acquisition_settings={"job": "Overview"}
-            )
-        self.assertEqual(len(answer["unconfirmed"]), 1)
-        self.assertEqual(answer["unconfirmed"][0]["what"], "acquire: select_job('Overview')")
-        self.assertEqual(answer["unconfirmed"][0]["message"], "no proof")
-        self.assertTrue(answer["files"])  # the capture went ahead
-
-    def test_a_refused_job_selection_still_fails_the_acquisition(self):
-        h = _handle(connection={**adapter.CONNECTION, "output_root": "/tmp/out"})
-        with (
-            self._capturing(),
-            patch.object(adapter._readers, "get_selected_job", return_value={"Name": "HiRes"}),
-            patch.object(
-                adapter._commands,
-                "select_job",
-                lambda c, j, **k: {"success": False, "confirmed": None, "message": "refused"},
-            ),
-            self.assertRaisesRegex(RuntimeError, "select_job\\('Overview'\\) failed"),
-        ):
-            adapter.acquire(h, position_label="A1", acquisition_settings={"job": "Overview"})
+            adapter.acquire(h, position_label="A1")
 
     def test_explicit_label_does_not_consume_counter(self):
         h = _handle(connection={**adapter.CONNECTION, "output_root": "/tmp/out"})
         calls = {}
         env = self._fake_acquire_env(calls)
-        with (
-            env[0],
-            env[1],
-            env[2],
-            env[3],
-            env[4],
-            env[5],
-            env[6],
-            env[7],
-            env[8],
-            env[9],
-        ):
+        with ExitStack() as standing_in:
+            for stand_in in env:
+                standing_in.enter_context(stand_in)
             adapter.acquire(h, position_label="named")  # must not bump the counter
             record = adapter.acquire(h)  # still gets 000000
-        self.assertEqual(calls["namings"][0].position_label, "named")
+        self.assertEqual(calls["namings"][0].stem, "named")
         self.assertEqual(record["position_label"], "000000")
 
     def test_acquire_runs_backlash_correction_before_capture_when_enabled(self):
+        """The driver's own setting: with rounds set, the slack is taken up right before the capture."""
         h = _handle(connection={**adapter.CONNECTION, "output_root": "/tmp/out"})
         order = []
-
-        def fake_select_job(client, job, **kwargs):
-            order.append(("select", job))
-            return {"success": True}
 
         def fake_correct_backlash(client, **kwargs):
             order.append(("backlash", client, kwargs["passes"]))
@@ -1375,30 +1236,19 @@ class TestAcquire(unittest.TestCase):
                 naming=naming,
             )
 
-        patches = _patch_position(job="Overview")
+        patches = _patch_position(job="HiRes")
         with (
+            patch.object(adapter, "ACQUISITION_BACKLASH_DEFAULT_ROUNDS", 2),
             patch.object(adapter._readers, "get_jobs", return_value=self._jobs()),
-            patch.object(adapter._commands, "select_job", fake_select_job),
             patch.object(adapter._motion, "correct_backlash", fake_correct_backlash),
             patch.object(adapter._capture, "acquire", fake_capture),
             patch.object(adapter._save, "save", fake_save),
             patches[2],
         ):
-            record = adapter.acquire(
-                h,
-                position_label="7",
-                acquisition_settings={
-                    "job": "HiRes",
-                    "backlash_correction": True,
-                    "backlash_rounds": 2,
-                },
-            )
-        # select -> backlash takeup -> capture, in that order (backlash pins the
-        # slack-state right before the image is taken, not before job selection).
-        self.assertEqual(
-            order,
-            [("select", "HiRes"), ("backlash", h.client, 2), ("capture", "HiRes")],
-        )
+            record = adapter.acquire(h, position_label="7")
+        # backlash takeup -> capture, in that order: it pins the slack right
+        # before the image is taken.
+        self.assertEqual(order, [("backlash", h.client, 2), ("capture", "HiRes")])
         self.assertEqual(record["settle"], "backlash-corrected")
         self.assertEqual(record["backlash_rounds"], 2)
 
@@ -1421,11 +1271,7 @@ class TestAcquire(unittest.TestCase):
             ),
             patches[2],
         ):
-            record = adapter.acquire(
-                h,
-                position_label="7",
-                acquisition_settings={"backlash_rounds": 0},
-            )
+            record = adapter.acquire(h, position_label="7")
         self.assertEqual(calls, [])
         self.assertEqual(record["settle"], "direct")
         self.assertEqual(record["backlash_rounds"], 0)
@@ -1926,7 +1772,10 @@ class TestObjectiveCompensation(unittest.TestCase):
         self.assertAlmostEqual(pos["x"]["position"], 12.0)
         self.assertAlmostEqual(pos["y"]["position"], -7.0)
         self.assertAlmostEqual(pos["z"]["position"], 4.0)
-        # set_xyz answered the same read-back, so no second call is needed.
+        # set_xyz answered the same read-back, so no second call is needed;
+        # only the motor each answer used differs, as each was asked for.
+        self.assertEqual(moved["z"].pop("actuator"), "z-galvo")
+        self.assertEqual(pos["z"].pop("actuator"), "z-wide")
         self.assertEqual(moved, pos)
 
     def test_cross_objective_move_without_translations_refuses(self):
@@ -2201,10 +2050,10 @@ class TestLifecycle(unittest.TestCase):
                 # The move answers a read-back in get_xyz's shape. The readers
                 # are mocked and never move, so it reads the origin itself.
                 moved = answer["content"]
-                self.assertEqual(list(moved["x"]), ["position", "unit", "actuators", "canvas"])
+                self.assertEqual(list(moved["x"]), ["position", "unit", "actuator", "actuators", "canvas"])
                 self.assertEqual(moved["x"]["position"], 0.0)
                 self.assertEqual(moved["z"]["actuators"], {"z-wide": 30.0, "z-galvo": 0.0})
-                xyz = session.get_xyz()
+                xyz = session.get_xyz(with_actuators={"z": "z-galvo"})
                 self.assertEqual(xyz["content"], moved)
             finally:
                 session.disconnect()
