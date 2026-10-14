@@ -11,6 +11,7 @@ import json
 import tempfile
 import unittest
 from contextlib import ExitStack, contextmanager
+from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -22,6 +23,7 @@ from limits_fixtures import (
 )
 
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert import scanfields
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.actions.profiles import ImageSaveProfile
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.output.product import PlaneIndex
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher import (
     checks as limits_checks,
@@ -882,8 +884,25 @@ class TestAcquire(unittest.TestCase):
         self.assertEqual(calls["save"]["source"], adapter.IMAGE_SAVE.source)
         self.assertEqual(calls["save"]["format"], adapter.IMAGE_SAVE.format)
         self.assertEqual(calls["save"]["projection"], adapter.IMAGE_SAVE.projection)
-        self.assertIs(calls["save"]["cleanup_source"], False)
+        self.assertIs(calls["save"]["cleanup_source"], adapter.IMAGE_SAVE.cleanup_source)
         self.assertEqual(record["format"], adapter.IMAGE_SAVE.format)
+
+    def test_letting_go_of_the_cache_follows_the_profile(self):
+        """A capture read from LAS X's cache is let go of when the profile says so, never per capture."""
+        h = _handle()
+        h.driven_to = {"x": 0.0, "y": 0.0, "z": 0.0, "z_wide_um": 0.0}
+        releasing = replace(adapter.IMAGE_SAVE, source="cache", cleanup_source=True)
+        with patch.object(adapter, "IMAGE_SAVE", releasing), self._capturing() as calls:
+            adapter.acquire(h, position_label="A1")
+        self.assertEqual(calls["save"]["source"], "cache")
+        self.assertIs(calls["save"]["cleanup_source"], True)
+
+    def test_the_profile_lets_go_only_of_what_it_read_from_the_cache(self):
+        """AutoSave's files are LAS X's project; letting go of them is refused when the profile is made."""
+        with self.assertRaisesRegex(ValueError, "cleanup_source.*cache"):
+            ImageSaveProfile(source="autosave", cleanup_source=True)
+        self.assertIs(ImageSaveProfile(source="cache", cleanup_source=True).cleanup_source, True)
+        self.assertIs(ImageSaveProfile().cleanup_source, False)
 
     def test_the_capture_is_placed_where_the_answer_says_its_planes_are(self):
         """The store is placed where the answer says its planes are."""

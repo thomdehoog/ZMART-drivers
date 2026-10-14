@@ -1,9 +1,11 @@
 """At the microscope: many captures, each released from LAS X's cache; does the cache stay flat?
 
-Captures one LAS X job again and again through the ZMART Controller, each
-saved from LAS X's cache with ``cleanup_source`` on, so that the driver has
-LAS X let go of the capture and clears the Navigator canvas, which holds the
-capture's hidden copy (``TileScan <n>``). It measures LAS X's cache (the
+Selects one LAS X job and captures it again and again through the ZMART
+Controller, as a workflow does. For this run only, the driver's profile
+(``IMAGE_SAVE``) reads each capture from LAS X's cache with
+``cleanup_source`` on, so that LAS X lets go of the capture once it is
+saved, and the Navigator canvas, which holds the capture's hidden copy
+(``TileScan <n>``), is cleared. It measures LAS X's cache (the
 ``V2LMSDC_*`` files in LAS X's cache folder) before, every ten captures and
 after: in total, how much of it is hidden copies, and the rest. It counts the
 captures that failed and the releases whose canvas could not be cleared.
@@ -31,6 +33,7 @@ import logging
 import re
 import sys
 import time
+from dataclasses import replace
 from pathlib import Path
 
 NOT_CLEARED = "the Navigator canvas was not cleared"
@@ -99,26 +102,29 @@ def main() -> int:
     import zmart_drivers.leica.stellaris5_y42h93.navigator_expert.zmart_controller_plugin as driver
     from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.output import lasx_cache_release
     from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.output import lasx_data_container as container
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.zmart_adapter import zmart_adapter as adapter
 
     releases = Releases()
     logging.getLogger(lasx_cache_release.__name__).addHandler(releases)
     cache = Cache(container.data_container_root())
-    settings = {"job": asked.job, "source": "cache", "format": "ome-zarr", "folder": "cache-release-check",
-                "cleanup_source": True, "projection": "none"}
-    if asked.save_to:
-        settings["save_to"] = asked.save_to
     report: dict = {"job": asked.job, "label": asked.label, "captures": asked.captures,
                     "cache folder": str(cache.root), "progress": [], "errors": []}
 
-    session = ZmartController(driver, {})
+    adapter.IMAGE_SAVE = replace(
+        adapter.IMAGE_SAVE, source="cache", format="ome-zarr", projection="none", cleanup_source=True
+    )
+    session = ZmartController(driver, {"output_root": asked.save_to} if asked.save_to else {})
     try:
+        chosen = session.set_state({"changeable": {"job": asked.job}})
+        if not chosen["success"]:
+            raise SystemExit(f"the job was not selected: {chosen['content']}")
         here = session.get_xyz()["content"]
         session.set_xyz(*(float(here[axis]["position"]) for axis in "xyz"))
         start = report["cache before, MB"] = cache.measure()
         print(f"before: {start['total']:.1f} MB, of which hidden copies {start['hidden']:.1f} MB", flush=True)
         began, failed = time.perf_counter(), 0
         for i in range(1, asked.captures + 1):
-            answer = session.acquire(position_label=f"t{i:04d}", acquisition_settings=settings)
+            answer = session.acquire(position_label=f"t{i:04d}")
             if not answer["success"]:
                 failed += 1
                 report["errors"].append(f"capture {i}: {answer['content']}"[:300])

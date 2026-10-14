@@ -1,7 +1,9 @@
 """At the microscope: one capture saved from LAS X's cache, checked, and its metadata shown.
 
-Captures one LAS X job through the ZMART Controller, as a workflow does, with
-``source: "cache"`` and ``format: "ome-zarr"``, then checks and reports:
+Selects one LAS X job and captures it through the ZMART Controller, as a
+workflow does. For this run only, the driver's profile (``IMAGE_SAVE``)
+reads the pictures from LAS X's cache and saves one OME-Zarr store; the
+capture stays in LAS X's cache. Then it checks and reports:
 
 - the store: one OME-Zarr image, valid OME-Zarr 0.5 (when ome-zarr-models
   is installed), and its OME-XML valid OME 2016-06 (when ome-types and lxml
@@ -23,7 +25,7 @@ A report is written where the script is run, as ``check_cache_route_<label>.json
 Usage, in the driver's environment on the microscope PC::
 
     python check_cache_route.py --job HiRes --label hires-16bit
-    python check_cache_route.py --job "AF Job" --label stack --save-to D:\\ZMART-check
+    python check_cache_route.py --job HiRes --label hires-stack --save-to D:/ZMART-check
 
 The data location must be set up (configuration/data_location), or given
 with ``--save-to``. See ``SCOPE_CHECK_CACHE_ROUTE.md`` for the tests to run.
@@ -36,6 +38,7 @@ import json
 import re
 import sys
 import time
+from dataclasses import replace
 from pathlib import Path
 
 import numpy as np
@@ -54,11 +57,17 @@ def main() -> int:
 
     import zmart_drivers.leica.stellaris5_y42h93.navigator_expert.zmart_controller_plugin as driver
     from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.output import lasx_native_autosave as autosave
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.zmart_adapter import zmart_adapter as adapter
 
     report: dict = {"job": asked.job, "label": asked.label, "checks": {}, "metadata": {}}
     checks = report["checks"]
-    session = ZmartController(driver, {})
+    adapter.IMAGE_SAVE = replace(adapter.IMAGE_SAVE, source="cache", format="ome-zarr", cleanup_source=False)
+    session = ZmartController(driver, {"output_root": asked.save_to} if asked.save_to else {})
     try:
+        chosen = session.set_state({"changeable": {"job": asked.job}})
+        if not chosen["success"]:
+            report["error"] = f"the job was not selected: {chosen['content']}"
+            return _finish(report)
         state = session.get_state()["content"]
         report["system"] = {k: v for k, v in (state.get("observed") or {}).items() if k in ("serial_number", "system_type", "stand")}
         here = session.get_xyz()["content"]
@@ -68,11 +77,8 @@ def main() -> int:
         autosave_root = _try(autosave.native_autosave_base_folder) if autosave_on else None
         before = {str(p) for p in Path(autosave_root).rglob("*.ome.tif")} if autosave_root else set()
 
-        settings = {"job": asked.job, "source": "cache", "format": "ome-zarr", "folder": "cache-check"}
-        if asked.save_to:
-            settings["save_to"] = asked.save_to
         started = time.perf_counter()
-        answer = session.acquire(position_label=re.sub(r"[^A-Za-z0-9_-]", "-", asked.label), acquisition_settings=settings)
+        answer = session.acquire(position_label=re.sub(r"[^A-Za-z0-9_-]", "-", asked.label))
         report["acquire_s"] = round(time.perf_counter() - started, 2)
         checks["captured and saved"] = bool(answer["success"])
         if not answer["success"]:

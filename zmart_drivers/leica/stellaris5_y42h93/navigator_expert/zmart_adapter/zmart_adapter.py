@@ -891,8 +891,9 @@ def get_acquisition_settings(handle: ZmartHandle) -> dict:
     That is the only way this driver captures, so it is the only option and
     the default. Which job runs is part of the state (``set_state``). How the
     pictures are saved -- format, where the pixels are read from, the
-    projection -- comes from this microscope's profile (``IMAGE_SAVE``), and
-    where they go from its data location, set up once. Whether the stage's
+    projection, and whether LAS X then lets go of the capture -- comes from
+    this microscope's profile (``IMAGE_SAVE``), and where they go from its
+    data location, set up once. Whether the stage's
     slack is taken up first, and how often, is the driver's own
     (``ACQUISITION_BACKLASH_DEFAULT_ROUNDS``).
     """
@@ -1055,7 +1056,7 @@ def acquire(
         # at connect (from the set_orientation setup notebook's file); a separate
         # concern from pixel-scale calibration and limits.
         orientation=_loaded_orientation(handle),
-        cleanup_source=False,
+        cleanup_source=IMAGE_SAVE.cleanup_source,
         source=IMAGE_SAVE.source,
         format=IMAGE_SAVE.format,
         projection=IMAGE_SAVE.projection,

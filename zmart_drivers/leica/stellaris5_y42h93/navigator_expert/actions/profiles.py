@@ -182,6 +182,20 @@ class ImageSaveProfile:
     #: ``<acquisition>/projections`` (``output.save.PROJECTIONS``): its
     #: ``"max"`` projection over z, or ``"none"``.
     projection: str = "max"
+    #: Whether LAS X lets go of a capture read from its cache once the copy is
+    #: saved and read back identical (``output.lasx_cache_release``): the
+    #: capture leaves the cache, and the Navigator canvas is cleared of the
+    #: hidden copies it holds. Without it, a long run fills the cache's disk.
+    #: Only for ``source="cache"``: AutoSave's files are LAS X's project.
+    #: Off until it has run on the microscope itself.
+    cleanup_source: bool = False
+
+    def __post_init__(self):
+        if self.cleanup_source and self.source != "cache":
+            raise ValueError(
+                f"cleanup_source lets go of captures read from LAS X's cache; with source "
+                f"{self.source!r} it would delete LAS X's own project files"
+            )
 
 
 IMAGE_SAVE = ImageSaveProfile()
