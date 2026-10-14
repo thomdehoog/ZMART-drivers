@@ -8,16 +8,21 @@ holds it while it shows the capture's tile: releasing the capture itself
 Clear button lets go of them all, while LAS X runs (simulator, 2026-10-14).
 
 No command or API call is known that clears the canvas, so the button is
-pressed, through Windows UI
-Automation: the view ``Navigator`` (a ``ViewStageOverview``), in it the
-``StageOverviewActionBar``, in that the button named Clear (0.2 s to find
-on the simulator; a whole-window search took 21 s). It is found once and
-kept, and pressed only when it is enabled, which it is while the canvas
-shows tiles. UI Automation finds it only while LAS X shows the Navigator;
-with another view shown the canvas is not cleared, and the release says so.
-A search that finds nothing returns comtypes' empty pointer, which is false
-but not None. Clearing removes the tiles from LAS X's own Navigator view;
-nothing else changes.
+pressed, through Windows UI Automation. The way to it is walked one child
+at a time from LAS X's main window down to the Navigator's tab control
+(:data:`NAVIGATOR_PATH`), then searched for inside it: the view
+``Navigator`` (a ``ViewStageOverview``), its ``StageOverviewActionBar``,
+and in that the button named Clear. With the Navigator shown this takes
+0.14 s; with another view shown the walk stops at the tab control in
+0.06 s. Searching all of LAS X's window instead took 0.2 s when the
+Navigator was shown, but 90 to 158 s when it was not, at every release
+(simulator, 2026-10-14). The button is found once and kept, and pressed
+only when it is enabled, which it is while the canvas shows tiles. With
+another view shown the canvas is not cleared, and the release says so;
+clearing it later lets go of every hidden copy left until then. A search
+that finds nothing returns comtypes' empty pointer, which is false but not
+None. Clearing removes the tiles from LAS X's own Navigator view; nothing
+else changes.
 """
 
 from __future__ import annotations
@@ -50,8 +55,20 @@ class ClearButton:
         pattern.QueryInterface(self.client.IUIAutomationInvokePattern).Invoke()
 
 
+#: The way from LAS X's main window to the Navigator's tab control, one child
+#: at a time: (class, automation id, name), None where LAS X gives none.
+NAVIGATOR_PATH = (
+    ("Pane", None, "AddIn"),
+    ("MainFormView", None, None),
+    ("ContainerLDMMatrixView", "LDMMatrix", None),
+    ("TabControl", "WorkFlowBar", None),
+    ("TabItem", "WorkflowStartScreen", None),
+    ("TabControl", "NavigatorTabControl", None),
+)
+
+
 def find_clear_button() -> ClearButton:
-    """The Clear button of the Navigator's action bar, found by the narrow path."""
+    """The Clear button of the Navigator's action bar, by :data:`NAVIGATOR_PATH`, never a whole-window search."""
     try:
         c, uia = automation()
     except WindowsUnavailable as why:
@@ -63,6 +80,17 @@ def find_clear_button() -> ClearButton:
     )
     if not found:
         raise NavigatorUnavailable("LAS X's window was not found")
+    for class_name, automation_id, name in NAVIGATOR_PATH:
+        condition = p(c.UIA_ClassNamePropertyId, class_name)
+        if automation_id:
+            condition = uia.CreateAndCondition(condition, p(c.UIA_AutomationIdPropertyId, automation_id))
+        if name:
+            condition = uia.CreateAndCondition(condition, p(c.UIA_NamePropertyId, name))
+        found = found.FindFirst(c.TreeScope_Children, condition)
+        if not found:
+            raise NavigatorUnavailable(
+                f"LAS X's window holds no {class_name} {automation_id or name or ''} (is the Navigator shown?)"
+            )
     for what, condition in (
         ("the view Navigator", uia.CreateAndCondition(
             p(c.UIA_AutomationIdPropertyId, "Navigator"), p(c.UIA_ClassNamePropertyId, "ViewStageOverview"))),
@@ -72,7 +100,7 @@ def find_clear_button() -> ClearButton:
     ):
         found = found.FindFirst(c.TreeScope_Descendants, condition)
         if not found:
-            raise NavigatorUnavailable(f"{what} was not found in LAS X's window (is the Navigator shown?)")
+            raise NavigatorUnavailable(f"{what} was not found in the Navigator's tab (is the Navigator shown?)")
     return ClearButton(c, found)
 
 

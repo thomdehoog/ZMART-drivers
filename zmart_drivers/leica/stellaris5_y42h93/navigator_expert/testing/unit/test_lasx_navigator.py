@@ -9,6 +9,8 @@ keeps it, presses it only when it is enabled (the canvas shows tiles), and
 finds it again when the kept one no longer answers.
 """
 
+import contextlib
+
 import pytest
 
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface import (
@@ -93,18 +95,36 @@ class NullPointer:
         raise ValueError("NULL COM pointer access")
 
 
+CHILDREN, DESCENDANTS = "children", "descendants"
+NAME, CLASS, AUTOMATION_ID, CONTROL_TYPE, BUTTON = "name", "class", "id", "type", "button"
+
+
 class StandInElement:
-    def __init__(self, child):
-        self.child = child
+    """One element of LAS X's window: its properties and children; every search it answers is noted."""
+
+    def __init__(self, searches, children=(), **properties):
+        self.searches, self.children, self.properties = searches, list(children), properties
+
+    def matches(self, condition):
+        if condition[0] == "and":
+            return all(self.matches(part) for part in condition[1:])
+        return self.properties.get(condition[1]) == condition[2]
+
+    def below(self):
+        for child in self.children:
+            yield child
+            yield from child.below()
 
     def FindFirst(self, scope, condition):
-        return self.child
+        self.searches.append((self.properties.get(AUTOMATION_ID) or self.properties.get(CLASS), scope))
+        candidates = self.children if scope == CHILDREN else self.below()
+        return next((e for e in candidates if e.matches(condition)), NullPointer())
 
 
 class StandInAutomation:
-    TreeScope_Children = TreeScope_Descendants = 0
-    UIA_NamePropertyId = UIA_ClassNamePropertyId = UIA_AutomationIdPropertyId = 0
-    UIA_ControlTypePropertyId = UIA_ButtonControlTypeId = 0
+    TreeScope_Children, TreeScope_Descendants = CHILDREN, DESCENDANTS
+    UIA_NamePropertyId, UIA_ClassNamePropertyId, UIA_AutomationIdPropertyId = NAME, CLASS, AUTOMATION_ID
+    UIA_ControlTypePropertyId, UIA_ButtonControlTypeId = CONTROL_TYPE, BUTTON
 
     def __init__(self, root):
         self.root = root
@@ -112,23 +132,65 @@ class StandInAutomation:
     def GetRootElement(self):
         return self.root
 
-    def CreatePropertyCondition(self, *args):
-        return args
+    def CreatePropertyCondition(self, prop, value):
+        return ("is", prop, value)
 
-    def CreateAndCondition(self, *args):
-        return args
+    def CreateAndCondition(self, *parts):
+        return ("and", *parts)
 
 
-def test_a_navigator_not_shown_is_unavailable_not_an_error(monkeypatch):
-    # LAS X's window found, the Navigator view not (another view is shown).
-    automation = StandInAutomation(StandInElement(StandInElement(NullPointer())))
+def las_x_window(searches, navigator_shown=True):
+    """LAS X's window as UI Automation shows it (simulator, 2026-10-14), down to the Clear button."""
+    e = lambda children=(), **props: StandInElement(searches, children, **props)  # noqa: E731
+    clear = e(**{CONTROL_TYPE: BUTTON, NAME: "Clear"})
+    navigator = e([e([e([clear], **{CLASS: "StageOverviewActionBar"})], **{CLASS: "TabItem"})],
+                  **{CLASS: "ViewStageOverview", AUTOMATION_ID: "Navigator"})
+    tabs = [e([e([navigator], **{CLASS: "TabItem"})], **{CLASS: "TabControl", AUTOMATION_ID: "NavigatorTabControl"})]
+    start_screen = e(tabs if navigator_shown else [e(**{CLASS: "Grid"})],
+                     **{CLASS: "TabItem", AUTOMATION_ID: "WorkflowStartScreen"})
+    other_views = [e([e(**{CONTROL_TYPE: BUTTON, NAME: "Clear"})], **{CLASS: "TabItem", AUTOMATION_ID: "Acquire"})]
+    workflow = e([start_screen, *other_views], **{CLASS: "TabControl", AUTOMATION_ID: "WorkFlowBar"})
+    main = e([e([e([e([workflow], **{CLASS: "ContainerLDMMatrixView", AUTOMATION_ID: "LDMMatrix"})],
+                   **{CLASS: "MainFormView"})], **{CLASS: "Pane", NAME: "AddIn"})],
+             **{CLASS: "Window", NAME: "LAS X"})
+    return e([main]), clear
+
+
+def stand_in(monkeypatch, root):
+    automation = StandInAutomation(root)
     monkeypatch.setattr(lasx_navigator, "automation", lambda: (automation, automation))
-    with pytest.raises(lasx_navigator.NavigatorUnavailable, match="the view Navigator was not found"):
+
+
+def test_the_clear_button_is_found_along_the_navigators_path(monkeypatch):
+    searches = []
+    root, clear = las_x_window(searches)
+    stand_in(monkeypatch, root)
+    assert lasx_navigator.find_clear_button().element is clear
+
+
+def test_a_navigator_not_shown_is_unavailable_and_named(monkeypatch):
+    searches = []
+    root, _ = las_x_window(searches, navigator_shown=False)
+    stand_in(monkeypatch, root)
+    with pytest.raises(lasx_navigator.NavigatorUnavailable, match="NavigatorTabControl.*is the Navigator shown"):
         lasx_navigator.find_clear_button()
 
 
+@pytest.mark.parametrize("navigator_shown", [True, False])
+def test_the_window_is_never_searched_whole(monkeypatch, navigator_shown):
+    # Searching all of LAS X's window for a view it does not show took 90 to
+    # 158 s (simulator, 2026-10-14); down to the Navigator's tab control the
+    # way is walked one child at a time.
+    searches = []
+    root, _ = las_x_window(searches, navigator_shown)
+    stand_in(monkeypatch, root)
+    with contextlib.suppress(lasx_navigator.NavigatorUnavailable):
+        lasx_navigator.find_clear_button()
+    above_the_tabs = {None, "Window", "AddIn", "MainFormView", "LDMMatrix", "WorkFlowBar", "WorkflowStartScreen", "Pane"}
+    assert [s for s in searches if s[1] == DESCENDANTS and s[0] in above_the_tabs] == []
+
+
 def test_no_las_x_window_is_unavailable(monkeypatch):
-    automation = StandInAutomation(StandInElement(NullPointer()))
-    monkeypatch.setattr(lasx_navigator, "automation", lambda: (automation, automation))
+    stand_in(monkeypatch, StandInElement([]))
     with pytest.raises(lasx_navigator.NavigatorUnavailable, match="LAS X's window was not found"):
         lasx_navigator.find_clear_button()
