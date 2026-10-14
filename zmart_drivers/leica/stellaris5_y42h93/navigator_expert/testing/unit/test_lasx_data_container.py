@@ -236,6 +236,20 @@ class TestFindingThePicture:
                 None, acquisition_of("HiRes"), cache_root=cache, timeout_s=0.3
             )
 
+    def test_a_picture_let_go_of_is_passed_over_even_when_it_has_the_same_name(self, cache):
+        """LAS X keeps a released picture's description, rewritten, without its pixels (simulator, 2026-10-14).
+
+        It names the next capture as the released one was ("HiRes009" twice),
+        and rewrites the released description after the next capture began.
+        """
+        two_channel_12_bit(cache, number=6642, name="HiRes009")
+        (cache / f"V2LMSDC_MMF6642_0_{PID}.tmp").unlink()
+        two_channel_12_bit(cache, number=6662, name="HiRes009")
+
+        exported = container.collect_lasx_data_container(None, acquisition_of("HiRes"), cache_root=cache)
+
+        assert exported.relative_path == f"V2LMSDC_MMF6662_0_{PID}.tmp"
+
     def test_two_new_pictures_of_the_job_are_refused_not_guessed(self, cache):
         two_channel_12_bit(cache, number=746, name="HiRes002")
         two_channel_12_bit(cache, number=790, name="HiRes003")

@@ -150,6 +150,12 @@ def pictures_of(root: Path, acq: AcquisitionResult) -> list[tuple[Path, str, str
     is not enough: job "HiRes2" makes "HiRes2001", which reads as "HiRes"
     with a number too. So the job the description says made the picture
     (``BlockName``) must be *acq*'s job as well.
+
+    A picture LAS X has let go of (``output.lasx_cache_release``) keeps its
+    description, rewritten after the release, but not its pixels, and the
+    next capture may get its name again ("HiRes009" twice, simulator,
+    2026-10-14). So a picture is one only while its pixels are there; one
+    still being written is found once they are.
     """
     own_name = re.compile(re.escape(acq.job) + r"\d+")
     since = acq.started_at - MTIME_SKEW_ALLOWANCE_S
@@ -171,6 +177,12 @@ def pictures_of(root: Path, acq: AcquisitionResult) -> list[tuple[Path, str, str
             continue
         made_by = JOB.search(xml)
         if made_by is not None and made_by.group(1) != acq.job:
+            continue
+        described = DESCRIPTION.fullmatch(path.name)
+        if described is None:
+            continue
+        number, pid = described.groups()
+        if not (root / f"V2LMSDC_MMF{number}_0_{pid}.tmp").is_file():
             continue
         found.append((path, name, xml))
     return found
