@@ -241,6 +241,20 @@ def test_the_direct_reader_route_can_be_chosen(caplog):
         profiles.STATE_READERS = prior
 
 
+def test_the_direct_route_keeps_the_drivers_own_job_confirmation():
+    """Job selection is confirmed by api, log or hybrid; on the direct route the driver's default stays."""
+    prior = profiles.STATE_READERS
+    try:
+        args = validate_hardware.parse_args(["--state-reader-mode", "direct"])
+        log = validate_hardware.logging.getLogger("t")
+        validate_hardware._apply_state_reader_mode(args.state_reader_mode, log)
+        validate_hardware._apply_log_select_confirmation(args, log)
+        assert profiles.STATE_READERS.selected_job_confirm_source == "hybrid"
+        assert profiles.STATE_READERS.xy_mode == "direct"
+    finally:
+        profiles.STATE_READERS = prior
+
+
 def test_explicit_log_mode_treats_empty_job_list_as_expected():
     """The job LIST is API-only (no log leg): a log-mode read returning
     nothing is the declared capability, not a driver fault. phase_readonly

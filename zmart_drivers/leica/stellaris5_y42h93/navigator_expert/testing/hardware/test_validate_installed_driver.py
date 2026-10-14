@@ -9,9 +9,11 @@ connecting by name through the real controller, in the offline suite.
 
 from __future__ import annotations
 
+import contextlib
 import json
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 _HERE = Path(__file__).resolve().parent
 _HELPERS = _HERE.parent / "helpers"
@@ -73,3 +75,32 @@ def test_the_report_ends_with_the_acceptance_checklist(tmp_path):
     assert "PASS: installed by folder" in text
     assert "PASS: the limits gate refuses before anything moves" in text
     assert "SKIP: the controller accepts an acquisition" in text
+
+
+class RecordingValidator:
+    """Stands in for the validator: runs each call and keeps every comparison."""
+
+    def __init__(self):
+        self.compared = {}
+
+    @contextlib.contextmanager
+    def phase(self, name):
+        yield
+
+    def callable(self, name, fn, mutating=False):
+        return fn()
+
+    def compare(self, name, actual, expected):
+        self.compared[name] = actual
+
+
+def test_a_capture_that_failed_is_reported_not_a_crash():
+    """A failed capture answers with words, not a record: the checks say it failed, nothing breaks."""
+    failed = {"success": False, "content": "RuntimeError: this microscope does not know where to save its data"}
+    session = SimpleNamespace(_session=SimpleNamespace(acquire=lambda **kwargs: failed))
+    v = RecordingValidator()
+
+    validate_installed_driver.phase_acquire(v, session, SimpleNamespace(mock=False))
+
+    assert v.compared["acquire: the controller accepts the answer"] != []
+    assert v.compared["acquire: at least one file"] is False

@@ -1519,9 +1519,11 @@ def _apply_log_select_confirmation(args: argparse.Namespace, log: logging.Logger
             "select-job confirmation source pinned to api for --mock "
             "(the mock backend has no log stream)"
         )
-    elif source is None and args.state_reader_mode is not None:
+    elif source is None and args.state_reader_mode in ("api", "log", "hybrid"):
         # A validator run that advertises a reader mode must not silently
-        # grade select_job with a different confirmation source.
+        # grade select_job with a different confirmation source. Job
+        # selection has no direct confirmation: on the direct route it keeps
+        # the driver's own (the profile's).
         source = args.state_reader_mode
         log.info("select-job confirmation source implied by --state-reader-mode: %s", source)
     if not (
