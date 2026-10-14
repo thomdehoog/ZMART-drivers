@@ -120,8 +120,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument(
         "--job",
-        default="HiRes",
-        help="with --hardware: the LAS X job the cache checks capture (default HiRes)",
+        default=None,
+        help="with --hardware: the LAS X job the cache checks capture (default: the one selected in LAS X)",
     )
     args = parser.parse_args(argv)
     if args.full and not args.hardware:
@@ -338,8 +338,7 @@ def main(argv: list[str] | None = None) -> int:
                     sys.executable,
                     str(hw / "check_cache_route.py"),
                     "--autosave-off",
-                    "--job",
-                    args.job,
+                    *(["--job", args.job] if args.job else []),
                     "--label",
                     "ci",
                     f"--save-to={REPORT_DIR / 'captures'}",
@@ -353,8 +352,7 @@ def main(argv: list[str] | None = None) -> int:
                     sys.executable,
                     str(hw / "check_cache_release.py"),
                     "--autosave-off",
-                    "--job",
-                    args.job,
+                    *(["--job", args.job] if args.job else []),
                     "--captures",
                     "10",
                     "--label",

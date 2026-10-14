@@ -358,7 +358,7 @@ def phase_acquire(v: vh.Validator, sess: Any, args: argparse.Namespace) -> None:
         content = answer.get("content") if isinstance(answer, dict) else None
         files = (content.get("files") or []) if isinstance(content, dict) else []
         v.compare("acquire: at least one file", len(files) >= 1, True)
-        present = all(Path(f).is_file() and Path(f).stat().st_size > 0 for f in files)
+        present = all(vh.capture_saved(f) for f in files)
         v.compare("acquire: every file exists and is not empty", present, True)
 
 

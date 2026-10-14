@@ -22,8 +22,10 @@ A report is written where the script is run (or to ``--report-dir``), as
 
 Usage, in the driver's environment on the microscope PC::
 
-    python check_cache_release.py --job HiRes --captures 50 --label hires-50
+    python check_cache_release.py --captures 50 --label fifty
     python check_cache_release.py --job HiRes --captures 50 --label hires-50 --save-to D:/ZMART-check
+
+Without ``--job`` the job selected in LAS X is captured.
 """
 
 from __future__ import annotations
@@ -92,7 +94,7 @@ def grown(now: dict, start: dict) -> dict:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--job", required=True, help="the LAS X job to capture")
+    parser.add_argument("--job", default=None, help="the LAS X job to capture (default: the one selected in LAS X)")
     parser.add_argument("--captures", type=int, default=50, help="how many captures")
     parser.add_argument("--label", required=True, help="a name for this check, e.g. hires-50")
     parser.add_argument("--save-to", default=None, help="a folder instead of the set-up data location")
@@ -128,7 +130,8 @@ def main() -> int:
     )
     session = ZmartController(driver, {"output_root": asked.save_to} if asked.save_to else {})
     try:
-        chosen = session.set_state({"changeable": {"job": asked.job}})
+        chosen = session.set_state({"changeable": {"job": asked.job}}) if asked.job else {"success": True}
+        report["job"] = session.get_state()["content"]["changeable"].get("job")
         if not chosen["success"]:
             raise SystemExit(f"the job was not selected: {chosen['content']}")
         here = session.get_xyz()["content"]

@@ -178,14 +178,11 @@ def test_validate_hardware_full_mock_run(tmp_path):
     selected_job_records = [
         record for record in records if record["name"].startswith("job selection: confirmed ")
     ]
-    assert {record["context"]["job"] for record in select_job_records} == {
-        "HiRes",
-        "Overview",
-        "AF Job",
-    }
+    # The autofocus job runs as a procedure, never as state, so it is not selected.
+    assert {record["context"]["job"] for record in select_job_records} == {"HiRes", "Overview"}
     assert {
         record["name"].removeprefix("job selection: confirmed ") for record in selected_job_records
-    } == {"HiRes", "Overview", "AF Job"}
+    } == {"HiRes", "Overview"}
 
     # The Markdown run report is produced and carries the summary table,
     # the timing overview, and every instrument change incl. restores.
@@ -253,6 +250,48 @@ def test_the_direct_route_keeps_the_drivers_own_job_confirmation():
         assert profiles.STATE_READERS.xy_mode == "direct"
     finally:
         profiles.STATE_READERS = prior
+
+
+def test_the_zoom_test_values_lie_in_the_jobs_own_range():
+    """Whatever the job, the alternate zoom is one LAS X accepts (HiRes on the simulator: 7.5 to 48)."""
+    for zoom in ({"current": 7.5, "min": 7.5, "max": 48.0}, {"current": 1.0, "min": 0.75, "max": 48.0},
+                 {"current": 48.0, "min": 7.5, "max": 48.0}):
+        candidates = validate_hardware.zoom_candidates(zoom)
+        assert candidates
+        assert all(zoom["min"] <= c <= zoom["max"] for c in candidates)
+        assert all(abs(c - zoom["current"]) > 0.1 for c in candidates)
+
+
+def test_job_selection_switches_between_normal_jobs_whatever_they_are_called():
+    """An autofocus job is run as a procedure, never selected as state: the round trip leaves it out."""
+    jobs = [{"Name": "Focus A", "IsAutofocus": True}, {"Name": "Wide", "IsAutofocus": False},
+            {"Name": "Detail", "IsAutofocus": False, "IsSelected": True}]
+    assert validate_hardware.selectable_job_names(jobs) == ["Wide", "Detail"]
+
+
+def test_a_capture_is_saved_as_a_file_or_as_a_store(tmp_path):
+    """An OME-TIFF plane is a file; an OME-Zarr store, the default format, is a folder."""
+    tiff = tmp_path / "A1.ome.tif"
+    tiff.write_bytes(b"II*\0 pixels")
+    empty = tmp_path / "empty.ome.tif"
+    empty.write_bytes(b"")
+    store = tmp_path / "A1.ome.zarr"
+    store.mkdir()
+    (store / "zarr.json").write_text("{}", encoding="utf-8")
+    hollow = tmp_path / "hollow.ome.zarr"
+    hollow.mkdir()
+    assert validate_hardware.capture_saved(tiff) is True
+    assert validate_hardware.capture_saved(store) is True
+    assert validate_hardware.capture_saved(empty) is False
+    assert validate_hardware.capture_saved(hollow) is False
+    assert validate_hardware.capture_saved(tmp_path / "missing.ome.tif") is False
+
+
+def test_a_stores_ome_xml_is_read_from_its_ome_folder(tmp_path):
+    store = tmp_path / "A1.ome.zarr"
+    (store / "OME").mkdir(parents=True)
+    (store / "OME" / "METADATA.ome.xml").write_text("<OME>the capture</OME>", encoding="utf-8")
+    assert validate_hardware.embedded_ome_xml(store) == b"<OME>the capture</OME>"
 
 
 def test_explicit_log_mode_treats_empty_job_list_as_expected():

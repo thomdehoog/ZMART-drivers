@@ -25,8 +25,9 @@ A report is written where the script is run (or to ``--report-dir``), as
 
 Usage, in the driver's environment on the microscope PC::
 
+    python check_cache_route.py --label selected-job
     python check_cache_route.py --job HiRes --label hires-16bit
-    python check_cache_route.py --job HiRes --label hires-stack --save-to D:/ZMART-check
+    python check_cache_route.py --label stack --save-to D:/ZMART-check
 
 The data location must be set up (configuration/data_location), or given
 with ``--save-to``. See ``SCOPE_CHECK_CACHE_ROUTE.md`` for the tests to run.
@@ -47,7 +48,7 @@ import numpy as np
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--job", required=True, help="the LAS X job to capture")
+    parser.add_argument("--job", default=None, help="the LAS X job to capture (default: the one selected in LAS X)")
     parser.add_argument("--label", required=True, help="a name for this check, e.g. hires-16bit")
     parser.add_argument("--save-to", default=None, help="a folder instead of the set-up data location")
     parser.add_argument("--report-dir", default=".", help="where the report is written (default: here)")
@@ -80,7 +81,8 @@ def main() -> int:
     adapter.IMAGE_SAVE = replace(adapter.IMAGE_SAVE, source="cache", format="ome-zarr", cleanup_source=False)
     session = ZmartController(driver, {"output_root": asked.save_to} if asked.save_to else {})
     try:
-        chosen = session.set_state({"changeable": {"job": asked.job}})
+        chosen = session.set_state({"changeable": {"job": asked.job}}) if asked.job else {"success": True}
+        report["job"] = session.get_state()["content"]["changeable"].get("job")
         if not chosen["success"]:
             report["error"] = f"the job was not selected: {chosen['content']}"
             return _finish(report, Path(asked.report_dir))

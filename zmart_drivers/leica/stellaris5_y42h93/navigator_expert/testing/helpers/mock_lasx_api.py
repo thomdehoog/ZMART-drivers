@@ -14,7 +14,7 @@ import time
 
 _DEFAULT_JOBS = {
     "HiRes": {
-        "zoom": {"current": 10.0},
+        "zoom": {"current": 10.0, "min": 0.75, "max": 48.0},
         "scanSpeed": {"value": 400, "isResonant": False},
         "scanMode": "xyz",
         "sequentialMode": "Frame",
@@ -63,7 +63,7 @@ _DEFAULT_JOBS = {
         ],
     },
     "Overview": {
-        "zoom": {"current": 1.0},
+        "zoom": {"current": 1.0, "min": 0.75, "max": 48.0},
         "scanSpeed": {"value": 800, "isResonant": False},
         "scanMode": "xy",
         "sequentialMode": "Frame",
@@ -106,7 +106,7 @@ _DEFAULT_JOBS = {
         ],
     },
     "AF Job": {
-        "zoom": {"current": 1.0},
+        "zoom": {"current": 1.0, "min": 0.75, "max": 48.0},
         "scanSpeed": {"value": 800, "isResonant": False},
         "scanMode": "xy",
         "sequentialMode": "Frame",

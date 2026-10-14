@@ -88,7 +88,7 @@ def test_the_quick_hardware_run_is_the_acceptance(monkeypatch, tmp_path):
     assert fatal_by_name["hardware: end-to-end validator [direct reader]"] is True
 
     saving = _command_for(captured, "check_cache_route.py")
-    assert saving[saving.index("--job") + 1] == "HiRes"
+    assert "--job" not in saving  # no job name: the job selected in LAS X is captured
     assert f"--report-dir={tmp_path}" in saving
     assert f"--save-to={tmp_path / 'captures'}" in saving
     assert (tmp_path / "captures").is_dir()
@@ -96,6 +96,7 @@ def test_the_quick_hardware_run_is_the_acceptance(monkeypatch, tmp_path):
     assert fatal_by_name["hardware: saving from LAS X's cache (one capture, checked)"] is True
 
     release = _command_for(captured, "check_cache_release.py")
+    assert "--job" not in release
     assert release[release.index("--captures") + 1] == "10"
     assert "--autosave-off" in release
     assert f"--report-dir={tmp_path}" in release

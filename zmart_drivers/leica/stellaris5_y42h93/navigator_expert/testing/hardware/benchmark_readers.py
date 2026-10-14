@@ -9,7 +9,7 @@ empty, and how far the three agree).
 
 Usage, in the driver's environment on the microscope PC::
 
-    python benchmark_readers.py --out D:/ZMART-check/readers --job HiRes
+    python benchmark_readers.py --out D:/ZMART-check/readers
     python benchmark_report.py D:/ZMART-check/readers > readers.md
 """
 
@@ -22,7 +22,7 @@ import sys
 import time
 from pathlib import Path
 
-JOB = "HiRes"  # replaced by --job
+JOB = None  # the job whose settings are read: --job, or the one selected in LAS X
 READERS = ("direct", "api", "log")
 
 
@@ -113,11 +113,15 @@ def main() -> int:
     global JOB
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--out", required=True, help="the folder the readings are written to")
-    parser.add_argument("--job", default="HiRes", help="the job whose settings are read")
+    parser.add_argument("--job", default=None, help="the job whose settings are read (default: the one selected)")
     parser.add_argument("--seconds", type=float, default=30, help="how long the readers read")
     parser.add_argument("--poll", choices=READERS, help=argparse.SUPPRESS)
     asked = parser.parse_args()
     JOB = asked.job
+    if JOB is None:
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface import direct_reader
+
+        JOB = direct_reader.get_selected_job()["Name"]
     out = Path(asked.out)
     until = out / "stop"
     if asked.poll:

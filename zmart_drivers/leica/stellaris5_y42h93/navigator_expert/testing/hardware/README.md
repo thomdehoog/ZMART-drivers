@@ -44,7 +44,7 @@ ready.
    z-galvo round-trip, and an acquire. Direct is the driver's default
    reader route, so this step is fatal.
 5. **Saving from LAS X's cache** (`check_cache_route.py`): one capture of
-   the job (`--job`, default HiRes) saved as one OME-Zarr store and checked,
+   the job selected in LAS X (or `--job`) saved as one OME-Zarr store and checked,
    with LAS X's AutoSave off, as the cache route is used; with AutoSave on
    this step fails and says so. (Run by hand with AutoSave on, the script
    also compares the store with AutoSave's file, pixel by pixel.)
@@ -75,8 +75,9 @@ commands a negative Z-wide target and restores it to 0 um.
 
 - LAS X running (simulator or scope) with the NavigatorExpert CAM add-in;
   no modal dialog open (a dialog blocks the whole CAM API).
-- A template/experiment loaded with **at least two jobs** (e.g. Overview +
-  HiRes) so job-selection round-trips have a target.
+- A template/experiment loaded with **at least two jobs that are not
+  autofocus jobs**, whatever they are called, so job-selection round-trips
+  have a target (an autofocus job runs as a procedure and is never selected).
 - Stage clear (no sample you care about): `--hardware` first moves to the
   fixed four-axis baseline above, then moves XY in a
   10-position pattern (±25 µm around the current position) and does a ±2 µm

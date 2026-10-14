@@ -625,6 +625,49 @@ def _job_objective_signature(drv: Any, client: Any, job_name: str) -> tuple | No
     return (objective.get("slotIndex"), objective.get("name"))
 
 
+def capture_saved(path) -> bool:
+    """Whether a saved capture is there and holds something, as an OME-TIFF file or an OME-Zarr store.
+
+    An OME-Zarr store, the driver's default format, is a folder; it counts as
+    saved when it holds its ``zarr.json``.
+    """
+    path = Path(path)
+    if path.is_dir():
+        return (path / "zarr.json").is_file()
+    return path.is_file() and path.stat().st_size > 0
+
+
+def embedded_ome_xml(path) -> bytes:
+    """The OME-XML a saved capture carries: inside the TIFF, or in an OME-Zarr store's ``OME`` folder."""
+    path = Path(path)
+    if path.is_dir():
+        return (path / "OME" / "METADATA.ome.xml").read_bytes()
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.output import materialize
+
+    return materialize.extract_embedded_ome_xml(path)
+
+
+def selectable_job_names(jobs: list[dict]) -> list[str]:
+    """The jobs a workflow selects as state, whatever they are called: all but the autofocus ones.
+
+    An autofocus job is run as a procedure (``run_procedure``); the driver
+    refuses it as state, so the round trip never selects it.
+    """
+    return [j["Name"] for j in jobs if not j.get("IsAutofocus")]
+
+
+def zoom_candidates(zoom: dict) -> list[float]:
+    """Zoom values inside the job's own range, away from the current one, whatever the job.
+
+    A quarter, half and three quarters of the way from the job's least to
+    its greatest zoom, as LAS X reports them (HiRes on the simulator: 7.5 to
+    48, so a fixed 5.0 was refused).
+    """
+    low, high, now = float(zoom["min"]), float(zoom["max"]), float(zoom["current"])
+    picks = [round(low + (high - low) * share, 1) for share in (0.25, 0.5, 0.75)]
+    return [z for z in picks if low <= z <= high and abs(z - now) > 0.1]
+
+
 def _job_selection_order(
     drv: Any,
     client: Any,
@@ -873,7 +916,7 @@ def phase_job_selection(
             v.skip("job selection: round-trip", "no jobs returned")
             return
 
-        names = [j["Name"] for j in jobs]
+        names = selectable_job_names(jobs)
         original = next((j["Name"] for j in jobs if j.get("IsSelected")), preferred_job)
         ordered_names = _job_selection_order(drv, client, names, original)
         last_target: str | None = None
@@ -938,13 +981,17 @@ def phase_settings(drv: Any, v: Validator, client: Any, job_name: str) -> None:
         return _settings(drv, client, job_name, mode="api")
 
     with v.phase("settings round-trip"):
+        try:
+            zoom_values = zoom_candidates(api_settings()["zoom"])
+        except Exception:  # noqa: BLE001 -- no range read: the round trip says it has no alternate
+            zoom_values = []
         _round_trip(
             v,
             "zoom",
             job_name,
             read=lambda: api_settings()["zoom"]["current"],
             write=lambda x: drv.set_zoom(client, job_name, x),
-            candidates=[5.0, 10.0, 2.0, 1.0],
+            candidates=zoom_values,
             tolerance=0.1,
         )
         _round_trip(

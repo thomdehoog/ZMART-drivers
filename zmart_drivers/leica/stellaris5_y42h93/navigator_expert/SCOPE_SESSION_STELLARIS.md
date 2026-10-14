@@ -59,7 +59,7 @@ It runs the installed driver, a move and a capture, every reversible setting thr
 readers, one capture saved from LAS X's cache and checked, and ten captures let go of from the
 cache with the Navigator canvas cleared, all with AutoSave off. Before each capture the driver
 shows Navigator Expert's Experiment tab by itself, when another tab is shown.
-Add `--job <name>` when the job to capture is not called HiRes.
+It captures the job selected in LAS X; add `--job <name>` to capture another.
 
 **Look at:**
 
@@ -73,12 +73,12 @@ Add `--job <name>` when the job to capture is not called HiRes.
 ## Step 2. The three readers side by side (about 1 minute, reads only)
 
 ```
-python <driver>\testing\hardware\benchmark_readers.py --out D:\ZMART-check\readers --job HiRes
+python <driver>\testing\hardware\benchmark_readers.py --out D:\ZMART-check\readers
 python <driver>\testing\hardware\benchmark_report.py D:\ZMART-check\readers > readers.md
 ```
 
-Then run it once more with `--job` set to a job that is **not** selected in LAS X (for example
-`"AF Job"`), and `--out D:\ZMART-check\readers-other`.
+Then run it once more with `--job` set to another job of the experiment, one that is **not**
+selected in LAS X, and `--out D:\ZMART-check\readers-other`.
 
 **Look at, in `readers.md`:**
 
@@ -132,7 +132,7 @@ available`.
 With AutoSave off:
 
 ```
-python <driver>\testing\hardware\check_cache_release.py --job HiRes --captures 50 --label hires-50 --autosave-off
+python <driver>\testing\hardware\check_cache_release.py --captures 50 --label fifty --autosave-off
 ```
 
 Every ten captures it prints how much LAS X's cache grew: in total, the hidden copies, and the
@@ -146,7 +146,7 @@ rest. **Look at:**
 Then once starting from **the Jobs tab** in Navigator Expert:
 
 ```
-python <driver>\testing\hardware\check_cache_release.py --job HiRes --captures 10 --label from-jobs-tab --autosave-off
+python <driver>\testing\hardware\check_cache_release.py --captures 10 --label from-jobs-tab --autosave-off
 ```
 
 At the first capture the screen switches to the Experiment tab by itself (it did so cleanly on
@@ -162,6 +162,6 @@ shown".
 - `readers.md` and `readers-other.md` from step 2
 - what step 3 printed, and the warning you used
 - the `check_cache_route_*.json` reports (step 4)
-- `check_cache_release_hires-50.json` and `check_cache_release_from-jobs-tab.json` (step 5)
+- `check_cache_release_fifty.json` and `check_cache_release_from-jobs-tab.json` (step 5)
 
 If all of it passes, the branch is ready to go to `release-candidate`.
