@@ -130,6 +130,20 @@ class TestAnswering:
         assert "Please keep minimum distance of 8nm." in caplog.text
         assert lasx_dialogs.pending() is None
 
+    def test_an_information_box_with_only_ok_is_answered_and_its_text_logged(self, lasx_log, monkeypatch, caplog):
+        """LAS X refuses a start with an Information box that waits for OK (simulator, 2026-10-15)."""
+        show(lasx_log, "2026-10-15 20:04:26.262 0009  Info DbTracer 'MessageBox Information : Can not start scan!\n"
+                       "(Reason: No channel active) '\n")
+        dialog = StandInDialog(lasx_log)
+        use(monkeypatch, StandInWindows([dialog]))
+        with caplog.at_level(logging.WARNING):
+            answered = lasx_dialogs.answer_warnings()
+        assert dialog.pressed == ["ButtonMessageOk"]
+        assert answered.dialog.caption == "Information"
+        assert "Can not start scan!" in answered.dialog.text and "No channel active" in answered.dialog.text
+        assert "No channel active" in caplog.text
+        assert "Information" in answered.message
+
     def test_a_dialog_with_another_button_is_left_open_and_refused(self, lasx_log, monkeypatch, caplog):
         show(lasx_log)
         dialog = StandInDialog(lasx_log, buttons=("ButtonMessageOk", "ButtonMessageCancel"))

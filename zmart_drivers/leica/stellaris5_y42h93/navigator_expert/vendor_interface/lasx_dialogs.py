@@ -14,8 +14,10 @@ Automation: the dialog is a second top-level window of LAS X's process
 holding ``MessageBoxContent``, its buttons named by their automation ids
 (simulator, 2026-10-14: ``ButtonMessageOk`` alone).
 
-The driver answers a warning whose only button is OK, and writes its text to
-the log. It answers nothing else: a question, a dialog with any other
+The driver answers a warning or an information box whose only button is OK
+(LAS X refuses a start with one: "Can not start scan! (Reason: No channel
+active)", simulator 2026-10-15; the command has failed already, OK only
+closes the notice), and writes its text to the log. It answers nothing else: a question, a dialog with any other
 button, or two dialogs at once stay open for the operator, and the command
 that met them is refused with the dialog's text.
 """
@@ -66,6 +68,8 @@ WATCH_INTERVAL_S = tuning.POLL_S
 #: The one button the driver presses, and the caption of the dialogs it presses it on.
 OK_BUTTON = "ButtonMessageOk"
 WARNING = "Warning"
+#: The dialogs answered with OK, when OK is their only button: notices, never questions.
+ANSWERED_CAPTIONS = (WARNING, "Information")
 
 #: COM's answer when a thread's COM is set up already, in another mode: usable as it is.
 RPC_E_CHANGED_MODE = -2147417850
@@ -134,7 +138,7 @@ class Answered:
 
     @property
     def message(self) -> str:
-        return f"LAS X warning answered with OK: {self.dialog.text!r} (shown {self.dialog.at})"
+        return f"LAS X {self.dialog.caption} answered with OK: {self.dialog.text!r} (shown {self.dialog.at})"
 
 
 class DialogOpen(RuntimeError):
@@ -251,9 +255,9 @@ def answer_open_warning() -> Answered | None:
         if time.monotonic() >= deadline:
             raise left_open(dialog, "in LAS X's log, not found on screen")
         time.sleep(tuning.ANSWER_POLL_S)
-    if dialog.caption != WARNING or len(windows) != 1 or windows[0].buttons != (OK_BUTTON,):
+    if dialog.caption not in ANSWERED_CAPTIONS or len(windows) != 1 or windows[0].buttons != (OK_BUTTON,):
         buttons = [w.buttons for w in windows]
-        raise left_open(dialog, f"not a warning with OK alone: {dialog.caption}, buttons {buttons}")
+        raise left_open(dialog, f"not a warning or information box with OK alone: {dialog.caption}, buttons {buttons}")
     windows[0].press(OK_BUTTON)
     deadline = time.monotonic() + ANSWER_WAIT_S
     while pending() is not None:

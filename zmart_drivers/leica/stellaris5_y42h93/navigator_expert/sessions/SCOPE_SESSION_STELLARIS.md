@@ -120,7 +120,7 @@ python <driver>\testing\hardware\watch_lasx_warnings.py --minutes 5
 Now the driver watches, as it does once it is connected. **Look at:**
 
 - Call up the same warning: within about a second it closes by itself.
-- The script prints `LAS X warning answered with OK: '<its text>'`.
+- The script prints `LAS X Warning answered with OK: '<its text>'` (an Information box with only OK is answered the same way).
 - A dialog with any other button stays open and is printed as `not answered`.
 
 If `--look` finds the warning in the log but `0 dialog window(s)` on screen, the microscope's
