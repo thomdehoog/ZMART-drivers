@@ -11,6 +11,10 @@ Usage, in the driver's environment on the microscope PC::
 
     python benchmark_readers.py --out D:/ZMART-check/readers
     python benchmark_report.py D:/ZMART-check/readers > readers.md
+
+With ``--check`` it writes the tables itself (``readers.md`` in ``--out``)
+and fails when a reader failed or the CAM API disagrees with the direct
+reader (``benchmark_report.problems``); the CI runs it so.
 """
 
 from __future__ import annotations
@@ -111,6 +115,7 @@ def main() -> int:
     parser.add_argument("--out", required=True, help="the folder the readings are written to")
     parser.add_argument("--job", default=None, help="the job whose settings are read (default: the one selected)")
     parser.add_argument("--seconds", type=float, default=30, help="how long the readers read")
+    parser.add_argument("--check", action="store_true", help="write readers.md and fail when a reader is wrong")
     parser.add_argument("--poll", choices=READERS, help=argparse.SUPPRESS)
     asked = parser.parse_args()
     JOB = asked.job
@@ -142,8 +147,19 @@ def main() -> int:
     (out / "benchmark.json").write_text(
         json.dumps({"job": JOB, "marks": marks}, indent=1), encoding="utf-8"
     )
-    print(f"readings for {asked.seconds:.0f} s; tables: python benchmark_report.py {out}")
-    return 0
+    if not asked.check:
+        print(f"readings for {asked.seconds:.0f} s; tables: python benchmark_report.py {out}")
+        return 0
+    # The CI starts scripts with PYTHONSAFEPATH, which keeps this folder off the search path.
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    import benchmark_report
+
+    (out / "readers.md").write_text(benchmark_report.report(out), encoding="utf-8")
+    found = benchmark_report.problems(out)
+    for problem in found:
+        print(f"  problem: {problem}")
+    print(f"\n{'ALL CHECKS PASSED' if not found else f'FAILED: {len(found)} problem(s)'}  (tables: {out / 'readers.md'})")
+    return 0 if not found else 1
 
 
 if __name__ == "__main__":

@@ -7,8 +7,8 @@ microscope PC)::
 
     python run_ci.py             # MOCK/OFFLINE (default): lint + offline tests + coverage
     python run_ci.py --mock      # explicit spelling of the default
-    python run_ci.py --hardware         # LIVE: the quick acceptance against LAS X (simulator or scope)
-    python run_ci.py --hardware --full  # LIVE: plus the reader probe, parity, and the api/log/hybrid routes
+    python run_ci.py --hardware         # LIVE: the quick acceptance: driver, moves, buttons, saving, the cache
+    python run_ci.py --hardware --full  # LIVE: plus the direct/api/log readers, the probe, parity, every route
 
 Design goals (matching the suite's standard):
 
@@ -298,13 +298,28 @@ def main(argv: list[str] | None = None) -> int:
                 True,
             ),
         ]
-        # The full set adds the diagnostics: the passive reader probe, the
-        # api/log parity check, and the end-to-end validator through the
+        # The full set adds the readers and the diagnostics: the three readers
+        # (direct, api, log) side by side, which fails when one fails or the
+        # CAM API disagrees with the direct reader; the passive reader probe;
+        # the api/log parity check; and the end-to-end validator through the
         # other reader routes. Once per release, or after a change to the
         # readers; the api, log and hybrid routes stay diagnostic, the direct
-        # route, the driver's default, is fatal.
+        # route, the driver's default, is fatal. All of it reads only, or
+        # restores what it changed, so it runs after the stage baseline.
         if args.full:
             hardware_steps = [
+                hardware_steps[0],
+                (
+                    "hardware: the direct, api and log readers side by side (reads only)",
+                    [
+                        sys.executable,
+                        str(hw / "benchmark_readers.py"),
+                        f"--out={REPORT_DIR / 'readers'}",
+                        "--seconds=15",
+                        "--check",
+                    ],
+                    True,
+                ),
                 (
                     "hardware: passive readers (api / log / hybrid)",
                     [sys.executable, str(hw / "probe_four_readers.py"), "--read-only"],
@@ -320,7 +335,7 @@ def main(argv: list[str] | None = None) -> int:
                     ],
                     False,
                 ),
-                *hardware_steps,
+                *hardware_steps[1:],
             ]
         for mode in ("api", "log", "hybrid", "direct") if args.full else ("direct",):
             hardware_steps.append(
@@ -349,6 +364,15 @@ def main(argv: list[str] | None = None) -> int:
         # data location.
         (REPORT_DIR / "captures").mkdir(parents=True, exist_ok=True)
         hardware_steps += [
+            # The two buttons the driver presses through Windows UI Automation
+            # (Experiment, which shows the Navigator canvas, and Clear), with
+            # the canvas left on purpose first; and no LAS X dialog open. It
+            # ends with the canvas shown, which the two cache checks need.
+            (
+                "hardware: the buttons the driver presses (Jobs, Experiment, Clear) and LAS X's dialogs",
+                [sys.executable, str(hw / "check_buttons.py"), f"--report-dir={REPORT_DIR}"],
+                True,
+            ),
             (
                 "hardware: saving from LAS X's cache (one capture, checked)",
                 [
@@ -409,7 +433,10 @@ def main(argv: list[str] | None = None) -> int:
         print(
             "    hardware_validate_{direct,api,log,hybrid}.jsonl  end-to-end checks; direct is the fatal production route"
         )
+        print("    check_buttons.json  the buttons the driver presses, and LAS X's dialogs")
         print("    check_cache_route_ci.json, check_cache_release_ci.json  saving from and letting go of LAS X's cache")
+        if args.full:
+            print("    readers/readers.md  the direct, api and log readers side by side")
     print("    ci_summary.json   this step summary")
 
     if run_hardware:

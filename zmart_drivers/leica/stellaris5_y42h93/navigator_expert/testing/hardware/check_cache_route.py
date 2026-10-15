@@ -129,7 +129,11 @@ def _read_ome(text: str, checks: dict):
         checks["valid OME 2016-06"] = "not checked (lxml missing)"
     except Exception as why:  # noqa: BLE001 -- reported, not raised
         checks["valid OME 2016-06"] = f"NO: {why}"
-        ome = ome_types.from_xml(text, validate=False)
+        try:
+            # Read without the schema, to still show the metadata a person can check.
+            ome = ome_types.from_xml(text, validate=False)
+        except Exception:  # noqa: BLE001 -- a value even this reading refuses: the report says why above
+            ome = None
     return ome
 
 

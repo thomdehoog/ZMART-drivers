@@ -8,7 +8,9 @@ saved, and the Navigator canvas, which holds the capture's hidden copy
 (``TileScan <n>``), is cleared. It measures LAS X's cache (the
 ``V2LMSDC_*`` files in LAS X's cache folder) before, every ten captures and
 after: in total, how much of it is hidden copies, and the rest. It counts the
-captures that failed and the releases whose canvas could not be cleared.
+captures that failed and the releases whose canvas could not be cleared, and
+it fails when the hidden copies grew over the run: a Clear press that goes
+through but frees nothing is caught there.
 
 On the LAS X simulator (2026-10-14) a hidden copy took 1.3 to 2 times its
 capture's pixels, and all of them were let go of at every release. The canvas
@@ -93,6 +95,27 @@ def grown(now: dict, start: dict) -> dict:
     return {part: round(now[part] - start[part], 2) for part in start}
 
 
+#: How much the hidden copies may grow over a whole run and still count as let
+#: go of. A capture's hidden copy is at least the capture's own pixels (about
+#: 1 MB for 512 x 512 in three channels), and it stays unless the canvas is
+#: cleared; so 1 MB in total is well below what one capture that was not let
+#: go of adds, and well above measuring noise.
+HIDDEN_MARGIN_MB = 1.0
+
+
+def verdict(*, captures: int, done: int, errors: list, not_cleared: int, hidden_grown_mb: float) -> dict:
+    """The run's checks, by name, True when passed.
+
+    A Clear press that goes through but frees nothing would still count as
+    cleared, so the hidden copies are measured too: they must not grow.
+    """
+    return {
+        "every capture saved": done == captures and not errors,
+        "the canvas cleared at every release": not_cleared == 0,
+        "the hidden copies did not grow": hidden_grown_mb <= HIDDEN_MARGIN_MB,
+    }
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--job", default=None, help="the LAS X job to capture (default: the one selected in LAS X)")
@@ -152,10 +175,10 @@ def main() -> int:
     report["per capture, MB"] = {part: round(value / done, 3) for part, value in g.items()} if done else None
     report["canvas not cleared"] = releases.not_cleared
     report["why not cleared"] = releases.reason
-    report["checks"] = {
-        "every capture saved": done == asked.captures and not report["errors"],
-        "the canvas cleared at every release": releases.not_cleared == 0,
-    }
+    report["checks"] = verdict(
+        captures=asked.captures, done=done, errors=report["errors"],
+        not_cleared=releases.not_cleared, hidden_grown_mb=g["hidden"],
+    )
     out = Path(asked.report_dir) / f"check_cache_release_{re.sub(r'[^A-Za-z0-9_-]', '-', asked.label)}.json"
     out.write_text(json.dumps(report, indent=1), encoding="utf-8")
     if report["per capture, MB"]:

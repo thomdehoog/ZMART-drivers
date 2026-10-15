@@ -102,8 +102,18 @@ def test_the_quick_hardware_run_is_the_acceptance(monkeypatch, tmp_path):
     assert f"--report-dir={tmp_path}" in release
     assert fatal_by_name["hardware: letting go of LAS X's cache (10 captures, the canvas cleared)"] is True
 
+    buttons = _command_for(captured, "check_buttons.py")
+    assert f"--report-dir={tmp_path}" in buttons
+    assert fatal_by_name["hardware: the buttons the driver presses (Jobs, Experiment, Clear) and LAS X's dialogs"] is True
+    # The canvas the button check leaves shown is what the cache checks need.
+    order = [name for name, _cmd, _fatal in captured]
+    assert order.index("hardware: the buttons the driver presses (Jobs, Experiment, Clear) and LAS X's dialogs") < order.index(
+        "hardware: saving from LAS X's cache (one capture, checked)"
+    )
+
     assert not _commands_for(captured, "probe_four_readers.py")
     assert not _commands_for(captured, "validate_readers_side_by_side.py")
+    assert not _commands_for(captured, "benchmark_readers.py")
 
 
 def test_the_stage_goes_to_the_ci_baseline_before_any_step_moves_it(monkeypatch, tmp_path):
@@ -119,11 +129,19 @@ def test_the_stage_goes_to_the_ci_baseline_before_any_step_moves_it(monkeypatch,
 
 
 def test_the_full_hardware_run_adds_the_diagnostics(monkeypatch, tmp_path):
-    """--hardware --full: the quick set plus the reader probe, parity, and the api and log routes."""
+    """--hardware --full: the quick set plus the three readers, the reader probe, parity, and the api and log routes."""
     run_ci = _load_run_ci()
     captured = _capture_steps(run_ci, monkeypatch, tmp_path, ["--hardware", "--full"])
     fatal_by_name = {name: fatal for name, _cmd, fatal in captured}
 
+    readers = _command_for(captured, "benchmark_readers.py")
+    assert "--check" in readers
+    assert f"--out={tmp_path / 'readers'}" in readers
+    assert fatal_by_name["hardware: the direct, api and log readers side by side (reads only)"] is True
+
+    assert _command_for(captured, "check_buttons.py")
+    assert _command_for(captured, "check_cache_route.py")
+    assert _command_for(captured, "check_cache_release.py")
     assert _command_for(captured, "validate_installed_driver.py")
     assert _command_for(captured, "probe_four_readers.py")
     assert "--mock" not in _command_for(captured, "validate_readers_side_by_side.py")

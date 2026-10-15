@@ -96,7 +96,45 @@ def report(folder: Path) -> str:
         ]
         lines.append(f"| {datum} | " + " | ".join(marked) + " |")
     lines.append("\nA value in bold differs from the direct reader's.")
+    found = problems(folder)
+    section("Check")
+    lines.extend([f"- {p}" for p in found] or ["No problems: every reader answered, and the CAM API agrees with the direct reader."])
     return "\n".join(lines) + "\n"
+
+
+#: What the CAM API is not compared on: its z-galvo is the height stored in the
+#: job's settings, which stays at a z-galvo stack's middle while the drive is
+#: elsewhere (STELLARIS, 2026-10-15); only the direct reader reads the drive.
+NOT_COMPARED = ("z-galvo",)
+
+
+def problems(folder: Path) -> list[str]:
+    """What is wrong with a run, in plain sentences; an empty list when nothing is.
+
+    Wrong is a reader with no reading at rest, a reader that failed at rest,
+    or the CAM API answering a value differently from the direct reader. The
+    log is not compared: it knows only what LAS X wrote lately, so it may have
+    no answer, or an older one, by design.
+    """
+    run, readings = load(folder)
+    marks = run["marks"]
+    rest = {r: between(readings[r], marks["rest"], marks["end"]) for r in READERS}
+    found = []
+    for r in READERS:
+        if not rest[r]:
+            found.append(f"{r}: no reading while LAS X was at rest")
+        failed = [x for x in rest[r] if x["error"]]
+        if failed:
+            found.append(f"{r}: {len(failed)} of {len(rest[r])} readings failed, e.g. {failed[0]['error'][:120]}")
+    direct = next((x["values"] for x in reversed(rest["direct"]) if x["values"]), None)
+    api = next((x["values"] for x in reversed(rest["api"]) if x["values"]), None)
+    if direct and api:
+        for datum in TOLERANCE:
+            if datum in NOT_COMPARED:
+                continue
+            if direct.get(datum) is None or not shows(datum, api.get(datum), direct[datum]):
+                found.append(f"{datum}: the CAM API says {api.get(datum)!r}, the direct reader {direct.get(datum)!r}")
+    return found
 
 
 if __name__ == "__main__":
