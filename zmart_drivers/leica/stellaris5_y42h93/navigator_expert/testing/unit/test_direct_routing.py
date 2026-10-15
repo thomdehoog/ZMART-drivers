@@ -237,6 +237,45 @@ class TestDirectByDefault:
         assert prechecks.check_idle(client)["success"] is True
         assert asked == []
 
+    def test_the_end_of_a_capture_is_watched_through_the_direct_reader(self, client, tree, monkeypatch):
+        # The scan runs for three readings, then LAS X is idle again.
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.actions import confirmations
+
+        real, asked = readers.get_scan_status, []
+
+        def watched(*args, **kwargs):
+            asked.append((kwargs.get("mode"), kwargs.get("fallback")))
+            tree.status = {"AcquisitionState": 2 if len(asked) <= 3 else 0}  # eScanSingle, then idle
+            reading = real(*args, **kwargs)
+            asked[-1] += (reading.source if reading is not None else None,)
+            return reading
+
+        monkeypatch.setattr(readers, "get_scan_status", watched)
+        result = confirmations.confirm_acquire(client, start_timeout=5.0, timeout=10.0, poll_interval=0.001)
+        assert result["success"] is True
+        assert {call for call in asked} == {("direct", "api", "direct")}
+
+    def test_a_job_switch_asks_neither_the_cam_api_nor_the_log_when_the_direct_reader_answers(
+        self, client, tree, monkeypatch
+    ):
+        # The direct reader says HiRes is selected; a stale log line claims the
+        # target, Overview, already is. The switch must still be made, and the
+        # CAM API's job list is never read for it.
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.actions import confirm_select_job
+
+        real_jobs, api_job_lists = readers.get_jobs, []
+
+        def jobs(*args, **kwargs):
+            if kwargs.get("mode") == "api":
+                api_job_lists.append(1)
+            return real_jobs(*args, **kwargs)
+
+        monkeypatch.setattr(readers, "get_jobs", jobs)
+        monkeypatch.setattr(confirm_select_job, "_selected_job_name_from_log", lambda _profile: "Overview")
+        result = commands.select_job(client, "Overview")
+        assert (result["success"], client._selected_job) == (True, "Overview")
+        assert api_job_lists == []
+
     def test_the_idle_check_falls_back_to_the_api_alone(self, client, monkeypatch):
         # No hardware server (the suite's conftest): the API decides, never the log, whose idle goes stale.
         monkeypatch.setattr(readers.log_reader, "parse_log", lambda: pytest.fail("the log was asked"))
