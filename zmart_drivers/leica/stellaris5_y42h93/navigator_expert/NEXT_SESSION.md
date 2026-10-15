@@ -8,7 +8,7 @@ Where this branch stands (15 October 2026, evening) and what to do next. Read th
 
 - **Branch** `readers-for-stellaris` on `ZMART-drivers`, from `release-candidate` at `74b3451`.
   The commits of 15 October afternoon are **not pushed yet**; Thom decides when.
-- **The re-run on the STELLARIS (15 October 2026, afternoon) is done, except one test:**
+- **The re-run on the STELLARIS (15 October 2026, afternoon and evening) is done:**
   - **Step 1, the CI with another window in front:** passed twice; LAS X stayed behind the
     other window the whole time.
   - **Step 4, the cache route** (`SCOPE_CHECK_CACHE_ROUTE.md`), each report checked against
@@ -17,8 +17,10 @@ Where this branch stands (15 October 2026, evening) and what to do next. Read th
       4a (z-galvo stack with z-wide at its working height), 4b (z-wide stack), 5 (two
       sequential settings), 7 (the laser power fields);
     - **4c (a stack set up top-down) found a bug:** the z pixel size was saved negative
-      (`PhysicalSizeZ = -2.409`), which OME does not allow. **Fixed since** (see below), but
-      not yet run again on the microscope;
+      (`PhysicalSizeZ = -2.409`), which OME does not allow. **Fixed** (see below), and run
+      again on the microscope (`stack-top-down-2`): all checks passed, the z pixel size
+      +2.409 um, plane 0 the lowest and the highest on top, the planes' times showing the
+      stack was taken from the top; LAS X's own record has begin above end;
     - 6 is no longer run (the check does not use AutoSave); 8 (a run in the interface) was
       not done.
   - **Step 3, LAS X's warnings:** skipped again; no warning with only an OK button could be
@@ -95,9 +97,6 @@ Where this branch stands (15 October 2026, evening) and what to do next. Read th
 `git fetch`, then `git reset --hard origin/readers-for-stellaris` in the clone (the history was
 rewritten on 15 October), once the commits are pushed. Then:
 
-- **Test 4c once more** (`check_cache_route.py --job <stack job> --label stack-top-down-2`,
-  the stack set top-down): `pixel size um` must have a positive z, and depth 0 the lowest
-  canvas z.
 - **Test 8**, a short run in the interface, if Thom wants it.
 - **Step 3**, if a warning with only an OK button can be called up by hand.
 
