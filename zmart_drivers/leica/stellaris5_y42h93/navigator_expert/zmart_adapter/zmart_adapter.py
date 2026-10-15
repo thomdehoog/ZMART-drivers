@@ -95,7 +95,6 @@ from ..dispatcher import gate as _gate
 from ..dispatcher import read as _readers
 from ..output import command_log as _log
 from ..output import lasx_cache_release as _release
-from ..output import lasx_native_autosave as _native
 from ..output import save as _save
 from ..output.naming import Naming, free_stem, run_hash
 from ..procedures import backlash as _motion
@@ -1059,7 +1058,6 @@ def acquire(
         # concern from pixel-scale calibration and limits.
         orientation=_loaded_orientation(handle),
         cleanup_cache=IMAGE_SAVE.cleanup_cache,
-        source=IMAGE_SAVE.source,
         format=IMAGE_SAVE.format,
         projection=IMAGE_SAVE.projection,
         # Where on the sample each plane was taken, the same answer the
@@ -1604,11 +1602,6 @@ def _connection_status(handle: ZmartHandle, root: Path | None) -> dict:
             calibration.get("name") or "found" if calibration else "failed — none found"
         ),
         "stage": _try(stage) or "failed — no reading",
-        "autosave": (
-            "not needed: captures are read from LAS X's cache" if IMAGE_SAVE.source == "cache"
-            else "enabled" if _try(_native.native_autosave_enabled)
-            else "failed — LAS X will not save what is captured"
-        ),
         "output root": str(root) if root is not None else f"not set up: {_info.SET_UP}",
     }
 

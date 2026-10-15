@@ -139,7 +139,7 @@ def main() -> int:
                     "cache folder": str(cache.root), "progress": [], "errors": []}
 
     adapter.IMAGE_SAVE = replace(
-        adapter.IMAGE_SAVE, source="cache", format="ome-zarr", projection="none", cleanup_cache=True
+        adapter.IMAGE_SAVE, format="ome-zarr", projection="none", cleanup_cache=True
     )
     session = ZmartController(driver, {"output_root": asked.save_to} if asked.save_to else {})
     try:

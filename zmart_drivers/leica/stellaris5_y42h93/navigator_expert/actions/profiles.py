@@ -164,15 +164,11 @@ class ImageSaveProfile:
     Normal saves apply the active camera-to-stage orientation. The orientation
     measurement is the only workflow that explicitly requests raw pixels.
 
-    ``source`` is where the pixels are collected from (``output.save.SOURCES``):
-    ``"cache"``, LAS X's own cache, read as the picture is taken, or
-    ``"autosave"``, the OME-TIFF LAS X's AutoSave writes. The cache is the
-    default: it needs no AutoSave, so AutoSave stays off (Thom, 2026-10-14),
-    and it does not wait for AutoSave's file.
+    The pixels are collected from LAS X's own cache, read as the picture is
+    taken; LAS X's AutoSave is not used, so it stays off (Thom, 2026-10-14).
     """
 
     apply_orientation: bool = True
-    source: str = "cache"
     #: What a capture is saved as (``output.save.FORMATS``): ``"ome-tiff"``,
     #: one file a plane, or ``"ome-zarr"``, one image store. Only the one
     #: chosen is written.
@@ -181,23 +177,13 @@ class ImageSaveProfile:
     #: ``<acquisition>/projections`` (``output.save.PROJECTIONS``): its
     #: ``"max"`` projection over z, or ``"none"``.
     projection: str = "max"
-    #: Whether LAS X lets go of a capture read from its cache once the copy is
-    #: saved and read back identical (``output.lasx_cache_release``): the
-    #: capture leaves the cache, and the Navigator canvas is cleared of the
-    #: hidden copies it holds. Without it, a long run fills the cache's disk.
-    #: Only for ``source="cache"``: AutoSave's files are LAS X's project, so
-    #: reading from AutoSave means setting this to False as well. On since it
-    #: passed on the STELLARIS (2026-10-15): fifty and then ten captures let
+    #: Whether LAS X lets go of a capture in its cache once the copy is saved
+    #: and read back identical (``output.lasx_cache_release``): the capture
+    #: leaves the cache, and the Navigator canvas is cleared of the hidden
+    #: copies it holds. Without it, a long run fills the cache's disk. On since
+    #: it passed on the STELLARIS (2026-10-15): fifty and then ten captures let
     #: go of, the cache staying flat.
     cleanup_cache: bool = True
-
-    def __post_init__(self):
-        if self.cleanup_cache and self.source != "cache":
-            raise ValueError(
-                f"cleanup_cache lets go of captures read from LAS X's cache; with source "
-                f"{self.source!r} it would delete LAS X's own project files. Set "
-                f"cleanup_cache=False together with source={self.source!r}."
-            )
 
 
 IMAGE_SAVE = ImageSaveProfile()

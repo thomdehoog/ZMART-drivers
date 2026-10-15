@@ -224,11 +224,10 @@ class ExportedAcquisition:
     metadata: AcquisitionMetadata
     method: str
     relative_path: str | None = None
-    source_exporter: str = "lasx_native_autosave"
-    cleanup_cache_supported: bool = True
+    source_exporter: str = "lasx_data_container"
     vendor_metadata_sources: tuple[VendorMetadataSource, ...] = ()
-    #: How a source its owner holds is let go of once saved (LAS X's cache:
-    #: through LAS X); None when its files are simply deleted.
+    #: How LAS X lets go of the capture once it is saved (``cleanup_cache``);
+    #: None when there is no way to, and then letting go is refused.
     release: Callable[[], None] | None = None
 
     @property

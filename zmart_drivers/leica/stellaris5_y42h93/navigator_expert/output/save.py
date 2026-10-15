@@ -5,11 +5,9 @@ Public workflow:
     acq = acquire(client, job)
     saved = save(client, acq, output_root, naming)
 
-``save`` owns persistence only. The pixels are collected from one of two
-sources (``SOURCES``): ``"cache"``, LAS X's Data Container cache
-(``lasx_data_container``), or ``"autosave"``, LAS X's own AutoSave files
-(``lasx_native_autosave``); either way the same OME-TIFFs are written. OME
-checks live in ``ome``.
+``save`` owns persistence only. The pixels are collected from LAS X's Data
+Container cache as LAS X writes them (``lasx_data_container``); LAS X's
+AutoSave is not used. OME checks live in ``ome``.
 """
 
 from __future__ import annotations
@@ -31,12 +29,8 @@ from . import ome_zarr
 from .files import (
     DEFAULT_EXPORT_COMPLETION_POLL_INTERVAL_S,
     DEFAULT_EXPORT_COMPLETION_TIMEOUT_S,
-    DEFAULT_FILE_STABILITY_TIMEOUT_S,
 )
 from .lasx_data_container import collect_lasx_data_container
-from .lasx_native_autosave import (
-    collect_lasx_native_autosave,
-)
 from .naming import (
     Naming,
     build_image_name,
@@ -50,11 +44,6 @@ from .naming import (
 from .product import ExportedAcquisition, PlaneIndex, SavedAcquisition
 
 log = logging.getLogger(__name__)
-
-#: Where ``save`` can collect the pixels from: ``"cache"``, LAS X's Data
-#: Container cache read as LAS X writes it (``lasx_data_container``), or
-#: ``"autosave"``, the OME-TIFF LAS X's AutoSave writes (``lasx_native_autosave``).
-SOURCES = ("cache", "autosave")
 
 #: What ``save`` writes the capture as: one OME-TIFF a plane, or one OME-Zarr
 #: image (``ome_zarr``). Only the one chosen is written.
@@ -76,10 +65,8 @@ def save(
     orientation: Orientation | None = None,
     fix_ome: bool = True,
     cleanup_cache: bool = False,
-    file_stability_timeout_s: int = DEFAULT_FILE_STABILITY_TIMEOUT_S,
     export_completion_timeout_s: float = DEFAULT_EXPORT_COMPLETION_TIMEOUT_S,
     export_completion_poll_interval_s: float = (DEFAULT_EXPORT_COMPLETION_POLL_INTERVAL_S),
-    source: str | None = None,
     cache_root: str | Path | None = None,
     format: str | None = None,
     placement: Callable[[list[int]], Callable[[int], dict]] | None = None,
@@ -87,18 +74,19 @@ def save(
 ) -> SavedAcquisition:
     """Persist the files produced for *acq* into *output_root*.
 
-    LAS X native AutoSave produces a writer-agnostic
-    ``ExportedAcquisition``. This function persists that product into the
-    flat ZMART OME-TIFF layout (one 2-D plane per file, no sidecar XML).
+    The capture is collected from LAS X's Data Container cache as a
+    writer-agnostic ``ExportedAcquisition``, which this function persists.
     When *state* is provided, the machine/software state at export time is
     embedded in each plane's OME-XML. By default, every plane is reoriented
     losslessly with this microscope's active orientation as it is written.
     Pass ``Orientation()`` explicitly only when raw camera pixels are required,
-    as in the orientation measurement itself.
+    as in the orientation measurement itself. *cache_root* names the Data
+    Container cache folder when it is not the one the registry gives.
 
-    *source* is one of ``SOURCES`` and defaults to the profile's
-    (``IMAGE_SAVE.source``); *cache_root* names the Data Container cache
-    folder when it is not the one the registry gives.
+    *cleanup_cache* asks LAS X to let go of the capture once everything is
+    written and read back the same. Only LAS X lets go of a capture, through
+    the collected product's ``release``; a product without one is refused
+    before anything is written, so the driver never deletes a file itself.
 
     *format* is one of ``FORMATS`` and defaults to the profile's
     (``IMAGE_SAVE.format``). With ``"ome-zarr"`` the capture becomes one
@@ -113,9 +101,6 @@ def save(
     """
     from ..actions.profiles import IMAGE_SAVE
 
-    source = IMAGE_SAVE.source if source is None else source
-    if source not in SOURCES:
-        raise ValueError(f"unknown image source {source!r}; the sources are {SOURCES}")
     format = IMAGE_SAVE.format if format is None else format
     if format not in FORMATS:
         raise ValueError(f"unknown image format {format!r}; the formats are {FORMATS}")
@@ -126,21 +111,17 @@ def save(
         from ..configuration.image_stage_registration import rig_orientation
 
         orientation = rig_orientation() if IMAGE_SAVE.apply_orientation else Orientation()
-    if source == "cache":
-        exported = collect_lasx_data_container(
-            client,
-            acq,
-            cache_root=cache_root,
-            timeout_s=export_completion_timeout_s,
-            poll_interval_s=export_completion_poll_interval_s,
-        )
-    else:
-        exported = collect_lasx_native_autosave(
-            client,
-            acq,
-            file_stability_timeout_s=file_stability_timeout_s,
-            export_completion_timeout=export_completion_timeout_s,
-            export_completion_poll_interval=export_completion_poll_interval_s,
+    exported = collect_lasx_data_container(
+        client,
+        acq,
+        cache_root=cache_root,
+        timeout_s=export_completion_timeout_s,
+        poll_interval_s=export_completion_poll_interval_s,
+    )
+    if cleanup_cache and exported.release is None:
+        raise RuntimeError(
+            f"cleanup_cache asks LAS X to let go of the capture, but {exported.source_exporter} "
+            "gives no way to; nothing was saved and nothing deleted"
         )
     exported = replace(exported, metadata=on_the_canvas(exported.metadata, exported, placement))
     if format == "ome-zarr":
@@ -162,7 +143,6 @@ def save(
             state=state,
             orientation=orientation,
             fix_ome=fix_ome,
-            cleanup_cache=cleanup_cache,
         )
     if projection != "none" and exported.metadata.size_z > 1:
         saved = replace(saved, projection_paths=_persist_projection(
@@ -170,17 +150,11 @@ def save(
             state=state,
         ))
     # Last, once everything made from the source has been made from it.
-    if cleanup_cache and exported.release is not None:
+    if cleanup_cache:
         try:
             exported.release()
         except Exception as e:  # noqa: BLE001 -- the capture is saved; letting go is the owner's
             log.warning("cleanup_cache failed for %s: %s", exported.relative_path, e)
-    elif cleanup_cache:
-        for p in exported.source_files:
-            try:
-                p.unlink()
-            except OSError as e:
-                log.warning("cleanup_cache failed for %s: %s", p, e)
     return saved
 
 
@@ -291,7 +265,6 @@ def _persist_export(
     state: dict | None = None,
     orientation: Orientation | None = None,
     fix_ome: bool,
-    cleanup_cache: bool,
 ) -> SavedAcquisition:
     """Shared persistence for stable exported source paths.
 
@@ -299,14 +272,6 @@ def _persist_export(
     ``data_dir(output_root)`` and its OME-XML is
     embedded (no sidecar companion). *state* is embedded per-plane.
     """
-    if cleanup_cache and not exported.cleanup_cache_supported:
-        raise RuntimeError(
-            f"cleanup_cache is not supported for "
-            f"{exported.source_exporter}. Native AutoSave sources are "
-            f"LAS X project containers; deleting them requires an "
-            f"explicit project-level cleanup policy."
-        )
-
     image_paths: dict[PlaneIndex, Path] = {}
     state_paths: dict[Path, None] = {}
     vendor_records = _persist_vendor_metadata(exported, output_root, naming)

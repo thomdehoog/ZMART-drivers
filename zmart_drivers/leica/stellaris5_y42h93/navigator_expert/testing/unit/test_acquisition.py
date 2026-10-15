@@ -48,12 +48,12 @@ def _identity_rig_orientation(monkeypatch):
 
 @pytest.fixture(autouse=True)
 def saves_as_ome_tiff(monkeypatch):
-    """These tests are about AutoSave's files saved as OME-TIFF: the profile reads AutoSave here."""
+    """These tests are about captures saved as OME-TIFF, kept in LAS X's cache."""
     from dataclasses import replace as replaced
 
     from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.actions import profiles
 
-    monkeypatch.setattr(profiles, "IMAGE_SAVE", replaced(profiles.IMAGE_SAVE, source="autosave", format="ome-tiff", cleanup_cache=False))
+    monkeypatch.setattr(profiles, "IMAGE_SAVE", replaced(profiles.IMAGE_SAVE, format="ome-tiff", cleanup_cache=False))
 
 
 @pytest.fixture
@@ -164,7 +164,7 @@ def fake_export(tmp_path: Path) -> dict:
         ],
         metadata=_grid_metadata(),
         method="test",
-        source_exporter="lasx_native_autosave",
+        source_exporter="lasx_data_container",
         vendor_metadata_sources=(drv.VendorMetadataSource(name="source.ome.xml", path=xml_path),),
     )
 
@@ -198,7 +198,7 @@ def patched_export(fake_export, monkeypatch):
         "error": None,
     }
     collect = Mock(return_value=fake_export["exported"])
-    monkeypatch.setattr(acquisition, "collect_lasx_native_autosave", collect)
+    monkeypatch.setattr(acquisition, "collect_lasx_data_container", collect)
     with (
         patch.object(
             materialize._ome,
@@ -395,7 +395,7 @@ class TestSave:
             metadata=metadata,
             method="test",
         )
-        monkeypatch.setattr(acquisition, "collect_lasx_native_autosave", lambda *a, **k: exported)
+        monkeypatch.setattr(acquisition, "collect_lasx_data_container", lambda *a, **k: exported)
 
         saved = drv.save(None, successful_acq, tmp_path / "out", naming)
 
@@ -441,7 +441,7 @@ class TestSave:
         )
         assert rec["image_path"] == ("data/" + build_image_name(naming))
         assert "xml_path" not in rec
-        assert rec["source_exporter"] == "lasx_native_autosave"
+        assert rec["source_exporter"] == "lasx_data_container"
         assert rec["naming"]["stem"] == "overview-scan_000001_000003"
 
     def test_save_does_not_issue_microscope_acquire(
@@ -468,7 +468,7 @@ class TestSave:
         monkeypatch,
     ):
         collect = Mock(side_effect=RuntimeError("stop after kwargs"))
-        monkeypatch.setattr(acquisition, "collect_lasx_native_autosave", collect)
+        monkeypatch.setattr(acquisition, "collect_lasx_data_container", collect)
         with pytest.raises(RuntimeError, match="stop after kwargs"):
             drv.save(
                 None,
@@ -479,8 +479,8 @@ class TestSave:
                 export_completion_poll_interval_s=0.25,
             )
 
-        assert collect.call_args.kwargs["export_completion_timeout"] == 12.0
-        assert collect.call_args.kwargs["export_completion_poll_interval"] == 0.25
+        assert collect.call_args.kwargs["timeout_s"] == 12.0
+        assert collect.call_args.kwargs["poll_interval_s"] == 0.25
 
     def test_lineage_passes_through(
         self,
@@ -501,22 +501,34 @@ class TestSave:
         summary = json.loads((output_root / "summary.json").read_text())
         assert summary["acquisitions"][0]["lineage"] == lineage
 
-    def test_cleanup_cache_removes_lasx_product(
+    @pytest.mark.parametrize("image_format", ["ome-zarr", "ome-tiff"])
+    def test_a_capture_with_no_way_to_be_let_go_of_is_refused_and_left_alone(
         self,
         patched_export,
         tmp_path,
         successful_acq,
         naming,
+        image_format,
     ):
-        drv.save(
-            None,
-            successful_acq,
-            tmp_path / "run_000001",
-            naming,
-            cleanup_cache=True,
-        )
-        assert all(not p.is_file() for p in patched_export["image_paths"])
-        assert not patched_export["xml_path"].is_file()
+        """Only LAS X lets go of a capture; nothing is ever deleted by the driver itself.
+
+        A source that gives no way for LAS X to let go of it (``release``) is
+        refused when releasing is asked for, before anything is saved, and its
+        files stay as they are.
+        """
+        with pytest.raises(RuntimeError, match="cleanup_cache"):
+            drv.save(
+                None,
+                successful_acq,
+                tmp_path / "run_000001",
+                naming,
+                format=image_format,
+                cleanup_cache=True,
+                placement=lambda _planes: lambda z: {"x_um": 0.0, "y_um": 0.0, "z_um": float(z)},
+            )
+        assert all(p.is_file() for p in patched_export["image_paths"])
+        assert patched_export["xml_path"].is_file()
+        assert not (tmp_path / "run_000001").exists()
 
     def test_cleanup_lets_go_of_a_source_that_says_how(
         self,
@@ -757,7 +769,6 @@ class TestSave:
                 naming,
                 lineage=None,
                 fix_ome=True,
-                cleanup_cache=False,
             )
 
         out_img = next((tmp_path / "out" / "data").glob("*.ome.tiff"))
@@ -885,7 +896,7 @@ class TestSave:
         assert {path.name for path in data.iterdir() if path.is_dir()} == {"metadata"}
         metadata = data / "metadata"
         assert {path.name for path in metadata.iterdir()} == {"ZMART_state", "vendor"}
-        assert (metadata / "vendor" / "lasx_native_autosave").is_dir()
+        assert (metadata / "vendor" / "lasx_data_container").is_dir()
 
     def test_the_state_is_printed_beside_the_images_as_metadata(
         self,

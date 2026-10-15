@@ -316,7 +316,7 @@ class TestLettingGo:
         exported = container.collect_lasx_data_container(None, acquisition_of("HiRes"), cache_root=cache)
         exported.release()
 
-        assert exported.cleanup_cache_supported is True
+        assert exported.release is not None
         assert asked == [(746, "HiRes002")]
 
 
@@ -383,7 +383,6 @@ class TestSaving:
             acquisition_of("HiRes"),
             tmp_path / "out",
             naming,
-            source="cache",
             cache_root=cache,
             format="ome-tiff",
         )
@@ -398,11 +397,3 @@ class TestSaving:
             assert 'SignificantBits="12"' in ome
             assert 'Type="uint16"' in ome
             assert 'PhysicalSizeX="2.5"' in ome
-
-    def test_an_unknown_source_is_refused(self, cache, tmp_path):
-        naming = Naming(stem="high-res_000001_000003")
-
-        with pytest.raises(ValueError, match="cache"):
-            acquisition.save(
-                None, acquisition_of("HiRes"), tmp_path / "out", naming, source="elsewhere"
-            )

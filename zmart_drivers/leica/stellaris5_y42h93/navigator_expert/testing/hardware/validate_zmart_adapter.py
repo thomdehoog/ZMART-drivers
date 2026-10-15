@@ -701,8 +701,8 @@ def phase_acquire(v: vh.Validator, sess: Any, args: argparse.Namespace) -> None:
         v.skip("phase: acquire", "save requires real LAS X export files; run live")
         return
     with v.phase("acquire (capture + save)"):
-        # The live LAS X session decides where it writes; save collects from
-        # the single native AutoSave path. The selected job runs, whole.
+        # save collects the capture from LAS X's cache, as a workflow's
+        # capture is. The selected job runs, whole.
         rec = v.callable(
             "acquire: capture + save",
             lambda: sess.acquire(

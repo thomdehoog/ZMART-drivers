@@ -1,7 +1,7 @@
 """LAS X source-side file primitives.
 
-This module stays deliberately small. Exporter-specific collection lives
-in ``lasx_native_autosave``; persistence and OME checks live in
+This module stays deliberately small. Collection from LAS X's cache lives
+in ``lasx_data_container``; persistence and OME checks live in
 ``save`` / ``ome``.
 
 Source naming (LAS X auto-export)::

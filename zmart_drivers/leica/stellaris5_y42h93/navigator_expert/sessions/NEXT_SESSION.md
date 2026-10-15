@@ -102,12 +102,20 @@ rewritten on 15 October), once the commits are pushed. Then:
 
 ## After the session
 
-- **Done (15 October 2026):** releasing is on in the profile (`IMAGE_SAVE.cleanup_cache = True`;
-  reading from AutoSave now means setting it to False as well), and these notes moved into
-  `sessions/`.
+- **Done (15 October 2026, evening):**
+  - releasing is on in the profile (`IMAGE_SAVE.cleanup_cache = True`, renamed from
+    `cleanup_source`); the driver never deletes a file itself: a capture LAS X gives no way to let
+    go of is refused before anything is saved;
+  - **AutoSave is gone from the driver:** every capture is read from LAS X's cache
+    (`output/lasx_native_autosave.py`, the profile's `source` and the connection status's
+    AutoSave line are removed);
+  - **the CAM API is nowhere the first choice for reading:** the end of a capture
+    (`confirm_acquire`) is watched through the direct reader, and a job switch is decided by the
+    direct reader alone when it answers (a stale log line could stop a needed switch before);
+    the CAM API sends the commands, and reads only when the direct reader cannot answer;
+  - these notes moved into `sessions/`.
 - **Open:**
-  - `confirm_acquire`, the check that a capture has finished, still asks the CAM API alone; to
-    ask the direct reader first, then run the hardware CI, whose captures check it;
+  - the hardware CI after these changes, whose captures check the end-of-capture watch;
   - merge into `release-candidate`;
   - then promote to `main` with the other repositories.
 

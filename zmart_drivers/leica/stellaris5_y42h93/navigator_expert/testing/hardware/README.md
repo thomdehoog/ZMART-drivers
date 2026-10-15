@@ -39,7 +39,7 @@ ready.
    its summary.
 3. **The adapter round-trip** (`validate_zmart_adapter.py`): first the
    four-axis CI baseline, then `set_origin` and `set_xyz`, the state
-   round-trip, and an acquire through LAS X native AutoSave.
+   round-trip, and an acquire saved from LAS X's cache.
 4. **The end-to-end validator in the direct reader route**
    (`validate_hardware.py`): every reversible setting, the XY pattern, the
    z-galvo round-trip, and an acquire. Direct is the driver's default
@@ -53,7 +53,7 @@ ready.
 6. **Saving from LAS X's cache** (`check_cache_route.py`): one capture of
    the job selected in LAS X (or `--job`) saved as one OME-Zarr store and
    checked: valid OME-Zarr and OME, a projection beside a stack, a log
-   beside the data. The cache route does not use AutoSave, so it does not
+   beside the data. The driver does not use AutoSave, so it does not
    matter whether AutoSave is on. Metadata the OME schema refuses is
    reported as a failed check.
 7. **Letting go of LAS X's cache** (`check_cache_release.py`): ten captures,
@@ -136,7 +136,7 @@ commands a negative Z-wide target and restores it to 0 um.
   microscope's saved origin is left exactly as it was before the run.
 - Acquisition: the adapter validator reads the notebook-critical live
   `get_info()` snapshot (output root, tile positions, focus positions) and one
-  acquire+save smoke through LAS X native AutoSave. Each end-to-end reader route
+  acquire+save smoke from LAS X's cache, which LAS X then lets go of. Each end-to-end reader route
   runs an acquire command in its reader mode; file materialization is proven once
   through the adapter path.
 - **NOT touched by run_ci**: objective turret. Opt in via a direct run only

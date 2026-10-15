@@ -90,7 +90,6 @@ def save_as_zarr(root, tmp_path, job, *, placement=None, orientation=Orientation
         acquisition_of(job),
         tmp_path / "out",
         Naming(stem="high-res_000001_A1"),
-        source="cache",
         cache_root=root,
         format="ome-zarr",
         placement=placement,
@@ -133,7 +132,7 @@ class TestOneCopy:
             saving.save(
                 None, acquisition_of("HiRes"), tmp_path / "out",
                 Naming(stem="high-res_000001_A1"),
-                source="cache", cache_root=root, format=format, placement=at(0.0, 0.0, {0: 0.0}),
+                cache_root=root, format=format, placement=at(0.0, 0.0, {0: 0.0}),
             )
 
         data = tmp_path / "out" / "data"
@@ -293,7 +292,7 @@ class TestEveryFileSaysTheCanvasPosition:
         saved = saving.save(
             None, acquisition_of("HiRes"), tmp_path / "out",
             Naming(stem="high-res_000001_A1"),
-            source="cache", cache_root=root, format="ome-tiff", orientation=Orientation(),
+            cache_root=root, format="ome-tiff", orientation=Orientation(),
             placement=at(1000.0, 2000.0, {0: 50.0}),
         )
 
@@ -330,7 +329,7 @@ class TestEveryFileSaysTheCanvasPosition:
         saved = saving.save(
             None, acquisition_of("HiRes"), tmp_path / "out",
             Naming(stem="high-res_000001_A1"),
-            source="cache", cache_root=root, format="ome-tiff", orientation=Orientation(),
+            cache_root=root, format="ome-tiff", orientation=Orientation(),
         )
 
         with tifffile.TiffFile(saved.image_paths[PlaneIndex(0, 0, 0)]) as tif:
@@ -349,7 +348,7 @@ def save_with_projection(root, tmp_path, job, *, format, placement, projection="
     return saving.save(
         None, acquisition_of(job), tmp_path / "out",
         Naming(stem="high-res_000001_A1"),
-        source="cache", cache_root=root, format=format, orientation=Orientation(),
+        cache_root=root, format=format, orientation=Orientation(),
         placement=placement, projection=projection,
     )
 
