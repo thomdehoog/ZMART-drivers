@@ -4,8 +4,7 @@ The branch `readers-for-stellaris` brings five changes to the driver. Each was s
 the LAS X simulator (14 October 2026), never yet on the microscope:
 
 - **Captures are read from LAS X's cache by default, so AutoSave stays off.** The driver saves
-  each capture itself, straight from the cache; AutoSave is only switched on to compare with
-  its files (step 4).
+  each capture itself, straight from the cache, and no step of this session needs AutoSave.
 - **The job settings come from LAS X's own JSON answers.** The direct reader now reads every
   job's settings and the hardware information as LAS X writes them for the CAM API, so it also
   reads the settings of jobs other than the selected one, and a filter wheel's spectrum mode.
@@ -42,7 +41,7 @@ capture where the stage already stands.
    [`SCOPE_CHECK_CACHE_ROUTE.md`](SCOPE_CHECK_CACHE_ROUTE.md).
 4. **In LAS X:** Navigator Expert open on its **Experiment** tab, which shows the Navigator
    canvas with its Clear button (not the Jobs tab). **AutoSave off**: the cache route is used
-   without it, and steps 1 and 5 check that it is off. Only step 4 switches it on.
+   without it, for the whole session.
 5. **In the loaded experiment, at least two jobs that are not autofocus jobs**, whatever they
    are called: step 1 switches between them (an autofocus job is never selected as a job).
 6. **The stage clear for step 1:** no sample you care about, objective clear. Step 1 first takes
@@ -128,11 +127,14 @@ If `--look` finds the warning in the log but `0 dialog window(s)` on screen, the
 dialog windows are built differently from the simulator's. Take a screenshot of the dialog and
 note what was printed.
 
-## Step 4. Saving straight from the cache (as planned)
+## Step 4. Saving straight from the cache
 
-Tests 1 to 8 of [`SCOPE_CHECK_CACHE_ROUTE.md`](SCOPE_CHECK_CACHE_ROUTE.md), unchanged. These
-compare each capture with AutoSave's file, so **switch AutoSave on** for them, into a project
-of its own; test 6 switches it off again. Leave it off for step 5.
+The tests of [`SCOPE_CHECK_CACHE_ROUTE.md`](SCOPE_CHECK_CACHE_ROUTE.md), one at a time, each
+with its own `--label`, and with AutoSave left off. The script does not compare a capture with
+AutoSave's file; instead, check what each report says against what LAS X shows for the same
+capture: the bit depth (tests 1 and 2), both channels and the plane heights of a stack (tests 3
+and 4), each channel's own laser and detector (test 5), and the laser power fields (test 7).
+Test 6 is no longer run, and test 8 (a short run in the interface) is optional.
 
 For a job with a z-stack (tests 3 and 4), the driver reads the stack's z position from the
 experiment it saves, which is the `.lrp` save fix. **Look at:** the output must not contain

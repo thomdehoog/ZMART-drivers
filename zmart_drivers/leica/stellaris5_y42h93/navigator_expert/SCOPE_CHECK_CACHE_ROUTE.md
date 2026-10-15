@@ -23,8 +23,9 @@ file, and they move the stage only to where it already stands.
 2. **Set the data location once**: open
    `configuration/data_location/notebooks/set_data_location.ipynb`, write the folder (a local disk,
    for example `D:\ZMART-data`) and run it. Without it the driver saves nothing and says so.
-3. Keep **AutoSave on** for tests 1 to 5 and 7: the script then compares every capture with
-   AutoSave's file, pixel by pixel.
+3. **AutoSave can stay off.** The script does not compare the capture with AutoSave's file any
+   more: the cache route does not use AutoSave, and the check never asks about it. What you
+   compare instead is the report against what LAS X shows for the same capture.
 
 Run each test from a folder of your choice, in the driver's environment; the report is written
 there as `check_cache_route_<label>.json`, and the last line says `ALL CHECKS PASSED` or which
@@ -41,13 +42,13 @@ python <driver>\testing\hardware\check_cache_route.py --job "<job>" --label <lab
 | # | In LAS X first | Command (`--job`, `--label`) | Look at |
 |---|---|---|---|
 | 1 | A single-plane job, 8 bit | `--job HiRes --label hires-8bit` | All checks pass; the report's `metadata`: microscope model and serial, objective, each channel's detector and dye match what LAS X shows |
-| 2 | Set the same job to 12 bit, then 16 bit (by hand) | `--label hires-12bit`, then `--label hires-16bit` | `type, significant bits` is `uint16, 12`, then `uint16, 16`; identical to AutoSave. Set the job back afterwards |
-| 3 | A job with **2 channels and a z-stack** | `--job <job> --label two-channel-stack` | Identical to AutoSave; in `planes`, both channels of a plane have the same canvas z, and `dt s` grows plane by plane |
+| 2 | Set the same job to 12 bit, then 16 bit (by hand) | `--label hires-12bit`, then `--label hires-16bit` | `type, significant bits` is `uint16, 12`, then `uint16, 16`. Set the job back afterwards |
+| 3 | A job with **2 channels and a z-stack** | `--job <job> --label two-channel-stack` | `size (x, y, z, c)` has both channels and as many planes as LAS X's stack; in `planes`, both channels of a plane have the same canvas z, and `dt s` grows plane by plane |
 | 4a | A stack made by **z-galvo**, with z-wide at its usual height | `--label galvo-stack` | In each plane's `drives`: z-wide stays at LAS X's z-wide position, z-galvo runs from the stack's begin to its end; the canvas z steps by the stack's step |
 | 4b | The same stack made by **z-wide** | `--label wide-stack` | z-wide runs from begin to end, z-galvo stays put; the canvas z steps the same way |
 | 4c | The same stack set up **top-down** (begin above end) | `--label stack-top-down` | In `planes`, depth 0 has the lowest canvas z and each depth is higher, as in 4b; the store's first slice is the lowest |
 | 5 | A job with **two sequential settings** (different lasers or detectors) | `--label sequential` | Each channel's laser, detector, gain and detection band are those of its own setting in LAS X |
-| 6 | **Switch AutoSave off** in LAS X | `--job HiRes --label autosave-off` | All checks pass; `identical to AutoSave's file` says `not compared: AutoSave is off`. The capture is saved without AutoSave |
+| 6 | — (no longer run) | — | AutoSave is off for every test now, so the others already show that a capture is saved without it |
 | 7 | — (any report) | — | `laser power, as LAS X writes it`: does `OutputPowerWatt` hold real numbers on this system, and in which unit? |
 | 8 | Start the interface on the STELLARIS | A short run: overview, focus, targets | In the run folder: each `<type>/data` holds only `.ome.zarr` stores; stacks have `<type>/projections`; every capture has a `<type>/log` file; there is no `positions` folder; the viewer shows the overview and the projections |
 
@@ -62,8 +63,6 @@ the plane heights.
 - **`captured and saved` is false**: the report's `error` says why. "does not know where to save"
   means step 2 above was skipped. "no picture of job … appeared" means LAS X did not put the
   capture in its cache; send the report and say what LAS X showed.
-- **`identical to AutoSave's file` is false**: the picture or its order differs. Keep both files
-  (the store in the report's `store.path`, AutoSave's in `autosave_file`) and send the report.
 - **A metadata value is wrong** (a dye, a detector, a height): note what LAS X shows for it, and
   send the report.
 
@@ -71,5 +70,5 @@ the plane heights.
 
 The `check_cache_route_*.json` reports, and for any test whose values do not match LAS X, what LAS X
 showed. `"cache"` is already the default source (`actions/profiles.py`, `IMAGE_SAVE.source`,
-14 October 2026), so AutoSave stays off in normal use; with all nine passing, the repositories
-go to `main`.
+14 October 2026), so AutoSave stays off in normal use; with all the tests passing, the
+repositories go to `main`.
