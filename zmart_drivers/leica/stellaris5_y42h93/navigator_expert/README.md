@@ -9,11 +9,14 @@ notebooks keep the thin 1–3-line invocation style used across the ZMART driver
 - **Author:** Thom de Hoog (ZMB, University of Zurich) · thom.dehoog@zmb.uzh.ch · thomdehoog@gmail.com
 - **License:** see the repository root [`LICENSE`](../../../../LICENSE).
 - **Status:** **Release candidate (`7.0.0rc1`), not yet released.** Version 7 reads LAS X's state
-  first from LAS X's hardware server, and from the CAM API and the log when that fails. This has been
-  tested on the LAS X simulator; it has not yet run on a real STELLARIS. The latest full run on the
-  microscope, of version 6, is recorded in [`SCOPE_RUN_2026-10-10.md`](SCOPE_RUN_2026-10-10.md).
-  Before it is released for unattended use, the findings in
-  [`RELEASE_CANDIDATE_REVIEW.md`](RELEASE_CANDIDATE_REVIEW.md) need to be fixed.
+  first from LAS X's hardware server, and from the CAM API and the log when that fails. It has been
+  tested on the LAS X simulator and, on 15 October 2026, on the STELLARIS: the full hardware CI and
+  the checks of saving from and letting go of LAS X's cache passed
+  ([`sessions/NEXT_SESSION.md`](sessions/NEXT_SESSION.md)). The run of version 6 is recorded in
+  [`sessions/SCOPE_RUN_2026-10-10.md`](sessions/SCOPE_RUN_2026-10-10.md). Before it is released for
+  unattended use, the findings in
+  [`sessions/RELEASE_CANDIDATE_REVIEW.md`](sessions/RELEASE_CANDIDATE_REVIEW.md) need to be fixed.
+  The session notes, plans and reviews are kept in [`sessions/`](sessions/).
 
 ## Contents
 

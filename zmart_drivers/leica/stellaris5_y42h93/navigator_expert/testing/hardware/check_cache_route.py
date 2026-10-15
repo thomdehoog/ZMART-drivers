@@ -28,7 +28,7 @@ Usage, in the driver's environment on the microscope PC::
     python check_cache_route.py --label stack --save-to D:/ZMART-check
 
 The data location must be set up (configuration/data_location), or given
-with ``--save-to``. See ``SCOPE_CHECK_CACHE_ROUTE.md`` for the tests to run.
+with ``--save-to``. See ``sessions/SCOPE_CHECK_CACHE_ROUTE.md`` for the tests to run.
 """
 
 from __future__ import annotations

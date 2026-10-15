@@ -41,7 +41,7 @@ microscope, is described in [the anatomy of a ZMART driver](docs/driver-anatomy.
 
 | Microscope | Vendor interface | Driver | Status |
 |---|---|---|---|
-| Leica STELLARIS 5 | LAS X Python (CAM) API, Navigator Expert | [`zmart_drivers/leica/stellaris5_y42h93/navigator_expert/`](zmart_drivers/leica/stellaris5_y42h93/navigator_expert/README.md) | **Release candidate `6.0.0rc1`**, not yet released. Tested on the LAS X simulator and a real STELLARIS. Laid out as [the anatomy of a ZMART driver](docs/driver-anatomy.md) describes, and plugs into the controller as a `ZmartDriver` class. See its [release candidate review](zmart_drivers/leica/stellaris5_y42h93/navigator_expert/RELEASE_CANDIDATE_REVIEW.md). |
+| Leica STELLARIS 5 | LAS X Python (CAM) API, Navigator Expert | [`zmart_drivers/leica/stellaris5_y42h93/navigator_expert/`](zmart_drivers/leica/stellaris5_y42h93/navigator_expert/README.md) | **Release candidate `6.0.0rc1`**, not yet released. Tested on the LAS X simulator and a real STELLARIS. Laid out as [the anatomy of a ZMART driver](docs/driver-anatomy.md) describes, and plugs into the controller as a `ZmartDriver` class. See its [release candidate review](zmart_drivers/leica/stellaris5_y42h93/navigator_expert/sessions/RELEASE_CANDIDATE_REVIEW.md). |
 | Nikon Ti2 | NIS-Elements AR 6.10, a bridge inside NIS | [`zmart_drivers/nikon/nis_elements_6_10/`](zmart_drivers/nikon/nis_elements_6_10/README.md) | Working on the NIS-Elements Ti2 simulator; not yet run on a real microscope. Plugs into the controller as a module. |
 | ZEISS (ZEN blue or ZEN core) | ZEN API (`zen_api`, gRPC) | [`zmart_drivers/zeiss/zenapi/`](zmart_drivers/zeiss/zenapi/README.md) | Speaks the published ZEN API, tested against its own fake gateway; not yet run against ZEN itself. Plugs into the controller as a module. |
 | mesoSPIM light-sheet | mesoSPIM-control, Remote Scripting | [`zmart_drivers/mesospim/`](zmart_drivers/mesospim/README.md) | Working through Remote Scripting. mesoSPIM-control's own Remote Control is the newer way in; this driver has not moved to it yet. Plugs into the controller as a module. |
@@ -136,7 +136,7 @@ to drive the microscope from Python without the controller.
 This repository is a **release candidate**. It collects the drivers that are ready to be
 reviewed for release, separately from the rest of ZMART-microscopy. Nothing in it is released
 yet. The Leica driver has been tested on the LAS X simulator and on a real STELLARIS, and its
-[release candidate review](zmart_drivers/leica/stellaris5_y42h93/navigator_expert/RELEASE_CANDIDATE_REVIEW.md)
+[release candidate review](zmart_drivers/leica/stellaris5_y42h93/navigator_expert/sessions/RELEASE_CANDIDATE_REVIEW.md)
 lists what must be fixed before release. Please do not leave the Leica driver running
 unattended until the high-severity findings in that review are resolved.
 

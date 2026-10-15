@@ -1,8 +1,9 @@
 # Plan: one copy of every capture, from the cache or AutoSave, as OME-TIFF or OME-Zarr
 
 *Status: built on 11 October 2026, on `release-candidate` of ZMART-drivers, ZMART-interface,
-ZMART-viewer and ZMART-controller; checked on the LAS X simulator. What is left is the check on
-the STELLARIS: [`SCOPE_CHECK_CACHE_ROUTE.md`](../zmart_drivers/leica/stellaris5_y42h93/navigator_expert/SCOPE_CHECK_CACHE_ROUTE.md).
+ZMART-viewer and ZMART-controller; checked on the LAS X simulator, and on the STELLARIS on 15
+October 2026 with the tests of
+[`SCOPE_CHECK_CACHE_ROUTE.md`](../zmart_drivers/leica/stellaris5_y42h93/navigator_expert/sessions/SCOPE_CHECK_CACHE_ROUTE.md).
 This page records what was built, and where it went another way than planned.*
 
 ## What a capture is now

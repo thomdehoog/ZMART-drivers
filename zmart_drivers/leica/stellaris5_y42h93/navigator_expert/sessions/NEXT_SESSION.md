@@ -102,8 +102,12 @@ rewritten on 15 October), once the commits are pushed. Then:
 
 ## After the session
 
-- **All passes:**
-  - switch releasing on in the profile (`IMAGE_SAVE.cleanup_source = True`);
+- **Done (15 October 2026):** releasing is on in the profile (`IMAGE_SAVE.cleanup_source = True`;
+  reading from AutoSave now means setting it to False as well), and these notes moved into
+  `sessions/`.
+- **Open:**
+  - `confirm_acquire`, the check that a capture has finished, still asks the CAM API alone; to
+    ask the direct reader first, then run the hardware CI, whose captures check it;
   - merge into `release-candidate`;
   - then promote to `main` with the other repositories.
 
