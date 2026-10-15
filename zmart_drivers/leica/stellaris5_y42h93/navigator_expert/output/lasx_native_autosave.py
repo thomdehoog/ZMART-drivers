@@ -115,7 +115,7 @@ def collect_lasx_native_autosave(
         method=f"lasx_native_autosave:{method}",
         relative_path=_relative_or_none(anchor, base),
         source_exporter="lasx_native_autosave",
-        cleanup_source_supported=False,
+        cleanup_cache_supported=False,
         vendor_metadata_sources=_vendor_metadata_sources(project_dir, anchor),
     )
 

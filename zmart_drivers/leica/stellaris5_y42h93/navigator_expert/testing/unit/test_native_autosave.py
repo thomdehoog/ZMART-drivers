@@ -41,7 +41,7 @@ def saves_as_ome_tiff(monkeypatch):
 
     from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.actions import profiles
 
-    monkeypatch.setattr(profiles, "IMAGE_SAVE", replaced(profiles.IMAGE_SAVE, source="autosave", format="ome-tiff", cleanup_source=False))
+    monkeypatch.setattr(profiles, "IMAGE_SAVE", replaced(profiles.IMAGE_SAVE, source="autosave", format="ome-tiff", cleanup_cache=False))
 
 
 @pytest.fixture
@@ -139,7 +139,7 @@ class TestCollectNativeAutoSave:
             )
 
         assert exported.source_exporter == "lasx_native_autosave"
-        assert exported.cleanup_source_supported is False
+        assert exported.cleanup_cache_supported is False
         assert exported.image_files == [tiff]
         assert any(src.data for src in exported.vendor_metadata_sources)
         assert exported.metadata.size_t == 2
@@ -362,7 +362,7 @@ class TestNativeSave:
             ),
             method="test",
             source_exporter="lasx_native_autosave",
-            cleanup_source_supported=False,
+            cleanup_cache_supported=False,
             vendor_metadata_sources=native._vendor_metadata_sources(project, tiff),
         )
 
@@ -393,7 +393,7 @@ class TestNativeSave:
         assert all(r["canonical_metadata"] is True for r in summary["acquisitions"])
         assert all(r["vendor_metadata"] for r in summary["acquisitions"])
 
-    def test_cleanup_source_rejected_for_native_project_container(
+    def test_cleanup_cache_rejected_for_native_project_container(
         self,
         tmp_path,
         successful_acq,
@@ -413,7 +413,7 @@ class TestNativeSave:
             ),
             method="test",
             source_exporter="lasx_native_autosave",
-            cleanup_source_supported=False,
+            cleanup_cache_supported=False,
             vendor_metadata_sources=native._vendor_metadata_sources(project, tiff),
         )
 
@@ -422,13 +422,13 @@ class TestNativeSave:
             "collect_lasx_native_autosave",
             Mock(return_value=exported),
         )
-        with pytest.raises(RuntimeError, match="cleanup_source"):
+        with pytest.raises(RuntimeError, match="cleanup_cache"):
             drv.save(
                 None,
                 successful_acq,
                 tmp_path / "run_000001",
                 naming,
-                cleanup_source=True,
+                cleanup_cache=True,
             )
         assert tiff.is_file()
         assert not (tmp_path / "run_000001").exists()

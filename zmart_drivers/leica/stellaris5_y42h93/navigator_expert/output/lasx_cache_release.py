@@ -22,7 +22,7 @@ What it takes:
 - the picture's name, checked before deleting, so that nothing else is ever
   deleted.
 
-The save calls it last (``cleanup_source``), only once its copy is written and
+The save calls it last (``cleanup_cache``), only once its copy is written and
 read back identical. Seen on the LAS X simulator: the picture's pixels leave
 the cache, the project file is rewritten without it, and LAS X captures on.
 About 0.2 MB of descriptions per picture stays while LAS X's window holds it.

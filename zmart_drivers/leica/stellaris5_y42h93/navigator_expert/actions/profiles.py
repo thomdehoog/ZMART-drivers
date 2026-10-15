@@ -189,14 +189,14 @@ class ImageSaveProfile:
     #: reading from AutoSave means setting this to False as well. On since it
     #: passed on the STELLARIS (2026-10-15): fifty and then ten captures let
     #: go of, the cache staying flat.
-    cleanup_source: bool = True
+    cleanup_cache: bool = True
 
     def __post_init__(self):
-        if self.cleanup_source and self.source != "cache":
+        if self.cleanup_cache and self.source != "cache":
             raise ValueError(
-                f"cleanup_source lets go of captures read from LAS X's cache; with source "
+                f"cleanup_cache lets go of captures read from LAS X's cache; with source "
                 f"{self.source!r} it would delete LAS X's own project files. Set "
-                f"cleanup_source=False together with source={self.source!r}."
+                f"cleanup_cache=False together with source={self.source!r}."
             )
 
 

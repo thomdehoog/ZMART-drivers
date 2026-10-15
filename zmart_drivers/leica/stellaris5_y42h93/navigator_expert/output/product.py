@@ -225,7 +225,7 @@ class ExportedAcquisition:
     method: str
     relative_path: str | None = None
     source_exporter: str = "lasx_native_autosave"
-    cleanup_source_supported: bool = True
+    cleanup_cache_supported: bool = True
     vendor_metadata_sources: tuple[VendorMetadataSource, ...] = ()
     #: How a source its owner holds is let go of once saved (LAS X's cache:
     #: through LAS X); None when its files are simply deleted.

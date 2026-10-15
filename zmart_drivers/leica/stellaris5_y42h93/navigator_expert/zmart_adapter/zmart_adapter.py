@@ -1033,7 +1033,7 @@ def acquire(
         settled = steps["backlash"] = _motion.correct_backlash(handle.client, passes=backlash_rounds)
         if not settled.get("confirmed"):
             _note_unconfirmed(handle, "acquire: backlash takeup", settled)
-    if IMAGE_SAVE.cleanup_source:
+    if IMAGE_SAVE.cleanup_cache:
         _release.prepare()
 
     acq = _capture.acquire(handle.client, job)
@@ -1058,7 +1058,7 @@ def acquire(
         # at connect (from the set_orientation setup notebook's file); a separate
         # concern from pixel-scale calibration and limits.
         orientation=_loaded_orientation(handle),
-        cleanup_source=IMAGE_SAVE.cleanup_source,
+        cleanup_cache=IMAGE_SAVE.cleanup_cache,
         source=IMAGE_SAVE.source,
         format=IMAGE_SAVE.format,
         projection=IMAGE_SAVE.projection,

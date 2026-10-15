@@ -884,25 +884,25 @@ class TestAcquire(unittest.TestCase):
         self.assertEqual(calls["save"]["source"], adapter.IMAGE_SAVE.source)
         self.assertEqual(calls["save"]["format"], adapter.IMAGE_SAVE.format)
         self.assertEqual(calls["save"]["projection"], adapter.IMAGE_SAVE.projection)
-        self.assertIs(calls["save"]["cleanup_source"], adapter.IMAGE_SAVE.cleanup_source)
+        self.assertIs(calls["save"]["cleanup_cache"], adapter.IMAGE_SAVE.cleanup_cache)
         self.assertEqual(record["format"], adapter.IMAGE_SAVE.format)
 
     def test_letting_go_of_the_cache_follows_the_profile(self):
         """A capture read from LAS X's cache is let go of when the profile says so, never per capture."""
         h = _handle()
         h.driven_to = {"x": 0.0, "y": 0.0, "z": 0.0, "z_wide_um": 0.0}
-        releasing = replace(adapter.IMAGE_SAVE, source="cache", cleanup_source=True)
+        releasing = replace(adapter.IMAGE_SAVE, source="cache", cleanup_cache=True)
         with patch.object(adapter, "IMAGE_SAVE", releasing), self._capturing() as calls:
             adapter.acquire(h, position_label="A1")
         self.assertEqual(calls["save"]["source"], "cache")
-        self.assertIs(calls["save"]["cleanup_source"], True)
+        self.assertIs(calls["save"]["cleanup_cache"], True)
 
     def test_a_capture_that_will_be_released_has_the_canvas_shown_first(self):
         """The canvas is shown while LAS X is idle, before the capture, so the release can clear it after."""
         h = _handle()
         h.driven_to = {"x": 0.0, "y": 0.0, "z": 0.0, "z_wide_um": 0.0}
         order = []
-        releasing = replace(adapter.IMAGE_SAVE, source="cache", cleanup_source=True)
+        releasing = replace(adapter.IMAGE_SAVE, source="cache", cleanup_cache=True)
         with (
             patch.object(adapter, "IMAGE_SAVE", releasing),
             self._capturing(),
@@ -916,7 +916,7 @@ class TestAcquire(unittest.TestCase):
         h = _handle()
         h.driven_to = {"x": 0.0, "y": 0.0, "z": 0.0, "z_wide_um": 0.0}
         prepared = []
-        keeping = replace(adapter.IMAGE_SAVE, cleanup_source=False)
+        keeping = replace(adapter.IMAGE_SAVE, cleanup_cache=False)
         with (
             patch.object(adapter, "IMAGE_SAVE", keeping),
             self._capturing(),
@@ -934,7 +934,7 @@ class TestAcquire(unittest.TestCase):
         with patch.object(adapter._native, "native_autosave_enabled", return_value=False):
             with patch.object(adapter, "IMAGE_SAVE", replace(adapter.IMAGE_SAVE, source="cache")):
                 from_cache = adapter._connection_status(h, Path("/runs"))["autosave"]
-            with patch.object(adapter, "IMAGE_SAVE", replace(adapter.IMAGE_SAVE, source="autosave", cleanup_source=False)):
+            with patch.object(adapter, "IMAGE_SAVE", replace(adapter.IMAGE_SAVE, source="autosave", cleanup_cache=False)):
                 from_autosave = adapter._connection_status(h, Path("/runs"))["autosave"]
         self.assertNotIn("failed", from_cache)
         self.assertIn("not needed", from_cache)
@@ -942,14 +942,14 @@ class TestAcquire(unittest.TestCase):
 
     def test_the_profile_lets_go_only_of_what_it_read_from_the_cache(self):
         """AutoSave's files are LAS X's project; letting go of them is refused when the profile is made."""
-        with self.assertRaisesRegex(ValueError, "cleanup_source.*cache"):
-            ImageSaveProfile(source="autosave", cleanup_source=True)
-        self.assertIs(ImageSaveProfile(source="cache", cleanup_source=True).cleanup_source, True)
+        with self.assertRaisesRegex(ValueError, "cleanup_cache.*cache"):
+            ImageSaveProfile(source="autosave", cleanup_cache=True)
+        self.assertIs(ImageSaveProfile(source="cache", cleanup_cache=True).cleanup_cache, True)
         # On by default since it passed on the STELLARIS (2026-10-15); reading
         # from AutoSave means switching it off too.
-        self.assertIs(ImageSaveProfile().cleanup_source, True)
-        self.assertIs(ImageSaveProfile(source="autosave", cleanup_source=False).cleanup_source, False)
-        with self.assertRaisesRegex(ValueError, "cleanup_source=False"):
+        self.assertIs(ImageSaveProfile().cleanup_cache, True)
+        self.assertIs(ImageSaveProfile(source="autosave", cleanup_cache=False).cleanup_cache, False)
+        with self.assertRaisesRegex(ValueError, "cleanup_cache=False"):
             ImageSaveProfile(source="autosave")
 
     def test_the_capture_is_placed_where_the_answer_says_its_planes_are(self):

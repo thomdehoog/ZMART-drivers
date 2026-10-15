@@ -81,7 +81,7 @@ by hand. Follow step 3 of the session sheet (`watch_lasx_warnings.py --look`, th
 - 3: done (and what was printed) or skipped (and why).
 
 If everything passes, the next step is Thom's decision: switch releasing on in the profile
-(`IMAGE_SAVE.cleanup_source = True`) and merge the branch into `release-candidate`.
+(`IMAGE_SAVE.cleanup_cache = True`) and merge the branch into `release-candidate`.
 
 ## Rules for this session
 

@@ -102,7 +102,7 @@ rewritten on 15 October), once the commits are pushed. Then:
 
 ## After the session
 
-- **Done (15 October 2026):** releasing is on in the profile (`IMAGE_SAVE.cleanup_source = True`;
+- **Done (15 October 2026):** releasing is on in the profile (`IMAGE_SAVE.cleanup_cache = True`;
   reading from AutoSave now means setting it to False as well), and these notes moved into
   `sessions/`.
 - **Open:**

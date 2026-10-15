@@ -3,7 +3,7 @@
 Selects one LAS X job and captures it again and again through the ZMART
 Controller, as a workflow does. For this run only, the driver's profile
 (``IMAGE_SAVE``) reads each capture from LAS X's cache with
-``cleanup_source`` on, so that LAS X lets go of the capture once it is
+``cleanup_cache`` on, so that LAS X lets go of the capture once it is
 saved, and the Navigator canvas, which holds the capture's hidden copy
 (``TileScan <n>``), is cleared. It measures LAS X's cache (the
 ``V2LMSDC_*`` files in LAS X's cache folder) before, every ten captures and
@@ -139,7 +139,7 @@ def main() -> int:
                     "cache folder": str(cache.root), "progress": [], "errors": []}
 
     adapter.IMAGE_SAVE = replace(
-        adapter.IMAGE_SAVE, source="cache", format="ome-zarr", projection="none", cleanup_source=True
+        adapter.IMAGE_SAVE, source="cache", format="ome-zarr", projection="none", cleanup_cache=True
     )
     session = ZmartController(driver, {"output_root": asked.save_to} if asked.save_to else {})
     try:

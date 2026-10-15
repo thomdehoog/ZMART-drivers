@@ -75,7 +75,7 @@ def save(
     state: dict | None = None,
     orientation: Orientation | None = None,
     fix_ome: bool = True,
-    cleanup_source: bool = False,
+    cleanup_cache: bool = False,
     file_stability_timeout_s: int = DEFAULT_FILE_STABILITY_TIMEOUT_S,
     export_completion_timeout_s: float = DEFAULT_EXPORT_COMPLETION_TIMEOUT_S,
     export_completion_poll_interval_s: float = (DEFAULT_EXPORT_COMPLETION_POLL_INTERVAL_S),
@@ -162,7 +162,7 @@ def save(
             state=state,
             orientation=orientation,
             fix_ome=fix_ome,
-            cleanup_source=cleanup_source,
+            cleanup_cache=cleanup_cache,
         )
     if projection != "none" and exported.metadata.size_z > 1:
         saved = replace(saved, projection_paths=_persist_projection(
@@ -170,17 +170,17 @@ def save(
             state=state,
         ))
     # Last, once everything made from the source has been made from it.
-    if cleanup_source and exported.release is not None:
+    if cleanup_cache and exported.release is not None:
         try:
             exported.release()
         except Exception as e:  # noqa: BLE001 -- the capture is saved; letting go is the owner's
-            log.warning("cleanup_source failed for %s: %s", exported.relative_path, e)
-    elif cleanup_source:
+            log.warning("cleanup_cache failed for %s: %s", exported.relative_path, e)
+    elif cleanup_cache:
         for p in exported.source_files:
             try:
                 p.unlink()
             except OSError as e:
-                log.warning("cleanup_source failed for %s: %s", p, e)
+                log.warning("cleanup_cache failed for %s: %s", p, e)
     return saved
 
 
@@ -291,7 +291,7 @@ def _persist_export(
     state: dict | None = None,
     orientation: Orientation | None = None,
     fix_ome: bool,
-    cleanup_source: bool,
+    cleanup_cache: bool,
 ) -> SavedAcquisition:
     """Shared persistence for stable exported source paths.
 
@@ -299,9 +299,9 @@ def _persist_export(
     ``data_dir(output_root)`` and its OME-XML is
     embedded (no sidecar companion). *state* is embedded per-plane.
     """
-    if cleanup_source and not exported.cleanup_source_supported:
+    if cleanup_cache and not exported.cleanup_cache_supported:
         raise RuntimeError(
-            f"cleanup_source is not supported for "
+            f"cleanup_cache is not supported for "
             f"{exported.source_exporter}. Native AutoSave sources are "
             f"LAS X project containers; deleting them requires an "
             f"explicit project-level cleanup policy."

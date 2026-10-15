@@ -316,7 +316,7 @@ class TestLettingGo:
         exported = container.collect_lasx_data_container(None, acquisition_of("HiRes"), cache_root=cache)
         exported.release()
 
-        assert exported.cleanup_source_supported is True
+        assert exported.cleanup_cache_supported is True
         assert asked == [(746, "HiRes002")]
 
 

@@ -422,7 +422,7 @@ select_job(client, job_name, *, compensate=None) -> dict                        
 acquire(client, job, *, poll_interval=None, poll_timeout=None, heartbeat_interval=None,
         start_timeout=None) -> AcquisitionResult                                  # RAISES on failure
 save(client, acq, output_root, naming, *, lineage=None, fix_ome=True,
-     cleanup_source=False) -> SavedAcquisition                                    # image_paths / xml_paths / naming
+     cleanup_cache=False) -> SavedAcquisition                                    # image_paths / xml_paths / naming
 ```
 `save()` collects LAS X native AutoSave output into a neutral product and
 writes canonical single-plane OME-TIFFs with OME-XML embedded in each image.
@@ -459,7 +459,7 @@ in place, preserving byte formatting; `output/ome_canonical.py` writes clean can
 Data Container cache until LAS X restarts, so a long time course fills the disk twice. The cache
 folder is the one the registry names under `Data Port` (`HKLM\SOFTWARE\Leica Microsystems\Data
 Container V2`): `D:\Temp2` on the STELLARIS Y42H93.
-With `source="cache"` and `cleanup_source=True`, the save's last step asks LAS X itself to delete the
+With `source="cache"` and `cleanup_cache=True`, the save's last step asks LAS X itself to delete the
 picture it was read from: the delete of LAS X's own window, so the cache's files go and the project
 stays whole (`output/lasx_cache_release.py` says how). It runs only once the copy is written and
 read back identical. Off by default. Each capture's hidden Navigator copy is not let go of yet.

@@ -58,7 +58,7 @@ def main() -> int:
 
     report: dict = {"job": asked.job, "label": asked.label, "checks": {}, "metadata": {}}
     checks = report["checks"]
-    adapter.IMAGE_SAVE = replace(adapter.IMAGE_SAVE, source="cache", format="ome-zarr", cleanup_source=False)
+    adapter.IMAGE_SAVE = replace(adapter.IMAGE_SAVE, source="cache", format="ome-zarr", cleanup_cache=False)
     session = ZmartController(driver, {"output_root": asked.save_to} if asked.save_to else {})
     try:
         chosen = session.set_state({"changeable": {"job": asked.job}}) if asked.job else {"success": True}

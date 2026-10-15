@@ -53,7 +53,7 @@ def saves_as_ome_tiff(monkeypatch):
 
     from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.actions import profiles
 
-    monkeypatch.setattr(profiles, "IMAGE_SAVE", replaced(profiles.IMAGE_SAVE, source="autosave", format="ome-tiff", cleanup_source=False))
+    monkeypatch.setattr(profiles, "IMAGE_SAVE", replaced(profiles.IMAGE_SAVE, source="autosave", format="ome-tiff", cleanup_cache=False))
 
 
 @pytest.fixture
@@ -501,7 +501,7 @@ class TestSave:
         summary = json.loads((output_root / "summary.json").read_text())
         assert summary["acquisitions"][0]["lineage"] == lineage
 
-    def test_cleanup_source_removes_lasx_product(
+    def test_cleanup_cache_removes_lasx_product(
         self,
         patched_export,
         tmp_path,
@@ -513,7 +513,7 @@ class TestSave:
             successful_acq,
             tmp_path / "run_000001",
             naming,
-            cleanup_source=True,
+            cleanup_cache=True,
         )
         assert all(not p.is_file() for p in patched_export["image_paths"])
         assert not patched_export["xml_path"].is_file()
@@ -533,7 +533,7 @@ class TestSave:
             successful_acq,
             tmp_path / "run_000001",
             naming,
-            cleanup_source=True,
+            cleanup_cache=True,
         )
         release.assert_called_once_with()
         assert all(p.is_file() for p in patched_export["image_paths"])
@@ -566,7 +566,7 @@ class TestSave:
                 tmp_path / "run_000001",
                 naming,
                 format=image_format,
-                cleanup_source=True,
+                cleanup_cache=True,
                 # Where each plane lies on the canvas, which a store needs.
                 placement=lambda _planes: lambda z: {"x_um": 0.0, "y_um": 0.0, "z_um": float(z)},
             )
@@ -757,7 +757,7 @@ class TestSave:
                 naming,
                 lineage=None,
                 fix_ome=True,
-                cleanup_source=False,
+                cleanup_cache=False,
             )
 
         out_img = next((tmp_path / "out" / "data").glob("*.ome.tiff"))

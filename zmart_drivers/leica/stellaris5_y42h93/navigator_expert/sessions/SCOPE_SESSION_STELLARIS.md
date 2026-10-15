@@ -15,10 +15,10 @@ the LAS X simulator (14 October 2026), never yet on the microscope:
   is refused with the dialog's text.
 - **The cache release also clears the Navigator canvas.** Every capture leaves a hidden copy
   in LAS X's cache (`TileScan <n>`, 1.3 to 2 times the capture's pixels), held by the Navigator
-  canvas. Releasing a capture (`cleanup_source`) now also presses the canvas's Clear button,
+  canvas. Releasing a capture (`cleanup_cache`) now also presses the canvas's Clear button,
   which lets go of all of them. Clear works only while LAS X shows the canvas (Navigator Expert's
   Experiment tab), so before each capture the driver shows that tab when another one is
-  shown. Releasing is set in the driver's profile (`IMAGE_SAVE.cleanup_source`) and stays off
+  shown. Releasing is set in the driver's profile (`IMAGE_SAVE.cleanup_cache`) and stays off
   until this session has passed; the check scripts below switch it on for their own run.
 - **Saving the experiment waits for the `.lrp` itself**, the file the driver reads the job's
   z-stack from.
