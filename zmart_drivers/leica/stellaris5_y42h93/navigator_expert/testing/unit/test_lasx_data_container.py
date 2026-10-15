@@ -250,6 +250,21 @@ class TestFindingThePicture:
 
         assert exported.relative_path == f"V2LMSDC_MMF6662_0_{PID}.tmp"
 
+    def test_an_older_picture_whose_description_is_written_again_is_passed_over(self, cache):
+        """LAS X writes a picture's description again about 4 s after the capture (simulator, 2026-10-15).
+
+        With two captures of one job close together, the first one's description
+        was written again after the second began; its pixels were not.
+        """
+        two_channel_12_bit(cache, number=10119, name="AF Job011")
+        old = time.time() - 30
+        os.utime(cache / f"V2LMSDC_MMF10119_0_{PID}.tmp", (old, old))
+        two_channel_12_bit(cache, number=10133, name="AF Job012")
+
+        exported = container.collect_lasx_data_container(None, acquisition_of("AF Job"), cache_root=cache)
+
+        assert exported.relative_path == f"V2LMSDC_MMF10133_0_{PID}.tmp"
+
     def test_two_new_pictures_of_the_job_are_refused_not_guessed(self, cache):
         two_channel_12_bit(cache, number=746, name="HiRes002")
         two_channel_12_bit(cache, number=790, name="HiRes003")

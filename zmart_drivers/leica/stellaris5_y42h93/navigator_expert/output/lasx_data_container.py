@@ -156,6 +156,13 @@ def pictures_of(root: Path, acq: AcquisitionResult) -> list[tuple[Path, str, str
     next capture may get its name again ("HiRes009" twice, simulator,
     2026-10-14). So a picture is one only while its pixels are there; one
     still being written is found once they are.
+
+    LAS X also writes a picture's description again about 4 s after the
+    capture, so with two captures of one job close together, the first one's
+    description was written after the second began (simulator, 2026-10-15).
+    Its pixels were not: the pixel file is written during the scan and left
+    alone. So a picture is new when its pixels were written since the
+    capture began; the description's time only narrows the search.
     """
     own_name = re.compile(re.escape(acq.job) + r"\d+")
     since = acq.started_at - MTIME_SKEW_ALLOWANCE_S
@@ -182,7 +189,10 @@ def pictures_of(root: Path, acq: AcquisitionResult) -> list[tuple[Path, str, str
         if described is None:
             continue
         number, pid = described.groups()
-        if not (root / f"V2LMSDC_MMF{number}_0_{pid}.tmp").is_file():
+        try:
+            if (root / f"V2LMSDC_MMF{number}_0_{pid}.tmp").stat().st_mtime < since:
+                continue
+        except OSError:
             continue
         found.append((path, name, xml))
     return found
