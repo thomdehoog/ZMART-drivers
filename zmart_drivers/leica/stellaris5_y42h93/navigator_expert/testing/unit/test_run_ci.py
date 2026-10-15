@@ -75,7 +75,7 @@ def test_the_quick_hardware_run_is_the_acceptance(monkeypatch, tmp_path):
     assert "--mock" not in installed_cmd
     assert fatal_by_name["hardware: installed driver (register folder, connect by name)"] is True
 
-    adapter_cmd = _command_for(captured, "validate_zmart_adapter.py")
+    adapter_cmd = next(cmd for cmd in _commands_for(captured, "validate_zmart_adapter.py") if "--allow-acquire" in cmd)
     assert "--allow-acquire" in adapter_cmd
     assert "--allow-missing-lasx" not in adapter_cmd
     assert "--mock" not in adapter_cmd
@@ -104,6 +104,18 @@ def test_the_quick_hardware_run_is_the_acceptance(monkeypatch, tmp_path):
 
     assert not _commands_for(captured, "probe_four_readers.py")
     assert not _commands_for(captured, "validate_readers_side_by_side.py")
+
+
+def test_the_stage_goes_to_the_ci_baseline_before_any_step_moves_it(monkeypatch, tmp_path):
+    """After a stage initialisation the stage stands at 0, 0, outside its limits (simulator, 2026-10-15)."""
+    run_ci = _load_run_ci()
+    captured = _capture_steps(run_ci, monkeypatch, tmp_path, ["--hardware"])
+    hardware = [(name, cmd) for name, cmd, _fatal in captured if name.startswith("hardware:")]
+    first_name, first_cmd = hardware[0]
+    assert first_name == "hardware: the stage to the CI baseline"
+    assert any(part.endswith("validate_zmart_adapter.py") for part in first_cmd)
+    assert "--enforce-ci-default-position" in first_cmd
+    assert not [part for part in first_cmd if part.startswith("--allow-")]
 
 
 def test_the_full_hardware_run_adds_the_diagnostics(monkeypatch, tmp_path):

@@ -253,6 +253,22 @@ def main(argv: list[str] | None = None) -> int:
         # settings through the production reader route (direct). Each step
         # restores what it changed.
         hardware_steps = [
+            # Every later step starts from the four-axis baseline, wherever the
+            # stage stood: after a stage initialisation it stands at 0, 0,
+            # outside its limits (simulator, 2026-10-15). The adapter validator
+            # with no --allow-* flag moves there and does nothing else.
+            (
+                "hardware: the stage to the CI baseline",
+                [
+                    sys.executable,
+                    str(hw / "validate_zmart_adapter.py"),
+                    "--yes",
+                    "--enforce-ci-default-position",
+                    f"--output={REPORT_DIR / 'ci_baseline.jsonl'}",
+                    f"--report-dir={REPORT_DIR}",
+                ],
+                True,
+            ),
             (
                 "hardware: installed driver (register folder, connect by name)",
                 [
