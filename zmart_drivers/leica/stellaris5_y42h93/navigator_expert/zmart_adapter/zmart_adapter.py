@@ -463,7 +463,8 @@ def disconnect(handle: ZmartHandle) -> None:
     The CAM client itself has no teardown, and none exists to call: the public
     methods of ``LasxApiClientPyModel`` (the client `connect_python_client`
     returns) are ``Connect``/``ConnectAsync`` (plus a COM-style ``Release``,
-    not a session close) -- there is no ``Disconnect``/``Close``/``Dispose``. Reconnecting without disconnecting the previous handle was
+    not a session close) -- there is no ``Disconnect``/``Close``/``Dispose``.
+    Reconnecting without disconnecting the previous handle was
     also verified live (both connections independently ping and read state
     correctly; the first stays usable after the second connects) -- a
     resource leak on the LAS X side, not a corruption/dead-end risk. Without
