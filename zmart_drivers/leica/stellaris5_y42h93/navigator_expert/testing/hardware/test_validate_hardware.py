@@ -294,6 +294,29 @@ def test_a_stores_ome_xml_is_read_from_its_ome_folder(tmp_path):
     assert validate_hardware.embedded_ome_xml(store) == b"<OME>the capture</OME>"
 
 
+class LaggingJobs:
+    """The CAM API's selected job: the old one for the first *lag* reads, then the new one."""
+
+    def __init__(self, old, new, lag):
+        self.old, self.new, self.lag, self.reads = old, new, lag, 0
+
+    def get_jobs(self, client, mode=None):
+        self.reads += 1
+        name = self.old if self.reads <= self.lag else self.new
+        return [{"Name": name, "IsSelected": True}]
+
+
+def test_a_selected_job_the_cam_api_reports_late_still_counts():
+    """LAS X switches at once; the CAM API's answer follows within 0.25 s (simulator, 2026-10-15)."""
+    drv = LaggingJobs("AF Job", "Overview", lag=2)
+    assert validate_hardware.settled_selected_job(drv, None, "Overview", window_s=1.0, poll_s=0.01) == "Overview"
+
+
+def test_a_selected_job_the_cam_api_never_reports_is_what_it_reports():
+    drv = LaggingJobs("AF Job", "Overview", lag=10_000)
+    assert validate_hardware.settled_selected_job(drv, None, "Overview", window_s=0.05, poll_s=0.01) == "AF Job"
+
+
 def test_explicit_log_mode_treats_empty_job_list_as_expected():
     """The job LIST is API-only (no log leg): a log-mode read returning
     nothing is the declared capability, not a driver fault. phase_readonly

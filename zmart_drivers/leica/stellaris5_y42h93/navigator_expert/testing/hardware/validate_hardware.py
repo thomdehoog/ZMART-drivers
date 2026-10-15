@@ -529,6 +529,23 @@ def _selected_job_name(
     return selected["Name"] if selected else None
 
 
+def settled_selected_job(drv: Any, client: Any, expected: str, *, window_s: float, poll_s: float) -> str | None:
+    """The CAM API's selected job once it shows *expected*, or what it shows when *window_s* has passed.
+
+    LAS X switches the job at once, and the direct reader shows it at once;
+    the CAM API's answer follows within 0.25 s (simulator, 2026-10-15). An
+    independent CAM reading taken at the first instant would grade a
+    correct switch as wrong, so it may catch up within the waiting rule's
+    window; one that never shows the job still fails.
+    """
+    deadline = time.monotonic() + window_s
+    while True:
+        selected = _selected_job_name(drv, client, mode="api")
+        if selected == expected or time.monotonic() >= deadline:
+            return selected
+        time.sleep(poll_s)
+
+
 def _select_job_confirmed_by_log(command_result: dict | None) -> bool:
     """Whether select_job already proved the target from log evidence."""
     if not command_result or not command_result.get("success"):
@@ -916,6 +933,8 @@ def phase_job_selection(
             v.skip("job selection: round-trip", "no jobs returned")
             return
 
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher import tuning
+
         names = selectable_job_names(jobs)
         original = next((j["Name"] for j in jobs if j.get("IsSelected")), preferred_job)
         ordered_names = _job_selection_order(drv, client, names, original)
@@ -953,7 +972,9 @@ def phase_job_selection(
                     )
                 selected = v.callable(
                     "job selection: read selected job",
-                    lambda: _selected_job_name(drv, client, mode="api"),
+                    lambda name=name: settled_selected_job(
+                        drv, client, name, window_s=tuning.WINDOW_S, poll_s=tuning.POLL_S
+                    ),
                     context=ctx,
                 )
                 _record_selected_job_postcheck(v, command_result, ctx, name, selected)
