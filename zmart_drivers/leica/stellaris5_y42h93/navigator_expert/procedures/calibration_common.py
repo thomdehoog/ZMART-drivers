@@ -114,9 +114,10 @@ def read_job_geometry(
     If ``image`` is provided, its ``shape[-2:]`` populates ``image_size_px``;
     otherwise ``image_size_px`` falls back to the LAS X format.
     """
-    # Calibration geometry is a persisted correctness artifact. Use the
-    # authoritative API reader, not the passive state-reader profile.
-    settings = drv.get_job_settings(client, job_name, mode="api") or {}
+    # Calibration geometry is kept and used later, so it is read from LAS X
+    # itself: the direct reader, with the CAM API only when it cannot answer
+    # (on the STELLARIS, 2026-10-15, both gave the same values).
+    settings = drv.get_job_settings(client, job_name, mode="direct") or {}
     geom = drv.parse_tile_geometry(settings)
     if geom is None or geom.get("pixel_w_um") is None or geom.get("pixels_x") is None:
         raise ValueError(
@@ -420,9 +421,10 @@ def read_stack_z_positions(
             )
         return [float(z) for z in override]
 
-    # Z-stack positions are persisted calibration geometry. Use the
-    # authoritative API reader, not the passive state-reader profile.
-    raw = drv.get_job_settings(client, job_name, mode="api")
+    # Z-stack positions are kept as calibration geometry, so they are read
+    # from LAS X itself: the direct reader, with the CAM API only when it
+    # cannot answer (on the STELLARIS, 2026-10-15, both gave the same stack).
+    raw = drv.get_job_settings(client, job_name, mode="direct")
     if not raw:
         raise RuntimeError(
             f"Could not read job settings for job {job_name!r}; cannot "

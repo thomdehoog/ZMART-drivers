@@ -326,14 +326,21 @@ class TestSaveAndReadLrpParsePath:
     def test_parses_saved_template(self, template_dir, monkeypatch):
         seen = {}
 
-        def fake_save(client, name, tdir, timeout):
-            seen["args"] = (client, name, str(tdir))
+        def fake_save(client, name, tdir, timeout, confirm_path=None):
+            seen["args"] = (client, name, str(tdir), str(confirm_path))
             return {"success": True}
 
         monkeypatch.setattr(sf_files, "save_experiment", fake_save)
         result = save_and_read_lrp(client="dummy-client", timeout=1.0)
         assert result == parse_lrp(ALL_LRP_FIXTURES[0])
-        assert seen["args"] == ("dummy-client", sf_files.TEMPLATE_XML, str(template_dir))
+        # It waits for the .lrp it reads: the .xml beside it is Navigator Expert's own,
+        # and a save sent straight to the hardware server writes the .lrp alone.
+        assert seen["args"] == (
+            "dummy-client",
+            sf_files.TEMPLATE_XML,
+            str(template_dir),
+            str(template_dir / TEMPLATE_LRP),
+        )
 
     def test_returns_none_when_save_fails(self, template_dir, monkeypatch):
         monkeypatch.setattr(sf_files, "save_experiment", lambda *a, **k: None)

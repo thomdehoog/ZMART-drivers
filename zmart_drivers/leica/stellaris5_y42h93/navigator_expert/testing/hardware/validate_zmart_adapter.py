@@ -701,8 +701,8 @@ def phase_acquire(v: vh.Validator, sess: Any, args: argparse.Namespace) -> None:
         v.skip("phase: acquire", "save requires real LAS X export files; run live")
         return
     with v.phase("acquire (capture + save)"):
-        # The live LAS X session decides where it writes; save collects from
-        # the single native AutoSave path. The selected job runs, whole.
+        # save collects the capture from LAS X's cache, as a workflow's
+        # capture is. The selected job runs, whole.
         rec = v.callable(
             "acquire: capture + save",
             lambda: sess.acquire(
@@ -722,19 +722,15 @@ def phase_acquire(v: vh.Validator, sess: Any, args: argparse.Namespace) -> None:
         # manifest carries no companion XML. Contract: acquisition/product.py
         # SavedAcquisition.xml_paths; offline tests assert xml_paths == {}.
         v.compare("acquire: no sidecar xml (state embedded per-plane)", len(xml), 0)
-        non_empty = all(Path(p).is_file() and Path(p).stat().st_size > 0 for p in images)
+        non_empty = all(vh.capture_saved(p) for p in images)
         v.compare("acquire: image files exist and are non-empty", non_empty, True)
         if images:
-            from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.output import (
-                materialize,
-            )
-
             # The no-sidecar contract means the metadata must be INSIDE the
-            # image; prove it on the real produced TIFF (offline tests only
-            # exercise the mock export).
+            # image (the TIFF, or the OME-Zarr store's OME folder); proved on
+            # the real capture (offline tests only exercise the mock export).
             embedded = v.callable(
                 "acquire: extract embedded OME-XML",
-                lambda: materialize.extract_embedded_ome_xml(Path(images[0])),
+                lambda: vh.embedded_ome_xml(images[0]),
             )
             if embedded is not None:
                 v.compare("acquire: image carries embedded OME-XML", b"<OME" in embedded, True)

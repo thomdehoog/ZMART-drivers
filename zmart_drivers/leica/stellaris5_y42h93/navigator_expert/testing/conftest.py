@@ -67,8 +67,8 @@ def pytest_report_header(config):
 def _no_hardware_server(monkeypatch):
     """Make LAS X's hardware server unreachable for every test.
 
-    The suite runs on microscope PCs with LAS X open, where the real
-    ``LCS.EXE`` would answer and a test would read the instrument's z.
+    The suite runs on microscope PCs with LAS X open, where LAS X's real
+    hardware server would answer and a test would read the instrument's z.
     Tests that need the server hand in a stand-in through ``attach``.
     """
     from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface import (
@@ -82,6 +82,38 @@ def _no_hardware_server(monkeypatch):
     hardware_server.forget_connection()
     yield
     hardware_server.forget_connection()
+
+
+@pytest.fixture(autouse=True)
+def _no_lasx_window(tmp_path, monkeypatch):
+    """Keep every test away from LAS X's own log, windows and Navigator.
+
+    On a microscope PC LAS X is open: a test would read its real ``LAS X.log``
+    and could press a real dialog's button. Tests that need either hand in a
+    stand-in log path and windows.
+    """
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface import (
+        lasx_dialogs,
+    )
+
+    def no_windows():
+        raise lasx_dialogs.WindowsUnavailable("no LAS X windows in the test suite")
+
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface import (
+        lasx_navigator,
+    )
+
+    def no_automation():
+        raise lasx_dialogs.WindowsUnavailable("no Windows UI Automation in the test suite")
+
+    monkeypatch.setattr(lasx_dialogs, "LASX_LOG", tmp_path / "no LAS X.log")
+    monkeypatch.setattr(lasx_dialogs, "lasx_windows", no_windows)
+    monkeypatch.setattr(lasx_navigator, "automation", no_automation)
+    lasx_navigator.forget()
+    lasx_dialogs.forget()
+    yield
+    lasx_dialogs.stop_watching()
+    lasx_dialogs.forget()
 
 
 @pytest.fixture(autouse=True)

@@ -36,8 +36,6 @@ same gated movement/acquisition wrappers. They therefore need no JSON entries.
 Offline ``experimental/lrp_edits`` and template-file edits do not command
 hardware at write time; they are gated at the point LAS X executes them
 (``load_experiment`` / job selection / ``acquire``), not at file write.
-The ``lasx_native_autosave`` exporter only toggles where LAS X writes files
-during an already-gated ``acquire``.
 
 State model
 -----------

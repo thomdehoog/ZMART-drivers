@@ -1,6 +1,6 @@
 """One parse of the LAS X log at a time, shared by readers asking together.
 
-On the STELLARIS (2026-10-10, SCOPE_CHECK_JOB_SWITCH.md "What was found") a
+On the STELLARIS (2026-10-10, sessions/SCOPE_CHECK_JOB_SWITCH.md "What was found") a
 burst of moves left about sixty log parses running at once: every reading's
 race started its own 0.1 s CPU-bound parse of the log's last 4 MB, a stopped
 race did not stop a parse in flight, and a job switch's own log read queued

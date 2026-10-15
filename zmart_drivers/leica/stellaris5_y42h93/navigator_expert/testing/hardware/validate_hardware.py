@@ -529,6 +529,23 @@ def _selected_job_name(
     return selected["Name"] if selected else None
 
 
+def settled_selected_job(drv: Any, client: Any, expected: str, *, window_s: float, poll_s: float) -> str | None:
+    """The CAM API's selected job once it shows *expected*, or what it shows when *window_s* has passed.
+
+    LAS X switches the job at once, and the direct reader shows it at once;
+    the CAM API's answer follows within 0.25 s (simulator, 2026-10-15). An
+    independent CAM reading taken at the first instant would grade a
+    correct switch as wrong, so it may catch up within the waiting rule's
+    window; one that never shows the job still fails.
+    """
+    deadline = time.monotonic() + window_s
+    while True:
+        selected = _selected_job_name(drv, client, mode="api")
+        if selected == expected or time.monotonic() >= deadline:
+            return selected
+        time.sleep(poll_s)
+
+
 def _select_job_confirmed_by_log(command_result: dict | None) -> bool:
     """Whether select_job already proved the target from log evidence."""
     if not command_result or not command_result.get("success"):
@@ -618,11 +635,54 @@ def _record_selected_job_postcheck(
 def _job_objective_signature(drv: Any, client: Any, job_name: str) -> tuple | None:
     """Best-effort objective identity for ordering validator job switches."""
     try:
-        settings = _settings(drv, client, job_name, mode="api")
+        settings = _settings(drv, client, job_name, mode="direct")
     except Exception:  # noqa: BLE001 - validator ordering hint only
         return None
     objective = settings.get("objective") or {}
     return (objective.get("slotIndex"), objective.get("name"))
+
+
+def capture_saved(path) -> bool:
+    """Whether a saved capture is there and holds something, as an OME-TIFF file or an OME-Zarr store.
+
+    An OME-Zarr store, the driver's default format, is a folder; it counts as
+    saved when it holds its ``zarr.json``.
+    """
+    path = Path(path)
+    if path.is_dir():
+        return (path / "zarr.json").is_file()
+    return path.is_file() and path.stat().st_size > 0
+
+
+def embedded_ome_xml(path) -> bytes:
+    """The OME-XML a saved capture carries: inside the TIFF, or in an OME-Zarr store's ``OME`` folder."""
+    path = Path(path)
+    if path.is_dir():
+        return (path / "OME" / "METADATA.ome.xml").read_bytes()
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.output import materialize
+
+    return materialize.extract_embedded_ome_xml(path)
+
+
+def selectable_job_names(jobs: list[dict]) -> list[str]:
+    """The jobs a workflow selects as state, whatever they are called: all but the autofocus ones.
+
+    An autofocus job is run as a procedure (``run_procedure``); the driver
+    refuses it as state, so the round trip never selects it.
+    """
+    return [j["Name"] for j in jobs if not j.get("IsAutofocus")]
+
+
+def zoom_candidates(zoom: dict) -> list[float]:
+    """Zoom values inside the job's own range, away from the current one, whatever the job.
+
+    A quarter, half and three quarters of the way from the job's least to
+    its greatest zoom, as LAS X reports them (HiRes on the simulator: 7.5 to
+    48, so a fixed 5.0 was refused).
+    """
+    low, high, now = float(zoom["min"]), float(zoom["max"]), float(zoom["current"])
+    picks = [round(low + (high - low) * share, 1) for share in (0.25, 0.5, 0.75)]
+    return [z for z in picks if low <= z <= high and abs(z - now) > 0.1]
 
 
 def _job_selection_order(
@@ -873,8 +933,22 @@ def phase_job_selection(
             v.skip("job selection: round-trip", "no jobs returned")
             return
 
-        names = [j["Name"] for j in jobs]
-        original = next((j["Name"] for j in jobs if j.get("IsSelected")), preferred_job)
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher import tuning
+
+        names = selectable_job_names(jobs)
+        # The job to come back to is read the way the driver reads it, not
+        # from the job list's own IsSelected flag: on the STELLARIS that flag
+        # still named the job selected before the last switch (15 October
+        # 2026), so the round-trip ended on the wrong job and left it selected.
+        selected_now = v.callable(
+            "job selection: read original job",
+            lambda: drv.get_selected_job(client),
+        )
+        original = (
+            selected_now.get("Name")
+            if isinstance(selected_now, dict) and selected_now.get("Name")
+            else next((j["Name"] for j in jobs if j.get("IsSelected")), preferred_job)
+        )
         ordered_names = _job_selection_order(drv, client, names, original)
         last_target: str | None = None
         last_result: dict | None = None
@@ -910,7 +984,9 @@ def phase_job_selection(
                     )
                 selected = v.callable(
                     "job selection: read selected job",
-                    lambda: _selected_job_name(drv, client, mode="api"),
+                    lambda name=name: settled_selected_job(
+                        drv, client, name, window_s=tuning.WINDOW_S, poll_s=tuning.POLL_S
+                    ),
                     context=ctx,
                 )
                 _record_selected_job_postcheck(v, command_result, ctx, name, selected)
@@ -935,16 +1011,20 @@ def phase_settings(drv: Any, v: Validator, client: Any, job_name: str) -> None:
     """
 
     def api_settings() -> dict:
-        return _settings(drv, client, job_name, mode="api")
+        return _settings(drv, client, job_name, mode="direct")
 
     with v.phase("settings round-trip"):
+        try:
+            zoom_values = zoom_candidates(api_settings()["zoom"])
+        except Exception:  # noqa: BLE001 -- no range read: the round trip says it has no alternate
+            zoom_values = []
         _round_trip(
             v,
             "zoom",
             job_name,
             read=lambda: api_settings()["zoom"]["current"],
             write=lambda x: drv.set_zoom(client, job_name, x),
-            candidates=[5.0, 10.0, 2.0, 1.0],
+            candidates=zoom_values,
             tolerance=0.1,
         )
         _round_trip(
@@ -1048,7 +1128,7 @@ def phase_detector_gain(drv: Any, v: Validator, client: Any, job_name: str) -> N
     noise to the JSONL without diagnostic value.
     """
     try:
-        settings = _settings(drv, client, job_name, mode="api")
+        settings = _settings(drv, client, job_name, mode="direct")
     except Exception as exc:  # noqa: BLE001
         v.skip("detector_gain: round-trip", f"cannot read detector settings: {exc}")
         return
@@ -1082,7 +1162,7 @@ def phase_detector_gain(drv: Any, v: Validator, client: Any, job_name: str) -> N
         v,
         "detector_gain",
         job_name,
-        read=lambda: _active_setting(_settings(drv, client, job_name, mode="api"))[
+        read=lambda: _active_setting(_settings(drv, client, job_name, mode="direct"))[
             "activeDetectors"
         ][0]["gain"]["value"],
         write=lambda x: drv.set_detector_gain(client, job_name, 0, beam_route, x),
@@ -1143,8 +1223,8 @@ def phase_xy(drv: Any, v: Validator, client: Any, args: argparse.Namespace) -> N
     with v.phase("xy 10-position pattern"):
         start = v.callable(
             "xy: read start",
-            lambda: drv.get_xy(client, mode="api"),
-            context={"mode": "api", "purpose": "stage-safety-anchor"},
+            lambda: drv.get_xy(client, mode="direct"),
+            context={"mode": "direct", "purpose": "stage-safety-anchor"},
         )
         if start is None:
             v.skip("xy: pattern", "get_xy returned None")
@@ -1199,7 +1279,7 @@ def phase_xy(drv: Any, v: Validator, client: Any, args: argparse.Namespace) -> N
                     break
                 end = v.callable(
                     f"xy: read {label}",
-                    lambda: drv.get_xy(client, mode="api"),
+                    lambda: drv.get_xy(client, mode="direct"),
                     context=ctx,
                 )
                 if end is None:
@@ -1271,9 +1351,12 @@ def phase_z(drv: Any, v: Validator, client: Any, job_name: str, args: argparse.N
                 lambda: drv.move_z(client, job_name, z1, unit="um", z_mode="galvo"),
                 context=ctx,
             )
+            # Read from the direct reader, as the driver does by default. With a
+            # z-galvo stack in the job, the CAM API keeps answering the stack's
+            # middle after a move (STELLARIS, 15 October 2026).
             after_settings = v.callable(
                 "z: read alternate",
-                lambda: _settings(drv, client, job_name, mode="api"),
+                lambda: _settings(drv, client, job_name, mode="direct"),
                 context={"job": job_name},
             )
             after = after_settings.get("zPosition", {}) if after_settings else {}
@@ -1408,7 +1491,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p.add_argument("--log-level", default="INFO", choices=["DEBUG", "INFO", "WARNING", "ERROR"])
     p.add_argument(
         "--state-reader-mode",
-        choices=["api", "log", "hybrid"],
+        choices=["direct", "api", "log", "hybrid"],
         help="override all profile-routed passive state readers",
     )
     p.add_argument(
@@ -1519,9 +1602,11 @@ def _apply_log_select_confirmation(args: argparse.Namespace, log: logging.Logger
             "select-job confirmation source pinned to api for --mock "
             "(the mock backend has no log stream)"
         )
-    elif source is None and args.state_reader_mode is not None:
+    elif source is None and args.state_reader_mode in ("api", "log", "hybrid"):
         # A validator run that advertises a reader mode must not silently
-        # grade select_job with a different confirmation source.
+        # grade select_job with a different confirmation source. Job
+        # selection has no direct confirmation: on the direct route it keeps
+        # the driver's own (the profile's).
         source = args.state_reader_mode
         log.info("select-job confirmation source implied by --state-reader-mode: %s", source)
     if not (

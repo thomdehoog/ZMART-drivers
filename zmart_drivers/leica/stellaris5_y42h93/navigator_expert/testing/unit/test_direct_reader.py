@@ -15,7 +15,7 @@ state a stand-in tree mirrors.
 import pytest
 from limits_fixtures import install_permissive_limits
 from mock_lasx_api import MockLasxClient
-from state_tree_stand_in import StandInNodes
+from state_tree_stand_in import StandInNodes, answer_json_read
 
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.actions import (
     get as capabilities,
@@ -31,7 +31,6 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface imp
 )
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.parsing import (
     make_changeable_copy,
-    parse_tile_geometry,
 )
 
 #: The jobs' block and element ids as on the simulator (2026-10-13).
@@ -39,13 +38,22 @@ JOBS = {"AF Job": (156, 1), "Overview": (154, 2), "HiRes": (152, 3)}
 
 
 def selection(jobs):
-    """Each job's name and whether it is selected: what every reader's job list has."""
-    return {job["Name"]: job["IsSelected"] for job in jobs}
+    """Each job's name, whether it is selected and whether it is the autofocus job: what the driver uses."""
+    return {job["Name"]: (job["IsSelected"], job["IsAutofocus"]) for job in jobs}
 
 
 class StandInServer:
-    def __init__(self, nodes):
+    """LAS X's hardware server: its state tree, and its answers to the two JSON reads."""
+
+    def __init__(self, nodes, client=None):
         self.ServerNodes = nodes
+        self.client = client
+        self.sent = []
+
+    def SendCommand2(self, xml, result):
+        self.sent.append(xml)
+        answer = answer_json_read(xml, self.client, self.ServerNodes)
+        return answer if answer is not None else '<Result Error="1">not a read the stand-in answers</Result>'
 
 
 @pytest.fixture
@@ -64,7 +72,7 @@ def tree(client, monkeypatch):
             2: client._hardware_z_um["z-wide"] * 1e-6,
         },
     )
-    monkeypatch.setattr(hardware_server, "attach", lambda: StandInServer(nodes))
+    monkeypatch.setattr(hardware_server, "attach", lambda: StandInServer(nodes, client))
     hardware_server.forget_connection()
     state_tree.forget_nodes()
     return nodes
@@ -85,7 +93,12 @@ class TestParityWithTheApiReader:
         assert direct_reader.get_selected_job()["Name"] == api_reader.get_selected_job(client)["Name"]
 
     def test_the_selected_job_carries_its_live_block_id(self, client, tree):
-        assert direct_reader.get_selected_job() == {"Name": "HiRes", "ID": 152, "IsSelected": True}
+        assert direct_reader.get_selected_job() == {
+            "Name": "HiRes",
+            "ID": 152,
+            "IsSelected": True,
+            "IsAutofocus": False,
+        }
 
     @pytest.mark.parametrize("job", ["HiRes", "Overview", "AF Job"])
     def test_the_jobs_and_their_selection_are_the_api_readers(self, client, tree, job):
@@ -96,15 +109,17 @@ class TestParityWithTheApiReader:
 class TestJobs:
     def test_every_job_in_sequence_order_with_its_live_block_id(self, client, tree):
         assert direct_reader.get_jobs() == [
-            {"Name": "AF Job", "ID": 156, "IsSelected": False},
-            {"Name": "Overview", "ID": 154, "IsSelected": False},
-            {"Name": "HiRes", "ID": 152, "IsSelected": True},
+            {"Name": "AF Job", "ID": 156, "IsSelected": False, "IsAutofocus": True},
+            {"Name": "Overview", "ID": 154, "IsSelected": False, "IsAutofocus": False},
+            {"Name": "HiRes", "ID": 152, "IsSelected": True, "IsAutofocus": False},
         ]
 
-    def test_it_does_not_say_which_jobs_are_autofocus_jobs(self, client, tree):
-        # The job sequence's IsAutoFocusOnStart was unset for the AF job too on the
-        # simulator, so this list cannot tell autofocus jobs (see get_jobs).
-        assert all("IsAutofocus" not in job for job in direct_reader.get_jobs())
+    def test_the_autofocus_job_is_the_one_navigator_expert_marks(self, client, tree):
+        # Each job's own IsAutoFocusOnStart, so it does not depend on the block
+        # ids, which an experiment load renumbers.
+        tree.autofocus = ("Overview",)
+        tree.reload()
+        assert [j["Name"] for j in direct_reader.get_jobs() if j["IsAutofocus"]] == ["Overview"]
 
     def test_a_reloaded_experiment_gives_the_new_ids(self, client, tree):
         tree.jobs = lambda: {"AF Job": (166, 1), "Overview": (164, 2), "HiRes": (162, 3)}
@@ -117,6 +132,7 @@ class TestJobs:
             "Name": "Overview",
             "ID": 154,
             "IsSelected": False,
+            "IsAutofocus": False,
         }
         assert direct_reader.get_job_by_name("No such job") is None
 
@@ -388,94 +404,84 @@ class TestTheRest:
 
 
 class TestTheJobSettings:
-    """The selected job's settings, whole, as the API and log readers give them."""
+    """A job's settings, whole: LAS X's answer, the same JSON the CAM API gives.
+
+    Asked of the hardware server with ``ATL_GetBlockApiInfoAsJsonString`` and
+    the job's block id, they are the CAM API's settings for every job, the
+    selected one or not, with each filter wheel's spectrum mode (simulator,
+    2026-10-14: identical, value for value, for all three jobs). For the
+    selected job the z drives are where they truly are, from the state tree:
+    the settings keep a drive's last set position, which freezes for the
+    drive carrying a z-stack.
+    """
+
+    @pytest.mark.parametrize("job", ["HiRes", "Overview", "AF Job"])
+    def test_every_job_is_the_api_readers_answer(self, client, tree, job):
+        client._selected_job = "Overview" if job == "HiRes" else "HiRes"
+        assert direct_reader.get_job_settings(job) == api_reader.get_job_settings(client, job)
 
     def test_the_driver_reads_them_as_it_reads_the_api_readers(self, client, tree):
         settings = direct_reader.get_job_settings("HiRes")
         assert capabilities.job_settings_complete(settings, job_name="HiRes")
-        geometry = parse_tile_geometry(settings)
-        assert geometry["tile_w_um"] == pytest.approx(1162.5)
-        assert geometry["pixel_w_um"] == pytest.approx(2.2705, rel=1e-4)
-        assert (geometry["pixels_x"], geometry["pixels_y"]) == (512, 512)
-        assert geometry["bbox"]["x_min"] == pytest.approx(50000.0 - 1162.5 / 2)
         flat = make_changeable_copy(settings)
-        assert flat["zoom"]["current"] == 1.0
-        assert flat["activeSettings"][0]["activeDetectors"][0]["name"] == "HyD 2"
-        assert flat["objective"]["slotIndex"] == 0
-        assert flat["stack"]["sections"] is None  # an xyz scan without a stack, as the parser marks it
+        assert flat["zoom"]["current"] == client._jobs["HiRes"]["zoom"]["current"]
 
-    def test_they_name_the_job_and_its_live_id(self, client, tree):
-        settings = direct_reader.get_job_settings("HiRes")
-        assert (settings["jobName"], settings["id"]) == ("HiRes", 152)
-        assert "autoFocus" not in settings
-
-    def test_both_z_drives_where_they_truly_are(self, client, tree):
+    def test_the_selected_jobs_z_drives_where_they_truly_are(self, client, tree):
         client._hardware_z_um.update({"z-galvo": -2.5, "z-wide": 4999.5})
         flat = make_changeable_copy(direct_reader.get_job_settings("HiRes"))
         assert flat["zPosition"] == pytest.approx({"z-galvo": -2.5, "z-wide": 4999.5})
 
-    def test_a_z_stack_comes_with_them(self, client, tree):
-        tree.live.update(
-            {
-                ("Acquire", "AcquireZStackInfo", "BeginValue"): -10e-6,
-                ("Acquire", "AcquireZStackInfo", "EndValue"): 10e-6,
-                ("Acquire", "AcquireZStackInfo", "SectionsCount"): 21,
-                ("Acquire", "AcquireZStackInfo", "StepSize"): 1e-6,
-                ("Acquire", "ZStackUseMode"): 1,
-            }
-        )
-        flat = make_changeable_copy(direct_reader.get_job_settings("HiRes"))
-        assert (flat["stack"]["sections"], flat["stack"]["zDrive"]) == (21, "z-galvo")
+    def test_another_jobs_z_is_its_own(self, client, tree):
+        client._hardware_z_um.update({"z-galvo": -2.5, "z-wide": 4999.5})
+        assert direct_reader.get_job_settings("Overview")["zPosition"] == api_reader.get_job_settings(
+            client, "Overview"
+        )["zPosition"]
 
-    def test_another_jobs_settings_are_not_in_the_tree(self, client, tree):
-        with pytest.raises(hardware_server.HardwareServerUnavailable, match="selected"):
-            direct_reader.get_job_settings("Overview")
+    def test_a_wheel_in_spectrum_mode_says_so(self, client, tree):
+        wheel = {"beamRoute": "", "isSpectrumMode": True, "name": "UV Lens Wheel", "spectrumPosition": 10.0, "type": 30}
+        client._jobs["HiRes"]["activeSettings"][0]["filterWheels"] = [wheel]
+        assert direct_reader.get_job_settings("HiRes")["activeSettings"][0]["filterWheels"] == [wheel]
+
+    def test_a_job_not_in_las_x_raises(self, client, tree):
+        with pytest.raises(hardware_server.HardwareServerUnavailable, match="No Such Job"):
+            direct_reader.get_job_settings("No Such Job")
+
+    def test_a_refused_read_raises(self, client, tree):
+        tree.jobs = lambda: {**JOBS, "Ghost": (999, 4)}  # in the sequence, unknown to the server
+        with pytest.raises(hardware_server.HardwareServerUnavailable, match="invalid block identifier"):
+            direct_reader.get_job_settings("Ghost")
 
 
 class TestTheHardwareInfo:
-    """The instrument, whole, as the API and log readers give it."""
+    """The instrument, whole: the hardware server's answer to ``GetConfocalHardwareInfoAsJson``,
+    the same JSON the CAM API gives (simulator, 2026-10-14: identical, ``SystemType`` included)."""
 
-    def test_the_turret_as_the_driver_reads_it(self, tree):
-        assert sorted(objective_by_slot(direct_reader.get_hardware_info())) == [0, 1]
+    def test_it_is_the_api_readers_answer(self, client, tree):
+        assert direct_reader.get_hardware_info() == api_reader.get_hardware_info(client)
 
-    def test_what_the_adapter_reads(self, tree):
-        info = direct_reader.get_hardware_info()
-        assert info["SerialNumber"] == "STELLARIS SIMULATOR"
-        assert info["Microscope"]["name"] == "DM Manual-6"
-        assert info["Microscope"]["AfcInstalled"] is False
-        assert info["ScanSpeed"] == {"Min": 1, "Max": 2600, "ResonantSpeed": 12000}
-        assert "SystemType" not in info
-
-    def test_detectors_grouped_by_where_the_light_goes(self, tree):
-        sinks = direct_reader.get_hardware_info()["LightSinks"]
-        assert [(s["BeamRoute"], [u["Name"] for u in s["DetectionUnits"]]) for s in sinks] == [
-            ("40", ["HyD 2", "HyD S 3"]),
-            ("10", ["Trans PMT"]),
-        ]
-
-    def test_light_sources_and_filter_wheels(self, tree):
-        info = direct_reader.get_hardware_info()
-        assert [s["name"] for s in info["LightSources"]] == ["UV", "Visible Light", "SuperContVisible Light"]
-        assert {"Type": 140, "FilterNames": ["--- ", "Substrate ", "Mirror "]} in info["FilterWheels"]
+    def test_the_turret_as_the_driver_reads_it(self, client, tree):
+        assert sorted(objective_by_slot(direct_reader.get_hardware_info())) == sorted(
+            objective_by_slot(api_reader.get_hardware_info(client))
+        )
 
 
 class TestWhatIsReadOnce:
     """What LAS X fixes for a session is read once, with the layout; what can change, every time."""
 
     def test_the_installed_hardware_is_read_once(self, tree):
-        first = direct_reader.get_hardware_info()
+        first = direct_reader.get_objectives()
         reads = tree.reads
-        assert direct_reader.get_hardware_info() == first
+        assert direct_reader.get_objectives() == first
         assert tree.reads == reads
 
     def test_what_changes_is_read_every_time(self, client, tree):
-        direct_reader.get_job_settings("HiRes")
+        direct_reader.get_active_settings()
         detector = tree.detection["Spectrophotometer"][0]["DetectionUnitList"]["DetectorHWInfo"][0]
         detector.update({"HighVoltage": 7.5, "WaveLengthEnd": 470.0, "DyeName": "Leica/DAPI"})
         tree.light_sources[0]["AOTF"]["AotfLine"][0]["Intensity"] = 5.0
         tree.filter_wheels["FilterWheel"][1]["CurrentSlotPosition"] = 1
         tree.live[("Microscope", "SlotPosition")] = 1
-        settings = direct_reader.get_job_settings("HiRes")["activeSettings"][0]
+        settings = direct_reader.get_active_settings()[0]
         hyd = settings["activeDetectors"][0]
         assert (hyd["gain"]["value"], hyd["detectionEnd"], hyd["dye"]) == (7.5, 470.0, "Leica/DAPI")
         assert settings["activeLaserLines"][0]["intensity"] == pytest.approx(0.05)
@@ -495,10 +501,10 @@ class TestWhatIsReadOnce:
         assert [s["name"] for s in direct_reader.get_light_sources()] == ["UV", "Visible Light"]
 
     def test_a_failed_connection_forgets_what_was_read_once(self, tree):
-        direct_reader.get_hardware_info()
+        direct_reader.get_objectives()
         state_tree.forget_nodes()
         reads = tree.reads
-        direct_reader.get_hardware_info()
+        direct_reader.get_objectives()
         assert tree.reads > reads
 
 

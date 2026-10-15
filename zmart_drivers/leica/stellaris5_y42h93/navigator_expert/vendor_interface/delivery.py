@@ -11,6 +11,13 @@ waits a full window for the answer.
 
 Acquisition never comes through here: a second acquire is a second
 acquisition, so it is sent once with ``UpdateAsync``.
+
+Before a message goes out, a LAS X warning that asks only for OK is answered,
+and a message is not sent while another dialog is open
+(``lasx_dialogs.DialogOpen``): LAS X's hardware server waits for every open
+dialog, and a message sent into it waits too. While the message is out, a
+watcher answers an OK-only warning it causes, which a message sent straight to
+the hardware server would otherwise wait for without end.
 """
 
 from __future__ import annotations
@@ -18,14 +25,21 @@ from __future__ import annotations
 import logging
 
 from ..dispatcher import tuning
+from . import lasx_dialogs
 
 log = logging.getLogger(__name__)
 
 
 def deliver(api_obj, *, label="message"):
-    """Deliver *api_obj*'s message; True once LAS X says "received", else False."""
-    for attempt in range(1, tuning.WINDOWS + 1):
-        if api_obj.UpdateAwaitReceipt(tuning.WINDOW_S):
-            return True
-        log.warning("%s not received (try %d/%d)", label, attempt, tuning.WINDOWS)
+    """Deliver *api_obj*'s message; True once LAS X says "received", else False.
+
+    Raises ``lasx_dialogs.DialogOpen``, with nothing sent, while a LAS X dialog
+    the driver does not answer is open.
+    """
+    lasx_dialogs.answer_warnings()
+    with lasx_dialogs.watching():
+        for attempt in range(1, tuning.WINDOWS + 1):
+            if api_obj.UpdateAwaitReceipt(tuning.WINDOW_S):
+                return True
+            log.warning("%s not received (try %d/%d)", label, attempt, tuning.WINDOWS)
     return False

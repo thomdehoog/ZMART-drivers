@@ -90,7 +90,6 @@ def save_as_zarr(root, tmp_path, job, *, placement=None, orientation=Orientation
         acquisition_of(job),
         tmp_path / "out",
         Naming(stem="high-res_000001_A1"),
-        source="cache",
         cache_root=root,
         format="ome-zarr",
         placement=placement,
@@ -133,11 +132,50 @@ class TestOneCopy:
             saving.save(
                 None, acquisition_of("HiRes"), tmp_path / "out",
                 Naming(stem="high-res_000001_A1"),
-                source="cache", cache_root=root, format=format, placement=at(0.0, 0.0, {0: 0.0}),
+                cache_root=root, format=format, placement=at(0.0, 0.0, {0: 0.0}),
             )
 
         data = tmp_path / "out" / "data"
         assert not data.is_dir() or [p.name for p in data.iterdir() if p.name != "metadata"] == []
+
+    def test_a_store_held_open_for_a_moment_is_still_renamed_into_place(self, hires, tmp_path, monkeypatch, caplog):
+        """Windows refuses to rename a folder while a file in it is open; the save waits it out."""
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.output import ome_zarr
+
+        root, _ = hires
+        real_replace, refusals = ome_zarr.os.replace, []
+
+        def held_twice(src, dst):
+            if str(src).endswith(".writing") and len(refusals) < 2:
+                refusals.append(src)
+                raise PermissionError(5, "Access is denied", str(src))
+            return real_replace(src, dst)
+
+        monkeypatch.setattr(ome_zarr.os, "replace", held_twice)
+        with caplog.at_level("WARNING", logger=ome_zarr.__name__):
+            save_as_zarr(root, tmp_path, "HiRes", placement=at(0.0, 0.0, {0: 0.0}))
+
+        data = tmp_path / "out" / "data"
+        assert [p.name for p in data.iterdir() if p.name != "metadata"] == ["high-res_000001_A1.ome.zarr"]
+        assert len(refusals) == 2
+        assert "renamed into place after" in caplog.text
+
+    def test_a_store_held_open_for_too_long_is_not_saved(self, hires, tmp_path, monkeypatch):
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.output import ome_zarr
+
+        root, _ = hires
+        monkeypatch.setattr(ome_zarr, "RENAME_WAIT_S", 0.3)
+        real_replace = ome_zarr.os.replace
+
+        def held(src, dst):
+            if str(src).endswith(".writing"):
+                raise PermissionError(5, "Access is denied", str(src))
+            return real_replace(src, dst)
+
+        monkeypatch.setattr(ome_zarr.os, "replace", held)
+
+        with pytest.raises(PermissionError):
+            save_as_zarr(root, tmp_path, "HiRes", placement=at(0.0, 0.0, {0: 0.0}))
 
 
 class TestTheStore:
@@ -254,7 +292,7 @@ class TestEveryFileSaysTheCanvasPosition:
         saved = saving.save(
             None, acquisition_of("HiRes"), tmp_path / "out",
             Naming(stem="high-res_000001_A1"),
-            source="cache", cache_root=root, format="ome-tiff", orientation=Orientation(),
+            cache_root=root, format="ome-tiff", orientation=Orientation(),
             placement=at(1000.0, 2000.0, {0: 50.0}),
         )
 
@@ -291,7 +329,7 @@ class TestEveryFileSaysTheCanvasPosition:
         saved = saving.save(
             None, acquisition_of("HiRes"), tmp_path / "out",
             Naming(stem="high-res_000001_A1"),
-            source="cache", cache_root=root, format="ome-tiff", orientation=Orientation(),
+            cache_root=root, format="ome-tiff", orientation=Orientation(),
         )
 
         with tifffile.TiffFile(saved.image_paths[PlaneIndex(0, 0, 0)]) as tif:
@@ -310,7 +348,7 @@ def save_with_projection(root, tmp_path, job, *, format, placement, projection="
     return saving.save(
         None, acquisition_of(job), tmp_path / "out",
         Naming(stem="high-res_000001_A1"),
-        source="cache", cache_root=root, format=format, orientation=Orientation(),
+        cache_root=root, format=format, orientation=Orientation(),
         placement=placement, projection=projection,
     )
 

@@ -32,8 +32,10 @@ import at all.
 
 from __future__ import annotations
 
+import logging
 import os
 import shutil
+import time
 import uuid
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, replace
@@ -48,8 +50,17 @@ from .product import AcquisitionMetadata, ExportedAcquisition, PlaneIndex
 
 __all__ = ["Capture", "gather", "max_projection", "write_position_store", "write_store"]
 
+log = logging.getLogger(__name__)
+
 #: The edge of a chunk in y and x: what the run stores the viewer reads use.
 PIECE = 128
+
+#: How long the finished store may wait to be renamed into place while
+#: Windows refuses ("Access is denied"): another program, such as the search
+#: indexer, has one of its fresh files open for a moment. On the STELLARIS
+#: (15 October 2026) this happened to two captures in ten and both folders
+#: could be renamed a minute later, so the store waits rather than fails.
+RENAME_WAIT_S = 10.0
 
 AXES = "tczyx"
 
@@ -252,8 +263,32 @@ def write_store(capture: Capture, store: Path, *, state: dict | None = None) -> 
     group.attrs["ome"] = ome
     (writing / "OME").mkdir()
     (writing / "OME" / "METADATA.ome.xml").write_bytes(canonical.image_xml(metadata, image_name=store.name, state=state))
-    os.replace(writing, store)
+    _rename_when_free(writing, store)
     return store
+
+
+def _rename_when_free(writing: Path, store: Path, *, wait_s: float = RENAME_WAIT_S) -> None:
+    """Rename the finished *writing* folder to *store*, waiting out a passing lock on it.
+
+    Windows refuses to rename a folder while any program holds one of its
+    files open, with "Access is denied". That hold is usually brief, so the
+    rename is tried again every tenth of a second for up to *wait_s*, and
+    how long it waited is logged. After that the error is raised as it is.
+    """
+    deadline = time.perf_counter() + wait_s
+    started = time.perf_counter()
+    while True:
+        try:
+            os.replace(writing, store)
+        except PermissionError:
+            if time.perf_counter() >= deadline:
+                raise
+            time.sleep(0.1)
+            continue
+        waited = time.perf_counter() - started
+        if waited >= 0.1:
+            log.warning("%s: renamed into place after %.1f s; something held a file in it open", store.name, waited)
+        return
 
 
 def _without_empty(value):

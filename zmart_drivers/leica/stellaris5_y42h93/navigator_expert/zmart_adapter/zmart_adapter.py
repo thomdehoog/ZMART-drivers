@@ -94,7 +94,7 @@ from ..configuration import store as _machine
 from ..dispatcher import gate as _gate
 from ..dispatcher import read as _readers
 from ..output import command_log as _log
-from ..output import lasx_native_autosave as _native
+from ..output import lasx_cache_release as _release
 from ..output import save as _save
 from ..output.naming import Naming, free_stem, run_hash
 from ..procedures import backlash as _motion
@@ -460,11 +460,10 @@ def _objective_delta_um(handle: ZmartHandle, current_objective: dict | None) -> 
 def disconnect(handle: ZmartHandle) -> None:
     """Mark the handle closed and drop this connection's loaded driver state.
 
-    The CAM client itself has no teardown, and none exists to call: verified
-    by reflection that ``LasxApiClientPyModel`` (the client `connect_python_client`
-    returns) exposes only ``Connect``/``ConnectAsync`` (plus a COM-style
-    ``Release``, not a session close) -- there is no ``Disconnect``/``Close``/
-    ``Dispose``. Reconnecting without disconnecting the previous handle was
+    The CAM client itself has no teardown, and none exists to call: the public
+    methods of ``LasxApiClientPyModel`` (the client `connect_python_client`
+    returns) are ``Connect``/``ConnectAsync`` (plus a COM-style ``Release``,
+    not a session close) -- there is no ``Disconnect``/``Close``/``Dispose``. Reconnecting without disconnecting the previous handle was
     also verified live (both connections independently ping and read state
     correctly; the first stays usable after the second connects) -- a
     resource leak on the LAS X side, not a corruption/dead-end risk. Without
@@ -891,8 +890,9 @@ def get_acquisition_settings(handle: ZmartHandle) -> dict:
     That is the only way this driver captures, so it is the only option and
     the default. Which job runs is part of the state (``set_state``). How the
     pictures are saved -- format, where the pixels are read from, the
-    projection -- comes from this microscope's profile (``IMAGE_SAVE``), and
-    where they go from its data location, set up once. Whether the stage's
+    projection, and whether LAS X then lets go of the capture -- comes from
+    this microscope's profile (``IMAGE_SAVE``), and where they go from its
+    data location, set up once. Whether the stage's
     slack is taken up first, and how often, is the driver's own
     (``ACQUISITION_BACKLASH_DEFAULT_ROUNDS``).
     """
@@ -1032,6 +1032,8 @@ def acquire(
         settled = steps["backlash"] = _motion.correct_backlash(handle.client, passes=backlash_rounds)
         if not settled.get("confirmed"):
             _note_unconfirmed(handle, "acquire: backlash takeup", settled)
+    if IMAGE_SAVE.cleanup_cache:
+        _release.prepare()
 
     acq = _capture.acquire(handle.client, job)
 
@@ -1055,8 +1057,7 @@ def acquire(
         # at connect (from the set_orientation setup notebook's file); a separate
         # concern from pixel-scale calibration and limits.
         orientation=_loaded_orientation(handle),
-        cleanup_source=False,
-        source=IMAGE_SAVE.source,
+        cleanup_cache=IMAGE_SAVE.cleanup_cache,
         format=IMAGE_SAVE.format,
         projection=IMAGE_SAVE.projection,
         # Where on the sample each plane was taken, the same answer the
@@ -1601,10 +1602,6 @@ def _connection_status(handle: ZmartHandle, root: Path | None) -> dict:
             calibration.get("name") or "found" if calibration else "failed — none found"
         ),
         "stage": _try(stage) or "failed — no reading",
-        "autosave": (
-            "enabled" if _try(_native.native_autosave_enabled)
-            else "failed — LAS X will not save what is captured"
-        ),
         "output root": str(root) if root is not None else f"not set up: {_info.SET_UP}",
     }
 

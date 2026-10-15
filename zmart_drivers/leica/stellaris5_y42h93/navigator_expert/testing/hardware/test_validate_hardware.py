@@ -178,14 +178,11 @@ def test_validate_hardware_full_mock_run(tmp_path):
     selected_job_records = [
         record for record in records if record["name"].startswith("job selection: confirmed ")
     ]
-    assert {record["context"]["job"] for record in select_job_records} == {
-        "HiRes",
-        "Overview",
-        "AF Job",
-    }
+    # The autofocus job runs as a procedure, never as state, so it is not selected.
+    assert {record["context"]["job"] for record in select_job_records} == {"HiRes", "Overview"}
     assert {
         record["name"].removeprefix("job selection: confirmed ") for record in selected_job_records
-    } == {"HiRes", "Overview", "AF Job"}
+    } == {"HiRes", "Overview"}
 
     # The Markdown run report is produced and carries the summary table,
     # the timing overview, and every instrument change incl. restores.
@@ -226,6 +223,98 @@ def test_state_reader_mode_argument_overrides_profile(tmp_path):
         assert profiles.STATE_READERS.selected_job_mode == "api"
     finally:
         profiles.STATE_READERS = prior
+
+
+def test_the_direct_reader_route_can_be_chosen(caplog):
+    """The direct reader is the driver's default route, so the validator runs on it too."""
+    prior = profiles.STATE_READERS
+    try:
+        args = validate_hardware.parse_args(["--state-reader-mode", "direct"])
+        validate_hardware._apply_state_reader_mode(args.state_reader_mode, validate_hardware.logging.getLogger("t"))
+        assert profiles.STATE_READERS.xy_mode == "direct"
+        assert profiles.STATE_READERS.job_settings_mode == "direct"
+        assert profiles.STATE_READERS.scan_status_mode == "direct"
+    finally:
+        profiles.STATE_READERS = prior
+
+
+def test_the_direct_route_keeps_the_drivers_own_job_confirmation():
+    """Job selection is confirmed by api, log or hybrid; on the direct route the driver's default stays."""
+    prior = profiles.STATE_READERS
+    try:
+        args = validate_hardware.parse_args(["--state-reader-mode", "direct"])
+        log = validate_hardware.logging.getLogger("t")
+        validate_hardware._apply_state_reader_mode(args.state_reader_mode, log)
+        validate_hardware._apply_log_select_confirmation(args, log)
+        assert profiles.STATE_READERS.selected_job_confirm_source == "hybrid"
+        assert profiles.STATE_READERS.xy_mode == "direct"
+    finally:
+        profiles.STATE_READERS = prior
+
+
+def test_the_zoom_test_values_lie_in_the_jobs_own_range():
+    """Whatever the job, the alternate zoom is one LAS X accepts (HiRes on the simulator: 7.5 to 48)."""
+    for zoom in ({"current": 7.5, "min": 7.5, "max": 48.0}, {"current": 1.0, "min": 0.75, "max": 48.0},
+                 {"current": 48.0, "min": 7.5, "max": 48.0}):
+        candidates = validate_hardware.zoom_candidates(zoom)
+        assert candidates
+        assert all(zoom["min"] <= c <= zoom["max"] for c in candidates)
+        assert all(abs(c - zoom["current"]) > 0.1 for c in candidates)
+
+
+def test_job_selection_switches_between_normal_jobs_whatever_they_are_called():
+    """An autofocus job is run as a procedure, never selected as state: the round trip leaves it out."""
+    jobs = [{"Name": "Focus A", "IsAutofocus": True}, {"Name": "Wide", "IsAutofocus": False},
+            {"Name": "Detail", "IsAutofocus": False, "IsSelected": True}]
+    assert validate_hardware.selectable_job_names(jobs) == ["Wide", "Detail"]
+
+
+def test_a_capture_is_saved_as_a_file_or_as_a_store(tmp_path):
+    """An OME-TIFF plane is a file; an OME-Zarr store, the default format, is a folder."""
+    tiff = tmp_path / "A1.ome.tif"
+    tiff.write_bytes(b"II*\0 pixels")
+    empty = tmp_path / "empty.ome.tif"
+    empty.write_bytes(b"")
+    store = tmp_path / "A1.ome.zarr"
+    store.mkdir()
+    (store / "zarr.json").write_text("{}", encoding="utf-8")
+    hollow = tmp_path / "hollow.ome.zarr"
+    hollow.mkdir()
+    assert validate_hardware.capture_saved(tiff) is True
+    assert validate_hardware.capture_saved(store) is True
+    assert validate_hardware.capture_saved(empty) is False
+    assert validate_hardware.capture_saved(hollow) is False
+    assert validate_hardware.capture_saved(tmp_path / "missing.ome.tif") is False
+
+
+def test_a_stores_ome_xml_is_read_from_its_ome_folder(tmp_path):
+    store = tmp_path / "A1.ome.zarr"
+    (store / "OME").mkdir(parents=True)
+    (store / "OME" / "METADATA.ome.xml").write_text("<OME>the capture</OME>", encoding="utf-8")
+    assert validate_hardware.embedded_ome_xml(store) == b"<OME>the capture</OME>"
+
+
+class LaggingJobs:
+    """The CAM API's selected job: the old one for the first *lag* reads, then the new one."""
+
+    def __init__(self, old, new, lag):
+        self.old, self.new, self.lag, self.reads = old, new, lag, 0
+
+    def get_jobs(self, client, mode=None):
+        self.reads += 1
+        name = self.old if self.reads <= self.lag else self.new
+        return [{"Name": name, "IsSelected": True}]
+
+
+def test_a_selected_job_the_cam_api_reports_late_still_counts():
+    """LAS X switches at once; the CAM API's answer follows within 0.25 s (simulator, 2026-10-15)."""
+    drv = LaggingJobs("AF Job", "Overview", lag=2)
+    assert validate_hardware.settled_selected_job(drv, None, "Overview", window_s=1.0, poll_s=0.01) == "Overview"
+
+
+def test_a_selected_job_the_cam_api_never_reports_is_what_it_reports():
+    drv = LaggingJobs("AF Job", "Overview", lag=10_000)
+    assert validate_hardware.settled_selected_job(drv, None, "Overview", window_s=0.05, poll_s=0.01) == "AF Job"
 
 
 def test_explicit_log_mode_treats_empty_job_list_as_expected():
@@ -477,3 +566,77 @@ def test_z_start_outside_envelope_is_skip_not_fail():
     assert not DummyDrv.moved
     row = next(r for r in records if r.name == "z: round-trip")
     assert row.status == "SKIP"
+
+
+def test_the_readbacks_ask_the_direct_reader_not_the_cam_api(tmp_path, monkeypatch):
+    """XY and job-settings readbacks read LAS X as the driver does: directly.
+
+    Only the two deliberate CAM API checks (the job list as a control for the
+    log reader, and the independent check of a job switch) still ask the API.
+    """
+    import zmart_drivers.leica.stellaris5_y42h93.navigator_expert as drv
+
+    asked = []
+    for name in ("get_xy", "get_job_settings"):
+        real = getattr(drv, name)
+
+        def spy(*args, _real=real, _name=name, **kwargs):
+            asked.append((_name, kwargs.get("mode")))
+            return _real(*args, **kwargs)
+
+        monkeypatch.setattr(drv, name, spy)
+
+    exit_code = validate_hardware.main(
+        ["--mock", "--allow-xy", "--allow-z", "--output", str(tmp_path / "run.jsonl"), "--report-dir", str(tmp_path)]
+    )
+
+    assert exit_code == 0
+    assert asked
+    assert [call for call in asked if call[1] == "api"] == []
+
+
+def test_the_z_readback_asks_the_direct_reader_not_the_cam_api():
+    """The z check reads where z-galvo went from the direct reader.
+
+    On the STELLARIS (15 October 2026), with a z-galvo stack set up in the
+    job, the CAM API kept answering the stack's middle (8.64 um) after a
+    move to 10.64 um, while the direct reader saw the move at once. The
+    driver reads the direct reader by default, so the check reads it too;
+    otherwise a correct move is graded as a failure.
+    """
+
+    class DummyDrv:
+        z = 8.64
+        asked: list = []
+
+        @staticmethod
+        def make_changeable_copy(raw):
+            return dict(raw or {})
+
+        @staticmethod
+        def get_job_settings(_client, _job, *, mode=None, **_kwargs):
+            DummyDrv.asked.append(mode)
+            # The CAM API stays at the stack's middle; the direct reader follows the drive.
+            return {"zPosition": {"z-galvo": 8.64 if mode == "api" else DummyDrv.z}}
+
+        @staticmethod
+        def get_stage_limits():
+            return dict(_ENVELOPE)
+
+        @staticmethod
+        def move_z(_client, _job, z_um, **_kwargs):
+            DummyDrv.z = z_um
+            return {"success": True, "confirmed": True}
+
+    records = []
+    validator = validate_hardware.Validator(
+        sink=records.append,
+        log=validate_hardware._configure_logging("ERROR", jsonl_to_stdout=False),
+    )
+    args = validate_hardware.parse_args(["--allow-z"])
+
+    validate_hardware.phase_z(DummyDrv, validator, object(), "HiRes", args)
+
+    row = next(r for r in records if r.name == "z: readback")
+    assert row.status == "PASS"
+    assert "api" not in DummyDrv.asked

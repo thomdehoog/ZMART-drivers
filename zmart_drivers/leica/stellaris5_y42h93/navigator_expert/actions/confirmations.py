@@ -1069,9 +1069,17 @@ def confirm_acquire(
     deadline = t_start + (timeout if timeout is not None else 1e9)
 
     while time.perf_counter() < deadline:
+        # Asked as the idle check asks: the direct reader when the profile
+        # reads the status directly (about 1 ms a reading, so a short scan is
+        # less likely to fall between two), else, and when it fails, the API
+        # alone, never the log, which writes the status only when it changes.
         status = _reading_value_after(
             _readers.get_scan_status(
-                client, mode="api", diagnostics=True, deadline=time.monotonic() + poll_interval
+                client,
+                mode=_readers.on_demand_mode("scan_status"),
+                fallback="api",
+                diagnostics=True,
+                deadline=time.monotonic() + poll_interval,
             ),
             observed_after,
         )

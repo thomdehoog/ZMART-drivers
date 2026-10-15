@@ -20,7 +20,7 @@ import time
 import pytest
 from limits_fixtures import install_permissive_limits
 from mock_lasx_api import MockLasxClient
-from state_tree_stand_in import StandInNodes
+from state_tree_stand_in import StandInNodes, answer_json_read
 
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.actions import (
     get as capabilities,
@@ -45,8 +45,17 @@ JOBS = {"AF Job": (156, 1), "Overview": (154, 2), "HiRes": (152, 3)}
 
 
 class StandInServer:
-    def __init__(self, nodes):
+    """LAS X's hardware server: its state tree, and its answers to the two JSON reads."""
+
+    def __init__(self, nodes, client=None):
         self.ServerNodes = nodes
+        self.client = client
+        self.sent = []
+
+    def SendCommand2(self, xml, result):
+        self.sent.append(xml)
+        answer = answer_json_read(xml, self.client, self.ServerNodes)
+        return answer if answer is not None else '<Result Error="1">not a read the stand-in answers</Result>'
 
 
 @pytest.fixture
@@ -65,7 +74,7 @@ def tree(client, monkeypatch):
             2: client._hardware_z_um["z-wide"] * 1e-6,
         },
     )
-    monkeypatch.setattr(hardware_server, "attach", lambda: StandInServer(nodes))
+    monkeypatch.setattr(hardware_server, "attach", lambda: StandInServer(nodes, client))
     hardware_server.forget_connection()
     state_tree.forget_nodes()
     return nodes
@@ -80,7 +89,7 @@ class TestFromTheTree:
     def test_selected_job(self, client, tree):
         reading = readers.get_selected_job(client, diagnostics=True)
         assert reading.source == "direct"
-        assert reading.value == {"Name": "HiRes", "ID": 152, "IsSelected": True}
+        assert reading.value == {"Name": "HiRes", "ID": 152, "IsSelected": True, "IsAutofocus": False}
 
     def test_both_z_drives_in_micrometres(self, client, tree):
         client._hardware_z_um.update({"z-galvo": 2.5, "z-wide": 4999.5})
@@ -156,33 +165,28 @@ class TestEveryDatumDirectly:
         reading = readers.get_scan_status(client, mode="direct", diagnostics=True)
         assert (reading.source, reading.value) == ("direct", "eScanIdle")
 
-    def test_the_job_list_has_no_direct_leg(self):
-        # The adapter keeps autofocus jobs apart, and the tree does not say which
-        # jobs are autofocus jobs; the direct reader's job list serves only its
-        # own selected-job reading.
-        assert capabilities.spec("jobs").direct_fn is None
-
-    def test_jobs_come_from_the_api_which_says_which_are_autofocus_jobs(self, client, tree):
+    def test_the_jobs_and_which_is_the_autofocus_job(self, client, tree):
         reading = readers.get_jobs(client, mode="direct", diagnostics=True)
-        assert reading.source == "api"
+        assert reading.source == "direct"
         assert [j["Name"] for j in reading.value if j["IsAutofocus"]] == ["AF Job"]
 
     def test_hardware_info(self, client, tree):
         reading = readers.get_hardware_info(client, mode="direct", diagnostics=True)
         assert reading.source == "direct"
-        assert reading.value["SerialNumber"] == "STELLARIS SIMULATOR"
+        assert reading.value == readers.get_hardware_info(client, mode="api")
 
     def test_the_selected_jobs_settings(self, client, tree):
         reading = readers.get_job_settings(client, "HiRes", mode="direct", diagnostics=True)
-        assert (reading.source, reading.value["jobName"]) == ("direct", "HiRes")
+        assert reading.source == "direct"
+        assert reading.value["zoom"] == readers.get_job_settings(client, "HiRes", mode="api")["zoom"]
 
     def test_the_field_of_view_through_the_settings(self, client, tree):
-        assert readers.get_fov(client, "HiRes", mode="direct") == pytest.approx((0.0011625, 0.0011625))
+        assert readers.get_fov(client, "HiRes", mode="direct") == readers.get_fov(client, "HiRes", mode="api")
 
-    def test_another_jobs_settings_fall_back(self, client, tree):
+    def test_another_jobs_settings_come_directly_too(self, client, tree):
         reading = readers.get_job_settings(client, "Overview", mode="direct", diagnostics=True)
-        assert reading.source in ("api", "log")
-        assert reading.value["objective"]["slotIndex"] is not None
+        assert reading.source == "direct"
+        assert reading.value == readers.get_job_settings(client, "Overview", mode="api")
 
 
 class TestDirectByDefault:
@@ -190,7 +194,7 @@ class TestDirectByDefault:
 
     def test_every_reading_asks_the_direct_reader_first(self, client, tree):
         assert readers.get_scan_status(client, diagnostics=True).source == "direct"
-        assert readers.get_jobs(client, diagnostics=True).source == "api"  # see test_jobs_come_from_the_api...
+        assert readers.get_jobs(client, diagnostics=True).source == "direct"
         assert readers.get_hardware_info(client, diagnostics=True).source == "direct"
         assert readers.get_job_settings(client, "HiRes", diagnostics=True).source == "direct"
         assert readers.get_xy(client, diagnostics=True).source == "direct"
@@ -232,6 +236,45 @@ class TestDirectByDefault:
         monkeypatch.setattr(readers.api_reader, "get_scan_status", lambda c: asked.append(c) or "eScanIdle")
         assert prechecks.check_idle(client)["success"] is True
         assert asked == []
+
+    def test_the_end_of_a_capture_is_watched_through_the_direct_reader(self, client, tree, monkeypatch):
+        # The scan runs for three readings, then LAS X is idle again.
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.actions import confirmations
+
+        real, asked = readers.get_scan_status, []
+
+        def watched(*args, **kwargs):
+            asked.append((kwargs.get("mode"), kwargs.get("fallback")))
+            tree.status = {"AcquisitionState": 2 if len(asked) <= 3 else 0}  # eScanSingle, then idle
+            reading = real(*args, **kwargs)
+            asked[-1] += (reading.source if reading is not None else None,)
+            return reading
+
+        monkeypatch.setattr(readers, "get_scan_status", watched)
+        result = confirmations.confirm_acquire(client, start_timeout=5.0, timeout=10.0, poll_interval=0.001)
+        assert result["success"] is True
+        assert {call for call in asked} == {("direct", "api", "direct")}
+
+    def test_a_job_switch_asks_neither_the_cam_api_nor_the_log_when_the_direct_reader_answers(
+        self, client, tree, monkeypatch
+    ):
+        # The direct reader says HiRes is selected; a stale log line claims the
+        # target, Overview, already is. The switch must still be made, and the
+        # CAM API's job list is never read for it.
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.actions import confirm_select_job
+
+        real_jobs, api_job_lists = readers.get_jobs, []
+
+        def jobs(*args, **kwargs):
+            if kwargs.get("mode") == "api":
+                api_job_lists.append(1)
+            return real_jobs(*args, **kwargs)
+
+        monkeypatch.setattr(readers, "get_jobs", jobs)
+        monkeypatch.setattr(confirm_select_job, "_selected_job_name_from_log", lambda _profile: "Overview")
+        result = commands.select_job(client, "Overview")
+        assert (result["success"], client._selected_job) == (True, "Overview")
+        assert api_job_lists == []
 
     def test_the_idle_check_falls_back_to_the_api_alone(self, client, monkeypatch):
         # No hardware server (the suite's conftest): the API decides, never the log, whose idle goes stale.

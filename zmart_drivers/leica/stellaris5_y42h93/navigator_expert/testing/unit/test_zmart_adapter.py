@@ -11,6 +11,7 @@ import json
 import tempfile
 import unittest
 from contextlib import ExitStack, contextmanager
+from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -22,6 +23,7 @@ from limits_fixtures import (
 )
 
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert import scanfields
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.actions.profiles import ImageSaveProfile
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.output.product import PlaneIndex
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher import (
     checks as limits_checks,
@@ -738,11 +740,6 @@ class TestAcquire(unittest.TestCase):
             patch.object(adapter, "_selected_job_name", return_value="Overview"),
             patch.object(adapter._info, "output_root", return_value=Path("/runs")),
             patch.object(adapter._readers, "ping", return_value=True),
-            # As it is really called: no client, it reads the startup .lcf.
-            # Handed the client as a path it raised, and the check said
-            # "failed" whatever the instrument was set to.
-            patch.object(adapter._native, "native_autosave_enabled",
-                         side_effect=lambda *a, **k: (_ for _ in ()).throw(TypeError()) if a else True),
             patches[0], patches[1], patches[2], patches[3],
         ):
             info = adapter.get_info(h)
@@ -755,7 +752,7 @@ class TestAcquire(unittest.TestCase):
 
         checks = info["connection_status"]
         self.assertEqual(checks["api"], "answering")
-        self.assertEqual(checks["autosave"], "enabled")
+        self.assertNotIn("autosave", checks)  # captures come from LAS X's cache; AutoSave is not used
         self.assertIn("um", checks["stage"])
         self.assertEqual(checks["output root"], str(Path("/runs")))
         self.assertNotIn("output_root", info)
@@ -870,7 +867,7 @@ class TestAcquire(unittest.TestCase):
             self.assertEqual(check_acquire_answer({"success": True, "content": record}), [])
 
     def test_saving_follows_this_microscopes_profile(self):
-        """Where the pixels are read from, the format and the projection are set up once.
+        """The format, the projection and letting go of the cache are set up once.
 
         They are this microscope's ``IMAGE_SAVE`` profile, the same for every
         capture, never a choice made per capture.
@@ -879,11 +876,55 @@ class TestAcquire(unittest.TestCase):
         h.driven_to = {"x": 0.0, "y": 0.0, "z": 0.0, "z_wide_um": 0.0}
         with self._capturing() as calls:
             record = adapter.acquire(h, position_label="A1")
-        self.assertEqual(calls["save"]["source"], adapter.IMAGE_SAVE.source)
+        self.assertNotIn("source", calls["save"])  # always LAS X's cache: nothing to choose
         self.assertEqual(calls["save"]["format"], adapter.IMAGE_SAVE.format)
         self.assertEqual(calls["save"]["projection"], adapter.IMAGE_SAVE.projection)
-        self.assertIs(calls["save"]["cleanup_source"], False)
+        self.assertIs(calls["save"]["cleanup_cache"], adapter.IMAGE_SAVE.cleanup_cache)
         self.assertEqual(record["format"], adapter.IMAGE_SAVE.format)
+
+    def test_letting_go_of_the_cache_follows_the_profile(self):
+        """A capture read from LAS X's cache is let go of when the profile says so, never per capture."""
+        h = _handle()
+        h.driven_to = {"x": 0.0, "y": 0.0, "z": 0.0, "z_wide_um": 0.0}
+        releasing = replace(adapter.IMAGE_SAVE, cleanup_cache=True)
+        with patch.object(adapter, "IMAGE_SAVE", releasing), self._capturing() as calls:
+            adapter.acquire(h, position_label="A1")
+        self.assertIs(calls["save"]["cleanup_cache"], True)
+
+    def test_a_capture_that_will_be_released_has_the_canvas_shown_first(self):
+        """The canvas is shown while LAS X is idle, before the capture, so the release can clear it after."""
+        h = _handle()
+        h.driven_to = {"x": 0.0, "y": 0.0, "z": 0.0, "z_wide_um": 0.0}
+        order = []
+        releasing = replace(adapter.IMAGE_SAVE, cleanup_cache=True)
+        with (
+            patch.object(adapter, "IMAGE_SAVE", releasing),
+            self._capturing(),
+            patch.object(adapter._release, "prepare", lambda: order.append("canvas shown")),
+            patch.object(adapter._capture, "acquire", lambda c, j, **k: order.append("captured") or _a_capture(j)),
+        ):
+            adapter.acquire(h, position_label="A1")
+        self.assertEqual(order, ["canvas shown", "captured"])
+
+    def test_a_capture_that_is_kept_leaves_the_screen_alone(self):
+        h = _handle()
+        h.driven_to = {"x": 0.0, "y": 0.0, "z": 0.0, "z_wide_um": 0.0}
+        prepared = []
+        keeping = replace(adapter.IMAGE_SAVE, cleanup_cache=False)
+        with (
+            patch.object(adapter, "IMAGE_SAVE", keeping),
+            self._capturing(),
+            patch.object(adapter._release, "prepare", lambda: prepared.append(1)),
+        ):
+            adapter.acquire(h, position_label="A1")
+        self.assertEqual(prepared, [])
+
+    def test_captures_come_from_the_cache_and_are_let_go_of_by_default(self):
+        """Every capture is read from LAS X's cache (AutoSave is not used, Thom, 2026-10-14),
+        and LAS X lets go of it once saved (on since the STELLARIS, 2026-10-15)."""
+        self.assertFalse(hasattr(ImageSaveProfile(), "source"))
+        self.assertIs(ImageSaveProfile().cleanup_cache, True)
+        self.assertIs(ImageSaveProfile(cleanup_cache=False).cleanup_cache, False)
 
     def test_the_capture_is_placed_where_the_answer_says_its_planes_are(self):
         """The store is placed where the answer says its planes are."""

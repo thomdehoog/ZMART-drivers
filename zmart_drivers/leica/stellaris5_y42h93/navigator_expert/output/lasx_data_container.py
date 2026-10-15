@@ -2,7 +2,7 @@
 
 While LAS X takes a picture it writes the pixels, uncompressed, into its
 Data Container cache (the folder named under ``Data Port`` in the registry,
-``D:\\Temp`` on our machines), one file per picture:
+``D:\\Temp2`` on the STELLARIS Y42H93), one file per picture:
 
 - ``V2LMSDC_MMF<n>_0_<pid>.tmp`` holds the raw pixels: no header, x fastest,
   then y, each channel and each plane starting where the description says.
@@ -11,8 +11,7 @@ Data Container cache (the folder named under ``Data Port`` in the registry,
   LAS X XML (size, bit depth, axis lengths, where each channel starts, a time
   stamp per plane); the third starts with the picture's name.
 
-``<pid>`` is the LAS X data server's process number in hex, new each time LAS
-X starts. The pixels are byte for byte those LAS X's AutoSave writes into its
+``<pid>`` is a number in hex that changes each time LAS X starts. The pixels are byte for byte those LAS X's AutoSave writes into its
 OME-TIFF (checked on 31 pictures: 8, 12 and 16 bit, two channels, a 17-plane
 stack), so this collector gives ``save`` the same product without waiting
 for AutoSave.
@@ -150,6 +149,19 @@ def pictures_of(root: Path, acq: AcquisitionResult) -> list[tuple[Path, str, str
     is not enough: job "HiRes2" makes "HiRes2001", which reads as "HiRes"
     with a number too. So the job the description says made the picture
     (``BlockName``) must be *acq*'s job as well.
+
+    A picture LAS X has let go of (``output.lasx_cache_release``) keeps its
+    description, rewritten after the release, but not its pixels, and the
+    next capture may get its name again ("HiRes009" twice, simulator,
+    2026-10-14). So a picture is one only while its pixels are there; one
+    still being written is found once they are.
+
+    LAS X also writes a picture's description again about 4 s after the
+    capture, so with two captures of one job close together, the first one's
+    description was written after the second began (simulator, 2026-10-15).
+    Its pixels were not: the pixel file is written during the scan and left
+    alone. So a picture is new when its pixels were written since the
+    capture began; the description's time only narrows the search.
     """
     own_name = re.compile(re.escape(acq.job) + r"\d+")
     since = acq.started_at - MTIME_SKEW_ALLOWANCE_S
@@ -171,6 +183,15 @@ def pictures_of(root: Path, acq: AcquisitionResult) -> list[tuple[Path, str, str
             continue
         made_by = JOB.search(xml)
         if made_by is not None and made_by.group(1) != acq.job:
+            continue
+        described = DESCRIPTION.fullmatch(path.name)
+        if described is None:
+            continue
+        number, pid = described.groups()
+        try:
+            if (root / f"V2LMSDC_MMF{number}_0_{pid}.tmp").stat().st_mtime < since:
+                continue
+        except OSError:
             continue
         found.append((path, name, xml))
     return found

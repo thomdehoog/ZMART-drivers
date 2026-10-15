@@ -2,8 +2,8 @@
 
 The third reader beside :mod:`api_reader` (the CAM API) and
 :mod:`log_reader` (LAS X's log). It reads the hardware server's state tree
-(:mod:`state_tree`), which holds what LAS X itself works from, so it is
-neither late like the CAM API's answers nor waiting for a log line. Its
+(:mod:`state_tree`), which holds LAS X's current state, so it is neither
+late like the CAM API's answers nor waiting for a log line. Its
 functions carry the other readers' names and give answers of the same
 shape, so a caller cannot tell which reader answered; the routed readers
 (``dispatcher.read``) say so in a reading's ``source``.
@@ -29,6 +29,14 @@ the CAM API's job settings are per job. On the simulator (2026-10-13) every
 one that the log's job settings for the selected job also carry agreed
 with them; the CAM API could not be compared, it refused connections then.
 
+A job's settings and the hardware info, whole, are LAS X's answers to two
+reads (``ATL_GetBlockApiInfoAsJsonString`` with the job's block id, and
+``GetConfocalHardwareInfoAsJson``), in the same JSON the CAM API gives: on
+the simulator (2026-10-14) identical to the CAM API's, value for value, for
+every job, a filter wheel's spectrum mode and the ``SystemType`` included,
+in 0.5-1.5 ms and 20 ms. Only for the selected
+job's z drives the state tree says more: where they truly are.
+
 Every function raises :class:`HardwareServerUnavailable` when the hardware
 server cannot be reached or does not answer, rather than returning anything
 that is not a fresh reading.
@@ -36,9 +44,10 @@ that is not a fresh reading.
 
 from __future__ import annotations
 
+import json
 import math
 
-from .hardware_server import HardwareServerUnavailable
+from .hardware_server import HardwareServerUnavailable, connected_server, forget_connection
 from .state_tree import (
     SCAN_STATES,
     STAGE_PATHS,
@@ -142,18 +151,14 @@ def get_jobs() -> list[dict]:
     """Every job, in the sequence's order, shaped as :func:`log_reader.get_jobs` gives them.
 
     Per job ``Name``, ``ID`` (its live block id, which an experiment load
-    changes while the CAM API's job list keeps the old one) and
-    ``IsSelected``. Not which jobs are autofocus jobs (the CAM API's
-    ``IsAutofocus``), so the routed job list keeps to the API and this list
-    serves the selected job. What is known (2026-10-13): in Navigator
-    Expert's matrix summary, which the log reader reads, ``IsAutoFocusOnStart``
-    marks the AF job (a capture checked against the API in June 2026); in
-    this job sequence the same-named field was unset for the AF job too on
-    the simulator. ``Acquire/MatrixScreener/AFJobID`` names the AF job in
-    Navigator Expert's own numbering (4), which the tree's id map
-    (``MatrixScreener_MapIDList``, old to new block ids) did not tie to a
-    job on the simulator after an experiment reload. To check on a freshly
-    started LAS X, beside the API. Nor the API's ``ScanMode`` per job.
+    changes while the CAM API's job list keeps the old one), ``IsSelected``
+    and ``IsAutofocus``: whether it is Navigator Expert's autofocus job, from
+    the job's own ``IsAutoFocusOnStart``, the field the log reader reads in
+    the matrix summary too. It is read beside the job's name, so it does not
+    depend on the block ids. On the STELLARIS (2026-10-15) it was set for the
+    AF job alone, as the CAM API's ``IsAutofocus`` said; on the simulator
+    (2026-10-13) it had been unset for the AF job too. Not the API's
+    ``ScanMode`` per job, which the driver does not use from this list.
     """
     sequence = job_sequence()
     ordered = sorted(sequence.jobs.items(), key=lambda item: item[1].element_id)
@@ -162,6 +167,7 @@ def get_jobs() -> list[dict]:
             "Name": name,
             "ID": job.block_id,
             "IsSelected": job.element_id == sequence.selected_element,
+            "IsAutofocus": job.autofocus,
         }
         for name, job in ordered
     ]
@@ -812,83 +818,51 @@ def get_active_settings() -> list[dict]:
     ]
 
 
-def micrometres_by_micrometres(width_m, height_m):
-    """``"W µm x H µm"``, the form of the job settings' ``imageSize`` and ``pixelSize``, at 0.1 nm."""
-    return f"{width_m * 1e6:.4f} µm x {height_m * 1e6:.4f} µm"
+def server_answer(command: str, what: str) -> dict:
+    """The JSON LAS X answers to a read *command*.
+
+    LAS X answers ``<Result Error="">{...}</Result>``; any other answer raises
+    :class:`HardwareServerUnavailable` with LAS X's words.
+    """
+    try:
+        answer = str(connected_server().SendCommand2(command, ""))
+    except HardwareServerUnavailable:
+        raise
+    except Exception as why:  # noqa: BLE001 -- the connection is suspect: drop it, raise the one error
+        forget_connection()
+        raise HardwareServerUnavailable(f"the hardware server did not answer {what}: {why}") from why
+    if not answer.startswith('<Result Error="">'):
+        raise HardwareServerUnavailable(f"LAS X refused {what}: {answer[:200]}")
+    try:
+        return json.loads(answer[answer.index(">") + 1 : answer.rindex("<")])
+    except ValueError as why:
+        raise HardwareServerUnavailable(f"LAS X's answer to {what} is not JSON: {answer[:200]}") from why
 
 
 def get_job_settings(job_name) -> dict:
-    """The settings of *job_name*, whole, as the API and log readers' ``get_job_settings`` give them.
+    """The settings of *job_name*, whole, in the JSON the CAM API gives too.
 
-    Only the selected job's: the tree holds the settings LAS X scans with
-    now, so another job raises :class:`HardwareServerUnavailable` and the
-    routed readers ask the API and the log instead. So does a job whose
-    sequential settings are several (:func:`get_active_settings`).
-
-    Beside the API's and log's: ``imageSize`` and ``pixelSize`` in µm to
-    0.1 nm where they round to 10 µm; ``zPosition`` where each drive truly
-    is, also the drive that carries the job's z-stack, whose settings stop
-    refreshing; no ``autoFocus``, which the tree does not hold for a job.
+    For every job, the selected one or not. For the selected job the z drives
+    are where they truly are, from the state tree: the settings keep a
+    drive's last set position, which freezes for the drive carrying a
+    z-stack. Raises :class:`HardwareServerUnavailable` for a job LAS X does
+    not have.
     """
-    selected = get_selected_job()
-    if selected is None or selected["Name"] != job_name:
-        raise HardwareServerUnavailable(
-            f"the state tree holds the selected job's settings "
-            f"({selected['Name'] if selected else 'none'}), not {job_name!r}'s"
-        )
-    xy = get_xy()
-    width, height = get_fov()
-    pixel_w, pixel_h = get_pixel_size()
-    settings = {
-        "jobName": job_name,
-        "id": selected["ID"],
-        "activeSettings": get_active_settings(),
-        "format": get_format(),
-        "imageSize": micrometres_by_micrometres(width, height),
-        "pixelSize": micrometres_by_micrometres(pixel_w, pixel_h),
-        "objective": get_objective(),
-        "scanFieldRotation": get_scan_field_rotation(),
-        "scanMode": get_scan_mode(),
-        "scanSpeed": get_scan_speed(),
-        "sequentialMode": get_sequential_mode(),
-        "xyStage": {"posX": xy["x_um"], "posY": xy["y_um"], "unit": "µm"},
-        "zoom": get_zoom(),
-        "zPosition": {
-            drive: {"position": read_z_um(drive), "unit": "µm"} for drive in Z_USE_MODE
-        },
-    }
-    stack = get_z_stack()
-    if stack is not None:
-        settings["stack"] = stack
+    sequence = job_sequence()
+    job = sequence.jobs.get(job_name)
+    if job is None:
+        raise HardwareServerUnavailable(f"no job {job_name!r} in LAS X's job sequence")
+    settings = server_answer(
+        f'<ATL Command="ATL_GetBlockApiInfoAsJsonString" Attribute="{job.block_id}"/>',
+        f"the settings of {job_name!r}",
+    )
+    if sequence.selected_job == job_name:
+        for drive, position in (settings.get("zPosition") or {}).items():
+            if drive in Z_USE_MODE:
+                position["position"] = read_z_um(drive)
     return settings
 
 
 def get_hardware_info() -> dict:
-    """The instrument, whole, as the API and log readers' ``get_hardware_info`` give it.
-
-    ``Microscope`` (``name``, ``AfcInstalled``, ``objectives``),
-    ``SerialNumber``, ``ScanSpeed``, ``LightSources``, ``LightSinks`` (the
-    detectors, grouped by the first part of their beam route, without the
-    sinks' names, which the tree does not hold) and ``FilterWheels``
-    (``Type``, ``FilterNames``; LAS X's internal wheels too). No
-    ``SystemType``: the tree's is a code (100 on the simulator) with no
-    name known for it yet.
-    """
-    sinks = {}
-    for unit in get_detection_units():
-        route = unit["BeamRoute"].split(";")[0]
-        sinks.setdefault(route, {"BeamRoute": route, "DetectionUnits": []})["DetectionUnits"].append(unit)
-    return {
-        "Microscope": {
-            "name": get_microscope_stand(),
-            "AfcInstalled": get_afc_installed(),
-            "objectives": get_objectives(),
-        },
-        "SerialNumber": get_serial_number(),
-        "ScanSpeed": get_scan_speed_range(),
-        "LightSources": get_light_sources(),
-        "LightSinks": list(sinks.values()),
-        "FilterWheels": [
-            {"Type": wheel["type"], "FilterNames": wheel["names"]} for wheel in installed_filter_wheels()
-        ],
-    }
+    """The instrument, whole: LAS X's description of it, in the JSON the CAM API gives too."""
+    return server_answer('<Scanner Command="GetConfocalHardwareInfoAsJson"/>', "the hardware info")

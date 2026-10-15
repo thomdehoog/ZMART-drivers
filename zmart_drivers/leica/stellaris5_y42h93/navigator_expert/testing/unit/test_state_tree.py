@@ -41,7 +41,7 @@ class TestSequence:
         assert sequence.jobs == {
             "HiRes": state_tree.Job(block_id=152, element_id=3),
             "Overview": state_tree.Job(block_id=154, element_id=2),
-            "AF Job": state_tree.Job(block_id=156, element_id=1),
+            "AF Job": state_tree.Job(block_id=156, element_id=1, autofocus=True),
         }
 
     def test_the_selected_job_by_name(self, nodes):

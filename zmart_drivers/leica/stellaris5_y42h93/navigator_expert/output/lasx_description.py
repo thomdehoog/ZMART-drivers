@@ -140,8 +140,10 @@ def metadata_from_description(xml: str) -> AcquisitionMetadata:
         physical_size_x_um=x["length_m"] / x["count"] * 1e6,
         physical_size_y_um=y["length_m"] / y["count"] * 1e6,
         # The z length spans the steps between the planes: 17 planes over
-        # 38.55 um are 2.41 um apart, as LAS X's own plane heights say.
-        physical_size_z_um=z["length_m"] / (size_z - 1) * 1e6 if z and size_z > 1 else None,
+        # 38.55 um are 2.41 um apart, as LAS X's own plane heights say. A
+        # stack taken top-down has a negative length (STELLARIS, 2026-10-15);
+        # the distance between planes is the same, so its size is taken.
+        physical_size_z_um=abs(z["length_m"]) / (size_z - 1) * 1e6 if z and size_z > 1 else None,
         significant_bits=significant_bits,
         acquisition_date=reading.acquisition_date(),
         channels=tuple(channel for channel, _ in described),
@@ -167,8 +169,9 @@ class Reading:
         """The setting a channel was taken with.
 
         A job with one setting has it in full at the top. A job with several
-        keeps each in its sequential list; that case has not been seen on a
-        microscope yet (only on the simulator, with one setting).
+        keeps each in its sequential list (STELLARIS, 2026-10-15: two
+        settings, each channel with its own laser and detector, as LAS X
+        showed them).
         """
         listed = (
             self.sequence.findall("./LDM_Block_Sequential_List/ATLConfocalSettingDefinition")
@@ -325,12 +328,14 @@ class Reading:
         description says it stood (``AdditionalZPosition``; the drive that
         moved is recorded there at its last position, so it is not read for
         the planes). The plane's height is all z drives together. A stack
-        made by z-wide is read the same way, but has not been seen on a
-        microscope yet (only z-galvo stacks, on the simulator).
+        made by z-wide is read the same way (STELLARIS, 2026-10-15: z-galvo
+        and z-wide stacks, each with the other drive at its working height,
+        matched LAS X's own plane heights). A stack taken top-down runs its
+        planes downwards from the axis's origin, as LAS X took them.
 
         LAS X stamps every plane of every channel once, in the order the
-        pixels are kept: channel inside plane. (Seen on the simulator for
-        several channels or several planes, not yet both at once.)
+        pixels are kept: channel inside plane (STELLARIS, 2026-10-15: two
+        channels in a six-plane stack).
         """
         stamps = self.time_stamps()
         size_z = z["count"] if z else 1

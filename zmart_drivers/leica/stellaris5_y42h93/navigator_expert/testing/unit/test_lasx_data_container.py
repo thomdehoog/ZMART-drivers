@@ -236,6 +236,35 @@ class TestFindingThePicture:
                 None, acquisition_of("HiRes"), cache_root=cache, timeout_s=0.3
             )
 
+    def test_a_picture_let_go_of_is_passed_over_even_when_it_has_the_same_name(self, cache):
+        """LAS X keeps a released picture's description, rewritten, without its pixels (simulator, 2026-10-14).
+
+        It names the next capture as the released one was ("HiRes009" twice),
+        and rewrites the released description after the next capture began.
+        """
+        two_channel_12_bit(cache, number=6642, name="HiRes009")
+        (cache / f"V2LMSDC_MMF6642_0_{PID}.tmp").unlink()
+        two_channel_12_bit(cache, number=6662, name="HiRes009")
+
+        exported = container.collect_lasx_data_container(None, acquisition_of("HiRes"), cache_root=cache)
+
+        assert exported.relative_path == f"V2LMSDC_MMF6662_0_{PID}.tmp"
+
+    def test_an_older_picture_whose_description_is_written_again_is_passed_over(self, cache):
+        """LAS X writes a picture's description again about 4 s after the capture (simulator, 2026-10-15).
+
+        With two captures of one job close together, the first one's description
+        was written again after the second began; its pixels were not.
+        """
+        two_channel_12_bit(cache, number=10119, name="AF Job011")
+        old = time.time() - 30
+        os.utime(cache / f"V2LMSDC_MMF10119_0_{PID}.tmp", (old, old))
+        two_channel_12_bit(cache, number=10133, name="AF Job012")
+
+        exported = container.collect_lasx_data_container(None, acquisition_of("AF Job"), cache_root=cache)
+
+        assert exported.relative_path == f"V2LMSDC_MMF10133_0_{PID}.tmp"
+
     def test_two_new_pictures_of_the_job_are_refused_not_guessed(self, cache):
         two_channel_12_bit(cache, number=746, name="HiRes002")
         two_channel_12_bit(cache, number=790, name="HiRes003")
@@ -287,7 +316,7 @@ class TestLettingGo:
         exported = container.collect_lasx_data_container(None, acquisition_of("HiRes"), cache_root=cache)
         exported.release()
 
-        assert exported.cleanup_source_supported is True
+        assert exported.release is not None
         assert asked == [(746, "HiRes002")]
 
 
@@ -354,7 +383,6 @@ class TestSaving:
             acquisition_of("HiRes"),
             tmp_path / "out",
             naming,
-            source="cache",
             cache_root=cache,
             format="ome-tiff",
         )
@@ -369,11 +397,3 @@ class TestSaving:
             assert 'SignificantBits="12"' in ome
             assert 'Type="uint16"' in ome
             assert 'PhysicalSizeX="2.5"' in ome
-
-    def test_an_unknown_source_is_refused(self, cache, tmp_path):
-        naming = Naming(stem="high-res_000001_000003")
-
-        with pytest.raises(ValueError, match="cache"):
-            acquisition.save(
-                None, acquisition_of("HiRes"), tmp_path / "out", naming, source="elsewhere"
-            )

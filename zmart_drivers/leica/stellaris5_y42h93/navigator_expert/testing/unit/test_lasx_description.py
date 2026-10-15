@@ -10,6 +10,7 @@ so every value AutoSave gives can be checked against ours.
 from __future__ import annotations
 
 import math
+import re
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
@@ -62,6 +63,24 @@ class TestThePicture:
 
         assert metadata.size_z == 17
         assert metadata.physical_size_z_um == pytest.approx(38.55132 / 16)
+
+    def test_a_stack_taken_top_down_has_a_positive_z_step_and_planes_running_down(self):
+        # LAS X writes a top-down stack (begin above end) with the z axis
+        # starting at the top and a negative length (STELLARIS, 2026-10-15:
+        # Origin 12.25 um, Length -7.23 um). A pixel size is a distance, never
+        # negative; the planes' heights keep the direction they were taken in.
+        xml = (DATA / f"{STACK}.xml").read_text(encoding="utf-8")
+        axis = re.search(r'<DimensionDescription DimID="3"[^>]*/>', xml).group(0)
+        origin = float(re.search(r'Origin="([^"]+)"', axis).group(1))
+        length = float(re.search(r'Length="([^"]+)"', axis).group(1))
+        flipped = re.sub(r'Origin="[^"]+"', f'Origin="{origin + length!r}"', axis)
+        flipped = re.sub(r'Length="[^"]+"', f'Length="{-length!r}"', flipped)
+        metadata = described.metadata_from_description(xml.replace(axis, flipped))
+
+        assert metadata.physical_size_z_um == pytest.approx(38.55132 / 16)
+        heights = [metadata.planes[PlaneIndex(0, z, 0)].position_z_um for z in range(17)]
+        assert heights[0] == pytest.approx(-19.27566 + 38.55132)
+        assert heights == sorted(heights, reverse=True)
 
     def test_the_time_it_was_taken_and_of_every_plane(self):
         metadata = metadata_of(STACK)

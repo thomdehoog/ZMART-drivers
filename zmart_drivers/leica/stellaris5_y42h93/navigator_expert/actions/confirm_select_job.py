@@ -355,15 +355,23 @@ def prepare_select_job(client, job_name):
         "api_said_selected": False,
     }
 
-    # The direct reader reads the live selection: when it is asked and names
-    # the target, that proves the no-op whatever the other sources say.
-    if selected_job_direct() == job_name:
+    # The direct reader reads the live selection, so when it answers it alone
+    # decides: the target selected is the no-op, another job means the
+    # command fires, and that job is the baseline the fallback leg needs.
+    # Neither the CAM API's job list nor the log is asked then: a stale log
+    # line naming the target would otherwise stop a switch that is needed.
+    selected = selected_job_direct()
+    if selected == job_name:
         return {
             "success": True,
             "confirmed": True,
             "message": f"'{job_name}' already selected",
             "logs": [_make_log_entry("info", "selected job already confirmed by the direct reader")],
         }, context
+    if selected is not None:
+        context["api_baseline_name"] = selected
+        context["api_baseline_reason"] = "direct"
+        return None, context
 
     if source == "api":
         try:

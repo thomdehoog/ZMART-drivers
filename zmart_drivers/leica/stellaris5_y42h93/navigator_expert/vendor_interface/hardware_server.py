@@ -1,17 +1,16 @@
 """LAS X's hardware server, read for where a z drive is.
 
-LAS X drives the instrument through a separate program, its hardware server
-``LCS.EXE`` (``LAS X\\LCS\\BIN``), whose automation interface is registered
-as ``TCS.Application`` (interface ``ITCS``). It reports each z drive's true
-position, in metres: ``Hardware.ZPosZGalvo`` and ``Hardware.ZPosZDrive``.
-The CAM API cannot: once a job's z-stack is on a drive, the job settings stop
-refreshing that drive's ``zPosition`` (measured on the simulator, 2026-08-25;
-on 2026-10-12 the server read the galvo at -2.38e-10 m while the settings
-said 0, and followed a +5 µm move the settings never saw).
+While LAS X runs, its hardware server can be reached through Windows'
+running-object table, and it gives each z drive's position, in metres:
+``Hardware.ZPosZGalvo`` and ``Hardware.ZPosZDrive``. The CAM API cannot:
+once a job's z-stack is on a drive, the job settings stop refreshing that
+drive's ``zPosition`` (seen on the simulator, 2026-08-25; on 2026-10-12 the
+server gave the galvo at -2.38e-10 m while the settings said 0, and followed
+a +5 µm move the settings never saw).
 
-This module only reads. It attaches to the server LAS X already runs,
-through Windows' running-object table, and creates nothing. It never writes
-a property and never sends a command.
+This module only reads. It attaches to what LAS X already runs and creates
+nothing; it never writes a property. The only commands sent through it are
+the reads of ``direct_reader``.
 """
 
 from __future__ import annotations
@@ -49,7 +48,7 @@ def attach():
         return win32com.client.Dispatch(running.QueryInterface(pythoncom.IID_IDispatch))
     except Exception as why:
         raise HardwareServerUnavailable(
-            f"LAS X's hardware server (LCS.EXE) is not running here: {why}"
+            f"LAS X's hardware server is not running here: {why}"
         ) from why
 
 

@@ -61,7 +61,7 @@ def _capture_steps(run_ci, monkeypatch, tmp_path, argv):
 
 
 def test_the_quick_hardware_run_is_the_acceptance(monkeypatch, tmp_path):
-    """--hardware: the limits self-check, the installed driver, the adapter, hybrid; nothing mocked."""
+    """--hardware: the limits self-check, the installed driver, the adapter, the direct route, the cache; nothing mocked."""
     run_ci = _load_run_ci()
     captured = _capture_steps(run_ci, monkeypatch, tmp_path, ["--hardware"])
 
@@ -75,7 +75,7 @@ def test_the_quick_hardware_run_is_the_acceptance(monkeypatch, tmp_path):
     assert "--mock" not in installed_cmd
     assert fatal_by_name["hardware: installed driver (register folder, connect by name)"] is True
 
-    adapter_cmd = _command_for(captured, "validate_zmart_adapter.py")
+    adapter_cmd = next(cmd for cmd in _commands_for(captured, "validate_zmart_adapter.py") if "--allow-acquire" in cmd)
     assert "--allow-acquire" in adapter_cmd
     assert "--allow-missing-lasx" not in adapter_cmd
     assert "--mock" not in adapter_cmd
@@ -83,33 +83,87 @@ def test_the_quick_hardware_run_is_the_acceptance(monkeypatch, tmp_path):
 
     hardware_cmds = _commands_for(captured, "validate_hardware.py")
     assert len(hardware_cmds) == 1
-    assert "hybrid" in hardware_cmds[0]
+    assert "direct" in hardware_cmds[0]
     assert "--allow-acquire" in hardware_cmds[0]
-    assert fatal_by_name["hardware: end-to-end validator [hybrid reader]"] is True
+    assert fatal_by_name["hardware: end-to-end validator [direct reader]"] is True
+
+    saving = _command_for(captured, "check_cache_route.py")
+    assert "--job" not in saving  # no job name: the job selected in LAS X is captured
+    assert f"--report-dir={tmp_path}" in saving
+    assert f"--save-to={tmp_path / 'captures'}" in saving
+    assert (tmp_path / "captures").is_dir()
+    assert "--autosave-off" not in saving  # the cache route never asks about AutoSave
+    assert fatal_by_name["hardware: saving from LAS X's cache (one capture, checked)"] is True
+
+    release = _command_for(captured, "check_cache_release.py")
+    assert "--job" not in release
+    assert release[release.index("--captures") + 1] == "10"
+    assert "--autosave-off" not in release
+    assert f"--report-dir={tmp_path}" in release
+    assert fatal_by_name["hardware: letting go of LAS X's cache (10 captures, the canvas cleared)"] is True
+
+    buttons = _command_for(captured, "check_buttons.py")
+    assert f"--report-dir={tmp_path}" in buttons
+    assert fatal_by_name["hardware: the buttons the driver presses (Jobs, Experiment, Clear) and LAS X's dialogs"] is True
+    # The canvas the button check leaves shown is what the cache checks need.
+    order = [name for name, _cmd, _fatal in captured]
+    assert order.index("hardware: the buttons the driver presses (Jobs, Experiment, Clear) and LAS X's dialogs") < order.index(
+        "hardware: saving from LAS X's cache (one capture, checked)"
+    )
 
     assert not _commands_for(captured, "probe_four_readers.py")
     assert not _commands_for(captured, "validate_readers_side_by_side.py")
+    assert not _commands_for(captured, "benchmark_readers.py")
+
+
+def test_the_stage_goes_to_the_ci_baseline_before_any_step_moves_it(monkeypatch, tmp_path):
+    """After a stage initialisation the stage stands at 0, 0, outside its limits (simulator, 2026-10-15)."""
+    run_ci = _load_run_ci()
+    captured = _capture_steps(run_ci, monkeypatch, tmp_path, ["--hardware"])
+    hardware = [(name, cmd) for name, cmd, _fatal in captured if name.startswith("hardware:")]
+    first_name, first_cmd = hardware[0]
+    assert first_name == "hardware: the stage to the CI baseline"
+    assert any(part.endswith("validate_zmart_adapter.py") for part in first_cmd)
+    assert "--enforce-ci-default-position" in first_cmd
+    assert not [part for part in first_cmd if part.startswith("--allow-")]
 
 
 def test_the_full_hardware_run_adds_the_diagnostics(monkeypatch, tmp_path):
-    """--hardware --full: the quick set plus the reader probe, parity, and the api and log routes."""
+    """--hardware --full: the quick set plus the three readers, the reader probe, parity, and the api and log routes."""
     run_ci = _load_run_ci()
     captured = _capture_steps(run_ci, monkeypatch, tmp_path, ["--hardware", "--full"])
     fatal_by_name = {name: fatal for name, _cmd, fatal in captured}
 
+    readers = _command_for(captured, "benchmark_readers.py")
+    assert "--check" in readers
+    assert f"--out={tmp_path / 'readers'}" in readers
+    assert fatal_by_name["hardware: the direct, api and log readers side by side (reads only)"] is True
+
+    assert _command_for(captured, "check_buttons.py")
+    assert _command_for(captured, "check_cache_route.py")
+    assert _command_for(captured, "check_cache_release.py")
     assert _command_for(captured, "validate_installed_driver.py")
     assert _command_for(captured, "probe_four_readers.py")
     assert "--mock" not in _command_for(captured, "validate_readers_side_by_side.py")
     assert fatal_by_name["hardware: reader parity + routed modes"] is False
 
     hardware_cmds = _commands_for(captured, "validate_hardware.py")
-    assert len(hardware_cmds) == 3
+    assert len(hardware_cmds) == 4
     for cmd in hardware_cmds:
         assert "--allow-acquire" in cmd
         assert "--mock" not in cmd
     assert fatal_by_name["hardware: end-to-end validator [api reader]"] is False
     assert fatal_by_name["hardware: end-to-end validator [log reader]"] is False
-    assert fatal_by_name["hardware: end-to-end validator [hybrid reader]"] is True
+    assert fatal_by_name["hardware: end-to-end validator [hybrid reader]"] is False
+    assert fatal_by_name["hardware: end-to-end validator [direct reader]"] is True
+
+
+def test_the_cache_checks_capture_the_job_asked_for(monkeypatch, tmp_path):
+    run_ci = _load_run_ci()
+    captured = _capture_steps(run_ci, monkeypatch, tmp_path, ["--hardware", "--job", "Overview"])
+    for script in ("check_cache_route.py", "check_cache_release.py"):
+        cmd = _command_for(captured, script)
+        assert cmd[cmd.index("--job") + 1] == "Overview"
 
 
 def _commands_for(captured: list[tuple[str, list[str], bool]], script_name: str) -> list[list[str]]:

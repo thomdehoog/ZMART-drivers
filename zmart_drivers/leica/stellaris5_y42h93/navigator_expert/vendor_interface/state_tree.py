@@ -6,7 +6,9 @@ children (the root is node 1), ``RegisterNode(id, out value)`` its value.
 Under ``Acquire/ATL/CurrentSequenceList`` LAS X keeps the job sequence: the
 sequence's own block id, the selected element, and per job
 (``SequenceBlockInfo``) its ``Name``, ``BlockID`` and ``ElementID``: what
-selecting a job by its element needs.
+selecting a job by its element needs. ``IsAutoFocusOnStart`` there marks
+Navigator Expert's autofocus job (STELLARIS, 2026-10-15: set for the AF job
+alone, in agreement with the CAM API's ``IsAutofocus``).
 
 The ids here are live: after an experiment load LAS X gave the jobs new ids
 (HiRes 145 -> 152) while the CAM API's own job list kept the old ones.
@@ -51,6 +53,7 @@ remembered = {}
 class Job:
     block_id: int
     element_id: int
+    autofocus: bool = False  # Navigator Expert's autofocus job (IsAutoFocusOnStart)
 
 
 @dataclass(frozen=True)
@@ -216,12 +219,21 @@ def of_name(nodes, kids, name):
 
 
 def sequence_layout(nodes, node, kids):
-    """``(sequence block id node, selected element node, [(name, block id, element id node) per job])``."""
+    """``(sequence block id node, selected element node, [(name, block id, element id, autofocus node) per job])``.
+
+    A job without an ``IsAutoFocusOnStart`` node has None there and counts as
+    not the autofocus job.
+    """
     return (
         named(nodes, node, "CurrentSequenceBlockID"),
         named(nodes, node, "CurrentSelectedElementID"),
         [
-            (named(nodes, info, "Name"), named(nodes, info, "BlockID"), named(nodes, info, "ElementID"))
+            (
+                named(nodes, info, "Name"),
+                named(nodes, info, "BlockID"),
+                named(nodes, info, "ElementID"),
+                child_named(nodes, info, "IsAutoFocusOnStart"),
+            )
             for info in of_name(nodes, kids, "SequenceBlockInfo")
         ],
     )
@@ -240,8 +252,9 @@ def job_sequence() -> JobSequence:
             str(node_value(nodes, name)): Job(
                 block_id=int(node_value(nodes, block_id)),
                 element_id=int(node_value(nodes, element_id)),
+                autofocus=autofocus is not None and bool(node_value(nodes, autofocus)),
             )
-            for name, block_id, element_id in per_job
+            for name, block_id, element_id, autofocus in per_job
         }
         return JobSequence(
             block_id=int(node_value(nodes, block)),

@@ -9,11 +9,14 @@ notebooks keep the thin 1–3-line invocation style used across the ZMART driver
 - **Author:** Thom de Hoog (ZMB, University of Zurich) · thom.dehoog@zmb.uzh.ch · thomdehoog@gmail.com
 - **License:** see the repository root [`LICENSE`](../../../../LICENSE).
 - **Status:** **Release candidate (`7.0.0rc1`), not yet released.** Version 7 reads LAS X's state
-  first from LAS X's hardware server, and from the CAM API and the log when that fails. This has been
-  tested on the LAS X simulator; it has not yet run on a real STELLARIS. The latest full run on the
-  microscope, of version 6, is recorded in [`SCOPE_RUN_2026-10-10.md`](SCOPE_RUN_2026-10-10.md).
-  Before it is released for unattended use, the findings in
-  [`RELEASE_CANDIDATE_REVIEW.md`](RELEASE_CANDIDATE_REVIEW.md) need to be fixed.
+  first from LAS X's hardware server, and from the CAM API and the log when that fails. It has been
+  tested on the LAS X simulator and, on 15 October 2026, on the STELLARIS: the full hardware CI and
+  the checks of saving from and letting go of LAS X's cache passed
+  ([`sessions/NEXT_SESSION.md`](sessions/NEXT_SESSION.md)). The run of version 6 is recorded in
+  [`sessions/SCOPE_RUN_2026-10-10.md`](sessions/SCOPE_RUN_2026-10-10.md). Before it is released for
+  unattended use, the findings in
+  [`sessions/RELEASE_CANDIDATE_REVIEW.md`](sessions/RELEASE_CANDIDATE_REVIEW.md) need to be fixed.
+  The session notes, plans and reviews are kept in [`sessions/`](sessions/).
 
 ## Contents
 
@@ -283,13 +286,21 @@ permanent error, failed pre-check) and `confirmed` is `None`.
 (`out of range`, `is invalid`, `not implemented`, …) then **transient** (`being scanned`, `busy`,
 `timeout`, …); unknown → permanent (conservative). Transient errors retry up to `max_retries`.
 
-**Reading state — api / log / hybrid** (`dispatcher/read.py`, over `vendor_interface/api_reader.py` and `log_reader.py`, chosen per datum by `StateReaderProfile`;
-default `hybrid` for all routed datums): `api` (CAM read requests, one at a time per connection), `log`
-(parse LAS X logs — never blocks the CAM API, can be stale), `hybrid` (watch both, the first answer
-that counts as a success wins — no source is preferred; the legs' staleness profiles are
-complementary, so one usually delivers). What counts as a success is declared once per datum in
-`actions/get.py` (job settings, for example, must name the job asked about and carry an objective
-slot and image geometry).
+**Reading state — direct, with api / log / hybrid behind it** (`dispatcher/read.py`, over
+`vendor_interface/direct_reader.py`, `api_reader.py` and `log_reader.py`, chosen per datum by
+`StateReaderProfile`). Every reading asks the **direct** reader first, the default for every datum
+since 13 October 2026: it reads LAS X's current state from its hardware server (`state_tree.py`),
+so it is neither late like the CAM API's answers nor waiting for a log line (on the simulator, the
+stage in about 1 ms against the CAM API's 20 ms). It answers the stage, the z drives, scan status,
+job settings, hardware info, the selected job and the job list, with which job is Navigator
+Expert's autofocus job. Only when it fails (LAS X not reachable, an answer that does not count) do
+the others answer: `api` (CAM read requests, one at a time per connection), `log` (parse LAS X logs
+— never blocks the CAM API, can be stale), `hybrid` (watch both, the first answer that counts as a
+success wins). A reading says which source answered. What counts as a success is declared once
+per datum in `actions/get.py` (job settings, for example, must name the job asked about and carry
+an objective slot and image geometry). On the STELLARIS (15 October 2026) the direct reader was
+right where the CAM API was stale: the z-galvo position while a job had a z-galvo stack, and the
+selected job just after a switch.
 
 **Waiting on LAS X — one rule** (`dispatcher/tuning.py`): every reading, confirmation and delivery
 waits **four windows of three seconds**. Within a window both sources are watched; between windows
@@ -297,9 +308,11 @@ something is sent again — a command is fired again, an unanswered read is requ
 message is delivered again. The driver looks again every `POLL_S` (0.1 s) and checks for an answer
 already requested every `ANSWER_POLL_S` (0.01 s). After four windows a reading is unknown, a change
 unconfirmed, a delivery failed. The idle check before a command is an ordinary reading under the same
-rule, asked of the API alone: whether a command fires is the API's to decide. Every other reading
-races the API against the log, a backup for each, because what the log shows can differ between
-machines and LAS X versions; only the job list is API-only (the log's list is incomplete). Outside the rule, by decision: acquisition (sent once, never again, watched for as long as the
+rule, asked of the direct reader and, when it fails, of the API alone, never the log: whether a
+command fires must not rest on a log line that may be old. When the direct
+reader cannot answer, a reading races the API against the log, a backup for each, because what the
+log shows can differ between machines and LAS X versions; the job list then comes from the API alone
+(the log's list is incomplete). Outside the rule, by decision: acquisition (sent once, never again, watched for as long as the
 scan takes), the one-second wait for LAS X's error report after a command, and waits on files being
 written. **Freshness rule:** a fresh-by-age
 *log* value must never decide whether a command fires, how it is parameterized, whether it confirms,
@@ -409,11 +422,11 @@ select_job(client, job_name, *, compensate=None) -> dict                        
 acquire(client, job, *, poll_interval=None, poll_timeout=None, heartbeat_interval=None,
         start_timeout=None) -> AcquisitionResult                                  # RAISES on failure
 save(client, acq, output_root, naming, *, lineage=None, fix_ome=True,
-     cleanup_source=False) -> SavedAcquisition                                    # image_paths / xml_paths / naming
+     cleanup_cache=False) -> SavedAcquisition                                    # image_paths / xml_paths / naming
 ```
-`save()` collects LAS X native AutoSave output into a neutral product and
-writes canonical single-plane OME-TIFFs with OME-XML embedded in each image.
-They land in `<output_root>/data/`, so what is made from
+`save()` collects the capture from LAS X's cache as LAS X writes it (LAS X's AutoSave is not used)
+and writes it as one OME-Zarr store, or as single-plane OME-TIFFs with OME-XML embedded in each
+image (`IMAGE_SAVE.format`). They land in `<output_root>/data/`, so what is made from
 them later (a stitched view, an analysis) becomes a folder beside `data` and is
 never confused with it. Everything describing the capture is under
 `data/metadata`, one folder per party:
@@ -423,7 +436,7 @@ data/
   overview_<hash6>_K00_M000001_G000001_P000000_V00_T000000_C00_Z00000.ome.tiff
   metadata/
     ZMART_state/  overview_<hash6>_..._T000000_ZMART_state.json
-    vendor/       lasx_native_autosave/{source_embedded.ome.xml, *.xlef, metadata_*.xlif}
+    vendor/       lasx_data_container/<picture>.lasx-description.xml
 ```
 
 Every name starts with the stem the workflow gave as the position label; the driver adds only
@@ -443,11 +456,16 @@ in place, preserving byte formatting; `output/ome_canonical.py` writes clean can
 `save(..., fix_ome=True)` validates/repairs each written file.
 
 **LAS X's cache can be let go of once a capture is saved.** Every picture LAS X takes stays in its
-Data Container cache (`D:\Temp`) until LAS X restarts, so a long time course fills the disk twice.
-With `source="cache"` and `cleanup_source=True`, the save's last step asks LAS X itself to delete the
-picture it was read from: the delete of LAS X's own window, so the cache's files go and the project
-stays whole (`output/lasx_cache_release.py` says how). It runs only once the copy is written and
-read back identical. Off by default. Each capture's hidden Navigator copy is not let go of yet.
+Data Container cache until LAS X restarts, so a long time course fills the disk twice. The cache
+folder is the one the registry names under `Data Port` (`HKLM\SOFTWARE\Leica Microsystems\Data
+Container V2`): `D:\Temp2` on the STELLARIS Y42H93.
+With `cleanup_cache=True`, the profile's default since it passed on the STELLARIS (15 October
+2026), the save's last step asks LAS X itself to delete the picture it was read from: the delete of
+LAS X's own window, so the cache's files go and the project stays whole
+(`output/lasx_cache_release.py` says how). It runs only once the copy is written and read back
+identical, and the Navigator canvas is then cleared, which lets go of each capture's hidden copy.
+The driver never deletes a file itself: a capture LAS X gives no way to let go of is refused before
+anything is saved.
 
 **Acquiring never touches the scanning template.** Positions are never made in the Navigator Expert:
 they come from the ZMART interface. `acquire()` and the autofocus procedure capture at the current
@@ -522,9 +540,9 @@ zmart_drivers/leica/stellaris5_y42h93/navigator_expert/
 ├── procedures/         backlash.py · measure_orientation.py · measure_limits.py ·
 │                       calibrate_objective_pair.py · check_calibration.py · adopt_calibration.py ·
 │                       calibration_common.py · algorithms/ (registration and focus scoring)
-├── output/             what comes out of one acquisition: lasx_native_autosave.py (collect) ·
-│                       files.py · materialize.py · ome.py · ome_canonical.py · naming.py ·
-│                       product.py · save.py
+├── output/             what comes out of one acquisition: lasx_data_container.py (collect) ·
+│                       lasx_cache_release.py · files.py · materialize.py · ome.py · ome_canonical.py ·
+│                       ome_zarr.py · naming.py · product.py · save.py
 ├── configuration/      what is measured once per microscope. limits/, image_stage_registration/
 │                       and optical_calibration/ each hold their defaults/ and their notebook;
 │                       store.py resolves the machine-local snapshots under ProgramData;
