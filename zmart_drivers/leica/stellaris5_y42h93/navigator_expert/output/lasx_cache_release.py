@@ -1,7 +1,8 @@
 """Let go of a picture in LAS X's cache, once it is saved, through LAS X's own Data Container.
 
-Every picture LAS X takes stays in its Data Container cache (``D:\\Temp`` on
-this microscope) until LAS X is restarted, so a long time course fills the
+Every picture LAS X takes stays in its Data Container cache (the folder the
+registry names; ``D:\\Temp2`` on the STELLARIS Y42H93) until LAS X is
+restarted, so a long time course fills the
 disk twice: once with the cache, once with the data we save. The cache
 cannot be emptied from outside. Its files are held open by LAS X's Data
 Container server, and LAS X's project still lists the picture, so deleting

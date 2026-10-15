@@ -2,7 +2,7 @@
 
 While LAS X takes a picture it writes the pixels, uncompressed, into its
 Data Container cache (the folder named under ``Data Port`` in the registry,
-``D:\\Temp`` on our machines), one file per picture:
+``D:\\Temp2`` on the STELLARIS Y42H93), one file per picture:
 
 - ``V2LMSDC_MMF<n>_0_<pid>.tmp`` holds the raw pixels: no header, x fastest,
   then y, each channel and each plane starting where the description says.

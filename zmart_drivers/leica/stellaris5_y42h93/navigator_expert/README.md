@@ -443,7 +443,9 @@ in place, preserving byte formatting; `output/ome_canonical.py` writes clean can
 `save(..., fix_ome=True)` validates/repairs each written file.
 
 **LAS X's cache can be let go of once a capture is saved.** Every picture LAS X takes stays in its
-Data Container cache (`D:\Temp`) until LAS X restarts, so a long time course fills the disk twice.
+Data Container cache until LAS X restarts, so a long time course fills the disk twice. The cache
+folder is the one the registry names under `Data Port` (`HKLM\SOFTWARE\Leica Microsystems\Data
+Container V2`): `D:\Temp2` on the STELLARIS Y42H93.
 With `source="cache"` and `cleanup_source=True`, the save's last step asks LAS X itself to delete the
 picture it was read from: the delete of LAS X's own window, so the cache's files go and the project
 stays whole (`output/lasx_cache_release.py` says how). It runs only once the copy is written and

@@ -11,7 +11,7 @@ Two choices in the acquisition settings decide what is written:
 
 | Setting | Values | Default |
 |---|---|---|
-| `source` | `"cache"`: straight from LAS X's cache in `D:\Temp`; `"autosave"`: from AutoSave's files, the backup | `"autosave"` until the microscope check passes |
+| `source` | `"cache"`: straight from LAS X's cache (the folder the registry names, `D:\Temp2` on Y42H93); `"autosave"`: from AutoSave's files, the backup | `"autosave"` until the microscope check passes |
 | `format` | `"ome-zarr"`: one OME-Zarr 0.5 image; `"ome-tiff"`: one OME-TIFF a plane | `"ome-zarr"` |
 | `projection` | `"max"`: a stack's max projection beside it; `"none"` | `"max"` |
 | `save_to` | a folder for this capture | the data location |

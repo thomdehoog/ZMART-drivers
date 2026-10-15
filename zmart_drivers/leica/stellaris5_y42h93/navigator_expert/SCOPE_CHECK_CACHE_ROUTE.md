@@ -1,6 +1,7 @@
 # On the microscope: saving straight from LAS X's cache
 
-The driver can now save a capture straight from LAS X's own cache in `D:\Temp`, instead of waiting
+The driver can now save a capture straight from LAS X's own cache (the folder the registry names,
+`D:\Temp2` on the STELLARIS Y42H93), instead of waiting
 for AutoSave's file. It saves one copy (OME-Zarr by default, or OME-TIFF) with LAS X's full record
 of the capture in it, a max projection beside a stack, and a log of what the driver did. On the
 LAS X simulator every check passed (11 October 2026), including 40 captures in a row, a
