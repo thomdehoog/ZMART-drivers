@@ -1351,9 +1351,12 @@ def phase_z(drv: Any, v: Validator, client: Any, job_name: str, args: argparse.N
                 lambda: drv.move_z(client, job_name, z1, unit="um", z_mode="galvo"),
                 context=ctx,
             )
+            # Read from the direct reader, as the driver does by default. With a
+            # z-galvo stack in the job, the CAM API keeps answering the stack's
+            # middle after a move (STELLARIS, 15 October 2026).
             after_settings = v.callable(
                 "z: read alternate",
-                lambda: _settings(drv, client, job_name, mode="api"),
+                lambda: _settings(drv, client, job_name, mode="direct"),
                 context={"job": job_name},
             )
             after = after_settings.get("zPosition", {}) if after_settings else {}

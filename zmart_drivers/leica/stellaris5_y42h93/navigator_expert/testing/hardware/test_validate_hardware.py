@@ -566,3 +566,50 @@ def test_z_start_outside_envelope_is_skip_not_fail():
     assert not DummyDrv.moved
     row = next(r for r in records if r.name == "z: round-trip")
     assert row.status == "SKIP"
+
+
+def test_the_z_readback_asks_the_direct_reader_not_the_cam_api():
+    """The z check reads where z-galvo went from the direct reader.
+
+    On the STELLARIS (15 October 2026), with a z-galvo stack set up in the
+    job, the CAM API kept answering the stack's middle (8.64 um) after a
+    move to 10.64 um, while the direct reader saw the move at once. The
+    driver reads the direct reader by default, so the check reads it too;
+    otherwise a correct move is graded as a failure.
+    """
+
+    class DummyDrv:
+        z = 8.64
+        asked: list = []
+
+        @staticmethod
+        def make_changeable_copy(raw):
+            return dict(raw or {})
+
+        @staticmethod
+        def get_job_settings(_client, _job, *, mode=None, **_kwargs):
+            DummyDrv.asked.append(mode)
+            # The CAM API stays at the stack's middle; the direct reader follows the drive.
+            return {"zPosition": {"z-galvo": 8.64 if mode == "api" else DummyDrv.z}}
+
+        @staticmethod
+        def get_stage_limits():
+            return dict(_ENVELOPE)
+
+        @staticmethod
+        def move_z(_client, _job, z_um, **_kwargs):
+            DummyDrv.z = z_um
+            return {"success": True, "confirmed": True}
+
+    records = []
+    validator = validate_hardware.Validator(
+        sink=records.append,
+        log=validate_hardware._configure_logging("ERROR", jsonl_to_stdout=False),
+    )
+    args = validate_hardware.parse_args(["--allow-z"])
+
+    validate_hardware.phase_z(DummyDrv, validator, object(), "HiRes", args)
+
+    row = next(r for r in records if r.name == "z: readback")
+    assert row.status == "PASS"
+    assert "api" not in DummyDrv.asked
