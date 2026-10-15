@@ -39,7 +39,7 @@ class CornerRecorder:
         """Read where the stage stands and keep it as corner *number*; returns it."""
         if isinstance(number, bool) or number not in CORNERS:
             raise ValueError(f"corner number must be 1, 2, 3 or 4, got {number!r}")
-        position = _readers.get_xy(self._client, mode="api")
+        position = _readers.get_xy(self._client, mode="direct")
         try:
             x_um = float(position["x_um"])
             y_um = float(position["y_um"])

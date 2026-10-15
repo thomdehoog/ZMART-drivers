@@ -568,6 +568,33 @@ def test_z_start_outside_envelope_is_skip_not_fail():
     assert row.status == "SKIP"
 
 
+def test_the_readbacks_ask_the_direct_reader_not_the_cam_api(tmp_path, monkeypatch):
+    """XY and job-settings readbacks read LAS X as the driver does: directly.
+
+    Only the two deliberate CAM API checks (the job list as a control for the
+    log reader, and the independent check of a job switch) still ask the API.
+    """
+    import zmart_drivers.leica.stellaris5_y42h93.navigator_expert as drv
+
+    asked = []
+    for name in ("get_xy", "get_job_settings"):
+        real = getattr(drv, name)
+
+        def spy(*args, _real=real, _name=name, **kwargs):
+            asked.append((_name, kwargs.get("mode")))
+            return _real(*args, **kwargs)
+
+        monkeypatch.setattr(drv, name, spy)
+
+    exit_code = validate_hardware.main(
+        ["--mock", "--allow-xy", "--allow-z", "--output", str(tmp_path / "run.jsonl"), "--report-dir", str(tmp_path)]
+    )
+
+    assert exit_code == 0
+    assert asked
+    assert [call for call in asked if call[1] == "api"] == []
+
+
 def test_the_z_readback_asks_the_direct_reader_not_the_cam_api():
     """The z check reads where z-galvo went from the direct reader.
 

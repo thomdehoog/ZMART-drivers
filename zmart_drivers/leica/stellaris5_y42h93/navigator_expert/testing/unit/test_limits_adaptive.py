@@ -72,7 +72,7 @@ def test_four_recorded_corners_give_the_limits():
         "x_um": {"range": [10_000.0, 30_000.0]},
         "y_um": {"range": [20_000.0, 40_000.0]},
     }
-    assert [call.get("mode") for call in calls] == ["api"] * 4  # saved for good: the API
+    assert [call.get("mode") for call in calls] == ["direct"] * 4  # saved for good: LAS X itself
 
 
 def test_recording_a_corner_again_replaces_it():

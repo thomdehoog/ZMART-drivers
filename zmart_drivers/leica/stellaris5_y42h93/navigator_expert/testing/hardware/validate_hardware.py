@@ -635,7 +635,7 @@ def _record_selected_job_postcheck(
 def _job_objective_signature(drv: Any, client: Any, job_name: str) -> tuple | None:
     """Best-effort objective identity for ordering validator job switches."""
     try:
-        settings = _settings(drv, client, job_name, mode="api")
+        settings = _settings(drv, client, job_name, mode="direct")
     except Exception:  # noqa: BLE001 - validator ordering hint only
         return None
     objective = settings.get("objective") or {}
@@ -1011,7 +1011,7 @@ def phase_settings(drv: Any, v: Validator, client: Any, job_name: str) -> None:
     """
 
     def api_settings() -> dict:
-        return _settings(drv, client, job_name, mode="api")
+        return _settings(drv, client, job_name, mode="direct")
 
     with v.phase("settings round-trip"):
         try:
@@ -1128,7 +1128,7 @@ def phase_detector_gain(drv: Any, v: Validator, client: Any, job_name: str) -> N
     noise to the JSONL without diagnostic value.
     """
     try:
-        settings = _settings(drv, client, job_name, mode="api")
+        settings = _settings(drv, client, job_name, mode="direct")
     except Exception as exc:  # noqa: BLE001
         v.skip("detector_gain: round-trip", f"cannot read detector settings: {exc}")
         return
@@ -1162,7 +1162,7 @@ def phase_detector_gain(drv: Any, v: Validator, client: Any, job_name: str) -> N
         v,
         "detector_gain",
         job_name,
-        read=lambda: _active_setting(_settings(drv, client, job_name, mode="api"))[
+        read=lambda: _active_setting(_settings(drv, client, job_name, mode="direct"))[
             "activeDetectors"
         ][0]["gain"]["value"],
         write=lambda x: drv.set_detector_gain(client, job_name, 0, beam_route, x),
@@ -1223,8 +1223,8 @@ def phase_xy(drv: Any, v: Validator, client: Any, args: argparse.Namespace) -> N
     with v.phase("xy 10-position pattern"):
         start = v.callable(
             "xy: read start",
-            lambda: drv.get_xy(client, mode="api"),
-            context={"mode": "api", "purpose": "stage-safety-anchor"},
+            lambda: drv.get_xy(client, mode="direct"),
+            context={"mode": "direct", "purpose": "stage-safety-anchor"},
         )
         if start is None:
             v.skip("xy: pattern", "get_xy returned None")
@@ -1279,7 +1279,7 @@ def phase_xy(drv: Any, v: Validator, client: Any, args: argparse.Namespace) -> N
                     break
                 end = v.callable(
                     f"xy: read {label}",
-                    lambda: drv.get_xy(client, mode="api"),
+                    lambda: drv.get_xy(client, mode="direct"),
                     context=ctx,
                 )
                 if end is None:
