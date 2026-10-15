@@ -11,8 +11,7 @@ Data Container cache (the folder named under ``Data Port`` in the registry,
   LAS X XML (size, bit depth, axis lengths, where each channel starts, a time
   stamp per plane); the third starts with the picture's name.
 
-``<pid>`` is the LAS X data server's process number in hex, new each time LAS
-X starts. The pixels are byte for byte those LAS X's AutoSave writes into its
+``<pid>`` is a number in hex that changes each time LAS X starts. The pixels are byte for byte those LAS X's AutoSave writes into its
 OME-TIFF (checked on 31 pictures: 8, 12 and 16 bit, two channels, a 17-plane
 stack), so this collector gives ``save`` the same product without waiting
 for AutoSave.

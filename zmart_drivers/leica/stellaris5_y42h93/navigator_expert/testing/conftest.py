@@ -67,8 +67,8 @@ def pytest_report_header(config):
 def _no_hardware_server(monkeypatch):
     """Make LAS X's hardware server unreachable for every test.
 
-    The suite runs on microscope PCs with LAS X open, where the real
-    ``LCS.EXE`` would answer and a test would read the instrument's z.
+    The suite runs on microscope PCs with LAS X open, where LAS X's real
+    hardware server would answer and a test would read the instrument's z.
     Tests that need the server hand in a stand-in through ``attach``.
     """
     from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface import (

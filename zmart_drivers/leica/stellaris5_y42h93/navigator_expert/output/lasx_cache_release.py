@@ -2,19 +2,16 @@
 
 Every picture LAS X takes stays in its Data Container cache (the folder the
 registry names; ``D:\\Temp2`` on the STELLARIS Y42H93) until LAS X is
-restarted, so a long time course fills the
-disk twice: once with the cache, once with the data we save. The cache
-cannot be emptied from outside. Its files are held open by LAS X's Data
-Container server, and LAS X's project still lists the picture, so deleting
-them would leave the project pointing at data that is gone.
+restarted, so a long time course fills the disk twice: once with the cache,
+once with the data we save. The cache cannot be emptied from outside: LAS X
+holds its files open, and LAS X's project still lists the picture, so
+deleting them would leave the project pointing at data that is gone.
 
-LAS X can let go of a picture itself: deleting it in LAS X's window makes the
-Data Container release its files, and LAS X's I/O manager take it out of the
-project, with the file AutoSave wrote of it. :func:`delete` asks for exactly
-that delete, through the .NET client every part of LAS X uses to reach its
-Data Container (``LMSDataContainerWrapper.dll`` from the LAS X install, the
-same folder the CAM API is loaded from). Nothing of LAS X is copied or
-changed.
+LAS X can let go of a picture itself, as when it is deleted in LAS X's
+window: its files leave the cache, and the project no longer lists it, nor
+the file AutoSave wrote of it. :func:`delete` asks for that delete through
+the Data Container's .NET client from the LAS X install
+(``vendor_interface.data_container``). Nothing of LAS X is copied or changed.
 
 What it takes:
 

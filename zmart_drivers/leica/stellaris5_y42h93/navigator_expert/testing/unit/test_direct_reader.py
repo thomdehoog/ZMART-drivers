@@ -404,7 +404,7 @@ class TestTheRest:
 
 
 class TestTheJobSettings:
-    """A job's settings, whole: the hardware server's own answer, the one the CAM API passes on.
+    """A job's settings, whole: LAS X's answer, the same JSON the CAM API gives.
 
     Asked of the hardware server with ``ATL_GetBlockApiInfoAsJsonString`` and
     the job's block id, they are the CAM API's settings for every job, the
@@ -454,7 +454,7 @@ class TestTheJobSettings:
 
 class TestTheHardwareInfo:
     """The instrument, whole: the hardware server's answer to ``GetConfocalHardwareInfoAsJson``,
-    which the CAM API passes on (simulator, 2026-10-14: identical, ``SystemType`` included)."""
+    the same JSON the CAM API gives (simulator, 2026-10-14: identical, ``SystemType`` included)."""
 
     def test_it_is_the_api_readers_answer(self, client, tree):
         assert direct_reader.get_hardware_info() == api_reader.get_hardware_info(client)

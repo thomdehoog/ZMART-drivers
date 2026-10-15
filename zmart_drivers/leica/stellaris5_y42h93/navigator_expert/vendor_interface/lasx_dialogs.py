@@ -1,13 +1,12 @@
 """LAS X's warning dialogs: noticed in its log, answered with OK when OK is all they ask.
 
-When LAS X's hardware server has a warning, it calls LAS X's window and
-waits for the answer: the window shows a dialog, and the server does nothing
-else until someone clicks it. On 2026-10-13 one such warning ("Please keep
-minimum distance of 8nm") held the hardware server for 33 hours, and every
-command, through the CAM API or directly, waited with it. No command answers
-a dialog; only its button does.
+When LAS X shows a warning, it waits for the answer: until someone clicks
+the dialog, every command waits. On 2026-10-13 one such warning ("Please
+keep minimum distance of 8nm") stayed open for 33 hours, and every command,
+through the CAM API or directly, waited with it. No command answers a
+dialog; only its button does.
 
-The window writes each dialog to ``LAS X.log`` the moment it opens
+LAS X writes each dialog to ``LAS X.log`` the moment it opens
 (``MessageBox Warning : <text>``) and its answer when it closes
 (``MessageBox Result: OK``), so the log says cheaply whether one is open and
 what it says. Only then are LAS X's windows looked at, through Windows UI

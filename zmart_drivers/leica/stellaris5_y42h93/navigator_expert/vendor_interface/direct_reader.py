@@ -2,8 +2,8 @@
 
 The third reader beside :mod:`api_reader` (the CAM API) and
 :mod:`log_reader` (LAS X's log). It reads the hardware server's state tree
-(:mod:`state_tree`), which holds what LAS X itself works from, so it is
-neither late like the CAM API's answers nor waiting for a log line. Its
+(:mod:`state_tree`), which holds LAS X's current state, so it is neither
+late like the CAM API's answers nor waiting for a log line. Its
 functions carry the other readers' names and give answers of the same
 shape, so a caller cannot tell which reader answered; the routed readers
 (``dispatcher.read``) say so in a reading's ``source``.
@@ -29,13 +29,12 @@ the CAM API's job settings are per job. On the simulator (2026-10-13) every
 one that the log's job settings for the selected job also carry agreed
 with them; the CAM API could not be compared, it refused connections then.
 
-A job's settings and the hardware info, whole, are the hardware server's
-own answers to the two reads the CAM API itself sends it
-(``ATL_GetBlockApiInfoAsJsonString`` with the job's block id,
-``GetConfocalHardwareInfoAsJson``; both in LAS X's ``lcsCommand.log`` as the
-CAM API's): on the simulator (2026-10-14) identical to the CAM API's, value
-for value, for every job, a filter wheel's spectrum mode and the
-``SystemType`` included, in 0.5-1.5 ms and 20 ms. Only for the selected
+A job's settings and the hardware info, whole, are LAS X's answers to two
+reads (``ATL_GetBlockApiInfoAsJsonString`` with the job's block id, and
+``GetConfocalHardwareInfoAsJson``), in the same JSON the CAM API gives: on
+the simulator (2026-10-14) identical to the CAM API's, value for value, for
+every job, a filter wheel's spectrum mode and the ``SystemType`` included,
+in 0.5-1.5 ms and 20 ms. Only for the selected
 job's z drives the state tree says more: where they truly are.
 
 Every function raises :class:`HardwareServerUnavailable` when the hardware
@@ -820,7 +819,7 @@ def get_active_settings() -> list[dict]:
 
 
 def server_answer(command: str, what: str) -> dict:
-    """The JSON the hardware server answers to a read *command*, as the CAM API receives it.
+    """The JSON LAS X answers to a read *command*.
 
     LAS X answers ``<Result Error="">{...}</Result>``; any other answer raises
     :class:`HardwareServerUnavailable` with LAS X's words.
@@ -841,7 +840,7 @@ def server_answer(command: str, what: str) -> dict:
 
 
 def get_job_settings(job_name) -> dict:
-    """The settings of *job_name*, whole: the hardware server's own, which the CAM API passes on.
+    """The settings of *job_name*, whole, in the JSON the CAM API gives too.
 
     For every job, the selected one or not. For the selected job the z drives
     are where they truly are, from the state tree: the settings keep a
@@ -865,5 +864,5 @@ def get_job_settings(job_name) -> dict:
 
 
 def get_hardware_info() -> dict:
-    """The instrument, whole: the hardware server's own description, which the CAM API passes on."""
+    """The instrument, whole: LAS X's description of it, in the JSON the CAM API gives too."""
     return server_answer('<Scanner Command="GetConfocalHardwareInfoAsJson"/>', "the hardware info")

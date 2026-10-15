@@ -130,7 +130,7 @@ def z_um_from_settings(settings, key, *, client=None, job_name=None):
     for the drive the job's stack is on (measured on the simulator
     2026-08-25/26; the CAM API offers no other Z readout). So for that one
     drive the value here is stale by construction, and this function reads
-    it elsewhere. First from LAS X's hardware server (``LCS.EXE``), which
+    it elsewhere. First from LAS X's hardware server, which
     reports where the drive truly is, in milliseconds. When that server
     cannot be reached, from the saved experiment: ``PyApiSaveExperiment``
     makes LAS X write the ``.lrp`` from its live block, and the job's Master

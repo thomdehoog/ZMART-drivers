@@ -1,8 +1,8 @@
 """
 Log-file state probe.
 =====================
-Reads LAS X state from the hardware log (``lcsCommand.log``, written by
-``LCS.exe``) instead of the NavigatorExpert CAM API. The CAM API can
+Reads LAS X state from LAS X's hardware log (``lcsCommand.log``) instead
+of the NavigatorExpert CAM API. The CAM API can
 freeze for seconds while a modal dialog blocks its channel; the log keeps
 flowing, so a log read never hangs.
 

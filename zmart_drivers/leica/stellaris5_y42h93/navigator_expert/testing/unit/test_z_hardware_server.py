@@ -4,7 +4,7 @@ Unit tests: the stacked drive's Z is read from LAS X's hardware server first.
 Once a job's z-stack is on a drive, LAS X stops refreshing that drive's
 ``zPosition`` in the job settings. The saved experiment (``.lrp``) records
 the last command, costs a save, and is not where the drive is. LAS X's
-hardware server (``LCS.EXE``) reports the drive's true position
+hardware server reports the drive's true position
 (``Hardware.ZPosZGalvo`` / ``ZPosZDrive``, metres; measured on the simulator
 2026-10-12: galvo -2.38e-10 m while the job settings said 0). So for the
 stacked drive the reader asks the hardware server first and falls back to the

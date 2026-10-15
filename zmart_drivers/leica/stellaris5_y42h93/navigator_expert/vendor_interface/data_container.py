@@ -1,10 +1,9 @@
 """LAS X's Data Container, reached as one more of its clients.
 
-Every picture LAS X takes is an element of its Data Container (the service on
-port 8892): an image, inside an experiment (a project). The .NET client every
-part of LAS X uses to reach it, ``LMSDataContainerWrapper.dll``, sits in the
-LAS X install beside the CAM API; the driver loads it from there, connected as
-the Windows user, who owns LAS X's pictures (any other name is refused access
+LAS X keeps every picture it takes as an element of its Data Container: an
+image, inside an experiment (a project). LAS X installs a .NET client for
+it beside the CAM API; the driver loads it from there and connects as the
+Windows user, who owns LAS X's pictures (any other name is refused access
 to them). Nothing of LAS X is copied or changed.
 """
 
