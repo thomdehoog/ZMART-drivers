@@ -34,18 +34,14 @@ def readings_direct(_client):
         direct_reader as d,
     )
 
-    xy = d.get_xy()
-    return {
-        "zoom": d.get_zoom()["current"],
-        "scan speed": d.get_scan_speed()["value"],
-        "pinhole": d.get_pinhole()["airy"]["value"],
-        "line average": d.get_averaging()["lineAverage"],
-        "rotation": d.get_scan_field_rotation()["value"],
-        "xy": [xy["x_um"], xy["y_um"]],
-        "z-galvo": d.read_z_um("z-galvo"),
-        "selected job": d.get_selected_job()["Name"],
-        "scan status": d.get_scan_status(),
-    }
+    # The job's settings are read for JOB, as the other two readers read them,
+    # so that an unselected job is compared on its own settings. (Read from
+    # the selected job's values instead, the direct column showed the selected
+    # job's zoom and rotation for HiRes, 15 October 2026.) The z drive is read
+    # where it truly is, as only the direct reader can.
+    values = from_settings(d.get_job_settings(JOB), d.get_xy(), d.get_selected_job(), d.get_scan_status())
+    values["z-galvo"] = d.read_z_um("z-galvo")
+    return values
 
 
 def from_settings(settings, xy, selected, status):

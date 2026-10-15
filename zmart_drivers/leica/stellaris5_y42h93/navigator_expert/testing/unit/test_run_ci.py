@@ -92,13 +92,13 @@ def test_the_quick_hardware_run_is_the_acceptance(monkeypatch, tmp_path):
     assert f"--report-dir={tmp_path}" in saving
     assert f"--save-to={tmp_path / 'captures'}" in saving
     assert (tmp_path / "captures").is_dir()
-    assert "--autosave-off" in saving  # the cache route as it is used: without AutoSave
+    assert "--autosave-off" not in saving  # the cache route never asks about AutoSave
     assert fatal_by_name["hardware: saving from LAS X's cache (one capture, checked)"] is True
 
     release = _command_for(captured, "check_cache_release.py")
     assert "--job" not in release
     assert release[release.index("--captures") + 1] == "10"
-    assert "--autosave-off" in release
+    assert "--autosave-off" not in release
     assert f"--report-dir={tmp_path}" in release
     assert fatal_by_name["hardware: letting go of LAS X's cache (10 captures, the canvas cleared)"] is True
 

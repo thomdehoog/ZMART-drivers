@@ -341,11 +341,12 @@ def main(argv: list[str] | None = None) -> int:
                     mode == "direct",
                 )
             )
-        # Saving from LAS X's cache, then letting go of it, with AutoSave off
-        # as the cache route is used: one capture saved and checked, then ten
-        # captures released, the Navigator canvas cleared after each. The
-        # second needs LAS X to show the Navigator, and fails saying so. The
-        # captures go under the reports, so the run needs no data location.
+        # Saving from LAS X's cache, then letting go of it: one capture saved
+        # and checked, then ten captures released, the Navigator canvas cleared
+        # after each. Neither asks whether AutoSave is on; the cache route does
+        # not use it. The second needs LAS X to show the Navigator, and fails
+        # saying so. The captures go under the reports, so the run needs no
+        # data location.
         (REPORT_DIR / "captures").mkdir(parents=True, exist_ok=True)
         hardware_steps += [
             (
@@ -353,7 +354,6 @@ def main(argv: list[str] | None = None) -> int:
                 [
                     sys.executable,
                     str(hw / "check_cache_route.py"),
-                    "--autosave-off",
                     *(["--job", args.job] if args.job else []),
                     "--label",
                     "ci",
@@ -367,7 +367,6 @@ def main(argv: list[str] | None = None) -> int:
                 [
                     sys.executable,
                     str(hw / "check_cache_release.py"),
-                    "--autosave-off",
                     *(["--job", args.job] if args.job else []),
                     "--captures",
                     "10",

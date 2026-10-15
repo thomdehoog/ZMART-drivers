@@ -936,7 +936,19 @@ def phase_job_selection(
         from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher import tuning
 
         names = selectable_job_names(jobs)
-        original = next((j["Name"] for j in jobs if j.get("IsSelected")), preferred_job)
+        # The job to come back to is read the way the driver reads it, not
+        # from the job list's own IsSelected flag: on the STELLARIS that flag
+        # still named the job selected before the last switch (15 October
+        # 2026), so the round-trip ended on the wrong job and left it selected.
+        selected_now = v.callable(
+            "job selection: read original job",
+            lambda: drv.get_selected_job(client),
+        )
+        original = (
+            selected_now.get("Name")
+            if isinstance(selected_now, dict) and selected_now.get("Name")
+            else next((j["Name"] for j in jobs if j.get("IsSelected")), preferred_job)
+        )
         ordered_names = _job_selection_order(drv, client, names, original)
         last_target: str | None = None
         last_result: dict | None = None

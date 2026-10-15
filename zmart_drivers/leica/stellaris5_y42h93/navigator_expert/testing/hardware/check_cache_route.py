@@ -8,9 +8,6 @@ capture stays in LAS X's cache. Then it checks and reports:
 - the store: one OME-Zarr image, valid OME-Zarr 0.5 (when ome-zarr-models
   is installed), and its OME-XML valid OME 2016-06 (when ome-types and lxml
   are);
-- when LAS X's AutoSave is on, that the store holds exactly the pixels of
-  the OME-TIFF AutoSave wrote for the same capture; with AutoSave off, that
-  the capture was saved at all;
 - the metadata, for a person to read: size and bit depth; each channel's
   dye, excitation, detector, gain, offset and detection band, laser and
   attenuation; the objective; the microscope's model and serial; and, per
@@ -20,7 +17,8 @@ capture stays in LAS X's cache. Then it checks and reports:
 
 It never edits a LAS X file: it selects the job, moves the stage to where
 it already stands (so every plane gets its canvas position), and captures.
-A report is written where the script is run (or to ``--report-dir``), as
+Whether LAS X's AutoSave is on or off makes no difference to it: the cache
+route does not use AutoSave, and the check never asks about it. A report is written where the script is run (or to ``--report-dir``), as
 ``check_cache_route_<label>.json``.
 
 Usage, in the driver's environment on the microscope PC::
@@ -43,8 +41,6 @@ import time
 from dataclasses import replace
 from pathlib import Path
 
-import numpy as np
-
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
@@ -52,32 +48,16 @@ def main() -> int:
     parser.add_argument("--label", required=True, help="a name for this check, e.g. hires-16bit")
     parser.add_argument("--save-to", default=None, help="a folder instead of the set-up data location")
     parser.add_argument("--report-dir", default=".", help="where the report is written (default: here)")
-    parser.add_argument(
-        "--autosave-off",
-        action="store_true",
-        help="capture only when LAS X's AutoSave is off, the way the cache route is used",
-    )
     asked = parser.parse_args()
 
-    import tifffile
     import zarr
     from zmart_controller import ZmartController
 
     import zmart_drivers.leica.stellaris5_y42h93.navigator_expert.zmart_controller_plugin as driver
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.output import lasx_native_autosave as autosave
     from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.zmart_adapter import zmart_adapter as adapter
 
     report: dict = {"job": asked.job, "label": asked.label, "checks": {}, "metadata": {}}
     checks = report["checks"]
-    if asked.autosave_off:
-        enabled = _try(autosave.native_autosave_enabled)
-        checks["AutoSave is off"] = (
-            True if enabled is False
-            else "NO: AutoSave is on in LAS X; switch it off and run again" if enabled
-            else "NO: whether AutoSave is on could not be read"
-        )
-        if checks["AutoSave is off"] is not True:
-            return _finish(report, Path(asked.report_dir))
     adapter.IMAGE_SAVE = replace(adapter.IMAGE_SAVE, source="cache", format="ome-zarr", cleanup_source=False)
     session = ZmartController(driver, {"output_root": asked.save_to} if asked.save_to else {})
     try:
@@ -90,10 +70,6 @@ def main() -> int:
         report["system"] = {k: v for k, v in (state.get("observed") or {}).items() if k in ("serial_number", "system_type", "stand")}
         here = session.get_xyz()["content"]
         session.set_xyz(*(float(here[axis]["position"]) for axis in "xyz"))
-
-        autosave_on = _try(autosave.native_autosave_enabled)
-        autosave_root = _try(autosave.native_autosave_base_folder) if autosave_on else None
-        before = {str(p) for p in Path(autosave_root).rglob("*.ome.tif")} if autosave_root else set()
 
         started = time.perf_counter()
         answer = session.acquire(position_label=re.sub(r"[^A-Za-z0-9_-]", "-", asked.label))
@@ -123,26 +99,6 @@ def main() -> int:
         ome = _read_ome(ome_text, checks)
         if ome is not None:
             report["metadata"] = _described(ome)
-
-        if autosave_on:
-            new = _wait_for_new(Path(autosave_root), before)
-            if len(new) != 1:
-                checks["identical to AutoSave's file"] = f"NO: AutoSave wrote {len(new)} new files"
-            else:
-                time.sleep(2.0)
-                with tifffile.TiffFile(new[0]) as tif:
-                    reference = tif.asarray().reshape(-1, *tif.pages[0].shape)
-                size_c, size_z = level.shape[1], level.shape[2]
-                # The store is ordered lowest plane first; AutoSave keeps LAS X's order.
-                order = _store_to_vendor_z(record)
-                same = all(
-                    np.array_equal(level[0, c, zi], reference[order[zi] * size_c + c])
-                    for c in range(size_c) for zi in range(size_z)
-                )
-                checks["identical to AutoSave's file"] = same
-                report["autosave_file"] = str(new[0])
-        else:
-            checks["identical to AutoSave's file"] = "not compared: AutoSave is off"
 
         report["laser power, as LAS X writes it"] = _laser_power(record)
         stack = level.shape[2] > 1
@@ -231,28 +187,6 @@ def _laser_power(record: dict) -> list[dict]:
         {key: laser.get(key) for key in fields if laser.get(key) is not None}
         for laser in (setting.findall("./LaserArray/Laser") if setting is not None else [])
     ]
-
-
-def _store_to_vendor_z(record: dict) -> list[int]:
-    """The vendor's z number of each store plane: the store runs from the lowest plane up."""
-    heights = {plane["z"]: plane["z_um"] for plane in record["planes"]}
-    return sorted(heights, key=lambda z: (heights[z] is None, heights[z] if heights[z] is not None else z))
-
-
-def _wait_for_new(root: Path, before: set[str], seconds: float = 60.0) -> list[Path]:
-    deadline = time.time() + seconds
-    while True:
-        new = [p for p in root.rglob("*.ome.tif") if str(p) not in before]
-        if new or time.time() > deadline:
-            return new
-        time.sleep(0.5)
-
-
-def _try(call):
-    try:
-        return call()
-    except Exception:  # noqa: BLE001 -- a check that cannot run says so in the report
-        return None
 
 
 def _finish(report: dict, folder: Path) -> int:

@@ -68,9 +68,11 @@ It captures the job selected in LAS X; add `--job <name>` to capture another.
 
 **Look at:**
 
-- Everything is green. If a cache step fails with "AutoSave is on", switch AutoSave off; if
-  the last step fails with "Experiment button was not found", open Navigator Expert; then run
-  again.
+- Everything is green. If the last step fails with "Experiment button was not found", open
+  Navigator Expert; then run again. Whether AutoSave is on or off does not matter to any step:
+  the cache route does not use AutoSave, and the checks no longer ask about it. (They used to
+  read the switch from LAS X's startup file, which LAS X rewrites only at exit, so on the
+  microscope the reading was stale and refused a run with AutoSave already off, 15 October.)
 - If LAS X shows "Can not start while live scan is running!" (an Information box, which the
   driver leaves for you), answer OK and note at which step and capture it came. It came once on
   the simulator, 3 s after LAS X reported idle, and is not explained yet.
@@ -99,6 +101,8 @@ selected in LAS X, and `--out D:\ZMART-check\readers-other`.
 
 For this step you need a warning that LAS X shows with **only an OK button**, which you can
 call up by hand. Each part watches for 5 minutes; call the warning up during that time.
+**Not run on 15 October 2026:** no such warning could be provoked on the STELLARIS that day, so
+find one beforehand (note how it is called up) or wait for one to appear during a run.
 
 ```
 python <driver>\testing\hardware\watch_lasx_warnings.py --look --minutes 5
@@ -140,7 +144,7 @@ available`.
 With AutoSave off:
 
 ```
-python <driver>\testing\hardware\check_cache_release.py --captures 50 --label fifty --autosave-off
+python <driver>\testing\hardware\check_cache_release.py --captures 50 --label fifty
 ```
 
 Every ten captures it prints how much LAS X's cache grew: in total, the hidden copies, and the
@@ -154,7 +158,7 @@ rest. **Look at:**
 Then once starting from **the Jobs tab** in Navigator Expert:
 
 ```
-python <driver>\testing\hardware\check_cache_release.py --captures 10 --label from-jobs-tab --autosave-off
+python <driver>\testing\hardware\check_cache_release.py --captures 10 --label from-jobs-tab
 ```
 
 At the first capture the screen switches to the Experiment tab by itself (it did so cleanly on

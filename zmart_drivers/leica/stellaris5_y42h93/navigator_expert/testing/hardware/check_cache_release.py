@@ -17,7 +17,8 @@ shows Navigator Expert's Experiment tab, when another one is shown.
 
 It never edits a LAS X file: it selects the job, moves the stage to where it
 already stands (so every capture gets its canvas position), and captures.
-A report is written where the script is run (or to ``--report-dir``), as
+Whether LAS X's AutoSave is on or off makes no difference to it: the cache
+route does not use AutoSave, and the check never asks about it. A report is written where the script is run (or to ``--report-dir``), as
 ``check_cache_release_<label>.json``.
 
 Usage, in the driver's environment on the microscope PC::
@@ -99,11 +100,6 @@ def main() -> int:
     parser.add_argument("--label", required=True, help="a name for this check, e.g. hires-50")
     parser.add_argument("--save-to", default=None, help="a folder instead of the set-up data location")
     parser.add_argument("--report-dir", default=".", help="where the report is written (default: here)")
-    parser.add_argument(
-        "--autosave-off",
-        action="store_true",
-        help="capture only when LAS X's AutoSave is off, the way the cache route is used",
-    )
     asked = parser.parse_args()
 
     from zmart_controller import ZmartController
@@ -113,12 +109,6 @@ def main() -> int:
     from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.output import lasx_data_container as container
     from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.zmart_adapter import zmart_adapter as adapter
 
-    if asked.autosave_off:
-        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.output import lasx_native_autosave as autosave
-
-        if autosave.native_autosave_enabled():
-            print("FAILED: AutoSave is on in LAS X; switch it off and run again")
-            return 1
     releases = Releases()
     logging.getLogger(lasx_cache_release.__name__).addHandler(releases)
     cache = Cache(container.data_container_root())
