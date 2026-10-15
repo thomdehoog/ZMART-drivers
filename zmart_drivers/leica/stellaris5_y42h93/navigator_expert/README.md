@@ -283,13 +283,21 @@ permanent error, failed pre-check) and `confirmed` is `None`.
 (`out of range`, `is invalid`, `not implemented`, …) then **transient** (`being scanned`, `busy`,
 `timeout`, …); unknown → permanent (conservative). Transient errors retry up to `max_retries`.
 
-**Reading state — api / log / hybrid** (`dispatcher/read.py`, over `vendor_interface/api_reader.py` and `log_reader.py`, chosen per datum by `StateReaderProfile`;
-default `hybrid` for all routed datums): `api` (CAM read requests, one at a time per connection), `log`
-(parse LAS X logs — never blocks the CAM API, can be stale), `hybrid` (watch both, the first answer
-that counts as a success wins — no source is preferred; the legs' staleness profiles are
-complementary, so one usually delivers). What counts as a success is declared once per datum in
-`actions/get.py` (job settings, for example, must name the job asked about and carry an objective
-slot and image geometry).
+**Reading state — direct, with api / log / hybrid behind it** (`dispatcher/read.py`, over
+`vendor_interface/direct_reader.py`, `api_reader.py` and `log_reader.py`, chosen per datum by
+`StateReaderProfile`). Every reading asks the **direct** reader first, the default for every datum
+since 13 October 2026: it reads LAS X's current state from its hardware server (`state_tree.py`),
+so it is neither late like the CAM API's answers nor waiting for a log line (on the simulator, the
+stage in about 1 ms against the CAM API's 20 ms). It answers the stage, the z drives, scan status,
+job settings, hardware info, the selected job and the job list, with which job is Navigator
+Expert's autofocus job. Only when it fails (LAS X not reachable, an answer that does not count) do
+the others answer: `api` (CAM read requests, one at a time per connection), `log` (parse LAS X logs
+— never blocks the CAM API, can be stale), `hybrid` (watch both, the first answer that counts as a
+success wins). A reading says which source answered. What counts as a success is declared once
+per datum in `actions/get.py` (job settings, for example, must name the job asked about and carry
+an objective slot and image geometry). On the STELLARIS (15 October 2026) the direct reader was
+right where the CAM API was stale: the z-galvo position while a job had a z-galvo stack, and the
+selected job just after a switch.
 
 **Waiting on LAS X — one rule** (`dispatcher/tuning.py`): every reading, confirmation and delivery
 waits **four windows of three seconds**. Within a window both sources are watched; between windows
@@ -297,9 +305,11 @@ something is sent again — a command is fired again, an unanswered read is requ
 message is delivered again. The driver looks again every `POLL_S` (0.1 s) and checks for an answer
 already requested every `ANSWER_POLL_S` (0.01 s). After four windows a reading is unknown, a change
 unconfirmed, a delivery failed. The idle check before a command is an ordinary reading under the same
-rule, asked of the API alone: whether a command fires is the API's to decide. Every other reading
-races the API against the log, a backup for each, because what the log shows can differ between
-machines and LAS X versions; only the job list is API-only (the log's list is incomplete). Outside the rule, by decision: acquisition (sent once, never again, watched for as long as the
+rule, asked of the direct reader and, when it fails, of the API alone, never the log: whether a
+command fires must not rest on a log line that may be old. When the direct
+reader cannot answer, a reading races the API against the log, a backup for each, because what the
+log shows can differ between machines and LAS X versions; the job list then comes from the API alone
+(the log's list is incomplete). Outside the rule, by decision: acquisition (sent once, never again, watched for as long as the
 scan takes), the one-second wait for LAS X's error report after a command, and waits on files being
 written. **Freshness rule:** a fresh-by-age
 *log* value must never decide whether a command fires, how it is parameterized, whether it confirms,
