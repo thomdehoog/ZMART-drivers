@@ -185,15 +185,18 @@ class ImageSaveProfile:
     #: saved and read back identical (``output.lasx_cache_release``): the
     #: capture leaves the cache, and the Navigator canvas is cleared of the
     #: hidden copies it holds. Without it, a long run fills the cache's disk.
-    #: Only for ``source="cache"``: AutoSave's files are LAS X's project.
-    #: Off until it has run on the microscope itself.
-    cleanup_source: bool = False
+    #: Only for ``source="cache"``: AutoSave's files are LAS X's project, so
+    #: reading from AutoSave means setting this to False as well. On since it
+    #: passed on the STELLARIS (2026-10-15): fifty and then ten captures let
+    #: go of, the cache staying flat.
+    cleanup_source: bool = True
 
     def __post_init__(self):
         if self.cleanup_source and self.source != "cache":
             raise ValueError(
                 f"cleanup_source lets go of captures read from LAS X's cache; with source "
-                f"{self.source!r} it would delete LAS X's own project files"
+                f"{self.source!r} it would delete LAS X's own project files. Set "
+                f"cleanup_source=False together with source={self.source!r}."
             )
 
 

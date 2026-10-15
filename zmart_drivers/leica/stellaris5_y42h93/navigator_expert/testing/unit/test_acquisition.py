@@ -53,7 +53,7 @@ def saves_as_ome_tiff(monkeypatch):
 
     from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.actions import profiles
 
-    monkeypatch.setattr(profiles, "IMAGE_SAVE", replaced(profiles.IMAGE_SAVE, source="autosave", format="ome-tiff"))
+    monkeypatch.setattr(profiles, "IMAGE_SAVE", replaced(profiles.IMAGE_SAVE, source="autosave", format="ome-tiff", cleanup_source=False))
 
 
 @pytest.fixture

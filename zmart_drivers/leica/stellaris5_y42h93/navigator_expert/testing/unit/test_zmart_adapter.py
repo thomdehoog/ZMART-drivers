@@ -916,7 +916,12 @@ class TestAcquire(unittest.TestCase):
         h = _handle()
         h.driven_to = {"x": 0.0, "y": 0.0, "z": 0.0, "z_wide_um": 0.0}
         prepared = []
-        with self._capturing(), patch.object(adapter._release, "prepare", lambda: prepared.append(1)):
+        keeping = replace(adapter.IMAGE_SAVE, cleanup_source=False)
+        with (
+            patch.object(adapter, "IMAGE_SAVE", keeping),
+            self._capturing(),
+            patch.object(adapter._release, "prepare", lambda: prepared.append(1)),
+        ):
             adapter.acquire(h, position_label="A1")
         self.assertEqual(prepared, [])
 
@@ -929,7 +934,7 @@ class TestAcquire(unittest.TestCase):
         with patch.object(adapter._native, "native_autosave_enabled", return_value=False):
             with patch.object(adapter, "IMAGE_SAVE", replace(adapter.IMAGE_SAVE, source="cache")):
                 from_cache = adapter._connection_status(h, Path("/runs"))["autosave"]
-            with patch.object(adapter, "IMAGE_SAVE", replace(adapter.IMAGE_SAVE, source="autosave")):
+            with patch.object(adapter, "IMAGE_SAVE", replace(adapter.IMAGE_SAVE, source="autosave", cleanup_source=False)):
                 from_autosave = adapter._connection_status(h, Path("/runs"))["autosave"]
         self.assertNotIn("failed", from_cache)
         self.assertIn("not needed", from_cache)
@@ -940,7 +945,12 @@ class TestAcquire(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "cleanup_source.*cache"):
             ImageSaveProfile(source="autosave", cleanup_source=True)
         self.assertIs(ImageSaveProfile(source="cache", cleanup_source=True).cleanup_source, True)
-        self.assertIs(ImageSaveProfile().cleanup_source, False)
+        # On by default since it passed on the STELLARIS (2026-10-15); reading
+        # from AutoSave means switching it off too.
+        self.assertIs(ImageSaveProfile().cleanup_source, True)
+        self.assertIs(ImageSaveProfile(source="autosave", cleanup_source=False).cleanup_source, False)
+        with self.assertRaisesRegex(ValueError, "cleanup_source=False"):
+            ImageSaveProfile(source="autosave")
 
     def test_the_capture_is_placed_where_the_answer_says_its_planes_are(self):
         """The store is placed where the answer says its planes are."""
