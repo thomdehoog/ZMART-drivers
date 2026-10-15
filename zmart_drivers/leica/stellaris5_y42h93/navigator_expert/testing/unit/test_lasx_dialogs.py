@@ -19,6 +19,8 @@ import logging
 import threading
 import time
 
+from types import SimpleNamespace
+
 import pytest
 
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface import (
@@ -422,3 +424,18 @@ class TestWatchingAllTheTime:
             time.sleep(0.2)
             lasx_dialogs.stop_watching()
         assert caplog.text.count("not answered") == 1
+
+
+def test_presses_set_no_focus_so_las_x_stays_behind():
+    """By default UI Automation sets focus before a press, which brings LAS X to the front (simulator,
+    2026-10-15); the newer client with AutoSetFocus off presses without it (Microsoft, IUIAutomation2)."""
+    made = {}
+
+    def create(cls, interface):
+        made.update(cls=cls, interface=interface)
+        return SimpleNamespace(AutoSetFocus=True)
+
+    client = SimpleNamespace(CUIAutomation8="CUIAutomation8", IUIAutomation2="IUIAutomation2")
+    uia = lasx_dialogs.quiet_automation(client, create)
+    assert made == {"cls": "CUIAutomation8", "interface": "IUIAutomation2"}
+    assert uia.AutoSetFocus is False

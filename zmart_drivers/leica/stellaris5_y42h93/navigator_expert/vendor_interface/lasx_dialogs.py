@@ -397,9 +397,23 @@ def automation():
         comtypes.client.GetModule("UIAutomationCore.dll")
         from comtypes.gen import UIAutomationClient as client
 
-        return client, comtypes.client.CreateObject(client.CUIAutomation, interface=client.IUIAutomation)
+        return client, quiet_automation(client, comtypes.client.CreateObject)
     except Exception as why:  # noqa: BLE001 -- no UI Automation, whatever the reason
         raise WindowsUnavailable(f"Windows UI Automation is not available: {why}") from why
+
+
+def quiet_automation(client, create):
+    """A UI Automation client whose presses leave the window in front where it is.
+
+    By default UI Automation sets focus to an element before acting on it,
+    and focus in LAS X's window brings LAS X to the front: at every Clear,
+    the operator's window went behind it (simulator, 2026-10-15). Microsoft's
+    newer client (``CUIAutomation8``, Windows 8 on) turns that off with
+    ``AutoSetFocus``; the buttons act the same.
+    """
+    uia = create(client.CUIAutomation8, interface=client.IUIAutomation2)
+    uia.AutoSetFocus = False
+    return uia
 
 
 class AutomatedDialog:
