@@ -538,6 +538,41 @@ class TestSave:
         release.assert_called_once_with()
         assert all(p.is_file() for p in patched_export["image_paths"])
 
+    @pytest.mark.parametrize("image_format", ["ome-zarr", "ome-tiff"])
+    def test_a_capture_whose_copy_does_not_read_back_is_never_let_go_of(
+        self,
+        patched_export,
+        tmp_path,
+        successful_acq,
+        naming,
+        monkeypatch,
+        image_format,
+    ):
+        """LAS X lets go of a capture only once our copy is on disk and reads back the same.
+
+        If the pixels read back differ, the save stops with an error, and the
+        capture stays in LAS X's cache (and its canvas is not cleared).
+        """
+        import numpy
+
+        # Every read-back comparison says the pixels differ.
+        monkeypatch.setattr(numpy, "array_equal", lambda *_args, **_kwargs: False)
+        release = Mock()
+        patched_export["collect"].return_value = replace(patched_export["exported"], release=release)
+        with pytest.raises(RuntimeError, match="read back"):
+            drv.save(
+                None,
+                successful_acq,
+                tmp_path / "run_000001",
+                naming,
+                format=image_format,
+                cleanup_source=True,
+                # Where each plane lies on the canvas, which a store needs.
+                placement=lambda _planes: lambda z: {"x_um": 0.0, "y_um": 0.0, "z_um": float(z)},
+            )
+        release.assert_not_called()
+        assert all(p.is_file() for p in patched_export["image_paths"])
+
     def test_save_embeds_state_in_plane_ome_xml_when_provided(
         self,
         patched_export,
