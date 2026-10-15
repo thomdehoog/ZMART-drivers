@@ -140,8 +140,10 @@ def metadata_from_description(xml: str) -> AcquisitionMetadata:
         physical_size_x_um=x["length_m"] / x["count"] * 1e6,
         physical_size_y_um=y["length_m"] / y["count"] * 1e6,
         # The z length spans the steps between the planes: 17 planes over
-        # 38.55 um are 2.41 um apart, as LAS X's own plane heights say.
-        physical_size_z_um=z["length_m"] / (size_z - 1) * 1e6 if z and size_z > 1 else None,
+        # 38.55 um are 2.41 um apart, as LAS X's own plane heights say. A
+        # stack taken top-down has a negative length (STELLARIS, 2026-10-15);
+        # the distance between planes is the same, so its size is taken.
+        physical_size_z_um=abs(z["length_m"]) / (size_z - 1) * 1e6 if z and size_z > 1 else None,
         significant_bits=significant_bits,
         acquisition_date=reading.acquisition_date(),
         channels=tuple(channel for channel, _ in described),
