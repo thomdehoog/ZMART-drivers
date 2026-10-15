@@ -24,8 +24,8 @@ the LAS X simulator (14 October 2026), never yet on the microscope:
 - **Saving the experiment waits for the `.lrp` itself**, the file the driver reads the job's
   z-stack from.
 
-One session of about an hour runs all five. Steps 2, 3 and 5 only read, or capture where the
-stage already stands.
+One session runs all five. Step 1 moves the stage (see below); steps 2, 3 and 5 only read, or
+capture where the stage already stands.
 
 ---
 
@@ -43,7 +43,12 @@ stage already stands.
 4. **In LAS X:** Navigator Expert open on its **Experiment** tab, which shows the Navigator
    canvas with its Clear button (not the Jobs tab). **AutoSave off**: the cache route is used
    without it, and steps 1 and 5 check that it is off. Only step 4 switches it on.
-5. **A folder for the reports**, for example `D:\ZMART-check`. Run every command from it, in
+5. **In the loaded experiment, at least two jobs that are not autofocus jobs**, whatever they
+   are called: step 1 switches between them (an autofocus job is never selected as a job).
+6. **The stage clear for step 1:** no sample you care about, objective clear. Step 1 first takes
+   the stage to the CI's baseline, X 63,500 um, Y 41,500 um, z-wide 0, z-galvo 0, as on
+   10 October, then moves XY in a small pattern around it and z by a few um.
+7. **A folder for the reports**, for example `D:\ZMART-check`. Run every command from it, in
    the driver's environment. `<driver>` stands for
    `ZMART-drivers\zmart_drivers\leica\stellaris5_y42h93\navigator_expert`.
 
@@ -66,6 +71,9 @@ It captures the job selected in LAS X; add `--job <name>` to capture another.
 - Everything is green. If a cache step fails with "AutoSave is on", switch AutoSave off; if
   the last step fails with "Experiment button was not found", open Navigator Expert; then run
   again.
+- If LAS X shows "Can not start while live scan is running!" (an Information box, which the
+  driver leaves for you), answer OK and note at which step and capture it came. It came once on
+  the simulator, 3 s after LAS X reported idle, and is not explained yet.
 - The first lines: if they say the machine's `limits.json` "did not validate", the session runs on
   the bundled default limits. Note it; the limits are then published again with
   `configuration/limits/notebooks/set_limits.ipynb`.
