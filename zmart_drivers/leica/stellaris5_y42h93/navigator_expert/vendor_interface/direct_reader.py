@@ -152,18 +152,14 @@ def get_jobs() -> list[dict]:
     """Every job, in the sequence's order, shaped as :func:`log_reader.get_jobs` gives them.
 
     Per job ``Name``, ``ID`` (its live block id, which an experiment load
-    changes while the CAM API's job list keeps the old one) and
-    ``IsSelected``. Not which jobs are autofocus jobs (the CAM API's
-    ``IsAutofocus``), so the routed job list keeps to the API and this list
-    serves the selected job. What is known (2026-10-13): in Navigator
-    Expert's matrix summary, which the log reader reads, ``IsAutoFocusOnStart``
-    marks the AF job (a capture checked against the API in June 2026); in
-    this job sequence the same-named field was unset for the AF job too on
-    the simulator. ``Acquire/MatrixScreener/AFJobID`` names the AF job in
-    Navigator Expert's own numbering (4), which the tree's id map
-    (``MatrixScreener_MapIDList``, old to new block ids) did not tie to a
-    job on the simulator after an experiment reload. To check on a freshly
-    started LAS X, beside the API. Nor the API's ``ScanMode`` per job.
+    changes while the CAM API's job list keeps the old one), ``IsSelected``
+    and ``IsAutofocus``: whether it is Navigator Expert's autofocus job, from
+    the job's own ``IsAutoFocusOnStart``, the field the log reader reads in
+    the matrix summary too. It is read beside the job's name, so it does not
+    depend on the block ids. On the STELLARIS (2026-10-15) it was set for the
+    AF job alone, as the CAM API's ``IsAutofocus`` said; on the simulator
+    (2026-10-13) it had been unset for the AF job too. Not the API's
+    ``ScanMode`` per job, which the driver does not use from this list.
     """
     sequence = job_sequence()
     ordered = sorted(sequence.jobs.items(), key=lambda item: item[1].element_id)
@@ -172,6 +168,7 @@ def get_jobs() -> list[dict]:
             "Name": name,
             "ID": job.block_id,
             "IsSelected": job.element_id == sequence.selected_element,
+            "IsAutofocus": job.autofocus,
         }
         for name, job in ordered
     ]

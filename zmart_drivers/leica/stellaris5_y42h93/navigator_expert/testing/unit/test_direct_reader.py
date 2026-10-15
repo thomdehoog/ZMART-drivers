@@ -38,8 +38,8 @@ JOBS = {"AF Job": (156, 1), "Overview": (154, 2), "HiRes": (152, 3)}
 
 
 def selection(jobs):
-    """Each job's name and whether it is selected: what every reader's job list has."""
-    return {job["Name"]: job["IsSelected"] for job in jobs}
+    """Each job's name, whether it is selected and whether it is the autofocus job: what the driver uses."""
+    return {job["Name"]: (job["IsSelected"], job["IsAutofocus"]) for job in jobs}
 
 
 class StandInServer:
@@ -93,7 +93,12 @@ class TestParityWithTheApiReader:
         assert direct_reader.get_selected_job()["Name"] == api_reader.get_selected_job(client)["Name"]
 
     def test_the_selected_job_carries_its_live_block_id(self, client, tree):
-        assert direct_reader.get_selected_job() == {"Name": "HiRes", "ID": 152, "IsSelected": True}
+        assert direct_reader.get_selected_job() == {
+            "Name": "HiRes",
+            "ID": 152,
+            "IsSelected": True,
+            "IsAutofocus": False,
+        }
 
     @pytest.mark.parametrize("job", ["HiRes", "Overview", "AF Job"])
     def test_the_jobs_and_their_selection_are_the_api_readers(self, client, tree, job):
@@ -104,15 +109,17 @@ class TestParityWithTheApiReader:
 class TestJobs:
     def test_every_job_in_sequence_order_with_its_live_block_id(self, client, tree):
         assert direct_reader.get_jobs() == [
-            {"Name": "AF Job", "ID": 156, "IsSelected": False},
-            {"Name": "Overview", "ID": 154, "IsSelected": False},
-            {"Name": "HiRes", "ID": 152, "IsSelected": True},
+            {"Name": "AF Job", "ID": 156, "IsSelected": False, "IsAutofocus": True},
+            {"Name": "Overview", "ID": 154, "IsSelected": False, "IsAutofocus": False},
+            {"Name": "HiRes", "ID": 152, "IsSelected": True, "IsAutofocus": False},
         ]
 
-    def test_it_does_not_say_which_jobs_are_autofocus_jobs(self, client, tree):
-        # The job sequence's IsAutoFocusOnStart was unset for the AF job too on the
-        # simulator, so this list cannot tell autofocus jobs (see get_jobs).
-        assert all("IsAutofocus" not in job for job in direct_reader.get_jobs())
+    def test_the_autofocus_job_is_the_one_navigator_expert_marks(self, client, tree):
+        # Each job's own IsAutoFocusOnStart, so it does not depend on the block
+        # ids, which an experiment load renumbers.
+        tree.autofocus = ("Overview",)
+        tree.reload()
+        assert [j["Name"] for j in direct_reader.get_jobs() if j["IsAutofocus"]] == ["Overview"]
 
     def test_a_reloaded_experiment_gives_the_new_ids(self, client, tree):
         tree.jobs = lambda: {"AF Job": (166, 1), "Overview": (164, 2), "HiRes": (162, 3)}
@@ -125,6 +132,7 @@ class TestJobs:
             "Name": "Overview",
             "ID": 154,
             "IsSelected": False,
+            "IsAutofocus": False,
         }
         assert direct_reader.get_job_by_name("No such job") is None
 

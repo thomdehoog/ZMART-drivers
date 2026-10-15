@@ -10,7 +10,9 @@ The nodes read on the LAS X simulator on 2026-10-13:
   ``IsPause``, ``PauseState`` and ``CurrentSequenceList`` with
   ``CurrentSequenceBlockID``, ``CurrentSelectedElementID``,
   ``CurrentRunningElementID`` and one ``SequenceBlockInfo`` per job
-  (``Name``, ``Type``, ``BlockID``, ``ElementID``).
+  (``Name``, ``Type``, ``BlockID``, ``ElementID``, ``IsAutoFocusOnStart``;
+  the last as on the STELLARIS, 2026-10-15, where it marks Navigator
+  Expert's autofocus job).
 
 The tree is built afresh on every call from the callables given, so a test
 can move the stage, select a job or reload the experiment between reads.
@@ -209,8 +211,10 @@ class StandInNodes:
         selected=None,
         stage=lambda: (0.066, 0.043),
         zdrives=lambda: {1: 0.0, 2: 0.0},
+        autofocus=("AF Job",),
     ):
         self.jobs = jobs  # () -> {name: (block_id, element_id)}
+        self.autofocus = autofocus  # the jobs whose IsAutoFocusOnStart is set
         self.sequence = sequence
         self.selected = selected  # () -> selected job name
         self.stage = stage  # () -> (x_m, y_m)
@@ -266,11 +270,12 @@ class StandInNodes:
         node = 1000 + 1000 * self.generation
         for name, (block, element) in self.jobs().items():
             info = node
-            add(info, "SequenceBlockInfo", 4, children=(info + 1, info + 2, info + 3, info + 4))
+            add(info, "SequenceBlockInfo", 4, children=(info + 1, info + 2, info + 3, info + 4, info + 5))
             add(info + 1, "Name", info, name)
             add(info + 2, "Type", info, 1)
             add(info + 3, "BlockID", info, block)
             add(info + 4, "ElementID", info, element)
+            add(info + 5, "IsAutoFocusOnStart", info, name in self.autofocus)
             if name == selected_name:
                 values[6] = element
             children.append(info)
