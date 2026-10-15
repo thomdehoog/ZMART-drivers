@@ -113,9 +113,11 @@ rewritten on 15 October), once the commits are pushed. Then:
     (`confirm_acquire`) is watched through the direct reader, and a job switch is decided by the
     direct reader alone when it answers (a stale log line could stop a needed switch before);
     the CAM API sends the commands, and reads only when the direct reader cannot answer;
-  - these notes moved into `sessions/`.
+  - these notes moved into `sessions/`;
+  - **the complete hardware CI after these changes passed on the STELLARIS**
+    (`run_ci.py --hardware --full`, 13 minutes): all 14 steps OK, no warning, every capture
+    confirmed through the direct reader, ten captures let go of with the hidden copies shrinking.
 - **Open:**
-  - the hardware CI after these changes, whose captures check the end-of-capture watch;
   - merge into `release-candidate`;
   - then promote to `main` with the other repositories.
 
