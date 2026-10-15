@@ -6,11 +6,15 @@ Where this branch stands (15 October 2026) and what to do next. Read this first,
 ## Where it stands
 
 - **Branch** `readers-for-stellaris` on `ZMART-drivers`, from `release-candidate` at `74b3451`,
-  pushed. Thirteen commits; the newest is `e9829ea`.
-- **On the LAS X simulator, everything is green.**
-  - `run_ci.py --hardware`: all seven steps, no warning, no failure, no LAS X dialog.
-  - Offline: 1584 tests (`unit` and `calibration`), plus 48 tests of the hardware scripts.
-- **Not yet run on the STELLARIS.** That is the next step.
+  pushed.
+- **On the STELLARIS (15 October 2026, `6dc3752`), steps 1, 2 and 5 of the session sheet
+  passed:** the hardware CI all green; the three readers agree with no failed round; 50 and
+  then 10 captures let go of from the cache, the canvas cleared every time.
+  - **Step 3 (LAS X's warnings) is not done:** no warning with only an OK button could be
+    called up by hand.
+  - **Step 4 (the cache route checks against AutoSave's files) is not done.**
+- **On the LAS X simulator, everything is green** (`run_ci.py --hardware`, all seven steps);
+  offline, 1588 tests (`unit` and `calibration`) and the hardware scripts' tests pass.
 
 ## What the branch brings
 
@@ -31,31 +35,34 @@ Where this branch stands (15 October 2026) and what to do next. Read this first,
      if it is not, so that Clear can be pressed (`vendor_interface/lasx_navigator.py`). The
      canvas counts as shown when its Clear button can be reached; nothing is pressed when it
      already is;
-   - a picture LAS X has let go of is never taken for the next capture.
+   - a picture is new when its pixel file was written since the capture began: LAS X writes
+     a picture's description again about 4 s after the capture, and keeps a released
+     picture's description without its pixels;
+   - presses through UI Automation do not bring LAS X to the front: the client is Microsoft's
+     `CUIAutomation8` with `AutoSetFocus` off (by default UI Automation sets focus before a
+     press, which brought LAS X forward at every Clear).
 5. **Saving the experiment waits for the `.lrp`** the job's z-stack is read from.
 6. **The CI** (`testing/run_ci.py --hardware`):
    - first takes the stage to the CI baseline (X 63,500 um, Y 41,500 um, z-wide 0, z-galvo 0);
    - runs the fatal end-to-end check on the direct readers, the driver's default (it used to
      force `hybrid`, so the direct readers were never checked end to end);
-   - saves one capture from the cache and checks it, then lets go of ten, with AutoSave off;
+   - saves one capture from the cache and checks it, then lets go of ten. It does not ask
+     whether AutoSave is on: LAS X writes the file that says so only when it closes, so the
+     answer can be out of date;
    - needs no job names: it captures the job selected in LAS X unless `--job` names another,
      switches between the jobs that are not autofocus jobs, and picks a zoom inside the job's
      own range.
 
-## Next: the STELLARIS session
+## Next: on the STELLARIS
 
-Follow [`SCOPE_SESSION_STELLARIS.md`](SCOPE_SESSION_STELLARIS.md). In short:
+`git pull` the branch in the local clone in the home folder, then, following
+[`SCOPE_SESSION_STELLARIS.md`](SCOPE_SESSION_STELLARIS.md):
 
-- **Before:**
-  - `git fetch`, `git switch readers-for-stellaris`, `git pull` in the local clone in the home
-    folder;
-  - `conda install -c conda-forge comtypes` in the driver's environment;
-  - the data location set up;
-  - AutoSave off, Navigator Expert open, at least two jobs that are not autofocus jobs;
-  - the stage clear.
-- **Step 1:** `run_ci.py --hardware`. Then steps 2 to 5: the readers side by side, LAS X's
-  warnings, the cache route checks, the release over 50 captures.
-- **Send back** what the sheet lists.
+- **Step 1 once more,** `run_ci.py --hardware`, since the two fixes after the run (the front
+  window, the pixel file's time) were seen on the simulator only. With another window in
+  front, LAS X should stay behind it.
+- **Step 4,** the cache route checks against AutoSave's files.
+- **Step 3,** if a warning with only an OK button can be called up by hand.
 
 ## After the session
 
@@ -76,7 +83,9 @@ Follow [`SCOPE_SESSION_STELLARIS.md`](SCOPE_SESSION_STELLARIS.md). In short:
   reported idle, during 10 captures right after a project was deleted. Not explained; not seen
   again.
 - **The simulator PC's machine limits** (`limits.json` from July) lack newer entries, so runs
-  there use the driver's bundled default limits. Check the STELLARIS's at step 1.
+  there use the driver's bundled default limits.
+- **The cache folder** is the one the registry names: `D:\Temp2` on the STELLARIS, `D:\Temp` on
+  the simulator PC.
 - **The test environment `zmart-integration`** has an older ZMART controller installed. Put
   the controller clone on `PYTHONPATH` for the tests, or a few controller-contract tests fail.
 - **`DCLogFile.log`**: LAS X's Data Container client writes it into the folder a script is
