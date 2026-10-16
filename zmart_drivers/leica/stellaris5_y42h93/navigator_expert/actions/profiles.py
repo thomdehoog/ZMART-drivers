@@ -1,0 +1,482 @@
+"""
+Per-command profiles.
+=====================
+Every command has a ``CommandProfile`` that is its complete recipe - all
+pluggable callables and all retry/confirm settings in one place. Adding
+a new command means adding a profile and a command function. Tuning a
+command means editing its profile. Nothing else needs to change.
+
+Command wrappers may accept explicit overrides for tests and unusual
+hardware sessions, but their default tolerances, polling intervals, and
+retry ceilings live here. This keeps machine-sensitive tuning out of
+the wrapper logic.
+
+All four callable fields follow the same rule: ``callable(client) -> result``.
+Extra parameters are pre-bound with ``partial`` at profile definition
+time. The command function always binds ``client`` via lambda - the same
+pattern for every field, no exceptions.
+
+**Two patterns cover all cases:**
+
+    Pattern A - callable needs extra parameters: use partial to pre-bind.
+    Pattern B - callable takes only client: assign directly.
+
+Import restrictions: command prechecks/confirmations, runtime errors/utilities,
+and stdlib. Nothing from dispatch or command wrappers.
+"""
+
+from collections.abc import Callable
+from dataclasses import dataclass
+
+from ..dispatcher.prechecks import check_idle
+from ..dispatcher.tuning import WINDOW_S, WINDOWS
+from ..vendor_interface.errors import _default_error_check
+from .confirmations import (
+    _confirm_detector_gain,
+    _confirm_filter_wheel_slot,
+    _confirm_filter_wheel_spectrum,
+    _confirm_frame_accumulation,
+    _confirm_frame_average,
+    _confirm_image_format,
+    _confirm_laser_intensity,
+    _confirm_laser_shutter,
+    _confirm_line_accumulation,
+    _confirm_line_average,
+    _confirm_pinhole_airy,
+    _confirm_scan_field_rotation,
+    _confirm_scan_mode,
+    _confirm_scan_resonant,
+    _confirm_scan_speed,
+    _confirm_sequential_mode,
+    _confirm_z_stack_definition,
+    _confirm_z_stack_size,
+    _confirm_z_stack_step_size,
+    _confirm_zoom,
+    confirm_acquire,
+    confirm_move_xy,
+    confirm_move_z,
+    confirm_objective,
+)
+
+
+@dataclass(frozen=True)
+class LogReaderProfile:
+    """Low-level LAS X log-reader paths and freshness defaults."""
+
+    lcs_log_path: str = r"C:\ProgramData\Leica Microsystems\LAS X\lcsCommand.log"
+    msgbox_log_path: str = r"C:\ProgramData\Leica Microsystems\LAS X\MatrixScreener.log"
+    current_window_s: float = 180.0
+    max_age_s: float | None = None
+
+
+@dataclass(frozen=True)
+class StateReaderProfile:
+    """Profile-controlled backend selection for passive state reads.
+
+    These modes govern routed state reads, including command confirmation.
+    Freshness limits reject old log state; transition-sensitive confirmations
+    additionally reject observations from before the command. Reads that
+    produce persisted or foundational correctness artifacts still use this
+    policy. Callers never pin a backend; source availability belongs to the
+    capability table and source preference belongs here.
+
+    Nothing here says how long to wait or how often to look: that is the one
+    rule in ``dispatcher.tuning``. A mode says which sources take part; a
+    ``*_log_max_age_s`` says how old a log answer may be and still count,
+    because each kind of state goes stale at its own pace.
+
+    Every reading asks the direct reader first (``direct``: LAS X's
+    hardware server's state tree; Thom's decision, 2026-10-13). When it
+    fails, for whatever reason (the hardware server not reachable, another
+    LAS X version laying the tree out differently, an answer that does not
+    count), the hybrid reader (CAM API and log) answers; the reading names
+    its source. Measured on the simulator, 2026-10-13: XY read directly in
+    1.1 ms against the CAM API's 20 ms (worst 57 ms), and a new stage
+    position seen 3.3-4.2 ms after a move against 22-58 ms.
+    """
+
+    xy_mode: str = "direct"
+    xy_log_max_age_s: float = 1.0
+
+    job_settings_mode: str = "direct"
+    job_settings_log_max_age_s: float = 2.0
+
+    # The job list comes from the direct reader, with the API as its fallback:
+    # the log stream only reports the ACTIVE job, so its list is incomplete (a
+    # job not re-dumped this session is absent). Confirmed on the bench
+    # (2026-07-06). selected_job (which job is active) is what the log can
+    # see, so its fallback is hybrid.
+    jobs_mode: str = "direct"
+    jobs_log_max_age_s: float = 2.0
+
+    selected_job_mode: str = "direct"
+    selected_job_log_max_age_s: float = 2.0
+    # Selected-job confirmation source: "api" | "log" | "hybrid".
+    # hybrid races the api leg (transition-admissible: a stale API readback
+    # cannot witness a transition to a target it already read pre-command)
+    # against the log leg (post-command CurrentBlock event). The race runs for
+    # one window (``tuning.WINDOW_S``), and the dispatcher runs four of them
+    # with the command fired again between: the one 4x3 rule.
+    # Default hybrid: the api confirm is measured-wrong on the real scope
+    # (stale 15 s+, wrong job) and log-only is insufficient on the
+    # simulator; hybrid fits both without environment detection.
+    selected_job_confirm_source: str = "hybrid"
+    selected_job_log_prime_cluster: bool = False
+    selected_job_log_cluster_max_age_s: float | None = None
+
+    # Where a z drive is: "direct", or "hybrid" for the job settings (and, for
+    # the drive carrying the job's z-stack, the reads of
+    # ``derived.z_um_from_settings``).
+    z_mode: str = "direct"
+
+    hardware_info_mode: str = "direct"
+    hardware_info_log_max_age_s: float = 2.0
+
+    scan_status_mode: str = "direct"
+    scan_status_log_max_age_s: float = 0.5
+
+
+LOG_READER = LogReaderProfile()
+STATE_READERS = StateReaderProfile()
+
+
+@dataclass(frozen=True)
+class LasxApiProfile:
+    """Connection-level LAS X API settings.
+
+    ``DelayInMilliseconds`` is Leica's client-side pacing knob. Keeping it in
+    the profile makes the default explicit and keeps hardware-specific API
+    timing out of scripts and workflows. ``runtime_root`` is the LAS X-installed
+    NavigatorExpert add-in directory that contains the CAM API assemblies.
+    """
+
+    delay_ms: int | None = 250
+    runtime_root: str = r"C:\Program Files\Leica Microsystems CMS GmbH\LAS X\AddIns\NavigatorExpert"
+
+
+LASX_API = LasxApiProfile()
+
+
+@dataclass(frozen=True)
+class ImageSaveProfile:
+    """Default image persistence policy.
+
+    Normal saves apply the active camera-to-stage orientation. The orientation
+    measurement is the only workflow that explicitly requests raw pixels.
+
+    The pixels are collected from LAS X's own cache, read as the picture is
+    taken; LAS X's AutoSave is not used, so it stays off (Thom, 2026-10-14).
+    """
+
+    apply_orientation: bool = True
+    #: What a capture is saved as (``output.save.FORMATS``): ``"ome-tiff"``,
+    #: one file a plane, or ``"ome-zarr"``, one image store. Only the one
+    #: chosen is written.
+    format: str = "ome-zarr"
+    #: What a capture with more than one plane also gets, in
+    #: ``<acquisition>/projections`` (``output.save.PROJECTIONS``): its
+    #: ``"max"`` projection over z, or ``"none"``.
+    projection: str = "max"
+    #: Whether LAS X lets go of a capture in its cache once the copy is saved
+    #: and read back identical (``output.lasx_cache_release``): the capture
+    #: leaves the cache, and the Navigator canvas is cleared of the hidden
+    #: copies it holds. Without it, a long run fills the cache's disk. On since
+    #: it passed on the STELLARIS (2026-10-15): fifty and then ten captures let
+    #: go of, the cache staying flat.
+    cleanup_cache: bool = True
+
+
+IMAGE_SAVE = ImageSaveProfile()
+
+
+@dataclass(frozen=True)
+class CommandProfile:
+    """Complete recipe for a single command's backbone behaviour.
+
+    Each field is either a callable or a tuning parameter. Callables
+    follow the contract ``callable(client) -> result dict``. Extra
+    parameters are pre-bound with ``partial``. The command function
+    binds ``client`` via lambda at call time.
+
+    Attributes:
+        pre_check_fn: Pre-flight check. ``callable(client) -> result``.
+            None to skip.
+        error_check_fn: Post-fire error check. ``callable(client) -> result``.
+            Defaults to ``_default_error_check``.
+        confirm_fn: Readback confirmation. ``callable(client) -> result``.
+            None to skip confirmation. Declarative only - commands always
+            override this with a target-bound partial at call time.
+        max_retries: Transient error retries inside the fire block. The
+            default gives ``WINDOWS`` tries in all, like every send-again.
+        max_confirm_attempts: Confirmation windows; ``WINDOWS`` by the rule.
+        refire_on_unconfirmed: If True, an unconfirmed readback causes
+            the command to be sent again before the next confirmation
+            attempt. If False, the dispatcher retries readback only.
+            Leica setting commands normally re-fire because the API may
+            accept a command while LAS X later settles to a different
+            state, or an operator may change the setting manually.
+        confirm_poll_s: One confirmation window (seconds), ``WINDOW_S`` by
+            the rule. NOT a timeout - the readback is watched for this long,
+            then the command re-fires and is watched again up to
+            ``max_confirm_attempts``; exhaustion returns unconfirmed, never a
+            hard fail.
+        confirm_tolerance: Numeric tolerance passed to target readback
+            confirmations. None means exact-match or function default.
+        poll_interval: Status-check interval for the acquisition watch,
+            which stays outside the window rule (it is never sent again).
+        poll_timeout: Poll deadline for long-running confirmations.
+            None means the confirmation waits until LAS X completes.
+        start_timeout: Acquisition-start deadline before the acquire
+            confirmation treats the command as failed.
+        heartbeat_interval: Status-log cadence during long acquisitions.
+        retry_backoff: Base delay in seconds between transient error retries.
+            None for immediate retry (no delay).
+        retry_escalate: If True, double the delay after each retry
+            (exponential backoff: 0s, base, 2×base, 4×base, ...).
+            If False, use a fixed delay. Ignored when retry_backoff is None.
+        skip_echo: If True, skip echo settlement polling after fire.
+            Use for commands where a dedicated confirm_fn (e.g. scan
+            status polling) is the authoritative completion signal and
+            echo waiting is redundant overhead.
+        fire_async: If True, use UpdateAsync instead of UpdateAwaitReceipt.
+            Use for hardware commands (e.g. stage moves, acquisitions)
+            where confirm_fn is the authoritative completion signal.
+        success_on_unconfirmed: If True (the default), return success=True with
+            confirmed=False when all confirmation attempts are exhausted. The
+            command never hard-fails on an unconfirmed readback; only transport
+            failure and an echo error-check rejection return success=False. Set
+            False only for a command that must hard-fail on unconfirmed - none do.
+    """
+
+    pre_check_fn: Callable[..., dict] | None = None
+    error_check_fn: Callable[..., dict] | None = _default_error_check
+    confirm_fn: Callable[..., dict] | None = None
+    max_retries: int = WINDOWS - 1
+    max_confirm_attempts: int = WINDOWS
+    refire_on_unconfirmed: bool = True
+    confirm_poll_s: float = WINDOW_S
+    confirm_tolerance: float | None = None
+    poll_interval: float | None = None
+    poll_timeout: float | None = None
+    start_timeout: float | None = None
+    heartbeat_interval: float | None = None
+    retry_backoff: float | None = None
+    retry_escalate: bool = False
+    skip_echo: bool = False
+    fire_async: bool = False
+    success_on_unconfirmed: bool = True
+
+    def __post_init__(self):
+        # Async fire blanks the echo, so an echo-based error check would read a
+        # cleared echo and report a meaningless success. Couple the two fields.
+        if self.fire_async and self.error_check_fn is not None:
+            raise ValueError("fire_async=True requires error_check_fn=None")
+        # A single confirm window has no 'next attempt' to re-fire before, so a
+        # requested re-fire could never run. Forbid the incoherent combination.
+        if self.max_confirm_attempts == 1 and self.refire_on_unconfirmed:
+            raise ValueError("max_confirm_attempts==1 requires refire_on_unconfirmed=False")
+
+
+COMMAND_DEFAULT = CommandProfile()
+
+
+def _leica_setting_profile(confirm_fn, **overrides):
+    """Profile for Leica setting updates with occasionally stale readback.
+
+    Setting commands get four 3-second readback poll windows: the initial
+    attempt plus three retries. If a window does
+    not confirm the requested state, the command is re-fired before the next
+    window. If LAS X still reports another state after all windows, the result
+    is ``success=True, confirmed=False`` so the larger acquisition workflow
+    continues while the logs show the mismatch. All of that is the
+    ``CommandProfile`` default now, so the helper only binds the confirm
+    function (plus any per-command tolerance override).
+    """
+    return CommandProfile(
+        confirm_fn=confirm_fn,
+        **overrides,
+    )
+
+
+# =============================================================================
+# Job-level set commands
+# =============================================================================
+
+ZOOM = _leica_setting_profile(
+    _confirm_zoom,
+    confirm_tolerance=0.1,
+)
+
+SCAN_SPEED = _leica_setting_profile(
+    _confirm_scan_speed,
+)
+
+SCAN_RESONANT = _leica_setting_profile(
+    _confirm_scan_resonant,
+)
+
+SCAN_MODE = _leica_setting_profile(
+    _confirm_scan_mode,
+)
+
+SEQUENTIAL_MODE = _leica_setting_profile(
+    _confirm_sequential_mode,
+)
+
+SCAN_FIELD_ROTATION = _leica_setting_profile(
+    _confirm_scan_field_rotation,
+    confirm_tolerance=0.5,
+)
+
+IMAGE_FORMAT = _leica_setting_profile(
+    _confirm_image_format,
+)
+
+OBJECTIVE = CommandProfile(
+    pre_check_fn=check_idle,
+    confirm_fn=confirm_objective,
+    # Uniform posture: 3 confirm windows, re-fire between them, unconfirmed-not-
+    # fail. A slow turret change is absorbed by the idle-wait before each re-fire.
+)
+
+
+# =============================================================================
+# Z-stack commands
+# =============================================================================
+
+Z_STACK_DEFINITION = _leica_setting_profile(
+    _confirm_z_stack_definition,
+    confirm_tolerance=1.0,
+)
+
+Z_STACK_STEP_SIZE = _leica_setting_profile(
+    _confirm_z_stack_step_size,
+    confirm_tolerance=0.5,
+)
+
+Z_STACK_SIZE = _leica_setting_profile(
+    _confirm_z_stack_size,
+    confirm_tolerance=1.5,
+)
+
+
+# =============================================================================
+# Per-setting commands
+# =============================================================================
+
+FRAME_ACCUMULATION = _leica_setting_profile(
+    _confirm_frame_accumulation,
+)
+
+FRAME_AVERAGE = _leica_setting_profile(
+    _confirm_frame_average,
+)
+
+LINE_ACCUMULATION = _leica_setting_profile(
+    _confirm_line_accumulation,
+)
+
+LINE_AVERAGE = _leica_setting_profile(
+    _confirm_line_average,
+)
+
+
+# =============================================================================
+# Detector commands
+# =============================================================================
+
+DETECTOR_GAIN = _leica_setting_profile(
+    _confirm_detector_gain,
+    confirm_tolerance=1.0,
+)
+
+PINHOLE_AIRY = _leica_setting_profile(
+    _confirm_pinhole_airy,
+    confirm_tolerance=0.05,
+)
+
+
+# =============================================================================
+# Laser commands
+# =============================================================================
+
+LASER_INTENSITY = _leica_setting_profile(
+    _confirm_laser_intensity,
+    confirm_tolerance=0.005,
+)
+
+LASER_SHUTTER = _leica_setting_profile(
+    _confirm_laser_shutter,
+)
+
+
+# =============================================================================
+# Filter wheel commands
+# =============================================================================
+
+FILTER_WHEEL_SLOT = _leica_setting_profile(
+    _confirm_filter_wheel_slot,
+)
+
+FILTER_WHEEL_SPECTRUM = _leica_setting_profile(
+    _confirm_filter_wheel_spectrum,
+    confirm_tolerance=1.0,
+)
+
+
+# =============================================================================
+# Stage movement
+# =============================================================================
+
+MOVE_XY = CommandProfile(
+    pre_check_fn=check_idle,
+    confirm_fn=confirm_move_xy,
+    error_check_fn=None,  # async fire blanks the echo; nothing to error-check
+    confirm_tolerance=20.0,
+    fire_async=True,
+    # Uniform posture: re-fires an unconfirmed absolute move (idempotent) after
+    # waiting for idle; unconfirmed-not-fail like every other command.
+)
+
+MOVE_Z = CommandProfile(
+    pre_check_fn=check_idle,
+    confirm_fn=confirm_move_z,
+    confirm_tolerance=1.0,
+    # Uniform posture (was single-attempt hard-fail): 3 windows, re-fire,
+    # unconfirmed-not-fail - same as MOVE_XY.
+)
+
+
+# =============================================================================
+# Acquisition and job selection
+# =============================================================================
+
+ACQUIRE = CommandProfile(
+    pre_check_fn=check_idle,
+    confirm_fn=confirm_acquire,
+    error_check_fn=None,
+    # ACQUIRE is the one command that must never re-send: re-firing starts a
+    # second acquisition (duplicate data). It declines retry on BOTH axes -
+    # max_retries=0 (fire loop) and refire_on_unconfirmed=False (confirm loop).
+    # It still returns unconfirmed rather than failing; save()'s freshness/grid
+    # check is the real gate against acting on missing data.
+    max_retries=0,
+    max_confirm_attempts=1,
+    refire_on_unconfirmed=False,
+    poll_interval=0.1,
+    poll_timeout=None,
+    start_timeout=15.0,
+    heartbeat_interval=30.0,
+    skip_echo=True,
+    fire_async=True,
+)
+
+SELECT_JOB = CommandProfile(
+    pre_check_fn=check_idle,
+    # select_job's confirmation legs are built per call by
+    # confirm_select_job.select_job_confirm_legs (api / log / hybrid policy from
+    # StateReaderProfile.selected_job_confirm_source), not by this profile.
+    # The one 4x3 rule like every other command: four confirmation windows of
+    # ``WINDOW_S``, fired again between, unconfirmed-not-fail.
+    confirm_fn=None,
+)
