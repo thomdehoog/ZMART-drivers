@@ -9,12 +9,12 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.actions import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitive_handling import (
     confirm_select_job,
     profiles,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.actions import (
-    get as capabilities,
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitive_handling import (
+    readings as capabilities,
 )
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher import (
     read as readers,
@@ -425,7 +425,7 @@ class TestApiModeCappedWorker(unittest.TestCase):
 
 class TestDerivedZoom(unittest.TestCase):
     def test_sub_unity_zoom_is_not_clamped(self):
-        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.actions import (
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitive_handling import (
             derived,
         )
 

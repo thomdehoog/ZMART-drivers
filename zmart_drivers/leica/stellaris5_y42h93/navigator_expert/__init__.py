@@ -9,14 +9,13 @@ this repository)::
                           older module shape of the same driver (zmart_controller_plugin.py)
     - zmart_adapter/      the functions behind it, one per controller command
     - connect.py          the connect flow: open LAS X, load this microscope's configuration
-    - vendor_interface/   the only part that knows LAS X: the CAM API runtime, the API and
-                          log readers, the parsers, and the sorting of LAS X's errors
-    - dispatcher/         the engines that run an action safely: read.py, change.py, the
-                          limits gate and rulebook, pre-checks, tuning
-    - actions/            the readings (get.py) and the changes (set.py) with their
-                          confirmations and profiles
-    - procedures/         recipes built from actions: backlash, the setup measurements,
-                          and the pure algorithms they use
+    - vendor_interface/   the only part that knows LAS X: the CAM API runtime, the readers, the
+                          parsers, the sorting of LAS X's errors, and primitive_handling/, which
+                          says how each command is treated
+    - dispatcher/         the engines that run a command safely: read.py, change.py, the
+                          limits gate and rulebook, tuning
+    - procedures/         the changes (changes.py) and the recipes built on them: the capture,
+                          backlash, the setup measurements, and the pure algorithms they use
     - output/             what comes out of one acquisition: LAS X export, OME, naming, save
     - configuration/      what is measured once per microscope: limits,
                           image_stage_registration, optical_calibration (each with its
@@ -122,8 +121,8 @@ from .dispatcher.read import (
     get_lasx_settings,
     get_pending_dialog,
 )
-from .actions.confirmations import _readback
-from .actions.set import (
+from .vendor_interface.primitive_handling.confirmations import _readback
+from .procedures.changes import (
     set_zoom,
     set_scan_speed,
     set_scan_resonant,
@@ -165,7 +164,7 @@ from .dispatcher.checks import (
 )
 
 # -- acquisition/ - capture, file arrival, and save handling
-from .actions.acquire import AcquisitionResult, acquire
+from .procedures.acquire import AcquisitionResult, acquire
 from .output.product import (
     AcquisitionMetadata,
     ChannelMetadata,

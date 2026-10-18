@@ -14,6 +14,16 @@ from pathlib import Path
 from .naming import Naming
 
 
+@dataclass(frozen=True)
+class AcquisitionResult:
+    """Save-agnostic result of one LAS X AcquireJob command."""
+
+    job: str
+    started_at: float
+    finished_at: float
+    command_result: dict
+
+
 @dataclass(frozen=True, order=True)
 class PlaneIndex:
     """Canonical flat image plane index."""

@@ -13,7 +13,7 @@ import pytest
 import tifffile
 
 import zmart_drivers.leica.stellaris5_y42h93.navigator_expert as drv
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.actions import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures import (
     acquire as capture,
 )
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.image_stage_registration import (
@@ -54,7 +54,9 @@ def saves_as_ome_tiff(monkeypatch):
     """These tests are about captures saved as OME-TIFF, kept in LAS X's cache."""
     from dataclasses import replace as replaced
 
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.actions import profiles
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitive_handling import (
+        profiles,
+    )
 
     monkeypatch.setattr(
         profiles,

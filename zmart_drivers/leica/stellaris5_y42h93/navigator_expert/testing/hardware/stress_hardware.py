@@ -1131,7 +1131,7 @@ def main(argv: list[str] | None = None) -> int:
         # exist; pin selected-job confirmation to the api leg.
         from dataclasses import replace  # noqa: PLC0415
 
-        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.actions import (
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitive_handling import (
             profiles,
         )
 

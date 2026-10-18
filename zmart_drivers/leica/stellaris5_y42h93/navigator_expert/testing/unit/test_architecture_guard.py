@@ -28,7 +28,6 @@ from pathlib import Path
 DRIVER_ROOT = Path(__file__).resolve().parents[2]
 
 # The parts that may fire native stage motion or call the limit-check functions.
-ACTIONS = "actions"
 DISPATCHER = "dispatcher"
 
 # Source selection is policy, not caller behaviour. The read engine implements
@@ -38,16 +37,16 @@ DISPATCHER = "dispatcher"
 READER_SOURCE_POLICY_MODULES = {
     Path("dispatcher/read.py"),
     Path("dispatcher/change.py"),
-    Path("actions/get.py"),
-    Path("actions/confirmations.py"),
-    Path("actions/confirm_select_job.py"),
+    Path("vendor_interface/primitive_handling/readings.py"),
+    Path("vendor_interface/primitive_handling/confirmations.py"),
+    Path("vendor_interface/primitive_handling/confirm_select_job.py"),
     # Calibration geometry is saved for good, so it is read from the API
     # and never from a log entry that may be stale (review finding M4).
     Path("procedures/calibration_common.py"),
     # The stage limits are saved for good too: the corners are read from the API.
     Path("procedures/measure_limits.py"),
     # Whether a command may fire is the API's to decide: the idle check.
-    Path("dispatcher/prechecks.py"),
+    Path("vendor_interface/primitive_handling/prechecks.py"),
 }
 EXPLICIT_READER_MODE = re.compile(r"\bmode\s*=\s*['\"](?:api|log|hybrid)['\"]")
 LOW_LEVEL_READER_CALL = re.compile(r"(?<!\w)_?(?:api_reader|log_reader)\.")
@@ -65,36 +64,40 @@ def _driver_sources():
 def test_native_stage_motion_fires_only_from_the_actions():
     """The native CAM motion functions are the stage's real door.
 
-    Only the change definitions in ``actions/set.py`` may touch them: that
+    Only the change definitions in ``procedures/changes.py`` may touch them: that
     is where the limit checks run, immediately before the native call. A
     native-motion reference anywhere else would be a second, unchecked door.
     """
     offenders = [
         str(rel)
         for rel, text in _driver_sources()
-        if "PyApiMoveHardware" in text and rel != Path("actions/set.py")
+        if "PyApiMoveHardware" in text and rel != Path("procedures/changes.py")
     ]
     assert offenders == [], (
-        f"native stage motion referenced outside actions/set.py: {offenders}; "
+        f"native stage motion referenced outside procedures/changes.py: {offenders}; "
         f"route the move through the move_xy / move_z actions instead"
     )
 
 
-def test_limit_checks_are_called_only_from_the_actions_and_the_dispatcher():
+def test_limit_checks_are_called_only_from_the_changes_and_the_dispatcher():
     """``check_xy`` / ``check_z`` are *defined* in the dispatcher's rulebook and
-    *called* only from the actions (and the backlash procedure, which composes
-    checked moves). A call anywhere else is a second whistle: a copy of
-    enforcement that can drift out of sync with the real one."""
-    allowed = {Path("procedures/backlash.py")}  # upward: composes checked moves
+    *called* only from the change definitions in ``procedures/changes.py`` (and
+    the backlash procedure, which composes checked moves). A call anywhere else
+    is a second whistle: a copy of enforcement that can drift out of sync with
+    the real one."""
+    allowed = {
+        Path("procedures/changes.py"),  # the change definitions: where the checks run
+        Path("procedures/backlash.py"),  # composes checked moves
+    }
     offenders = []
     for rel, text in _driver_sources():
-        if rel.parts[0] in (ACTIONS, DISPATCHER) or rel in allowed:
+        if rel.parts[0] == DISPATCHER or rel in allowed:
             continue
         if "check_xy(" in text or "check_z(" in text:
             offenders.append(str(rel))
     assert offenders == [], (
-        f"limit checks called outside actions/ and dispatcher/: {offenders}; the "
-        f"actions already check every move; delete the duplicate call"
+        f"limit checks called outside procedures/changes.py and dispatcher/: {offenders}; "
+        f"the changes already check every move; delete the duplicate call"
     )
 
 
@@ -159,35 +162,28 @@ def test_the_utils_grab_bag_stays_dissolved():
 # removed in a change of its own, and none may be added.
 ALLOWED = {
     "vendor_interface": {
-        "dispatcher",  # upward: api_reader reads the tuning, errors reads the envelope
-        "actions",  # upward: api_reader reads the profiles
+        # upward: the readers and the handling notes use the dispatcher's tuning,
+        # envelope and read engine
+        "dispatcher",
     },
     "dispatcher": {
-        "vendor_interface",
+        "vendor_interface",  # the engines run the driver's handling notes and readers
         "configuration",  # upward: the gate loads the limits item at connect
-        "actions",  # upward: the read engine reads the actions' table of readings
-    },
-    "actions": {
-        "vendor_interface",
-        "dispatcher",
-        "configuration",
     },
     "procedures": {
         "vendor_interface",
         "dispatcher",
-        "actions",
         "configuration",
         "output",
     },
-    "output": {"vendor_interface", "dispatcher", "actions", "configuration"},
+    "output": {"vendor_interface", "dispatcher", "configuration"},
     "configuration": {
         "dispatcher",  # upward: the limits item validates through the rulebook
     },
-    "connect": {"vendor_interface", "dispatcher", "actions", "configuration"},
+    "connect": {"vendor_interface", "dispatcher", "configuration"},
     "zmart_adapter": {
         "vendor_interface",
         "dispatcher",
-        "actions",
         "procedures",
         "output",
         "configuration",
@@ -198,7 +194,7 @@ ALLOWED = {
     "__init__": {
         "vendor_interface",
         "dispatcher",
-        "actions",
+        "procedures",
         "output",
         "connect",
     },
@@ -246,12 +242,15 @@ def test_each_part_only_imports_what_the_anatomy_allows():
 
 
 def test_a_reading_never_uses_a_change():
-    """A get never calls a set: actions/get.py must not import actions/set.py."""
-    tree = ast.parse((DRIVER_ROOT / "actions" / "get.py").read_text(encoding="utf-8"))
+    """A get never calls a set: vendor_interface/primitive_handling/readings.py must not import procedures/changes.py."""
+    readings = DRIVER_ROOT / "vendor_interface" / "primitive_handling" / "readings.py"
+    tree = ast.parse(readings.read_text(encoding="utf-8"))
     for node in ast.walk(tree):
         if isinstance(node, ast.ImportFrom):
             names = [node.module or "", *(a.name for a in node.names)]
-            assert "set" not in names, "actions/get.py imports actions/set.py"
+            assert "changes" not in names, (
+                "vendor_interface/primitive_handling/readings.py imports procedures/changes.py"
+            )
 
 
 def test_nothing_but_the_tests_imports_from_testing():

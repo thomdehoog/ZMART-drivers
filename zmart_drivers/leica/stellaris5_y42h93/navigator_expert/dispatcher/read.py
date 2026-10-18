@@ -35,9 +35,9 @@ import threading
 import time
 from dataclasses import dataclass
 
-from ..actions import derived
-from ..actions import get as capabilities
-from ..actions.derived import (  # noqa: F401  re-exported, as the readers package did
+from ..vendor_interface.primitive_handling import derived
+from ..vendor_interface.primitive_handling import readings as capabilities
+from ..vendor_interface.primitive_handling.derived import (  # noqa: F401  re-exported, as the readers package did
     stack_drive,
     stack_slices_um,
 )
@@ -74,7 +74,7 @@ class Reading:
 
 
 def _profile():
-    from ..actions import profiles
+    from ..vendor_interface.primitive_handling import profiles
 
     return profiles.STATE_READERS
 

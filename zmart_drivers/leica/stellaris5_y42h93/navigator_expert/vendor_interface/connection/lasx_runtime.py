@@ -21,7 +21,7 @@ REQUIRED_DLLS = (
 
 def _runtime_root() -> Path:
     """Return the configured LAS X CAM API runtime root."""
-    from ...actions import profiles
+    from ..primitive_handling import profiles
 
     return Path(profiles.LASX_API.runtime_root)
 

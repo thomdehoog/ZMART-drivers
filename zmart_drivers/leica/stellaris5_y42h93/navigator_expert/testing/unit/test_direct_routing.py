@@ -22,13 +22,13 @@ from limits_fixtures import install_permissive_limits
 from mock_lasx_api import MockLasxClient
 from state_tree_stand_in import StandInNodes, answer_json_read
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.actions import (
-    get as capabilities,
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitive_handling import (
+    readings as capabilities,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.actions import (
-    set as commands,
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures import (
+    changes as commands,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitive_handling import (
     prechecks,
 )
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher import (
@@ -288,7 +288,7 @@ class TestDirectByDefault:
         self, client, tree, monkeypatch
     ):
         # The scan runs for three readings, then LAS X is idle again.
-        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.actions import (
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitive_handling import (
             confirmations,
         )
 
@@ -316,7 +316,7 @@ class TestDirectByDefault:
         # The direct reader says HiRes is selected; a stale log line claims the
         # target, Overview, already is. The switch must still be made, and the
         # CAM API's job list is never read for it.
-        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.actions import (
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitive_handling import (
             confirm_select_job,
         )
 

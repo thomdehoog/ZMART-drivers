@@ -18,9 +18,9 @@ import math
 from collections.abc import Callable
 from dataclasses import dataclass
 
-from ..vendor_interface.primitives.api import api_reader
-from ..vendor_interface.primitives.direct import direct_reader
-from ..vendor_interface.primitives.log import log_reader
+from ..primitives.api import api_reader
+from ..primitives.direct import direct_reader
+from ..primitives.log import log_reader
 from . import derived
 
 

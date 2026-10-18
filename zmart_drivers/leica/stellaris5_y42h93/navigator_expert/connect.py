@@ -20,7 +20,7 @@ _log = logging.getLogger(__name__)
 
 def _profile_api_delay_ms() -> int | None:
     """Return the configured Leica API delay from the active profile."""
-    from .actions import profiles
+    from .vendor_interface.primitive_handling import profiles
 
     return profiles.LASX_API.delay_ms
 
@@ -163,7 +163,7 @@ def _load_rig_orientation() -> tuple[Any, dict]:
     with new readiness evidence. Invalid or disabled configuration returns the
     identity mapping with an explicit not-ready record.
     """
-    from .actions.profiles import IMAGE_SAVE
+    from .vendor_interface.primitive_handling.profiles import IMAGE_SAVE
     from .configuration import image_stage_registration as _orientation
     from .configuration.store import MACHINE
 

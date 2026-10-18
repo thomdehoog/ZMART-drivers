@@ -29,7 +29,7 @@ class LogPollResult:
 
 
 def _profile():
-    from ....actions import profiles
+    from ...primitive_handling import profiles
 
     return profiles.STATE_READERS
 

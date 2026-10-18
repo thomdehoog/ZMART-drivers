@@ -691,10 +691,18 @@ The first reshaping steps are done too: the file that sorts LAS X's errors is
 capture). Each step changed only names and places, and the offline tests gave the
 same result before and after.
 
+**Also done.** The `actions/` folder is gone. Its handling information (the
+profiles, the confirmations, the table of readings, what a value means and the
+idle check) is in `vendor_interface/primitive_handling/`. Its command
+definitions and the capture are in `procedures/`. The dispatcher engines stay
+in `dispatcher/`. The guard test lists the few imports that still run upward.
+
 **Still to do.** Three things do not fit yet:
 
-1. `actions/set.py` (about 1,500 lines) is not a table; it holds recipes that
-   belong in `procedures/`.
+1. `procedures/changes.py` (about 1,500 lines, the old `actions/set.py`) is still
+   written as one function for each command. Much of it is a table entry that
+   belongs in the handling notes, and only the real recipes belong in
+   `procedures/`.
 2. `zmart_adapter/zmart_adapter.py` (about 1,700 lines) holds much of the
    logic of `get_xyz`, `set_xyz` and `acquire`. The `ZmartDriver` class is
    meant to be thin, so that logic has to move into procedures, and the

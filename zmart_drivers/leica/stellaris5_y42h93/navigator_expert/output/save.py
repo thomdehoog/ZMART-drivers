@@ -21,7 +21,6 @@ from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
-from ..actions.acquire import AcquisitionResult
 from ..configuration.image_stage_registration import Orientation
 from . import files as _files
 from . import materialize as _materialize
@@ -41,7 +40,12 @@ from .naming import (
     projections_dir,
     state_dir,
 )
-from .product import ExportedAcquisition, PlaneIndex, SavedAcquisition
+from .product import (
+    AcquisitionResult,
+    ExportedAcquisition,
+    PlaneIndex,
+    SavedAcquisition,
+)
 
 log = logging.getLogger(__name__)
 
@@ -101,7 +105,7 @@ def save(
     a single plane is its own projection and gets none, so nothing is
     written twice.
     """
-    from ..actions.profiles import IMAGE_SAVE
+    from ..vendor_interface.primitive_handling.profiles import IMAGE_SAVE
 
     format = IMAGE_SAVE.format if format is None else format
     if format not in FORMATS:

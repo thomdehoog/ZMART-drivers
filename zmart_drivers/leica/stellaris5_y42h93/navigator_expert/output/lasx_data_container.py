@@ -30,7 +30,6 @@ import time
 from pathlib import Path
 from typing import Any
 
-from ..actions.acquire import AcquisitionResult
 from . import lasx_cache_release as cache_release
 from . import lasx_description as described
 from .files import (
@@ -39,6 +38,7 @@ from .files import (
     MTIME_SKEW_ALLOWANCE_S,
 )
 from .product import (
+    AcquisitionResult,
     AcquisitionMetadata,
     ExportedAcquisition,
     ExportedPosition,
