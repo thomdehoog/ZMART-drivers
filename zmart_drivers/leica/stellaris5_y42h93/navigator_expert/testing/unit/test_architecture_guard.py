@@ -47,9 +47,9 @@ READER_SOURCE_POLICY_MODULES = {
     Path("vendor_interface/primitive_handling/confirm_select_job.py"),
     # Calibration geometry is saved for good, so it is read from the API
     # and never from a log entry that may be stale (review finding M4).
-    Path("procedures/setup/calibration_common.py"),
+    Path("configuration/optical_calibration/calibration_common.py"),
     # The stage limits are saved for good too: the corners are read from the API.
-    Path("procedures/setup/measure_limits.py"),
+    Path("configuration/limits/measure_limits.py"),
     # Whether a command may fire is the API's to decide: the idle check.
     Path("vendor_interface/primitive_handling/prechecks.py"),
 }
@@ -187,6 +187,10 @@ ALLOWED = {
     },
     "configuration": {
         "vendor_interface",  # the limits item validates through the rulebook
+        # The measuring code of an item takes pictures and moves the stage, so it
+        # uses the commands. Run-time procedures never import that measuring code
+        # (see the test below): they read the saved values only.
+        "procedures",
     },
     # Everything that faces the controller: the ZmartDriver class and, until its
     # logic moves into the procedures, the adapter folder inside it.
@@ -262,3 +266,34 @@ def test_nothing_but_the_tests_imports_from_testing():
         assert "testing" not in _imported_parts(DRIVER_ROOT / rel, rel.parts[0]), str(
             rel
         )
+
+
+# The measuring code of the setup items. It writes the saved configuration files;
+# run-time procedures only read those files, through each item's loader.
+MEASURING_MODULES = {
+    "limits.measure_limits",
+    "image_stage_registration.measure_orientation",
+    "image_stage_registration.registration",
+    "optical_calibration.calibrate_objective_pair",
+    "optical_calibration.calibration_common",
+    "optical_calibration.check_calibration",
+    "optical_calibration.adopt_calibration",
+    "optical_calibration.focus",
+}
+
+
+def test_run_time_procedures_never_import_the_measuring_code():
+    """The two sides meet at the saved files in ProgramData, not in each other's code."""
+    offenders = []
+    for path in sorted((DRIVER_ROOT / "procedures").rglob("*.py")):
+        text = path.read_text(encoding="utf-8")
+        for name in MEASURING_MODULES:
+            item, module = name.split(".")
+            if f"configuration.{item}.{module}" in text or (
+                f"configuration.{item} import" in text and module in text
+            ):
+                offenders.append(f"{path.relative_to(DRIVER_ROOT)} -> {name}")
+    assert offenders == [], (
+        f"procedures import measuring code: {offenders}; read the saved values "
+        "through the item's loader instead"
+    )
