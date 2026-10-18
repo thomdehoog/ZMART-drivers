@@ -37,7 +37,7 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher import (
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface import (
     parsing as _readers_parsing,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.zmart_adapter import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.for_zmart_controller.zmart_adapter import (
     zmart_adapter as adapter,
 )
 

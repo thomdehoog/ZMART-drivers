@@ -41,7 +41,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from ..zmart_adapter import zmart_adapter as _adapter
+from .zmart_adapter import zmart_adapter as _adapter
 
 #: The three axes, in the order the controller's canvas lists them.
 _AXES = ("x", "y", "z")

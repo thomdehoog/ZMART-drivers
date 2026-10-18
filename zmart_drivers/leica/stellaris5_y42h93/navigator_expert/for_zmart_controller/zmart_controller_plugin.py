@@ -30,7 +30,7 @@ the adapter:
 - ``calibration_name`` (not set by default) picks a named calibration set.
 
 The commands themselves live in the driver's adapter,
-``zmart_adapter/zmart_adapter.py``. Called from there directly, each one
+``for_zmart_controller/zmart_adapter/zmart_adapter.py``. Called from there directly, each one
 returns its content alone. The versions below, which the controller calls,
 answer ``{"success": True, "content": ...}``. Every failure is raised.
 
@@ -38,7 +38,7 @@ Author: Thom de Hoog, Center for Microscopy and Image Analysis (ZMB),
 University of Zurich (thom.dehoog@zmb.uzh.ch, thomdehoog@gmail.com).
 """
 
-from ..zmart_adapter import zmart_adapter as _adapter
+from .zmart_adapter import zmart_adapter as _adapter
 
 # The driver's name in the controller's list of drivers, and its configuration
 # on this computer: the adapter's defaults, which you may edit here.

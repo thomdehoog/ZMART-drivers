@@ -378,7 +378,7 @@ class TestSingleSourcedDelta:
         swap-time stage move equals the adapter's per-move frame offset for
         the same lens pair. Swap-then-move-to-F therefore lands exactly
         where move-to-F-alone would."""
-        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.zmart_adapter import (
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.for_zmart_controller.zmart_adapter import (
             zmart_adapter as adapter,
         )
 

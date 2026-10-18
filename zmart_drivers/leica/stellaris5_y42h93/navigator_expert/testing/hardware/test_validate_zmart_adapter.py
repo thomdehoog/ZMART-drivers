@@ -28,7 +28,7 @@ for _p in (_HERE, _HELPERS, _REPO_ROOT):
         sys.path.insert(0, str(_p))
 
 import validate_zmart_adapter
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.zmart_adapter import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.for_zmart_controller.zmart_adapter import (
     zmart_adapter as adapter,
 )
 
