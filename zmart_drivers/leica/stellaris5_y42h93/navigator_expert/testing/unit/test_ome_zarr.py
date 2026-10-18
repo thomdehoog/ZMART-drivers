@@ -25,10 +25,10 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.nam
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.product import (
     PlaneIndex,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.commands import (
     acquire as capture,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.saving import (
     save as saving,
 )
 
@@ -179,7 +179,7 @@ class TestOneCopy:
         self, hires, tmp_path, monkeypatch, caplog
     ):
         """Windows refuses to rename a folder while a file in it is open; the save waits it out."""
-        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures import (
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.saving import (
             ome_zarr,
         )
 
@@ -206,7 +206,7 @@ class TestOneCopy:
     def test_a_store_held_open_for_too_long_is_not_saved(
         self, hires, tmp_path, monkeypatch
     ):
-        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures import (
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.saving import (
             ome_zarr,
         )
 
@@ -546,7 +546,7 @@ class TestTheProjection:
 
 
 def test_the_log_is_written_beside_data(tmp_path):
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures import (
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.saving import (
         command_log,
     )
 

@@ -1,6 +1,6 @@
 """The shared reader: one way to wait for an answer, whichever source gives it.
 
-Every reading follows the one rule in the waiting rule below: four windows of three
+Every reading follows the one waiting rule (below): four windows of three
 seconds. Within a window the sources the profile allows are asked one after
 the other, the CAM API first and then the LAS X log, and the first answer
 that counts as a success wins. Each source gets its own slice of the window,

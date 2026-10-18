@@ -44,10 +44,10 @@ from scipy.ndimage import gaussian_filter
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.store import (
     MachineProfile,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.setup import (
     calibrate_objective_pair as wf_obj,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.setup import (
     calibration_common as cm,
 )
 

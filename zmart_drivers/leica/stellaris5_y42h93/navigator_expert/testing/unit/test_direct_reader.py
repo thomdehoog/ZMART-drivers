@@ -20,7 +20,7 @@ from state_tree_stand_in import StandInNodes, answer_json_read
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitive_handling import (
     readings as capabilities,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.objectives import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.commands.objectives import (
     objective_by_slot,
 )
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitives.api import (

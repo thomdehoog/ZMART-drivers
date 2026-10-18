@@ -32,7 +32,7 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.pri
     confirmations,
     profiles,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.commands import (
     changes as commands,
 )
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher import (

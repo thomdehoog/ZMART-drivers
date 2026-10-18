@@ -145,7 +145,7 @@ def test_adopt_seeds_first_used_objective_at_origin():
     # Fresh config (FROM objective has no translation yet): the first objective
     # used becomes the [0,0,0] origin; the pair's translation lands on TO.
     sys.path.insert(0, str(_repo_root()))
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures import (
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.setup import (
         adopt_calibration as adopt,
     )
 

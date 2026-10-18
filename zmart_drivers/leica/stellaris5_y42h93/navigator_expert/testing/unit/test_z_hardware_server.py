@@ -23,7 +23,7 @@ from z_readback_settings import raw_settings
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitive_handling import (
     confirmations,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.commands import (
     changes as commands,
 )
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitive_handling.derived import (

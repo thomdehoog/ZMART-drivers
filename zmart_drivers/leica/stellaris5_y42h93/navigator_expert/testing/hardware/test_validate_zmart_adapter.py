@@ -32,13 +32,13 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert import connect as ad
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration import (
     store as _machine,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.saving import (
     save as _save,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.commands import (
     acquire as _capture,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.commands import (
     backlash as _motion,
 )
 

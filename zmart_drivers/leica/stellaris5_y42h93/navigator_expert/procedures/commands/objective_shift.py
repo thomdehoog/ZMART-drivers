@@ -58,7 +58,7 @@ def _translations_for(client: Any) -> dict | None:
     fails the command's result rather than silently leaving the stage at
     the old lens's spot.
     """
-    from ..configuration import session_state
+    from ...configuration import session_state
 
     config = session_state.get(client)
     if config is None:
@@ -98,7 +98,7 @@ def record_before_change(
             )
         return None
 
-    from ..vendor_interface.primitive_handling import state as _readers
+    from ...vendor_interface.primitive_handling import state as _readers
 
     if job_name is None:
         selected = _readers.get_selected_job(client) or {}
@@ -151,7 +151,7 @@ def compensate_after_change(
         }
 
     try:
-        from ..vendor_interface.primitive_handling import state as _readers
+        from ...vendor_interface.primitive_handling import state as _readers
 
         if new_slot is None:
             settings = _readers.get_job_settings(client, job_name) or {}
@@ -176,7 +176,7 @@ def compensate_after_change(
         # The delta math and the missing-pair policy live in ONE place —
         # calibration/core/model.py — shared with the adapter's per-move
         # frame mapping, so the two layers can never drift apart.
-        from ..configuration.optical_calibration import model as _cal_model
+        from ...configuration.optical_calibration import model as _cal_model
 
         try:
             delta = _cal_model.translation_delta_um(

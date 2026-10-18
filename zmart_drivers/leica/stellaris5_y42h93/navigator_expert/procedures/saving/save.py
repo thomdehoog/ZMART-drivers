@@ -21,18 +21,18 @@ from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
-from ..configuration.image_stage_registration import Orientation
-from ..vendor_interface import files as _files
+from ...configuration.image_stage_registration import Orientation
+from ...vendor_interface import files as _files
 from . import materialize as _materialize
 from . import ome_zarr
-from ..vendor_interface.files import (
+from ...vendor_interface.files import (
     DEFAULT_EXPORT_COMPLETION_POLL_INTERVAL_S,
     DEFAULT_EXPORT_COMPLETION_TIMEOUT_S,
 )
-from ..vendor_interface.primitives.capture.lasx_data_container import (
+from ...vendor_interface.primitives.capture.lasx_data_container import (
     collect_lasx_data_container,
 )
-from ..vendor_interface.naming import (
+from ...vendor_interface.naming import (
     Naming,
     build_state_name,
     data_dir,
@@ -40,7 +40,7 @@ from ..vendor_interface.naming import (
     projections_dir,
     state_dir,
 )
-from ..vendor_interface.product import (
+from ...vendor_interface.product import (
     AcquisitionResult,
     ExportedAcquisition,
     SavedAcquisition,
@@ -101,7 +101,7 @@ def save(
     a single plane is its own projection and gets none, so nothing is
     written twice.
     """
-    from ..vendor_interface.primitive_handling.profiles import IMAGE_SAVE
+    from ...vendor_interface.primitive_handling.profiles import IMAGE_SAVE
 
     projection = IMAGE_SAVE.projection if projection is None else projection
     if projection not in PROJECTIONS:
@@ -109,7 +109,7 @@ def save(
             f"unknown projection {projection!r}; the projections are {PROJECTIONS}"
         )
     if orientation is None:
-        from ..configuration.image_stage_registration import rig_orientation
+        from ...configuration.image_stage_registration import rig_orientation
 
         orientation = (
             rig_orientation() if IMAGE_SAVE.apply_orientation else Orientation()

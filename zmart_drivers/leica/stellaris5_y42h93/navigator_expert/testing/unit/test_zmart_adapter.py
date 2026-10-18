@@ -46,25 +46,25 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration import
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration import (
     store as _machine,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.saving import (
     command_log as _log,
 )
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitives.capture import (
     lasx_cache_release as _release,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.saving import (
     save as _save,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.commands import (
     acquire as _capture,
 )
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures import (
     acquisition as _acquisition,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.commands import (
     backlash as _motion,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.commands import (
     changes as _commands,
 )
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures import (
