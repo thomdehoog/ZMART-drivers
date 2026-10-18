@@ -45,8 +45,8 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.limits
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.store import (
     MachineProfile,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher import (
-    checks as motion_limits,
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitive_handling import (
+    limit_rules as motion_limits,
 )
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher import gate
 

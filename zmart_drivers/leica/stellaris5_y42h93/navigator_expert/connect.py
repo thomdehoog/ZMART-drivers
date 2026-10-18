@@ -267,8 +267,11 @@ def connect_microscope(
     from .configuration import session_state
     from .configuration.store import MACHINE
     from .dispatcher import gate as _gate
+    from .dispatcher import running_log
 
     MACHINE.ensure_layout()
+    # Kept beside the saved settings so that it survives a restart of the driver.
+    running_log.start(MACHINE.snapshot_root() / "logs", __package__)
     client = connect_python_client(client_name=client_name, api_delay_ms=api_delay_ms)
     _gate.connect_handshake(client, load=load_limits)
     lasx_dialogs.keep_watching()

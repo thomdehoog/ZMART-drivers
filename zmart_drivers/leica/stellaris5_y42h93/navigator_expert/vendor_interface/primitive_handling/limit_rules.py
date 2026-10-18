@@ -78,7 +78,7 @@ def check_envelope_within_backstop(stage_um):
             raise RuntimeError(
                 f"stage limits for axis {axis!r} = [{lo}, {hi}] reach outside the "
                 f"physical backstop [{backstop_lo}, {backstop_hi}] "
-                f"(limits/checks.py STAGE_BACKSTOP_UM); refusing the envelope — "
+                f"(vendor_interface/primitive_handling/limit_rules.py STAGE_BACKSTOP_UM); refusing the envelope — "
                 f"a file wider than the machine's physical travel cannot be trusted"
             )
 
@@ -189,7 +189,7 @@ def check_xy(x, y):
         if value < lo or value > hi:
             raise RuntimeError(
                 f"{axis.upper()}={value} outside the physical backstop [{lo}, {hi}] "
-                f"(limits/checks.py STAGE_BACKSTOP_UM) — refused regardless of the "
+                f"(vendor_interface/primitive_handling/limit_rules.py STAGE_BACKSTOP_UM) — refused regardless of the "
                 f"configured envelope"
             )
 
@@ -221,7 +221,7 @@ def check_z(z, z_mode):
     if z < backstop_lo or z > backstop_hi:
         raise RuntimeError(
             f"Z={z} ({z_mode}) outside the physical backstop [{backstop_lo}, {backstop_hi}] "
-            f"(limits/checks.py STAGE_BACKSTOP_UM) — refused regardless of the "
+            f"(vendor_interface/primitive_handling/limit_rules.py STAGE_BACKSTOP_UM) — refused regardless of the "
             f"configured envelope"
         )
 

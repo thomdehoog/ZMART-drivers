@@ -153,8 +153,8 @@ from .connect import connect_python_client, connect_microscope
 # -- commands/gate - command safety gate + connect handshake
 from .dispatcher.gate import connect_handshake as connect_limits_handshake
 
-# -- limits/checks.py - the rulebook: stage checks + the compiled limits document
-from .dispatcher.checks import (
+# -- vendor_interface/primitive_handling/limit_rules.py - the rulebook: stage checks + the compiled limits document
+from .vendor_interface.primitive_handling.limit_rules import (
     _stage_limits,
     set_stage_limits,
     get_stage_limits,

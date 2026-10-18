@@ -25,7 +25,7 @@ import logging
 import time
 
 from . import changes as _commands
-from ..dispatcher import checks as _checks
+from ..vendor_interface.primitive_handling import limit_rules as _checks
 from ..vendor_interface.primitive_handling import state as _readers
 
 log = logging.getLogger(__name__)

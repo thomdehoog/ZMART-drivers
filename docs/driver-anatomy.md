@@ -698,19 +698,40 @@ idle check) is in `vendor_interface/primitive_handling/`. Its command
 definitions and the capture are in `procedures/`. The dispatcher engines stay
 in `dispatcher/`. The guard test lists the few imports that still run upward.
 
-**Still to do.** Three things do not fit yet:
+**Also done (October 2026).** The shared engines no longer name anything
+Leica-specific:
 
-1. `procedures/changes.py` (about 1,500 lines, the old `actions/set.py`) is still
-   written as one function for each command. Much of it is a table entry that
-   belongs in the handling notes, and only the real recipes belong in
-   `procedures/`.
-2. `for_zmart_controller/zmart_adapter/zmart_adapter.py` (about 1,700 lines)
-   holds much of the logic of `get_xyz`, `set_xyz` and `acquire`. The `ZmartDriver` class is
-   meant to be thin, so that logic has to move into procedures, and the
-   coordinate conversion into the class.
-3. `dispatcher/checks.py` and `gate.py` use Leica's command names, and the
-   `dispatcher/` folder holds Leica code (see "The dispatcher is fully
-   shared").
+- `dispatcher/read.py` only waits for an answer from whichever source gives
+  one. Asking the API, the log or the direct reader once is in
+  `vendor_interface/primitive_handling/sources.py`, and the named readings
+  (`get_xy`, `get_jobs` and the others) are in `primitive_handling/state.py`.
+- `dispatcher/change.py` sends a request and awaits its reply through a
+  `transport` that each command profile carries. The LAS X version of it is in
+  `primitive_handling/transport.py`.
+- The Leica limits rulebook (`LeicaLimits` and the stage checks) is in
+  `primitive_handling/limit_rules.py`. `dispatcher/gate.py` keeps only the
+  moment of enforcement.
+- The settings of a job (zoom, scan speed, gain and the rest) are one table in
+  `primitive_handling/settings.py`, changed by one runner in
+  `procedures/changes.py`. Only the real recipes (`set_objective`, `move_xy`,
+  `move_z`, `acquire`, `select_job`) are still written by hand.
+- A command profile can say `never_resend`. The acquisition does, and nothing a
+  caller asks for can switch the resend back on.
+- The driver keeps a running log (`dispatcher/running_log.py`): a rolling text
+  file in a `logs` folder beside the saved settings.
+
+**Still to do.** Two things do not fit yet:
+
+1. `for_zmart_controller/zmart_adapter/zmart_adapter.py` (about 1,700 lines)
+   holds much of the logic of `get_xyz`, `set_xyz` and `acquire`. The
+   `ZmartDriver` class is already thin and only calls it. The logic has to move
+   into procedures, and the coordinate conversion into the class. This is left
+   for after the first run on the simulator, because about 300 of the offline
+   tests are written against the adapter's current shape.
+2. The shared reader still asks the API and the log at the same time (two small
+   threads) and takes whichever answers first. The plan above asks for one
+   source after the other. That changes how a reading behaves, so it waits for
+   the hardware tests.
 
 **The order, and a safety net.** The reshaping is done in small steps, each
 followed by the offline tests and the hardware tests at the STELLARIS: first

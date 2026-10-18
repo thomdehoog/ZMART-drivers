@@ -29,6 +29,8 @@ DRIVER_ROOT = Path(__file__).resolve().parents[2]
 
 # The parts that may fire native stage motion or call the limit-check functions.
 DISPATCHER = "dispatcher"
+# The Leica rulebook defines the check functions; the gate in the dispatcher enforces them.
+RULEBOOK = Path("vendor_interface/primitive_handling/limit_rules.py")
 
 # Source selection is policy, not caller behaviour. The read engine implements
 # the profile-controlled modes; the confirmation modules construct explicit
@@ -93,7 +95,7 @@ def test_limit_checks_are_called_only_from_the_changes_and_the_dispatcher():
     }
     offenders = []
     for rel, text in _driver_sources():
-        if rel.parts[0] == DISPATCHER or rel in allowed:
+        if rel.parts[0] == DISPATCHER or rel in allowed or rel == RULEBOOK:
             continue
         if "check_xy(" in text or "check_z(" in text:
             offenders.append(str(rel))
@@ -105,9 +107,11 @@ def test_limit_checks_are_called_only_from_the_changes_and_the_dispatcher():
 
 def test_the_rulebook_lives_in_the_dispatcher():
     """``LeicaLimits`` (the compiled limits document) is defined in
-    dispatcher/checks.py; the gate only imports it. If the class definition
+    vendor_interface/primitive_handling/limit_rules.py; the gate only imports it. If the class definition
     moves back into the gate, rulebook and whistle have merged again."""
-    checks_text = (DRIVER_ROOT / "dispatcher" / "checks.py").read_text(encoding="utf-8")
+    checks_text = (
+        DRIVER_ROOT / "vendor_interface" / "primitive_handling" / "limit_rules.py"
+    ).read_text(encoding="utf-8")
     gate_text = (DRIVER_ROOT / "dispatcher" / "gate.py").read_text(encoding="utf-8")
     assert "class LeicaLimits" in checks_text
     assert "class LeicaLimits" not in gate_text
@@ -180,7 +184,7 @@ ALLOWED = {
     },
     "output": {"vendor_interface", "dispatcher", "configuration"},
     "configuration": {
-        "dispatcher",  # upward: the limits item validates through the rulebook
+        "vendor_interface",  # the limits item validates through the rulebook
     },
     "connect": {"vendor_interface", "dispatcher", "configuration"},
     # Everything that faces the controller: the ZmartDriver class and, until its
