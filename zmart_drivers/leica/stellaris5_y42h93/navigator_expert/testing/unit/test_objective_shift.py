@@ -14,22 +14,18 @@ from types import SimpleNamespace
 import pytest
 from limits_fixtures import install_permissive_limits
 
-import zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitive_handling.state as readers
+import zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.state as readers
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.commands import (
     objective_shift as shift,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitive_handling import (
-    changes as cmds,
-)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling import changes as cmds
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.commands import (
     compensated_changes as cmds_comp,
 )
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures import (
     session_state,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.image_stage_registration import (
-    Orientation,
-)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.image_stage_registration import Orientation
 
 TRANSLATIONS = {1: (0.0, 0.0, 0.0), 2: (10.0, -6.0, 3.0)}
 
@@ -359,17 +355,13 @@ class TestSingleSourcedDelta:
     layers is structurally impossible."""
 
     def test_sign_convention_is_to_minus_from(self):
-        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.optical_calibration import (
-            model,
-        )
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.optical_calibration import model
 
         assert model.translation_delta_um(TRANSLATIONS, 1, 2) == (10.0, -6.0, 3.0)
         assert model.translation_delta_um(TRANSLATIONS, 2, 1) == (-10.0, 6.0, -3.0)
 
     def test_uncovered_pair_raises_the_one_shared_message(self):
-        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.optical_calibration import (
-            model,
-        )
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.optical_calibration import model
 
         with pytest.raises(RuntimeError, match="no calibration translation covers"):
             model.translation_delta_um(TRANSLATIONS, 1, 5)

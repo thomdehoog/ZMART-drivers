@@ -16,14 +16,9 @@ from pathlib import Path
 
 import pytest
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface import (
-    metadata_map as described,
-)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific import metadata_map as described
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.acquisition_and_saving import ome_canonical as canonical
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.product import (
-    AcquisitionMetadata,
-    PlaneIndex,
-)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.product import AcquisitionMetadata, PlaneIndex
 
 DATA = Path(__file__).resolve().parents[1] / "data" / "lasx_description"
 HIRES = "hires004-two-channels-12-bit"

@@ -30,7 +30,7 @@ DRIVER_ROOT = Path(__file__).resolve().parents[2]
 # The parts that may fire native stage motion or call the limit-check functions.
 DISPATCHER = "dispatcher"
 # The Leica rulebook defines the check functions; the gate in the dispatcher enforces them.
-RULEBOOK = Path("vendor_interface/primitive_handling/limit_rules.py")
+RULEBOOK = Path("vendor_specific/primitive_handling/limit_rules.py")
 
 # Source selection is policy, not caller behaviour. The read engine implements
 # the profile-controlled modes; the confirmation modules construct explicit
@@ -38,20 +38,20 @@ RULEBOOK = Path("vendor_interface/primitive_handling/limit_rules.py")
 # ``mode`` unset and consume the configured reader abstraction.
 READER_SOURCE_POLICY_MODULES = {
     Path("dispatcher/reader.py"),
-    Path("vendor_interface/primitive_handling/state.py"),
-    Path("vendor_interface/primitive_handling/sources.py"),
+    Path("vendor_specific/primitive_handling/state.py"),
+    Path("vendor_specific/primitive_handling/sources.py"),
     Path("dispatcher/send_loop.py"),
     Path("dispatcher/confirm_loop.py"),
-    Path("vendor_interface/primitive_handling/readings.py"),
-    Path("vendor_interface/primitive_handling/confirmations.py"),
-    Path("vendor_interface/primitive_handling/confirm_select_job.py"),
+    Path("vendor_specific/primitive_handling/readings.py"),
+    Path("vendor_specific/primitive_handling/confirmations.py"),
+    Path("vendor_specific/primitive_handling/confirm_select_job.py"),
     # Calibration geometry is saved for good, so it is read from the API
     # and never from a log entry that may be stale (review finding M4).
-    Path("configuration/optical_calibration/calibration_common.py"),
+    Path("driver_setup/optical_calibration/calibration_common.py"),
     # The stage limits are saved for good too: the corners are read from the API.
-    Path("configuration/limits/measure_limits.py"),
+    Path("driver_setup/limits/measure_limits.py"),
     # Whether a command may fire is the API's to decide: the idle check.
-    Path("vendor_interface/primitive_handling/prechecks.py"),
+    Path("vendor_specific/primitive_handling/prechecks.py"),
 }
 EXPLICIT_READER_MODE = re.compile(r"\bmode\s*=\s*['\"](?:api|log|hybrid)['\"]")
 LOW_LEVEL_READER_CALL = re.compile(r"(?<!\w)_?(?:api_reader|log_reader)\.")
@@ -69,7 +69,7 @@ def _driver_sources():
 def test_native_stage_motion_fires_only_from_the_actions():
     """The native CAM motion functions are the stage's real door.
 
-    Only the change definitions in ``vendor_interface/primitive_handling/changes.py`` may touch them: that
+    Only the change definitions in ``vendor_specific/primitive_handling/changes.py`` may touch them: that
     is where the limit checks run, immediately before the native call. A
     native-motion reference anywhere else would be a second, unchecked door.
     """
@@ -77,25 +77,23 @@ def test_native_stage_motion_fires_only_from_the_actions():
         str(rel)
         for rel, text in _driver_sources()
         if "PyApiMoveHardware" in text
-        and rel != Path("vendor_interface/primitive_handling/changes.py")
+        and rel != Path("vendor_specific/primitive_handling/changes.py")
     ]
     assert offenders == [], (
-        f"native stage motion referenced outside vendor_interface/primitive_handling/changes.py: {offenders}; "
+        f"native stage motion referenced outside vendor_specific/primitive_handling/changes.py: {offenders}; "
         f"route the move through the move_xy / move_z actions instead"
     )
 
 
 def test_limit_checks_are_called_only_from_the_changes_and_the_dispatcher():
     """``check_xy`` / ``check_z`` are *defined* in the dispatcher's rulebook and
-    *called* only from the change definitions in ``vendor_interface/primitive_handling/changes.py`` (and
-    the backlash procedure, which composes checked moves). A call anywhere else
+    *called* only from the change definitions in ``vendor_specific/primitive_handling/changes.py``. A call anywhere else
     is a second whistle: a copy of enforcement that can drift out of sync with
     the real one."""
     allowed = {
         Path(
-            "vendor_interface/primitive_handling/changes.py"
+            "vendor_specific/primitive_handling/changes.py"
         ),  # the change definitions: where the checks run
-        Path("procedures/commands/backlash.py"),  # composes checked moves
     }
     offenders = []
     for rel, text in _driver_sources():
@@ -104,17 +102,17 @@ def test_limit_checks_are_called_only_from_the_changes_and_the_dispatcher():
         if "check_xy(" in text or "check_z(" in text:
             offenders.append(str(rel))
     assert offenders == [], (
-        f"limit checks called outside vendor_interface/primitive_handling/changes.py and dispatcher/: {offenders}; "
+        f"limit checks called outside vendor_specific/primitive_handling/changes.py and dispatcher/: {offenders}; "
         f"the changes already check every move; delete the duplicate call"
     )
 
 
 def test_the_rulebook_lives_in_the_dispatcher():
     """``LeicaLimits`` (the compiled limits document) is defined in
-    vendor_interface/primitive_handling/limit_rules.py; the gate only imports it. If the class definition
+    vendor_specific/primitive_handling/limit_rules.py; the gate only imports it. If the class definition
     moves back into the gate, rulebook and whistle have merged again."""
     checks_text = (
-        DRIVER_ROOT / "vendor_interface" / "primitive_handling" / "limit_rules.py"
+        DRIVER_ROOT / "vendor_specific" / "primitive_handling" / "limit_rules.py"
     ).read_text(encoding="utf-8")
     gate_text = (DRIVER_ROOT / "dispatcher" / "gate.py").read_text(encoding="utf-8")
     assert "class LeicaLimits" in checks_text
@@ -145,7 +143,7 @@ def test_low_level_readers_are_called_only_by_reader_and_confirmation_policy():
     offenders = [
         str(rel)
         for rel, text in _driver_sources()
-        if rel.parts[0] != "vendor_interface"
+        if rel.parts[0] != "vendor_specific"
         and rel not in READER_SOURCE_POLICY_MODULES
         and LOW_LEVEL_READER_CALL.search(text)
     ]
@@ -171,23 +169,23 @@ def test_the_utils_grab_bag_stays_dissolved():
 # Entries marked "upward" are imports the move kept as they were; each is to be
 # removed in a change of its own, and none may be added.
 ALLOWED = {
-    "vendor_interface": {
+    "vendor_specific": {
         # upward: the readers and the handling notes use the dispatcher's tuning,
         # envelope and read engine
         "dispatcher",
     },
     "dispatcher": {
-        "vendor_interface",  # the engines run the driver's handling notes and readers
-        "configuration",  # upward: the gate loads the limits item at connect
+        "vendor_specific",  # the engines run the driver's handling notes and readers
+        "driver_setup",  # upward: the gate loads the limits item at connect
     },
     "procedures": {
-        "vendor_interface",
+        "vendor_specific",
         "dispatcher",
-        "configuration",
+        "driver_setup",
         "__version__",  # acquisition.py records the driver version in the saved state
     },
-    "configuration": {
-        "vendor_interface",  # the limits item validates through the rulebook
+    "driver_setup": {
+        "vendor_specific",  # the limits item validates through the rulebook
         # The measuring code of an item takes pictures and moves the stage, so it
         # uses the commands. Run-time procedures never import that measuring code
         # (see the test below): they read the saved values only.
@@ -196,14 +194,15 @@ ALLOWED = {
     # Everything that faces the controller: the ZmartDriver class and, until its
     # logic moves into the procedures, the adapter folder inside it.
     "for_zmart_controller": {
-        "vendor_interface",
+        "vendor_specific",
         "dispatcher",
         "procedures",
-        "configuration",
+        "driver_setup",
+        "running_log",  # the driver's log file, opened when the driver is made
         "__version__",
     },
     "__init__": {
-        "vendor_interface",
+        "vendor_specific",
         "dispatcher",
         "procedures",
     },
@@ -251,14 +250,14 @@ def test_each_part_only_imports_what_the_anatomy_allows():
 
 
 def test_a_reading_never_uses_a_change():
-    """A get never calls a set: vendor_interface/primitive_handling/readings.py must not import vendor_interface/primitive_handling/changes.py."""
-    readings = DRIVER_ROOT / "vendor_interface" / "primitive_handling" / "readings.py"
+    """A get never calls a set: vendor_specific/primitive_handling/readings.py must not import vendor_specific/primitive_handling/changes.py."""
+    readings = DRIVER_ROOT / "vendor_specific" / "primitive_handling" / "readings.py"
     tree = ast.parse(readings.read_text(encoding="utf-8"))
     for node in ast.walk(tree):
         if isinstance(node, ast.ImportFrom):
             names = [node.module or "", *(a.name for a in node.names)]
             assert "changes" not in names, (
-                "vendor_interface/primitive_handling/readings.py imports vendor_interface/primitive_handling/changes.py"
+                "vendor_specific/primitive_handling/readings.py imports vendor_specific/primitive_handling/changes.py"
             )
 
 
@@ -293,9 +292,9 @@ def _measuring_imports(path: Path) -> set[str]:
         module = node.module or ""
         for name in MEASURING_MODULES:
             item, leaf = name.split(".")
-            if module.endswith(f"configuration.{item}.{leaf}"):
+            if module.endswith(f"driver_setup.{item}.{leaf}"):
                 found.add(name)
-            elif module.endswith(f"configuration.{item}") or module == item:
+            elif module.endswith(f"driver_setup.{item}") or module == item:
                 if any(alias.name == leaf for alias in node.names):
                     found.add(name)
     return found

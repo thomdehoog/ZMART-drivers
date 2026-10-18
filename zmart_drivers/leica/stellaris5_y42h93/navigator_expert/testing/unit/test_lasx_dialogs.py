@@ -23,9 +23,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitives.interface import (
-    lasx_dialogs,
-)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitives.interface import lasx_dialogs
 
 SHOWN = (
     "2026-10-14 09:49:33.502 0007  Info DbTracer 'MessageBox Warning : "
@@ -250,9 +248,7 @@ class TestCommands:
     def test_a_setting_waits_for_no_open_dialog_and_says_why(
         self, client, lasx_log, monkeypatch
     ):
-        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitive_handling import (
-            changes as cam,
-        )
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling import changes as cam
 
         show(lasx_log)
         use(
@@ -274,9 +270,7 @@ class TestCommands:
     def test_a_setting_answers_an_ok_only_warning_first_and_reports_it(
         self, client, lasx_log, monkeypatch
     ):
-        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitive_handling import (
-            changes as cam,
-        )
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling import changes as cam
 
         show(lasx_log)
         dialog = StandInDialog(lasx_log)
@@ -292,9 +286,7 @@ class TestCommands:
     def test_an_acquire_is_not_started_into_an_open_dialog(
         self, client, lasx_log, monkeypatch
     ):
-        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitive_handling import (
-            changes as cam,
-        )
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling import changes as cam
 
         show(lasx_log)
         use(

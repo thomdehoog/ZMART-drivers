@@ -1,11 +1,9 @@
 """The log of one capture: what the driver was asked, and what it did.
 
 One JSON file a capture, ``log/<stem>.log.json``,
-beside ``data``: the settings asked for and the ones used, each step the
-driver took (selecting the job, taking up backlash, the capture itself) with
-what LAS X answered, what was sent but never confirmed, when the capture
-started and finished, where every plane was taken, and which files were
-saved. The pictures and their metadata say what was captured; this says how.
+beside ``data``: the settings asked for and the ones used, when the
+capture started and finished, what was sent but never confirmed, where every
+plane was taken, and which files were saved. The pictures and their metadata say what was captured; this says how.
 """
 
 from __future__ import annotations
@@ -15,7 +13,7 @@ import os
 import uuid
 from pathlib import Path
 
-from ...vendor_interface.naming import Naming, log_dir
+from ...vendor_specific.naming import Naming, log_dir
 
 __all__ = ["write"]
 

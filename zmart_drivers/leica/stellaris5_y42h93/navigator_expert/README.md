@@ -141,15 +141,15 @@ LAS X.
 | LAS X dialog / MessageBox log | `C:\ProgramData\Leica Microsystems\LAS X\MatrixScreener.log` |
 | CAM API assemblies (runtime) | `C:\Program Files\Leica Microsystems CMS GmbH\LAS X\AddIns\NavigatorExpert` |
 
-Defaults live in `vendor_interface/primitive_handling/profiles.py` (`LogReaderProfile`, `LasxApiProfile`) and are discovered at
+Defaults live in `vendor_specific/primitive_handling/profiles.py` (`LogReaderProfile`, `LasxApiProfile`) and are discovered at
 runtime where possible. Override via the profile, not at call sites.
 
 ## 3. Configuration
 
-- **Connection** — `LasxApiProfile` (`vendor_interface/primitive_handling/profiles.py`): `runtime_root` (the add-in dir) and
+- **Connection** — `LasxApiProfile` (`vendor_specific/primitive_handling/profiles.py`): `runtime_root` (the add-in dir) and
   `delay_ms` (Leica's client-side pacing knob `DelayInMilliseconds`, default 250 ms).
 - **Log reader** — `LogReaderProfile`: the `lcsCommand.log` / `MatrixScreener.log` paths + freshness windows.
-- **Machine-local calibration & limits** — `configuration/store.py` resolves the instrument's calibration
+- **Machine-local calibration & limits** — `driver_setup/store.py` resolves the instrument's calibration
   (image↔stage matrix, per-objective translation), limits, orientation, and origin from a
   machine-local ProgramData. Directly below `navigator_expert`, each subsystem owns an independent
   timestamp tree: `limits/<datetime>/`, `calibration/<datetime>/`,
@@ -159,12 +159,11 @@ runtime where possible. Override via the profile, not at call sites.
   connect. Setup notebooks append only to their owning tree,
   so publishing one subsystem never duplicates another. The single `limits.json` is
   flat: four typed stage-axis `range` entries, `objective_slot` with `allowed` values,
-  and either a typed constraint or explicit `[]` for each setter. Backlash remains a
-  command routine, not configuration.
+  and either a typed constraint or explicit `[]` for each setter.
 - **The driver loads the configs at connect** — making a `ZmartDriver` is the connection. Its
-  constructor opens the CAM client (`vendor_interface/connection/lasx_client.py`) and then loads this
+  constructor opens the CAM client (`vendor_specific/connection/lasx_client.py`) and then loads this
   microscope's three machine-local configs — the **instrument limits**, the **orientation**, and the
-  **calibration** — so the whole session works from one consistent picture. Normal image orientation is enabled by `IMAGE_SAVE` in `vendor_interface/primitive_handling/profiles.py`; only the
+  **calibration** — so the whole session works from one consistent picture. Normal image orientation is enabled by `IMAGE_SAVE` in `vendor_specific/primitive_handling/profiles.py`; only the
   orientation measurement explicitly requests raw pixels. Limits and calibration can still be skipped.
   This is a deliberate ladder: the limits notebook
   is bounded only by the physical backstop, `set_orientation` is bounded by limits, and
@@ -246,8 +245,8 @@ print(saved.image_paths)  # {PlaneIndex(t,z,c): Path, ...}
 > `output_root`, when a session gives one); the workflow files each capture into its own run.
 
 > No machine config yet? The first connect seeds ProgramData from the repo defaults so CI and local
-> mock runs work. On the rig, run `configuration/limits/notebooks/set_limits.ipynb`,
-> `configuration/image_stage_registration/notebooks/set_orientation.ipynb`, and the calibration notebook to replace those defaults
+> mock runs work. On the rig, run `driver_setup/limits/notebooks/set_limits.ipynb`,
+> `driver_setup/image_stage_registration/notebooks/set_orientation.ipynb`, and the calibration notebook to replace those defaults
 > with measured values. If a machine file is invalid, the session falls back to the bundled default
 > envelope (loudly) rather than refusing — fix the file the warning names and reconnect.
 
@@ -314,12 +313,12 @@ command but readback didn't confirm the value within the windows (most `set_*` u
 `success` alone as "applied"** for setting commands. `success=False` means it failed to fire (transport,
 permanent error, failed pre-check) and `confirmed` is `None`.
 
-**Error classification** (`vendor_interface/error_classification.py`): messages are matched **permanent-first**
+**Error classification** (`vendor_specific/error_classification.py`): messages are matched **permanent-first**
 (`out of range`, `is invalid`, `not implemented`, …) then **transient** (`being scanned`, `busy`,
 `timeout`, …); unknown → permanent (conservative). Transient errors retry up to `max_retries`.
 
 **Reading state — direct, with api / log / hybrid behind it** (`dispatcher/reader.py`, over
-the three readers in `vendor_interface/primitives/` (`direct/direct_reader.py`, `api/api_reader.py` and
+the three readers in `vendor_specific/primitives/` (`direct/direct_reader.py`, `api/api_reader.py` and
 `log/log_reader.py`), chosen per datum by
 `StateReaderProfile`). Every reading asks the **direct** reader first, the default for every datum
 since 13 October 2026: it reads LAS X's current state from its hardware server (`state_tree.py`),
@@ -330,7 +329,7 @@ Expert's autofocus job. Only when it fails (LAS X not reachable, an answer that 
 the others answer: `api` (CAM read requests, one at a time per connection), `log` (parse LAS X logs
 — never blocks the CAM API, can be stale), `hybrid` (watch both, the first answer that counts as a
 success wins). A reading says which source answered. What counts as a success is declared once
-per datum in `vendor_interface/primitive_handling/readings.py` (job settings, for example, must name the job asked about and carry
+per datum in `vendor_specific/primitive_handling/readings.py` (job settings, for example, must name the job asked about and carry
 an objective slot and image geometry). On the STELLARIS (15 October 2026) the direct reader was
 right where the CAM API was stale: the z-galvo position while a job had a z-galvo stack, and the
 selected job just after a switch.
@@ -383,7 +382,7 @@ schema-mismatched (it returns `None` only when the settings cannot be read at al
 
 Z has no hardware readback through CAM. The settings' `zPosition` is the job's stored setpoint
 and it stops refreshing for the drive that carries the job's z-stack; for that drive the Z
-extractor (`vendor_interface/primitive_handling/derived.py::z_um_from_settings`) asks LAS X's hardware server where the drive
+extractor (`vendor_specific/primitive_handling/derived.py::z_um_from_settings`) asks LAS X's hardware server where the drive
 really is, transparently to every caller — reader, `confirm_move_z`, the `ZmartDriver` class. If the hardware
 server cannot be reached, the stacked drive is refused with a clear message instead of answered
 with the stale number. The free drive is read from the settings at no extra cost.
@@ -435,7 +434,7 @@ Per-setting commands (below the rule) also take a `setting_index` targeting a sp
 | `set_filter_wheel_spectrum` | `setting_index, beam_route, filter_wheel_type, position` | 1 nm |
 
 ### Settings model
-`make_changeable_copy(get_job_settings(client, job))` (`vendor_interface/parsing.py`) normalizes raw job
+`make_changeable_copy(get_job_settings(client, job))` (`vendor_specific/parsing.py`) normalizes raw job
 settings into the flat, stable dict the `_confirm_*` functions read back against: `zoom`, `scanSpeed`,
 `scanMode`, `stack`, `zPosition`, and `activeSettings[...]` (with `activeDetectors`, `activeLaserLines`,
 `filterWheels`). Underscore-prefixed keys (`_beamRoute`, `_lineIndex`, `_index`, `_name`) are
@@ -517,10 +516,6 @@ anything is saved.
 (`source`), the projection -- is this microscope's `IMAGE_SAVE` profile, set up once. Where it
 goes is the `output_folder` that `acquire` is given, or else the data location set up once.
 
-**Extra in-place backlash rounds are off by default.** They are the driver's own setting,
-`ACQUISITION_BACKLASH_DEFAULT_ROUNDS` in `procedures/acquisition_and_saving/acquisition.py`, `0` unless changed there. The normal XY
-move still uses the driver's consistent final approach to the requested position.
-
 **`Naming`.** A capture is named by its stem, `{acquisition_type}_{position_label}`: the kind
 of acquisition `acquire` is given (`acquisition` when none is), then the workflow's label, for
 example `overview_K00_M000001_G000001_P000000_V00`. Characters that cannot be in a file name
@@ -543,7 +538,7 @@ zmart_drivers/leica/stellaris5_y42h93/navigator_expert/
 │   └── zmart_driver.py     the ZmartDriver class the controller calls, one method per command;
 │                           the work behind each method is in procedures/ (session, frame,
 │                           acquisition, instrument)
-├── vendor_interface/   the only part that knows LAS X:
+├── vendor_specific/   the only part that knows LAS X:
 │   ├── connection/     lasx_client.py (open the client and check it answers) · lasx_runtime.py (the .NET CAM
 │   │                   assemblies) · hardware_server.py
 │   ├── error_classification.py   the kinds of problem, the rule that only a temporary one is
@@ -575,21 +570,21 @@ zmart_drivers/leica/stellaris5_y42h93/navigator_expert/
 │                       until the change took effect, and sends again if it did not; never for an
 │                       acquisition) · gate.py (when the limits are enforced)
 ├── procedures/         the recipes built on the machinery, grouped by job:
-│   ├── session.py · frame.py · acquisition.py · instrument.py   what the ZmartDriver class
-│   │                   calls: the session handle, where the stage is and moving it, taking and
-│   │                   saving a picture, the state and the named procedures
-│   ├── commands/       changes.py (every set_*/move_*/select_job and the LAS X acquire command) ·
-│   │                   acquire.py (the capture) · objectives.py · objective_shift.py · backlash.py
-│   ├── saving/         save.py · ome_zarr.py · ome_canonical.py · materialize.py · command_log.py
-│   └── setup/          the measurements done once per microscope: measure_orientation.py ·
-│                       measure_limits.py · calibrate_objective_pair.py · check_calibration.py ·
-│                       adopt_calibration.py · calibration_common.py · algorithms/ (registration
-│                       and focus scoring)
-├── configuration/      what is measured once per microscope; coordinates.py holds the plain
-│                       arithmetic between stage and user coordinates. limits/, image_stage_registration/
-│                       and optical_calibration/ each hold their defaults/ and their notebook;
-│                       store.py resolves the machine-local snapshots under ProgramData;
-│                       session_state.py holds what one connection loaded; notebook_support.py
+│   ├── session.py · session_state.py · frame.py · coordinates.py · instrument.py   what the
+│   │                   ZmartDriver class calls: the session handle and what one connection loaded,
+│   │                   where the stage is and moving it (with the plain arithmetic between stage
+│   │                   and user coordinates), the state and the named procedures
+│   ├── acquisition_and_saving/   taking a picture and keeping it: acquisition.py · acquire.py (the
+│   │                   capture) · save.py · ome_zarr.py · ome_canonical.py · materialize.py ·
+│   │                   command_log.py · clear_cache.py
+│   └── commands/       compensated_changes.py (set_objective and select_job, with the stage
+│                       correction between objectives) · objectives.py · objective_shift.py
+├── driver_setup/       everything for setting up this driver on one microscope, one folder per item:
+│                       limits/, origin/, image_stage_registration/ (the picture's orientation),
+│                       optical_calibration/ and data_location/. Each holds its bundled defaults,
+│                       its loader, the code that measures it and its notebook. store.py finds
+│                       the saved values under ProgramData; notebook_support.py helps the notebooks
+├── running_log.py      the driver's rolling log file
 ├── testing/            unit/ (offline) · calibration/ (the calibration suites) · hardware/
 │                       (validate_*.py live scripts + mock-backed test_* gates) · helpers/ (the
 │                       LAS X mock) · data/
@@ -609,9 +604,9 @@ nothing about zoom/objectives/stages. Commands supply small zero-arg callables (
 with `functools.partial`).
 
 **Dependency direction.** The anatomy's rule is that each part imports only from the parts below
-it: `vendor_interface` → `dispatcher` → `procedures`, with `output` and `configuration` beside
+it: `vendor_specific` → `dispatcher` → `procedures`, with `driver_setup` beside
 them. The move that put every file in its part kept the imports as they were, so a few still run
-upward today: the readers and the handling notes in `vendor_interface` use the dispatcher's tuning,
+upward today: the readers and the handling notes in `vendor_specific` use the dispatcher's tuning,
 envelope and read engine, the gate loads the limits item, and the limits item validates through
 the rulebook. `testing/unit/test_architecture_guard.py` lists each
 of them and fails when a new one appears; removing them is follow-up work, one at a time.
@@ -635,14 +630,14 @@ workflow sees:
 - The limits gate moves inside the set dispatcher, so that no change calls it itself.
 - Done since the move: the logic of the commands left `zmart_adapter.py` for `procedures/`
   (`session.py`, `frame.py`, `acquisition.py`, `instrument.py`), the `output/` folder is gone, and
-  the plain coordinate arithmetic is in `configuration/coordinates.py`. Still to do: the
+  the plain coordinate arithmetic is in `procedures/coordinates.py`. Still to do: the
   `ZmartDriver` class converts at its edge. The full list of differences from the plan is in
   `docs/driver-anatomy.md` ("Where the Leica tree still differs from the plan").
 - The setup notebooks become thin: the measuring is a procedure, the notebook only calls it.
 
 ## 8. Configuration & tuning (profiles)
 
-Every command has a frozen `CommandProfile` in `vendor_interface/primitive_handling/profiles.py` — its complete recipe (pluggable
+Every command has a frozen `CommandProfile` in `vendor_specific/primitive_handling/profiles.py` — its complete recipe (pluggable
 callables + retry/confirm tuning). Tuning a command = editing its profile; nothing else changes.
 
 ```python
@@ -746,9 +741,9 @@ These **silently misbehave** instead of failing loudly — respect them or resul
 
 Adding a command touches four places, following the pattern every existing command uses:
 
-1. **Confirm function** (`vendor_interface/primitive_handling/confirmations.py`) — `_confirm_X(client, ...) -> {"success", "logs"}`
+1. **Confirm function** (`vendor_specific/primitive_handling/confirmations.py`) — `_confirm_X(client, ...) -> {"success", "logs"}`
    (skip if no readback is possible).
-2. **CommandProfile** (`vendor_interface/primitive_handling/profiles.py`) — `MY_PARAM = _leica_setting_profile(_confirm_my_param)`.
+2. **CommandProfile** (`vendor_specific/primitive_handling/profiles.py`) — `MY_PARAM = _leica_setting_profile(_confirm_my_param)`.
 3. **Command wrapper** (`procedures/commands/changes.py`) — three phases (pre-checks → `_dispatch(...)` with the
    profile + a `setup_fn` and target-bound `confirm_fn` → post-process). `_dispatch` handles
    client-binding, profile defaults, and the `confirm_and_fire` call.
@@ -764,4 +759,4 @@ Copy the closest existing command of a similar shape.
 - Sibling drivers, still under construction in the main ZMART-microscopy repository:
   [ZEISS ZEN API](https://github.com/ZMB-UZH/ZMART-microscopy/tree/main/zmart_drivers/zeiss/zenapi) (gRPC) and
   [Nikon NIS-Elements](https://github.com/ZMB-UZH/ZMART-microscopy/tree/main/zmart_drivers/nikon) (socket macro).
-- Leica filename implementation: [`vendor_interface/naming.py`](vendor_interface/naming.py)
+- Leica filename implementation: [`vendor_specific/naming.py`](vendor_specific/naming.py)

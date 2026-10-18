@@ -25,25 +25,12 @@ import tifffile
 
 pytest.importorskip("cv2")  # calibration core imports cv2
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.image_stage_registration import (
-    Orientation,
-)
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.store import (
-    MachineProfile,
-)
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.naming import (
-    build_image_name,
-    parse_image_name,
-)
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.optical_calibration import (
-    adopt_calibration as wf_adopt,
-)
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.optical_calibration import (
-    calibrate_objective_pair as wf_obj,
-)
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.optical_calibration import (
-    calibration_common as cm,
-)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.image_stage_registration import Orientation
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.store import MachineProfile
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.naming import build_image_name, parse_image_name
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.optical_calibration import adopt_calibration as wf_adopt
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.optical_calibration import calibrate_objective_pair as wf_obj
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.optical_calibration import calibration_common as cm
 
 # ---------------------------------------------------------------------
 # Explicit runtime roots
@@ -638,9 +625,7 @@ def test_adoption_refuses_a_reference_missing_from_the_calibration(
 
 def test_common_reference_adoptions_infer_every_objective_pair(sessions_root, machine):
     """10→20/40/60 measurements must imply every pair and reverse."""
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.optical_calibration import (
-        model as calibration_model,
-    )
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.optical_calibration import model as calibration_model
 
     calibration_name = "shared_lens_setup"
     reference = {
@@ -772,12 +757,8 @@ def test_orientation_unmeasured_warning_signals(tmp_path, caplog, monkeypatch):
     """
     import logging
 
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration import (
-        store as machine_mod,
-    )
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.optical_calibration import (
-        calibrate_objective_pair as op,
-    )
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup import store as machine_mod
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.optical_calibration import calibrate_objective_pair as op
 
     profile = MachineProfile(programdata_root=tmp_path / "programdata")
     snap = profile.ensure_snapshot("orientation")  # seeds the shipped placeholder
@@ -992,7 +973,6 @@ def _patch_objective_driver(
         "zwide": home_z,
         "z_move_modes": [],
         "acquire_jobs": [],
-        "backlash_passes": [],
         "acquisition_events": [],
         "stack_phase": "ref",
         "ref_stack": dict(default_ref if ref_stack is None else ref_stack),
@@ -1104,12 +1084,6 @@ def _patch_objective_driver(
     monkeypatch.setattr(cm.drv, "acquire", _acquire)
     monkeypatch.setattr(cm.drv, "save", _save)
 
-    def _correct_backlash(_client, *, passes, **_kwargs):
-        state["backlash_passes"].append(passes)
-        state["acquisition_events"].append("backlash")
-
-    monkeypatch.setattr(cm._movement, "correct_backlash", _correct_backlash)
-
     def _acquire_frame(client, job, **kw):
         idx = frame_count["n"]
         frame_count["n"] += 1
@@ -1186,7 +1160,7 @@ def test_objective_pair_defaults_to_machine_workspace_calibration_and_active_job
 ):
     _seed_snapshot(machine)
     monkeypatch.setattr(
-        "zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.store.MACHINE",
+        "zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.store.MACHINE",
         machine,
     )
     _patch_objective_driver(monkeypatch)
@@ -1207,7 +1181,6 @@ def test_objective_pair_defaults_to_machine_workspace_calibration_and_active_job
     assert session.calibration_path == machine.calibration_path().absolute()
     assert session.calibration_name is None
     assert session.job_name == "Overview"
-    assert session.backlash_rounds == 5
 
 
 def test_objective_pair_measure_runs_the_next_unfinished_step(monkeypatch):
@@ -1252,7 +1225,7 @@ def test_objective_pair_measure_runs_the_next_unfinished_step(monkeypatch):
 def test_objective_pair_notebook_only_configures_session_and_reference_slot():
     notebook_path = (
         Path(wf_obj.__file__).parents[2]
-        / "configuration"
+        / "driver_setup"
         / "optical_calibration"
         / "notebooks"
         / "calibrate_objective_pair.ipynb"
@@ -1267,7 +1240,6 @@ def test_objective_pair_notebook_only_configures_session_and_reference_slot():
     assert 'session_id="' in code
     assert 'acquisition_name="' in code
     assert "reference_slot=1" in code
-    assert "backlash_rounds=5" in code
     assert "job_name=" not in code
     assert "sessions_root=" not in code
     assert "parent_session=session" not in code
@@ -1307,16 +1279,6 @@ def test_objective_pair_rejects_conflicting_calibration_selectors(monkeypatch):
         )
 
 
-@pytest.mark.parametrize("invalid_rounds", [-1, 1.5, True, "2"])
-def test_objective_pair_rejects_invalid_backlash_rounds(invalid_rounds):
-    with pytest.raises(ValueError, match="backlash_rounds must be a whole number"):
-        wf_obj.start_session(
-            session_id="invalid_backlash",
-            reference_slot=1,
-            backlash_rounds=invalid_rounds,
-        )
-
-
 def test_objective_pair_can_select_named_machine_calibration(
     monkeypatch,
     sessions_root,
@@ -1329,7 +1291,7 @@ def test_objective_pair_can_select_named_machine_calibration(
         calibration_name="lens_A",
     )
     monkeypatch.setattr(
-        "zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.store.MACHINE",
+        "zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.store.MACHINE",
         machine,
     )
     _patch_objective_driver(monkeypatch)
@@ -1410,7 +1372,7 @@ def test_configured_reference_may_differ_on_a_placeholder_only_calibration(
         json.dumps(_placeholder_calibration_payload()), encoding="utf-8"
     )
     monkeypatch.setattr(
-        "zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.store.MACHINE",
+        "zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.store.MACHINE",
         machine,
     )
     _patch_objective_driver(monkeypatch)
@@ -1432,9 +1394,7 @@ def test_adoption_reanchors_a_placeholder_only_calibration(sessions_root, machin
     placeholder positions are dropped (they were relative to the shipped
     origin, which no longer exists), and the objective names survive.
     """
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.optical_calibration import (
-        model as calibration_model,
-    )
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.optical_calibration import model as calibration_model
 
     machine.publish_snapshot(
         _SEED_MOMENT, calibration=_placeholder_calibration_payload()
@@ -1854,12 +1814,10 @@ def test_objective_pair_z_translation_arithmetic_peak_to_peak(
     assert "Z-wide translation from 10x to 20x: +3.00 µm" in output
 
 
-@pytest.mark.parametrize("backlash_rounds", [0, 1, 2])
 def test_objective_pair_xy_translation_arithmetic_identity(
     monkeypatch,
     sessions_root,
     machine,
-    backlash_rounds,
 ):
     # Frames are stage-aligned (reoriented at save time), so the registered
     # image shift is already the stage-frame correction: motor_shift = (10, 20),
@@ -1893,7 +1851,6 @@ def test_objective_pair_xy_translation_arithmetic_identity(
         reference_slot=1,
         sessions_root=sessions_root,
         calibration_path=machine.calibration_path(),
-        backlash_rounds=backlash_rounds,
     )
     session = wf_obj.measure_parfocality_reference(session)
     state["stack_phase"] = "target"
@@ -1936,14 +1893,7 @@ def test_objective_pair_xy_translation_arithmetic_identity(
     assert state["z_move_modes"] == ["zwide", "zwide"]
     assert state["acquire_jobs"]
     assert set(state["acquire_jobs"]) == {"Overview"}
-    expected_passes = [] if backlash_rounds == 0 else [backlash_rounds] * 5
-    expected_events = (
-        ["acquire"] * 5 if backlash_rounds == 0 else ["backlash", "acquire"] * 5
-    )
-    assert state["backlash_passes"] == expected_passes
-    assert state["acquisition_events"] == expected_events
-    assert "backlash" not in payload
-    assert report["backlash_rounds"] == backlash_rounds
+    assert state["acquisition_events"] == ["acquire"] * 5
 
 
 def test_objective_pair_weak_xy_vote_blocks_config(monkeypatch, sessions_root, machine):

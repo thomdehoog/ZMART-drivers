@@ -21,17 +21,13 @@ from zmart_controller.registry import load_driver
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.for_zmart_controller import (
     zmart_driver,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitive_handling import (
-    profiles,
-)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling import profiles
 
 # The class file and zmart_driver.json sit together in for_zmart_controller/; that is the folder to register.
 DRIVER_FOLDER = Path(zmart_driver.__file__).resolve().parent
 
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.connection import (
-    lasx_client as _connect_module,
-)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.connection import lasx_client as _connect_module
 
 
 def _offline(monkeypatch, tmp_path):

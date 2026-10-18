@@ -6,10 +6,8 @@ the workflow gave, so the files of one place stay together. Along with the
 pictures the driver saves a small log of what it did, and it embeds the
 state of the machine in each saved plane.
 
-Before the capture, the stage can optionally be settled with backlash
-take-up (off by default); a change that was sent but could not be confirmed is
-recorded and the capture carries on, so the workflow is told rather than
-stopped.
+A change that was sent but could not be confirmed is recorded and the capture
+carries on, so the workflow is told rather than stopped.
 
 Author: Thom de Hoog, Center for Microscopy and Image Analysis (ZMB),
 University of Zurich (thom.dehoog@zmb.uzh.ch, thomdehoog@gmail.com).
@@ -26,27 +24,21 @@ try:  # driver version for embedded export state; never fail acquire over it
 except Exception:  # noqa: BLE001 -- best-effort provenance
     _DRIVER_VERSION = None
 
-from ...configuration import image_stage_registration as _orientation
+from ...driver_setup import image_stage_registration as _orientation
 from .. import session_state as _session_state
 from . import command_log as _log
 from . import clear_cache as _release
 from . import save as _save
-from ...vendor_interface.naming import Naming, free_stem
-from ...vendor_interface.primitive_handling import state as _readers
-from ...vendor_interface.primitive_handling.profiles import IMAGE_SAVE
+from ...vendor_specific.naming import Naming, free_stem
+from ...vendor_specific.primitive_handling import state as _readers
+from ...vendor_specific.primitive_handling.profiles import IMAGE_SAVE
 from . import acquire as _capture
-from ..commands import backlash as _motion
 from .. import session as _info
 from ..frame import get_xyz
 from ..instrument import get_state
-from ..session import ZmartHandle, note_unconfirmed, require_open, try_
+from ..session import ZmartHandle, require_open, try_
 
 log = logging.getLogger(__name__)
-
-# Routine backlash take-up remains explicitly available, but ordinary
-# controller acquisitions do not add in-place correction cycles unless the
-# caller opts in with a positive ``backlash_rounds`` value.
-ACQUISITION_BACKLASH_DEFAULT_ROUNDS = 0
 
 
 def _loaded_orientation(handle: ZmartHandle):
@@ -78,9 +70,7 @@ def get_acquisition_settings(handle: ZmartHandle) -> dict:
     pictures are saved -- format, where the pixels are read from, the
     projection, and whether LAS X then lets go of the capture -- comes from
     this microscope's profile (``IMAGE_SAVE``), and where they go from its
-    data location, set up once. Whether the stage's
-    slack is taken up first, and how often, is the driver's own
-    (``ACQUISITION_BACKLASH_DEFAULT_ROUNDS``).
+    data location, set up once.
     """
     require_open(handle)
     return {"trigger": {"options": ["full"], "default": "full", "active": "full"}}
@@ -213,16 +203,6 @@ def acquire(
             "with set_xyz before acquiring"
         )
     noted_before = len(handle.unconfirmed)
-    # What the capture's log says it did, step by step (see procedures/acquisition_and_saving/command_log.py).
-    steps: dict = {}
-    backlash_rounds = ACQUISITION_BACKLASH_DEFAULT_ROUNDS
-    apply_backlash = backlash_rounds > 0
-    if apply_backlash:
-        settled = steps["backlash"] = _motion.correct_backlash(
-            handle.client, passes=backlash_rounds
-        )
-        if not settled.get("confirmed"):
-            note_unconfirmed(handle, "acquire: backlash takeup", settled)
     if IMAGE_SAVE.cleanup_cache:
         _release.prepare()
 
@@ -306,7 +286,6 @@ def acquire(
             "stem": naming.stem,
             "asked": dict(acquisition_settings or {}),
             "settings": resolved,
-            "steps": steps,
             "capture": {
                 "started": _when(acq.started_at),
                 "finished": _when(acq.finished_at),
@@ -327,8 +306,6 @@ def acquire(
         "trigger": resolved["trigger"],
         "job": job,
         "format": "ome-zarr",
-        "settle": "backlash-corrected" if apply_backlash else "direct",
-        "backlash_rounds": backlash_rounds if apply_backlash else 0,
         # Every file this acquisition saved, under the name the ZMART
         # Controller's contract fixes, so a workflow finds them on any
         # microscope: the images, then the vendor's metadata, then the state.
@@ -341,7 +318,7 @@ def acquire(
         # images in ``data/metadata``. A client moving a record moves this too.
         "metadata": printed,
         # The changes made for this capture that were sent but never
-        # confirmed by a readback (the backlash takeup).
+        # confirmed by a readback.
         # Empty when everything confirmed. The capture itself went ahead.
         "unconfirmed": unconfirmed,
         # The driver's log of this capture: what it was asked, and what it did.

@@ -8,12 +8,8 @@ from pathlib import Path
 import pytest
 from limits_fixtures import merged_limits_payload
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.limits import (
-    config as limits_config,
-)
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.store import (
-    MachineProfile,
-)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.limits import config as limits_config
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.store import MachineProfile
 
 
 def _write_json(path, payload):
@@ -86,9 +82,7 @@ def test_adopt_limits_first_time_writes_complete_limits_snapshot(tmp_path):
 
 
 def test_adopt_limits_archives_the_saved_notebook_with_the_snapshot_timestamp(tmp_path):
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.store import (
-        format_snapshot_name,
-    )
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.store import format_snapshot_name
 
     m = MachineProfile(programdata_root=tmp_path / "programdata")
     notebook = tmp_path / "set_limits.ipynb"
@@ -220,7 +214,7 @@ def test_load_rejects_a_stray_backlash_block(tmp_path):
 def test_bundled_limits_stay_outside_programdata(tmp_path, monkeypatch):
     driver_root = Path(__file__).resolve().parents[2]
     template_limits = (
-        driver_root / "configuration" / "limits" / "defaults" / "limits.json"
+        driver_root / "driver_setup" / "limits" / "defaults" / "limits.json"
     )
     monkeypatch.setenv("ZMART_MICROSCOPY_ROOT", str(tmp_path / "programdata"))
 
@@ -238,7 +232,7 @@ def test_bundled_limits_stay_outside_programdata(tmp_path, monkeypatch):
 def test_defaults_path_remains_bundled_after_machine_limits_are_published(
     tmp_path, monkeypatch
 ):
-    import zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.store as machine_mod
+    import zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.store as machine_mod
 
     monkeypatch.setenv("ZMART_MICROSCOPY_ROOT", str(tmp_path))
     m = machine_mod.MachineProfile()
@@ -284,7 +278,7 @@ def test_limits_notebook_publishes_the_exact_flat_template():
     driver_root = Path(__file__).resolve().parents[2]
     notebook = json.loads(
         (
-            driver_root / "configuration" / "limits" / "notebooks" / "set_limits.ipynb"
+            driver_root / "driver_setup" / "limits" / "notebooks" / "set_limits.ipynb"
         ).read_text(encoding="utf-8")
     )
     source = "\n".join(
@@ -305,7 +299,7 @@ def test_limits_notebook_publishes_the_exact_flat_template():
     notebook_limits = ast.literal_eval(assignment.value)
     bundled = json.loads(
         (
-            driver_root / "configuration" / "limits" / "defaults" / "limits.json"
+            driver_root / "driver_setup" / "limits" / "defaults" / "limits.json"
         ).read_text(encoding="utf-8")
     )
     assert notebook_limits == bundled
@@ -315,7 +309,7 @@ def test_limits_notebook_publishes_the_exact_flat_template():
         if isinstance(node, ast.ImportFrom)
         for alias in node.names
     }
-    limits_config = "zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.limits.config"
+    limits_config = "zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.limits.config"
     assert (limits_config, "adopt_limits") in imported
     assert (limits_config, "validate_limits") in imported
     assert "lambda notebook: adopt_limits(" in source

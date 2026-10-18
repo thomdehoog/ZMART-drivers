@@ -103,11 +103,11 @@ each part only uses the parts below it.
   procedures/         recipes: acquire, autofocus, the setup measurements
   dispatcher/         the shared engines that run everything safely:
                       one read at a time, the limits gate, fallback, confirmation, error rules
-  vendor_interface/   the only part that is rewritten for a new microscope
+  vendor_specific/   the only part that is rewritten for a new microscope
   ───────────────────────────────────────────────────────────────
   vendor software (LAS X, NIS-Elements, ZEN, mesoSPIM-control)
 
-  alongside:  configuration/   testing/
+  alongside:  driver_setup/   testing/
 ```
 
 The folder layout inside a driver:
@@ -122,7 +122,7 @@ my_driver/
         __init__.py            needed: the controller imports the class file as part of the package, so its imports work
         zmart_driver.py        the ZmartDriver class the controller calls; kept thin
 
-    vendor_interface/          the part you write for a new microscope
+    vendor_specific/          the part you write for a new microscope
         connection/            reach the vendor software, keep the link, close it (a single connection.py when it is small)
         error_classification.py  sort this vendor's failures into the shared kinds of problem
         primitive_handling.py  how the dispatcher treats each primitive: which to try first,
@@ -151,7 +151,7 @@ my_driver/
         record_origin.py
         focus_score.py         the pure algorithms the recipes use
         registration.py
-    configuration/
+    driver_setup/
         machine_description/   each item: default.json, its check, and the notebook that sets it
         image_stage_registration/
         origin/
@@ -216,7 +216,7 @@ this means for the Leica driver").
 
 The point of the whole anatomy is that when someone writes a driver for a new
 microscope, such as a ZEISS, an Evident or a Nikon, the work is in one place:
-the `vendor_interface/` folder. Everything above it, the dispatcher, the
+the `vendor_specific/` folder. Everything above it, the dispatcher, the
 procedures and the `ZmartDriver` class, should already work.
 
 What a driver author writes:
@@ -535,7 +535,7 @@ new version.
 
 The arithmetic between raw stage coordinates and user coordinates (the origin,
 the orientation, the objective offsets) is done by the `ZmartDriver` class, at
-its edge, using the functions in `configuration/coordinates.py`. What comes in
+its edge, using the functions in `procedures/coordinates.py`. What comes in
 from the controller is converted to raw coordinates before it goes further,
 and what goes out is converted to user coordinates. Everything below the
 class, the procedures and the dispatcher, then works in one system, the raw
@@ -574,7 +574,7 @@ Three words, three files, so that each one says what it does:
 
 - **Error vocabulary** (`dispatcher/error_vocabulary.py`): the list of kinds of
   problem. It is the same for every microscope.
-- **Error classification** (`vendor_interface/error_classification.py`): the
+- **Error classification** (`vendor_specific/error_classification.py`): the
   sorting of this vendor's failures into that list. This is the part a driver
   author writes.
 - **Error rules** (`dispatcher/error_rules.py`): what to do for each kind. It
@@ -676,7 +676,7 @@ keeps only the translation.
 ### What this means for the Leica driver
 
 Walking the Leica driver through the anatomy showed that most of it fits:
-`vendor_interface/`, `dispatcher/`, `configuration/` and `procedures/` map
+`vendor_specific/`, `dispatcher/`, `driver_setup/` and `procedures/` map
 directly, and `output/` splits into the Leica-specific finding and reading of
 the picture (to the vendor interface) and the shared writer (to a procedure).
 
@@ -696,7 +696,7 @@ same result before and after.
 **Also done.** The adapter now sits inside `for_zmart_controller/`, with the
 class that uses it. The `actions/` folder is gone. Its handling information (the
 profiles, the confirmations, the table of readings, what a value means and the
-idle check) is in `vendor_interface/primitive_handling/`. Its command
+idle check) is in `vendor_specific/primitive_handling/`. Its command
 definitions and the capture are in `procedures/`. The dispatcher engines stay
 in `dispatcher/`. The guard test lists the few imports that still run upward.
 
@@ -705,7 +705,7 @@ Leica-specific:
 
 - `dispatcher/read.py` only waits for an answer from whichever source gives
   one. Asking the API, the log or the direct reader once is in
-  `vendor_interface/primitive_handling/sources.py`, and the named readings
+  `vendor_specific/primitive_handling/sources.py`, and the named readings
   (`get_xy`, `get_jobs` and the others) are in `primitive_handling/state.py`.
 - `dispatcher/change.py` sends a request and awaits its reply through a
   `transport` that each command profile carries. The LAS X version of it is in
@@ -734,10 +734,10 @@ Leica-specific:
   writing of the files (`save.py`, `materialize.py`, `ome*.py`,
   `command_log.py`) is in `procedures/`. What reads LAS X's own picture files
   (`lasx_data_container.py`, `lasx_cache_release.py`) is in
-  `vendor_interface/primitives/capture/`, and LAS X's description of a picture
-  is read into the standard fields by `vendor_interface/metadata_map.py`.
+  `vendor_specific/primitives/capture/`, and LAS X's description of a picture
+  is read into the standard fields by `vendor_specific/metadata_map.py`.
 - The plain arithmetic between stage and user coordinates is in
-  `configuration/coordinates.py`, as the plan says. `procedures/frame.py` only
+  `procedures/coordinates.py`, as the plan says. `procedures/frame.py` only
   decides what to read and what to move.
 
 **Done since (October 2026).**
@@ -771,13 +771,13 @@ purpose, so that it cannot be forgotten.
 
 1. **The confirmation of `select_job` still races two legs.** After a job
    change, the API and the log are checked at the same time in two threads
-   (`vendor_interface/primitive_handling/confirmations.py`, the dual-leg
+   (`vendor_specific/primitive_handling/confirmations.py`, the dual-leg
    race). The plan asks for one after the other. The tests for this are
    written around the race, and it was run on the microscope as it is, so it
    is left for after the first run on the simulator.
 2. **The conversion between user and stage coordinates is still in
    `procedures/frame.py`.** The plain arithmetic is in
-   `configuration/coordinates.py`, but the procedures still take and give
+   `procedures/coordinates.py`, but the procedures still take and give
    positions in the controller's frame (the acquisition places every plane from
    the frame position it remembers). The plan has the `ZmartDriver` class
    convert at its edge, and also says that whether procedures should own part of
@@ -1106,8 +1106,7 @@ fully shared").
 ## 4. Procedures
 
 **Purpose.** To offer recipes that combine several steps, such as autofocus,
-backlash takeup (always finishing a move from the same side, so that
-positions repeat), or parking the z-galvo at zero while keeping the focus.
+or parking the z-galvo at zero while keeping the focus.
 
 **Rules.**
 
@@ -1226,7 +1225,7 @@ registration.
 **An item may come from the vendor, or not apply.** NIS knows its own
 travel limits, ZEN reports the pixel size live, the mesoSPIM has no
 image-to-stage registration to speak of. Where the vendor is the source, the
-vendor interface offers a reading for it and the item in `configuration/`
+vendor interface offers a reading for it and the item in `driver_setup/`
 holds only what the operator adds, such as a narrowing of the vendor's
 range, or nothing at all. At connect, the class reads the vendor's value,
 applies what is saved, and hands the result on. The item still lives here,
@@ -1287,7 +1286,7 @@ anatomy"). The mock's `__init__`
 user coordinates (subtracting the origin, applying the registration, adding
 the objective offsets) lives once, as a pair of plain functions next to this
 configuration (`user_from_raw` and `raw_from_user` in the mock's
-`configuration/coordinates.py`). The `ZmartDriver` class uses these functions
+`procedures/coordinates.py`). The `ZmartDriver` class uses these functions
 at its edge (see "The simplified anatomy"). That way:
 
 - the controller and the experiments speak one coordinate system, the user's;
@@ -1588,7 +1587,7 @@ by any other part of the driver. The Leica driver already works this way.
   dispatcher is the only thing that follows them. The kinds table above is
   the seam between the two.
 - **The vendor side.** Code that runs inside the vendor software lives in
-  `vendor_interface/vendor_side/`, standard library only, importing nothing
+  `vendor_specific/vendor_side/`, standard library only, importing nothing
   of the driver but the shared message format.
 - **Actions and the dispatcher are separate folders.** The dispatcher is the
   same for every microscope and will move to the shared package; the actions

@@ -12,9 +12,7 @@ from __future__ import annotations
 import threading
 import time
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface import (
-    files as _files,
-)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific import files as _files
 
 
 def test_a_file_that_keeps_growing_longer_than_the_budget_is_still_waited_for(tmp_path):

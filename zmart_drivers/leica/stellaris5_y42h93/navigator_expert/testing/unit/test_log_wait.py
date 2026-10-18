@@ -2,16 +2,10 @@
 
 import unittest
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitive_handling import (
-    profiles,
-)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling import profiles
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher import dispatcher
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitives.log import (
-    log_reader,
-)
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitives.log.log_wait import (
-    wait_for_selected_job_log,
-)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitives.log import log_reader
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitives.log.log_wait import wait_for_selected_job_log
 
 
 def _job(block_id, name):

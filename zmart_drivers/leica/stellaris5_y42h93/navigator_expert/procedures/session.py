@@ -20,14 +20,14 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from ..vendor_interface.primitive_handling import state as _readers
+from ..vendor_specific.primitive_handling import state as _readers
 
 log = logging.getLogger(__name__)
 
 #: What to run when no data location was set up, said in every refusal.
 SET_UP = (
     "set this microscope's data location once with "
-    "configuration/data_location/notebooks/set_data_location.ipynb, "
+    "driver_setup/data_location/notebooks/set_data_location.ipynb, "
     "or connect with an output_root"
 )
 
@@ -87,7 +87,7 @@ class ZmartHandle:
     position_counter: int = 0
     translations: dict[int, tuple[float, float, float]] | None = None
     #: This microscope's data location, set up once and loaded at connect
-    #: (configuration/data_location); None when it was never set up.
+    #: (driver_setup/data_location); None when it was never set up.
     data_location: Path | None = None
     closed: bool = False
     unconfirmed: list[dict[str, Any]] = field(default_factory=list)

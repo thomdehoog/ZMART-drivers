@@ -1,7 +1,7 @@
 """At the microscope: does the driver see LAS X's warnings, and answer the OK-only ones?
 
 The driver reads each dialog LAS X opens from ``LAS X.log`` and finds its
-window through Windows UI Automation (``vendor_interface/primitives/interface/lasx_dialogs.py``).
+window through Windows UI Automation (``vendor_specific/primitives/interface/lasx_dialogs.py``).
 Both were seen only on the LAS X simulator. This script shows them on the
 microscope, in two steps:
 
@@ -31,9 +31,7 @@ POLL_S = 0.5
 
 
 def look(minutes: float) -> None:
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitives.interface import (
-        lasx_dialogs,
-    )
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitives.interface import lasx_dialogs
 
     lasx_dialogs.pending()  # what the log said before the look starts
     print(f"looking for {minutes:g} min; open a LAS X dialog now", flush=True)
@@ -61,9 +59,7 @@ def look(minutes: float) -> None:
 
 
 def answer(minutes: float) -> None:
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitives.interface import (
-        lasx_dialogs,
-    )
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitives.interface import lasx_dialogs
 
     logging.basicConfig(
         level=logging.WARNING, format="%(asctime)s %(levelname)s %(message)s"

@@ -37,21 +37,13 @@ from limits_fixtures import (
 )
 from mock_lasx_api import MockLasxClient
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitive_handling import (
-    changes as commands_mod,
-)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling import changes as commands_mod
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.commands import (
     compensated_changes as commands_mod_comp,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.limits import (
-    config as limits_config,
-)
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.store import (
-    MachineProfile,
-)
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitive_handling import (
-    limit_rules as motion_limits,
-)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.limits import config as limits_config
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.store import MachineProfile
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling import limit_rules as motion_limits
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher import gate
 
 DRIVER_ROOT = Path(__file__).resolve().parents[2]
@@ -61,9 +53,7 @@ DRIVER_ROOT = Path(__file__).resolve().parents[2]
 # =============================================================================
 
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.connection import (
-    lasx_client as _connect_module,
-)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.connection import lasx_client as _connect_module
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.for_zmart_controller.zmart_driver import (
     ZmartDriver,
 )
@@ -902,12 +892,8 @@ def test_adapter_bypass_refuses_at_the_commands_layer(clear_stage_limits):
     not a missing handshake."""
     from unittest.mock import patch
 
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface import (
-        parsing as _cmd_settings,
-    )
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitive_handling import (
-        state as _readers,
-    )
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific import parsing as _cmd_settings
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling import state as _readers
 
     _raw_snapshot(_machine_root(), limits_text=_BAD_LIMITS_TEXTS["missing_axis"])
     client = MockLasxClient(latency=0.0)
@@ -943,12 +929,8 @@ def test_controller_session_bypass_refuses_at_the_commands_layer(clear_stage_lim
     from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.for_zmart_controller.zmart_driver import (
         ZmartDriver as driver,
     )
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface import (
-        parsing as _cmd_settings,
-    )
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitive_handling import (
-        state as _readers,
-    )
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific import parsing as _cmd_settings
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling import state as _readers
 
     _raw_snapshot(_machine_root(), limits_text=_BAD_LIMITS_TEXTS["missing_axis"])
     client = MockLasxClient(latency=0.0)
@@ -1004,7 +986,7 @@ def test_mapping_is_total_over_the_key_vocabulary():
 def test_bundled_template_declares_exactly_the_key_vocabulary():
     template = json.loads(
         (
-            DRIVER_ROOT / "configuration" / "limits" / "defaults" / "limits.json"
+            DRIVER_ROOT / "driver_setup" / "limits" / "defaults" / "limits.json"
         ).read_text(encoding="utf-8")
     )
     assert set(template) == set(limits_config._REQUIRED_FILE_KEYS)
@@ -1026,7 +1008,7 @@ def test_every_dispatching_wrapper_declares_and_calls_the_gate():
     (b) call the gate with ITS OWN name — a new command cannot ship ungated."""
     vendor_tree = ast.parse(
         (
-            DRIVER_ROOT / "vendor_interface" / "primitive_handling" / "changes.py"
+            DRIVER_ROOT / "vendor_specific" / "primitive_handling" / "changes.py"
         ).read_text(encoding="utf-8")
     )
     recipe_tree = ast.parse(
@@ -1080,9 +1062,7 @@ def test_every_dispatching_wrapper_declares_and_calls_the_gate():
     # The settings of a job go through one runner, so their functions do not
     # call the gate themselves. Each must hand the runner the table entry that
     # carries its own name, and the runner must show the gate that name.
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitive_handling import (
-        settings as settings_table,
-    )
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling import settings as settings_table
 
     for node in tree.body:
         if not isinstance(node, ast.FunctionDef) or node.name.startswith("_"):
@@ -1110,7 +1090,7 @@ def test_every_dispatching_wrapper_declares_and_calls_the_gate():
         for call in ast.walk(runner)
         if isinstance(call, ast.Call)
         and isinstance(call.func, ast.Name)
-        and call.func.id == "_limits_refusal"
+        and call.func.id == "limits_refusal"
     ]
     assert shown_to_gate and all(
         isinstance(arg, ast.Attribute) and arg.attr == "command"
@@ -1129,7 +1109,7 @@ def test_every_dispatching_wrapper_declares_and_calls_the_gate():
 def test_backstop_allows_measured_xy_below_the_default_margin():
     template = json.loads(
         (
-            DRIVER_ROOT / "configuration" / "limits" / "defaults" / "limits.json"
+            DRIVER_ROOT / "driver_setup" / "limits" / "defaults" / "limits.json"
         ).read_text(encoding="utf-8")
     )
 
@@ -1188,17 +1168,9 @@ def test_calibration_values_seed_programdata_from_repo_defaults():
     assert machine.calibration_path() == path
 
 
-def test_backlash_is_not_config_and_the_primitive_uses_its_default_params():
-    """§2b (resolves MR-01/MR-02): backlash left limits.json entirely. The
-    published limits.json has NO backlash block, limits_config.load reads only
-    the envelope, and the backlash routine carries its own baked-in defaults —
-    there is no config path (and so no NaN-backlash path) left in limits."""
-    import inspect
-
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.commands import (
-        backlash as movement,
-    )
-
+def test_published_limits_hold_only_the_stage_envelope_and_the_policy():
+    """The published limits.json has no extra blocks, and loading it reads only
+    the policy and the stage envelope."""
     profile = provision_machine_limits(_machine_root())
     limits_path = profile.latest_snapshot("limits") / "limits.json"
     on_disk = json.loads(limits_path.read_text(encoding="utf-8"))
@@ -1208,14 +1180,6 @@ def test_backlash_is_not_config_and_the_primitive_uses_its_default_params():
     assert set(cfg) == {"policy", "stage_um"}
     assert set(cfg["stage_um"]) == {"x", "y", "z_galvo", "z_wide"}
     assert cfg["stage_um"]["x"] == DEFAULT_STAGE_UM["x"]
-
-    # the routine's params are baked into the module, not read from config
-    assert movement.BACKLASH_OVERSHOOT_UM == 50.0
-    assert movement.BACKLASH_SETTLE_MS == 100
-    defaults = inspect.signature(movement.correct_backlash).parameters
-    assert defaults["overshoot_um"].default == 50.0
-    assert defaults["settle_ms"].default == 100
-    assert defaults["tolerance_um"].default == 20.0
 
 
 def test_a_calibration_adopt_does_not_duplicate_other_machine_config():

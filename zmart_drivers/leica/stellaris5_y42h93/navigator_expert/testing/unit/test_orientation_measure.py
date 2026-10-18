@@ -20,21 +20,11 @@ import tifffile
 
 pytest.importorskip("cv2")  # calibration.core.common (reused by measure) imports cv2
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.image_stage_registration import (
-    Orientation,
-)
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.notebook_support import (
-    NotebookCheckpoint,
-)
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.naming import (
-    build_image_name,
-)
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.optical_calibration import (
-    calibration_common as cm,
-)
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.image_stage_registration import (
-    measure_orientation as wf,
-)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.image_stage_registration import Orientation
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.notebook_support import NotebookCheckpoint
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.naming import build_image_name
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.optical_calibration import calibration_common as cm
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.image_stage_registration import measure_orientation as wf
 
 
 @pytest.fixture
@@ -45,7 +35,7 @@ def sessions_root(tmp_path):
 # The notebook lives with the configuration item it sets, not with the procedure.
 _ORIENTATION_NOTEBOOKS = (
     Path(__file__).resolve().parents[2]
-    / "configuration"
+    / "driver_setup"
     / "image_stage_registration"
     / "notebooks"
 )
@@ -200,9 +190,7 @@ def _untrusted():
 def _start(sessions_root, **kw):
     from datetime import datetime, timezone
 
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.store import (
-        MachineProfile,
-    )
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.store import MachineProfile
 
     kw.pop("session_id", None)  # legacy test label; run names are automatic
     return wf.start_session(
@@ -510,9 +498,7 @@ def test_start_session_creates_a_new_session_after_kernel_restart(
 ):
     from datetime import datetime, timezone
 
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.store import (
-        MachineProfile,
-    )
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.store import MachineProfile
 
     _patch(monkeypatch)
     machine = MachineProfile(programdata_root=sessions_root)
@@ -606,9 +592,7 @@ def test_failed_run_keeps_evidence_but_is_not_active(monkeypatch, sessions_root)
     assert not (session.paths.session_dir / wf.ORIENTATION_NAME).exists()
     assert (session.paths.reports_dir / "orientation_report.json").is_file()
 
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.store import (
-        MachineProfile,
-    )
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.store import MachineProfile
 
     machine = MachineProfile(programdata_root=sessions_root)
     assert machine.latest_snapshot("orientation") is None

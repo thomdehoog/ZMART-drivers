@@ -4,7 +4,7 @@ Maintainer decision (MAINTAINER_DECISIONS.md §7): limits are enforced as low
 as possible — at the command wrapper that populates the native CAM function's
 model — so nothing built on top (adapter, controller, workflows, notebooks)
 can interfere with or bypass them. The rules themselves (what is allowed:
-``LeicaLimits`` and the stage checks) live in ``vendor_interface/primitive_handling/limit_rules.py``; this
+``LeicaLimits`` and the stage checks) live in ``vendor_specific/primitive_handling/limit_rules.py``; this
 module owns the *moment* of enforcement — per-connection state and refusal.
 The wrappers in ``actions/`` call :func:`check_refusal` before anything fires.
 
@@ -46,11 +46,11 @@ file. The defaults sit within the physical backstop, and the backstop bounds
 every move regardless. Only if even the shipped defaults are unusable does the
 session go fail-closed, and every gated wrapper then refuses with the recorded
 reason (which names the notebook that creates the files:
-``configuration/limits/notebooks/set_limits.ipynb``). A client that never handshook at
+``driver_setup/limits/notebooks/set_limits.ipynb``). A client that never handshook at
 all (no ``connect_handshake`` ran) still refuses fail-closed.
 
 Single-writer invariant: like command dispatch (``confirm_loop.py``) and the
-stage-envelope module global (``vendor_interface/primitive_handling/limit_rules.py``), this registry assumes
+stage-envelope module global (``vendor_specific/primitive_handling/limit_rules.py``), this registry assumes
 ONE instrument per process. The registry is keyed by ``id(client)`` and holds
 a strong reference to the client (CAM clients are process-lifetime), so an id
 can never be recycled onto a different client. A second ``connect_handshake``
@@ -71,14 +71,11 @@ from dataclasses import dataclass
 from types import MappingProxyType
 from typing import Any
 
-from ..configuration import store as _machine
-from ..configuration.limits import config as _limits_config
-from ..vendor_interface.primitive_handling import limit_rules as _rules
-from ..vendor_interface.primitive_handling.limit_rules import (
-    MUTATING_COMMANDS,
-    NOTEBOOK_POINTER,
-)
-from ..vendor_interface.limit_errors import LimitsError, LimitsStatus, LimitViolation
+from ..driver_setup import store as _machine
+from ..driver_setup.limits import config as _limits_config
+from ..vendor_specific.primitive_handling import limit_rules as _rules
+from ..vendor_specific.primitive_handling.limit_rules import MUTATING_COMMANDS, NOTEBOOK_POINTER
+from ..vendor_specific.limit_errors import LimitsError, LimitsStatus, LimitViolation
 
 log = logging.getLogger(__name__)
 

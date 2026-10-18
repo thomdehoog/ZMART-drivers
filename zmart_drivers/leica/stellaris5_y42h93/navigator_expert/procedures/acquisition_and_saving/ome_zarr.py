@@ -45,10 +45,10 @@ from pathlib import Path
 
 import numpy as np
 
-from ...configuration.image_stage_registration import Orientation, reorient_array
+from ...driver_setup.image_stage_registration import Orientation, reorient_array
 from . import materialize
 from . import ome_canonical as canonical
-from ...vendor_interface.product import AcquisitionMetadata, ExportedAcquisition, PlaneIndex
+from ...vendor_specific.product import AcquisitionMetadata, ExportedAcquisition, PlaneIndex
 
 __all__ = [
     "Capture",

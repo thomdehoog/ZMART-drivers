@@ -35,9 +35,9 @@ reading.
 This file knows nothing of any one microscope. The microscope's own sources
 (its table of readings, and one question to the API, the log or the direct
 reader) are handed in as ``vendor``. For LAS X these are in
-``vendor_interface/primitive_handling/sources.py``, and the named readings the
+``vendor_specific/primitive_handling/sources.py``, and the named readings the
 rest of the driver asks for (``get_xy`` and the others) are in
-``vendor_interface/primitive_handling/state.py``, which call :func:`wait_for`.
+``vendor_specific/primitive_handling/state.py``, which call :func:`wait_for`.
 
 Author: Thom de Hoog, Center for Microscopy and Image Analysis (ZMB),
 University of Zurich (thom.dehoog@zmb.uzh.ch, thomdehoog@gmail.com).

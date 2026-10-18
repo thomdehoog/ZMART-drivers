@@ -6,7 +6,7 @@ This is the first of the two loops of a change. It runs four steps:
 2. **Setup**: write the command's values into the request.
 3. **Fire**: send the request. How a request is sent and its reply awaited is
    the business of the command's ``profile.transport`` (for LAS X,
-   ``vendor_interface/primitive_handling/transport.py``); this file only asks
+   ``vendor_specific/primitive_handling/transport.py``); this file only asks
    it to clear the reply, send, wait for the reply and report an open dialog.
 4. **Error check**: read what the microscope answered. A temporary problem is
    sent again, up to ``max_retries`` times, with an optional pause that can
@@ -64,7 +64,7 @@ def resolve_profile(profile=None, **overrides):
     from dataclasses import replace
 
     if profile is None:
-        from ..vendor_interface.primitive_handling.profiles import COMMAND_DEFAULT
+        from ..vendor_specific.primitive_handling.profiles import COMMAND_DEFAULT
 
         profile = COMMAND_DEFAULT
     changes = {name: value for name, value in overrides.items() if value is not None}

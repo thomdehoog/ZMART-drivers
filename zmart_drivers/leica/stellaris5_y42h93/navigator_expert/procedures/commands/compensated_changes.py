@@ -10,7 +10,7 @@ cannot be made, the command answers ``success: False`` and names the step, so
 a picture is never taken at a position that no longer points at the sample.
 
 Each is built on the single-command changes in
-``vendor_interface/primitive_handling/changes.py``.
+``vendor_specific/primitive_handling/changes.py``.
 
 Author: Thom de Hoog, Center for Microscopy and Image Analysis (ZMB),
 University of Zurich (thom.dehoog@zmb.uzh.ch, thomdehoog@gmail.com).
@@ -23,14 +23,11 @@ from ...dispatcher.dispatcher import (
     make_log_entry as _make_log_entry,
     make_timing as _make_timing,
 )
-from ...vendor_interface.parsing import _hw_get
-from ...vendor_interface.primitive_handling import changes as _changes
-from ...vendor_interface.primitive_handling.confirm_select_job import (
-    prepare_select_job,
-    select_job_confirm_legs,
-)
-from ...vendor_interface.primitive_handling.confirmations import confirm_objective
-from ...vendor_interface.primitive_handling.profiles import OBJECTIVE, SELECT_JOB
+from ...vendor_specific.parsing import _hw_get
+from ...vendor_specific.primitive_handling import changes as _changes
+from ...vendor_specific.primitive_handling.confirm_select_job import prepare_select_job, select_job_confirm_legs
+from ...vendor_specific.primitive_handling.confirmations import confirm_objective
+from ...vendor_specific.primitive_handling.profiles import OBJECTIVE, SELECT_JOB
 from functools import partial
 
 from . import objective_shift as _objective_shift

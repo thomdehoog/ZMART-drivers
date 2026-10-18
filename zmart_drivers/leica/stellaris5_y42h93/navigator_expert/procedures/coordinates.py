@@ -43,7 +43,7 @@ def objective_delta_um(
     # calibration/core/model.py — shared with the driver's swap-time
     # compensation, so the two layers can never drift apart. Imported
     # lazily, matching the connection layer's calibration imports.
-    from ..configuration.optical_calibration import model as _cal_model
+    from ..driver_setup.optical_calibration import model as _cal_model
 
     try:
         return _cal_model.translation_delta_um(translations, origin_slot, current_slot)
