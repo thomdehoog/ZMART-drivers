@@ -633,8 +633,9 @@ workflow sees:
 - The limits gate moves inside the set dispatcher, so that no change calls it itself.
 - Done since the move: the logic of the commands left `zmart_adapter.py` for `procedures/`
   (`session.py`, `frame.py`, `acquisition.py`, `instrument.py`), the `output/` folder is gone, and
-  the plain coordinate arithmetic is in `procedures/absolute_coordinate_system/coordinates.py`. Still to do: the
-  `ZmartDriver` class converts at its edge. The full list of differences from the plan is in
+  the plain coordinate arithmetic is in `procedures/absolute_coordinate_system/coordinates.py`. The coordinate
+  system is a procedure of its own (`procedures/absolute_coordinate_system/`), so the `ZmartDriver` class
+  converts nothing. The full list of differences from the plan is in
   `docs/driver-anatomy.md` ("Where the Leica tree still differs from the plan").
 - The setup notebooks become thin: the measuring is a procedure, the notebook only calls it.
 
