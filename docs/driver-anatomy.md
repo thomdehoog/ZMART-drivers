@@ -836,6 +836,26 @@ is refused, not passed through.
   through `procedures.record_origin` and saves through `configuration.save`,
   which is what such a notebook would call.
 
+**Setting an item up.** The main way to set up each item is its notebook. The
+reason is the record: a notebook that has been run keeps everything that was
+sent to the microscope and everything that came back, so the setup can be
+looked at again later. The Leica driver already keeps the run notebook beside
+the saved result. The notebook only calls the item's procedure, so the same
+setup can also be offered through an interface later. That comes after the
+notebooks, and a setup run from an interface has no record of its own until
+we decide how to keep one. The notebook and procedure names:
+
+| Item | Notebook | Procedure |
+|---|---|---|
+| `machine_description/` | `describe_machine.ipynb` | None yet: typed in, or read from the vendor software |
+| `image_stage_registration/` | `set_orientation.ipynb` | `measure_orientation` |
+| `origin/` | `set_origin.ipynb` | `record_origin` |
+| `limits/` | `set_limits.ipynb` | `measure_limits` |
+| `optical_calibration/` | `calibrate_objectives.ipynb` | `calibrate_objectives` |
+
+Three of these notebook names already exist in the Leica driver; the notebooks
+for the origin and the machine description are proposals.
+
 **Order at connect.** Connecting is making the `ZmartDriver` (part 7): its
 `__init__` opens the vendor software and loads the configuration. Each item
 depends on the one before it, so it loads them in this order: machine
