@@ -542,8 +542,9 @@ zmart_drivers/leica/stellaris5_y42h93/navigator_expert/
 ├── for_zmart_controller/   everything that faces the controller:
 │   ├── zmart_driver.py     the ZmartDriver class the controller calls, one method per command
 │   ├── zmart_controller_plugin.py   the older module shape, kept until the class has run on hardware
-│   └── zmart_adapter/      the functions behind those methods, one per command (still holds the
-│                           coordinate arithmetic; see "What the move did not change" below)
+│   └── zmart_adapter/      connect, disconnect and the table of commands the controller calls;
+│                           the work behind them is in procedures/ (session, frame, acquisition,
+│                           instrument)
 ├── connect.py          the connect flow: open LAS X, load this microscope's configuration
 ├── vendor_interface/   the only part that knows LAS X:
 │   ├── connection/     lasx_runtime.py (the .NET CAM assemblies), hardware_server.py
@@ -566,7 +567,10 @@ zmart_drivers/leica/stellaris5_y42h93/navigator_expert/
 │                       read.py (waits for a reading from whichever source answers), reading.py,
 │                       change.py (confirm_and_fire), gate.py (when the limits are enforced),
 │                       envelope.py, tuning.py (the timing constants)
-├── procedures/         changes.py (every set_*/move_*/select_job and the acquire command) ·
+├── procedures/         session.py (the handle) · frame.py (get_xyz, set_xyz, set_origin) ·
+│                       acquisition.py (the acquire command and its log) · instrument.py (state,
+│                       procedures, info) ·
+│                       changes.py (every set_*/move_*/select_job and the LAS X acquire command) ·
 │                       acquire.py (the capture) · objectives.py · objective_shift.py ·
 │                       backlash.py · measure_orientation.py · measure_limits.py ·
 │                       calibrate_objective_pair.py · check_calibration.py · adopt_calibration.py ·
@@ -621,8 +625,10 @@ workflow sees:
   once, never re-sent, and waited for as long as the scan needs.
 - A limits refusal raises `ValueError`; today parts of the gate raise `RuntimeError`.
 - The limits gate moves inside the set dispatcher, so that no change calls it itself.
-- The coordinate arithmetic (origin, orientation, objective offsets) leaves `for_zmart_controller/zmart_adapter/` for
-  `configuration/coordinates.py` and the `ZmartDriver` class.
+- Done since the move: the logic of the commands left `zmart_adapter.py` for `procedures/`
+  (`session.py`, `frame.py`, `acquisition.py`, `instrument.py`). Still to do: the pure coordinate
+  arithmetic (origin, orientation, objective offsets) moves to `configuration/coordinates.py` and
+  the `ZmartDriver` class converts at its edge.
 - The setup notebooks become thin: the measuring is a procedure, the notebook only calls it.
 - `zmart_controller_plugin.py` goes, once `zmart_driver.py` has driven the real STELLARIS.
 

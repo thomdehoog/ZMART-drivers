@@ -378,8 +378,8 @@ class TestSingleSourcedDelta:
         swap-time stage move equals the adapter's per-move frame offset for
         the same lens pair. Swap-then-move-to-F therefore lands exactly
         where move-to-F-alone would."""
-        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.for_zmart_controller.zmart_adapter import (
-            zmart_adapter as adapter,
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures import (
+            frame as _frame,
         )
 
         _arm(client)
@@ -396,7 +396,7 @@ class TestSingleSourcedDelta:
             origin={"objective": {"slotIndex": 1}},
             translations=TRANSLATIONS,
         )
-        adapter_delta = adapter._objective_delta_um(handle, {"slotIndex": 2})
+        adapter_delta = _frame.objective_delta_um(handle, {"slotIndex": 2})
         assert adapter_delta == driver_delta
         # and the physical move the driver fired is exactly that delta
         assert moves[0] == ("xy", 1000.0 + driver_delta[0], 2000.0 + driver_delta[1])

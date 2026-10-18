@@ -1,0 +1,515 @@
+"""Where the stage is, in the frame the controller uses, and how to move it there.
+
+The driver speaks absolute stage micrometres; the controller speaks
+micrometres from a zero point (the *origin*) saved once for this microscope.
+This file holds that arithmetic: reading the stage and giving its position in
+the controller's frame, moving to a position given in that frame, saving a new
+origin, and the allowed range (the *canvas*) in the same frame.
+
+The controller's single ``z`` axis is the *focus*: the sum of the two
+physical focus drives, z-wide and z-galvo, relative to the origin's focus sum,
+so it reads the same whichever drive made a move. When the objective is
+changed, the calibration's per-objective offset keeps the same point of the
+sample under the lens: x and y apply to the motorised stage, and the z offset
+is made by z-wide. A move across objectives is refused when no calibration
+can say how far the objectives differ; a read warns and reports the position
+without the correction, because a read can never put the stage anywhere wrong.
+
+The z model assumes that the two drives add up with the same sign. The
+arithmetic and the sign are checked on a real microscope by
+``testing/hardware/validate_zmart_adapter.py``.
+
+Author: Thom de Hoog, Center for Microscopy and Image Analysis (ZMB),
+University of Zurich (thom.dehoog@zmb.uzh.ch, thomdehoog@gmail.com).
+"""
+
+from __future__ import annotations
+
+import logging
+import math
+import time
+from typing import Any
+
+from ..configuration import store as _machine
+from ..dispatcher import gate as _gate
+from ..vendor_interface.primitive_handling import state as _readers
+from ..vendor_interface.primitive_handling.derived import (
+    z_um_from_settings as _z_um_from_settings,
+)
+from . import backlash as _motion
+from . import changes as _commands
+from . import session as _info
+from .session import ZmartHandle, job_catalog, note_unconfirmed, require_open  # noqa: F401
+
+log = logging.getLogger(__name__)
+
+
+# The motors that can move each axis, under the names the controller uses.
+# These are the names ``get_actuators`` lists and ``with_actuators`` accepts.
+_ACTUATORS = {"x": ("motoric",), "y": ("motoric",), "z": ("z-wide", "z-galvo")}
+
+# Where each motor's own reading sits in a hardware snapshot (see
+# ``_hardware_snapshot``). ``get_xyz`` reports these readings under
+# ``actuators``, so every motor here must also be listed in ``_ACTUATORS``.
+_MOTOR_READINGS = {
+    "x": {"motoric": "x_um"},
+    "y": {"motoric": "y_um"},
+    "z": {"z-wide": "z_wide_um", "z-galvo": "z_galvo_um"},
+}
+
+# Fixed defaults for axes omitted from ``with_actuators`` — never sticky: a
+# previous call's choice is not state.
+_DEFAULT_ACTUATORS = {"x": "motoric", "y": "motoric", "z": "z-wide"}
+
+# Every number in a get_xyz or set_xyz answer is in micrometres, and each
+# axis says so under this key. The same spelling the controller uses.
+UNIT = "micrometer"
+
+# The values a frame origin must carry. They match what set_origin captures,
+# so an origin loaded at connect behaves exactly like a freshly captured one.
+_ORIGIN_NUMBER_KEYS = ("x_um", "y_um", "z_wide_um", "z_galvo_um", "z_focus_um")
+
+
+def load_saved_origin() -> dict | None:
+    """Read the newest saved frame origin, or return None when none exists.
+
+    The origin lives in this microscope's ``origin/<datetime>/origin.json``
+    (see ``config/machine.py``); the newest folder wins, just as for the
+    limits, orientation and calibration.
+
+    Returns:
+        The origin with the same fields :func:`set_origin` captures
+        (``x_um``, ``y_um``, ``z_wide_um``, ``z_galvo_um``, ``z_focus_um``
+        and ``objective``), or None when no origin has ever been saved. In
+        that case a warning explains that the frame is the plain stage
+        coordinates.
+
+    Raises:
+        RuntimeError: when the file exists but cannot be read, is not valid
+            JSON, or is missing one of the values above. Guessing a zero
+            origin here would quietly shift every position in the
+            experiment, so the connection stops and says how to fix it.
+    """
+    path = _machine.MACHINE.origin_path()
+    fix = (
+        "Fix or remove that file, or connect with load_origin=False and capture "
+        "the origin again with the driver's set_origin step."
+    )
+    try:
+        payload = _machine.MACHINE.read_origin()
+    except (OSError, ValueError) as exc:
+        raise RuntimeError(
+            f"the saved frame origin at {path} could not be read ({exc}). {fix}"
+        ) from exc
+    if payload is None:
+        log.warning(
+            "no frame origin has been saved on this microscope yet, so positions "
+            "are plain stage coordinates. Run the driver's set_origin step once "
+            "to choose a zero point; it will then be loaded at every connect."
+        )
+        return None
+    stored = payload.get("origin") if isinstance(payload, dict) else None
+    if not isinstance(stored, dict):
+        raise RuntimeError(
+            f"the saved frame origin at {path} has no 'origin' section. {fix}"
+        )
+    origin: dict[str, Any] = {}
+    for key in _ORIGIN_NUMBER_KEYS:
+        value = stored.get(key)
+        if (
+            isinstance(value, bool)
+            or not isinstance(value, (int, float))
+            or not math.isfinite(value)
+        ):
+            raise RuntimeError(
+                f"the saved frame origin at {path} has no usable value for {key!r} "
+                f"(found {value!r}). {fix}"
+            )
+        origin[key] = float(value)
+    # The objective is what lets the driver refuse a move under a different
+    # objective when no calibration can translate between the two, so a
+    # file that does not say which objective it was captured under is
+    # refused rather than treated as "no objective recorded".
+    if "objective" not in stored:
+        raise RuntimeError(
+            f"the saved frame origin at {path} does not record which objective it "
+            f"was captured under. {fix}"
+        )
+    objective = stored["objective"]
+    if objective is not None and not isinstance(objective, dict):
+        raise RuntimeError(
+            f"the saved frame origin at {path} records its objective in an unexpected "
+            f"form ({objective!r}). {fix}"
+        )
+    origin["objective"] = dict(objective) if objective is not None else None
+    log.info("loaded the saved frame origin from %s", path)
+    return origin
+
+
+def objective_delta_um(handle: ZmartHandle, current_objective: dict | None) -> tuple:
+    """ΔT = T[current objective] − T[origin's objective], in µm (x, y, z-focus).
+
+    Zero when the origin has no objective anchor or the objective is
+    unchanged. Raises RuntimeError when the objective HAS changed but the
+    translations are unavailable — the caller decides whether that refuses
+    (moves) or warns (reads).
+    """
+    origin_slot = (handle.origin.get("objective") or {}).get("slotIndex")
+    current_slot = (current_objective or {}).get("slotIndex")
+    if origin_slot is None or current_slot == origin_slot:
+        return (0.0, 0.0, 0.0)
+    if current_slot is None:
+        raise RuntimeError(
+            f"objective changed since the origin was captured (slot {origin_slot} -> "
+            f"unidentified) so the frame cannot be mapped; capture the origin "
+            f"again under the current objective"
+        )
+    # The delta math and the missing-pair policy live in ONE place —
+    # calibration/core/model.py — shared with the driver's swap-time
+    # compensation, so the two layers can never drift apart. Imported
+    # lazily, matching the connection layer's calibration imports.
+    from ..configuration.optical_calibration import model as _cal_model
+
+    try:
+        return _cal_model.translation_delta_um(
+            handle.translations, origin_slot, current_slot
+        )
+    except RuntimeError as exc:
+        raise RuntimeError(
+            f"objective changed since the origin was captured but {exc} — or "
+            f"capture the origin again under the current objective"
+        ) from exc
+
+
+def hardware_snapshot(handle: ZmartHandle) -> dict:
+    """One consistent read of everything the frame math needs.
+
+    Stage XY, both z drives, and the current objective use the configured
+    reader policy; raises when any of them is unreadable.
+    """
+    xy = _readers.get_xy(handle.client)
+    if not xy:
+        raise RuntimeError("could not read stage XY position")
+    job = _info.selected_job_name(handle)
+    if job is None:
+        raise RuntimeError(
+            "could not determine the selected LAS X job, which this command needs "
+            "to read the focus drives; nothing was moved"
+        )
+    settings = _readers.get_job_settings(handle.client, job)
+    if not settings:
+        raise RuntimeError(f"could not read job settings for '{job}'")
+    return {
+        "job": job,
+        "x_um": float(xy["x_um"]),
+        "y_um": float(xy["y_um"]),
+        "z_wide_um": _z_um_from_settings(
+            settings, "z-wide", client=handle.client, job_name=job
+        ),
+        "z_galvo_um": _z_um_from_settings(
+            settings, "z-galvo", client=handle.client, job_name=job
+        ),
+        "objective": settings.get("objective"),
+    }
+
+
+def delta_or_warn(handle: ZmartHandle, snapshot: dict) -> tuple:
+    """ΔT for a READ: uncompensated-but-loud when translations are missing.
+
+    Reads must stay available (a read cannot land the stage anywhere wrong),
+    so a missing translation degrades to ΔT = 0 with a warning instead of
+    raising — unlike moves, which refuse.
+    """
+    try:
+        return objective_delta_um(handle, snapshot.get("objective"))
+    except RuntimeError as exc:
+        log.warning("%s; frame values are UNCOMPENSATED for the objective change", exc)
+        return (0.0, 0.0, 0.0)
+
+
+def set_origin(handle: ZmartHandle) -> dict:
+    """Make the current stage position the (0, 0, 0) of the frame and save it.
+
+    This is a setup step for the driver, not a controller command. The
+    operator runs it once, working with the driver directly, for example::
+
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.for_zmart_controller.zmart_adapter import zmart_adapter as adapter
+        handle = adapter.connect(adapter.CONNECTION)
+        adapter.set_origin(handle)
+
+    It reads stage XY, both z drives (z-wide and z-galvo), their sum (the
+    focus) and the current objective, and records them as the zero point.
+    The record is saved to this microscope's configuration as a new
+    ``origin/<datetime>/origin.json``, and every later :func:`connect` loads
+    the newest one, so all sessions share the same frame until the origin
+    is captured again. The objective is saved with it so that a later
+    objective change can be compensated with the calibration, or refused
+    when no calibration can translate between the two objectives.
+
+    The handle passed in starts using the new origin straight away.
+
+    Returns:
+        ``{"origin": {"x": 0, "y": 0, "z": 0}, "reference": <the captured
+        stage values>, "origin_file": <path of the saved origin.json>}``.
+
+    Raises:
+        RuntimeError: when the position cannot be read, or when the file
+            cannot be saved. In the second case this handle already uses the
+            new origin, but the next connect would not, so fix the cause and
+            run ``set_origin`` again.
+
+    It is not checked against the limits, because it moves nothing: it only
+    reads the current position and writes a small file. (``set_origin``
+    stays in the ``limits.json`` ``functions`` list so machine files remain
+    explicit about it.)
+    """
+    require_open(handle)
+    snap = hardware_snapshot(handle)
+    handle.origin = {
+        "x_um": snap["x_um"],
+        "y_um": snap["y_um"],
+        "z_wide_um": snap["z_wide_um"],
+        "z_galvo_um": snap["z_galvo_um"],
+        "z_focus_um": snap["z_wide_um"] + snap["z_galvo_um"],
+        "objective": snap["objective"],
+    }
+    payload = {
+        "origin": handle.origin,
+        "job": snap["job"],
+        "session_hash6": handle.hash6,
+        "captured_at": time.time(),
+    }
+    try:
+        path = _machine.MACHINE.write_origin(payload)
+    except OSError as exc:
+        # This handle already uses the new origin, but the next connect will
+        # load the previous saved one. Say so clearly, because otherwise the
+        # two would disagree without anyone noticing.
+        raise RuntimeError(
+            f"could not save the origin: {exc}. This connection already uses the "
+            f"new zero point, but the next connect will load the previously saved "
+            f"origin. Fix the cause and run set_origin again."
+        ) from exc
+    return {
+        "origin": {"x": 0.0, "y": 0.0, "z": 0.0},
+        "reference": dict(handle.origin),
+        "origin_file": str(path),
+    }
+
+
+def get_actuators(handle: ZmartHandle) -> dict:
+    """The motors that can move each axis, and the one used when none is chosen.
+
+    ``{"x": {"options": ["motoric"], "default": "motoric"}, ...,
+    "z": {"options": ["z-wide", "z-galvo"], "default": "z-wide"}}``. The
+    options are exactly the names ``with_actuators`` accepts, and the names
+    under which :func:`get_xyz` reports each motor's own reading. An axis left
+    out of ``with_actuators`` uses its default (x and y ``motoric``, z
+    ``z-wide``, the focus drive that reaches the whole travel); a previous
+    call's choice is never remembered.
+    """
+    require_open(handle)
+    return {
+        axis: {"options": list(opts), "default": _DEFAULT_ACTUATORS[axis]}
+        for axis, opts in _ACTUATORS.items()
+    }
+
+
+def _resolve_actuators(with_actuators: dict | None) -> dict[str, str]:
+    """Merge a per-call actuator selection over the fixed defaults."""
+    chosen = dict(_DEFAULT_ACTUATORS)
+    for axis, actuator in (with_actuators or {}).items():
+        if actuator not in _ACTUATORS.get(axis, ()):
+            raise ValueError(f"unknown actuator {actuator!r} for axis {axis!r}")
+        chosen[axis] = actuator
+    return chosen
+
+
+def get_xyz(handle: ZmartHandle, *, with_actuators: dict | None = None) -> dict:
+    """Where the stage is, per axis: ``position``, ``unit``, ``actuators`` and ``canvas``.
+
+    The answer has the keys ``x``, ``y`` and ``z``. Each axis carries the
+    same four entries, and every number in them is in micrometres:
+
+    - ``position``: where the axis is, measured from the saved origin. For
+      ``z`` this is the *focus*: the sum of the two z drives (z-wide plus
+      z-galvo) minus the origin's focus sum, so it reads the same whichever
+      drive made the move. When the objective in place is not the one the
+      origin was saved under, the calibrated objective translation ΔT is
+      subtracted as well, so the position names the same point of the
+      sample under either objective. (In short: position = fresh reading −
+      origin − ΔT.) When no translation is available, the position is
+      reported uncompensated and a warning is logged, because a read can
+      never land the stage anywhere wrong.
+    - ``unit``: always ``"micrometer"``.
+    - ``actuators``: every motor of the axis with its own reading, exactly
+      as LAS X reports it: ``{"motoric": ...}`` for x and y, ``{"z-wide":
+      ..., "z-galvo": ...}`` for z. These are the stage's own numbers, with
+      nothing subtracted, so they show how the two z drives share the focus.
+    - ``canvas``: ``[min, max]``, everywhere a picture can show along the
+      axis, in the same frame as ``position`` (see :func:`_canvas`). When
+      no limits govern the session, so that every move is refused, the
+      canvas is the current position alone.
+
+    ``with_actuators`` only checks that the motors it names exist; the
+    answer always reports all of them. The driver adds one extra on top,
+    ``objective_translation_um``: the ΔT that was subtracted, as
+    ``[x, y, z]``, so an operator can see when a compensation is in play.
+    """
+    require_open(handle)
+    chosen = _resolve_actuators(with_actuators)
+    snap = hardware_snapshot(handle)
+    dt = delta_or_warn(handle, snap)
+    z_focus = snap["z_wide_um"] + snap["z_galvo_um"]
+    frame = {
+        "x": snap["x_um"] - handle.origin["x_um"] - dt[0],
+        "y": snap["y_um"] - handle.origin["y_um"] - dt[1],
+        "z": z_focus - handle.origin["z_focus_um"] - dt[2],
+    }
+    allowed = canvas(handle) or {}
+    result = {
+        axis: {
+            "position": frame[axis],
+            "unit": UNIT,
+            "actuator": chosen[axis],
+            "actuators": {
+                motor: snap[reading] for motor, reading in _MOTOR_READINGS[axis].items()
+            },
+            "canvas": allowed.get(f"{axis}_um") or [frame[axis], frame[axis]],
+        }
+        for axis in ("x", "y", "z")
+    }
+    result["objective_translation_um"] = list(dt)
+    handle.driven_to = {
+        **frame,
+        "z_wide_um": snap["z_wide_um"],
+        "z_galvo_um": snap["z_galvo_um"],
+    }
+    return result
+
+
+def set_xyz(
+    handle: ZmartHandle,
+    x: float,
+    y: float,
+    z: float,
+    *,
+    with_actuators: dict | None = None,
+) -> dict:
+    """Move to (x, y, z), in micrometres from the origin, then answer like :func:`get_xyz`.
+
+    Once every leg of the move is confirmed, the position is read back from
+    the microscope and returned in exactly the shape :func:`get_xyz` gives,
+    so the answer shows where the stage really is, not the numbers that
+    were asked for. A move that is refused or cannot be confirmed raises
+    instead, because carrying on at an unknown position is never safe.
+
+    Destination = origin + F + ΔT, commanded absolutely. Ordinary frame-Z
+    movement uses the selected actuator, but objective-calibration ΔT.z always
+    belongs to z-wide. With z-wide selected, its one target contains both the
+    requested frame Z and ΔT.z while the galvo stays parked. With z-galvo
+    selected across objectives, z-wide first receives the absolute calibrated
+    objective offset and z-galvo then realizes only the requested frame Z::
+
+        zwide_for_objective = origin_zwide + ΔT.z
+        zgalvo_for_frame = origin_zgalvo + z
+
+    ΔT compensates an objective change relative to the origin's objective
+    (from the calibration's translation totals); a cross-objective move with
+    no translations available REFUSES. The adapter does no limit checking of
+    its own: every leg is checked inside the command that fires it, in the
+    actions. A refused leg raises with an actionable alternative; legs that
+    already ran stay where they arrived (each was checked too). A leg that
+    was sent and accepted but could not be confirmed does not raise: it is
+    recorded under the handle's ``unconfirmed`` list, and the answer is read
+    back from the microscope anyway, so the workflow sees where the stage
+    really is and decides for itself.
+    """
+    require_open(handle)
+    chosen = _resolve_actuators(with_actuators)
+    snap = hardware_snapshot(handle)
+    dt = objective_delta_um(handle, snap.get("objective"))  # raises if unavailable
+    abs_x = handle.origin["x_um"] + x + dt[0]
+    abs_y = handle.origin["y_um"] + y + dt[1]
+    target_focus = handle.origin["z_focus_um"] + z + dt[2]
+    z_targets: list[tuple[str, float]]
+    if chosen["z"] == "z-wide":
+        z_target = target_focus - snap["z_galvo_um"]
+        z_targets = [("zwide", z_target)]
+    elif dt[2] != 0.0:
+        # Translation is an objective property, not a general focus move. Pin
+        # its absolute contribution on z-wide so repeated set_xyz calls cannot
+        # accumulate it, then let z-galvo realize only the requested frame Z.
+        zwide_target = handle.origin["z_wide_um"] + dt[2]
+        z_target = handle.origin["z_galvo_um"] + z
+        z_targets = [("zwide", zwide_target), ("galvo", z_target)]
+    else:
+        z_target = target_focus - snap["z_wide_um"]
+        z_targets = [("galvo", z_target)]
+
+    # Every leg below is limit-checked inside the command it fires — the
+    # adapter carries no checks of its own. A refused leg raises here with
+    # an actionable message; legs that already ran stay where they arrived.
+    arrived = _motion.arrive_xy(handle.client, abs_x, abs_y)
+    if not arrived.get("confirmed"):
+        note_unconfirmed(handle, f"set_xyz: xy to ({x}, {y})", arrived)
+
+    for z_mode, target in z_targets:
+        z_result = _commands.move_z(
+            handle.client,
+            snap["job"],
+            target,
+            unit="um",
+            z_mode=z_mode,
+        )
+        if not z_result.get("success"):
+            # With z-galvo selected across objectives, the extra z-wide leg
+            # is the calibrated objective offset — it can only ever be
+            # realized by z-wide, so suggesting the other actuator would
+            # send the operator in a circle. The hint is only useful for
+            # the leg that carries the requested frame-Z motion.
+            if len(z_targets) == 2 and z_mode == "zwide":
+                raise RuntimeError(
+                    f"move_z ({z_mode}) failed: {z_result} "
+                    f"(this z-wide target is the calibrated objective offset, which "
+                    f"cannot be moved to the other z drive — re-set the origin under "
+                    f"the current objective, or re-adopt the objective calibration)"
+                )
+            alternative = "z-wide" if chosen["z"] == "z-galvo" else "z-galvo"
+            raise RuntimeError(
+                f"move_z ({z_mode}) failed: {z_result} "
+                f"(try with_actuators={{'z': '{alternative}'}})"
+            )
+        if not z_result.get("confirmed"):
+            note_unconfirmed(handle, f"set_xyz: z ({z_mode}) to {target}", z_result)
+
+    # Read back from the microscope, so the answer is where the stage is now.
+    return get_xyz(handle, with_actuators=with_actuators)
+
+
+def canvas(handle: ZmartHandle) -> dict | None:
+    """Everywhere a picture can show, per axis, in the frame. None when no limits govern the session.
+
+    On z the frame follows the focus, the sum of the two z drives, so the
+    canvas is the z-wide travel widened by the z-galvo travel: a z-stack on
+    the galvo reaches no further than the galvo can go. On x and y the
+    canvas is the stage travel itself. A picture taken at the edge of the
+    travel does show half a field beyond it, but the field depends on the
+    objective and the zoom, and LAS X only reports it for the objective in
+    place now, so the driver cannot know the widest field of every allowed
+    objective ahead of time and does not widen x and y.
+    """
+    state = _gate.state_for(handle.client)
+    if state is None or state.stage_cfg is None:
+        return None
+    stage = state.stage_cfg["stage_um"]
+    galvo = stage.get("z_galvo") or [0.0, 0.0]
+    origin = handle.origin
+    return {
+        "x_um": [stage["x"][0] - origin["x_um"], stage["x"][1] - origin["x_um"]],
+        "y_um": [stage["y"][0] - origin["y_um"], stage["y"][1] - origin["y_um"]],
+        "z_um": [
+            stage["z_wide"][0] + galvo[0] - origin["z_focus_um"],
+            stage["z_wide"][1] + galvo[1] - origin["z_focus_um"],
+        ],
+    }

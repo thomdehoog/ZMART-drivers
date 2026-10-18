@@ -47,6 +47,15 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface imp
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.for_zmart_controller.zmart_adapter import (
     zmart_adapter as adapter,
 )
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures import (
+    backlash as _motion,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures import (
+    changes as _commands,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitive_handling import (
+    state as _readers,
+)
 
 # The ground-truth translation table (µm). Slot 1 is the reference lens.
 TRUE_T = {1: (0.0, 0.0, 0.0), 2: (50.0, -30.0, 7.0), 3: (-12.5, 4.0, -3.25)}
@@ -117,16 +126,16 @@ def _running(sim: SimScope):
         }
 
     with (
-        patch.object(adapter._motion, "arrive_xy", fake_arrive),
-        patch.object(adapter._commands, "move_z", fake_move_z),
+        patch.object(_motion, "arrive_xy", fake_arrive),
+        patch.object(_commands, "move_z", fake_move_z),
         patch.object(
-            adapter._readers,
+            _readers,
             "get_xy",
             side_effect=lambda c, **k: {"x_um": sim.x, "y_um": sim.y},
         ),
-        patch.object(adapter._readers, "get_job_settings", side_effect=settings),
+        patch.object(_readers, "get_job_settings", side_effect=settings),
         patch.object(
-            adapter._readers,
+            _readers,
             "get_selected_job",
             return_value={"Name": "Overview", "IsSelected": True},
         ),
@@ -370,7 +379,7 @@ def test_zero_z_galvo_refused_first_leg_moves_nothing():
     def refusing_move_z(client, job, z, unit="um", z_mode="galvo", **_k):
         return {"success": False, "message": "z_wide_um outside range"}
 
-    with _running(sim), patch.object(adapter._commands, "move_z", refusing_move_z):
+    with _running(sim), patch.object(_commands, "move_z", refusing_move_z):
         with pytest.raises(RuntimeError, match="zero_z_galvo"):
             adapter.run_procedure(h, {"name": "zero_z_galvo"})
     assert sim.state() == before

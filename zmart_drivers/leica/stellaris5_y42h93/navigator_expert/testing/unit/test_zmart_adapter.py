@@ -40,6 +40,43 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface imp
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.for_zmart_controller.zmart_adapter import (
     zmart_adapter as adapter,
 )
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration import (
+    image_stage_registration as _orientation,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration import (
+    store as _machine,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.output import (
+    command_log as _log,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.output import (
+    lasx_cache_release as _release,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.output import save as _save
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures import (
+    acquire as _capture,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures import (
+    acquisition as _acquisition,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures import (
+    backlash as _motion,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures import (
+    changes as _commands,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures import (
+    frame as _frame,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures import (
+    instrument as _instrument,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures import (
+    session as _info,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitive_handling import (
+    state as _readers,
+)
 
 
 def _origin(
@@ -90,18 +127,16 @@ def _patch_position(
     x_um=100.0, y_um=200.0, z_wide_um=50.0, z_galvo_um=0.0, job="Overview", slot=3
 ):
     return (
+        patch.object(_readers, "get_xy", return_value={"x_um": x_um, "y_um": y_um}),
         patch.object(
-            adapter._readers, "get_xy", return_value={"x_um": x_um, "y_um": y_um}
-        ),
-        patch.object(
-            adapter._readers,
+            _readers,
             "get_job_settings",
             return_value=_settings(
                 z_wide_um=z_wide_um, z_galvo_um=z_galvo_um, slot=slot
             ),
         ),
         patch.object(
-            adapter._readers,
+            _readers,
             "get_selected_job",
             return_value={"Name": job, "IsSelected": True},
         ),
@@ -141,9 +176,9 @@ def _a_capture(job: str) -> SimpleNamespace:
     )
 
 
-_WRITE_THE_LOG = adapter._log.write
+_WRITE_THE_LOG = _log.write
 _NO_LOG_ON_DISK = patch.object(
-    adapter._log,
+    _log,
     "write",
     lambda output_root, naming, entry: (
         Path("/tmp/out") / "log" / f"{naming.stem}.log.json"
@@ -315,7 +350,7 @@ class TestFrame(unittest.TestCase):
                 x_um=1000.0, y_um=2000.0, z_wide_um=30.0, z_galvo_um=2.0
             )
             with (
-                patch.object(adapter._machine, "MACHINE", profile),
+                patch.object(_machine, "MACHINE", profile),
                 patches[0],
                 patches[1],
                 patches[2],
@@ -337,7 +372,7 @@ class TestFrame(unittest.TestCase):
     def _connect_with_profile(self, profile, connection=None):
         """Connect against a throwaway machine configuration and a stand-in client."""
         with (
-            patch.object(adapter._machine, "MACHINE", profile),
+            patch.object(_machine, "MACHINE", profile),
             patch.object(
                 adapter._session, "connect_python_client", return_value=object()
             ),
@@ -371,7 +406,7 @@ class TestFrame(unittest.TestCase):
         # objective without calibration is still refused.
         h.translations = None
         with self.assertRaisesRegex(RuntimeError, "objective changed"):
-            adapter._objective_delta_um(h, {"slotIndex": 3})
+            _frame.objective_delta_um(h, {"slotIndex": 3})
 
     def test_set_origin_then_connect_round_trips(self):
         """What set_origin captures is exactly what the next connect loads."""
@@ -388,7 +423,7 @@ class TestFrame(unittest.TestCase):
                 x_um=1000.0, y_um=2000.0, z_wide_um=30.0, z_galvo_um=2.0
             )
             with (
-                patch.object(adapter._machine, "MACHINE", profile),
+                patch.object(_machine, "MACHINE", profile),
                 patches[0],
                 patches[1],
                 patches[2],
@@ -408,7 +443,7 @@ class TestFrame(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as tmp:
             profile = MachineProfile(programdata_root=Path(tmp))
-            with self.assertLogs(adapter.log, level="WARNING") as logs:
+            with self.assertLogs(_frame.log, level="WARNING") as logs:
                 h = self._connect_with_profile(profile)
         self.assertEqual(h.origin, _origin())
         self.assertIn("no frame origin has been saved", "\n".join(logs.output))
@@ -426,7 +461,7 @@ class TestFrame(unittest.TestCase):
             path = profile.write_origin({"origin": _origin(x_um=5.0)})
             path.write_text("{not json", encoding="utf-8")
             with (
-                patch.object(adapter._machine, "MACHINE", profile),
+                patch.object(_machine, "MACHINE", profile),
                 patch.object(
                     adapter._session, "connect_microscope"
                 ) as connect_microscope,
@@ -535,8 +570,8 @@ class TestFrame(unittest.TestCase):
         # current hardware: z-wide at 32, z-galvo at 3
         patches = _patch_position(z_wide_um=32.0, z_galvo_um=3.0)
         with (
-            patch.object(adapter._motion, "arrive_xy", fake_move_xy_with_backlash),
-            patch.object(adapter._commands, "move_z", fake_move_z),
+            patch.object(_motion, "arrive_xy", fake_move_xy_with_backlash),
+            patch.object(_commands, "move_z", fake_move_z),
             patches[0],
             patches[1],
             patches[2],
@@ -557,8 +592,8 @@ class TestFrame(unittest.TestCase):
         self.assertEqual(record["z"]["actuators"], {"z-wide": 32.0, "z-galvo": 3.0})
         self.assertEqual(record["z"]["position"], 5.0)  # (32 + 3) − 30
         # the selection does NOT persist: defaults are fixed, never sticky
-        self.assertEqual(adapter._resolve_actuators(None)["z"], "z-wide")
-        self.assertEqual(adapter._resolve_actuators(None)["x"], "motoric")
+        self.assertEqual(_frame._resolve_actuators(None)["z"], "z-wide")
+        self.assertEqual(_frame._resolve_actuators(None)["x"], "motoric")
 
     def test_set_xyz_z_wide_compensates_parked_galvo(self):
         # origin inside the physical backstop (x/y >= 1000)
@@ -572,11 +607,11 @@ class TestFrame(unittest.TestCase):
         patches = _patch_position(z_wide_um=25.0, z_galvo_um=4.0)
         with (
             patch.object(
-                adapter._motion,
+                _motion,
                 "arrive_xy",
                 return_value={"success": True, "confirmed": True},
             ),
-            patch.object(adapter._commands, "move_z", fake_move_z),
+            patch.object(_commands, "move_z", fake_move_z),
             patches[0],
             patches[1],
             patches[2],
@@ -593,12 +628,12 @@ class TestFrame(unittest.TestCase):
         patches = _patch_position()
         with (
             patch.object(
-                adapter._motion,
+                _motion,
                 "arrive_xy",
                 return_value={"success": True, "confirmed": True},
             ),
             patch.object(
-                adapter._commands,
+                _commands,
                 "move_z",
                 return_value={
                     "success": True,
@@ -623,12 +658,12 @@ class TestFrame(unittest.TestCase):
         patches = _patch_position()
         with (
             patch.object(
-                adapter._motion,
+                _motion,
                 "arrive_xy",
                 return_value={"success": True, "confirmed": True},
             ),
             patch.object(
-                adapter._commands,
+                _commands,
                 "move_z",
                 return_value={
                     "success": False,
@@ -680,14 +715,14 @@ class TestAcquire(unittest.TestCase):
             adapter.get_acquisition_settings(h),
             {"trigger": {"options": ["full"], "default": "full", "active": "full"}},
         )
-        self.assertEqual(adapter.ACQUISITION_BACKLASH_DEFAULT_ROUNDS, 0)
+        self.assertEqual(_acquisition.ACQUISITION_BACKLASH_DEFAULT_ROUNDS, 0)
 
     def test_unknown_or_invalid_option_rejected(self):
         h = _handle(connection={**adapter.CONNECTION, "output_root": "/tmp/out"})
         with (
-            patch.object(adapter._readers, "get_jobs", return_value=self._jobs()),
+            patch.object(_readers, "get_jobs", return_value=self._jobs()),
             patch.object(
-                adapter._readers,
+                _readers,
                 "get_selected_job",
                 return_value={"Name": "Overview", "IsSelected": True},
             ),
@@ -735,7 +770,7 @@ class TestAcquire(unittest.TestCase):
         """Where this microscope saves is set up once and said in ``setup``, not asked per capture."""
         with tempfile.TemporaryDirectory() as tmp:
             h = _handle(data_location=Path(tmp))
-            with patch.object(adapter, "_selected_job_name", return_value="Overview"):
+            with patch.object(_info, "selected_job_name", return_value="Overview"):
                 info = adapter.get_info(h)
             self.assertNotIn("output_root", info)
             self.assertTrue(info["setup"]["data_location"]["done"])
@@ -789,28 +824,26 @@ class TestAcquire(unittest.TestCase):
         patches = _patch_position(job="Overview")
         with ExitStack() as standing_in:
             for stand_in in (
-                patch.object(adapter._readers, "get_jobs", return_value=self._jobs()),
-                patch.object(adapter._readers, "get_hardware_info", return_value={}),
+                patch.object(_readers, "get_jobs", return_value=self._jobs()),
+                patch.object(_readers, "get_hardware_info", return_value={}),
                 patch.object(
-                    adapter._commands, "select_job", lambda c, j, **k: {"success": True}
+                    _commands, "select_job", lambda c, j, **k: {"success": True}
                 ),
                 patch.object(
-                    adapter._motion,
+                    _motion,
                     "correct_backlash",
                     lambda client, **k: {"success": True, "confirmed": True},
                 ),
-                patch.object(
-                    adapter._capture, "acquire", lambda c, j, **k: _a_capture(j)
-                ),
-                patch.object(adapter._save, "save", fake_save),
-                patch.object(adapter._log, "write", fake_log),
+                patch.object(_capture, "acquire", lambda c, j, **k: _a_capture(j)),
+                patch.object(_save, "save", fake_save),
+                patch.object(_log, "write", fake_log),
                 *patches,
             ):
                 standing_in.enter_context(stand_in)
             # Where to save is otherwise this microscope's set-up data location.
             if output_root is not None:
                 standing_in.enter_context(
-                    patch.object(adapter._info, "output_root", return_value=output_root)
+                    patch.object(_info, "output_root", return_value=output_root)
                 )
             yield calls
 
@@ -859,9 +892,9 @@ class TestAcquire(unittest.TestCase):
         )
         patches = _patch_position(x_um=1_000.0, y_um=500.0, z_wide_um=100.0)
         with (
-            patch.object(adapter, "_selected_job_name", return_value="Overview"),
-            patch.object(adapter._info, "output_root", return_value=Path("/runs")),
-            patch.object(adapter._readers, "ping", return_value=True),
+            patch.object(_info, "selected_job_name", return_value="Overview"),
+            patch.object(_info, "output_root", return_value=Path("/runs")),
+            patch.object(_readers, "ping", return_value=True),
             patches[0],
             patches[1],
             patches[2],
@@ -903,15 +936,15 @@ class TestAcquire(unittest.TestCase):
 
         patches = _patch_position(job="HiRes")
         with (
-            patch.object(adapter._readers, "get_jobs", return_value=self._jobs()),
-            patch.object(adapter._readers, "get_hardware_info", return_value={}),
+            patch.object(_readers, "get_jobs", return_value=self._jobs()),
+            patch.object(_readers, "get_hardware_info", return_value={}),
             patch.object(
-                adapter._motion,
+                _motion,
                 "correct_backlash",
                 lambda client, **k: {"success": True, "confirmed": True},
             ),
-            patch.object(adapter._capture, "acquire", fake_capture),
-            patch.object(adapter._save, "save", fake_save),
+            patch.object(_capture, "acquire", fake_capture),
+            patch.object(_save, "save", fake_save),
             patches[0],
             patches[1],
             patches[2],
@@ -992,24 +1025,24 @@ class TestAcquire(unittest.TestCase):
 
             patches = _patch_position(job="Overview")
             with (
-                patch.object(adapter._readers, "get_jobs", return_value=self._jobs()),
-                patch.object(adapter._readers, "get_hardware_info", return_value={}),
+                patch.object(_readers, "get_jobs", return_value=self._jobs()),
+                patch.object(_readers, "get_hardware_info", return_value={}),
                 patch.object(
-                    adapter._commands, "select_job", lambda *a, **k: {"success": True}
+                    _commands, "select_job", lambda *a, **k: {"success": True}
                 ),
                 patch.object(
-                    adapter._motion,
+                    _motion,
                     "correct_backlash",
                     lambda client, **k: {"success": True, "confirmed": True},
                 ),
                 patch.object(
-                    adapter._capture,
+                    _capture,
                     "acquire",
                     lambda client, job, **k: _a_capture(job),
                 ),
-                patch.object(adapter._save, "save", fake_save),
+                patch.object(_save, "save", fake_save),
                 # This answer is checked for files that exist: the log is written.
-                patch.object(adapter._log, "write", _WRITE_THE_LOG),
+                patch.object(_log, "write", _WRITE_THE_LOG),
                 patches[0],
                 patches[1],
                 patches[2],
@@ -1047,10 +1080,14 @@ class TestAcquire(unittest.TestCase):
         self.assertNotIn(
             "source", calls["save"]
         )  # always LAS X's cache: nothing to choose
-        self.assertEqual(calls["save"]["format"], adapter.IMAGE_SAVE.format)
-        self.assertEqual(calls["save"]["projection"], adapter.IMAGE_SAVE.projection)
-        self.assertIs(calls["save"]["cleanup_cache"], adapter.IMAGE_SAVE.cleanup_cache)
-        self.assertEqual(record["format"], adapter.IMAGE_SAVE.format)
+        self.assertEqual(calls["save"]["format"], _acquisition.IMAGE_SAVE.format)
+        self.assertEqual(
+            calls["save"]["projection"], _acquisition.IMAGE_SAVE.projection
+        )
+        self.assertIs(
+            calls["save"]["cleanup_cache"], _acquisition.IMAGE_SAVE.cleanup_cache
+        )
+        self.assertEqual(record["format"], _acquisition.IMAGE_SAVE.format)
 
     def test_the_capture_is_saved_in_the_output_folder_it_is_given(self):
         """The driver writes the files itself (from LAS X's cache), so it saves where it is told.
@@ -1090,8 +1127,11 @@ class TestAcquire(unittest.TestCase):
         """A capture read from LAS X's cache is let go of when the profile says so, never per capture."""
         h = _handle()
         h.driven_to = {"x": 0.0, "y": 0.0, "z": 0.0, "z_wide_um": 0.0}
-        releasing = replace(adapter.IMAGE_SAVE, cleanup_cache=True)
-        with patch.object(adapter, "IMAGE_SAVE", releasing), self._capturing() as calls:
+        releasing = replace(_acquisition.IMAGE_SAVE, cleanup_cache=True)
+        with (
+            patch.object(_acquisition, "IMAGE_SAVE", releasing),
+            self._capturing() as calls,
+        ):
             adapter.acquire(
                 h,
                 acquisition_type="acquisition",
@@ -1105,15 +1145,13 @@ class TestAcquire(unittest.TestCase):
         h = _handle()
         h.driven_to = {"x": 0.0, "y": 0.0, "z": 0.0, "z_wide_um": 0.0}
         order = []
-        releasing = replace(adapter.IMAGE_SAVE, cleanup_cache=True)
+        releasing = replace(_acquisition.IMAGE_SAVE, cleanup_cache=True)
         with (
-            patch.object(adapter, "IMAGE_SAVE", releasing),
+            patch.object(_acquisition, "IMAGE_SAVE", releasing),
             self._capturing(),
+            patch.object(_release, "prepare", lambda: order.append("canvas shown")),
             patch.object(
-                adapter._release, "prepare", lambda: order.append("canvas shown")
-            ),
-            patch.object(
-                adapter._capture,
+                _capture,
                 "acquire",
                 lambda c, j, **k: order.append("captured") or _a_capture(j),
             ),
@@ -1130,11 +1168,11 @@ class TestAcquire(unittest.TestCase):
         h = _handle()
         h.driven_to = {"x": 0.0, "y": 0.0, "z": 0.0, "z_wide_um": 0.0}
         prepared = []
-        keeping = replace(adapter.IMAGE_SAVE, cleanup_cache=False)
+        keeping = replace(_acquisition.IMAGE_SAVE, cleanup_cache=False)
         with (
-            patch.object(adapter, "IMAGE_SAVE", keeping),
+            patch.object(_acquisition, "IMAGE_SAVE", keeping),
             self._capturing(),
-            patch.object(adapter._release, "prepare", lambda: prepared.append(1)),
+            patch.object(_release, "prepare", lambda: prepared.append(1)),
         ):
             adapter.acquire(
                 h,
@@ -1164,7 +1202,7 @@ class TestAcquire(unittest.TestCase):
         with (
             self._capturing() as calls,
             patch.object(
-                adapter._readers,
+                _readers,
                 "get_job_settings",
                 return_value={
                     "stack": {
@@ -1211,7 +1249,9 @@ class TestAcquire(unittest.TestCase):
                 position_label="A1",
             )
 
-        self.assertEqual(calls["save"]["projection"], adapter.IMAGE_SAVE.projection)
+        self.assertEqual(
+            calls["save"]["projection"], _acquisition.IMAGE_SAVE.projection
+        )
         self.assertEqual(record["projections"], [str(projection)])
         self.assertIn(str(projection), record["files"])
 
@@ -1300,7 +1340,7 @@ class TestAcquire(unittest.TestCase):
         with (
             self._capturing(image_paths=planes) as calls,
             patch.object(
-                adapter._readers,
+                _readers,
                 "get_job_settings",
                 return_value={
                     "stack": {
@@ -1339,7 +1379,7 @@ class TestAcquire(unittest.TestCase):
         with (
             self._capturing(image_paths=planes),
             patch.object(
-                adapter._readers,
+                _readers,
                 "get_job_settings",
                 return_value={
                     "stack": {
@@ -1364,7 +1404,7 @@ class TestAcquire(unittest.TestCase):
         with (
             self._capturing(image_paths=planes),
             patch.object(
-                adapter._readers,
+                _readers,
                 "get_job_settings",
                 return_value={"stack": stack},
             ),
@@ -1554,25 +1594,25 @@ class TestAcquire(unittest.TestCase):
                 orientation={"schema_version": 1, "rotate_deg": 90},
             )
             with (
-                patch.object(adapter._machine, "MACHINE", machine),
-                patch.object(adapter._readers, "get_jobs", return_value=self._jobs()),
-                patch.object(adapter._readers, "get_hardware_info", return_value={}),
+                patch.object(_machine, "MACHINE", machine),
+                patch.object(_readers, "get_jobs", return_value=self._jobs()),
+                patch.object(_readers, "get_hardware_info", return_value={}),
                 patch.object(
-                    adapter._commands,
+                    _commands,
                     "select_job",
                     lambda client, job, **k: {"success": True},
                 ),
                 patch.object(
-                    adapter._motion,
+                    _motion,
                     "correct_backlash",
                     lambda client, **k: {"success": True, "confirmed": True},
                 ),
                 patch.object(
-                    adapter._capture,
+                    _capture,
                     "acquire",
                     lambda client, job, **k: _a_capture(job),
                 ),
-                patch.object(adapter._save, "save", fake_save),
+                patch.object(_save, "save", fake_save),
                 patches[0],
                 patches[1],
                 patches[2],
@@ -1587,9 +1627,7 @@ class TestAcquire(unittest.TestCase):
 
         # The measured 90-degree turn was read from the snapshot and threaded
         # into save -- not the shipped "no turn" placeholder.
-        self.assertEqual(
-            seen["orientation"], adapter._orientation.Orientation(rotate_deg=90)
-        )
+        self.assertEqual(seen["orientation"], _orientation.Orientation(rotate_deg=90))
 
     def _fake_acquire_env(self, calls):
         """Patches for a fully-mocked acquire; records each save's naming."""
@@ -1602,23 +1640,19 @@ class TestAcquire(unittest.TestCase):
 
         patches = _patch_position(job="Overview")
         return (
-            patch.object(adapter._readers, "get_jobs", return_value=self._jobs()),
-            patch.object(adapter._readers, "get_hardware_info", return_value={}),
+            patch.object(_readers, "get_jobs", return_value=self._jobs()),
+            patch.object(_readers, "get_hardware_info", return_value={}),
+            patch.object(_commands, "select_job", return_value={"success": True}),
             patch.object(
-                adapter._commands, "select_job", return_value={"success": True}
-            ),
-            patch.object(
-                adapter._motion,
+                _motion,
                 "correct_backlash",
                 side_effect=lambda client, **k: (
                     calls.setdefault("backlash", []).append(k["passes"])
                     or {"success": True, "confirmed": True}
                 ),
             ),
-            patch.object(
-                adapter._capture, "acquire", lambda client, job, **k: _a_capture(job)
-            ),
-            patch.object(adapter._save, "save", fake_save),
+            patch.object(_capture, "acquire", lambda client, job, **k: _a_capture(job)),
+            patch.object(_save, "save", fake_save),
             patches[0],
             patches[1],
             patches[2],
@@ -1674,7 +1708,7 @@ class TestAcquire(unittest.TestCase):
         h = _handle(connection={**adapter.CONNECTION, "output_root": "/tmp/out"})
         with (
             self._capturing(),
-            patch.object(adapter._readers, "get_selected_job", return_value=None),
+            patch.object(_readers, "get_selected_job", return_value=None),
             self.assertRaisesRegex(RuntimeError, "set_state"),
         ):
             adapter.acquire(
@@ -1725,11 +1759,11 @@ class TestAcquire(unittest.TestCase):
 
         patches = _patch_position(job="HiRes")
         with (
-            patch.object(adapter, "ACQUISITION_BACKLASH_DEFAULT_ROUNDS", 2),
-            patch.object(adapter._readers, "get_jobs", return_value=self._jobs()),
-            patch.object(adapter._motion, "correct_backlash", fake_correct_backlash),
-            patch.object(adapter._capture, "acquire", fake_capture),
-            patch.object(adapter._save, "save", fake_save),
+            patch.object(_acquisition, "ACQUISITION_BACKLASH_DEFAULT_ROUNDS", 2),
+            patch.object(_readers, "get_jobs", return_value=self._jobs()),
+            patch.object(_motion, "correct_backlash", fake_correct_backlash),
+            patch.object(_capture, "acquire", fake_capture),
+            patch.object(_save, "save", fake_save),
             patches[2],
         ):
             record = adapter.acquire(
@@ -1749,15 +1783,15 @@ class TestAcquire(unittest.TestCase):
         h = _handle(connection={**adapter.CONNECTION, "output_root": "/tmp/out"})
         patches = _patch_position(job="Overview")
         with (
-            patch.object(adapter._readers, "get_jobs", return_value=self._jobs()),
-            patch.object(adapter._motion, "correct_backlash", side_effect=calls.append),
+            patch.object(_readers, "get_jobs", return_value=self._jobs()),
+            patch.object(_motion, "correct_backlash", side_effect=calls.append),
             patch.object(
-                adapter._capture,
+                _capture,
                 "acquire",
                 return_value=_a_capture("Overview"),
             ),
             patch.object(
-                adapter._save,
+                _save,
                 "save",
                 return_value=SimpleNamespace(image_paths={}, xml_paths={}, naming=None),
             ),
@@ -1779,24 +1813,22 @@ class TestAcquire(unittest.TestCase):
         calls = []
         patches = _patch_position(job="Overview")
         with (
-            patch.object(adapter._readers, "get_jobs", return_value=self._jobs()),
+            patch.object(_readers, "get_jobs", return_value=self._jobs()),
+            patch.object(_commands, "select_job", return_value={"success": True}),
             patch.object(
-                adapter._commands, "select_job", return_value={"success": True}
-            ),
-            patch.object(
-                adapter._motion,
+                _motion,
                 "correct_backlash",
                 lambda client, **k: {"success": True, "confirmed": True},
             ),
             patch.object(
-                adapter._capture,
+                _capture,
                 "acquire",
                 side_effect=lambda client, job, **k: (
                     calls.append("capture") or _a_capture(job)
                 ),
             ),
             patch.object(
-                adapter._save,
+                _save,
                 "save",
                 return_value=SimpleNamespace(image_paths={}, xml_paths={}, naming=None),
             ),
@@ -1841,15 +1873,13 @@ class TestStateAndProcedures(unittest.TestCase):
             for n in jobs
         ] + [{"Name": n, "IsSelected": False, "IsAutofocus": True} for n in af_jobs]
         return (
+            patch.object(_readers, "get_hardware_info", return_value=dict(self._HW)),
             patch.object(
-                adapter._readers, "get_hardware_info", return_value=dict(self._HW)
-            ),
-            patch.object(
-                adapter._readers,
+                _readers,
                 "get_selected_job",
                 return_value={"Name": "Overview", "IsSelected": True},
             ),
-            patch.object(adapter._readers, "get_jobs", return_value=catalog),
+            patch.object(_readers, "get_jobs", return_value=catalog),
         )
 
     def test_state_shape_changeable_first_then_observed(self):
@@ -1859,9 +1889,7 @@ class TestStateAndProcedures(unittest.TestCase):
             p[0] as hardware,
             p[1] as selected,
             p[2] as jobs,
-            patch.object(
-                adapter._readers, "get_job_settings", return_value={}
-            ) as settings,
+            patch.object(_readers, "get_job_settings", return_value={}) as settings,
         ):
             state = adapter.get_state(h)
         self.assertEqual(list(state), ["changeable", "observed"])  # changeable first
@@ -1895,7 +1923,7 @@ class TestStateAndProcedures(unittest.TestCase):
             p[0],
             p[1],
             p[2],
-            patch.object(adapter._readers, "get_job_settings", return_value=settings),
+            patch.object(_readers, "get_job_settings", return_value=settings),
         ):
             observed = adapter.get_state(h)["observed"]
         self.assertEqual(
@@ -1906,7 +1934,7 @@ class TestStateAndProcedures(unittest.TestCase):
     def test_set_state_refuses_an_autofocus_job(self):
         h = _handle()
         p = self._state_patches()
-        with p[0], p[1], p[2], patch.object(adapter._commands, "select_job") as select:
+        with p[0], p[1], p[2], patch.object(_commands, "select_job") as select:
             with self.assertRaisesRegex(ValueError, "autofocus"):
                 adapter.set_state(h, {"changeable": {"job": "AF Job"}})
         select.assert_not_called()
@@ -1919,7 +1947,7 @@ class TestStateAndProcedures(unittest.TestCase):
             p[1],
             p[2],
             patch.object(
-                adapter._commands, "select_job", return_value={"success": True}
+                _commands, "select_job", return_value={"success": True}
             ) as select,
         ):
             captured = adapter.get_state(h)
@@ -1934,7 +1962,7 @@ class TestStateAndProcedures(unittest.TestCase):
     def test_set_state_refuses_a_job_that_no_longer_exists(self):
         h = _handle()
         p = self._state_patches(jobs=("Overview",))
-        with p[0], p[1], p[2], patch.object(adapter._commands, "select_job") as select:
+        with p[0], p[1], p[2], patch.object(_commands, "select_job") as select:
             with self.assertRaisesRegex(ValueError, "no longer exists"):
                 adapter.set_state(h, {"changeable": {"job": "Gone"}})
         select.assert_not_called()
@@ -1950,7 +1978,7 @@ class TestStateAndProcedures(unittest.TestCase):
         self.assertNotIn("get_focus_points", procedures)
         self.assertEqual(procedures["autofocus"]["jobs"], ["AF Job"])
         with patch.object(
-            adapter._motion,
+            _motion,
             "correct_backlash",
             lambda client, **k: {"success": True, "confirmed": True},
         ):
@@ -1975,14 +2003,14 @@ class TestStateAndProcedures(unittest.TestCase):
             position[2],
             position[3],
             patch.object(
-                adapter._commands,
+                _commands,
                 "select_job",
                 side_effect=lambda client, job, **k: (
                     calls.append(("select", job)) or {"success": True}
                 ),
             ),
             patch.object(
-                adapter._capture,
+                _capture,
                 "acquire",
                 side_effect=lambda client, job, **k: (
                     calls.append(("acquire", job))
@@ -2013,11 +2041,9 @@ class TestStateAndProcedures(unittest.TestCase):
             position[1],
             position[2],
             position[3],
+            patch.object(_commands, "select_job", return_value={"success": True}),
             patch.object(
-                adapter._commands, "select_job", return_value={"success": True}
-            ),
-            patch.object(
-                adapter._capture,
+                _capture,
                 "acquire",
                 return_value=SimpleNamespace(
                     job="AF Job", started_at=0.0, finished_at=1.0
@@ -2060,17 +2086,17 @@ class TestConnectCardCalibrationLine(unittest.TestCase):
     def test_a_loaded_calibration_shows_its_name(self):
         record = {"enabled": True, "loaded": True, "name": "water_lens_setup"}
 
-        self.assertEqual(adapter._calibration_status(record), "water_lens_setup")
+        self.assertEqual(_instrument._calibration_status(record), "water_lens_setup")
 
     def test_a_loaded_calibration_without_a_name_says_found(self):
         record = {"enabled": True, "loaded": True, "name": None}
 
-        self.assertEqual(adapter._calibration_status(record), "found")
+        self.assertEqual(_instrument._calibration_status(record), "found")
 
     def test_a_calibration_that_failed_to_load_says_so_even_when_it_has_a_name(self):
         record = {"enabled": True, "loaded": False, "name": "water_lens_setup"}
 
-        line = adapter._calibration_status(record)
+        line = _instrument._calibration_status(record)
 
         self.assertTrue(line.startswith("failed"))
         self.assertIn("objective changes are refused", line)
@@ -2078,10 +2104,10 @@ class TestConnectCardCalibrationLine(unittest.TestCase):
     def test_a_calibration_that_was_switched_off_says_so(self):
         record = {"enabled": False, "loaded": False, "name": None}
 
-        self.assertEqual(adapter._calibration_status(record), "switched off")
+        self.assertEqual(_instrument._calibration_status(record), "switched off")
 
     def test_no_record_at_all_says_none_found(self):
-        self.assertEqual(adapter._calibration_status(None), "failed — none found")
+        self.assertEqual(_instrument._calibration_status(None), "failed — none found")
 
 
 class TestGetInfoReportsNoPositions(unittest.TestCase):
@@ -2094,7 +2120,7 @@ class TestGetInfoReportsNoPositions(unittest.TestCase):
         h = _handle()
         h.connection["output_root"] = "/tmp/zmart-test"
         with (
-            patch.object(adapter, "_selected_job_name", return_value="Overview"),
+            patch.object(_info, "selected_job_name", return_value="Overview"),
         ):
             info = adapter.get_info(h)
         self.assertNotIn("tile_positions", info)
@@ -2158,8 +2184,8 @@ class TestObjectiveCompensation(unittest.TestCase):
 
         patches = _patch_position(z_wide_um=40.0, z_galvo_um=0.0, slot=2)
         with (
-            patch.object(adapter._motion, "arrive_xy", fake_xy),
-            patch.object(adapter._commands, "move_z", fake_z),
+            patch.object(_motion, "arrive_xy", fake_xy),
+            patch.object(_commands, "move_z", fake_z),
             patches[0],
             patches[1],
             patches[2],
@@ -2208,8 +2234,8 @@ class TestObjectiveCompensation(unittest.TestCase):
             slot=2,
         )
         with (
-            patch.object(adapter._motion, "arrive_xy", fake_xy),
-            patch.object(adapter._commands, "move_z", fake_z),
+            patch.object(_motion, "arrive_xy", fake_xy),
+            patch.object(_commands, "move_z", fake_z),
             patches[0],
             patches[1],
             patches[2],
@@ -2242,11 +2268,11 @@ class TestObjectiveCompensation(unittest.TestCase):
         patches = _patch_position(z_wide_um=40.0, z_galvo_um=0.0, slot=2)
         with (
             patch.object(
-                adapter._motion,
+                _motion,
                 "arrive_xy",
                 return_value={"success": True, "confirmed": True},
             ),
-            patch.object(adapter._commands, "move_z", fake_z),
+            patch.object(_commands, "move_z", fake_z),
             patches[0],
             patches[1],
             patches[2],
@@ -2274,7 +2300,7 @@ class TestObjectiveCompensation(unittest.TestCase):
         )
         patches = _patch_position(z_wide_um=40.0, z_galvo_um=0.0, slot=2)
         with (
-            patch.object(adapter._motion, "arrive_xy") as xy,
+            patch.object(_motion, "arrive_xy") as xy,
             patches[0],
             patches[1],
             patches[2],
@@ -2304,10 +2330,10 @@ class TestObjectiveCompensation(unittest.TestCase):
             return {"success": True, "confirmed": True}
 
         with (
-            patch.object(adapter._motion, "arrive_xy", fake_xy),
-            patch.object(adapter._commands, "move_z", fake_z),
+            patch.object(_motion, "arrive_xy", fake_xy),
+            patch.object(_commands, "move_z", fake_z),
             patch.object(
-                adapter._readers,
+                _readers,
                 "get_xy",
                 side_effect=lambda client, **kw: {
                     "x_um": state["x"],
@@ -2315,14 +2341,14 @@ class TestObjectiveCompensation(unittest.TestCase):
                 },
             ),
             patch.object(
-                adapter._readers,
+                _readers,
                 "get_job_settings",
                 side_effect=lambda client, job, **kw: _settings(
                     z_wide_um=state["z_wide"], z_galvo_um=state["z_galvo"], slot=2
                 ),
             ),
             patch.object(
-                adapter._readers,
+                _readers,
                 "get_selected_job",
                 return_value={"Name": "Overview", "IsSelected": True},
             ),
@@ -2345,7 +2371,7 @@ class TestObjectiveCompensation(unittest.TestCase):
         h = _handle(origin=_origin(objective={"name": "10x", "slotIndex": 1}))
         patches = _patch_position(slot=2)
         with (
-            patch.object(adapter._motion, "arrive_xy") as xy,
+            patch.object(_motion, "arrive_xy") as xy,
             patches[0],
             patches[1],
             patches[2],
@@ -2365,7 +2391,7 @@ class TestObjectiveCompensation(unittest.TestCase):
             patches[1],
             patches[2],
             patches[3],
-            self.assertLogs(adapter.log, level="WARNING"),
+            self.assertLogs(_frame.log, level="WARNING"),
         ):
             pos = adapter.get_xyz(h)
         self.assertEqual(pos["x"]["position"], 110.0)  # uncompensated, but loud
@@ -2389,7 +2415,7 @@ class TestObjectiveCompensation(unittest.TestCase):
         )
         patches = _patch_position(z_wide_um=0.0, z_galvo_um=0.0, slot=3)
         with (
-            patch.object(adapter._motion, "arrive_xy") as xy,
+            patch.object(_motion, "arrive_xy") as xy,
             patches[0],
             patches[1],
             patches[2],
@@ -2410,7 +2436,7 @@ class TestDriverSetupReadiness(unittest.TestCase):
         adapter._session_state.install(
             h.client,
             adapter._session_state.SessionConfig(
-                orientation=adapter._orientation.Orientation(rotate_deg=0),
+                orientation=_orientation.Orientation(rotate_deg=0),
                 translations={1: (0.0, 0.0, 0.0), 2: (1.0, 2.0, 3.0)},
                 calibration_name="water_lens_setup",
                 orientation_info={"loaded": True, "measured": True, "rotate_deg": 0},
@@ -2424,20 +2450,20 @@ class TestDriverSetupReadiness(unittest.TestCase):
         )
         self.addCleanup(adapter._session_state.uninstall, h.client)
 
-        ready = adapter._setup_readiness(
+        ready = _instrument.setup_readiness(
             h, {"slotIndex": 2, "name": "20x"}, self.measured_limits
         )
         self.assertTrue(ready["ready"])
         self.assertEqual(ready["issues"], [])
 
-        missing = adapter._setup_readiness(
+        missing = _instrument.setup_readiness(
             h, {"slotIndex": 3, "name": "40x"}, self.measured_limits
         )
         self.assertFalse(missing["ready"])
         self.assertIn("slot 3", missing["issues"][0])
 
         h.origin["objective"] = {"slotIndex": 4, "name": "uncalibrated"}
-        bad_origin = adapter._setup_readiness(
+        bad_origin = _instrument.setup_readiness(
             h, {"slotIndex": 2, "name": "20x"}, self.measured_limits
         )
         self.assertFalse(bad_origin["ready"])
@@ -2454,7 +2480,7 @@ class TestDriverSetupReadiness(unittest.TestCase):
         adapter._session_state.install(
             h.client,
             adapter._session_state.SessionConfig(
-                orientation=adapter._orientation.Orientation(rotate_deg=0),
+                orientation=_orientation.Orientation(rotate_deg=0),
                 translations={1: (0.0, 0.0, 0.0), 2: (-6.5, 21.5, -3.7)},
                 calibration_name="water_lens_setup",
                 orientation_info={"loaded": True, "measured": True, "rotate_deg": 0},
@@ -2468,7 +2494,7 @@ class TestDriverSetupReadiness(unittest.TestCase):
         )
         self.addCleanup(adapter._session_state.uninstall, h.client)
 
-        setup = adapter._setup_readiness(
+        setup = _instrument.setup_readiness(
             h, {"slotIndex": 2, "name": "20x"}, self.measured_limits
         )
 
@@ -2484,7 +2510,7 @@ class TestDriverSetupReadiness(unittest.TestCase):
         adapter._session_state.install(
             h.client,
             adapter._session_state.SessionConfig(
-                orientation=adapter._orientation.Orientation(rotate_deg=0),
+                orientation=_orientation.Orientation(rotate_deg=0),
                 translations={1: (0.0, 0.0, 0.0)},
                 orientation_info={"loaded": True, "measured": True, "rotate_deg": 0},
                 calibration_info={"loaded": True, "slots": [1]},
@@ -2492,7 +2518,7 @@ class TestDriverSetupReadiness(unittest.TestCase):
         )
         self.addCleanup(adapter._session_state.uninstall, h.client)
 
-        setup = adapter._setup_readiness(
+        setup = _instrument.setup_readiness(
             h, {"slotIndex": 1, "name": "10x"}, self.measured_limits
         )
 
@@ -2504,7 +2530,7 @@ class TestDriverSetupReadiness(unittest.TestCase):
         adapter._session_state.install(
             h.client,
             adapter._session_state.SessionConfig(
-                orientation=adapter._orientation.Orientation(rotate_deg=0),
+                orientation=_orientation.Orientation(rotate_deg=0),
                 translations={1: (0.0, 0.0, 0.0)},
                 orientation_info={"loaded": True, "measured": False, "rotate_deg": 0},
                 calibration_info={"loaded": True, "slots": [1]},
@@ -2512,7 +2538,7 @@ class TestDriverSetupReadiness(unittest.TestCase):
         )
         self.addCleanup(adapter._session_state.uninstall, h.client)
 
-        setup = adapter._setup_readiness(h, {"slotIndex": 1}, self.measured_limits)
+        setup = _instrument.setup_readiness(h, {"slotIndex": 1}, self.measured_limits)
 
         self.assertFalse(setup["ready"])
         self.assertIn("orientation", setup["issues"][0])
@@ -2522,7 +2548,7 @@ class TestDriverSetupReadiness(unittest.TestCase):
         adapter._session_state.install(
             h.client,
             adapter._session_state.SessionConfig(
-                orientation=adapter._orientation.Orientation(rotate_deg=0),
+                orientation=_orientation.Orientation(rotate_deg=0),
                 translations={1: (0.0, 0.0, 0.0)},
                 orientation_info={"loaded": True, "measured": True, "rotate_deg": 0},
                 calibration_info={"loaded": True, "slots": [1], "measured_slots": [1]},
@@ -2530,7 +2556,7 @@ class TestDriverSetupReadiness(unittest.TestCase):
         )
         self.addCleanup(adapter._session_state.uninstall, h.client)
 
-        setup = adapter._setup_readiness(
+        setup = _instrument.setup_readiness(
             h,
             {"slotIndex": 1},
             {"source": "defaults", "path": "limits.json", "is_fallback": True},
@@ -2590,7 +2616,7 @@ class TestLifecycle(unittest.TestCase):
         described = _gate.describe(h.client)
         self.assertEqual(described["source"], "defaults")
         self.assertTrue(described["is_fallback"])
-        self.assertIsNone(adapter._machine.MACHINE.latest_snapshot("limits"))
+        self.assertIsNone(_machine.MACHINE.latest_snapshot("limits"))
         state = _gate.state_for(h.client)
         self.assertTrue(state.ok)
 
@@ -2617,12 +2643,12 @@ class TestLifecycle(unittest.TestCase):
             patches[2],
             patches[3],
             patch.object(
-                adapter._motion,
+                _motion,
                 "arrive_xy",
                 return_value={"success": True, "confirmed": True},
             ),
             patch.object(
-                adapter._commands,
+                _commands,
                 "move_z",
                 return_value={"success": True, "confirmed": True},
             ),
@@ -2705,9 +2731,7 @@ class TestFunctionLimits(unittest.TestCase):
             config as limits_config,
         )
 
-        path = adapter._machine.MACHINE.bundled_default_path(
-            adapter._machine.LIMITS_FILENAME
-        )
+        path = _machine.MACHINE.bundled_default_path(_machine.LIMITS_FILENAME)
         payload = limits_config.validate_payload(
             json.loads(path.read_text(encoding="utf-8"))
         )
@@ -2723,7 +2747,7 @@ class TestFunctionLimits(unittest.TestCase):
         h = _handle(gate_constraints={"x_um": {"min": 0, "max": 500}})
         patches = _patch_position(x_um=0.0, y_um=0.0)
         with (
-            patch.object(adapter._commands, "move_z") as mz,
+            patch.object(_commands, "move_z") as mz,
             patches[0],
             patches[1],
             patches[2],
@@ -2744,7 +2768,7 @@ class TestFunctionLimits(unittest.TestCase):
         )
         patches = _patch_position(z_wide_um=0.0, z_galvo_um=0.0)
         with (
-            patch.object(adapter._motion, "arrive_xy") as xy,
+            patch.object(_motion, "arrive_xy") as xy,
             patches[0],
             patches[1],
             patches[2],
@@ -2777,7 +2801,7 @@ class TestFunctionLimits(unittest.TestCase):
             patches[1],
             patches[2],
             patches[3],
-            patch.object(adapter._readers, "get_jobs", return_value=catalog),
+            patch.object(_readers, "get_jobs", return_value=catalog),
         ):
             with self.assertRaisesRegex(RuntimeError, "refused"):
                 adapter.set_xyz(h, 0.0, 0.0, 0.0)
@@ -2791,16 +2815,16 @@ class TestFunctionLimits(unittest.TestCase):
         h = _handle()
         with (
             patch.object(
-                adapter._readers,
+                _readers,
                 "get_hardware_info",
                 return_value={"SerialNumber": "S", "SystemType": "T", "Microscope": {}},
             ),
             patch.object(
-                adapter._readers,
+                _readers,
                 "get_selected_job",
                 return_value={"Name": "Overview", "IsSelected": True},
             ),
-            patch.object(adapter._readers, "get_jobs", return_value=[]),
+            patch.object(_readers, "get_jobs", return_value=[]),
         ):
             observed = adapter.get_state(h)["observed"]
         self.assertEqual(

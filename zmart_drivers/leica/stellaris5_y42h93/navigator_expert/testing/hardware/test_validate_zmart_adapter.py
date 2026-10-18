@@ -31,6 +31,16 @@ import validate_zmart_adapter
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.for_zmart_controller.zmart_adapter import (
     zmart_adapter as adapter,
 )
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration import (
+    store as _machine,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.output import save as _save
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures import (
+    acquire as _capture,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures import (
+    backlash as _motion,
+)
 
 
 def _run_mock(tmp_path, *extra):
@@ -153,7 +163,7 @@ def test_full_mock_run_move_and_acquire(tmp_path):
     assert by_name["set_origin"]["status"] == "PASS"
     assert by_name["origin: frame x -> 0"]["status"] == "PASS"
     assert by_name["origin: remove the validator's origin record"]["status"] == "PASS"
-    assert adapter._machine.MACHINE.latest_snapshot("origin") is None
+    assert _machine.MACHINE.latest_snapshot("origin") is None
     assert by_name["zgalvo: frame z"]["status"] == "PASS"
     assert by_name["zwide: frame z is additive (z-wide + z-galvo)"]["status"] == "PASS"
     assert by_name["get_info: reports no template positions"]["status"] == "PASS"
@@ -236,6 +246,10 @@ def test_acquire_backlash_rounds_through_the_controller_seam(
     ops table -> adapter) is what is actually exercised for both the default
     and a positive ``ACQUISITION_BACKLASH_DEFAULT_ROUNDS``, the driver's own setting.
     """
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures import (
+        acquisition as _acquisition,
+    )
+
     from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitive_handling import (
         profiles,
     )
@@ -264,10 +278,10 @@ def test_acquire_backlash_rounds_through_the_controller_seam(
             return SimpleNamespace(image_paths={}, xml_paths={}, naming=naming)
 
         with (
-            patch.object(adapter, "ACQUISITION_BACKLASH_DEFAULT_ROUNDS", rounds),
-            patch.object(adapter._motion, "correct_backlash", fake_correct_backlash),
-            patch.object(adapter._capture, "acquire", fake_capture),
-            patch.object(adapter._save, "save", fake_save),
+            patch.object(_acquisition, "ACQUISITION_BACKLASH_DEFAULT_ROUNDS", rounds),
+            patch.object(_motion, "correct_backlash", fake_correct_backlash),
+            patch.object(_capture, "acquire", fake_capture),
+            patch.object(_save, "save", fake_save),
         ):
             record = session.acquire(position_label="1")
     finally:
