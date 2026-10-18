@@ -111,7 +111,7 @@ def test_the_rulebook_lives_in_the_dispatcher():
 def test_reader_source_is_selected_only_by_reader_and_confirmation_policy():
     """Operational callers consume the configured reader policy.
 
-    An adapter, calibration routine, scanfield parser, or action that pins
+    An adapter, calibration routine, or action that pins
     ``api``/``log``/``hybrid`` silently defeats ``StateReaderProfile``.
     Explicit modes belong only to the read engine and to confirmation-policy
     code constructing the individual legs of a configured race.
@@ -171,25 +171,20 @@ ALLOWED = {
         "vendor_interface",
         "dispatcher",
         "configuration",
-        "scanfields",  # upward: select_job strips scan fields
-        "experimental",  # upward: move_galvo_to_pixel uses the LRP edits
     },
-    "procedures": {"vendor_interface", "dispatcher", "actions", "configuration", "output", "scanfields"},
+    "procedures": {"vendor_interface", "dispatcher", "actions", "configuration", "output"},
     "output": {"vendor_interface", "dispatcher", "actions", "configuration"},
     "configuration": {
         "dispatcher",  # upward: the limits item validates through the rulebook
     },
-    "scanfields": {"vendor_interface", "dispatcher", "output"},
-    "experimental": {"scanfields"},
     "connect": {"vendor_interface", "dispatcher", "actions", "configuration"},
     "zmart_adapter": {
         "vendor_interface", "dispatcher", "actions", "procedures", "output",
-        "configuration", "scanfields", "connect", "__version__",
+        "configuration", "connect", "__version__",
     },
     "zmart_controller_plugin": {"zmart_adapter"},
     "__init__": {
-        "vendor_interface", "dispatcher", "actions", "output", "scanfields",
-        "experimental", "connect",
+        "vendor_interface", "dispatcher", "actions", "output", "connect",
     },
 }
 

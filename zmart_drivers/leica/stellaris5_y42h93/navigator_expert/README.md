@@ -42,14 +42,14 @@ this driver loads **in-process** via `pythonnet`. Commands are issued by writing
 calling `UpdateAwaitReceipt`/`UpdateAsync`; an **echo model** (`PyApiCommandEcho`) reports errors.
 State is read back through the CAM API and, as a hang-proof fallback, by tailing LAS X log files.
 
-This is the **vendor-specific** layer: it knows LAS X enum names, log paths, the `.lrp`/`.rgn`/`.xml`
-scan-field template formats, and OME exports. It runs **on the LAS X PC** (the API is in-process and
+This is the **vendor-specific** layer: it knows LAS X enum names, log paths, and how LAS X hands over
+finished captures. It runs **on the LAS X PC** (the API is in-process and
 blocking — unlike the gRPC/socket ZMART drivers). Keep LAS X-specific assumptions inside this package.
 
 ## 2. Requirements & installation
 
 Live control requires **LAS X installed** on the acquisition PC, with the Navigator Expert add-in
-directory that contains the CAM assemblies. Offline work (parsing, template edits, tests) needs no
+directory that contains the CAM assemblies. Offline work (parsing and the tests) needs no
 LAS X.
 
 - **Python 3.11 or newer** (the ZMART Controller needs it) and `pythonnet`, which loads the .NET
@@ -113,7 +113,6 @@ LAS X.
 | CAM API command log | `C:\ProgramData\Leica Microsystems\LAS X\lcsCommand.log` |
 | LAS X dialog / MessageBox log | `C:\ProgramData\Leica Microsystems\LAS X\MatrixScreener.log` |
 | CAM API assemblies (runtime) | `C:\Program Files\Leica Microsystems CMS GmbH\LAS X\AddIns\NavigatorExpert` |
-| Scan-field templates | `%APPDATA%\Leica Microsystems\LAS X\MatrixScreener6\User_*\ScanningTemplates` |
 
 Defaults live in `actions/profiles.py` (`LogReaderProfile`, `LasxApiProfile`) and are discovered at
 runtime where possible. Override via the profile, not at call sites.
@@ -258,10 +257,6 @@ remove that file, or connect with `load_origin=False` in the connection dict and
 again. (Earlier versions treated the origin as belonging to one session only and did not load it at
 connect; that is no longer the case.)
 
-**Live vs. file.** `set_zoom(...)` talks to the running scope and confirms by reading hardware back;
-`lrp_set_zoom(...)` edits a `.lrp` template *file* (nothing happens on the scope until LAS X reloads
-it). There is a deliberate parallel API for each — don't mix them (see §6).
-
 **Command vs. read.** Commands *change* state through the dispatch backbone; reads *observe* state
 through `readers`. Reads that gate control flow or become persisted truth have a stricter rule (below).
 
@@ -350,9 +345,10 @@ schema-mismatched (it returns `None` only when the settings cannot be read at al
 
 Z has no hardware readback through CAM. The settings' `zPosition` is the job's stored setpoint
 and it stops refreshing for the drive that carries the job's z-stack; for that drive the Z
-extractor (`actions/derived.py::z_um_from_settings`) saves the experiment and reads the job's
-`ZPosition` from the `.lrp` instead (~0.4 s), transparently to every caller — reader,
-`confirm_move_z`, the adapter. The free drive is read from the settings at no extra cost.
+extractor (`actions/derived.py::z_um_from_settings`) asks LAS X's hardware server where the drive
+really is, transparently to every caller — reader, `confirm_move_z`, the adapter. If the hardware
+server cannot be reached, the stacked drive is refused with a clear message instead of answered
+with the stale number. The free drive is read from the settings at no extra cost.
 `docs/design/z-readback-stacked-drive.md` has the measurements and the open items.
 
 | Function | Call | Returns |
@@ -411,7 +407,6 @@ driver-added aliases for stable access.
 ```python
 move_xy(client, x, y, unit="um", *, max_retries=None, tolerance=None) -> dict                           # tol 20 µm; result has "position"
 move_z(client, job_name, z, unit="um", z_mode="galvo", ...) -> dict                                     # z_mode "galvo"|"zwide"; tol 1 µm
-move_galvo_to_pixel(client, px, py, ...) -> dict                                                        # pan galvo to a pixel (no stage move)
 set_stage_limits(*, x_min, x_max, y_min, y_max, z_galvo_min, z_galvo_max, z_wide_min, z_wide_max) -> None
 get_stage_limits() -> dict ; apply_stage_limits_from_config(stage_cfg) -> None
 ```
@@ -467,9 +462,8 @@ identical, and the Navigator canvas is then cleared, which lets go of each captu
 The driver never deletes a file itself: a capture LAS X gives no way to let go of is refused before
 anything is saved.
 
-**Acquiring never touches the scanning template.** Positions are never made in the Navigator Expert:
-they come from the ZMART interface. `acquire()` and the autofocus procedure capture at the current
-position and leave the LAS X template alone.
+**Positions are never made in the Navigator Expert.** They come from the ZMART interface.
+`acquire()` and the autofocus procedure capture at the current position.
 
 **Acquisition settings say only how a capture is triggered.** This driver has one trigger,
 `full`: the whole of the LAS X job that is selected. Which job that is belongs to the state
@@ -486,31 +480,6 @@ that keeps the naming convention gives `{acquisition_type}_{hash6}_{K/M/G/P/V la
 that cannot be in a file name become `_`, and a stem longer than 80 characters is refused before
 anything is captured, so the whole path stays within Windows' old limit. A stem already used in
 the session's staging folder gets `_001`, `_002`, ..., so no capture is ever overwritten.
-
-### Templates / scan-fields (offline-capable)
-
-**Parse saved templates** (read-only, stdlib ElementTree — no fragile regex; `scanfields/parsers.py`,
-except `parse_lrp` in `scanfields/lrp.py`):
-`parse_lrp` (full job-settings tree) · `parse_scan_positions` · `parse_acquisition_positions` ·
-`parse_base_grid` · `parse_focus_points` · `parse_rgn_geometries` · `parse_rgn_tile_colors` ·
-`parse_matrix_settings` · `plan_tiles_from_geometries` (planning).
-
-**Active experiment:** `save_experiment` (fires save, confirms via file mtime + stable size) ·
-`load_experiment` (receipt only — verify with a follow-up save) · `save_and_read_lrp` (save +
-`parse_lrp` in one call) · `get_template_state` (`"fresh"`/`"unstripped"`/`"stripped"`/`"unreadable"`
-— the adapter treats `"unreadable"` as a hard pre-acquire error) ·
-`find_scanning_templates_dir` · `strip_template` / `restore_template` / `strip_template_in_place`
-(remove/restore operator-drawn scan fields, regions, focus points around an automated run).
-
-**Offline template edits** (`experimental/lrp_edits/`) — a **parallel, file-based** API mirroring the
-live `set_*` commands (`lrp_set_zoom` vs `set_zoom`, …), since file editing has no readback. Route
-every edit through `apply_lrp_change(...)` (**save → edit → reorder → load → save → verify**;
-`reorder_jobs` keeps the active job selected). It also provides ROI authoring — `make_rectangle` /
-`make_ellipse` / `make_polygon`, `lrp_add_roi`, `lrp_clear_rois` — and pixel↔stage↔pan/zoom coordinate
-math — `mask_contour_to_roi`, `roi_translation_to_pan`, `galvo_pan_for_pixel` (see the
-coordinate-frame docstring atop `experimental/lrp_edits/roi.py`). Despite the `experimental/` name this
-code is **load-bearing** (used by `move_galvo_to_pixel`, `disable_roi_scan`, `reset_pan`) — read it as
-"offline template editor", not "unstable".
 
 ## 7. Architecture
 
@@ -547,9 +516,6 @@ zmart_drivers/leica/stellaris5_y42h93/navigator_expert/
 │                       and optical_calibration/ each hold their defaults/ and their notebook;
 │                       store.py resolves the machine-local snapshots under ProgramData;
 │                       session_state.py holds what one connection loaded; notebook_support.py
-├── scanfields/         .lrp/.rgn/.xml parsing + templates (tile layout; a workflow concern, kept
-│                       here until it has a home elsewhere)
-├── experimental/       lrp_edits/: offline template editors without live-state readback
 ├── testing/            unit/ (offline) · calibration/ (the calibration suites) · hardware/
 │                       (validate_*.py live scripts + mock-backed test_* gates) · helpers/ (the
 │                       LAS X mock) · data/
@@ -596,7 +562,6 @@ workflow sees:
 - The coordinate arithmetic (origin, orientation, objective offsets) leaves `zmart_adapter/` for
   `configuration/coordinates.py` and the actions for position.
 - The setup notebooks become thin: the measuring is a procedure, the notebook only calls it.
-- `scanfields/` finds a home outside the driver, or becomes a procedure.
 - `zmart_controller_plugin.py` goes, once `zmart_driver.py` has driven the real STELLARIS.
 
 ## 8. Configuration & tuning (profiles)
@@ -644,8 +609,7 @@ python zmart_drivers/leica/stellaris5_y42h93/navigator_expert/testing/run_ci.py 
 python zmart_drivers/leica/stellaris5_y42h93/navigator_expert/testing/run_ci.py --hardware --full  # live: plus the reader probe, parity, and the api/log routes
 ```
 
-`testing/unit/` is offline against committed synthetic fixtures (template parsing, strip/restore,
-position parsers, stage/limits, log & state readers, acquisition, runtime loading). Follow the project
+`testing/unit/` is offline against committed synthetic fixtures (stage/limits, log & state readers, acquisition, runtime loading). Follow the project
 TDD practice: add a failing offline test first, and assert real values, not just shapes.
 
 **Live hardware validation** (requires a live LAS X — simulator or scope) runs through the
@@ -688,15 +652,11 @@ These **silently misbehave** instead of failing loudly — respect them or resul
    (surfaced in `MatrixScreener.log` / `get_pending_dialog`); prefer binding the objective via the job.
 8. **`PyApiAcquireJob` silently no-ops without `m.JobName`** — returns in ~0 s with no error; the driver
    sets it in the command's `setup_fn`. Check the setup callback before assuming a LAS X bug.
-9. **Edit templates only through `apply_lrp_change`** — a raw `.lrp` edit won't take effect and can
-   select the wrong job after reload.
-10. **`load_experiment` confirms only the receipt, not on-disk state** — follow with `save_experiment`
-    (or use `apply_lrp_change`, which does).
-11. **Adapter mutating ops are gated by the flat `limits.json` at the commands layer** — if the machine file
+9. **Adapter mutating ops are gated by the flat `limits.json` at the commands layer** — if the machine file
     fails to load/validate at connect, the session falls back to the bundled **default** envelope
     (loudly warned) rather than refusing everything; the connect-time warning names what happened
     (see §3). Out-of-envelope moves still refuse at the commands layer, below the adapter.
-12. **The origin is loaded at connect** — `connect` loads the newest origin saved by the adapter's
+10. **The origin is loaded at connect** — `connect` loads the newest origin saved by the adapter's
     `set_origin` setup step, so the controller never sets it. With none saved, positions are plain
     stage coordinates (with a warning); a damaged origin file stops connect with a clear error
     (see §5).

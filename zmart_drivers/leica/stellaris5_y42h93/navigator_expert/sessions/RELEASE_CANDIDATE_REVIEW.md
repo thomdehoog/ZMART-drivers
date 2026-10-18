@@ -3,6 +3,12 @@
 > **Note, October 2026.** This review was written before the driver was laid out as the
 > anatomy of a ZMART driver describes. The file paths it names are the old ones; the README's
 > architecture section maps them to the new folders. Findings T1 to T3 are fixed.
+>
+> **Note, scan fields removed.** The `scanfields/` and `experimental/` folders, and the galvo
+> pan move that depended on them, have been removed from the driver, because scan fields are
+> not something this driver does. Findings H4, H5, H10, M10, M11 and M17 described that code and
+> no longer apply. The saved-experiment fallback for the stacked z drive is gone too: the
+> driver now reads that drive from LAS X's hardware server, and refuses when it cannot.
 
 This review covers the **release candidate** of the Leica driver, version `6.0.0rc1`. The driver is not released yet. This document lists what should be fixed before it is released for unattended use.
 

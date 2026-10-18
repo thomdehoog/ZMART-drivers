@@ -320,13 +320,11 @@ def test_delivery_stops_trying_once_received():
     assert api_obj.UpdateAwaitReceipt.call_count == 2
 
 
-def test_commands_and_scan_field_files_deliver_through_the_one_helper():
+def test_commands_deliver_through_the_one_helper():
     """No other code hands a message to LAS X with its own tries or timeout."""
     from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher import change
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.scanfields import files
 
     assert change.deliver is delivery.deliver
-    assert files.deliver is delivery.deliver
 
 
 GUARDED = ("actions", "dispatcher", "vendor_interface")

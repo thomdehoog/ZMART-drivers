@@ -120,9 +120,7 @@ def wait_all_stable(files, *, timeout=60, poll_interval=0.5, stable_readings=3):
 # ---------------------------------------------------------------------------
 # File-stability helpers. LAS X writes its files asynchronously and holds
 # locks while it does; these wait until a file is complete and released
-# before anyone reads it. Also used by scanfields for template files —
-# waiting for LAS X to finish writing is file shepherding wherever the
-# file lives.
+# before anyone reads it.
 # ---------------------------------------------------------------------------
 
 

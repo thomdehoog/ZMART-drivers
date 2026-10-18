@@ -130,16 +130,11 @@ def z_um_from_settings(settings, key, *, client=None, job_name=None):
     for the drive the job's stack is on (measured on the simulator
     2026-08-25/26; the CAM API offers no other Z readout). So for that one
     drive the value here is stale by construction, and this function reads
-    it elsewhere. First from LAS X's hardware server, which
-    reports where the drive truly is, in milliseconds. When that server
-    cannot be reached, from the saved experiment: ``PyApiSaveExperiment``
-    makes LAS X write the ``.lrp`` from its live block, and the job's Master
-    setting carries ``ZPosition`` for the drive its ``ZUseModeName`` names —
-    the last command through the job, not a measured position. That costs
-    one save (~0.4 s) and needs *client* and *job_name*. The free drive
-    costs nothing extra — the decision is a lookup on the ``stack`` block
-    already in *settings*. A stacked drive that neither source can read
-    refuses rather than returning the stale number.
+    it from LAS X's hardware server instead, which reports where the drive
+    truly is, in milliseconds. The free drive costs nothing extra: the
+    decision is a lookup on the ``stack`` block already in *settings*. When
+    the hardware server cannot be reached, a stacked drive is refused rather
+    than answered with the stale number.
 
     Canonical home of the z-readback shape quirk: LAS X sometimes nests the
     value as ``{'position': ...}`` rather than a bare float, so after
@@ -156,8 +151,10 @@ def z_um_from_settings(settings, key, *, client=None, job_name=None):
         try:
             return read_hardware_z_um(key)
         except HardwareServerUnavailable as why:
-            log.info("%s carries the z-stack; reading the saved experiment instead (%s)", key, why)
-        return _z_um_from_saved_experiment(client, job_name, key)
+            raise RuntimeError(
+                f"{key} carries {job_name!r}'s z-stack, so its settings value is stale, and "
+                f"LAS X's hardware server could not be reached ({why}) - no current Z available"
+            ) from why
     if not ch or "zPosition" not in ch:
         raise RuntimeError("zPosition not in job settings - LAS X version mismatch?")
     val = ch["zPosition"].get(key)
@@ -166,50 +163,6 @@ def z_um_from_settings(settings, key, *, client=None, job_name=None):
     if val is None:
         raise RuntimeError(f"{key} readback missing; got {ch['zPosition']!r}")
     return float(val)
-
-
-def _z_um_from_saved_experiment(client, job_name, key):
-    """*job_name*'s ``ZPosition`` for *key* (µm), read from a fresh ``.lrp``.
-
-    The file holds one ``ZPosition`` per setting definition, for the drive
-    its ``ZUseModeName`` names (LAS X's own spelling, ``"z-galvo"`` or
-    ``"z-wide"``). Asking for the other drive is refused rather than
-    answered with the wrong axis under the right label.
-    """
-    if client is None or job_name is None:
-        raise RuntimeError(
-            f"{key} carries the job's z-stack, so its settings value is stale; reading it "
-            f"needs the client and the job name to save the experiment"
-        )
-    lrp_data = save_and_read_lrp(client)
-    if lrp_data is None:
-        raise RuntimeError(
-            f"{key} carries {job_name!r}'s z-stack, so its settings value is stale, and the "
-            f"experiment save failed - no current Z available"
-        )
-    job = lrp_data["jobs"].get(job_name)
-    if job is None:
-        raise RuntimeError(
-            f"No such job {job_name!r} in the saved experiment; it has {list(lrp_data['jobs'])}"
-        )
-    attrs = job.get("Master", {}).get("attrs", {})
-    if attrs.get("ZUseModeName") != key:
-        raise RuntimeError(
-            f"The saved experiment holds {job_name!r}'s ZPosition for "
-            f"{attrs.get('ZUseModeName')!r}, not for {key!r}"
-        )
-    raw = attrs.get("ZPosition")
-    if raw is None:
-        raise RuntimeError(f"{job_name!r}'s Master setting carries no ZPosition")
-    return float(raw) * 1e6
-
-
-def save_and_read_lrp(client, **kwargs):
-    """The driver's own save-and-parse, imported late: ``scanfields.files``
-    reaches ``commands.gate``, which reaches the readers this module belongs to."""
-    from ..scanfields.files import save_and_read_lrp as _save_and_read_lrp
-
-    return _save_and_read_lrp(client, **kwargs)
 
 
 def zwide_um_from_settings(settings, *, client=None, job_name=None):

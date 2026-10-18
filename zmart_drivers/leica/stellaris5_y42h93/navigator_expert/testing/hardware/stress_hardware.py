@@ -3,16 +3,13 @@
 This script is a manual integration runner, not a pytest test. It uses
 the same bootstrap and safety setup as validate_hardware.py, then runs a
 seeded sequence of reversible driver operations. The default pool avoids
-time-series behavior, LRP/pan/ROI edits, scan-mode mutation, z-stack
+time-series behavior, scan-mode mutation, z-stack
 setup, laser/filter changes, and detector-gain mutation for fixed/
 photon-counting detectors. On HyD systems the detector-gain operation is
 expected to report SKIP whenever the detector exposes fixed photon-counting
 gain; that skip is part of the stress baseline, not a failed check.
-Every run first installs the committed ``general_workflow`` template
-bundle from this test directory and loads it into LAS X. Template
-strip/restore and acquisition are deterministic one-shot steps, not
-random operations. Enable them explicitly when they are part of the
-stress run you want to execute.
+Acquisition is a deterministic one-shot step, not a random operation.
+Enable it explicitly when it is part of the stress run you want to execute.
 
 Use the Python mock for CI and fast refactor checks:
   python stress_hardware.py --mock --rounds 30 --cycles 4 --seed 1
@@ -23,8 +20,8 @@ Use LasxApi for the LAS X simulator or microscope:
 Stage and objective movement are opt-in:
   python stress_hardware.py --yes --allow-xy --allow-z --allow-objective
 
-Template and acquisition checks are also opt-in:
-  python stress_hardware.py --yes --allow-template-roundtrip --allow-acquire
+An acquisition is also opt-in:
+  python stress_hardware.py --yes --allow-acquire
 
 Every stress step emits one JSONL record with its operation, selected job,
 seed/cycle/round coordinates, timing, command confirmation, before/target/
@@ -42,13 +39,10 @@ import argparse
 import json
 import logging
 import random
-import shutil
 import statistics
 import sys
-import tempfile
 import time
-from collections.abc import Callable, Iterator
-from contextlib import contextmanager
+from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
@@ -74,15 +68,6 @@ class StressRecord:
     timing: dict[str, Any] | None = None
     driver_message: str | None = None
     context: dict[str, Any] = field(default_factory=dict)
-
-
-@dataclass
-class WorkflowBundle:
-    """Paths for the committed general workflow used by stress runs."""
-
-    source_dir: Path
-    backend: str
-    templates_dir: Path | None = None
 
 
 class StressRecorder:
@@ -135,7 +120,6 @@ class StressRecorder:
                 "exit_code": self.exit_code(),
                 "rounds": args.rounds,
                 "cycles": args.cycles,
-                "allow_template_roundtrip": args.allow_template_roundtrip,
                 "allow_acquire": args.allow_acquire,
                 "operation_stats": _operation_stats(self.records),
                 "cycle_stats": _cycle_stats(self.records),
@@ -256,15 +240,13 @@ def _configure_logging(level: str, jsonl_to_stdout: bool) -> logging.Logger:
 def _confirm_live_write(args: argparse.Namespace) -> bool:
     if args.yes or args.mock:
         return True
-    parts = ["load general_workflow", "reversible setting writes", "job selection"]
+    parts = ["reversible setting writes", "job selection"]
     if args.allow_xy:
         parts.append("XY moves")
     if args.allow_z:
         parts.append("Z-galvo moves")
     if args.allow_objective:
         parts.append("objective switches")
-    if args.allow_template_roundtrip:
-        parts.append("template strip/restore")
     if args.allow_acquire:
         parts.append("one acquisition")
     sys.stdout.write("LAS X session will receive randomized: ")
@@ -317,61 +299,6 @@ def _pick_random_alt(rng: random.Random, current: Any, candidates: list[Any]) ->
 
 def _test_data_dir() -> Path:
     return Path(__file__).resolve().parents[1] / "data"
-
-
-def _install_general_workflow(source_dir: Path, templates_dir: Path) -> None:
-    """Install one offline LRP/XML/RGN bundle under driver template filenames."""
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.scanfields.files import (  # noqa: PLC0415
-    TEMPLATE_LRP,
-    TEMPLATE_RGN,
-    TEMPLATE_XML,
-)
-
-    source_xml = next(source_dir.glob("*.xml"))
-    base = source_xml.stem
-    for suffix, target_name in (
-        (".xml", TEMPLATE_XML),
-        (".rgn", TEMPLATE_RGN),
-        (".lrp", TEMPLATE_LRP),
-    ):
-        shutil.copy2(source_dir / f"{base}{suffix}", templates_dir / target_name)
-
-
-@contextmanager
-def _workflow_environment(args: argparse.Namespace) -> Iterator[WorkflowBundle]:
-    """Keep the committed general workflow available for the full stress run."""
-    source = _test_data_dir() / "general_workflow"
-    if not source.is_dir():
-        raise FileNotFoundError(f"missing offline workflow data: {source}")
-
-    if not args.mock:
-        yield WorkflowBundle(
-            source_dir=source,
-            backend="lasx_scanning_templates",
-        )
-        return
-
-    import zmart_drivers.leica.stellaris5_y42h93.navigator_expert.scanfields.strip_restore as strip_mod  # noqa: PLC0415
-
-    old_find = strip_mod.find_scanning_templates_dir
-    old_save = strip_mod.save_experiment
-    old_load = strip_mod.load_experiment
-    with tempfile.TemporaryDirectory(prefix="stress_template_") as tmp:
-        templates_dir = Path(tmp)
-        _install_general_workflow(source, templates_dir)
-        strip_mod.find_scanning_templates_dir = lambda: templates_dir
-        strip_mod.save_experiment = lambda *_args, **_kwargs: {"success": True, "confirmed": True}
-        strip_mod.load_experiment = lambda *_args, **_kwargs: {"success": True, "confirmed": True}
-        try:
-            yield WorkflowBundle(
-                source_dir=source,
-                backend="mock_data",
-                templates_dir=templates_dir,
-            )
-        finally:
-            strip_mod.find_scanning_templates_dir = old_find
-            strip_mod.save_experiment = old_save
-            strip_mod.load_experiment = old_load
 
 
 def _step(
@@ -786,152 +713,6 @@ def op_objective(
     return status, "; ".join(m for m in messages if m), timing, driver_message, context
 
 
-def op_load_general_workflow(
-    drv: Any,
-    client: Any,
-    workflow: WorkflowBundle,
-    args: argparse.Namespace,
-) -> tuple[str, str, dict[str, Any] | None, str | None, dict[str, Any]]:
-    """Install and load the committed workflow bundle before stress starts."""
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.scanfields.files import (  # noqa: PLC0415
-    TEMPLATE_RGN,
-    TEMPLATE_XML,
-    find_scanning_templates_dir,
-    load_experiment,
-    save_experiment,
-)
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.scanfields.strip_restore import (
-    _count_objects,
-)
-
-    started = time.perf_counter()
-    context: dict[str, Any] = {
-        "op_class": "general_workflow_setup",
-        "backend": workflow.backend,
-        "source_dir": str(workflow.source_dir),
-    }
-    templates_dir = workflow.templates_dir or find_scanning_templates_dir()
-    if templates_dir is None:
-        return "FAIL", "cannot locate ScanningTemplates directory", None, None, context
-
-    templates_dir = Path(templates_dir)
-    workflow.templates_dir = templates_dir
-    context["templates_dir"] = str(templates_dir)
-
-    copy_t0 = time.perf_counter()
-    try:
-        _install_general_workflow(workflow.source_dir, templates_dir)
-    except Exception as exc:  # noqa: BLE001
-        return "FAIL", f"cannot install general_workflow: {exc}", None, None, context
-    copy_s = time.perf_counter() - copy_t0
-    fields, items, focus = _count_objects(
-        templates_dir / TEMPLATE_XML,
-        templates_dir / TEMPLATE_RGN,
-    )
-    context["objects"] = {"fields": fields, "items": items, "focus": focus}
-
-    if args.mock:
-        total_s = time.perf_counter() - started
-        return (
-            "PASS",
-            f"installed general_workflow fields={fields} items={items} focus={focus}",
-            {"copy_s": copy_s, "total_s": total_s},
-            None,
-            context,
-        )
-
-    load_t0 = time.perf_counter()
-    load_result = load_experiment(client, TEMPLATE_XML)
-    load_s = time.perf_counter() - load_t0
-    context["load_result"] = load_result
-    if not load_result or not load_result.get("success"):
-        return (
-            "FAIL",
-            "load_experiment general_workflow failed",
-            {"copy_s": copy_s, "load_s": load_s, "total_s": time.perf_counter() - started},
-            None,
-            context,
-        )
-
-    save_t0 = time.perf_counter()
-    save_result = save_experiment(
-        client,
-        TEMPLATE_XML,
-        templates_dir,
-        timeout=120,
-        confirm_path=templates_dir / TEMPLATE_RGN,
-    )
-    save_s = time.perf_counter() - save_t0
-    context["save_result"] = save_result
-    timing = {
-        "copy_s": copy_s,
-        "load_s": load_s,
-        "save_s": save_s,
-        "total_s": time.perf_counter() - started,
-    }
-    if not save_result or not save_result.get("success"):
-        return "FAIL", "confirm-save general_workflow failed", timing, None, context
-
-    return (
-        "PASS",
-        f"loaded general_workflow fields={fields} items={items} focus={focus}",
-        timing,
-        load_result.get("message"),
-        context,
-    )
-
-
-def op_template_roundtrip(
-    drv: Any,
-    client: Any,
-    _job_name: str,
-    _rng: random.Random,
-    args: argparse.Namespace,
-    workflow: WorkflowBundle,
-) -> tuple[str, str, dict[str, Any] | None, str | None, dict[str, Any]]:
-    context: dict[str, Any] = {
-        "op_class": "template_strip_restore",
-        "backend": workflow.backend,
-    }
-    if workflow.templates_dir is not None:
-        context["templates_dir"] = str(workflow.templates_dir)
-    status = "PASS"
-    messages: list[str] = []
-    timing: dict[str, Any] | None = None
-    try:
-        strip_result = drv.strip_template(client, save_timeout=1 if args.mock else 120)
-        context["strip_result"] = strip_result
-        if strip_result and strip_result.get("success"):
-            timing = {"strip_s": strip_result.get("total_s")}
-        else:
-            status = "FAIL"
-            messages.append("strip_template failed")
-        try:
-            restore_result = drv.restore_template(client)
-        finally:
-            context["restore_attempted"] = True
-        context["restore_result"] = restore_result
-        if not restore_result or not restore_result.get("success"):
-            status = "FAIL"
-            messages.append("restore_template failed")
-        else:
-            if timing is None:
-                timing = {}
-            timing["restore_s"] = restore_result.get("total_s")
-            if status == "PASS":
-                messages.append(
-                    "strip/restore ok "
-                    f"fields={restore_result.get('fields')} "
-                    f"items={restore_result.get('items')} "
-                    f"focus={restore_result.get('focus')}"
-                )
-            else:
-                messages.append("restore_template succeeded after strip failure")
-    except Exception as exc:  # noqa: BLE001
-        return "FAIL", f"{type(exc).__name__}: {exc}", timing, None, context
-    return status, "; ".join(messages), timing, None, context
-
-
 def op_acquire_once(
     drv: Any,
     client: Any,
@@ -1139,23 +920,10 @@ def _run_terminal_steps(
     job_name: str,
     recorder: StressRecorder,
     args: argparse.Namespace,
-    workflow: WorkflowBundle,
     *,
     step_index: int,
 ) -> None:
     rng = random.Random(args.seed)
-    if args.allow_template_roundtrip:
-        step_index += 1
-        _step(
-            recorder,
-            args=args,
-            cycle=None,
-            round_index=None,
-            step_index=step_index,
-            operation="template_roundtrip",
-            job=job_name,
-            run=lambda: op_template_roundtrip(drv, client, job_name, rng, args, workflow),
-        )
     if args.allow_acquire:
         step_index += 1
         _step(
@@ -1210,11 +978,6 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--allow-objective",
         action="store_true",
         help="include reversible objective switches in the random pool",
-    )
-    parser.add_argument(
-        "--allow-template-roundtrip",
-        action="store_true",
-        help="run one template strip/restore round-trip after random stress",
     )
     parser.add_argument(
         "--allow-acquire", action="store_true", help="run one acquisition after random stress"
@@ -1321,39 +1084,25 @@ def main(argv: list[str] | None = None) -> int:
             log.warning("aborted before live writes")
             return recorder.exit_code()
 
-        with _workflow_environment(args) as workflow:
-            _step(
-                recorder,
-                args=args,
-                cycle=None,
-                round_index=None,
-                step_index=1,
-                operation="general_workflow_load",
-                job=None,
-                run=lambda: op_load_general_workflow(drv, client, workflow, args),
-            )
-            if recorder.records[-1].status == "FAIL":
-                return recorder.exit_code()
-
-            job_name = vh.phase_readonly(drv, validator, client, args)
-            if job_name is None:
-                recorder.emit(
-                    StressRecord(
-                        kind="stress_step",
-                        status="FAIL",
-                        started_at=vh._now_iso(),
-                        elapsed_s=0.0,
-                        seed=args.seed,
-                        operation="job_resolve",
-                        message="could not resolve job",
-                    )
+        job_name = vh.phase_readonly(drv, validator, client, args)
+        if job_name is None:
+            recorder.emit(
+                StressRecord(
+                    kind="stress_step",
+                    status="FAIL",
+                    started_at=vh._now_iso(),
+                    elapsed_s=0.0,
+                    seed=args.seed,
+                    operation="job_resolve",
+                    message="could not resolve job",
                 )
-                return recorder.exit_code()
-
-            step_index = _run_stress(drv, client, job_name, recorder, args, start_index=1)
-            _run_terminal_steps(
-                drv, client, job_name, recorder, args, workflow, step_index=step_index
             )
+            return recorder.exit_code()
+
+        step_index = _run_stress(drv, client, job_name, recorder, args)
+        _run_terminal_steps(
+            drv, client, job_name, recorder, args, step_index=step_index
+        )
     finally:
         recorder.summary(args=args)
 
