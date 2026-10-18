@@ -52,7 +52,7 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.setup imp
 )
 
 NOTEBOOK_PATH = (
-    Path(wf_obj.__file__).parents[1]
+    Path(wf_obj.__file__).parents[2]
     / "configuration"
     / "optical_calibration"
     / "notebooks"

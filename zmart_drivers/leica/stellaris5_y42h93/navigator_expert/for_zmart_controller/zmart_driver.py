@@ -80,6 +80,9 @@ DEFAULT_CONNECTION = {
 class ZmartDriver:
     """One connected STELLARIS: the LAS X session and everything loaded for it."""
 
+    #: The connection settings a caller may leave out; see ``DEFAULT_CONNECTION``.
+    DEFAULT_CONNECTION = DEFAULT_CONNECTION
+
     def __init__(self, connection: dict[str, Any] | None = None) -> None:
         """Open LAS X and load this microscope's configuration.
 

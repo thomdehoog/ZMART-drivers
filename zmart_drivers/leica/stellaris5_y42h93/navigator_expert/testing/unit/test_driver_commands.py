@@ -8,6 +8,7 @@ end-to-end pass through a real controller ``Session``.
 """
 
 import json
+import re
 import tempfile
 import unittest
 from contextlib import ExitStack, contextmanager
@@ -36,9 +37,6 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher import (
 )
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface import (
     parsing as _readers_parsing,
-)
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.for_zmart_controller.zmart_adapter import (
-    zmart_adapter as adapter,
 )
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration import (
     image_stage_registration as _orientation,
@@ -81,6 +79,30 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.pri
 )
 
 
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert import (
+    connect as _connect_module,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration import (
+    session_state as _session_state,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.for_zmart_controller.zmart_driver import (
+    ZmartDriver,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.session import (
+    ZmartHandle,
+)
+
+
+def _connect_handle(connection=None):
+    """Connect the way the controller does, by making the driver, and return its session handle."""
+    return ZmartDriver(connection)._handle
+
+
+def _disconnect_handle(handle):
+    """Disconnect a session handle the way ``ZmartDriver.disconnect`` does."""
+    ZmartDriver.disconnect(SimpleNamespace(_handle=handle))
+
+
 def _origin(
     x_um=0.0, y_um=0.0, z_wide_um=0.0, z_galvo_um=0.0, z_focus_um=0.0, objective=None
 ):
@@ -102,8 +124,8 @@ def _handle(gate_constraints=None, gated=True, **overrides):
     without any gate state (the fail-closed posture of a failed handshake).
     The stage stands at the origin, as a get_xyz after connecting would read.
     """
-    h = adapter.ZmartHandle(
-        client=object(), connection=dict(adapter.CONNECTION), hash6="000abc"
+    h = ZmartHandle(
+        client=object(), connection=dict(ZmartDriver.DEFAULT_CONNECTION), hash6="000abc"
     )
     h.driven_to = {"x": 0.0, "y": 0.0, "z": 0.0, "z_wide_um": 0.0, "z_galvo_um": 0.0}
     if gated:
@@ -199,36 +221,31 @@ def tearDownModule():
 
 class TestRegistration(unittest.TestCase):
     def test_connection_profile_does_not_select_operator_calibration(self):
-        self.assertNotIn("calibration_name", adapter.CONNECTION)
+        self.assertNotIn("calibration_name", ZmartDriver.DEFAULT_CONNECTION)
 
-    def test_the_driver_module_holds_every_command(self):
-        from zmart_controller.registry import driver_functions
+    def test_the_driver_class_holds_every_command(self):
         from zmart_controller.zmart_controller import COMMANDS
 
-        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.for_zmart_controller import (
-            zmart_controller_plugin as driver,
+        for command in COMMANDS:
+            if command == "connect":
+                continue
+            with self.subTest(command=command):
+                self.assertTrue(callable(getattr(ZmartDriver, command)))
+
+    def test_importing_the_driver_registers_nothing(self):
+        import zmart_drivers.leica.stellaris5_y42h93.navigator_expert.for_zmart_controller.zmart_driver as module
+
+        source = Path(module.__file__).read_text(encoding="utf-8")
+        self.assertIsNone(
+            re.search(r"^\s*(from|import) zmart_controller", source, re.MULTILINE)
         )
-
-        ops = driver_functions(driver)
-        for op in COMMANDS:
-            self.assertIn(op, ops)
-        self.assertIn("connect", ops)
-        self.assertIn("disconnect", ops)
-
-    def test_importing_the_adapter_registers_nothing(self):
-        source = Path(adapter.__file__).read_text(encoding="utf-8")
-        self.assertNotIn("zmart_controller import", source)
 
     def test_set_origin_is_a_driver_step_not_a_controller_op(self):
         """The origin is driver configuration: the controller cannot set it."""
-        from zmart_controller.registry import driver_functions
+        from zmart_controller.zmart_controller import COMMANDS
 
-        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.for_zmart_controller import (
-            zmart_controller_plugin as driver,
-        )
-
-        self.assertNotIn("set_origin", driver_functions(driver))
-        self.assertTrue(callable(adapter.set_origin))
+        self.assertNotIn("set_origin", COMMANDS)
+        self.assertTrue(callable(ZmartDriver.set_origin))
 
 
 class TestCalibrationSelection(unittest.TestCase):
@@ -318,11 +335,11 @@ class TestFrame(unittest.TestCase):
         h = _handle()
         patches = _patch_position(x_um=1000.0, y_um=2000.0, z_wide_um=30.0)
         with patches[0], patches[1], patches[2], patches[3]:
-            record = adapter.set_origin(h)
+            record = _frame.set_origin(h)
             self.assertEqual(record["origin"], {"x": 0.0, "y": 0.0, "z": 0.0})
             self.assertTrue(record["origin_file"].endswith("origin.json"))
             self.assertEqual(record["reference"]["z_focus_um"], 30.0)
-            pos = adapter.get_xyz(h)
+            pos = _frame.get_xyz(h)
         self.assertEqual(pos["x"]["position"], 0.0)
         self.assertEqual(pos["z"]["position"], 0.0)
         # Each axis carries the five entries of the controller's contract, in
@@ -358,7 +375,7 @@ class TestFrame(unittest.TestCase):
                 patches[2],
                 patches[3],
             ):
-                record = adapter.set_origin(h)
+                record = _frame.set_origin(h)
             # Persists to its own origin/<datetime>/ snapshot tree.
             self.assertEqual(record["origin_file"], str(profile.origin_path()))
             self.assertEqual(profile.origin_path().parent.parent.name, "origin")
@@ -376,10 +393,10 @@ class TestFrame(unittest.TestCase):
         with (
             patch.object(_machine, "MACHINE", profile),
             patch.object(
-                adapter._session, "connect_python_client", return_value=object()
+                _connect_module, "connect_python_client", return_value=object()
             ),
         ):
-            return adapter.connect(connection or dict(adapter.CONNECTION))
+            return _connect_handle(connection or dict(ZmartDriver.DEFAULT_CONNECTION))
 
     def test_connect_restores_the_saved_origin(self):
         """The newest saved origin, objective included, becomes the session's frame."""
@@ -431,7 +448,7 @@ class TestFrame(unittest.TestCase):
                 patches[2],
                 patches[3],
             ):
-                adapter.set_origin(h)
+                _frame.set_origin(h)
             fresh = self._connect_with_profile(profile)
         self.assertEqual(fresh.origin, h.origin)
 
@@ -468,11 +485,11 @@ class TestFrame(unittest.TestCase):
             with (
                 patch.object(_machine, "MACHINE", profile),
                 patch.object(
-                    adapter._session, "connect_microscope"
+                    _connect_module, "connect_microscope"
                 ) as connect_microscope,
             ):
                 with self.assertRaisesRegex(RuntimeError, "could not be read"):
-                    adapter.connect(dict(adapter.CONNECTION))
+                    _connect_handle(dict(ZmartDriver.DEFAULT_CONNECTION))
             connect_microscope.assert_not_called()
 
     def test_connect_refuses_an_incomplete_origin_file(self):
@@ -514,7 +531,7 @@ class TestFrame(unittest.TestCase):
             path = profile.write_origin({"origin": _origin(x_um=5.0)})
             path.write_text("{not json", encoding="utf-8")
             h = self._connect_with_profile(
-                profile, {**adapter.CONNECTION, "load_origin": False}
+                profile, {**ZmartDriver.DEFAULT_CONNECTION, "load_origin": False}
             )
         self.assertEqual(h.origin, _origin())
 
@@ -524,7 +541,7 @@ class TestFrame(unittest.TestCase):
             x_um=1010.0, y_um=1990.0, z_wide_um=32.0, z_galvo_um=3.0
         )
         with patches[0], patches[1], patches[2], patches[3]:
-            pos = adapter.get_xyz(h)
+            pos = _frame.get_xyz(h)
         self.assertEqual(pos["x"]["position"], 10.0)
         self.assertEqual(pos["y"]["position"], -10.0)
         self.assertEqual(pos["z"]["position"], 5.0)  # (32 + 3) - 30 focus sum
@@ -548,15 +565,15 @@ class TestFrame(unittest.TestCase):
         h = _handle()
         patches = _patch_position()
         with patches[0], patches[1], patches[2], patches[3]:
-            pos = adapter.get_xyz(h)
-            menu = adapter.get_actuators(h)
+            pos = _frame.get_xyz(h)
+            menu = _frame.get_actuators(h)
         for axis in ("x", "y", "z"):
             self.assertEqual(list(pos[axis]["actuators"]), menu[axis]["options"])
             self.assertEqual(pos[axis]["actuator"], menu[axis]["default"])
         # with_actuators only chooses a motor; the answer still reports all of
         # them, and says which one it used
         with patches[0], patches[1], patches[2], patches[3]:
-            pos = adapter.get_xyz(h, with_actuators={"z": "z-galvo"})
+            pos = _frame.get_xyz(h, with_actuators={"z": "z-galvo"})
         self.assertEqual(list(pos["z"]["actuators"]), ["z-wide", "z-galvo"])
         self.assertEqual(pos["z"]["actuator"], "z-galvo")
 
@@ -582,9 +599,7 @@ class TestFrame(unittest.TestCase):
             patches[2],
             patches[3],
         ):
-            record = adapter.set_xyz(
-                h, 10.0, 20.0, 5.0, with_actuators={"z": "z-galvo"}
-            )
+            record = _frame.set_xyz(h, 10.0, 20.0, 5.0, with_actuators={"z": "z-galvo"})
         self.assertEqual(moves["xy"], (1010.0, 2020.0))
         # target focus = 30 + 5 = 35; galvo absorbs it minus z-wide's 32 -> 3
         self.assertEqual(moves["z"], (3.0, "galvo"))
@@ -622,7 +637,7 @@ class TestFrame(unittest.TestCase):
             patches[2],
             patches[3],
         ):
-            adapter.set_xyz(h, 0.0, 0.0, 10.0)  # default z actuator: z-wide
+            _frame.set_xyz(h, 0.0, 0.0, 10.0)  # default z actuator: z-wide
         # target focus = 30 + 10 = 40; the parked galvo offset (4) is kept
         self.assertEqual(moves["z"], (36.0, "zwide"))
 
@@ -651,7 +666,7 @@ class TestFrame(unittest.TestCase):
             patches[2],
             patches[3],
         ):
-            answer = adapter.set_xyz(h, 0.0, 0.0, 0.0)
+            answer = _frame.set_xyz(h, 0.0, 0.0, 0.0)
         self.assertEqual(sorted(answer), ["objective_translation_um", "x", "y", "z"])
         self.assertEqual(len(h.unconfirmed), 1)
         self.assertIn("set_xyz: z", h.unconfirmed[0]["what"])
@@ -682,13 +697,13 @@ class TestFrame(unittest.TestCase):
             patches[3],
             self.assertRaisesRegex(RuntimeError, "failed"),
         ):
-            adapter.set_xyz(h, 0.0, 0.0, 0.0)
+            _frame.set_xyz(h, 0.0, 0.0, 0.0)
         self.assertEqual(h.unconfirmed, [])
 
     def test_unknown_actuator_rejected(self):
         h = _handle()
         with self.assertRaises(ValueError):
-            adapter.get_actuators(h) and adapter.set_xyz(
+            _frame.get_actuators(h) and _frame.set_xyz(
                 h, 0, 0, 0, with_actuators={"z": "hovercraft"}
             )
 
@@ -696,7 +711,7 @@ class TestFrame(unittest.TestCase):
         """The driver names its default per axis: the focus drive that reaches the whole travel for z."""
         h = _handle()
         self.assertEqual(
-            adapter.get_actuators(h),
+            _frame.get_actuators(h),
             {
                 "x": {"options": ["motoric"], "default": "motoric"},
                 "y": {"options": ["motoric"], "default": "motoric"},
@@ -717,13 +732,15 @@ class TestAcquire(unittest.TestCase):
         """``full`` runs the whole selected job; the job itself is state, saving is set up."""
         h = _handle()
         self.assertEqual(
-            adapter.get_acquisition_settings(h),
+            _acquisition.get_acquisition_settings(h),
             {"trigger": {"options": ["full"], "default": "full", "active": "full"}},
         )
         self.assertEqual(_acquisition.ACQUISITION_BACKLASH_DEFAULT_ROUNDS, 0)
 
     def test_unknown_or_invalid_option_rejected(self):
-        h = _handle(connection={**adapter.CONNECTION, "output_root": "/tmp/out"})
+        h = _handle(
+            connection={**ZmartDriver.DEFAULT_CONNECTION, "output_root": "/tmp/out"}
+        )
         with (
             patch.object(_readers, "get_jobs", return_value=self._jobs()),
             patch.object(
@@ -733,7 +750,7 @@ class TestAcquire(unittest.TestCase):
             ),
         ):
             with self.assertRaisesRegex(ValueError, "unknown acquisition setting"):
-                adapter.acquire(
+                _acquisition.acquire(
                     h,
                     acquisition_type="acquisition",
                     output_folder=None,
@@ -741,7 +758,7 @@ class TestAcquire(unittest.TestCase):
                     acquisition_settings={"fromat": "x"},
                 )
             with self.assertRaisesRegex(ValueError, "invalid value"):
-                adapter.acquire(
+                _acquisition.acquire(
                     h,
                     acquisition_type="acquisition",
                     output_folder=None,
@@ -753,7 +770,7 @@ class TestAcquire(unittest.TestCase):
                     self.subTest(gone=gone),
                     self.assertRaisesRegex(ValueError, "unknown acquisition setting"),
                 ):
-                    adapter.acquire(
+                    _acquisition.acquire(
                         h,
                         acquisition_type="acquisition",
                         output_folder=None,
@@ -764,7 +781,7 @@ class TestAcquire(unittest.TestCase):
     def test_without_a_data_location_nothing_is_saved_and_the_notebook_is_named(self):
         h = _handle()
         with self.assertRaisesRegex(RuntimeError, "set_data_location"):
-            adapter.acquire(
+            _acquisition.acquire(
                 h,
                 acquisition_type="acquisition",
                 output_folder=None,
@@ -776,12 +793,12 @@ class TestAcquire(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             h = _handle(data_location=Path(tmp))
             with patch.object(_info, "selected_job_name", return_value="Overview"):
-                info = adapter.get_info(h)
+                info = _instrument.get_info(h)
             self.assertNotIn("output_root", info)
             self.assertTrue(info["setup"]["data_location"]["done"])
             self.assertIn(str(Path(tmp)), info["setup"]["data_location"]["says"])
             with self._capturing(output_root=None) as calls:
-                adapter.acquire(
+                _acquisition.acquire(
                     h,
                     acquisition_type="acquisition",
                     output_folder=None,
@@ -791,11 +808,14 @@ class TestAcquire(unittest.TestCase):
 
     def test_a_sessions_own_output_root_wins_over_the_set_up_one(self):
         h = _handle(
-            connection={**adapter.CONNECTION, "output_root": "/chosen/zmart"},
+            connection={
+                **ZmartDriver.DEFAULT_CONNECTION,
+                "output_root": "/chosen/zmart",
+            },
             data_location=Path("/elsewhere"),
         )
         with self._capturing(output_root=None) as calls:
-            adapter.acquire(
+            _acquisition.acquire(
                 h,
                 acquisition_type="acquisition",
                 output_folder=None,
@@ -879,10 +899,10 @@ class TestAcquire(unittest.TestCase):
             "z_focus_um": 100.0,
         }
         # The envelope the gate was handed at connect, in raw stage um.
-        gate = adapter._gate._state_for(h.client)
-        adapter._gate._install(
+        gate = _gate._state_for(h.client)
+        _gate._install(
             h.client,
-            adapter._gate.GateState(
+            _gate.GateState(
                 limits=gate.limits,
                 error=None,
                 stage_cfg={
@@ -905,7 +925,7 @@ class TestAcquire(unittest.TestCase):
             patches[2],
             patches[3],
         ):
-            info = adapter.get_info(h)
+            info = _instrument.get_info(h)
 
         # In the frame: the envelope shifted by the origin.
         self.assertEqual(info["canvas"]["x_um"], [-1_000.0, 119_000.0])
@@ -923,7 +943,9 @@ class TestAcquire(unittest.TestCase):
         self.assertNotIn("output_root", info)
         self.assertNotIn("failed", checks["limits"])
 
-        h = _handle(connection={**adapter.CONNECTION, "output_root": "/tmp/out"})
+        h = _handle(
+            connection={**ZmartDriver.DEFAULT_CONNECTION, "output_root": "/tmp/out"}
+        )
         calls = {}
 
         def fake_capture(client, job, **kwargs):
@@ -955,7 +977,7 @@ class TestAcquire(unittest.TestCase):
             patches[2],
             patches[3],
         ):
-            record = adapter.acquire(
+            record = _acquisition.acquire(
                 h,
                 acquisition_type="acquisition",
                 output_folder=None,
@@ -1018,7 +1040,9 @@ class TestAcquire(unittest.TestCase):
             for path in (image, state, vendor):
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_bytes(b"saved")
-            h = _handle(connection={**adapter.CONNECTION, "output_root": str(out)})
+            h = _handle(
+                connection={**ZmartDriver.DEFAULT_CONNECTION, "output_root": str(out)}
+            )
 
             def fake_save(client, acq, output_root, naming, **kwargs):
                 return SimpleNamespace(
@@ -1053,7 +1077,7 @@ class TestAcquire(unittest.TestCase):
                 patches[2],
                 patches[3],
             ):
-                record = adapter.acquire(
+                record = _acquisition.acquire(
                     h,
                     acquisition_type="acquisition",
                     output_folder=None,
@@ -1076,7 +1100,7 @@ class TestAcquire(unittest.TestCase):
         h = _handle()
         h.driven_to = {"x": 0.0, "y": 0.0, "z": 0.0, "z_wide_um": 0.0}
         with self._capturing() as calls:
-            record = adapter.acquire(
+            record = _acquisition.acquire(
                 h,
                 acquisition_type="acquisition",
                 output_folder=None,
@@ -1104,7 +1128,7 @@ class TestAcquire(unittest.TestCase):
         h = _handle()
         h.driven_to = {"x": 0.0, "y": 0.0, "z": 0.0, "z_wide_um": 0.0}
         with self._capturing(output_root=None) as calls:
-            adapter.acquire(
+            _acquisition.acquire(
                 h,
                 position_label="A1",
                 acquisition_type="acquisition",
@@ -1117,7 +1141,7 @@ class TestAcquire(unittest.TestCase):
         h = _handle()
         h.driven_to = {"x": 0.0, "y": 0.0, "z": 0.0, "z_wide_um": 0.0}
         with self._capturing() as calls:
-            record = adapter.acquire(
+            record = _acquisition.acquire(
                 h,
                 position_label="well-7",
                 acquisition_type="overview",
@@ -1138,7 +1162,7 @@ class TestAcquire(unittest.TestCase):
             patch.object(_acquisition, "IMAGE_SAVE", releasing),
             self._capturing() as calls,
         ):
-            adapter.acquire(
+            _acquisition.acquire(
                 h,
                 acquisition_type="acquisition",
                 output_folder=None,
@@ -1162,7 +1186,7 @@ class TestAcquire(unittest.TestCase):
                 lambda c, j, **k: order.append("captured") or _a_capture(j),
             ),
         ):
-            adapter.acquire(
+            _acquisition.acquire(
                 h,
                 acquisition_type="acquisition",
                 output_folder=None,
@@ -1180,7 +1204,7 @@ class TestAcquire(unittest.TestCase):
             self._capturing(),
             patch.object(_release, "prepare", lambda: prepared.append(1)),
         ):
-            adapter.acquire(
+            _acquisition.acquire(
                 h,
                 acquisition_type="acquisition",
                 output_folder=None,
@@ -1220,7 +1244,7 @@ class TestAcquire(unittest.TestCase):
                 },
             ),
         ):
-            adapter.acquire(
+            _acquisition.acquire(
                 h,
                 acquisition_type="acquisition",
                 output_folder=None,
@@ -1248,7 +1272,7 @@ class TestAcquire(unittest.TestCase):
         }
         projection = Path("/tmp/out/projections/A1.ome.zarr")
         with self._capturing(projections=[projection]) as calls:
-            record = adapter.acquire(
+            record = _acquisition.acquire(
                 h,
                 acquisition_type="acquisition",
                 output_folder=None,
@@ -1272,7 +1296,7 @@ class TestAcquire(unittest.TestCase):
         }
         image = Path("/tmp/out/.staging") / h.hash6 / "data" / "img.ome.tif"
         with self._capturing(image_paths={0: image}) as calls:
-            record = adapter.acquire(
+            record = _acquisition.acquire(
                 h,
                 acquisition_type="acquisition",
                 output_folder=None,
@@ -1319,7 +1343,7 @@ class TestAcquire(unittest.TestCase):
         h = _handle()
         h.driven_to = {"x": 1200.0, "y": -450.0, "z": 33.5, "z_wide_um": 900.0}
         with self._capturing() as calls:
-            record = adapter.acquire(
+            record = _acquisition.acquire(
                 h,
                 acquisition_type="acquisition",
                 output_folder=None,
@@ -1358,7 +1382,7 @@ class TestAcquire(unittest.TestCase):
                 },
             ),
         ):
-            record = adapter.acquire(
+            record = _acquisition.acquire(
                 h,
                 acquisition_type="acquisition",
                 output_folder=None,
@@ -1397,7 +1421,7 @@ class TestAcquire(unittest.TestCase):
                 },
             ),
         ):
-            record = adapter.acquire(
+            record = _acquisition.acquire(
                 h,
                 acquisition_type="acquisition",
                 output_folder=None,
@@ -1415,7 +1439,7 @@ class TestAcquire(unittest.TestCase):
                 return_value={"stack": stack},
             ),
         ):
-            record = adapter.acquire(
+            record = _acquisition.acquire(
                 h,
                 acquisition_type="acquisition",
                 output_folder=None,
@@ -1556,7 +1580,7 @@ class TestAcquire(unittest.TestCase):
             self._capturing(),
             self.assertRaisesRegex(RuntimeError, "where the stage is"),
         ):
-            adapter.acquire(
+            _acquisition.acquire(
                 h,
                 acquisition_type="acquisition",
                 output_folder=None,
@@ -1583,7 +1607,9 @@ class TestAcquire(unittest.TestCase):
             MachineProfile,
         )
 
-        h = _handle(connection={**adapter.CONNECTION, "output_root": "/tmp/out"})
+        h = _handle(
+            connection={**ZmartDriver.DEFAULT_CONNECTION, "output_root": "/tmp/out"}
+        )
         seen = {}
 
         def fake_save(client, acq, output_root, naming, **kwargs):
@@ -1624,7 +1650,7 @@ class TestAcquire(unittest.TestCase):
                 patches[2],
                 patches[3],
             ):
-                adapter.acquire(
+                _acquisition.acquire(
                     h,
                     acquisition_type="acquisition",
                     output_folder=None,
@@ -1666,15 +1692,17 @@ class TestAcquire(unittest.TestCase):
         )
 
     def test_an_unlabelled_capture_is_named_by_the_session_counter(self):
-        h = _handle(connection={**adapter.CONNECTION, "output_root": "/tmp/out"})
+        h = _handle(
+            connection={**ZmartDriver.DEFAULT_CONNECTION, "output_root": "/tmp/out"}
+        )
         calls = {}
         with ExitStack() as standing_in:
             for stand_in in self._fake_acquire_env(calls):
                 standing_in.enter_context(stand_in)
-            record0 = adapter.acquire(
+            record0 = _acquisition.acquire(
                 h, acquisition_type="acquisition", output_folder=None
             )
-            record1 = adapter.acquire(
+            record1 = _acquisition.acquire(
                 h, acquisition_type="acquisition", output_folder=None
             )
         self.assertEqual(calls.get("backlash", []), [])
@@ -1691,7 +1719,9 @@ class TestAcquire(unittest.TestCase):
     def test_a_label_already_staged_gets_the_next_free_stem(self):
         """No capture is ever overwritten: the same label again gets ``_001``."""
         with tempfile.TemporaryDirectory() as tmp:
-            h = _handle(connection={**adapter.CONNECTION, "output_root": tmp})
+            h = _handle(
+                connection={**ZmartDriver.DEFAULT_CONNECTION, "output_root": tmp}
+            )
             staged = Path(tmp).resolve() / ".staging" / h.hash6 / "data"
             staged.mkdir(parents=True)
             (staged / "acquisition_A1_T000000_C00_Z00000.ome.tiff").write_bytes(
@@ -1701,7 +1731,7 @@ class TestAcquire(unittest.TestCase):
             with ExitStack() as standing_in:
                 for stand_in in self._fake_acquire_env(calls):
                     standing_in.enter_context(stand_in)
-                adapter.acquire(
+                _acquisition.acquire(
                     h,
                     acquisition_type="acquisition",
                     output_folder=None,
@@ -1711,13 +1741,15 @@ class TestAcquire(unittest.TestCase):
 
     def test_without_a_selected_job_nothing_is_captured(self):
         """The job is state: a capture runs the selected one, and refuses when none can be read."""
-        h = _handle(connection={**adapter.CONNECTION, "output_root": "/tmp/out"})
+        h = _handle(
+            connection={**ZmartDriver.DEFAULT_CONNECTION, "output_root": "/tmp/out"}
+        )
         with (
             self._capturing(),
             patch.object(_readers, "get_selected_job", return_value=None),
             self.assertRaisesRegex(RuntimeError, "set_state"),
         ):
-            adapter.acquire(
+            _acquisition.acquire(
                 h,
                 acquisition_type="acquisition",
                 output_folder=None,
@@ -1725,19 +1757,21 @@ class TestAcquire(unittest.TestCase):
             )
 
     def test_explicit_label_does_not_consume_counter(self):
-        h = _handle(connection={**adapter.CONNECTION, "output_root": "/tmp/out"})
+        h = _handle(
+            connection={**ZmartDriver.DEFAULT_CONNECTION, "output_root": "/tmp/out"}
+        )
         calls = {}
         env = self._fake_acquire_env(calls)
         with ExitStack() as standing_in:
             for stand_in in env:
                 standing_in.enter_context(stand_in)
-            adapter.acquire(
+            _acquisition.acquire(
                 h,
                 acquisition_type="acquisition",
                 output_folder=None,
                 position_label="named",
             )  # must not bump the counter
-            record = adapter.acquire(
+            record = _acquisition.acquire(
                 h, acquisition_type="acquisition", output_folder=None
             )  # still gets 000000
         self.assertEqual(calls["namings"][0].stem, "acquisition_named")
@@ -1745,7 +1779,9 @@ class TestAcquire(unittest.TestCase):
 
     def test_acquire_runs_backlash_correction_before_capture_when_enabled(self):
         """The driver's own setting: with rounds set, the slack is taken up right before the capture."""
-        h = _handle(connection={**adapter.CONNECTION, "output_root": "/tmp/out"})
+        h = _handle(
+            connection={**ZmartDriver.DEFAULT_CONNECTION, "output_root": "/tmp/out"}
+        )
         order = []
 
         def fake_correct_backlash(client, **kwargs):
@@ -1772,7 +1808,7 @@ class TestAcquire(unittest.TestCase):
             patch.object(_save, "save", fake_save),
             patches[2],
         ):
-            record = adapter.acquire(
+            record = _acquisition.acquire(
                 h,
                 acquisition_type="acquisition",
                 output_folder=None,
@@ -1786,7 +1822,9 @@ class TestAcquire(unittest.TestCase):
 
     def test_zero_backlash_rounds_skips_correction(self):
         calls = []
-        h = _handle(connection={**adapter.CONNECTION, "output_root": "/tmp/out"})
+        h = _handle(
+            connection={**ZmartDriver.DEFAULT_CONNECTION, "output_root": "/tmp/out"}
+        )
         patches = _patch_position(job="Overview")
         with (
             patch.object(_readers, "get_jobs", return_value=self._jobs()),
@@ -1803,7 +1841,7 @@ class TestAcquire(unittest.TestCase):
             ),
             patches[2],
         ):
-            record = adapter.acquire(
+            record = _acquisition.acquire(
                 h,
                 acquisition_type="acquisition",
                 output_folder=None,
@@ -1815,7 +1853,9 @@ class TestAcquire(unittest.TestCase):
 
     def _acquire_and_list_the_calls(self, options=None):
         """Run acquire with every step stubbed out; returns the calls it made, in order."""
-        h = _handle(connection={**adapter.CONNECTION, "output_root": "/tmp/out"})
+        h = _handle(
+            connection={**ZmartDriver.DEFAULT_CONNECTION, "output_root": "/tmp/out"}
+        )
         calls = []
         patches = _patch_position(job="Overview")
         with (
@@ -1840,7 +1880,7 @@ class TestAcquire(unittest.TestCase):
             ),
             patches[2],
         ):
-            adapter.acquire(
+            _acquisition.acquire(
                 h,
                 acquisition_type="acquisition",
                 output_folder=None,
@@ -1897,7 +1937,7 @@ class TestStateAndProcedures(unittest.TestCase):
             p[2] as jobs,
             patch.object(_readers, "get_job_settings", return_value={}) as settings,
         ):
-            state = adapter.get_state(h)
+            state = _instrument.get_state(h)
         self.assertEqual(list(state), ["changeable", "observed"])  # changeable first
         self.assertEqual(state["changeable"], {"job": "Overview"})
         self.assertNotIn("mode", hardware.call_args.kwargs)
@@ -1931,7 +1971,7 @@ class TestStateAndProcedures(unittest.TestCase):
             p[2],
             patch.object(_readers, "get_job_settings", return_value=settings),
         ):
-            observed = adapter.get_state(h)["observed"]
+            observed = _instrument.get_state(h)["observed"]
         self.assertEqual(
             observed["pixel_size"],
             {"x": 0.1, "y": 0.2, "unit": "um"},
@@ -1942,7 +1982,7 @@ class TestStateAndProcedures(unittest.TestCase):
         p = self._state_patches()
         with p[0], p[1], p[2], patch.object(_commands, "select_job") as select:
             with self.assertRaisesRegex(ValueError, "autofocus"):
-                adapter.set_state(h, {"changeable": {"job": "AF Job"}})
+                _instrument.set_state(h, {"changeable": {"job": "AF Job"}})
         select.assert_not_called()
 
     def test_set_state_applies_changeable_ignoring_observed(self):
@@ -1956,12 +1996,12 @@ class TestStateAndProcedures(unittest.TestCase):
                 _commands, "select_job", return_value={"success": True}
             ) as select,
         ):
-            captured = adapter.get_state(h)
+            captured = _instrument.get_state(h)
             captured["changeable"]["job"] = "HiRes"
             # observed is a report, never an instruction: even a wildly
             # mismatching observed part does not block the apply.
             captured["observed"]["serial_number"] = "SOMETHING-ELSE"
-            result = adapter.set_state(h, captured)
+            result = _instrument.set_state(h, captured)
             self.assertEqual(result["applied"], {"job": "HiRes"})
             select.assert_called_once()
 
@@ -1970,14 +2010,14 @@ class TestStateAndProcedures(unittest.TestCase):
         p = self._state_patches(jobs=("Overview",))
         with p[0], p[1], p[2], patch.object(_commands, "select_job") as select:
             with self.assertRaisesRegex(ValueError, "no longer exists"):
-                adapter.set_state(h, {"changeable": {"job": "Gone"}})
+                _instrument.set_state(h, {"changeable": {"job": "Gone"}})
         select.assert_not_called()
 
     def test_procedures(self):
         h = _handle()
         p = self._state_patches()
         with p[2]:
-            procedures = adapter.get_procedures(h)
+            procedures = _instrument.get_procedures(h)
         self.assertIn("backlash_takeup", procedures)
         self.assertNotIn("get_root", procedures)
         self.assertNotIn("get_positions", procedures)
@@ -1989,11 +2029,13 @@ class TestStateAndProcedures(unittest.TestCase):
             lambda client, **k: {"success": True, "confirmed": True},
         ):
             self.assertEqual(
-                adapter.run_procedure(h, {"name": "backlash_takeup"})["ran"]["name"],
+                _instrument.run_procedure(h, {"name": "backlash_takeup"})["ran"][
+                    "name"
+                ],
                 "backlash_takeup",
             )
         with self.assertRaises(ValueError):
-            adapter.run_procedure(h, {"name": "nope"})
+            _instrument.run_procedure(h, {"name": "nope"})
 
     def test_autofocus_runs_capture_only_and_restores_the_selection(self):
         from types import SimpleNamespace
@@ -2024,7 +2066,7 @@ class TestStateAndProcedures(unittest.TestCase):
                 ),
             ),
         ):
-            result = adapter.run_procedure(
+            result = _instrument.run_procedure(
                 h, {"name": "autofocus"}
             )  # single AF job: no arg
         # select AF -> capture -> restore the original selection, in order
@@ -2056,7 +2098,7 @@ class TestStateAndProcedures(unittest.TestCase):
                 ),
             ),
         ):
-            result = adapter.run_procedure(h, {"name": "autofocus"})
+            result = _instrument.run_procedure(h, {"name": "autofocus"})
         self.assertEqual(result["ran"], "autofocus")
 
     def test_autofocus_rejects_a_normal_job(self):
@@ -2064,21 +2106,21 @@ class TestStateAndProcedures(unittest.TestCase):
         p = self._state_patches()
         with p[2]:
             with self.assertRaisesRegex(ValueError, "not an autofocus job"):
-                adapter.run_procedure(h, {"name": "autofocus", "job": "Overview"})
+                _instrument.run_procedure(h, {"name": "autofocus", "job": "Overview"})
 
     def test_autofocus_requires_a_choice_when_several_exist(self):
         h = _handle()
         p = self._state_patches(af_jobs=("AF Job", "AF Fine"))
         with p[2]:
             with self.assertRaisesRegex(ValueError, "multiple autofocus jobs"):
-                adapter.run_procedure(h, {"name": "autofocus"})
+                _instrument.run_procedure(h, {"name": "autofocus"})
 
     def test_autofocus_without_af_jobs_is_a_clear_error(self):
         h = _handle()
         p = self._state_patches(af_jobs=())
         with p[2]:
             with self.assertRaisesRegex(RuntimeError, "no autofocus job"):
-                adapter.run_procedure(h, {"name": "autofocus"})
+                _instrument.run_procedure(h, {"name": "autofocus"})
 
 
 class TestConnectCardCalibrationLine(unittest.TestCase):
@@ -2128,7 +2170,7 @@ class TestGetInfoReportsNoPositions(unittest.TestCase):
         with (
             patch.object(_info, "selected_job_name", return_value="Overview"),
         ):
-            info = adapter.get_info(h)
+            info = _instrument.get_info(h)
         self.assertNotIn("tile_positions", info)
         self.assertNotIn("focus_positions", info)
         self.assertEqual(info["selected_job"], "Overview")
@@ -2167,7 +2209,7 @@ class TestObjectiveCompensation(unittest.TestCase):
             x_um=1110.0, y_um=2060.0, z_wide_um=45.0, z_galvo_um=0.0, slot=2
         )
         with patches[0], patches[1], patches[2], patches[3]:
-            pos = adapter.get_xyz(h)
+            pos = _frame.get_xyz(h)
         self.assertEqual(pos["x"]["position"], 10.0)  # 1110 − 1000 − 100
         self.assertEqual(pos["y"]["position"], 10.0)  # 2060 − 2000 − 50
         self.assertEqual(pos["z"]["position"], 5.0)  # 45 − 30 − 10
@@ -2197,9 +2239,7 @@ class TestObjectiveCompensation(unittest.TestCase):
             patches[2],
             patches[3],
         ):
-            record = adapter.set_xyz(
-                h, 10.0, 10.0, 5.0, with_actuators={"z": "z-galvo"}
-            )
+            record = _frame.set_xyz(h, 10.0, 10.0, 5.0, with_actuators={"z": "z-galvo"})
         self.assertEqual(moves["xy"], (1110.0, 2060.0))  # ref + F + ΔT
         # ΔT.z=10 is pinned absolutely on z-wide (30+10), while the
         # ordinary requested frame z=5 is realized by z-galvo (0+5).
@@ -2247,10 +2287,8 @@ class TestObjectiveCompensation(unittest.TestCase):
             patches[2],
             patches[3],
         ):
-            pos = adapter.get_xyz(h)
-            record = adapter.set_xyz(
-                h, 10.0, 10.0, 5.0, with_actuators={"z": "z-galvo"}
-            )
+            pos = _frame.get_xyz(h)
+            record = _frame.set_xyz(h, 10.0, 10.0, 5.0, with_actuators={"z": "z-galvo"})
 
         # Read: compensated with ΔT taken from the NEW job's objective.
         self.assertEqual(pos["x"]["position"], 10.0)  # 1110 − 1000 − 100
@@ -2284,8 +2322,8 @@ class TestObjectiveCompensation(unittest.TestCase):
             patches[2],
             patches[3],
         ):
-            adapter.set_xyz(h, 0.0, 0.0, 4.0, with_actuators={"z": "z-galvo"})
-            adapter.set_xyz(h, 1.0, 1.0, 4.0, with_actuators={"z": "z-galvo"})
+            _frame.set_xyz(h, 0.0, 0.0, 4.0, with_actuators={"z": "z-galvo"})
+            _frame.set_xyz(h, 1.0, 1.0, 4.0, with_actuators={"z": "z-galvo"})
 
         assert moves == [
             (40.0, "zwide"),
@@ -2313,7 +2351,7 @@ class TestObjectiveCompensation(unittest.TestCase):
             patches[3],
             self.assertRaisesRegex(RuntimeError, "z_wide_um") as ctx,
         ):
-            adapter.set_xyz(h, 0.0, 0.0, 4.0, with_actuators={"z": "z-galvo"})
+            _frame.set_xyz(h, 0.0, 0.0, 4.0, with_actuators={"z": "z-galvo"})
         xy.assert_called_once()  # XY arrived (checked); the z leg then refused
         # The failing leg is the calibrated objective offset, which only
         # z-wide can realize — suggesting the other actuator would send the
@@ -2362,8 +2400,8 @@ class TestObjectiveCompensation(unittest.TestCase):
                 _readers_parsing, "make_changeable_copy", side_effect=lambda s: s
             ),
         ):
-            moved = adapter.set_xyz(h, 12.0, -7.0, 4.0, with_actuators={"z": "z-galvo"})
-            pos = adapter.get_xyz(h)
+            moved = _frame.set_xyz(h, 12.0, -7.0, 4.0, with_actuators={"z": "z-galvo"})
+            pos = _frame.get_xyz(h)
         self.assertAlmostEqual(pos["x"]["position"], 12.0)
         self.assertAlmostEqual(pos["y"]["position"], -7.0)
         self.assertAlmostEqual(pos["z"]["position"], 4.0)
@@ -2384,7 +2422,7 @@ class TestObjectiveCompensation(unittest.TestCase):
             patches[3],
         ):
             with self.assertRaisesRegex(RuntimeError, "translation"):
-                adapter.set_xyz(h, 1.0, 1.0, 0.0)
+                _frame.set_xyz(h, 1.0, 1.0, 0.0)
         xy.assert_not_called()  # refused before any motion
 
     def test_cross_objective_read_without_translations_warns_uncompensated(self):
@@ -2399,7 +2437,7 @@ class TestObjectiveCompensation(unittest.TestCase):
             patches[3],
             self.assertLogs(_frame.log, level="WARNING"),
         ):
-            pos = adapter.get_xyz(h)
+            pos = _frame.get_xyz(h)
         self.assertEqual(pos["x"]["position"], 110.0)  # uncompensated, but loud
 
     def test_same_objective_needs_no_calibration(self):
@@ -2408,7 +2446,7 @@ class TestObjectiveCompensation(unittest.TestCase):
         )
         patches = _patch_position(x_um=1010.0, slot=3)
         with patches[0], patches[1], patches[2], patches[3]:
-            pos = adapter.get_xyz(h)
+            pos = _frame.get_xyz(h)
         self.assertEqual(pos["x"]["position"], 10.0)  # ΔT = 0, translations unused
 
     def test_out_of_range_galvo_refuses_with_the_actuator_hint(self):
@@ -2428,7 +2466,7 @@ class TestObjectiveCompensation(unittest.TestCase):
             patches[3],
         ):
             with self.assertRaisesRegex(RuntimeError, "z-wide"):
-                adapter.set_xyz(h, 10.0, 10.0, 300.0, with_actuators={"z": "z-galvo"})
+                _frame.set_xyz(h, 10.0, 10.0, 300.0, with_actuators={"z": "z-galvo"})
         xy.assert_called_once()
 
 
@@ -2439,9 +2477,9 @@ class TestDriverSetupReadiness(unittest.TestCase):
         self,
     ):
         h = _handle(origin=_origin(objective={"slotIndex": 1, "name": "10x"}))
-        adapter._session_state.install(
+        _session_state.install(
             h.client,
-            adapter._session_state.SessionConfig(
+            _session_state.SessionConfig(
                 orientation=_orientation.Orientation(rotate_deg=0),
                 translations={1: (0.0, 0.0, 0.0), 2: (1.0, 2.0, 3.0)},
                 calibration_name="water_lens_setup",
@@ -2454,7 +2492,7 @@ class TestDriverSetupReadiness(unittest.TestCase):
                 },
             ),
         )
-        self.addCleanup(adapter._session_state.uninstall, h.client)
+        self.addCleanup(_session_state.uninstall, h.client)
 
         ready = _instrument.setup_readiness(
             h, {"slotIndex": 2, "name": "20x"}, self.measured_limits
@@ -2483,9 +2521,9 @@ class TestDriverSetupReadiness(unittest.TestCase):
         compensate objective changes with the repository's placeholder numbers.
         """
         h = _handle(origin=_origin(objective={"slotIndex": 1, "name": "10x"}))
-        adapter._session_state.install(
+        _session_state.install(
             h.client,
-            adapter._session_state.SessionConfig(
+            _session_state.SessionConfig(
                 orientation=_orientation.Orientation(rotate_deg=0),
                 translations={1: (0.0, 0.0, 0.0), 2: (-6.5, 21.5, -3.7)},
                 calibration_name="water_lens_setup",
@@ -2498,7 +2536,7 @@ class TestDriverSetupReadiness(unittest.TestCase):
                 },
             ),
         )
-        self.addCleanup(adapter._session_state.uninstall, h.client)
+        self.addCleanup(_session_state.uninstall, h.client)
 
         setup = _instrument.setup_readiness(
             h, {"slotIndex": 2, "name": "20x"}, self.measured_limits
@@ -2513,16 +2551,16 @@ class TestDriverSetupReadiness(unittest.TestCase):
     def test_calibration_info_without_provenance_field_fails_closed(self):
         """An info dict lacking measured_slots must count as unmeasured."""
         h = _handle(origin=_origin(objective={"slotIndex": 1, "name": "10x"}))
-        adapter._session_state.install(
+        _session_state.install(
             h.client,
-            adapter._session_state.SessionConfig(
+            _session_state.SessionConfig(
                 orientation=_orientation.Orientation(rotate_deg=0),
                 translations={1: (0.0, 0.0, 0.0)},
                 orientation_info={"loaded": True, "measured": True, "rotate_deg": 0},
                 calibration_info={"loaded": True, "slots": [1]},
             ),
         )
-        self.addCleanup(adapter._session_state.uninstall, h.client)
+        self.addCleanup(_session_state.uninstall, h.client)
 
         setup = _instrument.setup_readiness(
             h, {"slotIndex": 1, "name": "10x"}, self.measured_limits
@@ -2533,16 +2571,16 @@ class TestDriverSetupReadiness(unittest.TestCase):
 
     def test_placeholder_orientation_is_not_ready_even_when_rotation_is_zero(self):
         h = _handle(origin=_origin(objective={"slotIndex": 1, "name": "10x"}))
-        adapter._session_state.install(
+        _session_state.install(
             h.client,
-            adapter._session_state.SessionConfig(
+            _session_state.SessionConfig(
                 orientation=_orientation.Orientation(rotate_deg=0),
                 translations={1: (0.0, 0.0, 0.0)},
                 orientation_info={"loaded": True, "measured": False, "rotate_deg": 0},
                 calibration_info={"loaded": True, "slots": [1]},
             ),
         )
-        self.addCleanup(adapter._session_state.uninstall, h.client)
+        self.addCleanup(_session_state.uninstall, h.client)
 
         setup = _instrument.setup_readiness(h, {"slotIndex": 1}, self.measured_limits)
 
@@ -2551,16 +2589,16 @@ class TestDriverSetupReadiness(unittest.TestCase):
 
     def test_fallback_limits_are_part_of_the_single_driver_readiness_verdict(self):
         h = _handle(origin=_origin(objective={"slotIndex": 1, "name": "10x"}))
-        adapter._session_state.install(
+        _session_state.install(
             h.client,
-            adapter._session_state.SessionConfig(
+            _session_state.SessionConfig(
                 orientation=_orientation.Orientation(rotate_deg=0),
                 translations={1: (0.0, 0.0, 0.0)},
                 orientation_info={"loaded": True, "measured": True, "rotate_deg": 0},
                 calibration_info={"loaded": True, "slots": [1], "measured_slots": [1]},
             ),
         )
-        self.addCleanup(adapter._session_state.uninstall, h.client)
+        self.addCleanup(_session_state.uninstall, h.client)
 
         setup = _instrument.setup_readiness(
             h,
@@ -2576,15 +2614,15 @@ class TestDriverSetupReadiness(unittest.TestCase):
 class TestLifecycle(unittest.TestCase):
     def test_ops_after_disconnect_raise(self):
         h = _handle()
-        adapter.disconnect(h)
+        _disconnect_handle(h)
         with self.assertRaisesRegex(RuntimeError, "disconnected"):
-            adapter.get_actuators(h)
+            _frame.get_actuators(h)
 
     def test_disconnect_uninstalls_the_commands_layer_gate_state(self):
         h = _handle()
-        self.assertIsNotNone(adapter._gate.state_for(h.client))
-        adapter.disconnect(h)
-        self.assertIsNone(adapter._gate.state_for(h.client))
+        self.assertIsNotNone(_gate.state_for(h.client))
+        _disconnect_handle(h)
+        self.assertIsNone(_gate.state_for(h.client))
 
     def test_connect_runs_the_limits_handshake(self):
         """connect must run the machine-local limits handshake, or set_xyz can't move.
@@ -2600,10 +2638,10 @@ class TestLifecycle(unittest.TestCase):
         self.addCleanup(_clear_limits)
         provision_machine_limits(os.environ["ZMART_MICROSCOPY_ROOT"])
         with patch.object(
-            adapter._session, "connect_python_client", return_value=object()
+            _connect_module, "connect_python_client", return_value=object()
         ):
-            h = adapter.connect(dict(adapter.CONNECTION))
-        self.assertIsInstance(h, adapter.ZmartHandle)
+            h = _connect_handle(dict(ZmartDriver.DEFAULT_CONNECTION))
+        self.assertIsInstance(h, ZmartHandle)
         # the stage envelope was applied from the ProgramData snapshot...
         self.assertEqual(limits_checks.get_stage_limits()["x_max"], 130000.0)
         # ...and the commands-layer gate governs this client (with provenance)
@@ -2614,10 +2652,10 @@ class TestLifecycle(unittest.TestCase):
     def test_connect_uses_packaged_fallback_when_programdata_is_empty(self):
         """Empty ProgramData uses defaults without creating a limits snapshot."""
         with patch.object(
-            adapter._session, "connect_python_client", return_value=object()
+            _connect_module, "connect_python_client", return_value=object()
         ):
-            h = adapter.connect(dict(adapter.CONNECTION))
-        self.assertIsInstance(h, adapter.ZmartHandle)
+            h = _connect_handle(dict(ZmartDriver.DEFAULT_CONNECTION))
+        self.assertIsInstance(h, ZmartHandle)
         self.assertFalse(h.closed)
         described = _gate.describe(h.client)
         self.assertEqual(described["source"], "defaults")
@@ -2642,7 +2680,7 @@ class TestLifecycle(unittest.TestCase):
         patches = _patch_position(x_um=1000.0, y_um=2000.0, z_wide_um=30.0)
         with (
             patch.object(
-                adapter._session, "connect_python_client", return_value=object()
+                _connect_module, "connect_python_client", return_value=object()
             ),
             patches[0],
             patches[1],
@@ -2663,7 +2701,7 @@ class TestLifecycle(unittest.TestCase):
             try:
                 # Capturing the origin is a driver setup step, not a controller
                 # command, so it is called on the adapter with the driver handle.
-                adapter.set_origin(session._handle)
+                _frame.set_origin(session._handle)
                 answer = session.set_xyz(10, 20, 5, with_actuators={"z": "z-galvo"})
                 self.assertIs(answer["success"], True)
                 # The move answers a read-back in get_xyz's shape. The readers
@@ -2681,45 +2719,6 @@ class TestLifecycle(unittest.TestCase):
                 self.assertEqual(xyz["content"], moved)
             finally:
                 session.disconnect()
-
-    def test_every_command_answers_in_the_controller_shape(self):
-        """Read through the controller, every answer is {"success", "content"}.
-
-        The controller documents this shape for every driver, and a workflow
-        reads ``answer["content"]``. Each command here is called through a real
-        controller Session and checked against the adapter function it wraps.
-        """
-        import zmart_controller
-
-        patches = _patch_position(x_um=1000.0, y_um=2000.0, z_wide_um=30.0)
-        with patches[0], patches[1], patches[2], patches[3]:
-            handle = _handle()
-            # A module driver whose connect hands over this ready-made handle,
-            # so the controller wraps the ops table without a real connect.
-            ops = adapter.ops_table()
-            ops["connect"] = lambda connection: handle
-            driver = SimpleNamespace(__name__="stellaris", **ops)
-            session = zmart_controller.ZmartController(driver, {})
-            for name in ("get_actuators", "get_xyz"):
-                with self.subTest(command=name):
-                    answer = getattr(session, name)()
-                    self.assertEqual(set(answer), {"success", "content"})
-                    self.assertIs(answer["success"], True)
-                    self.assertEqual(answer["content"], getattr(adapter, name)(handle))
-
-    def test_the_ops_table_wraps_every_answering_command(self):
-        """connect and disconnect are handed over as they are; the rest are wrapped."""
-        from zmart_controller.zmart_controller import COMMANDS
-
-        table = adapter.ops_table()
-        self.assertIs(table["connect"], adapter.connect)
-        self.assertIs(table["disconnect"], adapter.disconnect)
-        for name in COMMANDS:
-            if name == "disconnect":
-                continue
-            with self.subTest(command=name):
-                self.assertIsNot(table[name], getattr(adapter, name))
-                self.assertIs(table[name].__wrapped__, getattr(adapter, name))
 
 
 class TestFunctionLimits(unittest.TestCase):
@@ -2762,7 +2761,7 @@ class TestFunctionLimits(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, r"x_um=.*outside range"):
                 # (1000, 10000) is inside envelope and backstop, so the
                 # function-keyed gate is the only layer that can refuse it.
-                adapter.set_xyz(h, 1000.0, 10000.0, 0.0)
+                _frame.set_xyz(h, 1000.0, 10000.0, 0.0)
         mz.assert_not_called()
 
     def test_z_leg_function_limit_violation_keeps_the_actuator_hint(self):
@@ -2783,7 +2782,7 @@ class TestFunctionLimits(unittest.TestCase):
             with self.assertRaisesRegex(
                 RuntimeError, r"with_actuators=\{'z': 'z-wide'\}"
             ):
-                adapter.set_xyz(h, 10.0, 10.0, 300.0, with_actuators={"z": "z-galvo"})
+                _frame.set_xyz(h, 10.0, 10.0, 300.0, with_actuators={"z": "z-galvo"})
         xy.assert_called_once()
 
     def test_mutating_ops_refuse_without_a_limits_handshake(self):
@@ -2810,12 +2809,14 @@ class TestFunctionLimits(unittest.TestCase):
             patch.object(_readers, "get_jobs", return_value=catalog),
         ):
             with self.assertRaisesRegex(RuntimeError, "refused"):
-                adapter.set_xyz(h, 0.0, 0.0, 0.0)
+                _frame.set_xyz(h, 0.0, 0.0, 0.0)
             with self.assertRaisesRegex(RuntimeError, "refused"):
-                adapter.set_state(h, {"changeable": {"job": "HiRes"}})
+                _instrument.set_state(h, {"changeable": {"job": "HiRes"}})
             with self.assertRaisesRegex(RuntimeError, "refused"):
-                adapter.run_procedure(h, {"name": "backlash_takeup"})
-            self.assertIn("backlash_takeup", adapter.get_procedures(h))  # reads fine
+                _instrument.run_procedure(h, {"name": "backlash_takeup"})
+            self.assertIn(
+                "backlash_takeup", _instrument.get_procedures(h)
+            )  # reads fine
 
     def test_get_state_reports_limits_provenance(self):
         h = _handle()
@@ -2832,7 +2833,7 @@ class TestFunctionLimits(unittest.TestCase):
             ),
             patch.object(_readers, "get_jobs", return_value=[]),
         ):
-            observed = adapter.get_state(h)["observed"]
+            observed = _instrument.get_state(h)["observed"]
         self.assertEqual(
             observed["limits"],
             {"source": "test", "path": None, "is_fallback": False},

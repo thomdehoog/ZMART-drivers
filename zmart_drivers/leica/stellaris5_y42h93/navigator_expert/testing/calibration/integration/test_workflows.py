@@ -131,7 +131,7 @@ def test_make_session_paths_does_not_use_package_sessions_root(sessions_root):
         "sess_pkg",
         sessions_root=sessions_root,
     )
-    package_sessions = Path(cm.__file__).resolve().parents[1] / "sessions"
+    package_sessions = Path(cm.__file__).resolve().parents[2] / "sessions"
     # session_dir lives under the explicit root, NOT the package tree.
     assert package_sessions not in paths.session_dir.parents
 
@@ -1251,7 +1251,7 @@ def test_objective_pair_measure_runs_the_next_unfinished_step(monkeypatch):
 
 def test_objective_pair_notebook_only_configures_session_and_reference_slot():
     notebook_path = (
-        Path(wf_obj.__file__).parents[1]
+        Path(wf_obj.__file__).parents[2]
         / "configuration"
         / "optical_calibration"
         / "notebooks"

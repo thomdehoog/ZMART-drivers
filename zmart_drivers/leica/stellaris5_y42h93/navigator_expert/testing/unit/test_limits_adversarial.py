@@ -27,6 +27,7 @@ import json
 import math
 import os
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 from limits_fixtures import (
@@ -55,6 +56,27 @@ DRIVER_ROOT = Path(__file__).resolve().parents[2]
 # =============================================================================
 # Helpers
 # =============================================================================
+
+
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert import (
+    connect as _connect_module,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.for_zmart_controller.zmart_driver import (
+    ZmartDriver,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures import (
+    frame as _frame,
+)
+
+
+def _connect_handle(connection=None):
+    """Connect the way the controller does, by making the driver, and return its session handle."""
+    return ZmartDriver(connection)._handle
+
+
+def _disconnect_handle(handle):
+    """Disconnect a session handle the way ``ZmartDriver.disconnect`` does."""
+    ZmartDriver.disconnect(SimpleNamespace(_handle=handle))
 
 
 def _machine_root() -> Path:
@@ -878,17 +900,14 @@ def test_adapter_bypass_refuses_at_the_commands_layer(clear_stage_limits):
     from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface import (
         parsing as _cmd_settings,
     )
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.for_zmart_controller.zmart_adapter import (
-        zmart_adapter as adapter,
-    )
     from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitive_handling import (
         state as _readers,
     )
 
     _raw_snapshot(_machine_root(), limits_text=_BAD_LIMITS_TEXTS["missing_axis"])
     client = MockLasxClient(latency=0.0)
-    with patch.object(adapter._session, "connect_python_client", return_value=client):
-        handle = adapter.connect(dict(adapter.CONNECTION))
+    with patch.object(_connect_module, "connect_python_client", return_value=client):
+        handle = _connect_handle(dict(ZmartDriver.DEFAULT_CONNECTION))
     settings = {
         "objective": {"name": "10x", "magnification": 10, "slotIndex": 1},
         "zPosition": {"z-wide": {"position": 0.0}, "z-galvo": {"position": 0.0}},
@@ -906,7 +925,7 @@ def test_adapter_bypass_refuses_at_the_commands_layer(clear_stage_limits):
         # Frame target (0, 0, 0) with an unset (absolute) origin lands at stage
         # x = 0, below the envelope's x_min — the commands-layer gate refuses.
         with pytest.raises(RuntimeError, match="outside"):
-            adapter.set_xyz(handle, 0.0, 0.0, 0.0)
+            _frame.set_xyz(handle, 0.0, 0.0, 0.0)
 
 
 def test_controller_session_bypass_refuses_at_the_commands_layer(clear_stage_limits):
@@ -922,9 +941,6 @@ def test_controller_session_bypass_refuses_at_the_commands_layer(clear_stage_lim
     from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface import (
         parsing as _cmd_settings,
     )
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.for_zmart_controller.zmart_adapter import (
-        zmart_adapter as adapter,
-    )
     from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitive_handling import (
         state as _readers,
     )
@@ -936,7 +952,7 @@ def test_controller_session_bypass_refuses_at_the_commands_layer(clear_stage_lim
         "zPosition": {"z-wide": {"position": 0.0}, "z-galvo": {"position": 0.0}},
     }
     with (
-        patch.object(adapter._session, "connect_python_client", return_value=client),
+        patch.object(_connect_module, "connect_python_client", return_value=client),
         patch.object(_readers, "get_xy", return_value={"x_um": 50000, "y_um": 30000}),
         patch.object(_readers, "get_job_settings", return_value=settings),
         patch.object(
