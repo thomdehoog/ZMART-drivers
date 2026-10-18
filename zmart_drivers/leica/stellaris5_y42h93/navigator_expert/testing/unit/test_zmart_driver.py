@@ -136,7 +136,7 @@ def test_the_class_hands_the_type_and_the_folder_to_the_capture(monkeypatch, tmp
 
     session = zmart_controller.ZmartController(zmart_driver.ZmartDriver, connection)
     try:
-        monkeypatch.setattr(adapter, "acquire", capture)
+        monkeypatch.setattr(zmart_driver._acquisition, "acquire", capture)
         answer = session.acquire(
             "A1", acquisition_type="overview", output_folder=str(tmp_path / "run")
         )
