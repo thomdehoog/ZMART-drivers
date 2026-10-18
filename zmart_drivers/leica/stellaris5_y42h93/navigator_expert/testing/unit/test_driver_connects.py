@@ -23,8 +23,8 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.prim
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures import (
     session_state,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup import image_stage_registration
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.image_stage_registration import Orientation, orientation_config
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup import orientation as orientation_item
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.orientation import Orientation, orientation_config
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.store import MachineProfile
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher import gate
 
@@ -155,9 +155,9 @@ def test_orientation_and_readiness_evidence_come_from_one_validated_read():
 
     real_loads = json.loads
     with patch.object(
-        image_stage_registration.json, "loads", wraps=real_loads
+        orientation_item.json, "loads", wraps=real_loads
     ) as loads:
-        orientation, info = image_stage_registration.load_rig_orientation()
+        orientation, info = orientation_item.load_rig_orientation()
 
     loads.assert_called_once()
     assert info["rotate_deg"] == orientation.rotate_deg

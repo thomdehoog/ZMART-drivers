@@ -25,7 +25,7 @@ import tifffile
 
 pytest.importorskip("cv2")  # calibration core imports cv2
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.image_stage_registration import Orientation
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.orientation import Orientation
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.store import MachineProfile
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.acquisition_and_saving.naming import build_image_name, parse_image_name
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.optical_calibration import adopt_calibration as wf_adopt

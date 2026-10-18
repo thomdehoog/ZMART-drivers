@@ -247,7 +247,7 @@ print(saved.image_paths)  # {PlaneIndex(t,z,c): Path, ...}
 
 > No machine config yet? The first connect seeds ProgramData from the repo defaults so CI and local
 > mock runs work. On the rig, run `driver_setup/limits/notebooks/set_limits.ipynb`,
-> `driver_setup/image_stage_registration/notebooks/set_orientation.ipynb`, and the calibration notebook to replace those defaults
+> `driver_setup/orientation/notebooks/set_orientation.ipynb`, and the calibration notebook to replace those defaults
 > with measured values. If a machine file is invalid, the session falls back to the bundled default
 > envelope (loudly) rather than refusing — fix the file the warning names and reconnect.
 
@@ -604,7 +604,7 @@ zmart_drivers/leica/stellaris5_y42h93/navigator_expert/
 │                       (the capture) · save.py · ome_zarr.py · ome_canonical.py · materialize.py ·
 │                       command_log.py · clear_cache.py
 ├── driver_setup/       everything for setting up this driver on one microscope, one folder per item:
-│                       limits/, origin/, image_stage_registration/ (the picture's orientation),
+│                       limits/, origin/, orientation/ (the picture's orientation),
 │                       optical_calibration/ and data_location/. Each holds its bundled defaults,
 │                       its loader, the code that measures it and its notebook. store.py finds
 │                       the saved values under ProgramData; notebook_support.py helps the notebooks

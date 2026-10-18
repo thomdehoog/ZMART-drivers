@@ -108,7 +108,7 @@ _BUNDLED_SUBSYSTEM = {
 _BUNDLED_ITEM_FOLDER = {
     "calibration": "optical_calibration",
     "limits": "limits",
-    "orientation": "image_stage_registration",
+    "orientation": "orientation",
 }
 _SUBSYSTEM_FILENAME = {
     subsystem: filename for filename, subsystem in _BUNDLED_SUBSYSTEM.items()

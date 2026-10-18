@@ -25,7 +25,7 @@ import tifffile
 import zarr
 
 import zmart_drivers.leica.stellaris5_y42h93.navigator_expert as drv
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.image_stage_registration import Orientation, reorient_array
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.orientation import Orientation, reorient_array
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.acquisition_and_saving.naming import Naming, build_image_name, parse_image_name
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.product import ExportedAcquisition, ExportedPosition
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.acquisition_and_saving import acquire as capture
@@ -39,7 +39,7 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.acquisiti
 @pytest.fixture(autouse=True)
 def _identity_rig_orientation(monkeypatch):
     monkeypatch.setattr(
-        "zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.image_stage_registration.rig_orientation",
+        "zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.orientation.rig_orientation",
         Orientation,
     )
 
@@ -355,7 +355,7 @@ class TestSave:
         """
         orientation = Orientation(rotate_deg=90, mirrored=True)
         monkeypatch.setattr(
-            "zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.image_stage_registration.rig_orientation",
+            "zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.orientation.rig_orientation",
             lambda: orientation,
         )
 

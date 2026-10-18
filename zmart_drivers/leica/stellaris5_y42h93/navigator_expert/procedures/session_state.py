@@ -23,7 +23,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from ..driver_setup.image_stage_registration import Orientation
+from ..driver_setup.orientation import Orientation
 
 
 @dataclass

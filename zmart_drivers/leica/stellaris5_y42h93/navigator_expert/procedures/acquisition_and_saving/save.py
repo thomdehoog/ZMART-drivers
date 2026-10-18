@@ -21,7 +21,7 @@ from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
-from ...driver_setup.image_stage_registration import Orientation
+from ...driver_setup.orientation import Orientation
 from ...vendor_specific.primitives.capture import files as _files
 from . import clear_cache
 from . import materialize as _materialize
@@ -95,7 +95,7 @@ def save(
             f"unknown projection {projection!r}; the projections are {PROJECTIONS}"
         )
     if orientation is None:
-        from ...driver_setup.image_stage_registration import rig_orientation
+        from ...driver_setup.orientation import rig_orientation
 
         orientation = (
             rig_orientation() if IMAGE_SAVE.apply_orientation else Orientation()

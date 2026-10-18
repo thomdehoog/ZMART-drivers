@@ -338,7 +338,7 @@ def load_rig_orientation() -> tuple[Any, dict]:
         _log.warning(
             "orientation unavailable (%s); saved images will NOT be corrected to the "
             "stage axes this session. Re-publish orientation.json with "
-            "driver_setup/image_stage_registration/notebooks/set_orientation.ipynb and reconnect.",
+            "driver_setup/orientation/notebooks/set_orientation.ipynb and reconnect.",
             exc,
         )
         return identity, {

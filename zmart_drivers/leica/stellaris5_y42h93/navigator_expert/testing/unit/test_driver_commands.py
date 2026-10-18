@@ -31,7 +31,7 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher import (
     gate as _gate,
 )
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific import parsing as _readers_parsing
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup import image_stage_registration as _orientation
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup import orientation as _orientation
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup import store as _machine
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.acquisition_and_saving import command_log as _log
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.acquisition_and_saving import clear_cache as _release

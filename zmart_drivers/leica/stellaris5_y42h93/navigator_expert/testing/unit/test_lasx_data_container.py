@@ -16,7 +16,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.image_stage_registration import Orientation
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.orientation import Orientation
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.acquisition_and_saving.naming import Naming
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.product import PlaneIndex, RawPlaneSource
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.acquisition_and_saving import acquire as capture
@@ -378,7 +378,7 @@ class TestSaving:
     def identity_orientation(self, monkeypatch):
         monkeypatch.setattr(
             "zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup."
-            "image_stage_registration.rig_orientation",
+            "orientation.rig_orientation",
             Orientation,
         )
 
