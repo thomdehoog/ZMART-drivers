@@ -45,11 +45,11 @@ follow the reason.
    counts and tolerances belong in a tuning file, and names say their unit
    (`_um`, `_s`). A number in the middle of a function is easy to miss and
    hard to change. A constant that only one test uses may stay in that test.
-10. **Let a formatter decide the layout.** The formatter is `ruff format`. It
-    should be a required check, so that nobody argues about line breaks. It is
-    not required yet: it would reformat 128 of the 178 files in the Leica
-    driver today, so the whole driver must be reformatted once, in a commit of
-    its own that changes no behaviour. This guide is for what a formatter cannot check.
+10. **Let a formatter decide the layout.** The formatter is `ruff format`. The
+    Leica driver was formatted with it in one commit that changes no behaviour.
+    Keep it that way, and make the format check a required step in the driver's
+    CI, so that nobody argues about line breaks. This guide is for what a
+    formatter cannot check.
 
 ## The top of every file
 
