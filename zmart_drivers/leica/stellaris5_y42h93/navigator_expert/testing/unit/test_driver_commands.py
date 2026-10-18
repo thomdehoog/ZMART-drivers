@@ -79,8 +79,8 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.pri
 )
 
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert import (
-    connect as _connect_module,
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.connection import (
+    lasx_client as _connect_module,
 )
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration import (
     session_state as _session_state,
@@ -251,10 +251,10 @@ class TestRegistration(unittest.TestCase):
 class TestCalibrationSelection(unittest.TestCase):
     def test_named_connection_calibration_is_used_for_objective_translations(self):
         # The driver now owns loading: the named calibration flows through
-        # connect_microscope -> session._load_objective_calibration, where one
+        # the driver's connection -> session_state.load_objective_calibration, where one
         # exact document supplies both translations and readiness provenance.
-        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert import (
-            connect as drv_session,
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration import (
+            session_state as drv_session,
         )
         from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.optical_calibration import (
             model as cal_model,
@@ -279,7 +279,7 @@ class TestCalibrationSelection(unittest.TestCase):
             patch.object(cal_model, "default_path", return_value=path),
             patch.object(cal_model, "load_calibration", return_value=cfg) as load,
         ):
-            translations, info = drv_session._load_objective_calibration("lens_A")
+            translations, info = drv_session.load_objective_calibration("lens_A")
 
         load.assert_called_once_with(path.absolute())
         self.assertEqual(translations[2], (12.0, 17.0, 3.0))
@@ -287,8 +287,8 @@ class TestCalibrationSelection(unittest.TestCase):
 
     def test_translations_and_provenance_come_from_one_calibration_read(self):
         """A snapshot adoption during connect cannot mix old math with new proof."""
-        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert import (
-            connect as drv_session,
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration import (
+            session_state as drv_session,
         )
         from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.optical_calibration import (
             model as cal_model,
@@ -317,7 +317,7 @@ class TestCalibrationSelection(unittest.TestCase):
                 side_effect=[old, newly_adopted],
             ) as load,
         ):
-            translations, info = drv_session._load_objective_calibration("lens_A")
+            translations, info = drv_session.load_objective_calibration("lens_A")
 
         self.assertEqual(load.call_count, 1)
         self.assertEqual(translations[2], (1.0, 2.0, 3.0))
@@ -485,7 +485,7 @@ class TestFrame(unittest.TestCase):
             with (
                 patch.object(_machine, "MACHINE", profile),
                 patch.object(
-                    _connect_module, "connect_microscope"
+                    _connect_module, "connect_python_client"
                 ) as connect_microscope,
             ):
                 with self.assertRaisesRegex(RuntimeError, "could not be read"):

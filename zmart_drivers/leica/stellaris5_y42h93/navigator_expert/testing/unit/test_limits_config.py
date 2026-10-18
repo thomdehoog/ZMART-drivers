@@ -320,11 +320,9 @@ def test_limits_notebook_publishes_the_exact_flat_template():
     assert (limits_config, "validate_limits") in imported
     assert "lambda notebook: adopt_limits(" in source
     assert "validated_limits," in source
-    assert (
-        "import zmart_drivers.leica.stellaris5_y42h93.navigator_expert as drv" in source
-    )
-    assert "drv.connect_microscope(load_calibration=False)" in source
-    assert "corners = CornerRecorder(client)" in source
+    assert "ZmartDriver," in source
+    assert 'ZmartDriver({"load_calibration": False})' in source
+    assert "corners = CornerRecorder(driver.client)" in source
     for number in (1, 2, 3, 4):
         assert f"corners.record({number})" in source
     assert "captured_xy = corners.limits()" in source

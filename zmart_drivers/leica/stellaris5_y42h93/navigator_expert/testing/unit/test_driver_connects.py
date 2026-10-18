@@ -1,7 +1,6 @@
-"""The driver's own connection entry point loads the three machine-local
-configs, with per-file load switches.
+"""Making a ``ZmartDriver`` loads the three machine-local configs, with per-file load switches.
 
-These exercise ``connection.session.connect_microscope`` against a mock CAM
+These exercise the driver's connection against a mock CAM
 client and the hermetic ProgramData root the autouse conftest fixture points
 at (so orientation/calibration seed while limits use the bundled fallback).
 """
@@ -16,8 +15,11 @@ from unittest.mock import patch
 import pytest
 from mock_lasx_api import MockLasxClient
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert import (
-    connect as drv_session,
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.for_zmart_controller.zmart_driver import (
+    ZmartDriver,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.connection import (
+    lasx_client,
 )
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitive_handling.profiles import (
     IMAGE_SAVE,
@@ -37,8 +39,8 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher import ga
 
 def _connect(**kwargs) -> MockLasxClient:
     client = MockLasxClient(latency=0.0)
-    with patch.object(drv_session, "connect_python_client", return_value=client):
-        drv_session.connect_microscope(**kwargs)
+    with patch.object(lasx_client, "connect_python_client", return_value=client):
+        ZmartDriver(kwargs)
     return client
 
 
@@ -160,8 +162,8 @@ def test_orientation_and_readiness_evidence_come_from_one_validated_read():
     import json
 
     real_loads = json.loads
-    with patch.object(drv_session.json, "loads", wraps=real_loads) as loads:
-        orientation, info = drv_session._load_rig_orientation()
+    with patch.object(session_state.json, "loads", wraps=real_loads) as loads:
+        orientation, info = session_state.load_rig_orientation()
 
     loads.assert_called_once()
     assert info["rotate_deg"] == orientation.rotate_deg

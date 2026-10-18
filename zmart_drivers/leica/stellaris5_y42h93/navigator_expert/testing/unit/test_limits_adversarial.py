@@ -58,8 +58,8 @@ DRIVER_ROOT = Path(__file__).resolve().parents[2]
 # =============================================================================
 
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert import (
-    connect as _connect_module,
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.connection import (
+    lasx_client as _connect_module,
 )
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.for_zmart_controller.zmart_driver import (
     ZmartDriver,

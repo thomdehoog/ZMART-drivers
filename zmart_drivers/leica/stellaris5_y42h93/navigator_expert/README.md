@@ -161,16 +161,15 @@ runtime where possible. Override via the profile, not at call sites.
   flat: four typed stage-axis `range` entries, `objective_slot` with `allowed` values,
   and either a typed constraint or explicit `[]` for each setter. Backlash remains a
   command routine, not configuration.
-- **The driver loads the configs at connect** — `connect_microscope(...)` (`connect.py`)
-  is the driver's own front door. It opens the CAM client and then loads this microscope's three
-  machine-local configs — the **instrument limits**, the **orientation**, and the **calibration** — so the
-  whole session works from one consistent picture. The `ZmartDriver` class's constructor simply calls
-  it. Normal image orientation is enabled by `IMAGE_SAVE` in `vendor_interface/primitive_handling/profiles.py`; only the
+- **The driver loads the configs at connect** — making a `ZmartDriver` is the connection. Its
+  constructor opens the CAM client (`vendor_interface/connection/lasx_client.py`) and then loads this
+  microscope's three machine-local configs — the **instrument limits**, the **orientation**, and the
+  **calibration** — so the whole session works from one consistent picture. Normal image orientation is enabled by `IMAGE_SAVE` in `vendor_interface/primitive_handling/profiles.py`; only the
   orientation measurement explicitly requests raw pixels. Limits and calibration can still be skipped.
   This is a deliberate ladder: the limits notebook
   is bounded only by the physical backstop, `set_orientation` is bounded by limits, and
   `calibrate_objective_pair` is bounded by limits and expects a measured orientation.
-- **Limits handshake** — `connect_limits_handshake(client)` (run by `connect_microscope`;
+- **Limits handshake** — `connect_limits_handshake(client)` (run by the `ZmartDriver` constructor;
   workflows/validators/notebooks call it directly). It resolves an operator-published ProgramData
   `limits.json`, or uses the bundled defaults directly when none exists. It validates exact flat keys, finite ranges, allowed
   objective slots, and envelope **within the hardcoded physical backstop**
@@ -213,7 +212,7 @@ client = connect_python_client()
 assert ping(client)
 
 # 2. Limits handshake (REQUIRED before any mutating command; run automatically
-#    by connect_microscope and the `ZmartDriver` class — shown here for the low-level
+#    by the `ZmartDriver` class — shown here for the low-level
 #    API): resolves and validates an operator-published ProgramData limits.json
 #    and installs the limits gate for this client. A MISSING or INVALID file
 #    uses the bundled defaults directly (loudly), so
@@ -254,14 +253,14 @@ print(saved.image_paths)  # {PlaneIndex(t,z,c): Path, ...}
 
 ## 5. Core concepts
 
-**The client.** `connect_microscope(...)` is the normal entry point: it opens the CAM client and
+**The client.** Making a `ZmartDriver` is the normal entry point: it opens the CAM client and
 loads this microscope's three machine-local configs (limits, orientation, calibration), so the whole
-session works from one consistent picture; `connect_python_client()` is the lower-level primitive that
+session works from one consistent picture (`driver.client` is the CAM client); `connect_python_client()` is the lower-level primitive that
 only opens and pings the client (the setup notebooks use it, since they load just the one config they
 need). Every command/reader takes the returned `client` as its first argument. The CAM client has no
 disconnect counterpart — it lives for the process; there is nothing to close when a session ends.
 
-**Which configs to load.** `connect_microscope(load_limits=…, load_calibration=…)` chooses whether
+**Which configs to load.** `ZmartDriver({"load_limits": …, "load_calibration": …})` chooses whether
 limits and calibration are loaded. `load_limits=False` governs the session with the bundled **default**
 envelope (never ungated; the physical backstop still holds); `load_calibration=False` refuses
 cross-objective moves rather than computing uncompensated ones. Normal image saves always use the
@@ -544,9 +543,9 @@ zmart_drivers/leica/stellaris5_y42h93/navigator_expert/
 │   └── zmart_driver.py     the ZmartDriver class the controller calls, one method per command;
 │                           the work behind each method is in procedures/ (session, frame,
 │                           acquisition, instrument)
-├── connect.py          the connect flow: open LAS X, load this microscope's configuration
 ├── vendor_interface/   the only part that knows LAS X:
-│   ├── connection/     lasx_runtime.py (the .NET CAM assemblies), hardware_server.py
+│   ├── connection/     lasx_client.py (open the client and check it answers) · lasx_runtime.py (the .NET CAM
+│   │                   assemblies) · hardware_server.py
 │   ├── error_classification.py   the kinds of problem, the rule that only a temporary one is
 │   │                   sent again, and the sorting of LAS X's messages into the kinds
 │   ├── product.py · naming.py · files.py   the shapes of a capture and its files
@@ -616,9 +615,9 @@ upward today: the readers and the handling notes in `vendor_interface` use the d
 envelope and read engine, the gate loads the limits item, and the limits item validates through
 the rulebook. `testing/unit/test_architecture_guard.py` lists each
 of them and fails when a new one appears; removing them is follow-up work, one at a time.
-`connect.py` is the connect-time composition point: `connect_microscope` reaches into the gate,
-the registration and the calibration (via function-local imports) to load the machine configs in
-one place. It is the flow that `ZmartDriver.__init__` runs, and will fold into it.
+The connect-time flow lives in `ZmartDriver.__init__`: it opens the client, installs the limits
+gate, and loads the orientation and the calibration (the loaders are in
+`configuration/session_state.py`).
 
 **What the move did not change.** The layout follows the anatomy; the behaviour is the release
 candidate's, so that the move can be reviewed and tested on hardware on its own. These are the
