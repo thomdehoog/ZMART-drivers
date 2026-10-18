@@ -18,16 +18,19 @@ from limits_fixtures import hermetic_mock_machine_root
 from mock_lasx_api import MockLasxClient
 from zmart_controller.registry import load_driver
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.for_zmart_controller import (
     zmart_controller_plugin as plugin,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert import zmart_driver
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.for_zmart_controller import (
+    zmart_driver,
+)
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.actions import profiles
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.zmart_adapter import (
     zmart_adapter as adapter,
 )
 
-DRIVER_FOLDER = Path(zmart_driver.__file__).resolve().parent
+# The class file is in for_zmart_controller/; the driver folder, with zmart_driver.json, is one up.
+DRIVER_FOLDER = Path(zmart_driver.__file__).resolve().parent.parent
 
 
 def _offline(monkeypatch, tmp_path):

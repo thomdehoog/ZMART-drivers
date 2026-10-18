@@ -194,7 +194,7 @@ ALLOWED = {
         "connect",
         "__version__",
     },
-    "zmart_controller_plugin": {"zmart_adapter"},
+    "for_zmart_controller": {"zmart_adapter"},
     "__init__": {
         "vendor_interface",
         "dispatcher",

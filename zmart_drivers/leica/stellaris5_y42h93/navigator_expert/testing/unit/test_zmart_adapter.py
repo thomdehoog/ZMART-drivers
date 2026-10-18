@@ -168,7 +168,7 @@ class TestRegistration(unittest.TestCase):
         from zmart_controller.registry import driver_functions
         from zmart_controller.zmart_controller import COMMANDS
 
-        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert import (
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.for_zmart_controller import (
             zmart_controller_plugin as driver,
         )
 
@@ -186,7 +186,7 @@ class TestRegistration(unittest.TestCase):
         """The origin is driver configuration: the controller cannot set it."""
         from zmart_controller.registry import driver_functions
 
-        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert import (
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.for_zmart_controller import (
             zmart_controller_plugin as driver,
         )
 
@@ -2428,7 +2428,7 @@ class TestLifecycle(unittest.TestCase):
 
         import zmart_controller
 
-        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert import (
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.for_zmart_controller import (
             zmart_controller_plugin as driver,
         )
 

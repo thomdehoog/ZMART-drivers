@@ -4,10 +4,10 @@ The functions that plug this driver into ``zmart_controller``: one function
 per controller command, each taking the opaque handle as its first argument.
 The controller stays vendor-free — this module (not the controller) knows
 both contracts. The controller finds these functions through the driver
-module, ``zmart_controller_plugin.py`` in the driver folder::
+module, ``zmart_controller_plugin.py`` in ``for_zmart_controller/``::
 
     import zmart_controller
-    import zmart_drivers.leica.stellaris5_y42h93.navigator_expert.zmart_controller_plugin as stellaris
+    import zmart_drivers.leica.stellaris5_y42h93.navigator_expert.for_zmart_controller.zmart_controller_plugin as stellaris
 
     zmart_controller.set_instrument(stellaris)
 

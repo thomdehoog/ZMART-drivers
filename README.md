@@ -52,8 +52,8 @@ not been reviewed for release.
 
 The Leica driver plugs in the way the controller's
 [guide to plugging in a driver](https://github.com/thomdehoog/ZMART-controller/blob/main/docs/plug_in_a_driver/README.md)
-describes: a `zmart_driver.json` and a `ZmartDriver` class in `zmart_driver.py`, at the top of its
-folder. The other three drivers still carry the older shape, a module called
+describes: a `zmart_driver.json` at the top of its folder and a `ZmartDriver` class in the file that
+JSON names (for Leica, `for_zmart_controller/zmart_driver.py`). The other three drivers still carry the older shape, a module called
 `zmart_controller_plugin.py` with one function per controller command, which the controller
 accepts when handed the module directly.
 Every connection setting is optional: a driver fills in what you leave out, such as where its
