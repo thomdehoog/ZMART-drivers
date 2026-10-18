@@ -43,7 +43,10 @@ import time
 from ..dispatcher import read as _readers
 from ..dispatcher import tuning as _timing
 from ..dispatcher.envelope import _make_log_entry
-from ..vendor_interface.errors import _check_api_error, _is_transient_error
+from ..vendor_interface.error_classification import (
+    _check_api_error,
+    _is_transient_error,
+)
 from ..vendor_interface.parsing import make_changeable_copy
 from .confirm_specs import CONFIRM_SPECS
 from .derived import z_um_from_settings
