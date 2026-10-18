@@ -1085,6 +1085,14 @@ vendor interface. Each driver already has one, though at different depths:
 | Nikon | `fake_nis_api.py`, an in-memory stand-in. |
 | Mock | MockScope Control in `testing/mock_api/`, pretend vendor software with a pretend microscope behind it: it takes time to move, refuses commands while busy, writes its own file format, and can be told to fail in every way the error rules know. |
 
+Between the mock API and the real microscope there can be one more step: a
+simulator that the vendor supplies, such as the LAS X simulator, which runs
+the real vendor software without a microscope. The driver is meant to work
+on the simulator and on the microscope without a separate variant for each.
+If a small difference turns up, such as a slower or older answer from the
+simulator, it is handled as a small change in the tuning numbers or in the
+handling notes of the primitive concerned, never in the shared dispatcher.
+
 The folder is called `testing/` rather than `tests/` on purpose. The mock API
 is used beyond the tests: the controller's mock driver runs on it, and
 workflows can be tried offline on it. Python packages often leave a folder
