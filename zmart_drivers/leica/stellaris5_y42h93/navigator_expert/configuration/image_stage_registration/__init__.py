@@ -44,9 +44,12 @@ License: MIT
 from __future__ import annotations
 
 import json
+import logging
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+
+_log = logging.getLogger(__name__)
 
 SCHEMA_VERSION = 3
 _VALID_ROTATIONS = (0, 90, 180, 270)
@@ -299,3 +302,64 @@ def reorient_array(array, orientation: Orientation):
     if k:
         array = np.rot90(array, k=-k)  # negative k turns clockwise
     return np.ascontiguousarray(array)
+
+
+def load_rig_orientation() -> tuple[Any, dict]:
+    """Load orientation and readiness evidence from one exact document.
+
+    A single resolve/read supplies both the orientation used for images and the
+    provenance used by preflight, so snapshot adoption cannot mix old geometry
+    with new readiness evidence. Invalid or disabled configuration returns the
+    identity mapping with an explicit not-ready record.
+    """
+    from ...vendor_interface.primitive_handling.profiles import IMAGE_SAVE
+    from ..store import MACHINE
+
+    identity = Orientation()
+    if not IMAGE_SAVE.apply_orientation:
+        return identity, {
+            "enabled": False,
+            "loaded": False,
+            "measured": False,
+            "path": None,
+            "rotate_deg": int(identity.rotate_deg),
+            "mirrored": identity.mirrored,
+        }
+
+    path = None
+    try:
+        path = MACHINE.orientation_path().absolute()
+        data = json.loads(path.read_text(encoding="utf-8"))
+        # Match orientation.load_orientation's validation without reading the
+        # file a second time: readiness evidence and runtime geometry must come
+        # from this same in-memory document.
+        orientation = orientation_from_config(data)
+    except Exception as exc:  # noqa: BLE001 -- config IO / schema; degrade, don't crash connect
+        _log.warning(
+            "orientation unavailable (%s); saved images will NOT be corrected to the "
+            "stage axes this session. Re-publish orientation.json with "
+            "configuration/image_stage_registration/notebooks/set_orientation.ipynb and reconnect.",
+            exc,
+        )
+        return identity, {
+            "enabled": True,
+            "loaded": False,
+            "measured": False,
+            "path": None if path is None else str(path),
+            "rotate_deg": int(identity.rotate_deg),
+            "mirrored": identity.mirrored,
+            "error": str(exc),
+        }
+    return orientation, {
+        "enabled": True,
+        "loaded": True,
+        # A real measured 0-degree orientation is valid. The explicit marker,
+        # not the angle, distinguishes it from the shipped identity placeholder.
+        "measured": data.get("measured") is True,
+        "path": str(path),
+        "rotate_deg": int(orientation.rotate_deg),
+        "mirrored": orientation.mirrored,
+        "axis_signs": orientation.axis_signs,
+        "axis_mapping": orientation.axis_mapping,
+        "image_to_stage": [list(row) for row in orientation.image_to_stage],
+    }

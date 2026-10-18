@@ -22,7 +22,7 @@ import math
 from pathlib import Path
 from typing import Any
 
-from ..configuration import session_state as _session_state
+from . import session_state as _session_state
 from ..configuration import store as _machine
 from ..dispatcher import gate as _gate
 from ..vendor_interface.parsing import parse_tile_geometry as _parse_tile_geometry

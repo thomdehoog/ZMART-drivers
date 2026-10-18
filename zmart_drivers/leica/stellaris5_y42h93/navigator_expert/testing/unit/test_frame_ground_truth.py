@@ -35,7 +35,7 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.commands 
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.commands import (
     changes as commands_mod,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures import (
     session_state,
 )
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.image_stage_registration import (
