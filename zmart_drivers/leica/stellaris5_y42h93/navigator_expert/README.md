@@ -505,7 +505,7 @@ zmart_drivers/leica/stellaris5_y42h93/navigator_expert/
 ├── actions/            get.py (which source answers each reading) · derived.py · set.py (every
 │                       set_*/move_*/acquire/select_job) · confirmations.py · confirm_specs.py ·
 │                       confirm_select_job.py · profiles.py (one CommandProfile per command) ·
-│                       objectives.py · objective_shift.py · galvo.py · acquire.py (the capture)
+│                       objectives.py · objective_shift.py · acquire.py (the capture)
 ├── procedures/         backlash.py · measure_orientation.py · measure_limits.py ·
 │                       calibrate_objective_pair.py · check_calibration.py · adopt_calibration.py ·
 │                       calibration_common.py · algorithms/ (registration and focus scoring)
