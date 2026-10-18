@@ -2,13 +2,13 @@ r"""The Leica STELLARIS 5 driver, as the ZMART Controller plugs it in.
 
 This is the class the controller makes when it connects, with one method per
 command (see the controller's "How do I plug in a ZMART-driver"). Together
-with ``zmart_driver.json`` at the top of the driver folder, which names this
+with ``zmart_driver.json`` beside it in this folder, which names this
 file, it is all the controller needs. Install
 the driver once on the LAS X computer, then connect by name in every session::
 
     from zmart_controller import mic
 
-    mic.register_driver(r"C:\ZMART-drivers\zmart_drivers\leica\stellaris5_y42h93\navigator_expert")
+    mic.register_driver(r"C:\ZMART-drivers\zmart_drivers\leica\stellaris5_y42h93\navigator_expert\for_zmart_controller")
     mic.connect("stellaris")
     mic.get_xyz()
 

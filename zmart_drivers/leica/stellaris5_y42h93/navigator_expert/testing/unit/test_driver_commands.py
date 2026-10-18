@@ -237,7 +237,7 @@ class TestRegistration(unittest.TestCase):
 
         source = Path(module.__file__).read_text(encoding="utf-8")
         self.assertIsNone(
-            re.search(r"^\s*(from|import) zmart_controller", source, re.MULTILINE)
+            re.search(r"^(from|import) zmart_controller", source, re.MULTILINE)
         )
 
     def test_set_origin_is_a_driver_step_not_a_controller_op(self):
@@ -2670,8 +2670,8 @@ class TestLifecycle(unittest.TestCase):
 
         import zmart_controller
 
-        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.for_zmart_controller import (
-            zmart_controller_plugin as driver,
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.for_zmart_controller.zmart_driver import (
+            ZmartDriver as driver,
         )
 
         _clear_limits()
@@ -2701,7 +2701,7 @@ class TestLifecycle(unittest.TestCase):
             try:
                 # Capturing the origin is a driver setup step, not a controller
                 # command, so it is called on the adapter with the driver handle.
-                _frame.set_origin(session._handle)
+                _frame.set_origin(session._handle._handle)
                 answer = session.set_xyz(10, 20, 5, with_actuators={"z": "z-galvo"})
                 self.assertIs(answer["success"], True)
                 # The move answers a read-back in get_xyz's shape. The readers

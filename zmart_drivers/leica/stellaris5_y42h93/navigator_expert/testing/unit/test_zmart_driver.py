@@ -1,7 +1,7 @@
 """The driver plugs into the ZMART Controller as a ``ZmartDriver`` class.
 
 These tests do what an operator does on the LAS X computer: point the
-controller at the driver's folder, which holds ``zmart_driver.json`` and
+controller at the driver's ``for_zmart_controller`` folder, which holds ``zmart_driver.json`` and
 ``zmart_driver.py``, and let the controller's own ``validate_driver`` check
 every answer against its contract. The driver connects to the offline LAS X
 mock, so the tests run on any computer.
@@ -25,8 +25,8 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.pri
     profiles,
 )
 
-# The class file is in for_zmart_controller/; the driver folder, with zmart_driver.json, is one up.
-DRIVER_FOLDER = Path(zmart_driver.__file__).resolve().parent.parent
+# The class file and zmart_driver.json sit together in for_zmart_controller/; that is the folder to register.
+DRIVER_FOLDER = Path(zmart_driver.__file__).resolve().parent
 
 
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert import (

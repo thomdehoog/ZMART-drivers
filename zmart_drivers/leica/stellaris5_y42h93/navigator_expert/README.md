@@ -68,15 +68,15 @@ LAS X.
   ```
   The Leica package is self-contained; its filename helper lives under
   `navigator_expert.acquisition.naming`.
-- **Plug it into the ZMART Controller** on the LAS X computer. Register this folder (its `zmart_driver.json` names the class
-  in `for_zmart_controller/`) with the controller once; from then on every session plugs the driver in by name.
+- **Plug it into the ZMART Controller** on the LAS X computer. Register the `for_zmart_controller` folder (its `zmart_driver.json` names the class
+  beside it) with the controller once; from then on every session plugs the driver in by name.
   Its settings, `CONNECTION` in that file, are all optional; the file explains each one:
   ```python
   import zmart_controller
 
   # Once, on the LAS X computer:
   zmart_controller.register_driver(
-      "C:/ZMART-drivers/zmart_drivers/leica/stellaris5_y42h93/navigator_expert"
+      "C:/ZMART-drivers/zmart_drivers/leica/stellaris5_y42h93/navigator_expert/for_zmart_controller"
   )
 
   # In every session:
@@ -538,8 +538,9 @@ bottom and the class the controller calls at the top.
 
 ```
 zmart_drivers/leica/stellaris5_y42h93/navigator_expert/
-├── zmart_driver.json   the driver's name ("stellaris") and how to reach LAS X on this computer
 ├── for_zmart_controller/   everything that faces the controller:
+│   ├── zmart_driver.json   the driver's name ("stellaris") and how to reach LAS X on this computer;
+│   │                       this is the folder you register with the controller
 │   └── zmart_driver.py     the ZmartDriver class the controller calls, one method per command;
 │                           the work behind each method is in procedures/ (session, frame,
 │                           acquisition, instrument)

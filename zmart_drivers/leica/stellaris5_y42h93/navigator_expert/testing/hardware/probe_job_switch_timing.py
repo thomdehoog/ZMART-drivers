@@ -76,7 +76,9 @@ def main(argv: list[str] | None = None) -> int:
     t0 = time.monotonic()
     _timed_readings(t0)
     connection = json.loads(
-        (_DRIVER_ROOT / "zmart_driver.json").read_text(encoding="utf-8")
+        (_DRIVER_ROOT / "for_zmart_controller" / "zmart_driver.json").read_text(
+            encoding="utf-8"
+        )
     )
     driver = ZmartDriver(connection["connection"])
     try:

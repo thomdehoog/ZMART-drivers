@@ -62,7 +62,7 @@ from zmart_controller.registry import registry_file
 #: The driver's name in zmart_driver.json, and what get_instruments lists it under.
 DRIVER_NAME = "stellaris"
 #: The folder register_driver is pointed at: it holds zmart_driver.json.
-DRIVER_FOLDER = _NAV_ROOT
+DRIVER_FOLDER = _NAV_ROOT / "for_zmart_controller"
 #: Readback tolerance for a move, matching the driver's own confirmation gate.
 XY_TOL_UM = 20.0
 #: A step far beyond any stage, so the gate refuses it whatever the limits are.
