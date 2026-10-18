@@ -360,8 +360,22 @@ dispatcher the same small result, one of five outcomes:
 | Accepted | The vendor said it has the command | Goes to the confirm loop |
 | Refused | The vendor said no, a fatal kind of problem | Stops and reports |
 | Not delivered | It certainly never arrived, a transient kind | Sends again, up to a set number of times |
-| Unknown | It was sent, but the reply never came | Does not send again; goes to the confirm loop |
+| Unknown | It was sent, but no reply came in time | Sends again only if the command is safe to repeat; otherwise goes to the confirm loop |
 | Done | The call blocked until the work was finished | Reads back once, then finishes |
+
+**No reply counts as a failure.** A microscope should answer within about one
+second. If nothing comes back, the call is treated as having failed and, where
+it is safe, it is sent again. The waiting time for a reply is a number in the
+handling notes for each primitive, with one second as the default for quick
+commands. Some calls legitimately take much longer, such as a ZEISS move or a
+Nikon capture, and they say so there.
+
+**An acquisition is never sent again. Never.** If an acquisition were sent a
+second time, nobody could tell which of the two the microscope ends up running:
+the first one may only be slow. So an acquisition is not retried after an
+error, is not retried after silence, is not sent again between confirmation
+windows, and never falls back to another primitive. This is a fixed rule of the
+dispatcher, not a setting that a handling note could change.
 
 The handling notes say which style each primitive has and whether sending it
 again is safe. Sending again is a property declared for each primitive, never a
@@ -540,12 +554,15 @@ Proposal, not yet confirmed: a limit is a small description with a fixed shape,
 so that the gate can stay free of vendor knowledge. It names the axis or
 setting, the units, and either a range (smallest and largest value) or a list
 of allowed values. An empty list means "reviewed and not restricted", and a
-setting with no entry at all is refused, as the Leica gate does today. A
-microscope with a fixed physical stop, such as Leica's lower limit for the wide
-z drive, supplies one small function that checks it, and that function lives in
-the vendor interface. The Leica gate does more than the old table of names: it
-checks two z drives under one command and keeps a hard-coded physical stop, so
-it will need a real rewrite, not a rename.
+setting with no entry at all is refused, as the Leica gate does today.
+
+Some microscopes also have a limit that is built into the hardware, such as
+Leica's lower limit for the wide z drive, which it can never go below. That is
+simply one more range, written in the vendor interface by the person who knows
+the hardware. The gate checks it as well as the operator's limits file, and the
+stricter of the two wins. The operator cannot widen it. The Leica gate does more
+than the old table of names, because it checks two z drives under one command,
+so it will need a real rewrite and not just a rename.
 
 ### Error vocabulary, classification and rules
 
@@ -572,18 +589,15 @@ driver uses it.
 
 Today this is not yet true of the Leica code. Its `dispatcher/` folder
 imports Leica's dialog handling, its log reader and its message delivery, and
-its idle check is Leica-specific. To make the folder shared, the vendor
-interface offers a few hooks that the dispatcher calls and knows nothing more
-about. Proposal, not yet confirmed:
-
-- **Diagnose after a failure**: read what the vendor software says went wrong,
-  such as a dialog or a log entry, and hand it to the error classification.
-- **Is it ready**: report whether the instrument can take a command now, for
-  example whether the scanner is idle.
-- **Prepare to send**: do what a send needs first, such as writing the
-  command's parameters into Leica's request object.
-- **Identify**: report the serial number and software version (see the
-  previous section).
+its idle check is Leica-specific. The way to make the folder shared is to move
+that work inside Leica's primitives, so that every writing primitive simply
+answers success, an error, or nothing (see "The two loops and the send
+styles"). A Leica move, for example, waits until the scanner is idle before it
+sends, and looks at LAS X's dialogs and log to find out why a command failed,
+and then returns an error that says so. The dispatcher sees only the answer. No
+extra hooks are needed in the dispatcher, apart from the one primitive that
+reports the microscope's serial number and software version, described under
+"Pinned to one microscope and one software version".
 
 **The handling notes may hold code.** Most confirmations are one row of data:
 which reading, the target, how close counts. A few need code of their own, such
@@ -1524,7 +1538,7 @@ by any other part of the driver. The Leica driver already works this way.
   once" above.
 
 - **Proposals waiting for a decision.** "Taking turns with the vendor
-  software", "The running log", the limit description, the hooks and the
+  software", "The running log", the limit description and the
   handling-notes code are written as proposals in "The simplified anatomy".
   Each is marked there.
 
