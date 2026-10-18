@@ -1016,14 +1016,14 @@ def test_generated_machine_payload_matches_the_vocabulary():
 
 def test_every_dispatching_wrapper_declares_and_calls_the_gate():
     """AST completeness sweep over procedures/commands/changes.py: any public function that
-    reaches the fire path (_dispatch/_dispatch_setting/confirm_and_fire)
+    reaches the fire path (_dispatch/_dispatch_setting/the dispatcher's write)
     must (a) be declared in gate.MUTATING_COMMANDS and
     (b) call the gate with ITS OWN name — a new command cannot ship ungated."""
     source = (DRIVER_ROOT / "procedures" / "commands" / "changes.py").read_text(
         encoding="utf-8"
     )
     tree = ast.parse(source)
-    fire_names = {"_dispatch", "_dispatch_setting", "confirm_and_fire"}
+    fire_names = {"_dispatch", "_dispatch_setting", "write"}
     # Raw-receipt fires must not escape the
     # sweep either: a wrapper that skips the dispatch helpers and calls
     # api_obj.UpdateAwaitReceipt()/UpdateAsync() directly still reaches

@@ -143,14 +143,16 @@ def fast_timing_windows(monkeypatch):
     wait. Shipped values are unchanged; a test that needs a specific window
     patches it itself (``test_waiting_rule``).
     """
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher import reader
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher import (
+        dispatcher,
+    )
     from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitive_handling import (
         transport,
     )
 
-    monkeypatch.setattr(reader, "WINDOW_S", 0.25)
-    monkeypatch.setattr(reader, "POLL_S", 0.005)
-    monkeypatch.setattr(reader, "ANSWER_POLL_S", 0.001)
+    monkeypatch.setattr(dispatcher, "WINDOW_S", 0.25)
+    monkeypatch.setattr(dispatcher, "POLL_S", 0.005)
+    monkeypatch.setattr(dispatcher, "ANSWER_POLL_S", 0.001)
     monkeypatch.setattr(transport, "ECHO_SETTLE_TIMEOUT_S", 0.05)
 
 

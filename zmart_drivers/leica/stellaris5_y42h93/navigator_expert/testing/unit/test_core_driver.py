@@ -780,8 +780,8 @@ class TestRetryBackoff(unittest.TestCase):
         )
 
         with patch.object(
-            commands,
-            "confirm_and_fire",
+            commands._dispatcher,
+            "write",
             return_value={
                 "success": True,
                 "confirmed": None,
@@ -813,8 +813,8 @@ class TestRetryBackoff(unittest.TestCase):
         )
 
         with patch.object(
-            commands,
-            "confirm_and_fire",
+            commands._dispatcher,
+            "write",
             return_value={
                 "success": True,
                 "confirmed": None,
@@ -844,8 +844,8 @@ class TestRetryBackoff(unittest.TestCase):
         profile = profiles.CommandProfile(confirm_poll_s=5.0)
 
         with patch.object(
-            commands,
-            "confirm_and_fire",
+            commands._dispatcher,
+            "write",
             return_value={
                 "success": True,
                 "confirmed": True,
@@ -882,8 +882,8 @@ class TestRetryBackoff(unittest.TestCase):
         profile = profiles.CommandProfile(confirm_poll_s=5.0)
 
         with patch.object(
-            commands,
-            "confirm_and_fire",
+            commands._dispatcher,
+            "write",
             return_value={
                 "success": True,
                 "confirmed": True,
@@ -1824,7 +1824,7 @@ class TestSetFunctionWiring(unittest.TestCase):
             captured["model"] = model
             return _make_v6_result(msg=description)
 
-        with patch.object(commands, "confirm_and_fire", side_effect=mock_fire):
+        with patch.object(commands._dispatcher, "write", side_effect=mock_fire):
             r = set_fn(*args, **kwargs)
         return captured, r
 
@@ -2089,7 +2089,7 @@ class TestSetFunctionDefaults(unittest.TestCase):
             captured.update(kw)
             return _make_v6_result(msg=desc)
 
-        with patch.object(commands, "confirm_and_fire", side_effect=mock_fire):
+        with patch.object(commands._dispatcher, "write", side_effect=mock_fire):
             fn(make_client(), "J")
         return captured
 
