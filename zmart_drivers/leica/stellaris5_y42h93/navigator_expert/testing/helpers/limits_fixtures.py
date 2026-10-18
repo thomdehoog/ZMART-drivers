@@ -26,15 +26,15 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.limits
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.store import (
     MachineProfile,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher import (
-    checks as _motion_limits,
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitive_handling import (
+    limit_rules as _motion_limits,
 )
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher import (
     gate as _gate,
 )
 
 # The bundled conservative default envelope. The absolute X/Y backstop
-# (limits/checks.py) extends down to coordinate zero, so measured limits may
+# (vendor_interface/primitive_handling/limit_rules.py) extends down to coordinate zero, so measured limits may
 # sit below the 1000 um default margin.
 DEFAULT_STAGE_UM = {
     "x": [1000.0, 130000.0],

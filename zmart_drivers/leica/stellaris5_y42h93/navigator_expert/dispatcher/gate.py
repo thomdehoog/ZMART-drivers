@@ -4,7 +4,7 @@ Maintainer decision (MAINTAINER_DECISIONS.md §7): limits are enforced as low
 as possible — at the command wrapper that populates the native CAM function's
 model — so nothing built on top (adapter, controller, workflows, notebooks)
 can interfere with or bypass them. The rules themselves (what is allowed:
-``LeicaLimits`` and the stage checks) live in ``limits/checks.py``; this
+``LeicaLimits`` and the stage checks) live in ``vendor_interface/primitive_handling/limit_rules.py``; this
 module owns the *moment* of enforcement — per-connection state and refusal.
 The wrappers in ``actions/`` call :func:`check_refusal` before anything fires.
 
@@ -50,7 +50,7 @@ reason (which names the notebook that creates the files:
 all (no ``connect_handshake`` ran) still refuses fail-closed.
 
 Single-writer invariant: like command dispatch (``dispatch.py``) and the
-stage-envelope module global (``limits/checks.py``), this registry assumes
+stage-envelope module global (``vendor_interface/primitive_handling/limit_rules.py``), this registry assumes
 ONE instrument per process. The registry is keyed by ``id(client)`` and holds
 a strong reference to the client (CAM clients are process-lifetime), so an id
 can never be recycled onto a different client. A second ``connect_handshake``
@@ -73,8 +73,13 @@ from typing import Any
 
 from ..configuration import store as _machine
 from ..configuration.limits import config as _limits_config
-from . import checks as _limits
-from .checks import LeicaLimits, LimitsError, LimitsStatus, LimitViolation
+from ..vendor_interface.primitive_handling import limit_rules as _limits
+from ..vendor_interface.primitive_handling.limit_rules import (
+    LeicaLimits,
+    LimitsError,
+    LimitsStatus,
+    LimitViolation,
+)
 
 log = logging.getLogger(__name__)
 

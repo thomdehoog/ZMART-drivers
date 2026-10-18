@@ -28,8 +28,8 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.pri
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.output.product import (
     PlaneIndex,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher import (
-    checks as limits_checks,
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitive_handling import (
+    limit_rules as limits_checks,
 )
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher import (
     gate as _gate,
