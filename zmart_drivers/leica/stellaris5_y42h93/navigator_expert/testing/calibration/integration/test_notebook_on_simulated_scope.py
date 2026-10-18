@@ -224,7 +224,11 @@ def _install_simulator(monkeypatch, machine) -> SimulatedScope:
             path = output_root / "plane_z000.tif"
             tifffile.imwrite(path, sim.render())
             image_paths[drv.PlaneIndex(t=0, z=0, c=0)] = path
-        return SimpleNamespace(image_paths=image_paths, naming=naming)
+        return SimpleNamespace(
+            image_paths=image_paths,
+            naming=naming,
+            read_plane=lambda index: tifffile.imread(image_paths[index]),
+        )
 
     monkeypatch.setattr(drv, "acquire", _acquire)
     monkeypatch.setattr(drv, "save", _save)

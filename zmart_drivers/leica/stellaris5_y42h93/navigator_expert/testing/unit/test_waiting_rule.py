@@ -381,6 +381,13 @@ EXCEPTIONS = {
     ("vendor_interface/primitive_handling/transport.py", "ECHO_SETTLE_TIMEOUT_S"),
     # How old a log entry may be to count as current: freshness, not a wait.
     ("vendor_interface/primitive_handling/profiles.py", "current_window_s"),
+    # Waiting for a finished picture's files to stop growing on disk. This is
+    # about files, not about LAS X's state, and has its own decided numbers.
+    ("dispatcher/files.py", "DEFAULT_FILE_STABILITY_TIMEOUT_S"),
+    ("dispatcher/files.py", "DEFAULT_EXPORT_COMPLETION_TIMEOUT_S"),
+    ("dispatcher/files.py", "DEFAULT_EXPORT_COMPLETION_POLL_INTERVAL_S"),
+    ("dispatcher/files.py", "timeout"),
+    ("dispatcher/files.py", "poll_interval"),
     # The rule itself.
     ("dispatcher/tuning.py", "WINDOW_S"),
 }

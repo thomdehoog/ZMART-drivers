@@ -29,7 +29,6 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
-import tifffile
 
 import zmart_drivers.leica.stellaris5_y42h93.navigator_expert as drv
 
@@ -363,9 +362,6 @@ def _capture_for_calibration(
         session.paths.data_dir / name,
         naming,
         orientation=orientation,
-        # A calibration frame is read back as one picture (one OME-TIFF),
-        # whatever format the profile saves captures in.
-        format="ome-tiff",
     )
 
 
@@ -374,8 +370,8 @@ def _single_plane_image(saved: Any, *, context: str) -> np.ndarray:
         raise ValueError(
             f"{context} expected one saved plane; got {len(saved.image_paths)}"
         )
-    _idx, path = next(iter(saved.image_paths.items()))
-    img = np.asarray(tifffile.imread(path))
+    index = next(iter(saved.image_paths))
+    img = np.asarray(saved.read_plane(index))
     if img.ndim == 3 and img.shape[0] == 1:
         img = img[0]
     if img.ndim != 2:
@@ -394,11 +390,11 @@ def _stack_from_saved_planes(saved: Any, *, context: str) -> np.ndarray:
             f"got channels={channels}, times={times}"
         )
     planes = [
-        (idx.z, path)
-        for idx, path in saved.image_paths.items()
-        if idx.c == channels[0] and idx.t == times[0]
+        idx for idx in saved.image_paths if idx.c == channels[0] and idx.t == times[0]
     ]
-    arr = np.asarray([tifffile.imread(path) for _z, path in sorted(planes)])
+    arr = np.asarray(
+        [saved.read_plane(idx) for idx in sorted(planes, key=lambda i: i.z)]
+    )
     return arr
 
 

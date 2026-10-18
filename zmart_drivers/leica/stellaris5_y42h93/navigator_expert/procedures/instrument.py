@@ -27,7 +27,6 @@ from ..configuration import store as _machine
 from ..dispatcher import gate as _gate
 from ..vendor_interface.parsing import parse_tile_geometry as _parse_tile_geometry
 from ..vendor_interface.primitive_handling import state as _readers
-from ..vendor_interface.primitive_handling.profiles import IMAGE_SAVE
 from . import acquire as _capture
 from . import backlash as _motion
 from . import changes as _commands
@@ -485,7 +484,7 @@ def _setup(handle: ZmartHandle) -> dict:
         "data_location": {
             "done": handle.data_location is not None,
             "says": (
-                f"{handle.data_location}, as {IMAGE_SAVE.format}"
+                f"{handle.data_location}, as OME-Zarr"
                 if handle.data_location is not None
                 else _info.SET_UP
             ),

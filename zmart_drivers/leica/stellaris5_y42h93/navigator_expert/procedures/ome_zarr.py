@@ -40,7 +40,7 @@ import shutil
 import time
 import uuid
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 
 import numpy as np
@@ -50,7 +50,14 @@ from . import materialize
 from . import ome_canonical as canonical
 from ..dispatcher.product import AcquisitionMetadata, ExportedAcquisition, PlaneIndex
 
-__all__ = ["Capture", "gather", "max_projection", "write_position_store", "write_store"]
+__all__ = [
+    "Capture",
+    "gather",
+    "max_projection",
+    "read_plane",
+    "write_position_store",
+    "write_store",
+]
 
 log = logging.getLogger(__name__)
 
@@ -84,6 +91,12 @@ class Capture:
     volume: np.ndarray
     metadata: AcquisitionMetadata
     translation: list[float]
+    #: Where each plane of the vendor's capture sits in ``volume``, as (t, c, z).
+    #: The volume holds its planes lowest first, which can be the other way
+    #: round from the vendor's numbering, so a plane is found through this.
+    store_position: Mapping[PlaneIndex, tuple[int, int, int]] = field(
+        default_factory=dict
+    )
 
 
 def write_position_store(
@@ -199,7 +212,27 @@ def gather(
             if PlaneIndex(t=t, z=z, c=c) in metadata.planes
         },
     )
-    return Capture(volume=volume, metadata=described, translation=translation)
+    store_position = {
+        PlaneIndex(t=t, z=z, c=c): (ti, ci, zi)
+        for ti, t in enumerate(times)
+        for ci, c in enumerate(channels)
+        for zi, z in enumerate(ascending)
+    }
+    return Capture(
+        volume=volume,
+        metadata=described,
+        translation=translation,
+        store_position=store_position,
+    )
+
+
+def read_plane(store: Path, position: tuple[int, int, int]) -> np.ndarray:
+    """One 2-D plane of the saved *store*, at (t, c, z) in the order the store holds them."""
+    import zarr
+
+    t, c, z = position
+    group = zarr.open_group(zarr.storage.LocalStore(str(store)), mode="r")
+    return np.asarray(group["0"][t, c, z])
 
 
 def max_projection(capture: Capture) -> Capture:

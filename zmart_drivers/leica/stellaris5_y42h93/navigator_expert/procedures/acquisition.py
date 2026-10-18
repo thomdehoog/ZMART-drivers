@@ -254,7 +254,6 @@ def acquire(
         # concern from pixel-scale calibration and limits.
         orientation=_loaded_orientation(handle),
         cleanup_cache=IMAGE_SAVE.cleanup_cache,
-        format=IMAGE_SAVE.format,
         projection=IMAGE_SAVE.projection,
         # Where on the sample each plane was taken, the same answer the
         # acquisition gives below, so a store lies where its planes say.
@@ -327,7 +326,7 @@ def acquire(
         "acquisition_type": acquisition_type,
         "trigger": resolved["trigger"],
         "job": job,
-        "format": IMAGE_SAVE.format,
+        "format": "ome-zarr",
         "settle": "backlash-corrected" if apply_backlash else "direct",
         "backlash_rounds": backlash_rounds if apply_backlash else 0,
         # Every file this acquisition saved, under the name the ZMART
