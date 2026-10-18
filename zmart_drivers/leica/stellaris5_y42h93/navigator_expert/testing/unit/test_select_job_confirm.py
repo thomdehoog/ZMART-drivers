@@ -21,8 +21,8 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.pri
     confirmations,
     profiles,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher import (
-    read as readers,
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitive_handling import (
+    state as readers,
 )
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitives.log import (
     log_wait,

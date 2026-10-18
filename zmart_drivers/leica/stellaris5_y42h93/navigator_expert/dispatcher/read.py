@@ -1,4 +1,4 @@
-"""Routed LAS X state readers: one way to wait for an answer.
+"""The shared reader: one way to wait for an answer, whichever source gives it.
 
 Every reading follows the one rule in :mod:`tuning`: four windows of three
 seconds. Within a window both sources the profile allows are watched, the
@@ -25,6 +25,14 @@ Public functions keep the plain return shapes by default; pass
 ``diagnostics=True`` to receive a :class:`Reading` with its source and age.
 A caller that already runs its own window, such as a command confirmation,
 passes ``deadline=`` to watch only until then.
+
+The legs themselves (one question to the API, the log or the direct reader)
+live in ``vendor_interface/primitive_handling/sources.py``; the named readings
+the rest of the driver asks for (``get_xy`` and the others) live in
+``vendor_interface/primitive_handling/state.py`` and call :func:`wait_for` here.
+
+Author: Thom de Hoog, Center for Microscopy and Image Analysis (ZMB),
+University of Zurich (thom.dehoog@zmb.uzh.ch, thomdehoog@gmail.com).
 """
 
 from __future__ import annotations
@@ -33,71 +41,24 @@ import logging
 import queue
 import threading
 import time
-from dataclasses import dataclass
 
-from ..vendor_interface.primitive_handling import derived
 from ..vendor_interface.primitive_handling import readings as capabilities
-from ..vendor_interface.primitive_handling.derived import (  # noqa: F401  re-exported, as the readers package did
-    stack_drive,
-    stack_slices_um,
-)
-from ..vendor_interface.primitives.api import api_reader
-from ..vendor_interface.primitives.direct import direct_reader
-from ..vendor_interface.primitives.log import log_reader
-from ..vendor_interface.connection.hardware_server import HardwareServerUnavailable
+from ..vendor_interface.primitive_handling import sources
 from . import tuning
+from .reading import Reading
 
 log = logging.getLogger(__name__)
 
 
-@dataclass(frozen=True)
-class Reading:
-    """A source-tagged state reading used by routed callers."""
-
-    value: object
-    source: str
-    observed_at: float | None
-    age_s: float | None
-    error: Exception | None = None
-
-    def _replace_value_none(self):
-        """This reading with the value stripped (kept: source/timing/error)."""
-        if self.value is None:
-            return self
-        return Reading(
-            value=None,
-            source=self.source,
-            observed_at=self.observed_at,
-            age_s=self.age_s,
-            error=self.error,
-        )
-
-
-def _profile():
-    from ..vendor_interface.primitive_handling import profiles
-
-    return profiles.STATE_READERS
-
-
 def on_demand_mode(datum):
-    """The direct reader when the profile reads *datum* directly, else the API: the sources that answer on demand.
+    """The direct reader when the policy reads *datum* directly, else the API: the sources that answer on demand.
 
     For readings a command waits on (whether the scanner is idle, where the
     stage went), which the log cannot settle: it writes a value only when it
     changes, so it can still show the state from before. Pair it with
     ``fallback="api"``.
     """
-    return (
-        "direct"
-        if getattr(_profile(), capabilities.spec(datum).mode_attr) == "direct"
-        else "api"
-    )
-
-
-def _plain_or_diagnostic(reading, diagnostics):
-    if diagnostics:
-        return reading
-    return None if reading is None else reading.value
+    return "direct" if sources.mode_for(datum) == "direct" else "api"
 
 
 # =============================================================================
@@ -147,73 +108,6 @@ def _client_api_key(client):
     return id(client)
 
 
-# =============================================================================
-# The two sources
-# =============================================================================
-
-
-def _api_read(fn) -> Reading:
-    try:
-        value = fn()
-        # API has no independent freshness timestamp. observed_at/age_s mark
-        # call completion, not proof that LAS X returned newly-produced state.
-        return Reading(value=value, source="api", observed_at=time.time(), age_s=0.0)
-    except Exception as exc:
-        log.debug("api reader failed", exc_info=True)
-        return Reading(
-            value=None, source="api", observed_at=time.time(), age_s=None, error=exc
-        )
-
-
-def _snapshot_read(spec, *, max_age_s, job_name=None) -> Reading:
-    try:
-        snapshot = log_reader.parse_log()
-        if job_name is None:
-            value = spec.log_fn(snapshot, max_age_s=max_age_s)
-        else:
-            value = spec.log_fn(snapshot, max_age_s=max_age_s, job_name=job_name)
-        age_s = capabilities.age_for_snapshot(
-            snapshot, age_key=spec.age_key, job_name=job_name, max_age_s=max_age_s
-        )
-        observed_at = None if age_s is None else snapshot.now - age_s
-        return Reading(value=value, source="log", observed_at=observed_at, age_s=age_s)
-    except Exception as exc:
-        log.debug("log reader failed", exc_info=True)
-        return Reading(
-            value=None, source="log", observed_at=time.time(), age_s=None, error=exc
-        )
-
-
-class DirectAnswerDidNotCount(RuntimeError):
-    """The direct reader answered, but not with an answer that counts for the datum."""
-
-
-def direct_read(spec, direct_kwargs) -> Reading:
-    """One answer from the direct reader; any error it raises is carried, never raised.
-
-    The hardware server not reachable is expected wherever LAS X is not
-    running; any other error means the tree is not as this reader knows it
-    (another LAS X version, another instrument), which is worth a warning.
-    Either way the fallback answers.
-    """
-    try:
-        value = spec.direct_fn(**direct_kwargs)
-        return Reading(value=value, source="direct", observed_at=time.time(), age_s=0.0)
-    except HardwareServerUnavailable as exc:
-        return Reading(
-            value=None, source="direct", observed_at=time.time(), age_s=None, error=exc
-        )
-    except Exception as exc:
-        log.warning(
-            "the direct reader failed (%s: %s); its fallback answers",
-            type(exc).__name__,
-            exc,
-        )
-        return Reading(
-            value=None, source="direct", observed_at=time.time(), age_s=None, error=exc
-        )
-
-
 def watch_direct(spec, *, succeeded, deadline, observed_after, direct_kwargs, waiting):
     """Ask the direct reader until an answer counts; a carried error at once when it fails.
 
@@ -224,7 +118,7 @@ def watch_direct(spec, *, succeeded, deadline, observed_after, direct_kwargs, wa
     at once instead of after the whole wait.
     """
     while True:
-        reading = direct_read(spec, direct_kwargs)
+        reading = sources.direct_read(spec, direct_kwargs)
         if reading.error is not None or _counts(reading, succeeded, observed_after):
             return reading
         if not waiting:
@@ -233,39 +127,13 @@ def watch_direct(spec, *, succeeded, deadline, observed_after, direct_kwargs, wa
                 source="direct",
                 observed_at=reading.observed_at,
                 age_s=None,
-                error=DirectAnswerDidNotCount(
+                error=sources.DirectAnswerDidNotCount(
                     f"the direct reader answered {reading.value!r}"
                 ),
             )
         if time.monotonic() + tuning.POLL_S >= deadline:
             return None
         time.sleep(tuning.POLL_S)
-
-
-def _unsupported(mode, datum) -> Reading:
-    return Reading(
-        value=None,
-        source=mode,
-        observed_at=None,
-        age_s=None,
-        error=capabilities.UnsupportedSource(f"datum {datum!r} has no {mode} leg"),
-    )
-
-
-def _legs(spec, datum, mode):
-    """Which sources take part for *mode*; an ``UnsupportedSource`` reading if none can."""
-    if mode == "api":
-        return ("api",) if spec.api_fn is not None else _unsupported("api", datum)
-    if mode == "log":
-        return ("log",) if spec.log_fn is not None else _unsupported("log", datum)
-    if mode == "hybrid":
-        legs = tuple(
-            leg
-            for leg, fn in (("api", spec.api_fn), ("log", spec.log_fn))
-            if fn is not None
-        )
-        return legs or _unsupported("hybrid", datum)
-    raise ValueError(f"unknown state-reader mode {mode!r}")
 
 
 def _api_worker(spec, client, api_kwargs, *, deadline, stop, answers):
@@ -283,7 +151,7 @@ def _api_worker(spec, client, api_kwargs, *, deadline, stop, answers):
         if not _API_TURNS.take(key, until=deadline, stop=stop):
             return
         try:
-            reading = _api_read(
+            reading = sources.api_read(
                 lambda: spec.api_fn(client, deadline=deadline, **api_kwargs)
             )
         finally:
@@ -301,7 +169,7 @@ def _log_worker(spec, job_name, max_age_s, *, deadline, stop, answers):
     race at once, the log is parsed by one parse at a time.
     """
     while not stop.is_set():
-        answers.put(_snapshot_read(spec, max_age_s=max_age_s, job_name=job_name))
+        answers.put(sources.snapshot_read(spec, max_age_s=max_age_s, job_name=job_name))
         if stop.wait(tuning.POLL_S) or time.monotonic() >= deadline:
             return
 
@@ -333,7 +201,7 @@ def _watch(
     the queue, so it needs no interval of its own.
     """
     spec = capabilities.spec(datum)
-    legs = _legs(spec, datum, mode)
+    legs = sources.legs(spec, datum, mode)
     if isinstance(legs, Reading):
         return legs
     answers = queue.Queue()
@@ -347,11 +215,7 @@ def _watch(
             daemon=True,
         ).start()
     if "log" in legs:
-        max_age_s = (
-            None
-            if spec.log_max_age_attr is None
-            else getattr(_profile(), spec.log_max_age_attr)
-        )
+        max_age_s = sources.max_age_s(spec)
         threading.Thread(
             target=_log_worker,
             args=(spec, job_name, max_age_s),
@@ -426,7 +290,7 @@ def wait_for(
         with its value stripped; else None.
     """
     spec = capabilities.spec(datum)
-    mode = mode if mode is not None else getattr(_profile(), spec.mode_attr)
+    mode = mode if mode is not None else sources.mode_for(datum)
     succeeded = _success_for(datum, job_name, accept)
     if mode == "direct":
         if spec.direct_fn is not None:
@@ -478,251 +342,3 @@ def wait_for(
         tuning.WINDOW_S,
     )
     return failed
-
-
-def _routed(
-    datum,
-    client,
-    *,
-    mode,
-    diagnostics,
-    deadline=None,
-    accept=None,
-    job_name=None,
-    fallback="hybrid",
-):
-    api_kwargs = {} if job_name is None else {"job_name": job_name}
-    reading = wait_for(
-        datum,
-        client,
-        accept=accept,
-        job_name=job_name,
-        mode=mode,
-        deadline=deadline,
-        api_kwargs=api_kwargs,
-        fallback=fallback,
-    )
-    return _plain_or_diagnostic(reading, diagnostics)
-
-
-def _derive(reading, value):
-    if reading is None:
-        return None
-    return Reading(
-        value=value,
-        source=reading.source,
-        observed_at=reading.observed_at,
-        age_s=reading.age_s,
-        error=reading.error,
-    )
-
-
-# =============================================================================
-# The readers
-# =============================================================================
-
-
-def get_scan_status(
-    client,
-    *,
-    mode=None,
-    diagnostics=False,
-    deadline=None,
-    accept=None,
-    fallback="hybrid",
-):
-    return _routed(
-        "scan_status",
-        client,
-        mode=mode,
-        diagnostics=diagnostics,
-        deadline=deadline,
-        accept=accept,
-        fallback=fallback,
-    )
-
-
-def ping(client):
-    return api_reader.ping(client)
-
-
-def get_job_settings(
-    client, job_name, *, mode=None, diagnostics=False, deadline=None, accept=None
-):
-    return _routed(
-        "job_settings",
-        client,
-        mode=mode,
-        diagnostics=diagnostics,
-        deadline=deadline,
-        accept=accept,
-        job_name=job_name,
-    )
-
-
-def get_hardware_info(client, *, mode=None, diagnostics=False, deadline=None):
-    return _routed(
-        "hardware_info", client, mode=mode, diagnostics=diagnostics, deadline=deadline
-    )
-
-
-def get_xy(
-    client,
-    *,
-    mode=None,
-    diagnostics=False,
-    deadline=None,
-    accept=None,
-    fallback="hybrid",
-):
-    return _routed(
-        "xy",
-        client,
-        mode=mode,
-        diagnostics=diagnostics,
-        deadline=deadline,
-        accept=accept,
-        fallback=fallback,
-    )
-
-
-def z_um_direct(drive, *, mode=None):
-    """Where one z drive truly is (um), from the direct reader; None when it does not answer or fails.
-
-    It is asked in ``direct`` mode (the profile's ``z_mode`` unless
-    *mode* says); None also when the hardware server cannot be reached, so
-    the caller reads the job settings instead.
-    """
-    mode = mode if mode is not None else _profile().z_mode
-    if mode != "direct":
-        return None
-    try:
-        return direct_reader.read_z_um(drive)
-    except HardwareServerUnavailable as why:
-        log.debug("%s: %s; the job settings answer", drive, why)
-    except Exception as why:
-        log.warning(
-            "the direct reader failed on %s (%s: %s); the job settings answer",
-            drive,
-            type(why).__name__,
-            why,
-        )
-    return None
-
-
-def read_z_um(client, job_name, drive, *, mode=None):
-    """Where one z drive is (um), *drive* ``"z-galvo"`` or ``"z-wide"``; None when unreadable.
-
-    From the direct reader (:func:`z_um_direct`); otherwise from
-    *job_name*'s settings: it waits for settings that carry ``zPosition``
-    and returns None only when none arrive within the rule's four windows.
-    Readable but incomplete settings raise: ``derived.z_um_from_settings``
-    raises ``RuntimeError`` when the drive is missing, and its settings
-    normalization can raise ``ValueError`` on a schema mismatch — unlike the
-    routed readers, which never raise.
-    """
-    direct = z_um_direct(drive, mode=mode)
-    if direct is not None:
-        return direct
-    settings = get_job_settings(
-        client,
-        job_name,
-        mode=None if mode == "direct" else mode,
-        accept=lambda s: s.get("zPosition") is not None,
-    )
-    if not settings:
-        log.warning("read_z_um: could not read job settings for '%s'", job_name)
-        return None
-    return derived.z_um_from_settings(settings, drive, client=client, job_name=job_name)
-
-
-def read_zwide_um(client, job_name, *, mode=None):
-    """Z-wide position (um), or None when unreadable; see :func:`read_z_um`."""
-    return read_z_um(client, job_name, "z-wide", mode=mode)
-
-
-def get_jobs(client, *, mode=None, diagnostics=False, deadline=None, accept=None):
-    return _routed(
-        "jobs",
-        client,
-        mode=mode,
-        diagnostics=diagnostics,
-        deadline=deadline,
-        accept=accept,
-    )
-
-
-def get_job_by_name(client, job_name, *, mode=None, diagnostics=False, deadline=None):
-    jobs_reading = get_jobs(client, mode=mode, diagnostics=True, deadline=deadline)
-    value = (
-        None
-        if jobs_reading is None
-        else derived.job_by_name(jobs_reading.value, job_name)
-    )
-    reading = _derive(jobs_reading, value)
-    return _plain_or_diagnostic(reading, diagnostics)
-
-
-def get_selected_job(
-    client,
-    *,
-    mode=None,
-    diagnostics=False,
-    deadline=None,
-    accept=None,
-    fallback="hybrid",
-):
-    return _routed(
-        "selected_job",
-        client,
-        mode=mode,
-        diagnostics=diagnostics,
-        deadline=deadline,
-        accept=accept,
-        fallback=fallback,
-    )
-
-
-def get_fov(client, job_name, *, mode=None, diagnostics=False, deadline=None):
-    settings_reading = get_job_settings(
-        client, job_name, mode=mode, diagnostics=True, deadline=deadline
-    )
-    value = (
-        None
-        if settings_reading is None
-        else derived.fov_from_settings(settings_reading.value)
-    )
-    reading = _derive(settings_reading, value)
-    return _plain_or_diagnostic(reading, diagnostics)
-
-
-def get_base_fov(client, job_name, *, mode=None, diagnostics=False, deadline=None):
-    settings_reading = get_job_settings(
-        client, job_name, mode=mode, diagnostics=True, deadline=deadline
-    )
-    value = (
-        None
-        if settings_reading is None
-        else derived.base_fov_from_settings(settings_reading.value)
-    )
-    reading = _derive(settings_reading, value)
-    return _plain_or_diagnostic(reading, diagnostics)
-
-
-def get_lasx_settings(settings_path=None):
-    return api_reader.get_lasx_settings(settings_path=settings_path)
-
-
-def get_pending_dialog(*, diagnostics=False):
-    snapshot = log_reader.parse_msgbox_log()
-    value = log_reader.get_pending_dialog(snapshot)
-    age_s = capabilities.age_for_snapshot(snapshot, age_key="dialog")
-    observed_at = None if age_s is None else snapshot.now - age_s
-    reading = Reading(
-        value=value,
-        source="log",
-        observed_at=observed_at,
-        age_s=age_s,
-        error=None,
-    )
-    return _plain_or_diagnostic(reading, diagnostics)

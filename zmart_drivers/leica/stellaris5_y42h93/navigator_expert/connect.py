@@ -12,7 +12,7 @@ import json
 import logging
 from typing import Any
 
-from .dispatcher import read as _readers
+from .vendor_interface.primitive_handling import state as _readers
 from .vendor_interface.primitives.interface import lasx_dialogs
 
 _log = logging.getLogger(__name__)

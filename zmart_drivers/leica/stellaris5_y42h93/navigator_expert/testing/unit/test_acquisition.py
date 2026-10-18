@@ -20,8 +20,8 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.image_
     Orientation,
     reorient_array,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher import (
-    read as readers_router,
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitive_handling import (
+    state as readers_router,
 )
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.output import (
     materialize,

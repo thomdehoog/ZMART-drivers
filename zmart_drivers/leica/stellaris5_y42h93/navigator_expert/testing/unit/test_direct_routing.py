@@ -31,8 +31,8 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures import (
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitive_handling import (
     prechecks,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher import (
-    read as readers,
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitive_handling import (
+    state as readers,
 )
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitives.direct import (
     direct_reader,

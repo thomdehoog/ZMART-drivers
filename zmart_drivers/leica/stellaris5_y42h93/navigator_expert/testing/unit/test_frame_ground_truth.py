@@ -28,7 +28,7 @@ from unittest.mock import patch
 
 import pytest
 
-import zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher.read as readers
+import zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitive_handling.state as readers
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures import (
     objective_shift as shift,
 )

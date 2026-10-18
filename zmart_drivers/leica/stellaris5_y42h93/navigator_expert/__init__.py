@@ -105,7 +105,7 @@ from .vendor_interface.error_classification import (
     _check_api_error,
     _default_error_check,
 )
-from .dispatcher.read import (
+from .vendor_interface.primitive_handling.state import (
     Reading,
     get_scan_status,
     ping,

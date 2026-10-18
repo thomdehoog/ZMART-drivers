@@ -28,11 +28,11 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.pri
     confirmations,
     profiles,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher import (
-    read as readers,
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitive_handling import (
+    state as readers,
 )
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher import (
-    read as router,
+    read as engine,
 )
 
 
@@ -201,7 +201,7 @@ class TestApiLegRoutedReads(unittest.TestCase):
     def _wait_claim_clear(self, api_key, timeout=2.0):
         deadline = time.monotonic() + timeout
         while time.monotonic() < deadline:
-            if api_key not in router._API_TURNS._busy:
+            if api_key not in engine._API_TURNS._busy:
                 return
             time.sleep(0.01)
 
@@ -216,7 +216,7 @@ class TestApiLegRoutedReads(unittest.TestCase):
             raw_calls.append(c)
             return [{"Name": "HiRes", "IsSelected": True}]
 
-        with patch.object(router.api_reader, "get_jobs", side_effect=raw_get_jobs):
+        with patch.object(readers.api_reader, "get_jobs", side_effect=raw_get_jobs):
             race = confirmations.race_confirmations(
                 api_leg=self._make_api_leg(client),
                 log_leg=lambda: _fail("log no event"),
@@ -236,13 +236,13 @@ class TestApiLegRoutedReads(unittest.TestCase):
         reach the raw reader — and once the external read finishes, the
         leg proceeds instead of having been skipped for the whole race."""
         client = object()
-        api_key = router._client_api_key(client)
+        api_key = engine._client_api_key(client)
         self.assertTrue(
-            router._API_TURNS.take(
+            engine._API_TURNS.take(
                 api_key, until=time.monotonic() + 1.0, stop=threading.Event()
             )
         )
-        self.addCleanup(router._API_TURNS.give_back, api_key)
+        self.addCleanup(engine._API_TURNS.give_back, api_key)
 
         raw_calls = []
 
@@ -255,9 +255,9 @@ class TestApiLegRoutedReads(unittest.TestCase):
         def release_later():
             time.sleep(0.2)
             raw_calls_while_held.extend(raw_calls)
-            router._API_TURNS.give_back(api_key)
+            engine._API_TURNS.give_back(api_key)
 
-        with patch.object(router.api_reader, "get_jobs", side_effect=raw_get_jobs):
+        with patch.object(readers.api_reader, "get_jobs", side_effect=raw_get_jobs):
             threading.Thread(target=release_later, daemon=True).start()
             race = confirmations.race_confirmations(
                 api_leg=self._make_api_leg(client),
@@ -276,7 +276,7 @@ class TestApiLegRoutedReads(unittest.TestCase):
         raw CAM read must leave no in-flight claim once that read returns;
         the next attempt's api leg reads and confirms normally."""
         client = object()
-        api_key = router._client_api_key(client)
+        api_key = engine._client_api_key(client)
         release = threading.Event()
         self.addCleanup(release.set)
         raw_calls = []
@@ -287,7 +287,7 @@ class TestApiLegRoutedReads(unittest.TestCase):
                 release.wait(5.0)  # the slow CAM read the first race abandons
             return [{"Name": "HiRes", "IsSelected": True}]
 
-        with patch.object(router.api_reader, "get_jobs", side_effect=raw_get_jobs):
+        with patch.object(readers.api_reader, "get_jobs", side_effect=raw_get_jobs):
             first = confirmations.race_confirmations(
                 api_leg=self._make_api_leg(client),
                 log_leg=lambda: _fail("log no event"),
@@ -298,7 +298,7 @@ class TestApiLegRoutedReads(unittest.TestCase):
 
             release.set()  # the hung CAM read finally returns
             self._wait_claim_clear(api_key)
-            self.assertNotIn(api_key, router._API_TURNS._busy)
+            self.assertNotIn(api_key, engine._API_TURNS._busy)
 
             second = confirmations.race_confirmations(
                 api_leg=self._make_api_leg(client),

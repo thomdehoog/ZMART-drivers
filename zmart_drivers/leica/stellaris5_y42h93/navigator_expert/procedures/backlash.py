@@ -26,7 +26,7 @@ import time
 
 from . import changes as _commands
 from ..dispatcher import checks as _checks
-from ..dispatcher import read as _readers
+from ..vendor_interface.primitive_handling import state as _readers
 
 log = logging.getLogger(__name__)
 

@@ -94,7 +94,7 @@ from ...configuration import image_stage_registration as _orientation
 from ...configuration import session_state as _session_state
 from ...configuration import store as _machine
 from ...dispatcher import gate as _gate
-from ...dispatcher import read as _readers
+from ...vendor_interface.primitive_handling import state as _readers
 from ...output import command_log as _log
 from ...output import lasx_cache_release as _release
 from ...output import save as _save

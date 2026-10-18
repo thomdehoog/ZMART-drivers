@@ -17,7 +17,7 @@ import math
 from collections.abc import Mapping, Sequence
 from typing import Any
 
-from ..dispatcher import read as _readers
+from ..vendor_interface.primitive_handling import state as _readers
 from ..dispatcher.checks import STAGE_BACKSTOP_UM
 
 CORNERS = (1, 2, 3, 4)

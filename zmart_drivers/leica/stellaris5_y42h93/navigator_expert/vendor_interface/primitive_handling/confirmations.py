@@ -40,7 +40,7 @@ import queue
 import threading
 import time
 
-from ...dispatcher import read as _readers
+from . import state as _readers
 from ...dispatcher import tuning as _timing
 from ...dispatcher.envelope import _make_log_entry
 from ..error_classification import _check_api_error, _is_transient_error

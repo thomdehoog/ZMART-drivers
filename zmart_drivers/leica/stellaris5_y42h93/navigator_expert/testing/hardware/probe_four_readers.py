@@ -39,8 +39,8 @@ import zmart_drivers.leica.stellaris5_y42h93.navigator_expert as drv
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitive_handling import (
     readings as capabilities,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher import (
-    read as readers,
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitive_handling import (
+    state as readers,
 )
 
 HERE = Path(__file__).resolve().parent
