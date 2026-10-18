@@ -119,8 +119,9 @@ LAS X.
     objective is in place than the one the origin was saved under, the calibrated objective
     translation is subtracted too, so the position names the same point of the sample.
   - `unit` is always `'micrometer'`.
-  - `actuator` is the motor this answer used: the one `with_actuators` chose, or else the default
-    `get_actuators` names (`motoric` for x and y, `z-wide` for z).
+  - `actuator` is the motor this answer used: `motoric` for x and y, and `z-wide` for z. The driver
+    always moves the focus with z-wide, because the objective offsets are measured on it; the z-galvo
+    is only read, and is parked at 0 before a move if it is not there.
   - `actuators` lists every motor of the axis, under the names `get_actuators` gives, each with
     its own reading exactly as LAS X reports it. Nothing is subtracted from these, so they show
     how z-wide and z-galvo share the focus.
@@ -517,6 +518,11 @@ once just before the capture and places the pictures from that reading. If it di
 workflow last saw, a note is added to the `unconfirmed` list of the result and the capture goes ahead.
 The driver does not bring the sample back into view after a change made by hand; that is up to the
 operator or the workflow.
+
+Going from one objective to another and back, with the operator switching in between, is safe for the
+same reason: the objective offset is worked out at every move from the lens that is in at that
+moment, relative to the lens the origin was saved under, so no history is needed. The focus is always
+moved with z-wide alone, so the offset never ends up shared between the two z drives.
 
 **Acquisition settings say only how a capture is triggered.** This driver has one trigger,
 `full`: the whole of the LAS X job that is selected. Which job that is belongs to the state
