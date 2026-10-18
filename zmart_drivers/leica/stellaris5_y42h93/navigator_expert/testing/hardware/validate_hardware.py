@@ -444,7 +444,7 @@ def _connect(
         log.info("limits | hermetic machine root provisioned at %s", root)
         return MockClient(latency=args.mock_latency)
     try:
-        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.lasx_runtime import (  # noqa: PLC0415
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.connection.lasx_runtime import (
             load_lasx_api_runtime,
         )
 
@@ -736,7 +736,7 @@ def _record_log_selected_job_poll(
     context: dict,
 ) -> None:
     """Record the experimental log-only selected-job wait."""
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.log_wait import (  # noqa: PLC0415
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitives.log.log_wait import (
         wait_for_selected_job_log,
     )
 

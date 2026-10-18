@@ -19,8 +19,9 @@ from functools import partial
 from ..dispatcher import read as _readers
 from ..dispatcher import tuning as _timing
 from ..dispatcher.envelope import _make_log_entry
-from ..vendor_interface import direct_reader, log_wait
-from ..vendor_interface.hardware_server import HardwareServerUnavailable
+from ..vendor_interface.primitives.direct import direct_reader
+from ..vendor_interface.primitives.log import log_wait
+from ..vendor_interface.connection.hardware_server import HardwareServerUnavailable
 from .confirmations import _reading_value_after
 
 log = logging.getLogger(__name__)
@@ -332,7 +333,7 @@ def _prime_selected_job_log_cluster(client, jobs):
 def _selected_job_name_from_log(profile):
     """Fresh selected-job name from LAS X logs, or None when unavailable."""
     try:
-        from ..vendor_interface import log_reader as _log_reader
+        from ..vendor_interface.primitives.log import log_reader as _log_reader
 
         max_age_s = profile.selected_job_log_cluster_max_age_s
         if max_age_s is None:

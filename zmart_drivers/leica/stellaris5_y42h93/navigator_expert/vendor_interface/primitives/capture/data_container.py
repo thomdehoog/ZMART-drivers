@@ -13,7 +13,7 @@ import functools
 import os
 from typing import Any
 
-from .lasx_runtime import _runtime_root
+from ...connection.lasx_runtime import _runtime_root
 
 __all__ = ["connected_data_container"]
 

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 
-from ..vendor_interface.hardware_server import (
+from ..vendor_interface.connection.hardware_server import (
     HardwareServerUnavailable,
     read_hardware_z_um,
 )

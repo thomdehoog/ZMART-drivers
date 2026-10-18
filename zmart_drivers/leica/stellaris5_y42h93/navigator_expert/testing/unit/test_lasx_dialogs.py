@@ -23,7 +23,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitives.interface import (
     lasx_dialogs,
 )
 

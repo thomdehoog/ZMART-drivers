@@ -31,7 +31,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from .hardware_server import (
+from ...connection.hardware_server import (
     HardwareServerUnavailable,
     connected_server,
     connections,

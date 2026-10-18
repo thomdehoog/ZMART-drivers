@@ -47,7 +47,7 @@ from __future__ import annotations
 import json
 import math
 
-from .hardware_server import (
+from ...connection.hardware_server import (
     HardwareServerUnavailable,
     connected_server,
     forget_connection,

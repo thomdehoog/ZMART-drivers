@@ -320,7 +320,8 @@ permanent error, failed pre-check) and `confirmed` is `None`.
 `timeout`, …); unknown → permanent (conservative). Transient errors retry up to `max_retries`.
 
 **Reading state — direct, with api / log / hybrid behind it** (`dispatcher/read.py`, over
-`vendor_interface/direct_reader.py`, `api_reader.py` and `log_reader.py`, chosen per datum by
+the three readers in `vendor_interface/primitives/` (`direct/direct_reader.py`, `api/api_reader.py` and
+`log/log_reader.py`), chosen per datum by
 `StateReaderProfile`). Every reading asks the **direct** reader first, the default for every datum
 since 13 October 2026: it reads LAS X's current state from its hardware server (`state_tree.py`),
 so it is neither late like the CAM API's answers nor waiting for a log line (on the simulator, the
@@ -535,9 +536,14 @@ zmart_drivers/leica/stellaris5_y42h93/navigator_expert/
 ├── zmart_adapter/      the functions behind those methods, one per command (still holds the
 │                       coordinate arithmetic; see "What the move did not change" below)
 ├── connect.py          the connect flow: open LAS X, load this microscope's configuration
-├── vendor_interface/   the only part that knows LAS X: lasx_runtime.py (the .NET CAM assemblies),
-│                       api_reader.py and log_reader.py (the two ways to read state), log_wait.py,
-│                       parsing.py (the strings LAS X hands back), error_classification.py (sorting LAS X's errors)
+├── vendor_interface/   the only part that knows LAS X:
+│   ├── connection/     lasx_runtime.py (the .NET CAM assemblies), hardware_server.py
+│   ├── primitives/     the smallest reads and writes, one folder for each way of reaching LAS X:
+│   │                   direct/ (direct_reader.py, state_tree.py), api/ (api_reader.py, delivery.py),
+│   │                   log/ (log_reader.py, log_wait.py), interface/ (lasx_navigator.py,
+│   │                   lasx_dialogs.py: its buttons and dialogs), capture/ (data_container.py)
+│   ├── parsing.py      the strings LAS X hands back
+│   └── error_classification.py   sorting LAS X's errors
 ├── dispatcher/         the engines that run an action safely: read.py (api/log/hybrid routing),
 │                       change.py (confirm_and_fire), gate.py and checks.py (the limits gate and its
 │                       rulebook), prechecks.py, envelope.py, tuning.py (the timing constants)

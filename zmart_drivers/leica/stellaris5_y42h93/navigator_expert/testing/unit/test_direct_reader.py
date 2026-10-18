@@ -23,11 +23,15 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.actions import (
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.actions.objectives import (
     objective_by_slot,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitives.api import (
     api_reader,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitives.direct import (
     direct_reader,
-    hardware_server,
     state_tree,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.connection import (
+    hardware_server,
 )
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.parsing import (
     make_changeable_copy,

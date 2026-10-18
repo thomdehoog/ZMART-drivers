@@ -11,7 +11,7 @@ LAS X can let go of a picture itself, as when it is deleted in LAS X's
 window: its files leave the cache, and the project no longer lists it, nor
 the file AutoSave wrote of it. :func:`delete` asks for that delete through
 the Data Container's .NET client from the LAS X install
-(``vendor_interface.data_container``). Nothing of LAS X is copied or changed.
+(``vendor_interface.primitives.capture.data_container``). Nothing of LAS X is copied or changed.
 
 What it takes:
 
@@ -30,7 +30,7 @@ About 0.2 MB of descriptions per picture stays while LAS X's window holds it.
 Every capture also leaves a hidden copy, ``TileScan <n>`` (the pixels again,
 a zoom pyramid and a histogram: about twice a 512 x 512 capture's pixels),
 which the Navigator canvas holds while it shows the capture's tile. So the
-release also clears the canvas (``vendor_interface.lasx_navigator``), which
+release also clears the canvas (``vendor_interface.primitives.interface.lasx_navigator``), which
 lets go of the hidden copies too (simulator, 2026-10-14). The canvas can be
 cleared only while LAS X shows it, so :func:`prepare` shows it before the
 capture, while LAS X is idle. A canvas that cannot be shown or cleared is
@@ -41,8 +41,10 @@ from __future__ import annotations
 
 import logging
 
-from ..vendor_interface import lasx_navigator
-from ..vendor_interface.data_container import connected_data_container
+from ..vendor_interface.primitives.interface import lasx_navigator
+from ..vendor_interface.primitives.capture.data_container import (
+    connected_data_container,
+)
 
 log = logging.getLogger(__name__)
 

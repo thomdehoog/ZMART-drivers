@@ -19,7 +19,7 @@ import sys
 # Mimic an example-script entry point: only the repository root on sys.path.
 sys.path.insert(0, r"{repo}")
 import zmart_drivers.leica.stellaris5_y42h93.navigator_expert as drv
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface import lasx_runtime
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.connection import lasx_runtime
 assert drv.acquire is not None
 assert drv.save is not None
 assert drv.AcquisitionResult is not None
@@ -65,7 +65,7 @@ def test_lasx_runtime_load_smoke_when_installed():
     Bare dev/CI machines can import the loader but cannot load LAS X assemblies;
     hardware validation covers the required installed-runtime path.
     """
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface import (
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.connection import (
         lasx_runtime,
     )
 
