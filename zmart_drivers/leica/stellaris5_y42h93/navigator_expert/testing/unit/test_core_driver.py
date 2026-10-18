@@ -26,7 +26,9 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock, PropertyMock, patch
 
 import zmart_drivers.leica.stellaris5_y42h93.navigator_expert as drv
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert import connect as session
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.connection import (
+    lasx_client as session,
+)
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitive_handling import (
     confirm_select_job,
     confirmations,

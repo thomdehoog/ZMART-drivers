@@ -41,16 +41,19 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from .. import connect as _session
 from ..configuration import coordinates as _coordinates
 from ..configuration import data_location as _data_location
+from ..configuration import running_log
 from ..configuration import session_state as _session_state
+from ..configuration.store import MACHINE
 from ..dispatcher import gate as _gate
 from ..vendor_interface.naming import run_hash
 from ..procedures import acquisition as _acquisition
 from ..procedures import frame as _frame
 from ..procedures import instrument as _instrument
 from ..procedures.session import ZmartHandle
+from ..vendor_interface.connection import lasx_client
+from ..vendor_interface.primitives.interface import lasx_dialogs
 
 log = logging.getLogger(__name__)
 
@@ -104,12 +107,30 @@ class ZmartDriver:
             else None
         )
         saved_location = _load_data_location()
-        client = _session.connect_microscope(
+        MACHINE.ensure_layout()
+        # Kept beside the saved settings so that it survives a restart of the driver.
+        running_log.start(MACHINE.snapshot_root() / "logs", __package__)
+        client = lasx_client.connect_python_client(
             client_name=connection.get("client", "PythonClient"),
             api_delay_ms=connection.get("api_delay_ms"),
-            load_limits=connection.get("load_limits", True),
-            load_calibration=connection.get("load_calibration", True),
-            calibration_name=connection.get("calibration_name"),
+        )
+        # The limits are loaded first, so nothing can move before they govern.
+        _gate.connect_handshake(client, load=connection.get("load_limits", True))
+        lasx_dialogs.keep_watching()
+        orientation, orientation_info = _session_state.load_rig_orientation()
+        translations, calibration_info = _session_state.load_objective_calibration(
+            connection.get("calibration_name"),
+            enabled=connection.get("load_calibration", True),
+        )
+        _session_state.install(
+            client,
+            _session_state.SessionConfig(
+                orientation=orientation,
+                translations=translations,
+                calibration_name=calibration_info["name"],
+                orientation_info=orientation_info,
+                calibration_info=calibration_info,
+            ),
         )
         handle = ZmartHandle(
             client=client, connection=dict(connection), hash6=run_hash()
@@ -120,6 +141,11 @@ class ZmartDriver:
             handle.origin = saved_origin
         handle.data_location = saved_location
         self._handle = handle
+
+    @property
+    def client(self):
+        """The connected LAS X client, for the setup notebooks that work with LAS X directly."""
+        return self._handle.client
 
     def disconnect(self) -> None:
         """Close the session and drop what was loaded for it. A second call does nothing.

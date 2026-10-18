@@ -7,7 +7,6 @@ this repository)::
     navigator_expert/
     - for_zmart_controller/  the ZmartDriver class the controller makes (zmart_driver.py), one
                           method per controller command
-    - connect.py          the connect flow: open LAS X, load this microscope's configuration
     - vendor_interface/   the only part that knows LAS X: the CAM API runtime, the readers, the
                           parsers, the sorting of LAS X's errors, and primitive_handling/, which
                           says how each command is treated
@@ -83,7 +82,6 @@ __all__ = [
     "select_job",
     # session helpers
     "connect_python_client",
-    "connect_microscope",
     # acquisition workflow
     "AcquisitionResult",
     "PlaneIndex",
@@ -148,7 +146,7 @@ from .procedures.commands.changes import (
     move_z,
     select_job,
 )
-from .connect import connect_python_client, connect_microscope
+from .vendor_interface.connection.lasx_client import connect_python_client
 
 # -- commands/gate - command safety gate + connect handshake
 from .dispatcher.gate import connect_handshake as connect_limits_handshake

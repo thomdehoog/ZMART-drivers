@@ -23,7 +23,9 @@ for _p in (_HERE, _HELPERS, _REPO_ROOT):
 
 import validate_installed_driver
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert import connect as adapter
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.connection import (
+    lasx_client as adapter,
+)
 
 
 def _run_mock(tmp_path, *extra):

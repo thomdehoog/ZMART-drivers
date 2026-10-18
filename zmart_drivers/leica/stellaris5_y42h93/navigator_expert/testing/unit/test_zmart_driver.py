@@ -29,8 +29,8 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.pri
 DRIVER_FOLDER = Path(zmart_driver.__file__).resolve().parent
 
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert import (
-    connect as _connect_module,
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.connection import (
+    lasx_client as _connect_module,
 )
 
 
