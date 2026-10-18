@@ -29,7 +29,7 @@ except Exception:  # noqa: BLE001 -- best-effort provenance
 from ..configuration import image_stage_registration as _orientation
 from . import session_state as _session_state
 from .saving import command_log as _log
-from ..vendor_interface.primitives.capture import lasx_cache_release as _release
+from .saving import clear_cache as _release
 from .saving import save as _save
 from ..vendor_interface.naming import Naming, free_stem
 from ..vendor_interface.primitive_handling import state as _readers

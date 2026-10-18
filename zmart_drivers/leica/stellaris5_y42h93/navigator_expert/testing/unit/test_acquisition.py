@@ -51,6 +51,10 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.pri
     state as readers_router,
 )
 
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.saving import (
+    clear_cache,
+)
+
 
 @pytest.fixture(autouse=True)
 def _identity_rig_orientation(monkeypatch):
@@ -516,7 +520,7 @@ class TestSave:
     ):
         """Only LAS X lets go of a capture; nothing is ever deleted by the driver itself.
 
-        A source that gives no way for LAS X to let go of it (``release``) is
+        A source that gives no way for LAS X to let go of it (``release_target``) is
         refused when releasing is asked for, before anything is saved, and its
         files stay as they are.
         """
@@ -539,12 +543,12 @@ class TestSave:
         naming,
     ):
         """A source LAS X holds (its cache) is let go of through LAS X, its files left alone."""
-        release = Mock()
         patched_export["collect"].return_value = replace(
-            patched_export["exported"], release=release
+            patched_export["exported"], release_target=(7, "HiRes")
         )
-        _save(successful_acq, tmp_path / "run_000001", naming, cleanup_cache=True)
-        release.assert_called_once_with()
+        with patch.object(clear_cache, "delete") as delete:
+            _save(successful_acq, tmp_path / "run_000001", naming, cleanup_cache=True)
+        delete.assert_called_once_with(7, "HiRes")
         assert all(p.is_file() for p in patched_export["image_paths"])
 
     def test_a_capture_whose_copy_does_not_read_back_is_never_let_go_of(
@@ -562,13 +566,15 @@ class TestSave:
         """
         # Every read-back comparison says the pixels differ.
         monkeypatch.setattr(np, "array_equal", lambda *_args, **_kwargs: False)
-        release = Mock()
         patched_export["collect"].return_value = replace(
-            patched_export["exported"], release=release
+            patched_export["exported"], release_target=(7, "HiRes")
         )
-        with pytest.raises(RuntimeError, match="read back"):
-            _save(successful_acq, tmp_path / "run_000001", naming, cleanup_cache=True)
-        release.assert_not_called()
+        with patch.object(clear_cache, "delete") as delete:
+            with pytest.raises(RuntimeError, match="read back"):
+                _save(
+                    successful_acq, tmp_path / "run_000001", naming, cleanup_cache=True
+                )
+        delete.assert_not_called()
         assert all(p.is_file() for p in patched_export["image_paths"])
 
     def test_save_embeds_state_in_the_stores_ome_xml_when_provided(

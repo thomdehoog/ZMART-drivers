@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import pytest
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitives.capture import (
-    lasx_cache_release as release,
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.saving import (
+    clear_cache as release,
 )
 
 
