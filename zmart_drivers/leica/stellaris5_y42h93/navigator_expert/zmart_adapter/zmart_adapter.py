@@ -1579,6 +1579,25 @@ def _where_it_saves(handle: ZmartHandle) -> Path | None:
         return None
 
 
+def _calibration_status(calibration: dict | None) -> str:
+    """The Connect card's one line about the objective calibration.
+
+    The session always holds a calibration record, even when loading failed, so
+    the line is decided by what the record says was loaded. A calibration that
+    could not be used means objective changes are refused, and the card says so.
+    """
+    if calibration is None:
+        return "failed — none found"
+
+    if not calibration.get("enabled", True):
+        return "switched off"
+
+    if calibration.get("loaded"):
+        return calibration.get("name") or "found"
+
+    return "failed — no usable calibration, so objective changes are refused"
+
+
 def _connection_status(handle: ZmartHandle, root: Path | None) -> dict:
     """What a session stands on, from what the driver already holds; a
     failure names itself."""
@@ -1599,9 +1618,7 @@ def _connection_status(handle: ZmartHandle, root: Path | None) -> dict:
             f"{limits['source']}{' (fallback)' if limits.get('is_fallback') else ''}"
             if limits else "failed — none loaded, every move refused"
         ),
-        "calibration": (
-            calibration.get("name") or "found" if calibration else "failed — none found"
-        ),
+        "calibration": _calibration_status(calibration),
         "stage": _try(stage) or "failed — no reading",
         "output root": str(root) if root is not None else f"not set up: {_info.SET_UP}",
     }
