@@ -254,6 +254,51 @@ The rules that go with routes:
   Where a microscope offers only one way to send a command, as with Leica's
   API, there simply is no fallback for it.
 
+### The two loops and the send styles
+
+Every change runs two loops, whatever the vendor software is.
+
+1. **The send loop.** Make the call, and learn whether it went through. A
+   transient problem may be tried again; a fatal one stops here.
+2. **The confirm loop.** Read the state until it shows the target. When a window
+   ends without it, send again, but only when sending again is safe.
+
+How a vendor's call behaves differs a great deal. Leica waits for a receipt
+from a .NET call, or fires without waiting. Nikon and the mesoSPIM send one
+line or one message over a local socket and read one reply. ZEISS makes a gRPC
+call that blocks until it is done. The Evident protocol answers `+` or `-` at
+once, with no detail. None of that may show above the vendor interface. Each
+writing primitive therefore hands the dispatcher the same small result, one of
+five outcomes:
+
+| Outcome | Meaning | What the send loop does |
+|---|---|---|
+| Accepted | The vendor said it has the command | Goes to the confirm loop |
+| Refused | The vendor said no, a fatal kind of problem | Stops and reports |
+| Not delivered | It certainly never arrived, a transient kind | Sends again, up to a set number of times |
+| Unknown | It was sent, but the reply never came | Does not send again; goes to the confirm loop |
+| Done | The call blocked until the work was finished | Reads back once, then finishes |
+
+The handling notes say which style each primitive has and whether sending it
+again is safe. Sending again is a property declared for each primitive, never a
+default: an absolute move or a setting is safe to repeat, an acquisition is
+not. The error classification is what tells "not delivered" from "unknown". A
+dropped link before the request was sent is the first, and a timeout after it
+was sent is the second. At least one driver today treats both as transient,
+which is the mistake this table is meant to prevent.
+
+Two things follow for the confirm loop. It has two kinds of confirmation: reach
+a value, and complete a process (an acquisition starts and then finishes, or a
+file stops growing). And the units and the tolerance, how close counts as
+arrived, belong to the handling notes, because the dispatcher compares numbers
+and does not know what they mean.
+
+**A test of the abstraction.** The dispatcher is plug-in enough if it runs, with
+no change, against a fake vendor of each style. The controller's mock already
+takes time to move and refuses commands while busy. Add two small fakes, one
+that blocks until done and one that answers accepted or refused at once. This
+belongs in the size check.
+
 ### Confirmation
 
 After a change, the dispatcher checks that the microscope really did it. This
