@@ -219,6 +219,11 @@ def tearDownModule():
     _NO_LOG_ON_DISK.stop()
 
 
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.origin import (
+    set_origin as _set_origin,
+)
+
+
 class TestRegistration(unittest.TestCase):
     def test_connection_profile_does_not_select_operator_calibration(self):
         self.assertNotIn("calibration_name", ZmartDriver.DEFAULT_CONNECTION)
@@ -335,7 +340,7 @@ class TestFrame(unittest.TestCase):
         h = _handle()
         patches = _patch_position(x_um=1000.0, y_um=2000.0, z_wide_um=30.0)
         with patches[0], patches[1], patches[2], patches[3]:
-            record = _frame.set_origin(h)
+            record = _set_origin.set_origin(h)
             self.assertEqual(record["origin"], {"x": 0.0, "y": 0.0, "z": 0.0})
             self.assertTrue(record["origin_file"].endswith("origin.json"))
             self.assertEqual(record["reference"]["z_focus_um"], 30.0)
@@ -375,7 +380,7 @@ class TestFrame(unittest.TestCase):
                 patches[2],
                 patches[3],
             ):
-                record = _frame.set_origin(h)
+                record = _set_origin.set_origin(h)
             # Persists to its own origin/<datetime>/ snapshot tree.
             self.assertEqual(record["origin_file"], str(profile.origin_path()))
             self.assertEqual(profile.origin_path().parent.parent.name, "origin")
@@ -448,7 +453,7 @@ class TestFrame(unittest.TestCase):
                 patches[2],
                 patches[3],
             ):
-                _frame.set_origin(h)
+                _set_origin.set_origin(h)
             fresh = self._connect_with_profile(profile)
         self.assertEqual(fresh.origin, h.origin)
 
@@ -463,7 +468,7 @@ class TestFrame(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             profile = MachineProfile(programdata_root=Path(tmp))
             with self.assertLogs(
-                "zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.coordinates",
+                "zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.origin.saved_origin",
                 level="WARNING",
             ) as logs:
                 h = self._connect_with_profile(profile)
@@ -2701,7 +2706,7 @@ class TestLifecycle(unittest.TestCase):
             try:
                 # Capturing the origin is a driver setup step, not a controller
                 # command, so it is called on the adapter with the driver handle.
-                _frame.set_origin(session._handle._handle)
+                _set_origin.set_origin(session._handle._handle)
                 answer = session.set_xyz(10, 20, 5, with_actuators={"z": "z-galvo"})
                 self.assertIs(answer["success"], True)
                 # The move answers a read-back in get_xyz's shape. The readers

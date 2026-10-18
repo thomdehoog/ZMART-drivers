@@ -271,6 +271,7 @@ def test_nothing_but_the_tests_imports_from_testing():
 # The measuring code of the setup items. It writes the saved configuration files;
 # run-time procedures only read those files, through each item's loader.
 MEASURING_MODULES = {
+    "origin.set_origin",
     "limits.measure_limits",
     "image_stage_registration.measure_orientation",
     "image_stage_registration.registration",
