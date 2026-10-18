@@ -38,3 +38,24 @@ Concretely:
 
 Good docs are not decoration here; they are how a biologist learns to drive
 their microscope. Treat them with the same care as the code.
+
+## How code is written
+
+The full guide is `docs/code-style.md`, with the reason for each rule. The short
+version, for every file you write or change:
+
+- Code that belongs together sits together. Remove dead code, and its tests.
+- Fewer lines are better, until they hurt readability. Then stop cutting.
+- Put blank lines between the steps of a function. Where a step needs a label,
+  put a short `#` comment above it.
+- Start each file with a readable docstring that is not bloated. Under it, give
+  the author, where they work and their email:
+  Thom de Hoog, Center for Microscopy and Image Analysis (ZMB), University of
+  Zurich (thom.dehoog@zmb.uzh.ch, thomdehoog@gmail.com).
+- If anything in the code is inspired by someone else's work, or by Thom de
+  Hoog's earlier work, acknowledge it in the docstring.
+- Name things after their job, not after jargon. Keep a file to one job.
+- Comments say why, or what was seen, with the date. Numbers live in one place
+  and carry their unit in the name.
+- One idea per commit, with a message in plain words.
+
