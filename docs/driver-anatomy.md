@@ -1087,11 +1087,17 @@ vendor interface. Each driver already has one, though at different depths:
 
 Between the mock API and the real microscope there can be one more step: a
 simulator that the vendor supplies, such as the LAS X simulator, which runs
-the real vendor software without a microscope. The driver is meant to work
-on the simulator and on the microscope without a separate variant for each.
-If a small difference turns up, such as a slower or older answer from the
-simulator, it is handled as a small change in the tuning numbers or in the
-handling notes of the primitive concerned, never in the shared dispatcher.
+the real vendor software without a microscope. For integration testing it
+gives the same information as the microscope, with one exception: its
+pictures are not taken from a sample but come from a loop of stored images.
+So the simulator can prove that the driver's commands, readings,
+confirmations and saving work end to end, but it cannot prove anything that
+depends on what is in the picture, such as autofocus, the orientation
+measurement or the objective calibration. Those need the real microscope.
+The driver is meant to work on the simulator and on the microscope without a
+separate variant for each. If a small difference turns up, it is handled as a
+small change in the tuning numbers or in the handling notes of the primitive
+concerned, never in the shared dispatcher.
 
 The folder is called `testing/` rather than `tests/` on purpose. The mock API
 is used beyond the tests: the controller's mock driver runs on it, and
