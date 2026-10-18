@@ -210,9 +210,14 @@ class TestTheStore:
         [level] = multiscale["datasets"]
         transforms = {t["type"]: t for t in level["coordinateTransformations"]}
         assert transforms["scale"]["scale"][3:] == pytest.approx([2.2705078125, 2.2705078125])
-        # The stage point is the middle of the frame; the store starts at its corner.
-        half = 512 * 2.2705078125 / 2
-        assert transforms["translation"]["translation"][2:] == pytest.approx([50.0, 2000.0 - half, 1000.0 - half])
+        # The stage point is the middle of the frame. The store is placed by the
+        # centre of its first voxel (OME-NGFF RFC-5), half a pixel in from the
+        # frame's corner; z is the plane's own height.
+        pixel = 2.2705078125
+        first_centre = -512 * pixel / 2 + pixel / 2
+        assert transforms["translation"]["translation"][2:] == pytest.approx(
+            [50.0, 2000.0 + first_centre, 1000.0 + first_centre]
+        )
         # The viewer builds the coarser levels itself from this one.
         assert multiscale["type"] == "mean"
 
