@@ -19,7 +19,9 @@ profiles, prechecks, or confirmations.
 
 import logging
 
+from ..dispatcher import error_rules
 from ..dispatcher.envelope import _make_log_entry
+from ..dispatcher.error_vocabulary import Kind
 
 log = logging.getLogger(__name__)
 
@@ -40,6 +42,17 @@ _PERMANENT_PATTERNS = [
     "not implemented",
 ]
 
+# The permanent patterns that mean the request itself was wrong.
+_BAD_REQUEST_PATTERNS = {
+    "out of range",
+    "is invalid",
+    "invalid block identifier",
+    "invalid detector",
+    "invalid light source",
+    "not defined",
+    "not found",
+}
+
 _TRANSIENT_PATTERNS = [
     "being scanned",
     "cannot be set while",
@@ -51,29 +64,35 @@ _TRANSIENT_PATTERNS = [
 ]
 
 
-def _is_transient_error(msg):
-    """Classify an error message as transient or permanent.
+def classify_error(msg):
+    """Sort an error message from LAS X into one of the shared kinds of problem.
 
     Args:
         msg: Error message string from LAS X.
 
     Returns:
-        True if transient (retry-worthy), False if permanent.
-        Permanent patterns are checked first and take priority.
+        ``Kind.TEMPORARY`` for a busy or timed-out LAS X, ``Kind.BAD_REQUEST``
+        for a request LAS X calls invalid or out of range, and
+        ``Kind.PERMANENT`` for everything else. Permanent patterns are checked
+        first and take priority, and a message that matches nothing is
+        treated as permanent, which is the safe choice.
     """
     if not msg:
-        return False
+        return Kind.PERMANENT
     lower = msg.lower()
-    # Permanent patterns checked first — they take priority
     for pat in _PERMANENT_PATTERNS:
         if pat in lower:
-            return False
+            return Kind.BAD_REQUEST if pat in _BAD_REQUEST_PATTERNS else Kind.PERMANENT
     for pat in _TRANSIENT_PATTERNS:
         if pat in lower:
-            return True
-    # Unknown errors → treated as permanent (safe default)
+            return Kind.TEMPORARY
     log.warning("Unclassified error (treated as permanent): %s", msg)
-    return False
+    return Kind.PERMANENT
+
+
+def _is_transient_error(msg):
+    """True when sending the command again is worthwhile (the rules say so for this kind)."""
+    return error_rules.sends_again(classify_error(msg))
 
 
 # =============================================================================
@@ -231,7 +250,8 @@ def _default_error_check(client):
 
     error_msg = err.get("error", "")
     details = err.get("details", {})
-    transient = _is_transient_error(error_msg)
+    kind = classify_error(error_msg)
+    transient = error_rules.sends_again(kind)
     level = "warning" if transient else "error"
 
     log_msg = f"API error: {error_msg}"
@@ -242,6 +262,7 @@ def _default_error_check(client):
     return {
         "success": False,
         "error": error_msg,
+        "kind": kind,
         "transient": transient,
         "logs": logs,
     }

@@ -73,41 +73,21 @@ from typing import Any
 
 from ..configuration import store as _machine
 from ..configuration.limits import config as _limits_config
-from ..vendor_interface.primitive_handling import limit_rules as _limits
+from ..vendor_interface.primitive_handling import limit_rules as _rules
 from ..vendor_interface.primitive_handling.limit_rules import (
-    LeicaLimits,
-    LimitsError,
-    LimitsStatus,
-    LimitViolation,
+    MUTATING_COMMANDS,
+    NOTEBOOK_POINTER,
 )
+from .limit_errors import LimitsError, LimitsStatus, LimitViolation
 
 log = logging.getLogger(__name__)
-
-
-NOTEBOOK_POINTER = "configuration/limits/notebooks/set_limits.ipynb"
-
-# Every mutating command wrapper -> its low-level policy key. The completeness
-# suite (testing/unit/test_limits_adversarial.py) enumerates the wrappers that
-# dispatch through the fire path and fails if any is missing here — the
-# commands-layer successor of the adapter's old _MUTATING_OPS guard.
-MUTATING_COMMANDS = {
-    # each configurable setter maps directly to its flat JSON entry
-    **{name: name for name in _limits_config.SETTER_LIMIT_KEYS},
-    "set_objective": "set_objective",
-    "select_job": "set_state",
-    # stage motion
-    "move_xy": "set_xyz",
-    "move_z": "set_xyz",
-    # acquisition
-    "acquire": "acquire",
-}
 
 
 @dataclass(frozen=True, slots=True)
 class GateState:
     """Private installed state for one session.
 
-    ``limits`` is the loaded :class:`LeicaLimits` and ``stage_cfg``
+    ``limits`` is the loaded limits object of the vendor interface and ``stage_cfg``
     the validated stage config when the handshake succeeded; on failure both
     are None and ``error`` records exactly what is wrong (fail closed: every
     gated wrapper refuses with this message).
@@ -242,15 +222,9 @@ def _build_gate_from_file(
     """
     # The limits config validates the complete flat file in one read.
     stage_cfg = _limits_config.load(limits_path=limits_file)
-    # The envelope must sit within the hardcoded physical backstop.
-    _limits.check_envelope_within_backstop(stage_cfg["stage_um"])
-    function_limits = LeicaLimits(
-        stage_cfg["policy"],
-        source=source,
-        path=limits_file,
-        is_fallback=is_fallback,
+    function_limits = _rules.build_limits(
+        stage_cfg, source=source, path=limits_file, is_fallback=is_fallback
     )
-    _limits.apply_stage_limits_from_config(stage_cfg)
     state = GateState(limits=function_limits, stage_cfg=_freeze(stage_cfg), error=None)
     _install(client, state)
     return state

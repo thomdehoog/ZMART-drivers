@@ -15,9 +15,9 @@ the driver once on the LAS X computer, then connect by name in every session::
 The methods only translate. The work of every command lives in the parts
 below: the readings and changes in ``vendor_interface/`` and ``dispatcher/``,
 the recipes (including saving the files) in ``procedures/``, the microscope's
-own settings in ``configuration/``. Today the methods reach those parts
-through the short command table in ``zmart_adapter/``; folding that table
-into this class is the next step of the refactor.
+own settings in ``configuration/``. This class opens the connection, hands
+each call to the procedure that does the work, and turns the answer into the
+shape the controller takes.
 
 Each method hands back ``True`` and the values when the microscope did what
 was asked. When it did not, the function behind the method raises:
@@ -30,7 +30,7 @@ anything itself.
 Positions are micrometres from the saved origin, in the sample's coordinate
 system. The ``connection`` dictionary comes from ``zmart_driver.json``; every
 key may be left out and then takes the driver's default (see
-``zmart_adapter.CONNECTION``).
+``DEFAULT_CONNECTION`` below).
 
 Author: Thom de Hoog, Center for Microscopy and Image Analysis (ZMB),
 University of Zurich (thom.dehoog@zmb.uzh.ch, thomdehoog@gmail.com).
@@ -38,12 +38,43 @@ University of Zurich (thom.dehoog@zmb.uzh.ch, thomdehoog@gmail.com).
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
-from .zmart_adapter import zmart_adapter as _adapter
+from .. import connect as _session
+from ..configuration import coordinates as _coordinates
+from ..configuration import data_location as _data_location
+from ..configuration import session_state as _session_state
+from ..dispatcher import gate as _gate
+from ..dispatcher.naming import run_hash
+from ..procedures import acquisition as _acquisition
+from ..procedures import frame as _frame
+from ..procedures import instrument as _instrument
+from ..procedures.session import ZmartHandle
+
+log = logging.getLogger(__name__)
 
 #: The three axes, in the order the controller's canvas lists them.
 _AXES = ("x", "y", "z")
+
+#: The connection settings used for any key the caller leaves out.
+#: ``microscope`` names this instrument. ``client`` and ``api_delay_ms`` feed
+#: the LAS X connection. ``output_root`` is where ``acquire`` saves when it is
+#: not told a folder. ``load_limits`` and ``load_calibration`` load this
+#: microscope's limits and objective calibration at connect; leave both on for
+#: normal work. ``load_origin`` loads the saved zero point of the coordinate
+#: frame; set it to False only to start in plain stage coordinates, for
+#: example to capture a new origin when the saved one is damaged.
+#: ``calibration_name`` (not set by default) picks a named calibration set.
+DEFAULT_CONNECTION = {
+    "microscope": "stellaris5-y42h93",
+    "client": "PythonClient",
+    "api_delay_ms": None,
+    "output_root": None,
+    "load_limits": True,
+    "load_calibration": True,
+    "load_origin": True,
+}
 
 
 class ZmartDriver:
@@ -57,12 +88,46 @@ class ZmartDriver:
         origin, the image-to-stage orientation and the objective
         calibration, and checks that LAS X answers. Raises when any of
         these fail, and leaves nothing open behind.
+
+        The saved origin is read before LAS X is contacted. A saved origin
+        that exists but cannot be read stops the connection, because
+        quietly falling back to stage coordinates would put every later
+        move somewhere other than intended.
         """
-        self._handle = _adapter.connect(dict(connection or {}))
+        connection = {**DEFAULT_CONNECTION, **(connection or {})}
+        saved_origin = (
+            _coordinates.load_saved_origin()
+            if connection.get("load_origin", True)
+            else None
+        )
+        saved_location = _load_data_location()
+        client = _session.connect_microscope(
+            client_name=connection.get("client", "PythonClient"),
+            api_delay_ms=connection.get("api_delay_ms"),
+            load_limits=connection.get("load_limits", True),
+            load_calibration=connection.get("load_calibration", True),
+            calibration_name=connection.get("calibration_name"),
+        )
+        handle = ZmartHandle(
+            client=client, connection=dict(connection), hash6=run_hash()
+        )
+        loaded = _session_state.get(client)
+        handle.translations = loaded.translations if loaded is not None else None
+        if saved_origin is not None:
+            handle.origin = saved_origin
+        handle.data_location = saved_location
+        self._handle = handle
 
     def disconnect(self) -> None:
-        """Close the LAS X session. A second call does nothing."""
-        _adapter.disconnect(self._handle)
+        """Close the session and drop what was loaded for it. A second call does nothing.
+
+        LAS X's client has no close of its own, so the driver only forgets
+        the limits and the calibration it installed for this connection and
+        marks the session closed; every later command is then refused.
+        """
+        _gate.uninstall(self._handle.client)
+        _session_state.uninstall(self._handle.client)
+        self._handle.closed = True
 
     # --- describing the setup ---------------------------------------------------------
 
@@ -78,7 +143,7 @@ class ZmartDriver:
         ``chooses_its_own_folder`` is False: the driver writes every file
         itself, from LAS X's cache, so it saves where ``acquire`` is told.
         """
-        info = _adapter.get_info(self._handle)
+        info = _instrument.get_info(self._handle)
         return True, (
             info["description"],
             info["setup"],
@@ -92,7 +157,7 @@ class ZmartDriver:
         focus drive, which is the default, and ``z-galvo``, the fast drive for
         small steps.
         """
-        motors = _adapter.get_actuators(self._handle)
+        motors = _frame.get_actuators(self._handle)
         return True, tuple(dict(motors[axis]) for axis in _AXES)
 
     # --- the stage ----------------------------------------------------------------------
@@ -107,7 +172,7 @@ class ZmartDriver:
         ``with_actuators`` names the motor of every axis; the controller has
         filled in the defaults.
         """
-        answer = _adapter.get_xyz(self._handle, with_actuators=with_actuators)
+        answer = _frame.get_xyz(self._handle, with_actuators=with_actuators)
         return True, _xyz(answer)
 
     def set_xyz(self, x, y, z, with_actuators=None):
@@ -119,8 +184,20 @@ class ZmartDriver:
         answer is read back from LAS X once the stage has arrived, so it
         shows where the stage really is.
         """
-        answer = _adapter.set_xyz(self._handle, x, y, z, with_actuators=with_actuators)
+        answer = _frame.set_xyz(self._handle, x, y, z, with_actuators=with_actuators)
         return True, _xyz(answer)
+
+    def set_origin(self):
+        """Make the current stage position the zero point of the frame, and save it.
+
+        This is a setup step you run yourself, once, working with the driver
+        directly; it is not a controller command. It records the stage
+        position, both z drives and the objective in place, and saves them to
+        this microscope's configuration. Every later connection starts from the
+        saved zero point. Returns where it was saved. See
+        ``procedures/frame.py`` for the details.
+        """
+        return _frame.set_origin(self._handle)
 
     # --- the settings -------------------------------------------------------------------
 
@@ -132,7 +209,7 @@ class ZmartDriver:
         serial number, objectives, pixel size, the jobs on offer, and which
         limits file governs.
         """
-        state = _adapter.get_state(self._handle)
+        state = _instrument.get_state(self._handle)
         return True, (state["changeable"], state["observed"])
 
     def set_state(self, changeable):
@@ -140,15 +217,15 @@ class ZmartDriver:
 
         An unknown setting or job is refused with ``ValueError``.
         """
-        return True, _adapter.set_state(self._handle, {"changeable": dict(changeable)})[
-            "applied"
-        ]
+        return True, _instrument.set_state(
+            self._handle, {"changeable": dict(changeable)}
+        )["applied"]
 
     # --- acquiring ----------------------------------------------------------------------
 
     def get_acquisition_settings(self):
         """``True, settings``: how a capture is triggered, ``full`` and nothing else."""
-        return True, _adapter.get_acquisition_settings(self._handle)
+        return True, _acquisition.get_acquisition_settings(self._handle)
 
     def acquire(
         self, position_label, acquisition_settings, acquisition_type, output_folder
@@ -162,7 +239,7 @@ class ZmartDriver:
         plane entry carries its file, its channel, depth and time index,
         and the stage position it was taken at, in the sample's frame.
         """
-        answer = _adapter.acquire(
+        answer = _acquisition.acquire(
             self._handle,
             position_label=position_label,
             acquisition_settings=acquisition_settings,
@@ -175,7 +252,7 @@ class ZmartDriver:
 
     def get_procedures(self):
         """``True, procedures``: backlash takeup, parking the z-galvo, autofocus."""
-        return True, _adapter.get_procedures(self._handle)
+        return True, _instrument.get_procedures(self._handle)
 
     def run_procedure(self, procedure):
         """Run the routine named by ``procedure["name"]``; the other keys are its arguments.
@@ -184,7 +261,22 @@ class ZmartDriver:
         ran, and for autofocus the focus read back afterwards. A name that
         ``get_procedures`` does not list is refused with ``ValueError``.
         """
-        return True, _adapter.run_procedure(self._handle, dict(procedure))
+        return True, _instrument.run_procedure(self._handle, dict(procedure))
+
+
+def _load_data_location():
+    """This microscope's set-up data location, or None when it was never set up.
+
+    A record that cannot be read stops the connection with how to fix it,
+    rather than being taken for "not set up".
+    """
+    try:
+        return _data_location.data_location()
+    except (OSError, ValueError) as exc:
+        raise RuntimeError(
+            f"this microscope's saved data location could not be read ({exc}); "
+            "set it again with configuration/data_location/notebooks/set_data_location.ipynb"
+        ) from exc
 
 
 def _xyz(answer: dict) -> tuple:

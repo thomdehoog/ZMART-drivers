@@ -48,6 +48,7 @@ Nothing from command wrappers, prechecks, or confirmations.
 import logging
 import time
 
+from . import error_rules
 from . import tuning as _timing
 from .envelope import _make_log_entry, _make_timing
 
@@ -307,7 +308,14 @@ def _fire_block(
             break
 
         error_msg = err_result.get("error", "")
-        transient = err_result.get("transient", False)
+        # An error check that sorted the problem names its kind and the shared
+        # rules decide; a custom check that only says "transient" is believed.
+        kind = err_result.get("kind")
+        transient = (
+            error_rules.sends_again(kind)
+            if kind is not None
+            else err_result.get("transient", False)
+        )
 
         if transient and attempt < profile.max_retries:
             # Backoff: first retry is immediate, then base × 2^(attempt-1)

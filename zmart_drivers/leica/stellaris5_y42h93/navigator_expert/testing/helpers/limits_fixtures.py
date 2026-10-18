@@ -142,7 +142,9 @@ def permissive_function_limits(**set_xyz_constraints) -> object:
     )
     for param, bounds in set_xyz_constraints.items():
         payload[param] = {"range": [bounds["min"], bounds["max"]]}
-    return _gate.LeicaLimits(payload, source="test", path=None, is_fallback=False)
+    return _motion_limits.LeicaLimits(
+        payload, source="test", path=None, is_fallback=False
+    )
 
 
 def install_permissive_limits(client, *, wide_stage=False, **set_xyz_constraints):

@@ -703,7 +703,7 @@ def test_every_configurable_setter_enforces_before_touching_native_api(setter):
     gate._install(
         client,
         gate.GateState(
-            limits=gate.LeicaLimits(
+            limits=motion_limits.LeicaLimits(
                 policy, source="test", path="limits.json", is_fallback=False
             ),
             stage_cfg=None,
@@ -762,7 +762,7 @@ def test_z_stack_definition_checks_both_endpoints_before_native_api():
     gate._install(
         client,
         gate.GateState(
-            limits=gate.LeicaLimits(
+            limits=motion_limits.LeicaLimits(
                 policy, source="test", path="limits.json", is_fallback=False
             ),
             stage_cfg=None,
@@ -785,7 +785,7 @@ def test_z_stack_definition_configured_limit_refuses_value_unknown_reset():
     gate._install(
         client,
         gate.GateState(
-            limits=gate.LeicaLimits(
+            limits=motion_limits.LeicaLimits(
                 policy, source="test", path="limits.json", is_fallback=False
             ),
             stage_cfg=None,
@@ -803,7 +803,7 @@ def test_installed_policy_is_independent_of_input_payload_mutation():
     payload = _valid_payload()
     payload["set_zoom"] = {"allowed": [1.0]}
     policy = limits_config.validate_payload(payload)
-    installed = gate.LeicaLimits(
+    installed = motion_limits.LeicaLimits(
         policy, source="test", path="limits.json", is_fallback=False
     )
     gate._install(

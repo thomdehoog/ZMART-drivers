@@ -131,27 +131,25 @@ def test_a_failed_parse_is_not_shared():
     assert len(calls) == 2
 
 
-def test_a_log_worker_whose_race_is_won_starts_no_parse():
-    stop = threading.Event()
-    stop.set()
-    answers = []
-    spec = readers.capabilities.spec("xy")
-    with patch.object(log_reader, "parse_log") as parse:
-        engine._log_worker(
-            spec, None, 1.0, deadline=time.monotonic() + 1.0, stop=stop, answers=answers
-        )
-    parse.assert_not_called()
-    assert answers == []
-
-
-def test_sixty_racing_readings_never_overlap_two_parses():
-    """The scope's burst: many readings racing at once, the API answering fast."""
-    slow = SlowParse()
+def test_the_log_is_not_parsed_when_the_api_answers():
+    """The sources are asked one after the other: an API answer that counts ends the look."""
     with (
-        patch.object(log_reader, "parse_files", side_effect=slow),
+        patch.object(log_reader, "parse_log") as parse,
         patch.object(
             readers.api_reader, "get_xy", return_value={"x_um": 1.0, "y_um": 2.0}
         ),
+    ):
+        reading = readers.get_xy(object(), diagnostics=True)
+    assert reading.source == "api"
+    parse.assert_not_called()
+
+
+def test_sixty_readings_at_once_never_overlap_two_parses():
+    """The scope's burst: many readings at once, the API giving no answer so the log is read."""
+    slow = SlowParse()
+    with (
+        patch.object(log_reader, "parse_files", side_effect=slow),
+        patch.object(readers.api_reader, "get_xy", return_value=None),
     ):
         threads = [
             threading.Thread(target=lambda: readers.get_xy(object())) for _ in range(60)
@@ -193,32 +191,22 @@ def test_a_snapshot_counts_only_for_the_log_files_it_was_parsed_from(
     assert seen[1] == str(tmp_path / "none.log")
 
 
-def test_a_question_sent_to_las_x_is_seen_through_when_the_log_wins():
+def test_a_question_sent_to_las_x_is_seen_through_to_its_answer():
     """Abandoning a CAM question mid-flight made LAS X drop the next one, under a burst.
 
-    The log now answers at once from the shared snapshot, so it wins most
-    races; the API question already sent is still waited for to its answer,
-    and no new question is sent after the race is won.
+    The API is asked first. A question already sent is waited for to its
+    answer within its slice of the window, and only one is sent.
     """
-    asked, answered = [], []
-    log_value = {"x_um": 5.0, "y_um": 6.0}
+    asked = []
 
     def slow_api(client, *, deadline, should_stop=None, **kwargs):
         asked.append(1)
         time.sleep(0.05)
-        stopped_early = should_stop is not None and should_stop()
-        answered.append(not stopped_early)
         return {"x_um": 1.0, "y_um": 2.0}
 
-    snapshot = log_reader.Snapshot(now=time.time())
-    with (
-        patch.object(log_reader, "parse_files", return_value=snapshot),
-        patch.object(log_reader, "get_xy", return_value=log_value),
-        patch.object(log_reader, "ages", return_value={"xy": 0.1}),
-        patch.object(readers.api_reader, "get_xy", side_effect=slow_api),
-    ):
+    with patch.object(readers.api_reader, "get_xy", side_effect=slow_api):
         reading = readers.get_xy(object(), diagnostics=True)
         time.sleep(0.2)
-    assert reading.source == "log"
+    assert reading.source == "api"
+    assert reading.value == {"x_um": 1.0, "y_um": 2.0}
     assert asked == [1]
-    assert answered == [True]
