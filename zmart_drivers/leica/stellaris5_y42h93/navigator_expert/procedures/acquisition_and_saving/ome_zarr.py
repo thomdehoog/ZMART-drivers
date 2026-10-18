@@ -48,11 +48,7 @@ import numpy as np
 from ...configuration.image_stage_registration import Orientation, reorient_array
 from . import materialize
 from . import ome_canonical as canonical
-from ...vendor_interface.product import (
-    AcquisitionMetadata,
-    ExportedAcquisition,
-    PlaneIndex,
-)
+from ...vendor_interface.product import AcquisitionMetadata, ExportedAcquisition, PlaneIndex
 
 __all__ = [
     "Capture",

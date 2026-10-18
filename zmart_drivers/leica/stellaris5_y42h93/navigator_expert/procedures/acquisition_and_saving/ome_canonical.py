@@ -23,13 +23,7 @@ from typing import Any
 from ...vendor_interface.primitive_handling import state as _readers
 from ...vendor_interface import parsing as _parsing
 from ...vendor_interface.primitives.capture import tiff_tag as _ome
-from ...vendor_interface.product import (
-    AcquisitionMetadata,
-    ChannelMetadata,
-    Instrument,
-    PlaneIndex,
-    PlaneMetadata,
-)
+from ...vendor_interface.product import AcquisitionMetadata, ChannelMetadata, Instrument, PlaneIndex, PlaneMetadata
 
 log = logging.getLogger(__name__)
 

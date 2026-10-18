@@ -8,11 +8,7 @@ import uuid
 from pathlib import Path
 
 from . import ome_canonical as _canonical
-from ...vendor_interface.product import (
-    PlaneSource,
-    RawPlaneSource,
-    VendorMetadataSource,
-)
+from ...vendor_interface.product import PlaneSource, RawPlaneSource, VendorMetadataSource
 
 
 def save_vendor_metadata_atomic(source: VendorMetadataSource, dest: Path) -> None:

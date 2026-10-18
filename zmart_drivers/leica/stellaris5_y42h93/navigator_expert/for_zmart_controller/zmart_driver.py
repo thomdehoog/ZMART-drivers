@@ -51,7 +51,7 @@ from ..procedures import session_state as _session_state
 from ..configuration.store import MACHINE
 from ..dispatcher import gate as _gate
 from ..vendor_interface.naming import run_hash
-from ..procedures import acquisition as _acquisition
+from ..procedures.acquisition_and_saving import acquisition as _acquisition
 from ..procedures import frame as _frame
 from ..procedures import instrument as _instrument
 from ..procedures.session import ZmartHandle

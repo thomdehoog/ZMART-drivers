@@ -164,7 +164,7 @@ from .vendor_interface.primitive_handling.limit_rules import (
 )
 
 # -- acquisition/ - capture, file arrival, and save handling
-from .procedures.commands.acquire import AcquisitionResult, acquire
+from .procedures.acquisition_and_saving.acquire import AcquisitionResult, acquire
 from .vendor_interface.product import (
     AcquisitionMetadata,
     ChannelMetadata,
@@ -174,7 +174,7 @@ from .vendor_interface.product import (
     SavedAcquisition,
     VendorMetadataSource,
 )
-from .procedures.saving.save import save
+from .procedures.acquisition_and_saving.save import save
 
 # -- logging
 import logging

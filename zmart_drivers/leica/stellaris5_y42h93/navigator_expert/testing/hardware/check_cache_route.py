@@ -66,9 +66,7 @@ def main() -> int:
     from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.for_zmart_controller.zmart_driver import (
         ZmartDriver as driver,
     )
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures import (
-        acquisition as _acquisition,
-    )
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.acquisition_and_saving import acquisition as _acquisition
 
     report: dict = {
         "job": asked.job,

@@ -34,12 +34,8 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.con
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration import (
     store as _machine,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.saving import (
-    save as _save,
-)
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.commands import (
-    acquire as _capture,
-)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.acquisition_and_saving import save as _save
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.acquisition_and_saving import acquire as _capture
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.commands import (
     backlash as _motion,
 )
@@ -248,9 +244,7 @@ def test_acquire_backlash_rounds_through_the_controller_seam(
     ops table -> adapter) is what is actually exercised for both the default
     and a positive ``ACQUISITION_BACKLASH_DEFAULT_ROUNDS``, the driver's own setting.
     """
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures import (
-        acquisition as _acquisition,
-    )
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.acquisition_and_saving import acquisition as _acquisition
 
     from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitive_handling import (
         profiles,
