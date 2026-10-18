@@ -144,10 +144,8 @@ def main(argv: list[str] | None = None) -> int:
         _say(f"--- burst: {args.moves} XY moves of 25 um, then back to the start")
         for index in range(args.moves):
             sign = -1 if index % 2 == 0 else 1
-            driver.set_xyz(
-                x + sign * 25, y + sign * 25, z, with_actuators={"z": "z-galvo"}
-            )
-        driver.set_xyz(x, y, z, with_actuators={"z": "z-galvo"})
+            driver.set_xyz(x + sign * 25, y + sign * 25, z)
+        driver.set_xyz(x, y, z)
         _say("--- moves done; get_state, as the validator does before it switches")
         driver.get_state()
 

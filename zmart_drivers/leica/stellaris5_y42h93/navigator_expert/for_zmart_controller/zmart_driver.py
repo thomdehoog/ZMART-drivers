@@ -186,9 +186,9 @@ class ZmartDriver:
     def get_actuators(self):
         """``True, (x, y, z)``: per axis the motors and the default, ``{"options": [...], "default": ...}``.
 
-        x and y have one motor each, ``motoric``. z has two: ``z-wide``, the
-        focus drive, which is the default, and ``z-galvo``, the fast drive for
-        small steps.
+        Each axis has one motor to move with: ``motoric`` for x and y, and
+        ``z-wide`` for z. The fast ``z-galvo`` is read and reported by
+        ``get_xyz`` but never used to move the focus.
         """
         motors = _frame.get_actuators(self._handle)
         return True, tuple(dict(motors[axis]) for axis in _AXES)
@@ -212,8 +212,8 @@ class ZmartDriver:
         """Move the stage, then answer exactly as ``get_xyz`` does.
 
         The limits gate refuses a position outside the travel before
-        anything moves (``ValueError``). ``with_actuators`` picks the z
-        drive, for example ``{"z": "z-galvo"}`` for a small fast step. The
+        anything moves (``ValueError``). The focus is always moved with z-wide;
+        ``with_actuators`` only names the motors that already are the choice. The
         answer is read back from LAS X once the stage has arrived, so it
         shows where the stage really is.
         """

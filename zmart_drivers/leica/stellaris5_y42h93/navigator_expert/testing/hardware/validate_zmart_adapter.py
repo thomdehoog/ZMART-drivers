@@ -482,7 +482,7 @@ def _restore(
         )
     v.callable(
         "move: restore XY + focus (frame 0,0,0)",
-        lambda: sess.set_xyz(0.0, 0.0, 0.0, with_actuators={"z": "z-galvo"}),
+        lambda: sess.set_xyz(0.0, 0.0, 0.0),
         context=dict(orig, job=job),
         mutating=True,
     )
@@ -556,11 +556,11 @@ def phase_move(
                     "origin: frame z -> 0", f["z"]["position"], 0.0, tolerance=Z_TOL_UM
                 )
 
-            # XY leg: hold focus via the galvo (keeps z-wide untouched on the sim).
+            # XY leg: the focus is held at frame 0.
             v.callable(
                 "set_xyz: XY move",
-                lambda: sess.set_xyz(dx, dy, 0.0, with_actuators={"z": "z-galvo"}),
-                context={"to_frame": (dx, dy, 0.0), "z_actuator": "z-galvo"},
+                lambda: sess.set_xyz(dx, dy, 0.0),
+                context={"to_frame": (dx, dy, 0.0), "z_actuator": "z-wide"},
                 mutating=True,
             )
             f = v.callable("get_xyz after XY", sess.get_xyz)
@@ -568,43 +568,16 @@ def phase_move(
                 v.compare("xy: frame x", f["x"]["position"], dx, tolerance=XY_TOL_UM)
                 v.compare("xy: frame y", f["y"]["position"], dy, tolerance=XY_TOL_UM)
 
-            # z-galvo leg: focus target dzg via z-galvo; z-wide must stay put.
-            # This validates the additive relationship, units, and sign against
-            # the real CAM readback.
-            v.callable(
-                "set_xyz: z-galvo move",
-                lambda: sess.set_xyz(dx, dy, dzg, with_actuators={"z": "z-galvo"}),
-                context={"to_frame": (dx, dy, dzg), "z_actuator": "z-galvo"},
-                mutating=True,
-            )
-            f = v.callable("get_xyz after z-galvo", sess.get_xyz)
-            if f is not None:
-                v.compare(
-                    "zgalvo: frame z", f["z"]["position"], dzg, tolerance=Z_TOL_UM
-                )
-                v.compare(
-                    "zgalvo: drive moved by delta (sign check)",
-                    f["z"]["actuators"]["z-galvo"] - orig["z_galvo_um"],
-                    dzg,
-                    tolerance=Z_TOL_UM,
-                )
-                v.compare(
-                    "zgalvo: z-wide drive unchanged",
-                    f["z"]["actuators"]["z-wide"],
-                    orig["z_wide_um"],
-                    tolerance=Z_TOL_UM,
-                )
-
-            # z-wide leg (gated): focus target dzg+dzw via z-wide; galvo holds.
+            # z-wide leg (gated): the focus is moved with z-wide alone; the galvo is parked at 0.
             zw_target = orig["z_wide_um"] + dzw
             zw_lo, zw_hi = limits["z_wide_min"], limits["z_wide_max"]
             if _within(orig["z_wide_um"], zw_lo, zw_hi) and _within(
                 zw_target, zw_lo, zw_hi
             ):
-                total = dzg + dzw
+                total = dzw
                 v.callable(
                     "set_xyz: z-wide move",
-                    lambda: sess.set_xyz(dx, dy, total, with_actuators={"z": "z-wide"}),
+                    lambda: sess.set_xyz(dx, dy, total),
                     context={"to_frame": (dx, dy, total), "z_actuator": "z-wide"},
                     mutating=True,
                 )
@@ -612,7 +585,7 @@ def phase_move(
                 f = v.callable("get_xyz after z-wide", sess.get_xyz)
                 if f is not None:
                     v.compare(
-                        "zwide: frame z is additive (z-wide + z-galvo)",
+                        "zwide: frame z",
                         f["z"]["position"],
                         total,
                         tolerance=Z_TOL_UM,
@@ -624,9 +597,9 @@ def phase_move(
                         tolerance=Z_TOL_UM,
                     )
                     v.compare(
-                        "zwide: z-galvo drive unchanged",
-                        f["z"]["actuators"]["z-galvo"] - orig["z_galvo_um"],
-                        dzg,
+                        "zwide: z-galvo drive parked at 0",
+                        f["z"]["actuators"]["z-galvo"],
+                        0.0,
                         tolerance=Z_TOL_UM,
                     )
             else:

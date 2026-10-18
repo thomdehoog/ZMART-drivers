@@ -38,13 +38,16 @@ from ..session import ZmartHandle, job_catalog, note_unconfirmed, require_open  
 log = logging.getLogger(__name__)
 
 
-# The motors that can move each axis, under the names the controller uses.
-# These are the names ``get_actuators`` lists and ``with_actuators`` accepts.
-_ACTUATORS = {"x": ("motoric",), "y": ("motoric",), "z": ("z-wide", "z-galvo")}
+# The motors the driver moves each axis with, under the names the controller
+# uses. These are the names ``get_actuators`` lists and ``with_actuators``
+# accepts. The focus is always moved with z-wide: the objective offsets are
+# measured on z-wide, so moving the focus with the fast z-galvo as well would
+# let the two drives share the focus differently from call to call.
+_ACTUATORS = {"x": ("motoric",), "y": ("motoric",), "z": ("z-wide",)}
 
 # Where each motor's own reading sits in a hardware snapshot (see
 # ``_hardware_snapshot``). ``get_xyz`` reports these readings under
-# ``actuators``, so every motor here must also be listed in ``_ACTUATORS``.
+# ``actuators``. They include the z-galvo, which is read but never moved here.
 _MOTOR_READINGS = {
     "x": {"motoric": "x_um"},
     "y": {"motoric": "y_um"},
@@ -117,12 +120,10 @@ def get_actuators(handle: ZmartHandle) -> dict:
     """The motors that can move each axis, and the one used when none is chosen.
 
     ``{"x": {"options": ["motoric"], "default": "motoric"}, ...,
-    "z": {"options": ["z-wide", "z-galvo"], "default": "z-wide"}}``. The
-    options are exactly the names ``with_actuators`` accepts, and the names
-    under which :func:`get_xyz` reports each motor's own reading. An axis left
-    out of ``with_actuators`` uses its default (x and y ``motoric``, z
-    ``z-wide``, the focus drive that reaches the whole travel); a previous
-    call's choice is never remembered.
+    "z": {"options": ["z-wide"], "default": "z-wide"}}``. The options are
+    exactly the names ``with_actuators`` accepts. The focus is always moved
+    with z-wide, the drive the objective offsets are measured on; the z-galvo
+    is still read and reported by :func:`get_xyz`, but never used to move.
     """
     require_open(handle)
     return {
@@ -199,6 +200,41 @@ def get_xyz(handle: ZmartHandle, *, with_actuators: dict | None = None) -> dict:
     return result
 
 
+#: The z-galvo counts as parked when it reads within this much of 0. The
+#: readback is never exact, and moving the galvo for noise would only add moves.
+Z_GALVO_PARKED_TOLERANCE_UM = 0.5
+
+
+def zero_z_galvo(handle: ZmartHandle) -> dict:
+    """Park the z-galvo at 0 while keeping the focus.
+
+    The driver moves the focus with z-wide alone, so the fast z-galvo is kept
+    at 0 and out of the way. If it is not there (for example after someone
+    used it in LAS X), z-wide first takes over the galvo's offset, so a refused
+    z-wide move (limits) aborts with nothing moved, and only then does the
+    galvo go to 0. The focus does not change. Both moves go through the checked
+    ``move_z``; a refused or failed move raises, and a move that could not be
+    confirmed is recorded and the procedure carries on.
+
+    Returns how much was transferred to z-wide, in µm.
+    """
+    snap = hardware_snapshot(handle)
+    offset = snap["z_galvo_um"]
+    if offset == 0.0:
+        return {"transferred_um": 0.0}
+    for z_mode, target in (("zwide", snap["z_wide_um"] + offset), ("galvo", 0.0)):
+        result = _commands.move_z(
+            handle.client, snap["job"], target, unit="um", z_mode=z_mode
+        )
+        if not result.get("success"):
+            raise RuntimeError(f"zero_z_galvo: move_z ({z_mode}) failed: {result}")
+        if not result.get("confirmed"):
+            note_unconfirmed(
+                handle, f"zero_z_galvo: move_z ({z_mode}) to {target}", result
+            )
+    return {"transferred_um": offset}
+
+
 def set_xyz(
     handle: ZmartHandle,
     x: float,
@@ -215,21 +251,17 @@ def set_xyz(
     were asked for. A move that is refused or cannot be confirmed raises
     instead, because carrying on at an unknown position is never safe.
 
-    Destination = origin + F + ΔT, commanded absolutely. Ordinary frame-Z
-    movement uses the selected actuator, but objective-calibration ΔT.z always
-    belongs to z-wide. With z-wide selected, its one target contains both the
-    requested frame Z and ΔT.z while the galvo stays parked. With z-galvo
-    selected across objectives, z-wide first receives the absolute calibrated
-    objective offset and z-galvo then realizes only the requested frame Z::
-
-        zwide_for_objective = origin_zwide + ΔT.z
-        zgalvo_for_frame = origin_zgalvo + z
+    Destination = origin + F + ΔT, commanded absolutely. The focus is always
+    moved with z-wide alone: its one target holds both the requested frame Z
+    and the objective offset ΔT.z, and the z-galvo is parked at 0 first if it is not already there. Using
+    one drive only means the focus cannot slowly shift between the two drives
+    from one call to the next.
 
     ΔT compensates an objective change relative to the origin's objective
     (from the calibration's translation totals); a cross-objective move with
     no translations available REFUSES. The frame code does no limit checking of
     its own: every leg is checked inside the command that fires it, in the
-    actions. A refused leg raises with an actionable alternative; legs that
+    actions. A refused leg raises with the reason; legs that
     already ran stay where they arrived (each was checked too). A leg that
     was sent and accepted but could not be confirmed does not raise: it is
     recorded under the handle's ``unconfirmed`` list, and the answer is read
@@ -237,24 +269,17 @@ def set_xyz(
     really is and decides for itself.
     """
     require_open(handle)
-    chosen = _resolve_actuators(with_actuators)
+    _resolve_actuators(with_actuators)
     snap = hardware_snapshot(handle)
+    if abs(snap["z_galvo_um"]) > Z_GALVO_PARKED_TOLERANCE_UM:
+        zero_z_galvo(handle)
+        snap = hardware_snapshot(handle)
     dt = objective_delta_um(handle, snap.get("objective"))  # raises if unavailable
     abs_x, abs_y, target_focus = coordinates.stage_target(x, y, z, handle.origin, dt)
-    z_targets: list[tuple[str, float]]
-    if chosen["z"] == "z-wide":
-        z_target = target_focus - snap["z_galvo_um"]
-        z_targets = [("zwide", z_target)]
-    elif dt[2] != 0.0:
-        # Translation is an objective property, not a general focus move. Pin
-        # its absolute contribution on z-wide so repeated set_xyz calls cannot
-        # accumulate it, then let z-galvo realize only the requested frame Z.
-        zwide_target = handle.origin["z_wide_um"] + dt[2]
-        z_target = handle.origin["z_galvo_um"] + z
-        z_targets = [("zwide", zwide_target), ("galvo", z_target)]
-    else:
-        z_target = target_focus - snap["z_wide_um"]
-        z_targets = [("galvo", z_target)]
+    # The focus is moved with z-wide alone: it takes up the whole difference
+    # to the target focus, with the z-galvo parked at 0 (see above).
+    z_target = target_focus - snap["z_galvo_um"]
+    z_targets = [("zwide", z_target)]
 
     # Every leg below is limit-checked inside the command it fires — the
     # frame code carries no checks of its own. A refused leg raises here with
@@ -274,23 +299,7 @@ def set_xyz(
             z_mode=z_mode,
         )
         if not z_result.get("success"):
-            # With z-galvo selected across objectives, the extra z-wide leg
-            # is the calibrated objective offset — it can only ever be
-            # realized by z-wide, so suggesting the other actuator would
-            # send the operator in a circle. The hint is only useful for
-            # the leg that carries the requested frame-Z motion.
-            if len(z_targets) == 2 and z_mode == "zwide":
-                raise RuntimeError(
-                    f"move_z ({z_mode}) failed: {z_result} "
-                    f"(this z-wide target is the calibrated objective offset, which "
-                    f"cannot be moved to the other z drive — re-set the origin under "
-                    f"the current objective, or re-adopt the objective calibration)"
-                )
-            alternative = "z-wide" if chosen["z"] == "z-galvo" else "z-galvo"
-            raise RuntimeError(
-                f"move_z ({z_mode}) failed: {z_result} "
-                f"(try with_actuators={{'z': '{alternative}'}})"
-            )
+            raise RuntimeError(f"move_z ({z_mode}) failed: {z_result}")
         if not z_result.get("confirmed"):
             note_unconfirmed(handle, f"set_xyz: z ({z_mode}) to {target}", z_result)
 

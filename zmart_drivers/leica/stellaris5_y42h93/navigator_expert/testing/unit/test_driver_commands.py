@@ -509,24 +509,47 @@ class TestFrame(unittest.TestCase):
         )
 
     def test_get_xyz_names_every_motor_get_actuators_lists(self):
-        """The motors reported per axis are exactly the menu, so a workflow can
-        look a motor's reading up by the name it would pass to with_actuators."""
+        """Every motor in the menu is reported with its own reading, so a workflow
+        can look it up by the name it would pass to with_actuators. The z-galvo
+        is reported too, though it is never used to move."""
         h = _handle()
         patches = _patch_position()
         with patches[0], patches[1], patches[2], patches[3]:
             pos = _frame.get_xyz(h)
             menu = _frame.get_actuators(h)
-        for axis in ("x", "y", "z"):
+        for axis in ("x", "y"):
             self.assertEqual(list(pos[axis]["actuators"]), menu[axis]["options"])
+        for axis in ("x", "y", "z"):
             self.assertEqual(pos[axis]["actuator"], menu[axis]["default"])
-        # with_actuators only chooses a motor; the answer still reports all of
-        # them, and says which one it used
-        with patches[0], patches[1], patches[2], patches[3]:
-            pos = _frame.get_xyz(h, with_actuators={"z": "z-galvo"})
         self.assertEqual(list(pos["z"]["actuators"]), ["z-wide", "z-galvo"])
-        self.assertEqual(pos["z"]["actuator"], "z-galvo")
+        # the z-galvo cannot be chosen to move with
+        with self.assertRaises(ValueError):
+            _frame.get_xyz(h, with_actuators={"z": "z-galvo"})
 
-    def test_set_xyz_moves_to_absolute_and_maps_z_actuator(self):
+    def test_set_xyz_parks_a_galvo_that_is_not_at_zero_first(self):
+        h = _handle(origin=_origin(x_um=1000.0, y_um=2000.0, z_focus_um=30.0))
+        moves = []
+
+        def fake_move_z(client, job, z, unit="um", z_mode="galvo", **kwargs):
+            moves.append((z, z_mode))
+            return {"success": True, "confirmed": True}
+
+        # z-wide at 32, z-galvo at 3: z-wide takes the 3 over, then the galvo goes to 0
+        patches = _patch_position(z_wide_um=32.0, z_galvo_um=3.0)
+        with (
+            patch.object(
+                _commands, "move_xy", return_value={"success": True, "confirmed": True}
+            ),
+            patch.object(_commands, "move_z", fake_move_z),
+            patches[0],
+            patches[1],
+            patches[2],
+            patches[3],
+        ):
+            _frame.set_xyz(h, 0.0, 0.0, 5.0)
+        self.assertEqual(moves[:2], [(35.0, "zwide"), (0.0, "galvo")])
+
+    def test_set_xyz_moves_to_absolute_with_z_wide_alone(self):
         h = _handle(origin=_origin(x_um=1000.0, y_um=2000.0, z_focus_um=30.0))
         moves = {}
 
@@ -535,11 +558,11 @@ class TestFrame(unittest.TestCase):
             return {"success": True, "confirmed": True}
 
         def fake_move_z(client, job, z, unit="um", z_mode="galvo", **kwargs):
-            moves["z"] = (z, z_mode)
+            moves.setdefault("z", []).append((z, z_mode))
             return {"success": True, "confirmed": True}
 
-        # current hardware: z-wide at 32, z-galvo at 3
-        patches = _patch_position(z_wide_um=32.0, z_galvo_um=3.0)
+        # current hardware: z-wide at 32, z-galvo parked at 0
+        patches = _patch_position(z_wide_um=32.0, z_galvo_um=0.0)
         with (
             patch.object(_commands, "move_xy", fake_move_xy),
             patch.object(_commands, "move_z", fake_move_z),
@@ -548,18 +571,18 @@ class TestFrame(unittest.TestCase):
             patches[2],
             patches[3],
         ):
-            record = _frame.set_xyz(h, 10.0, 20.0, 5.0, with_actuators={"z": "z-galvo"})
+            record = _frame.set_xyz(h, 10.0, 20.0, 5.0)
         self.assertEqual(moves["xy"], (1010.0, 2020.0))
-        # target focus = 30 + 5 = 35; galvo absorbs it minus z-wide's 32 -> 3
-        self.assertEqual(moves["z"], (3.0, "galvo"))
+        # target focus = 30 + 5 = 35, all of it on z-wide; the galvo is not moved
+        self.assertEqual(moves["z"], [(35.0, "zwide")])
         # The answer is a fresh get_xyz: the (patched) readings, not the targets.
         self.assertEqual(list(record), ["x", "y", "z", "objective_translation_um"])
         self.assertEqual(
             list(record["z"]), ["position", "unit", "actuator", "actuators", "canvas"]
         )
-        self.assertEqual(record["z"]["actuator"], "z-galvo")
-        self.assertEqual(record["z"]["actuators"], {"z-wide": 32.0, "z-galvo": 3.0})
-        self.assertEqual(record["z"]["position"], 5.0)  # (32 + 3) − 30
+        self.assertEqual(record["z"]["actuator"], "z-wide")
+        self.assertEqual(record["z"]["actuators"], {"z-wide": 32.0, "z-galvo": 0.0})
+        self.assertEqual(record["z"]["position"], 2.0)  # (32 + 0) − 30 (patched readings)
         # the selection does NOT persist: defaults are fixed, never sticky
         self.assertEqual(_frame._resolve_actuators(None)["z"], "z-wide")
         self.assertEqual(_frame._resolve_actuators(None)["x"], "motoric")
@@ -664,7 +687,7 @@ class TestFrame(unittest.TestCase):
             {
                 "x": {"options": ["motoric"], "default": "motoric"},
                 "y": {"options": ["motoric"], "default": "motoric"},
-                "z": {"options": ["z-wide", "z-galvo"], "default": "z-wide"},
+                "z": {"options": ["z-wide"], "default": "z-wide"},
             },
         )
 
@@ -2095,11 +2118,11 @@ class TestObjectiveCompensation(unittest.TestCase):
             patches[2],
             patches[3],
         ):
-            record = _frame.set_xyz(h, 10.0, 10.0, 5.0, with_actuators={"z": "z-galvo"})
+            record = _frame.set_xyz(h, 10.0, 10.0, 5.0)
         self.assertEqual(moves["xy"], (1110.0, 2060.0))  # ref + F + ΔT
-        # ΔT.z=10 is pinned absolutely on z-wide (30+10), while the
-        # ordinary requested frame z=5 is realized by z-galvo (0+5).
-        self.assertEqual(moves["z"], [(40.0, "zwide"), (5.0, "galvo")])
+        # One z-wide move holds the requested frame z=5 and ΔT.z=10 (30+5+10);
+        # the z-galvo stays parked at 0.
+        self.assertEqual(moves["z"], [(45.0, "zwide")])
         self.assertEqual(record["objective_translation_um"], [100.0, 50.0, 10.0])
         # The answer is read back from the (patched) microscope, like get_xyz.
         self.assertEqual(record["z"]["actuators"], {"z-wide": 40.0, "z-galvo": 0.0})
@@ -2144,7 +2167,7 @@ class TestObjectiveCompensation(unittest.TestCase):
             patches[3],
         ):
             pos = _frame.get_xyz(h)
-            record = _frame.set_xyz(h, 10.0, 10.0, 5.0, with_actuators={"z": "z-galvo"})
+            record = _frame.set_xyz(h, 10.0, 10.0, 5.0)
 
         # Read: compensated with ΔT taken from the NEW job's objective.
         self.assertEqual(pos["x"]["position"], 10.0)  # 1110 − 1000 − 100
@@ -2152,12 +2175,10 @@ class TestObjectiveCompensation(unittest.TestCase):
         self.assertEqual(pos["z"]["position"], 5.0)  # 45 − 30 − 10
         # Move: targets include ΔT, and z is driven on the selected job.
         self.assertEqual(moves["xy"], (1110.0, 2060.0))
-        self.assertEqual(
-            moves["z"], [("HiRes", 40.0, "zwide"), ("HiRes", 5.0, "galvo")]
-        )
+        self.assertEqual(moves["z"], [("HiRes", 45.0, "zwide")])
         self.assertEqual(record["objective_translation_um"], [100.0, 50.0, 10.0])
 
-    def test_cross_objective_galvo_moves_do_not_accumulate_translation_on_zwide(self):
+    def test_repeated_cross_objective_moves_do_not_accumulate_the_translation(self):
         h = self._cross_handle()
         moves = []
 
@@ -2178,20 +2199,15 @@ class TestObjectiveCompensation(unittest.TestCase):
             patches[2],
             patches[3],
         ):
-            _frame.set_xyz(h, 0.0, 0.0, 4.0, with_actuators={"z": "z-galvo"})
-            _frame.set_xyz(h, 1.0, 1.0, 4.0, with_actuators={"z": "z-galvo"})
+            _frame.set_xyz(h, 0.0, 0.0, 4.0)
+            _frame.set_xyz(h, 1.0, 1.0, 4.0)
 
-        assert moves == [
-            (40.0, "zwide"),
-            (4.0, "galvo"),
-            (40.0, "zwide"),
-            (4.0, "galvo"),
-        ]
+        # The same absolute z-wide target (30 + 4 + 10) both times.
+        assert moves == [(44.0, "zwide"), (44.0, "zwide")]
 
-    def test_cross_objective_zwide_translation_refuses_with_the_offset_hint(self):
-        """The doomed z-wide leg is refused inside the real move_z (the
-        commands layer owns all checking); the adapter's job is only the
-        actionable message on top."""
+    def test_cross_objective_zwide_target_beyond_the_limit_is_refused(self):
+        """The z-wide move is refused inside the real move_z (the commands
+        layer owns all checking), after the XY move has arrived."""
         h = self._cross_handle()
         install_permissive_limits(
             h.client,
@@ -2207,14 +2223,9 @@ class TestObjectiveCompensation(unittest.TestCase):
             patches[3],
             self.assertRaisesRegex(RuntimeError, "z_wide_um") as ctx,
         ):
-            _frame.set_xyz(h, 0.0, 0.0, 4.0, with_actuators={"z": "z-galvo"})
-        xy.assert_called_once()  # XY arrived (checked); the z leg then refused
-        # The failing leg is the calibrated objective offset, which only
-        # z-wide can realize — suggesting the other actuator would send the
-        # operator in a circle, so the message must not do that.
-        message = str(ctx.exception)
-        self.assertIn("calibrated objective offset", message)
-        self.assertNotIn("with_actuators", message)
+            _frame.set_xyz(h, 0.0, 0.0, 4.0)
+        xy.assert_called_once()  # XY arrived (checked); the z move then refused
+        self.assertNotIn("with_actuators", str(ctx.exception))
 
     def test_round_trip_property_across_objectives(self):
         """get_xyz(set_xyz(F)) == F — commanded hardware read back through the frame."""
@@ -2256,15 +2267,13 @@ class TestObjectiveCompensation(unittest.TestCase):
                 _readers_parsing, "make_changeable_copy", side_effect=lambda s: s
             ),
         ):
-            moved = _frame.set_xyz(h, 12.0, -7.0, 4.0, with_actuators={"z": "z-galvo"})
+            moved = _frame.set_xyz(h, 12.0, -7.0, 4.0)
             pos = _frame.get_xyz(h)
         self.assertAlmostEqual(pos["x"]["position"], 12.0)
         self.assertAlmostEqual(pos["y"]["position"], -7.0)
         self.assertAlmostEqual(pos["z"]["position"], 4.0)
         # set_xyz answered the same read-back, so no second call is needed;
         # only the motor each answer used differs, as each was asked for.
-        self.assertEqual(moved["z"].pop("actuator"), "z-galvo")
-        self.assertEqual(pos["z"].pop("actuator"), "z-wide")
         self.assertEqual(moved, pos)
 
     def test_cross_objective_move_without_translations_refuses(self):
@@ -2305,9 +2314,8 @@ class TestObjectiveCompensation(unittest.TestCase):
             pos = _frame.get_xyz(h)
         self.assertEqual(pos["x"]["position"], 10.0)  # ΔT = 0, translations unused
 
-    def test_out_of_range_galvo_refuses_with_the_actuator_hint(self):
-        """An out-of-range galvo target is refused inside the real move_z;
-        the adapter adds the try-the-other-actuator hint."""
+    def test_out_of_range_focus_is_refused(self):
+        """An out-of-range focus target is refused inside the real move_z."""
         h = _handle(
             origin=_origin(
                 x_um=10000.0, y_um=10000.0, objective={"name": "63x", "slotIndex": 3}
@@ -2321,8 +2329,8 @@ class TestObjectiveCompensation(unittest.TestCase):
             patches[2],
             patches[3],
         ):
-            with self.assertRaisesRegex(RuntimeError, "z-wide"):
-                _frame.set_xyz(h, 10.0, 10.0, 300.0, with_actuators={"z": "z-galvo"})
+            with self.assertRaisesRegex(RuntimeError, "zwide"):
+                _frame.set_xyz(h, 10.0, 10.0, 1_000_000.0)
         xy.assert_called_once()
 
 
@@ -2558,7 +2566,7 @@ class TestLifecycle(unittest.TestCase):
                 # Capturing the origin is a driver setup step, not a controller
                 # command, so it is called on the adapter with the driver handle.
                 _set_origin.set_origin(session._handle._handle)
-                answer = session.set_xyz(10, 20, 5, with_actuators={"z": "z-galvo"})
+                answer = session.set_xyz(10, 20, 5)
                 self.assertIs(answer["success"], True)
                 # The move answers a read-back in get_xyz's shape. The readers
                 # are mocked and never move, so it reads the origin itself.
@@ -2571,7 +2579,7 @@ class TestLifecycle(unittest.TestCase):
                 self.assertEqual(
                     moved["z"]["actuators"], {"z-wide": 30.0, "z-galvo": 0.0}
                 )
-                xyz = session.get_xyz(with_actuators={"z": "z-galvo"})
+                xyz = session.get_xyz()
                 self.assertEqual(xyz["content"], moved)
             finally:
                 session.disconnect()
@@ -2618,11 +2626,11 @@ class TestFunctionLimits(unittest.TestCase):
                 _frame.set_xyz(h, 1000.0, 10000.0, 0.0)
         mz.assert_not_called()
 
-    def test_z_leg_function_limit_violation_keeps_the_actuator_hint(self):
+    def test_z_move_beyond_the_function_limits_is_refused(self):
         _wide_limits()
         self.addCleanup(_clear_limits)
         h = _handle(
-            gate_constraints={"z_galvo_um": {"min": -250, "max": 250}},
+            gate_constraints={"z_wide_um": {"min": -250, "max": 250}},
             origin=_origin(x_um=10000.0, y_um=10000.0),
         )
         patches = _patch_position(z_wide_um=0.0, z_galvo_um=0.0)
@@ -2633,10 +2641,8 @@ class TestFunctionLimits(unittest.TestCase):
             patches[2],
             patches[3],
         ):
-            with self.assertRaisesRegex(
-                RuntimeError, r"with_actuators=\{'z': 'z-wide'\}"
-            ):
-                _frame.set_xyz(h, 10.0, 10.0, 300.0, with_actuators={"z": "z-galvo"})
+            with self.assertRaisesRegex(RuntimeError, "zwide"):
+                _frame.set_xyz(h, 10.0, 10.0, 300.0)
         xy.assert_called_once()
 
     def test_mutating_ops_refuse_without_a_limits_handshake(self):

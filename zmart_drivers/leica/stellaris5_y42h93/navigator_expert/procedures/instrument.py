@@ -31,7 +31,7 @@ from .acquisition_and_saving import acquire as _capture
 from ..vendor_specific.primitive_handling import changes as _commands
 from .objective_change import compensated_changes as _compensated
 from . import session as _info
-from .absolute_coordinate_system.frame import canvas, delta_or_warn, get_xyz, hardware_snapshot
+from .absolute_coordinate_system.frame import canvas, delta_or_warn, get_xyz, hardware_snapshot, zero_z_galvo
 from .session import ZmartHandle, job_catalog, note_unconfirmed, require_open, try_
 
 log = logging.getLogger(__name__)
@@ -260,38 +260,10 @@ def run_procedure(handle: ZmartHandle, procedure: dict) -> dict:
     require_open(handle)
     name = procedure.get("name")
     if name == "zero_z_galvo":
-        return {"ran": dict(procedure), **_zero_z_galvo(handle)}
+        return {"ran": dict(procedure), **zero_z_galvo(handle)}
     if name == "autofocus":
         return _run_autofocus(handle, procedure)
     raise ValueError(f"unknown procedure {name!r}")
-
-
-def _zero_z_galvo(handle: ZmartHandle) -> dict:
-    """Park the z-galvo at 0 while keeping the focus.
-
-    A pure re-split of the focus sum between the two drives: z-wide
-    absorbs the galvo's current offset FIRST — so a refused z-wide leg
-    (limits) aborts with nothing moved — and only then does the galvo
-    drive to 0. The frame z is unchanged by construction, and the galvo's
-    full travel becomes available for whatever comes next. Both legs go
-    through the checked ``move_z`` door; a refused or failed leg raises, a
-    leg that could not be confirmed is recorded and the procedure carries on.
-    """
-    snap = hardware_snapshot(handle)
-    offset = snap["z_galvo_um"]
-    if offset == 0.0:
-        return {"transferred_um": 0.0}
-    for z_mode, target in (("zwide", snap["z_wide_um"] + offset), ("galvo", 0.0)):
-        result = _commands.move_z(
-            handle.client, snap["job"], target, unit="um", z_mode=z_mode
-        )
-        if not result.get("success"):
-            raise RuntimeError(f"zero_z_galvo: move_z ({z_mode}) failed: {result}")
-        if not result.get("confirmed"):
-            note_unconfirmed(
-                handle, f"zero_z_galvo: move_z ({z_mode}) to {target}", result
-            )
-    return {"transferred_um": offset}
 
 
 def _run_autofocus(handle: ZmartHandle, procedure: dict) -> dict:

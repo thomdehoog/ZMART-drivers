@@ -140,16 +140,15 @@ ORIGIN_STATE = dict(x=10_000.0, y=20_000.0, z_wide=100.0, z_galvo=0.0)
 
 @pytest.mark.parametrize("origin_lens", [1, 2])
 @pytest.mark.parametrize("current_lens", [1, 2, 3])
-@pytest.mark.parametrize("z_actuator", ["z-wide", "z-galvo"])
 @pytest.mark.parametrize("parked_offset", [0.0, -35.0])
 @pytest.mark.parametrize("frame_target", [(200.0, -150.0, 5.0), (-80.0, 60.0, -12.0)])
 def test_viewed_point_is_origin_view_plus_frame_target(
-    origin_lens, current_lens, z_actuator, parked_offset, frame_target
+    origin_lens, current_lens, parked_offset, frame_target
 ):
-    """THE promise, over the full grid (48 cases): set_xyz(F) makes the
-    current lens look at exactly origin_view + F — regardless of which
-    lens the origin was set under, which lens is in now, which z drive
-    realizes the move, and where the OTHER z drive happens to be parked.
+    """THE promise, over the full grid: set_xyz(F) makes the current lens look
+    at exactly origin_view + F — regardless of which lens the origin was set
+    under, which lens is in now, and where the z-galvo happens to be parked
+    (the driver moves it back to 0 and moves the focus with z-wide alone).
     """
     sim = SimScope(**ORIGIN_STATE, slot=origin_lens)
     h = _handle_at(sim)
@@ -161,13 +160,10 @@ def test_viewed_point_is_origin_view_plus_frame_target(
     sim.slot = current_lens
     sim.x += 1234.5
     sim.y -= 987.0
-    if z_actuator == "z-wide":
-        sim.z_galvo += parked_offset
-    else:
-        sim.z_wide += parked_offset
+    sim.z_galvo += parked_offset
 
     with _running(sim):
-        _frame.set_xyz(h, *frame_target, with_actuators={"z": z_actuator})
+        _frame.set_xyz(h, *frame_target)
         got = _frame.get_xyz(h)
 
     expected = tuple(o + f for o, f in zip(origin_view, frame_target, strict=True))
@@ -199,7 +195,7 @@ def test_same_target_lands_identically_from_any_history():
         sim.z_galvo += d["park"]
         sim.slot = 2  # the lens that ends up in when the move is asked for
         with _running(sim):
-            _frame.set_xyz(h, 300.0, -75.0, 9.0, with_actuators={"z": "z-wide"})
+            _frame.set_xyz(h, 300.0, -75.0, 9.0)
         landings.append(sim.viewed_point())
 
     assert landings[0] == pytest.approx(landings[1])
@@ -207,8 +203,7 @@ def test_same_target_lands_identically_from_any_history():
 
 
 def test_repeated_cross_objective_moves_do_not_accumulate():
-    """The dangerous path: z-galvo selected across objectives, where ΔT.z
-    is pinned on z-wide. Five identical calls must be a fixed point —
+    """Five identical calls across objectives must be a fixed point —
     identical hardware state after each — or the objective offset is
     accumulating.
     """
@@ -219,14 +214,16 @@ def test_repeated_cross_objective_moves_do_not_accumulate():
     states = []
     with _running(sim):
         for _ in range(5):
-            _frame.set_xyz(h, 120.0, 40.0, 3.0, with_actuators={"z": "z-galvo"})
+            _frame.set_xyz(h, 120.0, 40.0, 3.0)
             states.append(sim.state())
 
     assert all(s == states[0] for s in states[1:])
-    # the pinned leg is absolute: origin z-wide plus the lens-pair z delta
+    # z-wide holds it all, absolutely: origin focus, the frame z asked for and
+    # the lens-pair z delta; the z-galvo stays at 0
     assert sim.z_wide == pytest.approx(
-        ORIGIN_STATE["z_wide"] + (TRUE_T[2][2] - TRUE_T[1][2])
+        ORIGIN_STATE["z_wide"] + 3.0 + (TRUE_T[2][2] - TRUE_T[1][2])
     )
+    assert sim.z_galvo == 0.0
 
 
 def test_get_xyz_reports_truthfully_after_external_meddling():
