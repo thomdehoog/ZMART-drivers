@@ -48,7 +48,7 @@ Nothing from command wrappers, prechecks, or confirmations.
 import logging
 import time
 
-from . import timing as _timing
+from . import reader
 
 log = logging.getLogger(__name__)
 
@@ -324,7 +324,7 @@ def _fire_block(
         if not delivered:
             msg = (
                 f"{description} | Transport failure: "
-                f"not received after {_timing.WINDOWS} tries of {_timing.WINDOW_S}s"
+                f"not received after {reader.WINDOWS} tries of {reader.WINDOW_S}s"
             )
             log.error(msg)
             all_logs.append(_make_log_entry("error", msg))

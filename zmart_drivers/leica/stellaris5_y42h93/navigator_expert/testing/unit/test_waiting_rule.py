@@ -32,7 +32,7 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.pri
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitive_handling import (
     prechecks,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher import timing
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher import reader
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitive_handling import (
     state as readers,
 )
@@ -46,9 +46,9 @@ WINDOW_S = 0.5
 @pytest.fixture(autouse=True)
 def short_windows(monkeypatch):
     """Four windows of 0.5 s, looking every 10 ms, checking every 1 ms."""
-    monkeypatch.setattr(timing, "WINDOW_S", WINDOW_S)
-    monkeypatch.setattr(timing, "POLL_S", 0.01)
-    monkeypatch.setattr(timing, "ANSWER_POLL_S", 0.001)
+    monkeypatch.setattr(reader, "WINDOW_S", WINDOW_S)
+    monkeypatch.setattr(reader, "POLL_S", 0.01)
+    monkeypatch.setattr(reader, "ANSWER_POLL_S", 0.001)
     monkeypatch.setattr(profiles, "STATE_READERS", profiles.StateReaderProfile())
 
 

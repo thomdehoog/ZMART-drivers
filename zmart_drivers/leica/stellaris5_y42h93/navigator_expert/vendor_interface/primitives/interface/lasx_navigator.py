@@ -39,7 +39,7 @@ import logging
 import threading
 import time
 
-from ....dispatcher import timing
+from ....dispatcher import reader
 from .lasx_dialogs import WindowsUnavailable, automation
 
 log = logging.getLogger(__name__)
@@ -224,13 +224,13 @@ def show_canvas() -> bool:
     experiment = find_experiment_button()
     if not experiment.is_on():
         experiment.press()
-    deadline = time.monotonic() + timing.WINDOW_S
+    deadline = time.monotonic() + reader.WINDOW_S
     while not canvas_shown():
         if time.monotonic() >= deadline:
             raise NavigatorUnavailable(
-                f"Experiment was pressed, but the canvas could not be reached within {timing.WINDOW_S:g} s"
+                f"Experiment was pressed, but the canvas could not be reached within {reader.WINDOW_S:g} s"
             )
-        time.sleep(timing.POLL_S)
+        time.sleep(reader.POLL_S)
     return True
 
 

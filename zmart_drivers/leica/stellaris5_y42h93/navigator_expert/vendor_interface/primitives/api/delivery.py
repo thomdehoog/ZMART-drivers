@@ -24,7 +24,7 @@ from __future__ import annotations
 
 import logging
 
-from ....dispatcher import timing
+from ....dispatcher import reader
 from ..interface import lasx_dialogs
 
 log = logging.getLogger(__name__)
@@ -38,8 +38,8 @@ def deliver(api_obj, *, label="message"):
     """
     lasx_dialogs.answer_warnings()
     with lasx_dialogs.watching():
-        for attempt in range(1, timing.WINDOWS + 1):
-            if api_obj.UpdateAwaitReceipt(timing.WINDOW_S):
+        for attempt in range(1, reader.WINDOWS + 1):
+            if api_obj.UpdateAwaitReceipt(reader.WINDOW_S):
                 return True
-            log.warning("%s not received (try %d/%d)", label, attempt, timing.WINDOWS)
+            log.warning("%s not received (try %d/%d)", label, attempt, reader.WINDOWS)
     return False

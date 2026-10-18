@@ -32,7 +32,7 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 
-from ....dispatcher import timing
+from ....dispatcher import reader
 
 log = logging.getLogger(__name__)
 
@@ -58,10 +58,10 @@ __all__ = [
 LASX_LOG = Path(r"C:\ProgramData\Leica Microsystems\LAS X\LAS X.log")
 
 #: How long LAS X may take to record the answer after OK is pressed: one window, by the one rule.
-ANSWER_WAIT_S = timing.WINDOW_S
+ANSWER_WAIT_S = reader.WINDOW_S
 
 #: How often the watcher of a waiting send looks at the log.
-WATCH_INTERVAL_S = timing.POLL_S
+WATCH_INTERVAL_S = reader.POLL_S
 
 #: The one button the driver presses, and the caption of the dialogs it presses it on.
 OK_BUTTON = "ButtonMessageOk"
@@ -255,7 +255,7 @@ def answer_open_warning() -> Answered | None:
             return None
         if time.monotonic() >= deadline:
             raise left_open(dialog, "in LAS X's log, not found on screen")
-        time.sleep(timing.ANSWER_POLL_S)
+        time.sleep(reader.ANSWER_POLL_S)
     if (
         dialog.caption != WARNING
         or len(windows) != 1
@@ -270,7 +270,7 @@ def answer_open_warning() -> Answered | None:
     while pending() is not None:
         if time.monotonic() >= deadline:
             raise left_open(dialog, "OK pressed, but the dialog did not close")
-        time.sleep(timing.ANSWER_POLL_S)
+        time.sleep(reader.ANSWER_POLL_S)
     answered = Answered(dialog)
     history.append((time.monotonic(), answered))
     del history[:-100]
@@ -303,7 +303,7 @@ def watching():
         yield notes
     finally:
         done.set()
-        watcher.join(timeout=timing.WINDOW_S)
+        watcher.join(timeout=reader.WINDOW_S)
 
 
 sentinel = {"thread": None, "stop": None}
@@ -351,7 +351,7 @@ def stop_watching() -> None:
         thread = sentinel["thread"]
         sentinel.update(thread=None, stop=None)
     if thread is not None:
-        thread.join(timeout=timing.WINDOW_S)
+        thread.join(timeout=reader.WINDOW_S)
 
 
 def apartment() -> int | None:

@@ -41,7 +41,7 @@ import threading
 import time
 
 from . import state as _readers
-from ...dispatcher import timing as _timing
+from ...dispatcher import reader
 from ...dispatcher.writer import _make_log_entry
 from ..error_classification import _check_api_error, _is_transient_error
 from ..parsing import make_changeable_copy
@@ -302,7 +302,7 @@ def _confirm_readback(
         {"success": bool, "logs": [...]}
     """
     if poll_window is None:
-        poll_window = _timing.WINDOW_S
+        poll_window = reader.WINDOW_S
     logs = []
     t_start = time.monotonic()
     deadline = t_start + poll_window
@@ -317,7 +317,7 @@ def _confirm_readback(
                 log.debug("%s confirm: target=%s actual=%s", label, target, actual)
             except errors:
                 pass
-        time.sleep(_timing.POLL_S)
+        time.sleep(reader.POLL_S)
 
     msg = f"{label} timeout after {time.monotonic() - t_start:.1f}s — target={target}"
     log.warning(msg)
@@ -391,7 +391,7 @@ def confirm_move_z(
         {"success": bool, "logs": [...]}
     """
     if poll_window is None:
-        poll_window = _timing.WINDOW_S
+        poll_window = reader.WINDOW_S
     logs = []
     key = ZMODE_KEY[z_mode]
     t_start = time.monotonic()
@@ -425,7 +425,7 @@ def confirm_move_z(
             if abs(actual - target_um) < tolerance:
                 return {"success": True, "logs": logs}
 
-        time.sleep(_timing.POLL_S)
+        time.sleep(reader.POLL_S)
 
     msg = (
         f"MoveZ timeout after {time.monotonic() - t_start:.1f}s — "
@@ -450,7 +450,7 @@ def _confirm_zoom(client, job_name, target, tolerance=0.1, poll_window=None):
         {"success": bool, "logs": [...]}
     """
     if poll_window is None:
-        poll_window = _timing.WINDOW_S
+        poll_window = reader.WINDOW_S
     logs = []
     t_start = time.monotonic()
     deadline = t_start + poll_window
@@ -467,7 +467,7 @@ def _confirm_zoom(client, job_name, target, tolerance=0.1, poll_window=None):
                 log.debug("Zoom confirm: target=%s actual=%s", target, actual)
             except (KeyError, TypeError):
                 pass
-        time.sleep(_timing.POLL_S)
+        time.sleep(reader.POLL_S)
 
     msg = (
         f"Zoom timeout after {time.monotonic() - t_start:.1f}s "
@@ -538,7 +538,7 @@ def _confirm_z_stack_definition(
         {"success": bool, "logs": [...]}
     """
     if poll_window is None:
-        poll_window = _timing.WINDOW_S
+        poll_window = reader.WINDOW_S
     logs = []
     t_start = time.monotonic()
     deadline = t_start + poll_window
@@ -589,7 +589,7 @@ def _confirm_z_stack_definition(
                 log.debug(
                     "Z-stack def confirm: exception %s, stack=%s", e, ch.get("stack")
                 )
-        time.sleep(_timing.POLL_S)
+        time.sleep(reader.POLL_S)
 
     msg = (
         f"Z-stack def timeout after {time.monotonic() - t_start:.1f}s — "
@@ -633,7 +633,7 @@ def _confirm_z_stack_size(client, job_name, target_um, tolerance=1.5, poll_windo
         {"success": bool, "logs": [...]}
     """
     if poll_window is None:
-        poll_window = _timing.WINDOW_S
+        poll_window = reader.WINDOW_S
     logs = []
     t_start = time.monotonic()
     deadline = t_start + poll_window
@@ -673,7 +673,7 @@ def _confirm_z_stack_size(client, job_name, target_um, tolerance=1.5, poll_windo
                 log.debug(
                     "Z-stack size confirm: exception %s, stack=%s", e, ch.get("stack")
                 )
-        time.sleep(_timing.POLL_S)
+        time.sleep(reader.POLL_S)
 
     msg = f"Z-stack size timeout after {time.monotonic() - t_start:.1f}s — target={target_um}"
     log.warning(msg)
@@ -811,7 +811,7 @@ def _confirm_image_format(client, job_name, w, h, poll_window=None):
         {"success": bool, "logs": [...]}
     """
     if poll_window is None:
-        poll_window = _timing.WINDOW_S
+        poll_window = reader.WINDOW_S
     logs = []
     t_start = time.monotonic()
     deadline = t_start + poll_window
@@ -828,7 +828,7 @@ def _confirm_image_format(client, job_name, w, h, poll_window=None):
                 )
             except (KeyError, TypeError):
                 pass
-        time.sleep(_timing.POLL_S)
+        time.sleep(reader.POLL_S)
 
     msg = f"ImageFormat timeout after {time.monotonic() - t_start:.1f}s — target='{w} x {h}'"
     log.warning(msg)
@@ -856,7 +856,7 @@ def confirm_objective(
         {"success": bool, "logs": [...]}
     """
     if poll_window is None:
-        poll_window = _timing.WINDOW_S
+        poll_window = reader.WINDOW_S
     logs = []
     t_start = time.monotonic()
     deadline = t_start + poll_window
@@ -877,7 +877,7 @@ def confirm_objective(
             except (KeyError, TypeError, AttributeError):
                 pass
 
-        time.sleep(_timing.POLL_S)
+        time.sleep(reader.POLL_S)
 
     msg = (
         f"Objective timeout after {time.monotonic() - t_start:.1f}s — "
@@ -989,7 +989,7 @@ def confirm_move_xy(
         {"success": bool, "logs": [...]}
     """
     if poll_window is None:
-        poll_window = _timing.WINDOW_S
+        poll_window = reader.WINDOW_S
     logs = []
     observed_after = time.time()
     t_start = time.monotonic()
@@ -1024,7 +1024,7 @@ def confirm_move_xy(
             if dx < tolerance and dy < tolerance:
                 return {"success": True, "logs": logs, "last_position": last_position}
 
-        time.sleep(_timing.POLL_S)
+        time.sleep(reader.POLL_S)
 
     msg = (
         f"MoveXY timeout after {time.monotonic() - t_start:.1f}s — "

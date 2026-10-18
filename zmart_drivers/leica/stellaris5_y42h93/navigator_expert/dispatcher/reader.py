@@ -1,6 +1,6 @@
 """The shared reader: one way to wait for an answer, whichever source gives it.
 
-Every reading follows the one rule in :mod:`timing`: four windows of three
+Every reading follows the one rule in the waiting rule below: four windows of three
 seconds. Within a window the sources the profile allows are asked one after
 the other, the CAM API first and then the LAS X log, and the first answer
 that counts as a success wins. Each source gets its own slice of the window,
@@ -51,9 +51,49 @@ import time
 
 from dataclasses import dataclass
 
-from . import timing
 
 log = logging.getLogger(__name__)
+
+
+# =============================================================================
+# The waiting rule: how long the driver waits, whichever source answers
+# =============================================================================
+#
+# How the driver waits on LAS X: the one rule and its four numbers.
+#
+# Every wait on LAS X follows the same rule, whether it is a reading, the
+# confirmation of a command, or the delivery of a message:
+#
+# - **Four windows of three seconds** (``WINDOWS`` x ``WINDOW_S``). Within a
+#   window the driver watches both sources, the CAM API and the LAS X log, and
+#   the first answer that counts as a success wins, from whichever source gives
+#   it. Between windows something is sent again: a command is fired again, a
+#   read that got no answer is requested again, a message is delivered again.
+#   After four windows a reading is unknown, a change is unconfirmed, a
+#   delivery has failed.
+# - **Look again every** ``POLL_S``: a new look at the source that shows the
+#   state, a new read request to the API or a new read of the LAS X log. One
+#   read of the log took 64-71 ms (median 66 ms over 30 reads) on the LAS X
+#   simulator PC on 2026-10-10, and one API read 60-80 ms, so looking faster
+#   gains little and keeps a CPU core busy re-reading the log. To be confirmed
+#   on the microscope PC.
+# - **Check for the answer every** ``ANSWER_POLL_S``: whether a request already
+#   sent has been answered, a field on the local API object. At ``POLL_S`` a
+#   65 ms answer would only be noticed at 100 ms.
+#
+# Acquisition is the one command that is never sent again (a second acquire is
+# a second acquisition); it keeps its own watch in ``ACQUIRE``. Waits on a
+# physical process, such as a file being written, are not waits on LAS X and
+# keep their own numbers.
+#
+# Runtime consumers read these at call time (``WINDOW_S``), so a test
+# can shrink them with monkeypatch. ``actions.profiles`` captures them into
+# dataclass field defaults at import.
+
+WINDOWS = 4
+WINDOW_S = 3
+POLL_S = 0.1
+ANSWER_POLL_S = 0.01
 
 
 @dataclass(frozen=True)
@@ -127,7 +167,7 @@ class _ApiTurns:
                 remaining = until - time.monotonic()
                 if remaining <= 0 or stop.is_set():
                     return False
-                self._changed.wait(min(remaining, timing.POLL_S))
+                self._changed.wait(min(remaining, POLL_S))
             if stop.is_set():
                 return False
             self._busy.add(key)
@@ -174,9 +214,9 @@ def watch_direct(
                     f"the direct reader answered {reading.value!r}"
                 ),
             )
-        if time.monotonic() + timing.POLL_S >= deadline:
+        if time.monotonic() + POLL_S >= deadline:
             return None
-        time.sleep(timing.POLL_S)
+        time.sleep(POLL_S)
 
 
 def _ask_api(vendor, spec, client, api_kwargs, *, until, answer_counts):
@@ -215,7 +255,7 @@ def _ask_api(vendor, spec, client, api_kwargs, *, until, answer_counts):
         reading = answers[0]
         if answer_counts(reading):
             return reading
-        time.sleep(max(0.0, min(timing.POLL_S, until - time.monotonic())))
+        time.sleep(max(0.0, min(POLL_S, until - time.monotonic())))
     return reading
 
 
@@ -232,7 +272,7 @@ def _ask_log(vendor, spec, job_name, max_age_s, *, until, answer_counts):
         remaining = until - time.monotonic()
         if answer_counts(reading) or remaining <= 0:
             return reading
-        time.sleep(min(timing.POLL_S, remaining))
+        time.sleep(min(POLL_S, remaining))
 
 
 def _counts(reading, succeeded, observed_after):
@@ -367,7 +407,7 @@ def wait_for(
             until = (
                 deadline
                 if deadline is not None
-                else time.monotonic() + timing.WINDOWS * timing.WINDOW_S
+                else time.monotonic() + WINDOWS * WINDOW_S
             )
             reading = watch_direct(
                 vendor,
@@ -392,9 +432,9 @@ def wait_for(
     if deadline is not None:
         return _watch(vendor, datum, client, deadline=deadline, **kwargs)
     failed = None
-    for window in range(1, timing.WINDOWS + 1):
+    for window in range(1, WINDOWS + 1):
         reading = _watch(
-            vendor, datum, client, deadline=time.monotonic() + timing.WINDOW_S, **kwargs
+            vendor, datum, client, deadline=time.monotonic() + WINDOW_S, **kwargs
         )
         if reading is not None and reading.error is None:
             return reading
@@ -402,14 +442,12 @@ def wait_for(
             if isinstance(reading.error, vendor.UnsupportedSource):
                 return reading
             failed = reading
-        log.debug(
-            "%s: no answer counted in window %d/%d", datum, window, timing.WINDOWS
-        )
+        log.debug("%s: no answer counted in window %d/%d", datum, window, WINDOWS)
     log.warning(
         "%s%s: no answer counted as a success in %d windows of %ss",
         datum,
         f" for '{job_name}'" if job_name else "",
-        timing.WINDOWS,
-        timing.WINDOW_S,
+        WINDOWS,
+        WINDOW_S,
     )
     return failed

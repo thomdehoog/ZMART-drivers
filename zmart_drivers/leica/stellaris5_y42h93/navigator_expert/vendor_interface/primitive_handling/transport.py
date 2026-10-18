@@ -17,7 +17,7 @@ Author: Thom de Hoog, Center for Microscopy and Image Analysis (ZMB),
 import logging
 import time
 
-from ...dispatcher import timing as _timing
+from ...dispatcher import reader
 from ..primitives.api.delivery import deliver
 from ..primitives.interface import lasx_dialogs
 from ..primitives.log import log_reader as _log_reader
@@ -73,7 +73,7 @@ def _await_echo_result(client, timeout=None):
         if time.perf_counter() >= deadline:
             return False
 
-        time.sleep(_timing.ANSWER_POLL_S)
+        time.sleep(reader.ANSWER_POLL_S)
 
 
 class LasxTransport:
