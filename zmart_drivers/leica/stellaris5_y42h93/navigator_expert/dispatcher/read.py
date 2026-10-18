@@ -27,10 +27,17 @@ Public functions keep the plain return shapes by default; pass
 A caller that already runs its own window, such as a command confirmation,
 passes ``deadline=`` to watch only until then.
 
-The legs themselves (one question to the API, the log or the direct reader)
-live in ``vendor_interface/primitive_handling/sources.py``; the named readings
-the rest of the driver asks for (``get_xy`` and the others) live in
-``vendor_interface/primitive_handling/state.py`` and call :func:`wait_for` here.
+A reading comes back as a :class:`Reading`: the value, the source that gave it,
+when it was seen and how old it was. Callers that only want the value ask for
+it plainly; callers that want to know how far to trust it ask for the whole
+reading.
+
+This file knows nothing of any one microscope. The microscope's own sources
+(its table of readings, and one question to the API, the log or the direct
+reader) are handed in as ``vendor``. For LAS X these are in
+``vendor_interface/primitive_handling/sources.py``, and the named readings the
+rest of the driver asks for (``get_xy`` and the others) are in
+``vendor_interface/primitive_handling/state.py``, which call :func:`wait_for`.
 
 Author: Thom de Hoog, Center for Microscopy and Image Analysis (ZMB),
 University of Zurich (thom.dehoog@zmb.uzh.ch, thomdehoog@gmail.com).
@@ -42,23 +49,54 @@ import logging
 import threading
 import time
 
-from ..vendor_interface.primitive_handling import readings as capabilities
-from ..vendor_interface.primitive_handling import sources
+from dataclasses import dataclass
+
 from . import tuning
-from .reading import Reading
 
 log = logging.getLogger(__name__)
 
 
-def on_demand_mode(datum):
-    """The direct reader when the policy reads *datum* directly, else the API: the sources that answer on demand.
+@dataclass(frozen=True)
+class Reading:
+    """A source-tagged state reading used by routed callers."""
 
-    For readings a command waits on (whether the scanner is idle, where the
-    stage went), which the log cannot settle: it writes a value only when it
-    changes, so it can still show the state from before. Pair it with
-    ``fallback="api"``.
-    """
-    return "direct" if sources.mode_for(datum) == "direct" else "api"
+    value: object
+    source: str
+    observed_at: float | None
+    age_s: float | None
+    error: Exception | None = None
+
+    def _replace_value_none(self):
+        """This reading with the value stripped (kept: source/timing/error)."""
+        if self.value is None:
+            return self
+        return Reading(
+            value=None,
+            source=self.source,
+            observed_at=self.observed_at,
+            age_s=self.age_s,
+            error=self.error,
+        )
+
+
+def plain_or_diagnostic(reading, diagnostics):
+    """The whole reading when *diagnostics* is asked for, otherwise just its value."""
+    if diagnostics:
+        return reading
+    return None if reading is None else reading.value
+
+
+def derive(reading, value):
+    """A reading with a new value, keeping the source, timing and error of *reading*."""
+    if reading is None:
+        return None
+    return Reading(
+        value=value,
+        source=reading.source,
+        observed_at=reading.observed_at,
+        age_s=reading.age_s,
+        error=reading.error,
+    )
 
 
 # =============================================================================
@@ -111,7 +149,9 @@ def _client_api_key(client):
     return id(client)
 
 
-def watch_direct(spec, *, succeeded, deadline, observed_after, direct_kwargs, waiting):
+def watch_direct(
+    vendor, spec, *, succeeded, deadline, observed_after, direct_kwargs, waiting
+):
     """Ask the direct reader until an answer counts; a carried error at once when it fails.
 
     A caller *waiting* for a change (a confirmation's ``accept`` or
@@ -121,7 +161,7 @@ def watch_direct(spec, *, succeeded, deadline, observed_after, direct_kwargs, wa
     at once instead of after the whole wait.
     """
     while True:
-        reading = sources.direct_read(spec, direct_kwargs)
+        reading = vendor.direct_read(spec, direct_kwargs)
         if reading.error is not None or _counts(reading, succeeded, observed_after):
             return reading
         if not waiting:
@@ -130,7 +170,7 @@ def watch_direct(spec, *, succeeded, deadline, observed_after, direct_kwargs, wa
                 source="direct",
                 observed_at=reading.observed_at,
                 age_s=None,
-                error=sources.DirectAnswerDidNotCount(
+                error=vendor.DirectAnswerDidNotCount(
                     f"the direct reader answered {reading.value!r}"
                 ),
             )
@@ -139,7 +179,7 @@ def watch_direct(spec, *, succeeded, deadline, observed_after, direct_kwargs, wa
         time.sleep(tuning.POLL_S)
 
 
-def _ask_api(spec, client, api_kwargs, *, until, answer_counts):
+def _ask_api(vendor, spec, client, api_kwargs, *, until, answer_counts):
     """Request the read, and request it again every ``POLL_S`` until an answer counts or *until*.
 
     One request at a time per connection: a busy connection is waited for,
@@ -161,7 +201,7 @@ def _ask_api(spec, client, api_kwargs, *, until, answer_counts):
         def request(answers=answers, done=done):
             try:
                 answers.append(
-                    sources.api_read(
+                    vendor.api_read(
                         lambda: spec.api_fn(client, deadline=until, **api_kwargs)
                     )
                 )
@@ -179,7 +219,7 @@ def _ask_api(spec, client, api_kwargs, *, until, answer_counts):
     return reading
 
 
-def _ask_log(spec, job_name, max_age_s, *, until, answer_counts):
+def _ask_log(vendor, spec, job_name, max_age_s, *, until, answer_counts):
     """Read the LAS X log, and again every ``POLL_S`` until an answer counts or *until*.
 
     Each read takes the shared live snapshot (``log_reader.LIVE_LOG``), so
@@ -188,7 +228,7 @@ def _ask_log(spec, job_name, max_age_s, *, until, answer_counts):
     """
     reading = None
     while True:
-        reading = sources.snapshot_read(spec, max_age_s=max_age_s, job_name=job_name)
+        reading = vendor.snapshot_read(spec, max_age_s=max_age_s, job_name=job_name)
         remaining = until - time.monotonic()
         if answer_counts(reading) or remaining <= 0:
             return reading
@@ -211,7 +251,16 @@ def _counts(reading, succeeded, observed_after):
 
 
 def _watch(
-    datum, client, *, mode, succeeded, deadline, job_name, observed_after, api_kwargs
+    vendor,
+    datum,
+    client,
+    *,
+    mode,
+    succeeded,
+    deadline,
+    job_name,
+    observed_after,
+    api_kwargs,
 ):
     """Watch one window: ask each allowed source in turn, and return the first answer that counts.
 
@@ -221,8 +270,8 @@ def _watch(
     reading with its value stripped (so diagnostics show why), else None. An
     ``UnsupportedSource`` reading comes back at once.
     """
-    spec = capabilities.spec(datum)
-    legs = sources.legs(spec, datum, mode)
+    spec = vendor.spec(datum)
+    legs = vendor.legs(spec, datum, mode)
     if isinstance(legs, Reading):
         return legs
 
@@ -235,13 +284,19 @@ def _watch(
         until = began + (deadline - began) * turn / len(legs)
         if leg == "api":
             reading = _ask_api(
-                spec, client, api_kwargs, until=until, answer_counts=answer_counts
+                vendor,
+                spec,
+                client,
+                api_kwargs,
+                until=until,
+                answer_counts=answer_counts,
             )
         else:
             reading = _ask_log(
+                vendor,
                 spec,
                 job_name,
-                sources.max_age_s(spec),
+                vendor.max_age_s(spec),
                 until=until,
                 answer_counts=answer_counts,
             )
@@ -252,8 +307,8 @@ def _watch(
     return failed
 
 
-def _success_for(datum, job_name, accept):
-    spec = capabilities.spec(datum)
+def _success_for(vendor, datum, job_name, accept):
+    spec = vendor.spec(datum)
 
     def succeeded(value):
         if not spec.success(value, job_name=job_name):
@@ -264,6 +319,7 @@ def _success_for(datum, job_name, accept):
 
 
 def wait_for(
+    vendor,
     datum,
     client,
     *,
@@ -278,8 +334,12 @@ def wait_for(
     """Wait for a reading by the one rule; return the winning Reading, or a failure.
 
     Args:
-        datum: A row of the readings table in :mod:`capabilities`.
-        client: The connected LAS X API client.
+        vendor: The microscope's own sources: the object that knows its
+            readings table and how to ask the API, the log and the direct
+            reader once (for LAS X, ``primitive_handling/sources.py``). The
+            reader itself knows nothing of any one microscope.
+        datum: A row of the vendor's table of readings.
+        client: The connected microscope client.
         accept: Optional ``accept(value) -> bool`` that narrows the datum's
             own success rule for this caller (a target value, a field the
             caller needs). Applied on top of the rule, never instead of it.
@@ -299,9 +359,9 @@ def wait_for(
         The winning :class:`Reading`; else the latest error-carrying reading
         with its value stripped; else None.
     """
-    spec = capabilities.spec(datum)
-    mode = mode if mode is not None else sources.mode_for(datum)
-    succeeded = _success_for(datum, job_name, accept)
+    spec = vendor.spec(datum)
+    mode = mode if mode is not None else vendor.mode_for(datum)
+    succeeded = _success_for(vendor, datum, job_name, accept)
     if mode == "direct":
         if spec.direct_fn is not None:
             until = (
@@ -310,6 +370,7 @@ def wait_for(
                 else time.monotonic() + tuning.WINDOWS * tuning.WINDOW_S
             )
             reading = watch_direct(
+                vendor,
                 spec,
                 succeeded=succeeded,
                 deadline=until,
@@ -329,16 +390,16 @@ def wait_for(
         api_kwargs=api_kwargs or {},
     )
     if deadline is not None:
-        return _watch(datum, client, deadline=deadline, **kwargs)
+        return _watch(vendor, datum, client, deadline=deadline, **kwargs)
     failed = None
     for window in range(1, tuning.WINDOWS + 1):
         reading = _watch(
-            datum, client, deadline=time.monotonic() + tuning.WINDOW_S, **kwargs
+            vendor, datum, client, deadline=time.monotonic() + tuning.WINDOW_S, **kwargs
         )
         if reading is not None and reading.error is None:
             return reading
         if reading is not None:
-            if isinstance(reading.error, capabilities.UnsupportedSource):
+            if isinstance(reading.error, vendor.UnsupportedSource):
                 return reading
             failed = reading
         log.debug(
