@@ -953,9 +953,9 @@ class TestAcquire(unittest.TestCase):
                     "z": 0,
                     "c": 0,
                     "path": str(Path("/tmp/out/img.ome.tif")),
-                    "x_um": 0.0,
-                    "y_um": 0.0,
-                    "z_um": 0.0,
+                    "x_um": 100.0,
+                    "y_um": 200.0,
+                    "z_um": 50.0,
                 }
             ],
         )
@@ -1220,10 +1220,10 @@ class TestAcquire(unittest.TestCase):
     def test_every_capture_leaves_a_log_of_what_was_asked_and_done(self):
         h = _handle()
         h.driven_to = {
-            "x": 5.0,
-            "y": 6.0,
-            "z": 7.0,
-            "z_wide_um": 0.0,
+            "x": 100.0,
+            "y": 200.0,
+            "z": 50.0,
+            "z_wide_um": 50.0,
             "z_galvo_um": 0.0,
         }
         image = Path("/tmp/out/.staging") / h.hash6 / "data" / "img.ome.tif"
@@ -1273,8 +1273,15 @@ class TestAcquire(unittest.TestCase):
         be handed straight back in.
         """
         h = _handle()
-        h.driven_to = {"x": 1200.0, "y": -450.0, "z": 33.5, "z_wide_um": 900.0}
-        with self._capturing() as calls:
+
+        def read_the_stage(handle):
+            handle.driven_to = {"x": 1200.0, "y": -450.0, "z": 33.5, "z_wide_um": 900.0}
+            return {}
+
+        with (
+            self._capturing() as calls,
+            patch.object(_acquisition, "get_xyz", read_the_stage),
+        ):
             record = _acquisition.acquire(
                 h,
                 acquisition_type="acquisition",
@@ -1505,11 +1512,36 @@ class TestAcquire(unittest.TestCase):
             [(0, 100.0), (1, 110.0), (2, 120.0)],
         )
 
+    def test_a_stage_changed_in_las_x_is_noted_and_the_fresh_reading_is_used(self):
+        h = _handle()
+        h.driven_to = {"x": 0.0, "y": 0.0, "z": 0.0, "z_wide_um": 50.0}
+        with self._capturing():
+            record = _acquisition.acquire(
+                h, acquisition_type="acquisition", output_folder=None, position_label="A1"
+            )
+        self.assertEqual(
+            [(p["x_um"], p["y_um"]) for p in record["planes"]], [(100.0, 200.0)]
+        )
+        self.assertEqual(
+            [n["what"] for n in record["unconfirmed"]],
+            ["acquire: the stage or the objective changed"],
+        )
+
+    def test_an_unchanged_stage_adds_no_note(self):
+        h = _handle()
+        h.driven_to = {"x": 100.0, "y": 200.0, "z": 50.0, "z_wide_um": 50.0}
+        with self._capturing():
+            record = _acquisition.acquire(
+                h, acquisition_type="acquisition", output_folder=None, position_label="A1"
+            )
+        self.assertEqual(record["unconfirmed"], [])
+
     def test_a_capture_before_the_stage_was_read_is_refused(self):
         """Every plane says where it is; with no position read or set yet, there is none to say."""
         h = _handle(driven_to=None)
         with (
             self._capturing(),
+            patch.object(_acquisition, "get_xyz", side_effect=RuntimeError("no answer")),
             self.assertRaisesRegex(RuntimeError, "where the stage is"),
         ):
             _acquisition.acquire(

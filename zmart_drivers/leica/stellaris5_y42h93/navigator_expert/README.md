@@ -510,6 +510,14 @@ anything is saved.
 **Positions are never made in the Navigator Expert.** They come from the ZMART interface.
 `acquire()` and the autofocus procedure capture at the current position.
 
+**Changes made in the LAS X window.** The operator can move the stage, or change the objective or the
+job, in LAS X itself, and the driver cannot see that as it happens. Every position it works out uses
+the objective that is in at that moment, so the numbers stay right. `acquire()` also reads the stage
+once just before the capture and places the pictures from that reading. If it differs from what the
+workflow last saw, a note is added to the `unconfirmed` list of the result and the capture goes ahead.
+The driver does not bring the sample back into view after a change made by hand; that is up to the
+operator or the workflow.
+
 **Acquisition settings say only how a capture is triggered.** This driver has one trigger,
 `full`: the whole of the LAS X job that is selected. Which job that is belongs to the state
 (`set_state({"job": ...})`). How a capture is saved -- the format, where the pixels are read from
