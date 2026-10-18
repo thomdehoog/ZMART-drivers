@@ -13,6 +13,12 @@ part 7 of this document follows it. And the controller's mock driver,
 folder, so there is a complete, small driver to read alongside this text. The last sections say
 what is still open and in which order we plan to get there.
 
+In October 2026 the design was simplified while we talked it through against
+the Leica driver. The result is described in "The simplified anatomy", right
+after the overview below. Where an older part further down says something
+different, the simplified anatomy is the newer decision, and those older parts
+carry a short note saying so.
+
 ## Why a common anatomy
 
 ZMART drives very different microscopes: a Leica confocal through LAS X, a
@@ -29,59 +35,60 @@ it can look and behave the same.
 
 ## The parts at a glance
 
-A driver has eight parts. Read the picture from bottom to top: each part
-only uses the parts below it.
+A driver is built from the parts below. Read the picture from bottom to top:
+each part only uses the parts below it.
 
 ```
   experiments and workflows, through the ZMART Controller
   ───────────────────────────────────────────────────────────────
-  7  zmart_driver.py        the ZmartDriver class: one method per command
-  4  Procedures             recipes built from actions
-  3  Actions                the readings (get) and the changes (set), as short definitions
-  2  Dispatcher             the engines that run an action safely:
-                            one read at a time, the limits gate, retry, confirm, give up softly
-  1  Vendor interface       the only part that is completely microscope-specific;
-                            sorts the vendor's errors into the shared kinds
+  zmart_driver.py     the ZmartDriver class: one method per command
+  procedures/         recipes: acquire, autofocus, the setup measurements
+  dispatcher/         the shared engines that run everything safely:
+                      one read at a time, the limits gate, fallback, confirmation, error rules
+  vendor_interface/   the only part that is rewritten for a new microscope
   ───────────────────────────────────────────────────────────────
   vendor software (LAS X, NIS-Elements, ZEN, mesoSPIM-control)
 
-  alongside:  5 Output   6 Configuration   8 Testing
+  alongside:  configuration/   testing/
 ```
 
-The folder layout inside a driver, which the mock follows exactly:
+The folder layout inside a driver:
 
 ```
 my_driver/
     zmart_driver.json          the driver's name, and how to reach the microscope on this computer
-    zmart_driver.py            the ZmartDriver class the controller calls
+    zmart_driver.py            the ZmartDriver class the controller calls; kept thin
     __init__.py                makes the folder a package, so zmart_driver.py can import the parts
 
-    vendor_interface/
-        client.py              the connection and the primitives
-        errors.py              the shared kinds of problem, and the sorting of the vendor's errors into them
+    vendor_interface/          the part you write for a new microscope
+        connection.py          reach the vendor software, keep the link, close it
+        error_classification.py  sort this vendor's failures into the shared kinds of problem
+        primitive_handling.py  how the dispatcher treats each primitive: which to try first,
+                               how to confirm, whether it may be sent again, how long to wait
+        metadata_map.py        turn the vendor's description of a picture into the standard metadata
+        primitives/            the smallest single reads and writes, grouped by the way they reach the software
+            direct.py          reading (and, where possible, writing) the software's own state
+            api.py             the vendor's programming interface
+            log.py             reading what the software writes in its log (reading only)
+            capture.py         fetching the finished picture
+            (a file for button presses, if the microscope needs it: see the open questions)
         vendor_side/           code that runs inside the vendor software, if the vendor needs it, with its installer
-    dispatcher/
-        read.py                the engine that runs a reading
-        change.py              the engine that runs a change and confirms it
+    dispatcher/                the same in every driver
+        read.py                runs a reading, with fallback
+        change.py              runs a change and confirms it
         gate.py                the limits gate
-        rules.py               what each engine does for each kind of problem
-        tuning.py              retries and time windows, set per microscope
-    actions/
-        get.py                 the readings: which primitive, what the value means
-        set.py                 the changes: which primitive, how to confirm it
-    procedures/
-        autofocus.py           one file per recipe, for experiments and for setup alike
+        error_vocabulary.py    the shared kinds of problem
+        error_rules.py         what to do for each kind of problem
+        tuning.py              the shared waiting rule and its numbers
+    procedures/                one file per recipe, for experiments and for setup alike
+        acquire.py             start, wait, fetch, map the metadata, save
+        save_zarr.py           the OME-Zarr writer, shared until the shared package takes it
+        autofocus.py
         measure_orientation.py
         calibrate_objectives.py
         record_origin.py
-        focus_score.py         the pure algorithms the recipes use, until the shared package takes them
+        focus_score.py         the pure algorithms the recipes use
         registration.py
-    output/                    what comes out of one acquire call
-        collect.py             find the vendor's product and wait until it is complete
-        ome_tiff.py            convert to the standard formats
-        ome_zarr.py
-        save.py                name by position label, never overwrite, attach the metadata
-        command_log.py         the log of what was asked and what happened, saved beside the images
     configuration/
         machine_description/   each item: default.json, its check, and the notebook that sets it
         image_stage_registration/
@@ -100,11 +107,220 @@ my_driver/
     README.md
 ```
 
+What changed from the first version of this layout: the `actions/` folder is
+gone, `client.py` is split into `connection.py` and the `primitives/` folder,
+the `output/` folder is gone (saving is now a procedure), and OME-TIFF is no
+longer part of the design, only OME-Zarr. The next section explains why.
+
 Two names need a word of care. `actions/set.py` is reached as `actions.set`
 and never written as `from actions import set`, which would hide Python's
 built-in `set` in that file; `from ..actions import set as setter` is the
 form the mock uses. And no folder in a driver is called `config/`, because a
 package with that common name gets imported in place of other packages.
+
+## The simplified anatomy
+
+This section records the decisions of October 2026. They came from walking the
+Leica driver through the anatomy, file by file. They are a design; the Leica
+driver has not been reshaped to match yet, apart from one removal (see "What
+this means for the Leica driver").
+
+### The one rule: a new microscope means a new vendor interface
+
+The point of the whole anatomy is that when someone writes a driver for a new
+microscope, such as a ZEISS, an Evident or a Nikon, the work is in one place:
+the `vendor_interface/` folder. Everything above it, the dispatcher, the
+procedures and the `ZmartDriver` class, should already work.
+
+What a driver author writes:
+
+- **The connection**: how to reach this vendor's software, keep the link
+  open, and close it.
+- **The primitives**: the smallest single reads and writes that the software
+  offers.
+- **The error classification**: the sorting of this vendor's failures into the
+  shared kinds of problem.
+- **The handling notes** (`primitive_handling.py`): for each primitive, how the
+  dispatcher should treat it. This is the information that Leica keeps today
+  in its "profiles". The word "profile" is software shorthand, so the file is
+  called what it is about.
+- **The metadata map**: how this vendor describes a picture, and how that
+  becomes the standard metadata.
+
+What else a new driver needs, all of it small and mostly data, not code: the
+tuning numbers (how long a confirmation waits), the configuration that is
+measured on the instrument (limits, orientation, calibration), a few tests,
+and any recipes that microscope needs and others do not.
+
+Two checks keep this honest:
+
+1. **The leak test.** If supporting a new microscope ever requires editing
+   one of the dispatcher's engines, then something that belongs in the vendor
+   interface has leaked upward. Move it down.
+2. **The size check.** Outside its vendor interface, a minimal driver should
+   be about as small as the controller's mock driver. If it is much larger,
+   something that should be shared has crept into the driver.
+
+### Primitives, and the families they come in
+
+A **primitive** is one small function that does one thing with the vendor
+software: read one value, change one setting, press one button, fetch one
+picture. A primitive does not retry, does not check limits and does not wait
+for confirmation. Those jobs belong to the dispatcher, so that they are done
+the same way for every primitive.
+
+Primitives are grouped into **families** by the way they reach the software:
+
+| Family | What it uses | Reads | Writes |
+|---|---|---|---|
+| Direct | The software's own state, read as it is held inside the program | Yes | Where the software allows it |
+| API | The vendor's programming interface (for Leica, the CAM API) | Yes | Yes |
+| Log | What the software writes in its log file | Yes | No |
+| Capture | The place where the finished picture is handed over | Yes | – |
+
+A microscope uses the families it has. A ZEISS may have a single one. The
+Leica driver has all of them. The direct readers are the closest to the real
+state of the instrument, which is why they come first wherever they exist.
+
+### Routes, tiers and fallback
+
+A **route** says which primitives to use for one job, in order of preference.
+It is a list of **tiers**. A tier holds one primitive, or several that run at
+the same time. For example:
+
+```
+read the selected job:    [ direct ]  then  [ api ]  then  [ log ]
+start an acquisition:     [ api ]
+confirm a stage move:     [ direct ]  then  [ api, log ]
+```
+
+The routes are written in the driver's handling notes. The dispatcher follows
+them and never decides on its own which primitive to trust.
+
+The rules that go with routes:
+
+- **Fallback happens only when a tier cannot answer.** That means a primitive
+  could not be called, raised an error, or could not give a value. The next
+  tier then takes over. "The value is not what we hoped for yet" is an answer,
+  not an error, and never starts a fallback. A slower source would only be
+  reporting an older state.
+- **Within a tier, the first usable answer wins.** Most tiers hold a single
+  primitive. Put several into one tier only when they are equally close to the
+  real state, and only deliberately, because any one of them may then decide.
+  A source that can lag behind, such as a log, must only count if what it saw
+  was observed after the command was sent.
+- **The result says who answered.** Every reading and every confirmation names
+  the primitive and the tier it came from, so that anyone reading the command
+  log can see when a fallback was used.
+- **Writes fall back more carefully than reads.** A write may go to the next
+  tier only when it certainly was not delivered. If a send timed out and
+  nobody knows whether it arrived, the dispatcher reads the state back and
+  does not send again by another route. An acquisition is never sent twice.
+  Where a microscope offers only one way to send a command, as with Leica's
+  API, there simply is no fallback for it.
+
+### Confirmation
+
+After a change, the dispatcher checks that the microscope really did it. This
+is a special kind of reading, because the driver knows exactly which value it
+expects. It watches for that value and waits until it appears or the time is
+up.
+
+- The tiers work as for any reading. The first tier that can answer is the one
+  that watches. If every primitive in the tier errors, the next tier takes
+  over for the following time window.
+- If a primitive answers "not yet" until the time is up, the change is
+  **unconfirmed**. Nothing else is tried, because the question has already
+  been answered by the source closest to the real state.
+- The usual confirmation uses the direct primitives first. A race between
+  several sources is possible, but it has to be written down for that one
+  change.
+
+What an unconfirmed change means for the workflow is unchanged (see "Settled
+since the first version"): it is recorded, and the workflow carries on. One
+rule is added: **anything that builds on a change must wait for it to be
+confirmed.** Leica's compensating stage move after an objective change, and
+the label a picture is saved under after a job change, must not run on a
+change that was only accepted. Otherwise the driver moves the stage for a
+lens that never arrived.
+
+### Error vocabulary, classification and rules
+
+Three words, three files, so that each one says what it does:
+
+- **Error vocabulary** (`dispatcher/error_vocabulary.py`): the list of kinds of
+  problem. It is the same for every microscope.
+- **Error classification** (`vendor_interface/error_classification.py`): the
+  sorting of this vendor's failures into that list. This is the part a driver
+  author writes.
+- **Error rules** (`dispatcher/error_rules.py`): what to do for each kind. It
+  is the same for every microscope.
+
+The table of kinds in part 1 stays as it is.
+
+### The dispatcher is fully shared
+
+Because the handling notes now live in the vendor interface, nothing in the
+`dispatcher/` folder belongs to one microscope. The waiting rule in
+`tuning.py` (Leica's is four windows of three seconds) is the shared default;
+a microscope that needs different numbers for a command puts them in its
+handling notes. The whole folder can move to the shared package once a second
+driver uses it.
+
+### Actions dissolve
+
+The first version had an `actions/` folder between the dispatcher and the
+procedures. In practice an action did one of two things. Either it was a
+table entry (which primitive, how to confirm, how close counts as arrived),
+or it was a real recipe (selecting a job and moving the stage to make up for
+the new objective). The table entries are now the handling notes in the
+vendor interface. The recipes are procedures. That removes one layer and
+leaves each piece of knowledge in one place.
+
+### Saving is a procedure, and only OME-Zarr
+
+Saving a picture is a recipe with several steps, so it is a procedure.
+`acquire` starts the capture, waits for it to finish, fetches the picture
+through the capture primitives, turns the vendor's description into the
+standard metadata through the metadata map, and calls the shared OME-Zarr
+writer. The writer, which also orients, names and saves the files so that a
+half-written file is never left behind, is the same for every microscope. It
+lives in `procedures/save_zarr.py` until the shared package takes it.
+
+For this design, OME-TIFF is dropped and OME-Zarr is the only format.
+
+The **standard metadata** is one record that every driver fills in: the pixel
+size and the z spacing, the channels and their wavelengths, the stage position
+of each plane, the objective and settings used, when the capture began and
+ended, and which command produced it. A driver that cannot fill a field, for
+example the wavelength on a camera-only system, must say "unknown". It must
+not guess or leave a blank that looks like a value. Which fields are required
+is still to be decided.
+
+### What this means for the Leica driver
+
+Walking the Leica driver through the anatomy showed that most of it fits:
+`vendor_interface/`, `dispatcher/`, `configuration/` and `procedures/` map
+directly, and `output/` splits into the Leica-specific finding and reading of
+the picture (to the vendor interface) and the shared writer (to a procedure).
+
+Three things do not fit yet:
+
+1. `actions/set.py` (about 1,700 lines) is not a table; it holds recipes that
+   belong in `procedures/`.
+2. `zmart_adapter/zmart_adapter.py` (about 1,700 lines) holds much of the
+   logic of `get_xyz`, `set_xyz` and `acquire`. The `ZmartDriver` class is
+   meant to be thin, so that logic has to move into procedures.
+3. `dispatcher/checks.py` and `gate.py` use Leica's command names. For the
+   dispatcher to be fully shared, which command is limited by what must come
+   from the handling notes.
+
+One part has already gone. The Leica driver used to read and edit LAS X's
+scan-field template files (`scanfields/` and `experimental/lrp_edits/`, with
+the galvo pan move that wrote into them). Scan fields are not something this
+driver does, so that code was removed. The stacked z drive is now read only
+from LAS X's hardware server, and refused with a clear message when the server
+cannot be reached.
 
 ## Words we use
 
@@ -115,7 +331,9 @@ avoids a lot of confusion.
   as `set_xyz` or `acquire`. The list is short and the same for every
   microscope. The driver carries a command out with actions.
 - **Action**: anything the driver asks the microscope to do. An action is
-  either a *get* or a *set*.
+  either a *get* or a *set*. (Since October 2026 this is a way of speaking
+  about what the dispatcher runs, not a folder: the table entries are in the
+  handling notes and the recipes are procedures.)
 - **Get action**: asks the microscope something, such as the stage position
   or the selected objective. It never changes anything.
 - **Set action**: changes the microscope. "Set" is meant broadly here: moving
@@ -135,6 +353,8 @@ avoids a lot of confusion.
   origin. This is what experiments see.
 
 ## 1. Vendor interface
+
+> **Note, October 2026.** The vendor interface is now split into `connection.py`, `error_classification.py`, `primitive_handling.py`, `metadata_map.py` and a `primitives/` folder of families, and it holds the handling notes that used to sit with the actions. See "The simplified anatomy". The file `errors.py` named below is now `error_classification.py`, with the shared list of kinds in `dispatcher/error_vocabulary.py`.
 
 **Purpose.** This is where each microscope is allowed to be completely
 different. It opens the connection to the vendor software and does whatever
@@ -280,6 +500,8 @@ Part 7 says more about the answers.
 
 ## 2. Dispatcher
 
+> **Note, October 2026.** The dispatcher is now fully shared. The routes and tiers, the fallback rule and the confirmation rule in "The simplified anatomy" replace the idea of racing two sources by default. The file `rules.py` is now `error_rules.py`.
+
 **Purpose.** To run every action safely, the same way every time, so that an
 action definition can stay a few lines long and never has to think about
 retries, limits or confirmation itself. The dispatcher is the part that is
@@ -380,6 +602,8 @@ That is a reading like any other, with a source, an age and a possible
 
 ## 3. Actions
 
+> **Note, October 2026.** This part is superseded. There is no `actions/` folder any more: the table entries became the handling notes in the vendor interface, and the real recipes became procedures. The rules below about readings and changes still describe how the dispatcher treats them. See "The simplified anatomy".
+
 **Purpose.** To say, for each thing the driver can ask of the microscope,
 which primitive to call and what it means. An action is a short definition
 that the dispatcher runs; all the care about retries, limits and
@@ -443,6 +667,8 @@ positions repeat), or parking the z-galvo at zero while keeping the focus.
   `procedures/focus_score.py` this way.
 
 ## 5. Output
+
+> **Note, October 2026.** This part is superseded. There is no `output/` folder any more. Saving is the `acquire` procedure, finding and reading the vendor's picture belongs to the vendor interface (the capture primitives and the metadata map), and the writer is shared. Only OME-Zarr is part of the design. See "The simplified anatomy".
 
 **Purpose.** To turn what the microscope produced for one `acquire` call into
 ZMART's product of that call, and to say exactly where it was saved. The
@@ -814,8 +1040,8 @@ What is the same in every driver, and what differs:
 | Part | The same everywhere | Specific to each microscope |
 |---|---|---|
 | Vendor interface | The three promises; the names of the kinds of problem | Everything inside, including the sorting of errors |
-| Dispatcher | Both engines, the limits gate and the rules | `tuning.py` |
-| Actions | The shape of a definition | Which primitive, what the value means, the target, the confirmation |
+| Dispatcher | Everything: both engines, the limits gate, the error vocabulary and rules, the routes mechanism | Nothing (the numbers live in the handling notes) |
+| Handling notes (`primitive_handling.py`) | The shape of an entry | Which primitives, in which order, how to confirm, how long to wait |
 | Procedures | The "actions only" rule; the algorithms | The recipes |
 | Output | OME-TIFF and OME-Zarr writing, naming, the command log | Finding and reading the vendor's raw product |
 | Configuration | Load, check and save; the notebook pattern | Default values; the machine description |
@@ -856,9 +1082,27 @@ by any other part of the driver. The Leica driver already works this way.
 - **Actions and the dispatcher are separate folders.** The dispatcher is the
   same for every microscope and will move to the shared package; the actions
   are what differs. Readings and changes are two files in one folder, not two
-  folders.
+  folders. (Replaced in October 2026: the actions folder is gone; see the last
+  item below.)
+- **Simplified anatomy (October 2026).** No `actions/` folder, no `output/`
+  folder, OME-Zarr only, handling notes in the vendor interface, and a
+  fully shared dispatcher with routes, tiers and fallback only on error. See
+  "The simplified anatomy".
 
 ## Open questions
+
+- **The family names.** The design above calls the families direct, API, log
+  and capture. If a driver needs the Windows COM interface as a family of its
+  own, it would be added to the list. Which name fits the Leica CAM API best
+  should be settled before the files are renamed.
+
+- **Button presses.** Pressing buttons and answering dialogs in the vendor
+  software (Leica's navigator and dialog handling) does not fit the direct,
+  API, log or capture families cleanly. It needs a family of its own, or a
+  place under one of them.
+
+- **Required metadata.** Which fields every driver must fill in the standard
+  metadata, and how "unknown" is written.
 
 - **Axes that are neither x, y, z nor settings.** The mesoSPIM has a focus
   drive and a rotation axis. Today they are reachable only through
