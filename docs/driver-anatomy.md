@@ -775,15 +775,13 @@ Leica-specific:
 **Where the Leica tree still differs from the plan.** Each item is listed on
 purpose, so that it cannot be forgotten.
 
-1. **The confirmation of `select_job` still races two legs.** After a job
-   change, the API and the log are checked at the same time in two threads
-   (`vendor_specific/primitive_handling/confirmations.py`, the dual-leg
-   race). The plan asks for one after the other. Only the API leg asks LAS X
-   for anything, and it does so one request at a time; the log leg reads a
-   file, which never reaches LAS X, so the one-request-at-a-time rule still
-   holds. The tests for this are written around the race, and it was run on
-   the microscope as it is, so it is left for after the first run on the
-   simulator.
+1. **The fallback for confirming `select_job` still races two legs.** The
+   direct reader confirms a job change alone, as it is first choice for every
+   read. Only when it cannot answer do the API and the log run together in two
+   threads (`vendor_specific/primitive_handling/confirmations.py`, the dual-leg
+   race), as before. The log leg reads a file, which never reaches LAS X, so
+   the one-request-at-a-time rule still holds. The tests for the race are kept,
+   and the new default is to be checked on the simulator first.
 2. **A limit is not yet a declared description.** The gate gets its rulebook
    and table of commands from `limit_rules.py`, so it names no Leica class, but
    the shape of a limit (axis, unit, range or allowed values) is still the

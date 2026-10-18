@@ -22,7 +22,7 @@ from ...dispatcher.dispatcher import make_log_entry as _make_log_entry
 from ..primitives.direct import direct_reader
 from ..primitives.log import log_wait
 from ..connection.hardware_server import HardwareServerUnavailable
-from .confirmations import _reading_value_after
+from .confirmations import _reading_value_after, race_confirmations
 
 log = logging.getLogger(__name__)
 
@@ -229,6 +229,9 @@ def select_job_confirm_legs(
 
     The ONE place that knows what ``selected_job_confirm_source`` means:
 
+    - ``direct`` (the default): the direct reader alone confirms, as its
+      selection is LAS X's live one. When it cannot answer, the ``hybrid``
+      race below takes its place.
     - ``api``: the API poll alone, exactly today's semantics.
     - ``log``: the post-command ``CurrentBlock`` wait alone.
     - with the profile's ``selected_job_mode`` ``direct``, the direct reader
@@ -252,27 +255,49 @@ def select_job_confirm_legs(
     """
     profile = _state_reader_profile()
     source = profile.selected_job_confirm_source
-    if source not in ("api", "log", "hybrid"):
+    if source not in ("direct", "api", "log", "hybrid"):
         raise ValueError(
-            f"unknown selected-job confirmation source {source!r}; expected api, log, or hybrid"
+            f"unknown selected-job confirmation source {source!r}; expected direct, api, log, or hybrid"
         )
     window_s = dispatcher.WINDOW_S if timeout is None else timeout
+    fallback = "hybrid" if source == "direct" else source
     api_confirm = None
     log_leg = None
-    budget_s = window_s if source == "hybrid" else None
-    if source in ("api", "hybrid"):
+    budget_s = window_s if fallback == "hybrid" else None
+    if fallback in ("api", "hybrid"):
         api_confirm = partial(
             confirm_select_job,
             job_name=job_name,
             timeout=window_s,
             command_started_at=command_started_at,
-            inadmissible_baseline=(api_baseline_name if source == "hybrid" else None),
-            require_transition_witness=(source == "hybrid"),
+            inadmissible_baseline=(api_baseline_name if fallback == "hybrid" else None),
+            require_transition_witness=(fallback == "hybrid"),
         )
-    if source in ("log", "hybrid"):
+    if fallback in ("log", "hybrid"):
         log_leg = partial(
             _confirm_select_job_log, job_name, command_started_at, timeout=window_s
         )
+    if source == "direct":
+        # The direct reader confirms alone. Only when it cannot answer does the
+        # hybrid race (the API leg and the log leg) take its place.
+        api_leg, log_fallback = api_confirm, log_leg
+
+        def hybrid_instead(client):
+            race = race_confirmations(
+                api_leg=lambda: api_leg(client),
+                log_leg=log_fallback,
+                label=f"SelectJob '{job_name}'",
+                budget_s=window_s,
+            )
+            return race()
+
+        api_confirm = partial(
+            confirm_select_job_direct,
+            job_name=job_name,
+            timeout=window_s,
+            otherwise=hybrid_instead,
+        )
+        return api_confirm, None, None
     if profile.selected_job_mode == "direct" and api_confirm is not None:
         api_confirm = partial(
             confirm_select_job_direct,
@@ -316,7 +341,7 @@ def _prime_selected_job_log_cluster(client, jobs):
     """
     profile = _state_reader_profile()
     if (
-        profile.selected_job_confirm_source not in ("log", "hybrid")
+        profile.selected_job_confirm_source not in ("log", "hybrid", "direct")
         or not profile.selected_job_log_prime_cluster
     ):
         return
@@ -366,6 +391,8 @@ def prepare_select_job(client, job_name):
     """
     profile = _state_reader_profile()
     source = profile.selected_job_confirm_source
+    if source == "direct":
+        source = "hybrid"  # the direct reader was asked just below; hybrid is its fallback
     context = {
         "api_baseline_name": None,
         "api_baseline_reason": "not_attempted",

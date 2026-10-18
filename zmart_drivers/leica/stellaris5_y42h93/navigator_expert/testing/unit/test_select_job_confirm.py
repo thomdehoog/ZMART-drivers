@@ -184,12 +184,13 @@ class TestHybridAdmissibility(SelectJobCase):
 
 
 class TestDefaultPolicy(unittest.TestCase):
-    def test_selected_job_confirmation_defaults_to_hybrid(self):
-        """The api confirm is measured-wrong on the real scope and log-only
-        is insufficient on the simulator; hybrid is the one default that
-        fits both without environment detection (validated 2026-06-11)."""
+    def test_selected_job_confirmation_defaults_to_the_direct_reader(self):
+        """The direct reader is the first choice for every read, so it also
+        confirms a job change. The hybrid race (api and log) is only its
+        fallback: the api confirm alone is measured-wrong on the real scope
+        and log-only is insufficient on the simulator (validated 2026-06-11)."""
         profile = profiles.StateReaderProfile()
-        self.assertEqual(profile.selected_job_confirm_source, "hybrid")
+        self.assertEqual(profile.selected_job_confirm_source, "direct")
 
 
 class TestLegsBuilder(SelectJobCase):
@@ -286,6 +287,44 @@ class TestLegsBuilder(SelectJobCase):
         )
         self.assertIsNone(budget)
         self.assertEqual(api_leg.keywords["timeout"], 5.0)
+
+    def test_direct_source_confirms_alone_and_has_no_race(self):
+        self._use(selected_job_confirm_source="direct")
+        leg, log_leg, budget = confirm_select_job.select_job_confirm_legs(
+            "HiRes", command_started_at=100.0, api_baseline_name="Overview", timeout=5.0
+        )
+        self.assertIsNone(log_leg)
+        self.assertIsNone(budget)
+        self.assertEqual(leg.func, confirm_select_job.confirm_select_job_direct)
+
+    def test_direct_source_uses_the_hybrid_race_when_the_direct_reader_cannot_answer(self):
+        self._use(selected_job_confirm_source="direct")
+        with (
+            patch.object(
+                confirm_select_job.direct_reader,
+                "get_selected_job",
+                side_effect=RuntimeError("hardware server not reachable"),
+            ),
+            patch.object(
+                confirm_select_job,
+                "confirm_select_job",
+                return_value={"success": True, "logs": []},
+            ) as api_leg,
+            patch.object(
+                confirm_select_job,
+                "_confirm_select_job_log",
+                return_value={"success": False, "logs": []},
+            ),
+        ):
+            leg, _, _ = confirm_select_job.select_job_confirm_legs(
+                "HiRes",
+                command_started_at=100.0,
+                api_baseline_name="Overview",
+                timeout=1.0,
+            )
+            result = leg(object())
+        self.assertTrue(result["success"])
+        api_leg.assert_called_once()
 
     def test_unknown_source_raises_before_firing(self):
         self._use(selected_job_confirm_source="nonsense")
