@@ -24,7 +24,7 @@ from state_tree_stand_in import StandInNodes, answer_json_read
 
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling import readings as capabilities
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling import changes as commands
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.absolute_coordinate_system import compensated_changes as commands_comp
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.objective_change import compensated_changes as commands_comp
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling import prechecks
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling import state as readers
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitives.direct import direct_reader, state_tree
