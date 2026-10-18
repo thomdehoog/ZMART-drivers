@@ -87,16 +87,19 @@ class StateReaderProfile:
 
     selected_job_mode: str = "direct"
     selected_job_log_max_age_s: float = 2.0
-    # Selected-job confirmation source: "api" | "log" | "hybrid".
+    # Selected-job confirmation source: "direct" | "api" | "log" | "hybrid".
+    # direct: the direct reader alone confirms (LAS X's live selection); only
+    # when it cannot answer does hybrid take its place.
     # hybrid races the api leg (transition-admissible: a stale API readback
     # cannot witness a transition to a target it already read pre-command)
     # against the log leg (post-command CurrentBlock event). The race runs for
     # one window (``tuning.WINDOW_S``), and the dispatcher runs four of them
     # with the command fired again between: the one 4x3 rule.
-    # Default hybrid: the api confirm is measured-wrong on the real scope
-    # (stale 15 s+, wrong job) and log-only is insufficient on the
-    # simulator; hybrid fits both without environment detection.
-    selected_job_confirm_source: str = "hybrid"
+    # The api confirm is measured-wrong on the real scope (stale 15 s+, wrong
+    # job) and log-only is insufficient on the simulator; hybrid fits both
+    # without environment detection, so it is the fallback behind the direct
+    # reader, which is the default.
+    selected_job_confirm_source: str = "direct"
     selected_job_log_prime_cluster: bool = False
     selected_job_log_cluster_max_age_s: float | None = None
 

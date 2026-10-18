@@ -265,7 +265,7 @@ def test_the_direct_route_keeps_the_drivers_own_job_confirmation():
         log = validate_hardware.logging.getLogger("t")
         validate_hardware._apply_state_reader_mode(args.state_reader_mode, log)
         validate_hardware._apply_log_select_confirmation(args, log)
-        assert profiles.STATE_READERS.selected_job_confirm_source == "hybrid"
+        assert profiles.STATE_READERS.selected_job_confirm_source == "direct"
         assert profiles.STATE_READERS.xy_mode == "direct"
     finally:
         profiles.STATE_READERS = prior
