@@ -691,7 +691,8 @@ The first reshaping steps are done too: the file that sorts LAS X's errors is
 capture). Each step changed only names and places, and the offline tests gave the
 same result before and after.
 
-**Also done.** The `actions/` folder is gone. Its handling information (the
+**Also done.** The adapter now sits inside `for_zmart_controller/`, with the
+class that uses it. The `actions/` folder is gone. Its handling information (the
 profiles, the confirmations, the table of readings, what a value means and the
 idle check) is in `vendor_interface/primitive_handling/`. Its command
 definitions and the capture are in `procedures/`. The dispatcher engines stay
@@ -703,8 +704,8 @@ in `dispatcher/`. The guard test lists the few imports that still run upward.
    written as one function for each command. Much of it is a table entry that
    belongs in the handling notes, and only the real recipes belong in
    `procedures/`.
-2. `zmart_adapter/zmart_adapter.py` (about 1,700 lines) holds much of the
-   logic of `get_xyz`, `set_xyz` and `acquire`. The `ZmartDriver` class is
+2. `for_zmart_controller/zmart_adapter/zmart_adapter.py` (about 1,700 lines)
+   holds much of the logic of `get_xyz`, `set_xyz` and `acquire`. The `ZmartDriver` class is
    meant to be thin, so that logic has to move into procedures, and the
    coordinate conversion into the class.
 3. `dispatcher/checks.py` and `gate.py` use Leica's command names, and the

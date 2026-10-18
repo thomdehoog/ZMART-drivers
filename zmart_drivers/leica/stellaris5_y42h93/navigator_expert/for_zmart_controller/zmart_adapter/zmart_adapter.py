@@ -79,29 +79,29 @@ from pathlib import Path
 from typing import Any
 
 try:  # driver version for embedded export state; never fail acquire over it
-    from .. import __version__ as _DRIVER_VERSION
+    from ... import __version__ as _DRIVER_VERSION
 except Exception:  # noqa: BLE001 -- best-effort provenance
     _DRIVER_VERSION = None
 
-from .. import connect as _session
-from ..procedures import acquire as _capture
-from ..procedures import changes as _commands
-from ..vendor_interface.primitive_handling.derived import (
+from ... import connect as _session
+from ...procedures import acquire as _capture
+from ...procedures import changes as _commands
+from ...vendor_interface.primitive_handling.derived import (
     z_um_from_settings as _z_um_from_settings,
 )
-from ..vendor_interface.primitive_handling.profiles import IMAGE_SAVE
-from ..configuration import image_stage_registration as _orientation
-from ..configuration import session_state as _session_state
-from ..configuration import store as _machine
-from ..dispatcher import gate as _gate
-from ..dispatcher import read as _readers
-from ..output import command_log as _log
-from ..output import lasx_cache_release as _release
-from ..output import save as _save
-from ..output.naming import Naming, free_stem, run_hash
-from ..procedures import backlash as _motion
-from ..vendor_interface.parsing import parse_tile_geometry as _parse_tile_geometry
-from ..configuration import data_location as _data_location
+from ...vendor_interface.primitive_handling.profiles import IMAGE_SAVE
+from ...configuration import image_stage_registration as _orientation
+from ...configuration import session_state as _session_state
+from ...configuration import store as _machine
+from ...dispatcher import gate as _gate
+from ...dispatcher import read as _readers
+from ...output import command_log as _log
+from ...output import lasx_cache_release as _release
+from ...output import save as _save
+from ...output.naming import Naming, free_stem, run_hash
+from ...procedures import backlash as _motion
+from ...vendor_interface.parsing import parse_tile_geometry as _parse_tile_geometry
+from ...configuration import data_location as _data_location
 from . import info as _info
 
 log = logging.getLogger(__name__)
@@ -450,7 +450,7 @@ def _objective_delta_um(handle: ZmartHandle, current_objective: dict | None) -> 
     # calibration/core/model.py — shared with the driver's swap-time
     # compensation, so the two layers can never drift apart. Imported
     # lazily, matching the connection layer's calibration imports.
-    from ..configuration.optical_calibration import model as _cal_model
+    from ...configuration.optical_calibration import model as _cal_model
 
     try:
         return _cal_model.translation_delta_um(
@@ -645,7 +645,7 @@ def set_origin(handle: ZmartHandle) -> dict:
     This is a setup step for the driver, not a controller command. The
     operator runs it once, working with the driver directly, for example::
 
-        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.zmart_adapter import zmart_adapter as adapter
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.for_zmart_controller.zmart_adapter import zmart_adapter as adapter
         handle = adapter.connect(adapter.CONNECTION)
         adapter.set_origin(handle)
 

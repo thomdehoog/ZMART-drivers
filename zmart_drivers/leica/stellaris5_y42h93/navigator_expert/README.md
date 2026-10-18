@@ -274,7 +274,7 @@ once in a setup step and then reused by every session. During that step the oper
 the driver directly and calls the adapter's `set_origin`:
 
 ```python
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.zmart_adapter import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.for_zmart_controller.zmart_adapter import (
     zmart_adapter as adapter,
 )
 
@@ -541,9 +541,9 @@ zmart_drivers/leica/stellaris5_y42h93/navigator_expert/
 ├── zmart_driver.json   the driver's name ("stellaris") and how to reach LAS X on this computer
 ├── for_zmart_controller/   everything that faces the controller:
 │   ├── zmart_driver.py     the ZmartDriver class the controller calls, one method per command
-│   └── zmart_controller_plugin.py   the older module shape, kept until the class has run on hardware
-├── zmart_adapter/      the functions behind those methods, one per command (still holds the
-│                       coordinate arithmetic; see "What the move did not change" below)
+│   ├── zmart_controller_plugin.py   the older module shape, kept until the class has run on hardware
+│   └── zmart_adapter/      the functions behind those methods, one per command (still holds the
+│                           coordinate arithmetic; see "What the move did not change" below)
 ├── connect.py          the connect flow: open LAS X, load this microscope's configuration
 ├── vendor_interface/   the only part that knows LAS X:
 │   ├── connection/     lasx_runtime.py (the .NET CAM assemblies), hardware_server.py
@@ -616,7 +616,7 @@ workflow sees:
   once, never re-sent, and waited for as long as the scan needs.
 - A limits refusal raises `ValueError`; today parts of the gate raise `RuntimeError`.
 - The limits gate moves inside the set dispatcher, so that no change calls it itself.
-- The coordinate arithmetic (origin, orientation, objective offsets) leaves `zmart_adapter/` for
+- The coordinate arithmetic (origin, orientation, objective offsets) leaves `for_zmart_controller/zmart_adapter/` for
   `configuration/coordinates.py` and the `ZmartDriver` class.
 - The setup notebooks become thin: the measuring is a procedure, the notebook only calls it.
 - `zmart_controller_plugin.py` goes, once `zmart_driver.py` has driven the real STELLARIS.

@@ -23,7 +23,7 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.for_zmart_controller
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitive_handling import (
     profiles,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.zmart_adapter import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.for_zmart_controller.zmart_adapter import (
     zmart_adapter as adapter,
 )
 

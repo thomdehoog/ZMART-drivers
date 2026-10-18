@@ -8,10 +8,10 @@ example).
 Tests and validators that patch the adapter's driver seams (``_session``,
 ``_readers``, ...) import the implementation module directly::
 
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.zmart_adapter import zmart_adapter as adapter
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.for_zmart_controller.zmart_adapter import zmart_adapter as adapter
 """
 
-from .zmart_adapter import (  # noqa: F401 -- re-exported public surface
+from .zmart_adapter import (
     CONNECTION,
     ZmartHandle,
     acquire,
@@ -28,3 +28,21 @@ from .zmart_adapter import (  # noqa: F401 -- re-exported public surface
     set_state,
     set_xyz,
 )
+
+__all__ = [
+    "CONNECTION",
+    "ZmartHandle",
+    "acquire",
+    "connect",
+    "disconnect",
+    "get_acquisition_settings",
+    "get_actuators",
+    "get_info",
+    "get_procedures",
+    "get_state",
+    "get_xyz",
+    "run_procedure",
+    "set_origin",
+    "set_state",
+    "set_xyz",
+]

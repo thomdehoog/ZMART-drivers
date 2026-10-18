@@ -878,7 +878,7 @@ def test_adapter_bypass_refuses_at_the_commands_layer(clear_stage_limits):
     from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface import (
         parsing as _cmd_settings,
     )
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.zmart_adapter import (
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.for_zmart_controller.zmart_adapter import (
         zmart_adapter as adapter,
     )
 
@@ -921,7 +921,7 @@ def test_controller_session_bypass_refuses_at_the_commands_layer(clear_stage_lim
     from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface import (
         parsing as _cmd_settings,
     )
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.zmart_adapter import (
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.for_zmart_controller.zmart_adapter import (
         zmart_adapter as adapter,
     )
 
