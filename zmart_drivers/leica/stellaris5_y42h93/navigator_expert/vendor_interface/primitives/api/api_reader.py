@@ -46,7 +46,7 @@ import time
 import xml.etree.ElementTree as ET
 
 from ...primitive_handling import derived
-from ....dispatcher import timing
+from ....dispatcher import reader
 from .delivery import deliver
 
 log = logging.getLogger(__name__)
@@ -131,7 +131,7 @@ def _request(
         The answered value, or None when there was no answer.
     """
     label = label or command
-    deadline = time.monotonic() + timing.WINDOW_S if deadline is None else deadline
+    deadline = time.monotonic() + reader.WINDOW_S if deadline is None else deadline
     should_stop = should_stop or _never_stop
     try:
         flush(client)
@@ -148,7 +148,7 @@ def _request(
                     return value
             if time.monotonic() >= deadline:
                 break
-            time.sleep(timing.ANSWER_POLL_S)
+            time.sleep(reader.ANSWER_POLL_S)
         log.debug("%s: no answer%s", label, context)
     except Exception as e:
         log.debug("%s failed: %s", label, e)
@@ -198,7 +198,7 @@ def get_job_settings(client, job_name, *, deadline=None, should_stop=None):
             return _STALE
         return _ACCEPT
 
-    deadline_at = time.monotonic() + timing.WINDOW_S if deadline is None else deadline
+    deadline_at = time.monotonic() + reader.WINDOW_S if deadline is None else deadline
     return _request(
         client,
         command="GetJobSettingsByName",
