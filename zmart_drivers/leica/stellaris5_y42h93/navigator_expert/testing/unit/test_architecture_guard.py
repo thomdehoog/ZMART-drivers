@@ -172,19 +172,35 @@ ALLOWED = {
         "dispatcher",
         "configuration",
     },
-    "procedures": {"vendor_interface", "dispatcher", "actions", "configuration", "output"},
+    "procedures": {
+        "vendor_interface",
+        "dispatcher",
+        "actions",
+        "configuration",
+        "output",
+    },
     "output": {"vendor_interface", "dispatcher", "actions", "configuration"},
     "configuration": {
         "dispatcher",  # upward: the limits item validates through the rulebook
     },
     "connect": {"vendor_interface", "dispatcher", "actions", "configuration"},
     "zmart_adapter": {
-        "vendor_interface", "dispatcher", "actions", "procedures", "output",
-        "configuration", "connect", "__version__",
+        "vendor_interface",
+        "dispatcher",
+        "actions",
+        "procedures",
+        "output",
+        "configuration",
+        "connect",
+        "__version__",
     },
     "zmart_controller_plugin": {"zmart_adapter"},
     "__init__": {
-        "vendor_interface", "dispatcher", "actions", "output", "connect",
+        "vendor_interface",
+        "dispatcher",
+        "actions",
+        "output",
+        "connect",
     },
 }
 
@@ -216,7 +232,9 @@ def _imported_parts(path: Path, part: str) -> set[str]:
 def test_each_part_only_imports_what_the_anatomy_allows():
     for part, allowed in ALLOWED.items():
         folder = DRIVER_ROOT / part
-        paths = folder.rglob("*.py") if folder.is_dir() else [DRIVER_ROOT / f"{part}.py"]
+        paths = (
+            folder.rglob("*.py") if folder.is_dir() else [DRIVER_ROOT / f"{part}.py"]
+        )
         for path in paths:
             if "__pycache__" in path.parts:
                 continue
@@ -238,4 +256,6 @@ def test_a_reading_never_uses_a_change():
 
 def test_nothing_but_the_tests_imports_from_testing():
     for rel, text in _driver_sources():
-        assert "testing" not in _imported_parts(DRIVER_ROOT / rel, rel.parts[0]), str(rel)
+        assert "testing" not in _imported_parts(DRIVER_ROOT / rel, rel.parts[0]), str(
+            rel
+        )

@@ -145,7 +145,9 @@ def z_drive_node(nodes, drive):
             if found is not None:
                 remembered[path] = found
                 return found
-    raise HardwareServerUnavailable(f"the state tree has no {drive} under {'/'.join(Z_DRIVES_PATH)}")
+    raise HardwareServerUnavailable(
+        f"the state tree has no {drive} under {'/'.join(Z_DRIVES_PATH)}"
+    )
 
 
 def server_nodes():

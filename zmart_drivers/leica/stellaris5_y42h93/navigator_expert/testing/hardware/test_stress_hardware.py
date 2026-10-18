@@ -33,15 +33,17 @@ def test_readback_mismatch_is_warn_by_default_and_fail_when_strict():
             "timing": {"attempts": 1, "confirm_attempts": 1},
         }
 
-    status, _message, _timing, _driver_message, context = stress_hardware._setting_round_trip(
-        None,
-        None,
-        "Job",
-        rng,
-        setting_name="example",
-        read=stale_readback,
-        write=successful_write,
-        candidates=[2],
+    status, _message, _timing, _driver_message, context = (
+        stress_hardware._setting_round_trip(
+            None,
+            None,
+            "Job",
+            rng,
+            setting_name="example",
+            read=stale_readback,
+            write=successful_write,
+            candidates=[2],
+        )
     )
     assert status == "WARN"
     assert context["readback_status"] == "mismatch"
@@ -65,7 +67,9 @@ def test_readback_mismatch_is_warn_by_default_and_fail_when_strict():
 
 def _records(path: Path) -> list[dict]:
     return [
-        json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()
+        json.loads(line)
+        for line in path.read_text(encoding="utf-8").splitlines()
+        if line.strip()
     ]
 
 

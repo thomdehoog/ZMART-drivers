@@ -64,7 +64,9 @@ class TestSingleLegIdentity(unittest.TestCase):
 class TestDualLegRace(unittest.TestCase):
     def test_dual_leg_requires_budget(self):
         with self.assertRaises(ValueError):
-            confirmations.race_confirmations(api_leg=lambda: _ok(), log_leg=lambda: _ok())
+            confirmations.race_confirmations(
+                api_leg=lambda: _ok(), log_leg=lambda: _ok()
+            )
 
     def test_log_wins_while_api_leg_blocked(self):
         release = threading.Event()
@@ -107,7 +109,9 @@ class TestDualLegRace(unittest.TestCase):
         )
         result = race()
         self.assertTrue(result["success"])
-        warnings = [entry["msg"] for entry in result["logs"] if entry["level"] == "warning"]
+        warnings = [
+            entry["msg"] for entry in result["logs"] if entry["level"] == "warning"
+        ]
         self.assertTrue(any("log leg had not confirmed" in m for m in warnings))
 
     def test_both_fail_is_fail_closed_with_both_logs(self):
@@ -234,7 +238,9 @@ class TestApiLegRoutedReads(unittest.TestCase):
         client = object()
         api_key = router._client_api_key(client)
         self.assertTrue(
-            router._API_TURNS.take(api_key, until=time.monotonic() + 1.0, stop=threading.Event())
+            router._API_TURNS.take(
+                api_key, until=time.monotonic() + 1.0, stop=threading.Event()
+            )
         )
         self.addCleanup(router._API_TURNS.give_back, api_key)
 

@@ -9,7 +9,10 @@ def raw_settings(*, galvo_um=0.0, wide_um=4999.5, stack_on=None):
         "scanSpeed": {"value": 400, "isResonant": False},
         "activeSettings": [],
         "scanMode": "xyz",
-        "zPosition": {"z-galvo": {"position": galvo_um}, "z-wide": {"position": wide_um}},
+        "zPosition": {
+            "z-galvo": {"position": galvo_um},
+            "z-wide": {"position": wide_um},
+        },
     }
     if stack_on is not None:
         settings["stack"] = {

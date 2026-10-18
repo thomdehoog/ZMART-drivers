@@ -42,7 +42,11 @@ def _atl_obj(block_id, name, image="1.16 mm x 1.16 mm", zoom=1.0, zwide=1810.7):
         "zoom": {"current": zoom},
         "scanSpeed": {"value": 400, "isResonant": False},
         "activeSettings": [
-            {"pinholeAiry": {"value": 1.0}, "activeDetectors": [], "activeLaserLines": []}
+            {
+                "pinholeAiry": {"value": 1.0},
+                "activeDetectors": [],
+                "activeLaserLines": [],
+            }
         ],
         "zPosition": {"z-wide": {"position": zwide}, "z-galvo": {"position": 0.0}},
         "objective": {"name": "10x", "slotIndex": 0},
@@ -104,7 +108,9 @@ def current_block_lines(offset, name, block_id):
 
 
 def hw_line(offset, payload=None):
-    payload = payload if payload is not None else {"Microscope": {"name": "DM Manual-6"}}
+    payload = (
+        payload if payload is not None else {"Microscope": {"name": "DM Manual-6"}}
+    )
     return (
         f"{ts(offset)} Result of command Scanner GetConfocalHardwareInfoAsJson "
         f"'<Result Error=\"\">{json.dumps(payload)}''"
@@ -139,7 +145,9 @@ class TestLogReader(unittest.TestCase):
                 atl_line(1, 224, "AF Job", image=""),
             ]
         )
-        self.assertEqual(L.get_job_settings("AF Job", s)["imageSize"], "1.16 mm x 1.16 mm")
+        self.assertEqual(
+            L.get_job_settings("AF Job", s)["imageSize"], "1.16 mm x 1.16 mm"
+        )
 
     def test_duplicate_names_within_window_fail_closed(self):
         s = parse([atl_line(0, 10, "Dup"), atl_line(1, 11, "Dup")])
@@ -167,7 +175,12 @@ class TestLogReader(unittest.TestCase):
 
     def test_valid_selection(self):
         s = parse(
-            [atl_line(0, 10, "A"), atl_line(0, 11, "B"), atl_line(0, 12, "C"), sel_line(1, 2)]
+            [
+                atl_line(0, 10, "A"),
+                atl_line(0, 11, "B"),
+                atl_line(0, 12, "C"),
+                sel_line(1, 2),
+            ]
         )
         self.assertEqual([j["Name"] for j in L.get_jobs(s) if j["IsSelected"]], ["B"])
 
@@ -197,7 +210,9 @@ class TestLogReader(unittest.TestCase):
         self.assertIsNone(s.current_block_id)  # not the stale 6
 
     def test_matrix_job_list_honors_max_age(self):
-        s = parse([matrix_jobs_line(0)], now=(BASE + timedelta(seconds=600)).timestamp())
+        s = parse(
+            [matrix_jobs_line(0)], now=(BASE + timedelta(seconds=600)).timestamp()
+        )
         self.assertIsNotNone(L.get_jobs(s))
         self.assertIsNone(L.get_jobs(s, max_age_s=60.0))
 
@@ -249,7 +264,12 @@ class TestLogReader(unittest.TestCase):
 
     def test_ambiguous_selection_unknown(self):
         s = parse(
-            [atl_line(0, 10, "A"), atl_line(0, 11, "B"), atl_line(0, 12, "C"), sel_line(1, 9)]
+            [
+                atl_line(0, 10, "A"),
+                atl_line(0, 11, "B"),
+                atl_line(0, 12, "C"),
+                sel_line(1, 9),
+            ]
         )
         for j in L.get_jobs(s):
             self.assertIsNone(j["IsSelected"])
@@ -267,7 +287,10 @@ class TestLogReader(unittest.TestCase):
         self.assertIsNotNone(L.get_xy(s))
 
     def test_per_job_age_exposed(self):
-        s = parse([atl_line(0, 224, "AF Job")], now=(BASE + timedelta(seconds=120)).timestamp())
+        s = parse(
+            [atl_line(0, 224, "AF Job")],
+            now=(BASE + timedelta(seconds=120)).timestamp(),
+        )
         self.assertAlmostEqual(L.ages(s)["jobs"]["AF Job"], 120, delta=1)
 
     def test_stale_exposed_and_refused(self):
@@ -298,7 +321,8 @@ class TestLogReader(unittest.TestCase):
 
     def test_max_age_gates_get_jobs_and_selection(self):
         s = parse(
-            [atl_line(0, 10, "A"), sel_line(1, 1)], now=(BASE + timedelta(seconds=600)).timestamp()
+            [atl_line(0, 10, "A"), sel_line(1, 1)],
+            now=(BASE + timedelta(seconds=600)).timestamp(),
         )
         self.assertIsNotNone(L.get_jobs(s))  # default: exposed
         old = profiles.LOG_READER
@@ -320,7 +344,9 @@ class TestLogReader(unittest.TestCase):
         old = profiles.LOG_READER
         try:
             profiles.LOG_READER = profiles.LogReaderProfile(max_age_s=60.0)
-            self.assertIsNone(L.get_job_settings("A", s))  # no timestamp -> refused under policy
+            self.assertIsNone(
+                L.get_job_settings("A", s)
+            )  # no timestamp -> refused under policy
         finally:
             profiles.LOG_READER = old
 
@@ -374,7 +400,9 @@ class TestLogReader(unittest.TestCase):
         hw = L.get_hardware_info(s)
         self.assertEqual(hw, payload)
         self.assertEqual(len(hw["Microscope"]["objectives"]), 3)
-        self.assertEqual([o["slotIndex"] for o in hw["Microscope"]["objectives"]], [1, 2, 3])
+        self.assertEqual(
+            [o["slotIndex"] for o in hw["Microscope"]["objectives"]], [1, 2, 3]
+        )
 
     def test_latin1_micro_in_imagesize(self):
         line = atl_line(0, 242, "HiRes", image="290.63 µm x 290.63 µm")
@@ -405,17 +433,23 @@ class TestLogReader(unittest.TestCase):
         opn = f"{ts(0)} 0001 Info DbTracer 'MessageBox : Please turn turret manually.'"
         res = f"{ts(0)} 0001 Info DbTracer 'MessageBox Result: OK'"  # SAME timestamp
         # open then close (same ts) -> closed
-        s = L.parse_log(lcs_path=NONE_PATH, msgbox_path=self._write_msgbox([opn, res]), now=NOWE)
+        s = L.parse_log(
+            lcs_path=NONE_PATH, msgbox_path=self._write_msgbox([opn, res]), now=NOWE
+        )
         self.assertIsNone(L.get_pending_dialog(s))
         # close then open (same ts) -> open  (line order decides, not timestamp)
-        s2 = L.parse_log(lcs_path=NONE_PATH, msgbox_path=self._write_msgbox([res, opn]), now=NOWE)
+        s2 = L.parse_log(
+            lcs_path=NONE_PATH, msgbox_path=self._write_msgbox([res, opn]), now=NOWE
+        )
         self.assertIn("turn turret", (L.get_pending_dialog(s2) or ""))
 
     def test_dialog_interleaved_latest_open_wins(self):
         a = f"{ts(0)} 0001 Info DbTracer 'MessageBox : Dialog A'"
         ok = f"{ts(1)} 0001 Info DbTracer 'MessageBox Result: OK'"
         b = f"{ts(2)} 0001 Info DbTracer 'MessageBox : Dialog B'"
-        s = L.parse_log(lcs_path=NONE_PATH, msgbox_path=self._write_msgbox([a, ok, b]), now=NOWE)
+        s = L.parse_log(
+            lcs_path=NONE_PATH, msgbox_path=self._write_msgbox([a, ok, b]), now=NOWE
+        )
         self.assertIn("Dialog B", (L.get_pending_dialog(s) or ""))
 
     def test_selection_partial_cluster_fails_closed(self):

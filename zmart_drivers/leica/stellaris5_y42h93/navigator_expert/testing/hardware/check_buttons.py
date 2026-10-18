@@ -51,16 +51,32 @@ def press_jobs() -> None:
     The driver itself never presses Jobs; the check does, so that the canvas
     is gone and the driver has to bring it back.
     """
-    c, uia, found = lasx_navigator.walked(lasx_navigator.SWITCH_PATH, "so no Jobs button; is Navigator Expert open?")
+    c, uia, found = lasx_navigator.walked(
+        lasx_navigator.SWITCH_PATH, "so no Jobs button; is Navigator Expert open?"
+    )
     p = uia.CreatePropertyCondition
-    switch = found.FindFirst(c.TreeScope_Descendants, p(c.UIA_ClassNamePropertyId, "ModuleSwitchBetweenLDMAndMatrixView"))
-    button = switch.FindFirst(
-        c.TreeScope_Children,
-        uia.CreateAndCondition(p(c.UIA_ControlTypePropertyId, c.UIA_ButtonControlTypeId), p(c.UIA_NamePropertyId, "Jobs")),
-    ) if switch else None
+    switch = found.FindFirst(
+        c.TreeScope_Descendants,
+        p(c.UIA_ClassNamePropertyId, "ModuleSwitchBetweenLDMAndMatrixView"),
+    )
+    button = (
+        switch.FindFirst(
+            c.TreeScope_Children,
+            uia.CreateAndCondition(
+                p(c.UIA_ControlTypePropertyId, c.UIA_ButtonControlTypeId),
+                p(c.UIA_NamePropertyId, "Jobs"),
+            ),
+        )
+        if switch
+        else None
+    )
     if not button:
-        raise lasx_navigator.NavigatorUnavailable("Navigator Expert's Jobs button was not found")
-    toggle = button.GetCurrentPattern(c.UIA_TogglePatternId).QueryInterface(c.IUIAutomationTogglePattern)
+        raise lasx_navigator.NavigatorUnavailable(
+            "Navigator Expert's Jobs button was not found"
+        )
+    toggle = button.GetCurrentPattern(c.UIA_TogglePatternId).QueryInterface(
+        c.IUIAutomationTogglePattern
+    )
     if toggle.CurrentToggleState != 1:
         toggle.Toggle()
 
@@ -89,16 +105,28 @@ def run_checks() -> dict:
 
     def jobs_hides_the_canvas():
         press_jobs()
-        return True if until(lambda: not lasx_navigator.canvas_shown(), WAIT_S) else "NO: the canvas stayed shown after Jobs"
+        return (
+            True
+            if until(lambda: not lasx_navigator.canvas_shown(), WAIT_S)
+            else "NO: the canvas stayed shown after Jobs"
+        )
 
     def experiment_brings_it_back():
         pressed = lasx_navigator.show_canvas()
         if not pressed:
             return "NO: the driver did not press Experiment, though the canvas was gone"
-        return True if lasx_navigator.canvas_shown() else "NO: Experiment pressed, the canvas not reachable"
+        return (
+            True
+            if lasx_navigator.canvas_shown()
+            else "NO: Experiment pressed, the canvas not reachable"
+        )
 
     def shown_is_left_alone():
-        return True if lasx_navigator.show_canvas() is False else "NO: Experiment pressed again on a shown canvas"
+        return (
+            True
+            if lasx_navigator.show_canvas() is False
+            else "NO: Experiment pressed again on a shown canvas"
+        )
 
     def clear_is_pressed():
         # The press itself: the driver found the button and pressed it, or it
@@ -114,7 +142,10 @@ def run_checks() -> dict:
         return True
 
     if check("Jobs pressed: the canvas is gone", jobs_hides_the_canvas):
-        check("the driver brought the canvas back with Experiment", experiment_brings_it_back)
+        check(
+            "the driver brought the canvas back with Experiment",
+            experiment_brings_it_back,
+        )
         check("a shown canvas is left alone", shown_is_left_alone)
     if lasx_navigator.canvas_shown():
         check("Clear found and pressed", clear_is_pressed)
@@ -126,11 +157,16 @@ def run_checks() -> dict:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--report-dir", default=".", help="where the report is written (default: here)")
+    parser.add_argument(
+        "--report-dir", default=".", help="where the report is written (default: here)"
+    )
     asked = parser.parse_args()
     checks = run_checks()
     failed = [name for name, result in checks.items() if result is not True]
-    report = {"checks": checks, "verdict": "ALL CHECKS PASSED" if not failed else f"FAILED: {failed}"}
+    report = {
+        "checks": checks,
+        "verdict": "ALL CHECKS PASSED" if not failed else f"FAILED: {failed}",
+    }
     out = Path(asked.report_dir) / "check_buttons.json"
     out.write_text(json.dumps(report, indent=2, ensure_ascii=False), encoding="utf-8")
     print(json.dumps(report, indent=2, ensure_ascii=False))

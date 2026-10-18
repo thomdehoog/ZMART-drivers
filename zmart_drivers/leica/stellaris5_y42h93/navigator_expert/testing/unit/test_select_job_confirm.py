@@ -298,7 +298,9 @@ class TestLegsBuilder(SelectJobCase):
     def test_unknown_source_raises_before_firing(self):
         self._use(selected_job_confirm_source="nonsense")
         with self.assertRaises(ValueError):
-            confirm_select_job.select_job_confirm_legs("HiRes", command_started_at=100.0)
+            confirm_select_job.select_job_confirm_legs(
+                "HiRes", command_started_at=100.0
+            )
 
     def test_refires_reuse_the_original_command_timestamp(self):
         self._use(
@@ -336,7 +338,9 @@ class TestPrepareSelectJob(SelectJobCase):
         self._use(selected_job_confirm_source="hybrid")
         jobs = [{"Name": "AF Job", "IsSelected": True}]
         with (
-            patch.object(confirm_select_job, "_selected_job_name_from_log", return_value=None),
+            patch.object(
+                confirm_select_job, "_selected_job_name_from_log", return_value=None
+            ),
             patch.object(
                 confirm_select_job,
                 "_selected_job_api_baseline",
@@ -352,7 +356,9 @@ class TestPrepareSelectJob(SelectJobCase):
         jobs = [{"Name": "Overview", "IsSelected": True}]
         with (
             patch.object(readers, "get_jobs", return_value=jobs),
-            patch.object(confirm_select_job, "_selected_job_name_from_log", return_value="AF Job"),
+            patch.object(
+                confirm_select_job, "_selected_job_name_from_log", return_value="AF Job"
+            ),
         ):
             noop, _ = confirm_select_job.prepare_select_job(None, "AF Job")
         self.assertIsNotNone(noop)
@@ -363,7 +369,9 @@ class TestPrepareSelectJob(SelectJobCase):
         jobs = [{"Name": "Overview", "IsSelected": True}]
         with (
             patch.object(readers, "get_jobs", return_value=jobs),
-            patch.object(confirm_select_job, "_selected_job_name_from_log", return_value="AF Job"),
+            patch.object(
+                confirm_select_job, "_selected_job_name_from_log", return_value="AF Job"
+            ),
         ):
             noop, _ = confirm_select_job.prepare_select_job(None, "AF Job")
         self.assertIsNotNone(noop)
@@ -371,7 +379,9 @@ class TestPrepareSelectJob(SelectJobCase):
     def test_log_source_does_not_touch_api_when_log_has_no_noop(self):
         self._use(selected_job_confirm_source="log")
         with (
-            patch.object(confirm_select_job, "_selected_job_name_from_log", return_value=None),
+            patch.object(
+                confirm_select_job, "_selected_job_name_from_log", return_value=None
+            ),
             patch.object(readers, "get_jobs") as api_jobs,
             patch.object(readers, "get_job_settings") as api_settings,
         ):

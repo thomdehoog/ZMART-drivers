@@ -38,23 +38,31 @@ class TestIdlePrecheckPolicy(unittest.TestCase):
     def test_physical_commands_see_idle_before_firing(self):
         for name in IDLE_GUARDED:
             with self.subTest(profile=name):
-                self.assertIs(getattr(profiles, name).pre_check_fn, prechecks.check_idle)
+                self.assertIs(
+                    getattr(profiles, name).pre_check_fn, prechecks.check_idle
+                )
 
     def test_check_idle_waits_through_a_busy_phase_within_the_windows(self):
         statuses = self._statuses(["eScanRunning"] * 10 + ["eScanIdle"])
-        with patch.object(prechecks._readers.api_reader, "get_scan_status", side_effect=statuses):
+        with patch.object(
+            prechecks._readers.api_reader, "get_scan_status", side_effect=statuses
+        ):
             result = prechecks.check_idle(object())
         self.assertTrue(result["success"])
 
     def test_check_idle_unknown_is_not_idle(self):
         statuses = self._statuses(["Unknown", "Unknown", "eScanIdle"])
-        with patch.object(prechecks._readers.api_reader, "get_scan_status", side_effect=statuses):
+        with patch.object(
+            prechecks._readers.api_reader, "get_scan_status", side_effect=statuses
+        ):
             result = prechecks.check_idle(object())
         self.assertTrue(result["success"])  # waited through Unknown, not past it
 
     def test_check_idle_fails_when_busy_through_all_four_windows(self):
         with patch.object(
-            prechecks._readers.api_reader, "get_scan_status", return_value="eScanRunning"
+            prechecks._readers.api_reader,
+            "get_scan_status",
+            return_value="eScanRunning",
         ):
             result = prechecks.check_idle(object())
         self.assertFalse(result["success"])

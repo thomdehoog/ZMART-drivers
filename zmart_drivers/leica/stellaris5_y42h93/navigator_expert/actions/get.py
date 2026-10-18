@@ -44,12 +44,18 @@ def hardware_info_present(value, *, job_name=None) -> bool:
 
 def xy_present(value, *, job_name=None) -> bool:
     """Both stage coordinates, as finite numbers."""
-    return isinstance(value, dict) and _finite(value.get("x_um")) and _finite(value.get("y_um"))
+    return (
+        isinstance(value, dict)
+        and _finite(value.get("x_um"))
+        and _finite(value.get("y_um"))
+    )
 
 
 def jobs_listed(value, *, job_name=None) -> bool:
     """A job list whose every entry names its job; an empty list is a real answer."""
-    return isinstance(value, list) and all(isinstance(j, dict) and j.get("Name") for j in value)
+    return isinstance(value, list) and all(
+        isinstance(j, dict) and j.get("Name") for j in value
+    )
 
 
 def selected_job_named(value, *, job_name=None) -> bool:
@@ -148,7 +154,9 @@ DATUMS = {
     "job_settings": DatumSpec(
         mode_attr="job_settings_mode",
         success=job_settings_complete,
-        api_fn=lambda client, job_name, **kw: api_reader.get_job_settings(client, job_name, **kw),
+        api_fn=lambda client, job_name, **kw: api_reader.get_job_settings(
+            client, job_name, **kw
+        ),
         direct_fn=direct_reader.get_job_settings,
         log_fn=lambda snapshot, *, max_age_s, job_name: log_reader.get_job_settings(
             job_name, snapshot, max_age_s=max_age_s
@@ -170,7 +178,9 @@ DATUMS = {
         mode_attr="xy_mode",
         success=xy_present,
         api_fn=lambda client, **kw: api_reader.get_xy(client, **kw),
-        log_fn=lambda snapshot, *, max_age_s: log_reader.get_xy(snapshot, max_age_s=max_age_s),
+        log_fn=lambda snapshot, *, max_age_s: log_reader.get_xy(
+            snapshot, max_age_s=max_age_s
+        ),
         log_max_age_attr="xy_log_max_age_s",
         age_key="xy",
         direct_fn=direct_reader.get_xy,

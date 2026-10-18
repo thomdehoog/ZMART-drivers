@@ -246,8 +246,12 @@ def make_changeable_copy(settings):
         lasers = []
         for laser_raw in s.get("activeLaserLines", []):
             laser = dict(laser_raw)
-            laser["_beamRoute"] = laser_raw.get("beamRoute", laser_raw.get("_beamRoute", ""))
-            laser["_lineIndex"] = laser_raw.get("lineIndex", laser_raw.get("_lineIndex", 0))
+            laser["_beamRoute"] = laser_raw.get(
+                "beamRoute", laser_raw.get("_beamRoute", "")
+            )
+            laser["_lineIndex"] = laser_raw.get(
+                "lineIndex", laser_raw.get("_lineIndex", 0)
+            )
             lasers.append(laser)
         entry["activeLaserLines"] = lasers
 

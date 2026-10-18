@@ -39,7 +39,9 @@ class TestValidateHardwareCli(unittest.TestCase):
             prime_log_select_cluster=False,
         )
 
-        validator._apply_log_select_confirmation(args, logging.getLogger("validate-hardware-test"))
+        validator._apply_log_select_confirmation(
+            args, logging.getLogger("validate-hardware-test")
+        )
 
         self.assertEqual(profiles.STATE_READERS.selected_job_confirm_source, "hybrid")
         self.assertEqual(profiles.STATE_READERS.selected_job_log_cluster_max_age_s, 4.0)

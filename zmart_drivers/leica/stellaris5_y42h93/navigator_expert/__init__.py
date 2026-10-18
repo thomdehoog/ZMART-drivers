@@ -100,7 +100,11 @@ from .vendor_interface.parsing import (
     parse_tile_geometry,
 )
 from .dispatcher.envelope import _make_log_entry
-from .vendor_interface.errors import _is_transient_error, _check_api_error, _default_error_check
+from .vendor_interface.errors import (
+    _is_transient_error,
+    _check_api_error,
+    _default_error_check,
+)
 from .dispatcher.read import (
     Reading,
     get_scan_status,

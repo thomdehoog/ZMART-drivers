@@ -282,7 +282,11 @@ def _install_default_limits(client: Any, machine: Any, reason: str) -> GateState
 
 
 def connect_handshake(
-    client: Any, *, machine: Any = None, stage_limits_path: Any = None, load: bool = True
+    client: Any,
+    *,
+    machine: Any = None,
+    stage_limits_path: Any = None,
+    load: bool = True,
 ):
     """The connect-time limits handshake: resolve, validate, install. Never raises.
 

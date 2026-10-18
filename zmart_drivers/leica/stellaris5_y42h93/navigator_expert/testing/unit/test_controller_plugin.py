@@ -48,9 +48,13 @@ def test_the_driver_fits_the_controller_contract_offline(monkeypatch, tmp_path):
     )
     hermetic_mock_machine_root()
     monkeypatch.setattr(
-        adapter._session, "connect_python_client", lambda **_kw: MockLasxClient(latency=0.0)
+        adapter._session,
+        "connect_python_client",
+        lambda **_kw: MockLasxClient(latency=0.0),
     )
-    problems = zmart_controller.validate_driver(driver, {"output_root": str(tmp_path / "out")})
+    problems = zmart_controller.validate_driver(
+        driver, {"output_root": str(tmp_path / "out")}
+    )
 
     assert problems == []
 
@@ -61,9 +65,13 @@ def test_get_info_describes_the_microscope_in_plain_words(monkeypatch, tmp_path)
     monkeypatch.setattr(profiles, "LOG_READER", profiles.LOG_READER)
     hermetic_mock_machine_root()
     monkeypatch.setattr(
-        adapter._session, "connect_python_client", lambda **_kw: MockLasxClient(latency=0.0)
+        adapter._session,
+        "connect_python_client",
+        lambda **_kw: MockLasxClient(latency=0.0),
     )
-    session = zmart_controller.ZmartController(driver, {"output_root": str(tmp_path / "out")})
+    session = zmart_controller.ZmartController(
+        driver, {"output_root": str(tmp_path / "out")}
+    )
     try:
         answer = session.get_info()
         xyz = session.get_xyz()["content"]

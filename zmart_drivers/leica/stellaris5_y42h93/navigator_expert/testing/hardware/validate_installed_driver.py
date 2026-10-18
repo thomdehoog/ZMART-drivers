@@ -38,7 +38,6 @@ Usage:
   python validate_installed_driver.py --yes --allow-move --allow-acquire   # simulator or scope
 """
 
-
 from __future__ import annotations
 
 import argparse
@@ -221,11 +220,14 @@ def phase_commands(v: vh.Validator, sess: Any) -> dict[str, Any]:
         settings = v.callable("get_acquisition_settings", sess.get_acquisition_settings)
         if settings is not None:
             shaped = all(
-                isinstance(spec, dict) and {"options", "default", "active"} <= spec.keys()
+                isinstance(spec, dict)
+                and {"options", "default", "active"} <= spec.keys()
                 for spec in settings.values()
             )
             v.compare(
-                "get_acquisition_settings: options, default and active per setting", shaped, True
+                "get_acquisition_settings: options, default and active per setting",
+                shaped,
+                True,
             )
 
         procedures = v.callable("get_procedures", sess.get_procedures)

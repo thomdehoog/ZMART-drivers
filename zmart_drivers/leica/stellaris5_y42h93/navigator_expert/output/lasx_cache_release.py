@@ -51,9 +51,14 @@ def prepare() -> None:
     """Show the Navigator canvas before a capture that will be released, so that its Clear can be pressed after."""
     try:
         if lasx_navigator.show_canvas():
-            log.info("Navigator Expert's Experiment tab shown, so the canvas can be cleared after the capture")
+            log.info(
+                "Navigator Expert's Experiment tab shown, so the canvas can be cleared after the capture"
+            )
     except lasx_navigator.NavigatorUnavailable as why:
-        log.warning("the Navigator canvas could not be shown, so this capture's hidden copy may stay in LAS X's cache: %s", why)
+        log.warning(
+            "the Navigator canvas could not be shown, so this capture's hidden copy may stay in LAS X's cache: %s",
+            why,
+        )
 
 
 def delete(number: int, name: str) -> None:
@@ -65,9 +70,15 @@ def delete(number: int, name: str) -> None:
     """
     element = connected_data_container().GetElement(number)
     if element.GetName() != name:
-        raise RuntimeError(f"LAS X's element {number} is {element.GetName()!r}, not {name!r}; nothing deleted")
+        raise RuntimeError(
+            f"LAS X's element {number} is {element.GetName()!r}, not {name!r}; nothing deleted"
+        )
     element.Delete()
     try:
         lasx_navigator.clear_canvas()
     except lasx_navigator.NavigatorUnavailable as why:
-        log.warning("the Navigator canvas was not cleared, so %r's hidden copy stays in LAS X's cache: %s", name, why)
+        log.warning(
+            "the Navigator canvas was not cleared, so %r's hidden copy stays in LAS X's cache: %s",
+            name,
+            why,
+        )

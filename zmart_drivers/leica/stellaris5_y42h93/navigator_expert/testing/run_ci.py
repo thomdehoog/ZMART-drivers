@@ -55,7 +55,9 @@ def build_env() -> dict:
     """
     env = dict(os.environ)
     existing = env.get("PYTHONPATH", "")
-    env["PYTHONPATH"] = os.pathsep.join([str(REPO_ROOT), existing]) if existing else str(REPO_ROOT)
+    env["PYTHONPATH"] = (
+        os.pathsep.join([str(REPO_ROOT), existing]) if existing else str(REPO_ROOT)
+    )
     # Do not put the working directory on the search path. The driver folder
     # holds folders with common names, such as config and connection, which a
     # run started there would otherwise import in place of other packages.
@@ -107,7 +109,9 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Navigator Expert driver CI (offline suite + coverage + reports)."
     )
-    parser.add_argument("--mock", action="store_true", help="run the mock/offline suite (default)")
+    parser.add_argument(
+        "--mock", action="store_true", help="run the mock/offline suite (default)"
+    )
     parser.add_argument(
         "--hardware",
         action="store_true",
@@ -144,7 +148,9 @@ def main(argv: list[str] | None = None) -> int:
     print(_rule())
     print("NAVIGATOR EXPERT DRIVER CI")
     print(_rule())
-    subprocess.run([sys.executable, str(DRIVER_ROOT / "testing" / "_diagnostics.py")], env=env)
+    subprocess.run(
+        [sys.executable, str(DRIVER_ROOT / "testing" / "_diagnostics.py")], env=env
+    )
 
     steps: list[dict] = []
 
@@ -163,13 +169,22 @@ def main(argv: list[str] | None = None) -> int:
             steps.append(
                 run_step(
                     "lint: ruff format --check",
-                    [sys.executable, "-m", "ruff", "format", "--check", str(DRIVER_ROOT)],
+                    [
+                        sys.executable,
+                        "-m",
+                        "ruff",
+                        "format",
+                        "--check",
+                        str(DRIVER_ROOT),
+                    ],
                     env,
                     fatal=False,
                 )
             )
         else:
-            print("\n  (ruff not installed -- skipping lint; `pip install ruff` to enable)")
+            print(
+                "\n  (ruff not installed -- skipping lint; `pip install ruff` to enable)"
+            )
 
     cov_available = importlib.util.find_spec("pytest_cov") is not None
 
@@ -370,7 +385,11 @@ def main(argv: list[str] | None = None) -> int:
             # ends with the canvas shown, which the two cache checks need.
             (
                 "hardware: the buttons the driver presses (Jobs, Experiment, Clear) and LAS X's dialogs",
-                [sys.executable, str(hw / "check_buttons.py"), f"--report-dir={REPORT_DIR}"],
+                [
+                    sys.executable,
+                    str(hw / "check_buttons.py"),
+                    f"--report-dir={REPORT_DIR}",
+                ],
                 True,
             ),
             (
@@ -433,10 +452,16 @@ def main(argv: list[str] | None = None) -> int:
         print(
             "    hardware_validate_{direct,api,log,hybrid}.jsonl  end-to-end checks; direct is the fatal production route"
         )
-        print("    check_buttons.json  the buttons the driver presses, and LAS X's dialogs")
-        print("    check_cache_route_ci.json, check_cache_release_ci.json  saving from and letting go of LAS X's cache")
+        print(
+            "    check_buttons.json  the buttons the driver presses, and LAS X's dialogs"
+        )
+        print(
+            "    check_cache_route_ci.json, check_cache_release_ci.json  saving from and letting go of LAS X's cache"
+        )
         if args.full:
-            print("    readers/readers.md  the direct, api and log readers side by side")
+            print(
+                "    readers/readers.md  the direct, api and log readers side by side"
+            )
     print("    ci_summary.json   this step summary")
 
     if run_hardware:
@@ -454,7 +479,9 @@ def main(argv: list[str] | None = None) -> int:
             and "validate_installed_driver" in p.read_text(encoding="utf-8")[:2000]
         )
         if installed:
-            print("\n  ACCEPTANCE (from the installed-driver run; all PASS on the simulator,")
+            print(
+                "\n  ACCEPTANCE (from the installed-driver run; all PASS on the simulator,"
+            )
             print("  then all PASS on the scope, is production ready):")
             for line in installed[-1].read_text(encoding="utf-8").splitlines():
                 if line.startswith(("- PASS: ", "- FAIL: ", "- SKIP: ")):
@@ -473,7 +500,9 @@ def main(argv: list[str] | None = None) -> int:
         "warnings": [s["name"] for s in warn_failures],
         "steps": steps,
     }
-    (REPORT_DIR / "ci_summary.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
+    (REPORT_DIR / "ci_summary.json").write_text(
+        json.dumps(summary, indent=2), encoding="utf-8"
+    )
 
     if warn_failures:
         print(

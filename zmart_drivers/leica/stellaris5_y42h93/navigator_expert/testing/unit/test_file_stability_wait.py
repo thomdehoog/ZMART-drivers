@@ -31,7 +31,9 @@ def test_a_file_that_keeps_growing_longer_than_the_budget_is_still_waited_for(tm
     writer = threading.Thread(target=write_slowly)
     writer.start()
     try:
-        stable = _files._wait_file_stable(path, budget_s, poll_interval=0.02, stable_readings=3)
+        stable = _files._wait_file_stable(
+            path, budget_s, poll_interval=0.02, stable_readings=3
+        )
     finally:
         writer.join()
 

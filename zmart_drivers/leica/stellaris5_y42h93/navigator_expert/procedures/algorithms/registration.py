@@ -112,7 +112,10 @@ def _finite_median(values, *, default: float = 0.0) -> float:
 
 
 def pcc(
-    ref: np.ndarray, tgt: np.ndarray, pixel_um: float, mask_pct: float = MASK_PCT_DEFAULT
+    ref: np.ndarray,
+    tgt: np.ndarray,
+    pixel_um: float,
+    mask_pct: float = MASK_PCT_DEFAULT,
 ) -> tuple[float, float, float]:
     """Phase cross-correlation, unmasked. Quality = ``1 - error``."""
     shift, error, _ = phase_cross_correlation(
@@ -125,7 +128,10 @@ def pcc(
 
 
 def masked_pcc(
-    ref: np.ndarray, tgt: np.ndarray, pixel_um: float, mask_pct: float = MASK_PCT_DEFAULT
+    ref: np.ndarray,
+    tgt: np.ndarray,
+    pixel_um: float,
+    mask_pct: float = MASK_PCT_DEFAULT,
 ) -> tuple[float, float, float]:
     """PCC with intensity-percentile foreground masks (Padfield 2012)."""
     ref_mask = ref > np.percentile(ref, mask_pct)
@@ -142,7 +148,10 @@ def masked_pcc(
 
 
 def ncc(
-    ref: np.ndarray, tgt: np.ndarray, pixel_um: float, mask_pct: float = MASK_PCT_DEFAULT
+    ref: np.ndarray,
+    tgt: np.ndarray,
+    pixel_um: float,
+    mask_pct: float = MASK_PCT_DEFAULT,
 ) -> tuple[float, float, float]:
     """Normalised cross-correlation. Centre crop of TGT vs full REF."""
     ref8 = _to_uint8(ref)
@@ -157,7 +166,10 @@ def ncc(
 
 
 def orb_ransac(
-    ref: np.ndarray, tgt: np.ndarray, pixel_um: float, mask_pct: float = MASK_PCT_DEFAULT
+    ref: np.ndarray,
+    tgt: np.ndarray,
+    pixel_um: float,
+    mask_pct: float = MASK_PCT_DEFAULT,
 ) -> tuple[float, float, float]:
     """ORB descriptors + RANSAC EuclideanTransform. Quality = inlier ratio."""
     ref_n = _to_uint8(ref)
@@ -242,7 +254,9 @@ def register_voting(
 
     best_cluster: list = []
     for _, dxi, dyi, _ in valid:
-        cluster = [v for v in valid if (v[1] - dxi) ** 2 + (v[2] - dyi) ** 2 <= tolerance_um**2]
+        cluster = [
+            v for v in valid if (v[1] - dxi) ** 2 + (v[2] - dyi) ** 2 <= tolerance_um**2
+        ]
         if len(cluster) > len(best_cluster):
             best_cluster = cluster
 

@@ -63,7 +63,9 @@ def _blob(shape=(96, 96), seed=3):
     img = np.zeros(shape, float)
     for _ in range(30):
         cx, cy = rng.uniform(16, shape[1] - 16), rng.uniform(16, shape[0] - 16)
-        img += rng.uniform(0.3, 1.0) * np.exp(-0.5 * (((xx - cx) / 4) ** 2 + ((yy - cy) / 4) ** 2))
+        img += rng.uniform(0.3, 1.0) * np.exp(
+            -0.5 * (((xx - cx) / 4) ** 2 + ((yy - cy) / 4) ** 2)
+        )
     return (img / img.max() * np.iinfo(np.uint16).max).astype(np.uint16)
 
 
@@ -110,7 +112,9 @@ def _patch(
     }
 
     monkeypatch.setattr(
-        chk._model, "load_translations", lambda calibration_name=None: dict(translations)
+        chk._model,
+        "load_translations",
+        lambda calibration_name=None: dict(translations),
     )
     monkeypatch.setattr(
         chk._model,
@@ -128,10 +132,15 @@ def _patch(
     )
     monkeypatch.setattr(chk.drv, "connect_python_client", lambda *a, **k: object())
     monkeypatch.setattr(
-        chk.drv, "connect_limits_handshake", lambda c, **k: SimpleNamespace(ok=True, error=None)
+        chk.drv,
+        "connect_limits_handshake",
+        lambda c, **k: SimpleNamespace(ok=True, error=None),
     )
     monkeypatch.setattr(chk.drv, "get_hardware_info", lambda c, **k: {"ok": True})
-    monkeypatch.setattr("zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.image_stage_registration.rig_orientation", Orientation)
+    monkeypatch.setattr(
+        "zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.image_stage_registration.rig_orientation",
+        Orientation,
+    )
 
     get_xy = lambda c, **k: {"x_um": rig["x"], "y_um": rig["y"]}  # noqa: E731
 
@@ -158,16 +167,25 @@ def _patch(
     monkeypatch.setattr(
         cm.drv,
         "parse_tile_geometry",
-        lambda s: {"pixel_w_um": PIXEL_UM, "pixel_h_um": PIXEL_UM, "pixels_x": 96, "pixels_y": 96},
+        lambda s: {
+            "pixel_w_um": PIXEL_UM,
+            "pixel_h_um": PIXEL_UM,
+            "pixels_x": 96,
+            "pixels_y": 96,
+        },
     )
     monkeypatch.setattr(
-        cm.drv, "acquire", lambda c, job, **k: SimpleNamespace(job=job, command_result={"ok": True})
+        cm.drv,
+        "acquire",
+        lambda c, job, **k: SimpleNamespace(job=job, command_result={"ok": True}),
     )
     seq = iter(frames)
     monkeypatch.setattr(
         cm.drv,
         "save",
-        lambda c, acq, output_root, naming, **k: _manifest(output_root, naming, next(seq)),
+        lambda c, acq, output_root, naming, **k: _manifest(
+            output_root, naming, next(seq)
+        ),
     )
     return rig
 
@@ -183,7 +201,9 @@ def test_check_returns_via_the_adopted_translation(monkeypatch, tmp_path):
         [ref, ref],
         translations={1: (0.0, 0.0, 0.0), 2: (10.0, -6.0, 3.0)},
     )
-    session = chk.start_session(session_id="chk", job_name=JOB, sessions_root=tmp_path / "s")
+    session = chk.start_session(
+        session_id="chk", job_name=JOB, sessions_root=tmp_path / "s"
+    )
     chk.measure_reference(session)
     rig["slot"] = 2  # operator switches to the target objective
     report = chk.measure_target_and_report(session, show=False)
@@ -201,7 +221,9 @@ def test_check_reports_negated_offset_and_writes_report(monkeypatch, tmp_path):
     target = _shift(ref, 6, -4)  # target features at +6 col, -4 row
     rig = _patch(monkeypatch, [ref, target])
 
-    session = chk.start_session(session_id="chk", job_name=JOB, sessions_root=tmp_path / "s")
+    session = chk.start_session(
+        session_id="chk", job_name=JOB, sessions_root=tmp_path / "s"
+    )
     chk.measure_reference(session)
     rig["slot"] = 2
     report = chk.measure_target_and_report(session, show=False)
@@ -212,7 +234,9 @@ def test_check_reports_negated_offset_and_writes_report(monkeypatch, tmp_path):
     assert report["dy_um"] == pytest.approx(4 * PIXEL_UM, abs=PIXEL_UM)
     assert report["position_frame_um"] == {"x": 1000.0, "y": 2000.0}
 
-    written = json.loads((session.paths.reports_dir / "calibration_check.json").read_text())
+    written = json.loads(
+        (session.paths.reports_dir / "calibration_check.json").read_text()
+    )
     assert written == report
     assert (session.paths.reports_dir / "calibration_check.png").is_file()
 
@@ -220,7 +244,9 @@ def test_check_reports_negated_offset_and_writes_report(monkeypatch, tmp_path):
 def test_check_refuses_when_objective_was_not_switched(monkeypatch, tmp_path):
     ref = _blob()
     _patch(monkeypatch, [ref, ref])
-    session = chk.start_session(session_id="chk", job_name=JOB, sessions_root=tmp_path / "s")
+    session = chk.start_session(
+        session_id="chk", job_name=JOB, sessions_root=tmp_path / "s"
+    )
     chk.measure_reference(session)
     # Objective left on the reference slot: the check must refuse rather
     # than register two identical frames and bless the calibration.
@@ -231,7 +257,9 @@ def test_check_refuses_when_objective_was_not_switched(monkeypatch, tmp_path):
 def test_check_refuses_a_slot_the_calibration_does_not_cover(monkeypatch, tmp_path):
     ref = _blob()
     rig = _patch(monkeypatch, [ref, ref])
-    session = chk.start_session(session_id="chk", job_name=JOB, sessions_root=tmp_path / "s")
+    session = chk.start_session(
+        session_id="chk", job_name=JOB, sessions_root=tmp_path / "s"
+    )
     chk.measure_reference(session)
     rig["slot"] = 3  # not in the adopted calibration
     with pytest.raises(RuntimeError, match="not covered by the adopted calibration"):
@@ -244,14 +272,22 @@ def test_start_session_requires_two_calibrated_slots(monkeypatch, tmp_path):
         chk.start_session(session_id="chk", job_name=JOB, sessions_root=tmp_path / "s")
 
 
-def test_start_session_defaults_to_machine_workspace_and_active_job(monkeypatch, tmp_path):
+def test_start_session_defaults_to_machine_workspace_and_active_job(
+    monkeypatch, tmp_path
+):
     machine = MachineProfile(programdata_root=tmp_path / "programdata")
-    monkeypatch.setattr("zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.store.MACHINE", machine)
+    monkeypatch.setattr(
+        "zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.store.MACHINE",
+        machine,
+    )
     _patch(monkeypatch, [])
 
     session = chk.start_session(session_id="check_defaults")
 
-    assert session.paths.session_root == machine.subsystem_root("calibration") / "check_defaults"
+    assert (
+        session.paths.session_root
+        == machine.subsystem_root("calibration") / "check_defaults"
+    )
     assert session.paths.session_dir == session.paths.session_root / "validation"
     assert session.job_name == JOB
 
@@ -281,7 +317,9 @@ def test_featureless_frames_are_untrusted(monkeypatch, tmp_path):
     flat = np.full((96, 96), 1000, np.uint16)
     rig = _patch(monkeypatch, [flat, flat])
 
-    session = chk.start_session(session_id="flat", job_name=JOB, sessions_root=tmp_path / "s")
+    session = chk.start_session(
+        session_id="flat", job_name=JOB, sessions_root=tmp_path / "s"
+    )
     chk.measure_reference(session)
     rig["slot"] = 2
     report = chk.measure_target_and_report(session, show=False)

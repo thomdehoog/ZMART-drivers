@@ -41,6 +41,7 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures import (
 def sessions_root(tmp_path):
     return tmp_path / "sessions"
 
+
 # The notebook lives with the configuration item it sets, not with the procedure.
 _ORIENTATION_NOTEBOOKS = (
     Path(__file__).resolve().parents[2]
@@ -111,7 +112,9 @@ def _patch(
         ),
     )
     monkeypatch.setattr(wf.drv, "get_hardware_info", lambda client, **kw: {"ok": True})
-    monkeypatch.setattr(wf.drv, "get_selected_job", lambda client, **kw: {"Name": "Overview"})
+    monkeypatch.setattr(
+        wf.drv, "get_selected_job", lambda client, **kw: {"Name": "Overview"}
+    )
 
     pos = {"x": home_xy[0], "y": home_xy[1]}
 
@@ -169,7 +172,9 @@ def _patch(
 
 def _install_votes(monkeypatch, votes):
     iterator = iter(votes)
-    monkeypatch.setattr(wf, "register_voting", lambda ref, tgt, px, **kw: next(iterator))
+    monkeypatch.setattr(
+        wf, "register_voting", lambda ref, tgt, px, **kw: next(iterator)
+    )
 
 
 def _trusted(dx, dy):
@@ -183,15 +188,20 @@ def _trusted(dx, dy):
 
 
 def _untrusted():
-    return {"dx_um": float("nan"), "dy_um": float("nan"), "trusted": False, "confidence": 0}
+    return {
+        "dx_um": float("nan"),
+        "dy_um": float("nan"),
+        "trusted": False,
+        "confidence": 0,
+    }
 
 
 def _start(sessions_root, **kw):
     from datetime import datetime, timezone
 
     from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.store import (
-    MachineProfile,
-)
+        MachineProfile,
+    )
 
     kw.pop("session_id", None)  # legacy test label; run names are automatic
     return wf.start_session(
@@ -207,7 +217,9 @@ def test_gallery_covers_all_options_and_correct_candidate_has_best_overlap():
     candidates = wf._gallery_orientations()
     assert len(candidates) == 8
     assert {(item.rotate_deg, item.mirrored) for item in candidates} == {
-        (degrees, mirrored) for mirrored in (False, True) for degrees in (0, 90, 180, 270)
+        (degrees, mirrored)
+        for mirrored in (False, True)
+        for degrees in (0, 90, 180, 270)
     }
 
     expected = Orientation(rotate_deg=90, mirrored=True)
@@ -230,7 +242,9 @@ def test_gallery_covers_all_options_and_correct_candidate_has_best_overlap():
             pixel_size_um=pixel_size_um,
             orientation=candidate,
         )
-        disagreement[candidate] = float(np.mean(np.abs(overlay[..., 0] - overlay[..., 1])))
+        disagreement[candidate] = float(
+            np.mean(np.abs(overlay[..., 0] - overlay[..., 1]))
+        )
 
     assert min(disagreement, key=disagreement.get) == expected
 
@@ -250,7 +264,9 @@ def test_gallery_preview_applies_reflected_candidate_to_displayed_pixels(rotate_
         orientation=Orientation(rotate_deg=rotate_deg, mirrored=True),
     )
 
-    expected_red = np.rot90(np.fliplr(wf._normalise_for_display(home)), k=-(rotate_deg // 90))
+    expected_red = np.rot90(
+        np.fliplr(wf._normalise_for_display(home)), k=-(rotate_deg // 90)
+    )
     assert np.array_equal(overlay[..., 0], expected_red)
 
 
@@ -286,7 +302,9 @@ def test_measure_success_keeps_orientation_as_candidate(monkeypatch, sessions_ro
     assert diagnostic.is_file()
     assert diagnostic.stat().st_size > 10_000
 
-    report = json.loads((session.paths.reports_dir / "orientation_report.json").read_text())
+    report = json.loads(
+        (session.paths.reports_dir / "orientation_report.json").read_text()
+    )
     assert report["image_to_stage"] == [[0, -1], [1, 0]]
     assert report["mirrored"] is False
     assert report["reflection_axis"] is None
@@ -350,7 +368,9 @@ def test_measure_weak_vote_stops_without_config(monkeypatch, sessions_root):
     assert session.d4_accepted is None
     assert session.orientation is None
     assert session.config_written is False
-    assert session.failure_reason is not None and "not trusted" in session.failure_reason
+    assert (
+        session.failure_reason is not None and "not trusted" in session.failure_reason
+    )
     assert not (session.paths.session_dir / wf.ORIENTATION_NAME).exists()
 
 
@@ -380,7 +400,9 @@ def test_measure_accepts_and_records_mirror(monkeypatch, sessions_root):
     }
     diagnostic = session.paths.reports_dir / wf.DIAGNOSTIC_NAME
     assert diagnostic.is_file()
-    report = json.loads((session.paths.reports_dir / "orientation_report.json").read_text())
+    report = json.loads(
+        (session.paths.reports_dir / "orientation_report.json").read_text()
+    )
     assert report["mirrored"] is True
     assert report["reflection_axis"] == "vertical"
     assert report["determinant"] == -1
@@ -482,12 +504,14 @@ def test_measure_rerun_replaces_this_sessions_outputs(monkeypatch, sessions_root
     assert not (session.paths.session_dir / wf.ORIENTATION_NAME).exists()
 
 
-def test_start_session_creates_a_new_session_after_kernel_restart(monkeypatch, sessions_root):
+def test_start_session_creates_a_new_session_after_kernel_restart(
+    monkeypatch, sessions_root
+):
     from datetime import datetime, timezone
 
     from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.store import (
-    MachineProfile,
-)
+        MachineProfile,
+    )
 
     _patch(monkeypatch)
     machine = MachineProfile(programdata_root=sessions_root)
@@ -506,7 +530,9 @@ def test_start_session_creates_a_new_session_after_kernel_restart(monkeypatch, s
 
     assert restarted.paths.session_dir != first.paths.session_dir
     assert not restarted.paths.session_dir.name.startswith(".")
-    assert sorted(path.name for path in restarted.paths.session_dir.parent.iterdir()) == [
+    assert sorted(
+        path.name for path in restarted.paths.session_dir.parent.iterdir()
+    ) == [
         "2026-07-01T12-00-00-000000Z",
         "2026-07-01T12-01-00-000000Z",
     ]
@@ -527,7 +553,9 @@ def test_successful_run_becomes_active_only_after_validation_and_adoption(
         "reports",
         "validation",
     }
-    assert not any(path.name.startswith(".") for path in session.paths.session_dir.iterdir())
+    assert not any(
+        path.name.startswith(".") for path in session.paths.session_dir.iterdir()
+    )
     assert not (session.paths.session_dir / "configs").exists()
 
     validation = session.paths.session_dir / "validation" / "check.ome.tiff"
@@ -578,8 +606,8 @@ def test_failed_run_keeps_evidence_but_is_not_active(monkeypatch, sessions_root)
     assert (session.paths.reports_dir / "orientation_report.json").is_file()
 
     from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.store import (
-    MachineProfile,
-)
+        MachineProfile,
+    )
 
     machine = MachineProfile(programdata_root=sessions_root)
     assert machine.latest_snapshot("orientation") is None
@@ -587,7 +615,9 @@ def test_failed_run_keeps_evidence_but_is_not_active(monkeypatch, sessions_root)
 
 def test_notebook_archive_waits_for_a_new_saved_file_version(tmp_path, monkeypatch):
     bootstrap_path = _ORIENTATION_NOTEBOOKS / "_bootstrap.py"
-    spec = importlib.util.spec_from_file_location("orientation_notebook_bootstrap", bootstrap_path)
+    spec = importlib.util.spec_from_file_location(
+        "orientation_notebook_bootstrap", bootstrap_path
+    )
     bootstrap = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(bootstrap)
     notebook = tmp_path / "set_orientation.ipynb"
@@ -625,16 +655,22 @@ def test_notebook_archive_waits_for_a_new_saved_file_version(tmp_path, monkeypat
         ),
     )
 
-    os.utime(notebook, ns=(previous_mtime_ns + 1_000_000, previous_mtime_ns + 1_000_000))
+    os.utime(
+        notebook, ns=(previous_mtime_ns + 1_000_000, previous_mtime_ns + 1_000_000)
+    )
 
-    assert bootstrap.NOTEBOOK.wait_for_save(previous_mtime_ns, timeout_s=0.1) == notebook
+    assert (
+        bootstrap.NOTEBOOK.wait_for_save(previous_mtime_ns, timeout_s=0.1) == notebook
+    )
 
 
 def test_orientation_notebook_uses_one_automatic_run_directory():
     notebook_path = _ORIENTATION_NOTEBOOKS / "set_orientation.ipynb"
     notebook = json.loads(notebook_path.read_text(encoding="utf-8"))
     code = "\n".join(
-        "".join(cell.get("source", [])) for cell in notebook["cells"] if cell["cell_type"] == "code"
+        "".join(cell.get("source", []))
+        for cell in notebook["cells"]
+        if cell["cell_type"] == "code"
     )
 
     assert "session_id=" not in code

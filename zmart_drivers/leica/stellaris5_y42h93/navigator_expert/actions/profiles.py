@@ -151,7 +151,9 @@ class LasxApiProfile:
     """
 
     delay_ms: int | None = 250
-    runtime_root: str = r"C:\Program Files\Leica Microsystems CMS GmbH\LAS X\AddIns\NavigatorExpert"
+    runtime_root: str = (
+        r"C:\Program Files\Leica Microsystems CMS GmbH\LAS X\AddIns\NavigatorExpert"
+    )
 
 
 LASX_API = LasxApiProfile()
@@ -274,7 +276,9 @@ class CommandProfile:
         # A single confirm window has no 'next attempt' to re-fire before, so a
         # requested re-fire could never run. Forbid the incoherent combination.
         if self.max_confirm_attempts == 1 and self.refire_on_unconfirmed:
-            raise ValueError("max_confirm_attempts==1 requires refire_on_unconfirmed=False")
+            raise ValueError(
+                "max_confirm_attempts==1 requires refire_on_unconfirmed=False"
+            )
 
 
 COMMAND_DEFAULT = CommandProfile()

@@ -31,7 +31,9 @@ POLL_S = 0.5
 
 
 def look(minutes: float) -> None:
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface import lasx_dialogs
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface import (
+        lasx_dialogs,
+    )
 
     lasx_dialogs.pending()  # what the log said before the look starts
     print(f"looking for {minutes:g} min; open a LAS X dialog now", flush=True)
@@ -43,21 +45,33 @@ def look(minutes: float) -> None:
             if dialog is None:
                 print("the log says: the dialog was closed", flush=True)
             else:
-                print(f"the log says: {dialog.caption}: {dialog.text!r} (shown {dialog.at})", flush=True)
+                print(
+                    f"the log says: {dialog.caption}: {dialog.text!r} (shown {dialog.at})",
+                    flush=True,
+                )
                 try:
                     windows = lasx_dialogs.lasx_windows().dialogs()
-                    print(f"  on screen: {len(windows)} dialog window(s), buttons {[w.buttons for w in windows]}", flush=True)
+                    print(
+                        f"  on screen: {len(windows)} dialog window(s), buttons {[w.buttons for w in windows]}",
+                        flush=True,
+                    )
                 except lasx_dialogs.WindowsUnavailable as why:
                     print(f"  on screen: not found: {why}", flush=True)
         time.sleep(POLL_S)
 
 
 def answer(minutes: float) -> None:
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface import lasx_dialogs
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface import (
+        lasx_dialogs,
+    )
 
-    logging.basicConfig(level=logging.WARNING, format="%(asctime)s %(levelname)s %(message)s")
+    logging.basicConfig(
+        level=logging.WARNING, format="%(asctime)s %(levelname)s %(message)s"
+    )
     lasx_dialogs.keep_watching()
-    print(f"the driver's watcher answers OK-only warnings for {minutes:g} min", flush=True)
+    print(
+        f"the driver's watcher answers OK-only warnings for {minutes:g} min", flush=True
+    )
     try:
         time.sleep(minutes * 60)
     finally:
@@ -66,7 +80,9 @@ def answer(minutes: float) -> None:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--look", action="store_true", help="press nothing; print what is seen")
+    parser.add_argument(
+        "--look", action="store_true", help="press nothing; print what is seen"
+    )
     parser.add_argument("--minutes", type=float, default=5, help="how long to watch")
     asked = parser.parse_args()
     (look if asked.look else answer)(asked.minutes)

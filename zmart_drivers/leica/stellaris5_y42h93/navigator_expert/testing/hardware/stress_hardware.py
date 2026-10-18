@@ -132,9 +132,7 @@ class StressRecorder:
         if record.kind == "stress_summary":
             self._log.info("DONE | %s", record.message)
             return
-        head = (
-            f"{record.status:4s} | cycle={record.cycle} round={record.round} op={record.operation}"
-        )
+        head = f"{record.status:4s} | cycle={record.cycle} round={record.round} op={record.operation}"
         if record.job:
             head += f" job={record.job}"
         head += f" ({record.elapsed_s * 1000:.0f}ms)"
@@ -154,9 +152,13 @@ def _summary_message(counts: dict[str, int]) -> str:
 
 def _operation_stats(records: list[StressRecord]) -> dict[str, dict[str, Any]]:
     stats: dict[str, dict[str, Any]] = {}
-    operations = sorted({r.operation for r in records if r.kind == "stress_step" and r.operation})
+    operations = sorted(
+        {r.operation for r in records if r.kind == "stress_step" and r.operation}
+    )
     for operation in operations:
-        subset = [r for r in records if r.kind == "stress_step" and r.operation == operation]
+        subset = [
+            r for r in records if r.kind == "stress_step" and r.operation == operation
+        ]
         elapsed = [r.elapsed_s for r in subset]
         counts = {"PASS": 0, "WARN": 0, "FAIL": 0, "SKIP": 0}
         confirm_attempts = []
@@ -176,14 +178,18 @@ def _operation_stats(records: list[StressRecord]) -> dict[str, dict[str, Any]]:
             "max_s": max(elapsed) if elapsed else 0.0,
             "stdev_s": stdev_s,
             "cv": (stdev_s / mean_s) if mean_s > 0 else 0.0,
-            "max_confirm_attempts": (max(confirm_attempts) if confirm_attempts else None),
+            "max_confirm_attempts": (
+                max(confirm_attempts) if confirm_attempts else None
+            ),
         }
     return stats
 
 
 def _cycle_stats(records: list[StressRecord]) -> dict[str, dict[str, Any]]:
     stats: dict[str, dict[str, Any]] = {}
-    cycles = sorted({r.cycle for r in records if r.kind == "stress_step" and r.cycle is not None})
+    cycles = sorted(
+        {r.cycle for r in records if r.kind == "stress_step" and r.cycle is not None}
+    )
     for cycle in cycles:
         subset = [r for r in records if r.kind == "stress_step" and r.cycle == cycle]
         counts = {"PASS": 0, "WARN": 0, "FAIL": 0, "SKIP": 0}
@@ -208,7 +214,9 @@ def _json_safe(value: Any) -> Any:
     return value
 
 
-def _make_sink(output: str | None, log: logging.Logger) -> Callable[[StressRecord], None]:
+def _make_sink(
+    output: str | None, log: logging.Logger
+) -> Callable[[StressRecord], None]:
     if output is None:
         return lambda _r: None
     if output == "-":
@@ -256,7 +264,9 @@ def _confirm_live_write(args: argparse.Namespace) -> bool:
     return sys.stdin.readline().strip().lower() == "yes"
 
 
-def _driver_call(run: Callable[[], dict]) -> tuple[str, str, dict[str, Any] | None, str | None]:
+def _driver_call(
+    run: Callable[[], dict],
+) -> tuple[str, str, dict[str, Any] | None, str | None]:
     try:
         result = run()
     except Exception as exc:  # noqa: BLE001 -- convert driver failures into records
@@ -290,7 +300,9 @@ def _compare(actual: Any, expected: Any, tolerance: float | None) -> bool:
         return False
 
 
-def _pick_random_alt(rng: random.Random, current: Any, candidates: list[Any]) -> Any | None:
+def _pick_random_alt(
+    rng: random.Random, current: Any, candidates: list[Any]
+) -> Any | None:
     alts = [candidate for candidate in candidates if candidate != current]
     if not alts:
         return None
@@ -310,7 +322,9 @@ def _step(
     step_index: int,
     operation: str,
     job: str | None,
-    run: Callable[[], tuple[str, str, dict[str, Any] | None, str | None, dict[str, Any]]],
+    run: Callable[
+        [], tuple[str, str, dict[str, Any] | None, str | None, dict[str, Any]]
+    ],
 ) -> None:
     started, t0 = vh._now_iso(), time.monotonic()
     try:
@@ -384,7 +398,13 @@ def _setting_round_trip(
         status = _combine_status(status, cmd_status)
         messages.append(msg)
         if cmd_status == "FAIL":
-            return status, "; ".join(m for m in messages if m), timing, driver_message, context
+            return (
+                status,
+                "; ".join(m for m in messages if m),
+                timing,
+                driver_message,
+                context,
+            )
         if cmd_status == "WARN":
             messages.append("readback comparison suppressed after unconfirmed command")
         else:
@@ -399,10 +419,12 @@ def _setting_round_trip(
                 if not _compare(after, target, tolerance):
                     status = _combine_status(status, _readback_status(strict_readback))
                     context["readback_status"] = "mismatch"
-                    messages.append(f"readback mismatch expected={target!r} actual={after!r}")
+                    messages.append(
+                        f"readback mismatch expected={target!r} actual={after!r}"
+                    )
     finally:
-        restore_status, restore_msg, _restore_timing, _restore_driver_msg = _driver_call(
-            lambda: write(current)
+        restore_status, restore_msg, _restore_timing, _restore_driver_msg = (
+            _driver_call(lambda: write(current))
         )
         context["restore_status"] = restore_status
         if restore_msg:
@@ -421,7 +443,9 @@ def _setting_round_trip(
             if not context["restored"]:
                 status = _combine_status(status, _readback_status(strict_readback))
                 context["restore_readback_status"] = "mismatch"
-                messages.append(f"restore mismatch expected={current!r} actual={restored!r}")
+                messages.append(
+                    f"restore mismatch expected={current!r} actual={restored!r}"
+                )
 
     return status, "; ".join(m for m in messages if m), timing, driver_message, context
 
@@ -478,8 +502,8 @@ def op_select_job(
                 status = _combine_status(status, _readback_status(args.strict_readback))
                 messages.append(f"{name}: readback={readback!r}")
     finally:
-        restore_status, restore_msg, _restore_timing, _restore_driver_msg = _driver_call(
-            lambda: drv.select_job(client, selected)
+        restore_status, restore_msg, _restore_timing, _restore_driver_msg = (
+            _driver_call(lambda: drv.select_job(client, selected))
         )
         context["restore_status"] = restore_status
         if restore_msg:
@@ -550,8 +574,12 @@ def op_detector_gain(
         job_name,
         rng,
         setting_name="detector_gain",
-        read=lambda: _active_setting(drv, client, job_name)["activeDetectors"][0]["gain"]["value"],
-        write=lambda value: drv.set_detector_gain(client, job_name, 0, beam_route, value),
+        read=lambda: _active_setting(drv, client, job_name)["activeDetectors"][0][
+            "gain"
+        ]["value"],
+        write=lambda value: drv.set_detector_gain(
+            client, job_name, 0, beam_route, value
+        ),
         candidates=[target, current],
         tolerance=0.1,
     )
@@ -582,9 +610,21 @@ def op_xy(
     if start_error:
         # Setup/positioning precondition, not a driver fault (the sim often
         # homes at 0,0, outside a real envelope) -- SKIP, like target-outside.
-        return "SKIP", f"starting position outside limits: {start_error}", None, None, context
+        return (
+            "SKIP",
+            f"starting position outside limits: {start_error}",
+            None,
+            None,
+            context,
+        )
     if target_error:
-        return "SKIP", f"target position outside limits: {target_error}", None, None, context
+        return (
+            "SKIP",
+            f"target position outside limits: {target_error}",
+            None,
+            None,
+            context,
+        )
     status = "PASS"
     timing = None
     driver_message = None
@@ -598,13 +638,15 @@ def op_xy(
         if cmd_status == "PASS":
             after = drv.get_xy(client)
             context["after"] = [after["x_um"], after["y_um"]]
-            if not (_compare(after["x_um"], x1, 20.0) and _compare(after["y_um"], y1, 20.0)):
+            if not (
+                _compare(after["x_um"], x1, 20.0) and _compare(after["y_um"], y1, 20.0)
+            ):
                 status = _combine_status(status, _readback_status(args.strict_readback))
                 context["readback_status"] = "mismatch"
                 messages.append("XY readback mismatch")
     finally:
-        restore_status, restore_msg, _restore_timing, _restore_driver_msg = _driver_call(
-            lambda: drv.move_xy(client, x0, y0, unit="um")
+        restore_status, restore_msg, _restore_timing, _restore_driver_msg = (
+            _driver_call(lambda: drv.move_xy(client, x0, y0, unit="um"))
         )
         context["restore_status"] = restore_status
         if restore_msg:
@@ -638,9 +680,21 @@ def op_z(
     if start_error:
         # Setup/positioning precondition, not a driver fault -- SKIP, matching
         # the target-outside case below.
-        return "SKIP", f"starting position outside limits: {start_error}", None, None, context
+        return (
+            "SKIP",
+            f"starting position outside limits: {start_error}",
+            None,
+            None,
+            context,
+        )
     if target_error:
-        return "SKIP", f"target position outside limits: {target_error}", None, None, context
+        return (
+            "SKIP",
+            f"target position outside limits: {target_error}",
+            None,
+            None,
+            context,
+        )
     status = "PASS"
     timing = None
     driver_message = None
@@ -660,8 +714,10 @@ def op_z(
                 context["readback_status"] = "mismatch"
                 messages.append("Z readback mismatch")
     finally:
-        restore_status, restore_msg, _restore_timing, _restore_driver_msg = _driver_call(
-            lambda: drv.move_z(client, job_name, z0, unit="um", z_mode="galvo")
+        restore_status, restore_msg, _restore_timing, _restore_driver_msg = (
+            _driver_call(
+                lambda: drv.move_z(client, job_name, z0, unit="um", z_mode="galvo")
+            )
         )
         context["restore_status"] = restore_status
         if restore_msg:
@@ -698,13 +754,19 @@ def op_objective(
     messages: list[str] = []
     try:
         cmd_status, msg, timing, driver_message = _driver_call(
-            lambda: drv.set_objective(client, job_name, hw, slot_index=target["slotIndex"])
+            lambda: drv.set_objective(
+                client, job_name, hw, slot_index=target["slotIndex"]
+            )
         )
         status = _combine_status(status, cmd_status)
         messages.append(msg)
     finally:
-        restore_status, restore_msg, _restore_timing, _restore_driver_msg = _driver_call(
-            lambda: drv.set_objective(client, job_name, hw, slot_index=current["slotIndex"])
+        restore_status, restore_msg, _restore_timing, _restore_driver_msg = (
+            _driver_call(
+                lambda: drv.set_objective(
+                    client, job_name, hw, slot_index=current["slotIndex"]
+                )
+            )
         )
         context["restore_status"] = restore_status
         if restore_msg:
@@ -900,7 +962,11 @@ def _run_stress(
             cycle_plan.extend(rng.choice(random_names) for _ in range(args.rounds - 1))
         for round_index, operation_name in enumerate(cycle_plan, start=1):
             step_index += 1
-            operation = op_select_job if operation_name == "job_selection" else pool[operation_name]
+            operation = (
+                op_select_job
+                if operation_name == "job_selection"
+                else pool[operation_name]
+            )
             _step(
                 recorder,
                 args=args,
@@ -909,7 +975,9 @@ def _run_stress(
                 step_index=step_index,
                 operation=operation_name,
                 job=job_name,
-                run=lambda operation=operation: operation(drv, client, job_name, rng, args),
+                run=lambda operation=operation: operation(
+                    drv, client, job_name, rng, args
+                ),
             )
     return step_index
 
@@ -944,17 +1012,23 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument(
-        "--mock", action="store_true", help="use the Python in-process mock instead of LasxApi"
+        "--mock",
+        action="store_true",
+        help="use the Python in-process mock instead of LasxApi",
     )
     parser.add_argument(
-        "--client-name", default="PythonClient", help="LAS X client name passed to Connect"
+        "--client-name",
+        default="PythonClient",
+        help="LAS X client name passed to Connect",
     )
     parser.add_argument("--job", help="job used for setting and Z operations")
     parser.add_argument(
         "--mock-latency", type=float, default=0.0, help="per-command latency for --mock"
     )
     parser.add_argument(
-        "--api-delay-ms", type=int, help="override profiles.LASX_API.delay_ms for LasxApi"
+        "--api-delay-ms",
+        type=int,
+        help="override profiles.LASX_API.delay_ms for LasxApi",
     )
     parser.add_argument(
         "--limits-config",
@@ -962,17 +1036,29 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "active ProgramData snapshot, seeding repo defaults there first when needed",
     )
     parser.add_argument(
-        "--rounds", type=int, default=30, help="stress steps per cycle; first step is a job sweep"
-    )
-    parser.add_argument("--cycles", type=int, default=4, help="number of repeated stress cycles")
-    parser.add_argument(
-        "--seed", type=int, default=1, help="random seed for reproducible operation order"
-    )
-    parser.add_argument(
-        "--allow-xy", action="store_true", help="include reversible XY moves in the random pool"
+        "--rounds",
+        type=int,
+        default=30,
+        help="stress steps per cycle; first step is a job sweep",
     )
     parser.add_argument(
-        "--allow-z", action="store_true", help="include reversible Z moves in the random pool"
+        "--cycles", type=int, default=4, help="number of repeated stress cycles"
+    )
+    parser.add_argument(
+        "--seed",
+        type=int,
+        default=1,
+        help="random seed for reproducible operation order",
+    )
+    parser.add_argument(
+        "--allow-xy",
+        action="store_true",
+        help="include reversible XY moves in the random pool",
+    )
+    parser.add_argument(
+        "--allow-z",
+        action="store_true",
+        help="include reversible Z moves in the random pool",
     )
     parser.add_argument(
         "--allow-objective",
@@ -980,19 +1066,27 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="include reversible objective switches in the random pool",
     )
     parser.add_argument(
-        "--allow-acquire", action="store_true", help="run one acquisition after random stress"
+        "--allow-acquire",
+        action="store_true",
+        help="run one acquisition after random stress",
     )
     parser.add_argument("--xy-delta-um", type=float, default=25.0)
     parser.add_argument("--z-delta-um", type=float, default=2.0)
-    parser.add_argument("--output", default=None, help="JSONL output path; '-' for stdout")
-    parser.add_argument("--strict-confirmation", action="store_true", help="treat WARN as exit 1")
+    parser.add_argument(
+        "--output", default=None, help="JSONL output path; '-' for stdout"
+    )
+    parser.add_argument(
+        "--strict-confirmation", action="store_true", help="treat WARN as exit 1"
+    )
     parser.add_argument(
         "--strict-readback",
         action="store_true",
         help="treat extra post-command readback mismatches as FAIL instead of WARN",
     )
     parser.add_argument(
-        "--yes", action="store_true", help="skip interactive confirmation before LasxApi writes"
+        "--yes",
+        action="store_true",
+        help="skip interactive confirmation before LasxApi writes",
     )
     parser.add_argument(
         "--allow-missing-lasx",
@@ -1041,8 +1135,12 @@ def main(argv: list[str] | None = None) -> int:
             profiles,
         )
 
-        profiles.STATE_READERS = replace(profiles.STATE_READERS, selected_job_confirm_source="api")
-        log.info("mock backend: selected-job confirmation pinned to api (no log stream exists)")
+        profiles.STATE_READERS = replace(
+            profiles.STATE_READERS, selected_job_confirm_source="api"
+        )
+        log.info(
+            "mock backend: selected-job confirmation pinned to api (no log stream exists)"
+        )
 
     try:
         client = vh._connect(args, MockClient, log)

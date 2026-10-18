@@ -58,7 +58,9 @@ def wait_for_selected_job_log(
     profile = _profile()
     timeout_s = tuning.WINDOW_S if timeout_s is None else timeout_s
     poll_interval_s = tuning.POLL_S if poll_interval_s is None else poll_interval_s
-    max_age_s = profile.selected_job_log_cluster_max_age_s if max_age_s is None else max_age_s
+    max_age_s = (
+        profile.selected_job_log_cluster_max_age_s if max_age_s is None else max_age_s
+    )
     parse_fn = log_reader.parse_log if parse_fn is None else parse_fn
     sleep_fn = time.sleep if sleep_fn is None else sleep_fn
     monotonic_fn = time.monotonic if monotonic_fn is None else monotonic_fn
@@ -141,7 +143,9 @@ def _selected_job_reason(
     selected_after = selected_ts is not None and selected_ts > command_started_at
     current_block_name = snapshot.current_block_name
     current_block_ts = snapshot.current_block_ts
-    current_block_after = current_block_ts is not None and current_block_ts > command_started_at
+    current_block_after = (
+        current_block_ts is not None and current_block_ts > command_started_at
+    )
     current_block_fresh = not log_reader._too_old(
         current_block_ts, snapshot.now, max_age_s=max_age_s
     )
@@ -204,10 +208,13 @@ def _cluster_diagnostics(snapshot: log_reader.Snapshot, *, max_age_s):
     )
     latest_names = set(latest.keys())
     all_names = {
-        j.get("jobName") for (j, _ts) in snapshot.atl_by_block.values() if j.get("jobName")
+        j.get("jobName")
+        for (j, _ts) in snapshot.atl_by_block.values()
+        if j.get("jobName")
     }
     block_ids_numeric = all(
-        log_reader._block_id_int(block_id) is not None for block_id, _job, _ts in latest.values()
+        log_reader._block_id_int(block_id) is not None
+        for block_id, _job, _ts in latest.values()
     )
     return {
         "current_job_names": sorted(latest_names),

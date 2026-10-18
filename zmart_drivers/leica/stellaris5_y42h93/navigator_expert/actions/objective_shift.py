@@ -179,7 +179,9 @@ def compensate_after_change(
         from ..configuration.optical_calibration import model as _cal_model
 
         try:
-            delta = _cal_model.translation_delta_um(before["translations"], old_slot, new_slot)
+            delta = _cal_model.translation_delta_um(
+                before["translations"], old_slot, new_slot
+            )
         except RuntimeError as exc:
             return _failed(
                 f"the change swapped the objective but {exc}; the stage was "
@@ -228,7 +230,9 @@ def compensate_after_change(
             "message": None,
         }
     except Exception as exc:  # noqa: BLE001 -- the change already fired; report, never mask
-        return _failed(f"objective compensation failed after the change: {exc}", changed=None)
+        return _failed(
+            f"objective compensation failed after the change: {exc}", changed=None
+        )
 
 
 def merge_into_result(result: dict, compensation: dict | None) -> dict:
@@ -248,6 +252,8 @@ def merge_into_result(result: dict, compensation: dict | None) -> dict:
         result["success"] = False
         prefix = result.get("message")
         result["message"] = (
-            f"{prefix} | {compensation['message']}" if prefix else compensation["message"]
+            f"{prefix} | {compensation['message']}"
+            if prefix
+            else compensation["message"]
         )
     return result

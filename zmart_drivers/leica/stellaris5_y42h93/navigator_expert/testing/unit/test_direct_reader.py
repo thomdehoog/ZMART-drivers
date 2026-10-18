@@ -53,7 +53,11 @@ class StandInServer:
     def SendCommand2(self, xml, result):
         self.sent.append(xml)
         answer = answer_json_read(xml, self.client, self.ServerNodes)
-        return answer if answer is not None else '<Result Error="1">not a read the stand-in answers</Result>'
+        return (
+            answer
+            if answer is not None
+            else '<Result Error="1">not a read the stand-in answers</Result>'
+        )
 
 
 @pytest.fixture
@@ -90,7 +94,10 @@ class TestParityWithTheApiReader:
     @pytest.mark.parametrize("job", ["HiRes", "Overview", "AF Job"])
     def test_the_selected_job_is_the_api_readers(self, client, tree, job):
         client._selected_job = job
-        assert direct_reader.get_selected_job()["Name"] == api_reader.get_selected_job(client)["Name"]
+        assert (
+            direct_reader.get_selected_job()["Name"]
+            == api_reader.get_selected_job(client)["Name"]
+        )
 
     def test_the_selected_job_carries_its_live_block_id(self, client, tree):
         assert direct_reader.get_selected_job() == {
@@ -103,7 +110,9 @@ class TestParityWithTheApiReader:
     @pytest.mark.parametrize("job", ["HiRes", "Overview", "AF Job"])
     def test_the_jobs_and_their_selection_are_the_api_readers(self, client, tree, job):
         client._selected_job = job
-        assert selection(direct_reader.get_jobs()) == selection(api_reader.get_jobs(client))
+        assert selection(direct_reader.get_jobs()) == selection(
+            api_reader.get_jobs(client)
+        )
 
 
 class TestJobs:
@@ -119,10 +128,16 @@ class TestJobs:
         # ids, which an experiment load renumbers.
         tree.autofocus = ("Overview",)
         tree.reload()
-        assert [j["Name"] for j in direct_reader.get_jobs() if j["IsAutofocus"]] == ["Overview"]
+        assert [j["Name"] for j in direct_reader.get_jobs() if j["IsAutofocus"]] == [
+            "Overview"
+        ]
 
     def test_a_reloaded_experiment_gives_the_new_ids(self, client, tree):
-        tree.jobs = lambda: {"AF Job": (166, 1), "Overview": (164, 2), "HiRes": (162, 3)}
+        tree.jobs = lambda: {
+            "AF Job": (166, 1),
+            "Overview": (164, 2),
+            "HiRes": (162, 3),
+        }
         tree.reload()
         assert [j["ID"] for j in direct_reader.get_jobs()] == [166, 164, 162]
         assert direct_reader.get_selected_job()["ID"] == 162
@@ -176,7 +191,11 @@ class TestTheCurrentSetting:
         assert direct_reader.get_zoom() == {"current": 1.0, "min": 0.75, "max": 48.0}
 
     def test_scan_speed(self, tree):
-        assert direct_reader.get_scan_speed() == {"value": 400, "unit": "Hz", "isResonant": False}
+        assert direct_reader.get_scan_speed() == {
+            "value": 400,
+            "unit": "Hz",
+            "isResonant": False,
+        }
 
     def test_format(self, tree):
         assert direct_reader.get_format() == "512 x 512"
@@ -192,7 +211,9 @@ class TestTheCurrentSetting:
 
     def test_pinhole(self, tree):
         pinhole = direct_reader.get_pinhole()
-        assert pinhole["airy"] == pytest.approx({"value": 0.9994, "min": 0.2512, "max": 2.5124}, abs=1e-4)
+        assert pinhole["airy"] == pytest.approx(
+            {"value": 0.9994, "min": 0.2512, "max": 2.5124}, abs=1e-4
+        )
         assert pinhole["metres"] == pytest.approx(397.7875e-6)
 
     def test_the_objective_in_the_light_path(self, tree):
@@ -246,11 +267,24 @@ class TestLightAndScanning:
 
     def test_the_laser_lines_that_are_on(self, tree):
         assert direct_reader.get_laser_lines() == [
-            {"lightSource": "UV", "laserName": "Laser 405", "beamRoute": "30", "lineIndex": 0,
-             "wavelength": 405.0, "intensity": pytest.approx(0.0196, abs=1e-4), "shutterOpen": True},
-            {"lightSource": "SuperContVisible Light", "laserName": "WLL", "beamRoute": "10;10",
-             "lineIndex": 0, "wavelength": 497.0, "intensity": pytest.approx(0.0200, abs=1e-4),
-             "shutterOpen": True},
+            {
+                "lightSource": "UV",
+                "laserName": "Laser 405",
+                "beamRoute": "30",
+                "lineIndex": 0,
+                "wavelength": 405.0,
+                "intensity": pytest.approx(0.0196, abs=1e-4),
+                "shutterOpen": True,
+            },
+            {
+                "lightSource": "SuperContVisible Light",
+                "laserName": "WLL",
+                "beamRoute": "10;10",
+                "lineIndex": 0,
+                "wavelength": 497.0,
+                "intensity": pytest.approx(0.0200, abs=1e-4),
+                "shutterOpen": True,
+            },
         ]
 
     def test_a_line_turned_down_to_nothing_is_off(self, tree):
@@ -259,7 +293,11 @@ class TestLightAndScanning:
         assert direct_reader.get_laser_lines() == []
 
     def test_scan_field_rotation(self, tree):
-        assert direct_reader.get_scan_field_rotation() == {"value": 0.0, "min": -100.0, "max": 100.0}
+        assert direct_reader.get_scan_field_rotation() == {
+            "value": 0.0,
+            "min": -100.0,
+            "max": 100.0,
+        }
 
     def test_sequential_mode(self, tree):
         assert direct_reader.get_sequential_mode() == "Line"
@@ -273,7 +311,9 @@ class TestLightAndScanning:
         assert direct_reader.get_sequential_mode() is None
 
     def test_pixel_size_in_metres(self, tree):
-        assert direct_reader.get_pixel_size() == pytest.approx((2.2705e-6, 2.2705e-6), rel=1e-4)
+        assert direct_reader.get_pixel_size() == pytest.approx(
+            (2.2705e-6, 2.2705e-6), rel=1e-4
+        )
 
     def test_bit_depth(self, tree):
         assert direct_reader.get_bit_depth() == 8
@@ -290,13 +330,20 @@ class TestTheInstrument:
 
     def test_every_objective_by_slot(self, tree):
         objectives = direct_reader.get_objectives()
-        assert [(o["slotIndex"], o["magnification"], o["objectiveNumber"]) for o in objectives] == [
+        assert [
+            (o["slotIndex"], o["magnification"], o["objectiveNumber"])
+            for o in objectives
+        ] == [
             (0, 10.0, 506511),
             (1, 20.0, 506513),
         ]
 
     def test_scan_speed_range(self, tree):
-        assert direct_reader.get_scan_speed_range() == {"Min": 1, "Max": 2600, "ResonantSpeed": 12000}
+        assert direct_reader.get_scan_speed_range() == {
+            "Min": 1,
+            "Max": 2600,
+            "ResonantSpeed": 12000,
+        }
 
     def test_stage_limits_in_metres(self, tree):
         assert direct_reader.get_stage_limits() == {
@@ -312,38 +359,85 @@ class TestDetectionAndFilters:
 
     def test_the_detectors_in_use(self, tree):
         assert direct_reader.get_detectors() == [
-            {"name": "HyD 2", "beamRoute": "40;2", "detectionBegin": 410.0, "detectionEnd": 487.0,
-             "detectionUnit": "nm", "dye": "Leica/ALEXA 405",
-             "gain": {"value": 2.5, "min": 2.5, "max": 500.0}, "offset": 0.0},
-            {"name": "HyD S 3", "beamRoute": "40;3", "detectionBegin": 502.0, "detectionEnd": 779.0,
-             "detectionUnit": "nm", "dye": "Leica/ALEXA 488",
-             "gain": {"value": 2.5, "min": 2.5, "max": 500.0}, "offset": 0.0},
+            {
+                "name": "HyD 2",
+                "beamRoute": "40;2",
+                "detectionBegin": 410.0,
+                "detectionEnd": 487.0,
+                "detectionUnit": "nm",
+                "dye": "Leica/ALEXA 405",
+                "gain": {"value": 2.5, "min": 2.5, "max": 500.0},
+                "offset": 0.0,
+            },
+            {
+                "name": "HyD S 3",
+                "beamRoute": "40;3",
+                "detectionBegin": 502.0,
+                "detectionEnd": 779.0,
+                "detectionUnit": "nm",
+                "dye": "Leica/ALEXA 488",
+                "gain": {"value": 2.5, "min": 2.5, "max": 500.0},
+                "offset": 0.0,
+            },
         ]
 
     def test_the_installed_detectors_as_the_hardware_info_names_them(self, tree):
         assert direct_reader.get_detection_units() == [
-            {"Name": "HyD 2", "BeamRoute": "40;2", "Type": "HyD",
-             "CanDoPhotonCounting": True, "MinDetectionBandpassWidth": 5.0},
-            {"Name": "HyD S 3", "BeamRoute": "40;3", "Type": "SiPM",
-             "CanDoPhotonCounting": True, "MinDetectionBandpassWidth": 5.0},
-            {"Name": "Trans PMT", "BeamRoute": "10;5", "Type": "PMT",
-             "CanDoPhotonCounting": False, "MinDetectionBandpassWidth": 5.0},
+            {
+                "Name": "HyD 2",
+                "BeamRoute": "40;2",
+                "Type": "HyD",
+                "CanDoPhotonCounting": True,
+                "MinDetectionBandpassWidth": 5.0,
+            },
+            {
+                "Name": "HyD S 3",
+                "BeamRoute": "40;3",
+                "Type": "SiPM",
+                "CanDoPhotonCounting": True,
+                "MinDetectionBandpassWidth": 5.0,
+            },
+            {
+                "Name": "Trans PMT",
+                "BeamRoute": "10;5",
+                "Type": "PMT",
+                "CanDoPhotonCounting": False,
+                "MinDetectionBandpassWidth": 5.0,
+            },
         ]
 
     def test_a_detector_type_not_yet_seen_is_named_by_its_code(self, tree):
-        tree.detection["Spectrophotometer"][1]["DetectionUnitList"]["DetectorHWInfo"][0]["Type"] = 9
+        tree.detection["Spectrophotometer"][1]["DetectionUnitList"]["DetectorHWInfo"][
+            0
+        ]["Type"] = 9
         assert direct_reader.get_detection_units()[-1]["Type"] == "type 9"
 
     def test_every_filter_wheel_and_the_multi_function_port(self, tree):
         assert direct_reader.get_filter_wheels() == [
-            {"type": 200, "filterIndex": 0, "filterName": "Galvo X Pan Center ",
-             "filterNames": ["Galvo X Pan Center ", "Galvo X Pan Mirror "]},
-            {"type": 140, "filterIndex": 2, "filterName": "Mirror ",
-             "filterNames": ["--- ", "Substrate ", "Mirror "]},
-            {"type": 130, "filterIndex": 0, "filterName": "Empty",
-             "filterNames": ["Empty", "NF 448/514/561"]},
-            {"type": 180, "filterIndex": 1, "filterName": "Substrate ",
-             "filterNames": ["--- ", "Substrate ", "SD 470", "DD 470/640", "--- "]},
+            {
+                "type": 200,
+                "filterIndex": 0,
+                "filterName": "Galvo X Pan Center ",
+                "filterNames": ["Galvo X Pan Center ", "Galvo X Pan Mirror "],
+            },
+            {
+                "type": 140,
+                "filterIndex": 2,
+                "filterName": "Mirror ",
+                "filterNames": ["--- ", "Substrate ", "Mirror "],
+            },
+            {
+                "type": 130,
+                "filterIndex": 0,
+                "filterName": "Empty",
+                "filterNames": ["Empty", "NF 448/514/561"],
+            },
+            {
+                "type": 180,
+                "filterIndex": 1,
+                "filterName": "Substrate ",
+                "filterNames": ["--- ", "Substrate ", "SD 470", "DD 470/640", "--- "],
+            },
         ]
 
     def test_the_installed_light_sources_as_the_hardware_info_names_them(self, tree):
@@ -354,16 +448,41 @@ class TestDetectionAndFilters:
             ("SuperContVisible Light", "10;10"),
         ]
         assert sources[1]["LaserLines"] == [
-            {"LaserName": "Laser 488", "Index": 0, "MinWavelength": 488.0, "MaxWavelength": 488.0},
-            {"LaserName": "Laser 638", "Index": 1, "MinWavelength": 638.0, "MaxWavelength": 638.0},
-            {"LaserName": "Laser 730", "Index": 2, "MinWavelength": 730.0, "MaxWavelength": 730.0},
+            {
+                "LaserName": "Laser 488",
+                "Index": 0,
+                "MinWavelength": 488.0,
+                "MaxWavelength": 488.0,
+            },
+            {
+                "LaserName": "Laser 638",
+                "Index": 1,
+                "MinWavelength": 638.0,
+                "MaxWavelength": 638.0,
+            },
+            {
+                "LaserName": "Laser 730",
+                "Index": 2,
+                "MinWavelength": 730.0,
+                "MaxWavelength": 730.0,
+            },
         ]
 
     def test_a_tunable_laser_gives_each_of_its_lines(self, tree):
         lines = direct_reader.get_light_sources()[2]["LaserLines"]
         assert lines == [
-            {"LaserName": "WLL", "Index": 0, "MinWavelength": 485.0, "MaxWavelength": 685.0},
-            {"LaserName": "WLL", "Index": 1, "MinWavelength": 485.0, "MaxWavelength": 685.0},
+            {
+                "LaserName": "WLL",
+                "Index": 0,
+                "MinWavelength": 485.0,
+                "MaxWavelength": 685.0,
+            },
+            {
+                "LaserName": "WLL",
+                "Index": 1,
+                "MinWavelength": 485.0,
+                "MaxWavelength": 685.0,
+            },
         ]
 
 
@@ -395,11 +514,18 @@ class TestTheRest:
         assert setting["activeDetectors"] == direct_reader.get_detectors()
         assert setting["filterWheels"] == direct_reader.get_filter_wheels()
         assert setting["pinholeAiry"] == direct_reader.get_pinhole()["airy"]
-        assert {k: setting[k] for k in direct_reader.get_averaging()} == direct_reader.get_averaging()
+        assert {
+            k: setting[k] for k in direct_reader.get_averaging()
+        } == direct_reader.get_averaging()
 
     def test_several_sequential_settings_are_not_read_yet(self, tree):
-        tree.live[("Confocal", "ScanningParameter", "LineAverageSequentialList")] = (1, 2)
-        with pytest.raises(hardware_server.HardwareServerUnavailable, match="2 sequential settings"):
+        tree.live[("Confocal", "ScanningParameter", "LineAverageSequentialList")] = (
+            1,
+            2,
+        )
+        with pytest.raises(
+            hardware_server.HardwareServerUnavailable, match="2 sequential settings"
+        ):
             direct_reader.get_active_settings()
 
 
@@ -418,7 +544,9 @@ class TestTheJobSettings:
     @pytest.mark.parametrize("job", ["HiRes", "Overview", "AF Job"])
     def test_every_job_is_the_api_readers_answer(self, client, tree, job):
         client._selected_job = "Overview" if job == "HiRes" else "HiRes"
-        assert direct_reader.get_job_settings(job) == api_reader.get_job_settings(client, job)
+        assert direct_reader.get_job_settings(job) == api_reader.get_job_settings(
+            client, job
+        )
 
     def test_the_driver_reads_them_as_it_reads_the_api_readers(self, client, tree):
         settings = direct_reader.get_job_settings("HiRes")
@@ -433,22 +561,38 @@ class TestTheJobSettings:
 
     def test_another_jobs_z_is_its_own(self, client, tree):
         client._hardware_z_um.update({"z-galvo": -2.5, "z-wide": 4999.5})
-        assert direct_reader.get_job_settings("Overview")["zPosition"] == api_reader.get_job_settings(
-            client, "Overview"
-        )["zPosition"]
+        assert (
+            direct_reader.get_job_settings("Overview")["zPosition"]
+            == api_reader.get_job_settings(client, "Overview")["zPosition"]
+        )
 
     def test_a_wheel_in_spectrum_mode_says_so(self, client, tree):
-        wheel = {"beamRoute": "", "isSpectrumMode": True, "name": "UV Lens Wheel", "spectrumPosition": 10.0, "type": 30}
+        wheel = {
+            "beamRoute": "",
+            "isSpectrumMode": True,
+            "name": "UV Lens Wheel",
+            "spectrumPosition": 10.0,
+            "type": 30,
+        }
         client._jobs["HiRes"]["activeSettings"][0]["filterWheels"] = [wheel]
-        assert direct_reader.get_job_settings("HiRes")["activeSettings"][0]["filterWheels"] == [wheel]
+        assert direct_reader.get_job_settings("HiRes")["activeSettings"][0][
+            "filterWheels"
+        ] == [wheel]
 
     def test_a_job_not_in_las_x_raises(self, client, tree):
-        with pytest.raises(hardware_server.HardwareServerUnavailable, match="No Such Job"):
+        with pytest.raises(
+            hardware_server.HardwareServerUnavailable, match="No Such Job"
+        ):
             direct_reader.get_job_settings("No Such Job")
 
     def test_a_refused_read_raises(self, client, tree):
-        tree.jobs = lambda: {**JOBS, "Ghost": (999, 4)}  # in the sequence, unknown to the server
-        with pytest.raises(hardware_server.HardwareServerUnavailable, match="invalid block identifier"):
+        tree.jobs = lambda: {
+            **JOBS,
+            "Ghost": (999, 4),
+        }  # in the sequence, unknown to the server
+        with pytest.raises(
+            hardware_server.HardwareServerUnavailable, match="invalid block identifier"
+        ):
             direct_reader.get_job_settings("Ghost")
 
 
@@ -476,29 +620,53 @@ class TestWhatIsReadOnce:
 
     def test_what_changes_is_read_every_time(self, client, tree):
         direct_reader.get_active_settings()
-        detector = tree.detection["Spectrophotometer"][0]["DetectionUnitList"]["DetectorHWInfo"][0]
-        detector.update({"HighVoltage": 7.5, "WaveLengthEnd": 470.0, "DyeName": "Leica/DAPI"})
+        detector = tree.detection["Spectrophotometer"][0]["DetectionUnitList"][
+            "DetectorHWInfo"
+        ][0]
+        detector.update(
+            {"HighVoltage": 7.5, "WaveLengthEnd": 470.0, "DyeName": "Leica/DAPI"}
+        )
         tree.light_sources[0]["AOTF"]["AotfLine"][0]["Intensity"] = 5.0
         tree.filter_wheels["FilterWheel"][1]["CurrentSlotPosition"] = 1
         tree.live[("Microscope", "SlotPosition")] = 1
         settings = direct_reader.get_active_settings()[0]
         hyd = settings["activeDetectors"][0]
-        assert (hyd["gain"]["value"], hyd["detectionEnd"], hyd["dye"]) == (7.5, 470.0, "Leica/DAPI")
+        assert (hyd["gain"]["value"], hyd["detectionEnd"], hyd["dye"]) == (
+            7.5,
+            470.0,
+            "Leica/DAPI",
+        )
         assert settings["activeLaserLines"][0]["intensity"] == pytest.approx(0.05)
-        assert {"type": 140, "filterIndex": 1, "filterName": "Substrate "}.items() <= next(
+        assert {
+            "type": 140,
+            "filterIndex": 1,
+            "filterName": "Substrate ",
+        }.items() <= next(
             w for w in settings["filterWheels"] if w["type"] == 140
         ).items()
         assert direct_reader.get_objective()["magnification"] == 20.0
 
     def test_a_detector_switched_on_is_seen(self, tree):
-        assert [d["name"] for d in direct_reader.get_detectors()] == ["HyD 2", "HyD S 3"]
-        tree.detection["Spectrophotometer"][1]["DetectionUnitList"]["DetectorHWInfo"][0]["IsActive"] = True
-        assert [d["name"] for d in direct_reader.get_detectors()] == ["HyD 2", "HyD S 3", "Trans PMT"]
+        assert [d["name"] for d in direct_reader.get_detectors()] == [
+            "HyD 2",
+            "HyD S 3",
+        ]
+        tree.detection["Spectrophotometer"][1]["DetectionUnitList"]["DetectorHWInfo"][
+            0
+        ]["IsActive"] = True
+        assert [d["name"] for d in direct_reader.get_detectors()] == [
+            "HyD 2",
+            "HyD S 3",
+            "Trans PMT",
+        ]
 
     def test_a_changed_layout_is_read_afresh(self, tree):
         assert len(direct_reader.get_light_sources()) == 3
         tree.light_sources = tree.light_sources[:2]
-        assert [s["name"] for s in direct_reader.get_light_sources()] == ["UV", "Visible Light"]
+        assert [s["name"] for s in direct_reader.get_light_sources()] == [
+            "UV",
+            "Visible Light",
+        ]
 
     def test_a_failed_connection_forgets_what_was_read_once(self, tree):
         direct_reader.get_objectives()

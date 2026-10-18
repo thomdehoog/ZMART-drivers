@@ -322,7 +322,9 @@ def _observe_objective_for_step(
         session.hardware_objectives[slot] = name
     elif role == "target":
         if session.from_slot is None:
-            raise RuntimeError("measure the reference objective before the target objective")
+            raise RuntimeError(
+                "measure the reference objective before the target objective"
+            )
         if slot == session.from_slot:
             raise RuntimeError(
                 f"target objective is still the reference objective: slot {slot} ({name}). "
@@ -461,7 +463,9 @@ def _fit_focus_z(z_values: np.ndarray, scores: list[float]) -> float:
     return _parabolic_peak(z_values[lead:end], scores[lead:end], step)
 
 
-def _parabolic_peak(z_values: np.ndarray, scores: list[float], z_step_um: float) -> float:
+def _parabolic_peak(
+    z_values: np.ndarray, scores: list[float], z_step_um: float
+) -> float:
     i_peak = int(np.argmax(scores))
     n = len(z_values)
     if i_peak == 0 or i_peak == n - 1:
@@ -491,7 +495,9 @@ def _print_step5_summary(session, summary: dict) -> None:
     trusted = bool(reg.get("trusted"))
     confidence = int(reg.get("confidence", 0))
     shift = reg.get("image_shift_um") or [None, None]
-    status = summary.get("status") or ("OK" if summary.get("config_written") else "FAILED")
+    status = summary.get("status") or (
+        "OK" if summary.get("config_written") else "FAILED"
+    )
     # Strip the appended reason: keep the status header short.
     header = status.split(" (", 1)[0]
 
@@ -852,7 +858,9 @@ def measure_parcentricity_reference(
     geom = read_job_geometry(session.client, session.job_name, ref_image)
     session.ref_xy_pixel_size_um = float(geom.pixel_size_um)
 
-    print(f"Reference XY image acquired.  pixel size = {session.ref_xy_pixel_size_um:.4f} um")
+    print(
+        f"Reference XY image acquired.  pixel size = {session.ref_xy_pixel_size_um:.4f} um"
+    )
     return session
 
 
@@ -959,7 +967,9 @@ def measure_parcentricity_target_and_save(
         # at save time per the rig's measured orientation), so the registered
         # image shift is already in the stage frame -- no rotation needed.
         correction_xy = image_shift
-        translation_xy = np.asarray(session.motor_shift_xy_um, dtype=float) + correction_xy
+        translation_xy = (
+            np.asarray(session.motor_shift_xy_um, dtype=float) + correction_xy
+        )
         session.correction_xy_um = (
             float(correction_xy[0]),
             float(correction_xy[1]),
@@ -985,7 +995,9 @@ def measure_parcentricity_target_and_save(
     else:
         session.failure_reason = "voting registration not trusted"
 
-    overlay_shift = (float(vote["dx_um"]), float(vote["dy_um"])) if vote.get("trusted") else None
+    overlay_shift = (
+        (float(vote["dx_um"]), float(vote["dy_um"])) if vote.get("trusted") else None
+    )
     fig = plot_overlay(
         session.ref_image,
         target_image,
@@ -1020,7 +1032,8 @@ def measure_parcentricity_target_and_save(
         z_dir = session.paths.data_dir / dirname
         if z_dir.exists():
             images[dirname] = (
-                str(z_dir.relative_to(session.paths.session_dir)).replace("\\", "/") + "/"
+                str(z_dir.relative_to(session.paths.session_dir)).replace("\\", "/")
+                + "/"
             )
 
     # source_calibration_file: record the absolute source we actually
@@ -1049,7 +1062,10 @@ def measure_parcentricity_target_and_save(
         "xy_post_um": [_f(session.xy_post[0]), _f(session.xy_post[1])],
         "z_post_um": _f(session.z_post),
         "focus_z_target_um": _f(session.focus_z_target_um),
-        "motor_shift_xy_um": [_f(session.motor_shift_xy_um[0]), _f(session.motor_shift_xy_um[1])],
+        "motor_shift_xy_um": [
+            _f(session.motor_shift_xy_um[0]),
+            _f(session.motor_shift_xy_um[1]),
+        ],
         "motor_shift_z_um": _f(session.motor_shift_z_um),
         "correction_xy_um": (
             [_f(session.correction_xy_um[0]), _f(session.correction_xy_um[1])]
@@ -1110,7 +1126,10 @@ def measure_parcentricity_target_and_save(
         "to_slot": session.to_slot,
         "from_objective": session.from_objective,
         "to_objective": session.to_objective,
-        "motor_shift_xy_um": [_f(session.motor_shift_xy_um[0]), _f(session.motor_shift_xy_um[1])],
+        "motor_shift_xy_um": [
+            _f(session.motor_shift_xy_um[0]),
+            _f(session.motor_shift_xy_um[1]),
+        ],
         "motor_shift_z_um": _f(session.motor_shift_z_um),
         "correction_xy_um": (
             [_f(session.correction_xy_um[0]), _f(session.correction_xy_um[1])]

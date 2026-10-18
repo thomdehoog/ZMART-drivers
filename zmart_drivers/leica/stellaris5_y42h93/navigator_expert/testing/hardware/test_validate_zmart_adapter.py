@@ -48,7 +48,9 @@ def _run_mock(tmp_path, *extra):
         adapter._session.connect_python_client = original_connect
         profiles.STATE_READERS = original_profile
     records = [
-        json.loads(line) for line in output.read_text(encoding="utf-8").splitlines() if line.strip()
+        json.loads(line)
+        for line in output.read_text(encoding="utf-8").splitlines()
+        if line.strip()
     ]
     return exit_code, records
 
@@ -118,7 +120,9 @@ def test_readonly_mock_run(tmp_path):
 
 def test_full_mock_run_move_and_acquire(tmp_path):
     """Read-only + move (both z drives) + state pass; acquire SKIPs under the mock."""
-    exit_code, records = _run_mock(tmp_path, "--allow-move", "--allow-state", "--allow-acquire")
+    exit_code, records = _run_mock(
+        tmp_path, "--allow-move", "--allow-state", "--allow-acquire"
+    )
     assert exit_code == 0
 
     summary = records[-1]
@@ -215,7 +219,9 @@ def test_connect_session_leaves_output_root_for_driver_discovery():
 
 
 @pytest.mark.parametrize(("rounds", "corrects"), [(0, False), (1, True)])
-def test_acquire_backlash_rounds_through_the_controller_seam(tmp_path, rounds, corrects):
+def test_acquire_backlash_rounds_through_the_controller_seam(
+    tmp_path, rounds, corrects
+):
     """The driver's own rounds, zero by default or positive, both cross the real Session seam.
 
     Unlike the adapter-direct unit tests (which patch driver internals and pass

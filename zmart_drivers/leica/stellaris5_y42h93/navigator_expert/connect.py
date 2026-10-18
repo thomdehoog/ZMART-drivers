@@ -25,7 +25,9 @@ def _profile_api_delay_ms() -> int | None:
     return profiles.LASX_API.delay_ms
 
 
-def configure_lasx_api_delay(lasx_api_module: Any, delay_ms: int | None = None) -> int | None:
+def configure_lasx_api_delay(
+    lasx_api_module: Any, delay_ms: int | None = None
+) -> int | None:
     """Set Leica's ``PyApiClient.DelayInMilliseconds`` pacing knob.
 
     ``delay_ms=None`` means "use the current profile value." A profile value
@@ -50,7 +52,9 @@ def configure_lasx_api_delay(lasx_api_module: Any, delay_ms: int | None = None) 
     try:
         pyapi_client.DelayInMilliseconds = int(delay_ms)
     except Exception as exc:  # noqa: BLE001 - .NET interop exceptions vary
-        raise RuntimeError("Could not set LasxApi.PyApiClient.DelayInMilliseconds") from exc
+        raise RuntimeError(
+            "Could not set LasxApi.PyApiClient.DelayInMilliseconds"
+        ) from exc
     return int(delay_ms)
 
 

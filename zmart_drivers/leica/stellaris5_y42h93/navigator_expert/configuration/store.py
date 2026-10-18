@@ -111,7 +111,9 @@ _BUNDLED_ITEM_FOLDER = {
     "limits": "limits",
     "orientation": "image_stage_registration",
 }
-_SUBSYSTEM_FILENAME = {subsystem: filename for filename, subsystem in _BUNDLED_SUBSYSTEM.items()}
+_SUBSYSTEM_FILENAME = {
+    subsystem: filename for filename, subsystem in _BUNDLED_SUBSYSTEM.items()
+}
 _SUBSYSTEM_FILENAME["origin"] = ORIGIN_FILENAME
 _SUBSYSTEM_FILENAME["data_location"] = DATA_LOCATION_FILENAME
 _SEED_SNAPSHOT_MOMENT = datetime(1970, 1, 1, tzinfo=timezone.utc)
@@ -227,7 +229,9 @@ class MachineProfile:
         for src in self._legacy_snapshots():
             target = self.snapshot_root() / src.name
             if target.exists():
-                log.warning("legacy snapshot %s also exists at %s; not moving", src, target)
+                log.warning(
+                    "legacy snapshot %s also exists at %s; not moving", src, target
+                )
                 continue
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copytree(src, target)
@@ -255,7 +259,11 @@ class MachineProfile:
         if not root.is_dir():
             return []
         return sorted(
-            (path for path in root.iterdir() if path.is_dir() and is_snapshot_name(path.name)),
+            (
+                path
+                for path in root.iterdir()
+                if path.is_dir() and is_snapshot_name(path.name)
+            ),
             key=lambda path: path.name,
         )
 
@@ -340,7 +348,11 @@ class MachineProfile:
             ("limits", limits),
             ("orientation", orientation),
         )
-        selected = [(subsystem, payload) for subsystem, payload in updates if payload is not None]
+        selected = [
+            (subsystem, payload)
+            for subsystem, payload in updates
+            if payload is not None
+        ]
         if len(selected) != 1:
             raise ValueError("publish_snapshot requires exactly one subsystem payload")
         self.migrate_flat_snapshots()
@@ -368,7 +380,10 @@ class MachineProfile:
                     path
                     for path in reversed(flat)
                     if (path / filename).is_file()
-                    and (subsystem != "limits" or (path / LEGACY_LIMITS_MACHINE_MARKER).is_file())
+                    and (
+                        subsystem != "limits"
+                        or (path / LEGACY_LIMITS_MACHINE_MARKER).is_file()
+                    )
                 ),
                 None,
             )
@@ -401,7 +416,9 @@ class MachineProfile:
         try:
             subsystem = _BUNDLED_SUBSYSTEM[filename]
         except KeyError as exc:
-            raise FileNotFoundError(f"unknown ProgramData config file: {filename}") from exc
+            raise FileNotFoundError(
+                f"unknown ProgramData config file: {filename}"
+            ) from exc
         snapshot = self.ensure_snapshot(subsystem)
         return snapshot / filename, False
 
@@ -413,7 +430,9 @@ class MachineProfile:
             / CALIBRATION_FILENAME
         )
 
-    def resolve_calibration(self, calibration_name: str | None = None) -> tuple[Path, bool]:
+    def resolve_calibration(
+        self, calibration_name: str | None = None
+    ) -> tuple[Path, bool]:
         """Resolve the active ProgramData calibration, optionally by lens setup."""
         if calibration_name is None:
             return self.resolve(CALIBRATION_FILENAME)
@@ -487,7 +506,11 @@ class MachineProfile:
         """Newest persisted frame origin, or a non-existent placeholder path."""
         self.migrate_flat_snapshots()
         latest = self.latest_snapshot("origin")
-        return (latest / ORIGIN_FILENAME) if latest else (self.origin_dir() / ORIGIN_FILENAME)
+        return (
+            (latest / ORIGIN_FILENAME)
+            if latest
+            else (self.origin_dir() / ORIGIN_FILENAME)
+        )
 
     def read_origin(self) -> dict | None:
         """The newest saved frame origin, or None when none has been saved.
@@ -522,12 +545,21 @@ class MachineProfile:
             return None
         return json.loads(path.read_text(encoding="utf-8"))
 
-    def write_data_location(self, payload: dict, *, moment: datetime | None = None) -> Path:
+    def write_data_location(
+        self, payload: dict, *, moment: datetime | None = None
+    ) -> Path:
         """Append one timestamped data-location record and return its JSON path."""
-        return self._append_record("data_location", DATA_LOCATION_FILENAME, payload, moment=moment)
+        return self._append_record(
+            "data_location", DATA_LOCATION_FILENAME, payload, moment=moment
+        )
 
     def _append_record(
-        self, subsystem: str, filename: str, payload: dict, *, moment: datetime | None = None
+        self,
+        subsystem: str,
+        filename: str,
+        payload: dict,
+        *,
+        moment: datetime | None = None,
     ) -> Path:
         """One new timestamped record of *subsystem*, written whole; its JSON path."""
         self.migrate_flat_snapshots()
@@ -648,7 +680,9 @@ class MachineProfile:
             if subsystem == "calibration":
                 self._seed_calibrations_dir(staging, prior=prior)
                 if payload is not None and calibration_name is not None:
-                    _write_json(staging / self.calibration_relpath(calibration_name), payload)
+                    _write_json(
+                        staging / self.calibration_relpath(calibration_name), payload
+                    )
             for source in archive_paths:
                 source = Path(source)
                 destination = staging / source.name
@@ -667,7 +701,9 @@ class MachineProfile:
                 archive_notebook(
                     nb,
                     staging,
-                    directory="notebook" if subsystem == "limits" else Path("data") / "notebook",
+                    directory="notebook"
+                    if subsystem == "limits"
+                    else Path("data") / "notebook",
                 )
             os.replace(staging, target)
         except BaseException:

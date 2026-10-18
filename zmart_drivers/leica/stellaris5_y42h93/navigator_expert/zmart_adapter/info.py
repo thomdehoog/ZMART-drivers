@@ -21,5 +21,7 @@ def output_root(handle: Any) -> Path:
     """
     root = handle.connection.get("output_root") or handle.data_location
     if not root:
-        raise RuntimeError(f"this microscope does not know where to save its data: {SET_UP}")
+        raise RuntimeError(
+            f"this microscope does not know where to save its data: {SET_UP}"
+        )
     return Path(root).expanduser().resolve()

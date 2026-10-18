@@ -66,7 +66,9 @@ def save(
     fix_ome: bool = True,
     cleanup_cache: bool = False,
     export_completion_timeout_s: float = DEFAULT_EXPORT_COMPLETION_TIMEOUT_S,
-    export_completion_poll_interval_s: float = (DEFAULT_EXPORT_COMPLETION_POLL_INTERVAL_S),
+    export_completion_poll_interval_s: float = (
+        DEFAULT_EXPORT_COMPLETION_POLL_INTERVAL_S
+    ),
     cache_root: str | Path | None = None,
     format: str | None = None,
     placement: Callable[[list[int]], Callable[[int], dict]] | None = None,
@@ -106,11 +108,15 @@ def save(
         raise ValueError(f"unknown image format {format!r}; the formats are {FORMATS}")
     projection = IMAGE_SAVE.projection if projection is None else projection
     if projection not in PROJECTIONS:
-        raise ValueError(f"unknown projection {projection!r}; the projections are {PROJECTIONS}")
+        raise ValueError(
+            f"unknown projection {projection!r}; the projections are {PROJECTIONS}"
+        )
     if orientation is None:
         from ..configuration.image_stage_registration import rig_orientation
 
-        orientation = rig_orientation() if IMAGE_SAVE.apply_orientation else Orientation()
+        orientation = (
+            rig_orientation() if IMAGE_SAVE.apply_orientation else Orientation()
+        )
     exported = collect_lasx_data_container(
         client,
         acq,
@@ -123,7 +129,9 @@ def save(
             f"cleanup_cache asks LAS X to let go of the capture, but {exported.source_exporter} "
             "gives no way to; nothing was saved and nothing deleted"
         )
-    exported = replace(exported, metadata=on_the_canvas(exported.metadata, exported, placement))
+    exported = replace(
+        exported, metadata=on_the_canvas(exported.metadata, exported, placement)
+    )
     if format == "ome-zarr":
         saved = _persist_store(
             exported,
@@ -145,10 +153,18 @@ def save(
             fix_ome=fix_ome,
         )
     if projection != "none" and exported.metadata.size_z > 1:
-        saved = replace(saved, projection_paths=_persist_projection(
-            exported, Path(output_root), naming, format=format, orientation=orientation, placement=placement,
-            state=state,
-        ))
+        saved = replace(
+            saved,
+            projection_paths=_persist_projection(
+                exported,
+                Path(output_root),
+                naming,
+                format=format,
+                orientation=orientation,
+                placement=placement,
+                state=state,
+            ),
+        )
     # Last, once everything made from the source has been made from it.
     if cleanup_cache:
         try:
@@ -170,8 +186,14 @@ def _persist_projection(
 ) -> tuple[Path, ...]:
     """The capture's max projection in ``projections``, in the capture's own format."""
     indices = [index for position in exported.positions for index in position.planes]
-    where = placement(sorted({index.z for index in indices})) if placement is not None else None
-    projected = ome_zarr.max_projection(ome_zarr.gather(exported, orientation=orientation, where=where))
+    where = (
+        placement(sorted({index.z for index in indices}))
+        if placement is not None
+        else None
+    )
+    projected = ome_zarr.max_projection(
+        ome_zarr.gather(exported, orientation=orientation, where=where)
+    )
     folder = projections_dir(output_root)
     if format == "ome-zarr":
         store = folder / f"{naming.stem}.ome.zarr"
@@ -179,11 +201,16 @@ def _persist_projection(
     folder.mkdir(parents=True, exist_ok=True)
     written = []
     for (ti, ci), plane in (
-        ((index.t, index.c), projected.volume[index.t, index.c, 0]) for index in sorted(projected.metadata.planes)
+        ((index.t, index.c), projected.volume[index.t, index.c, 0])
+        for index in sorted(projected.metadata.planes)
     ):
         path = folder / build_projection_name(replace(naming, t=ti, c=ci), "max")
         _materialize.write_plane_atomic(
-            plane, path, metadata=projected.metadata, index=PlaneIndex(t=ti, z=0, c=ci), state=state
+            plane,
+            path,
+            metadata=projected.metadata,
+            index=PlaneIndex(t=ti, z=0, c=ci),
+            state=state,
         )
         written.append(path)
     return tuple(written)
@@ -200,7 +227,11 @@ def on_the_canvas(metadata, exported: ExportedAcquisition, placement) -> object:
     called them its position would put the picture somewhere else.
     """
     indices = [index for position in exported.positions for index in position.planes]
-    where = placement(sorted({index.z for index in indices})) if placement is not None else None
+    where = (
+        placement(sorted({index.z for index in indices}))
+        if placement is not None
+        else None
+    )
     planes = {}
     for index, plane in metadata.planes.items():
         at = where(index.z) if where is not None else {}
@@ -226,9 +257,15 @@ def _persist_store(
     """The capture as one OME-Zarr image in ``data``, beside the vendor's metadata and the state."""
     vendor_records = _persist_vendor_metadata(exported, output_root, naming)
     indices = [index for position in exported.positions for index in position.planes]
-    where = placement(sorted({index.z for index in indices})) if placement is not None else None
+    where = (
+        placement(sorted({index.z for index in indices}))
+        if placement is not None
+        else None
+    )
     store = data_dir(output_root) / f"{naming.stem}.ome.zarr"
-    ome_zarr.write_position_store(exported, store, orientation=orientation, where=where, state=state)
+    ome_zarr.write_position_store(
+        exported, store, orientation=orientation, where=where, state=state
+    )
     printed = _print_state(state, output_root, naming)
 
     summary_path = output_root / "summary.json"
@@ -251,7 +288,9 @@ def _persist_store(
     return SavedAcquisition(
         image_paths={index: store for index in sorted(indices)},
         naming=naming,
-        vendor_metadata_paths=tuple(output_root / record["path"] for record in vendor_records),
+        vendor_metadata_paths=tuple(
+            output_root / record["path"] for record in vendor_records
+        ),
         state_paths=(printed,) if printed is not None else (),
     )
 
@@ -323,7 +362,9 @@ def _persist_export(
     return SavedAcquisition(
         image_paths=image_paths,
         naming=naming,
-        vendor_metadata_paths=tuple(output_root / record["path"] for record in vendor_records),
+        vendor_metadata_paths=tuple(
+            output_root / record["path"] for record in vendor_records
+        ),
         state_paths=tuple(state_paths),
     )
 
@@ -357,9 +398,7 @@ def _persist_vendor_metadata(
     # it sits under the same roof rather than beside `data` -- what is beside
     # `data` is what was made from the pixels afterwards, and this was not.
     vendor_dir = (
-        metadata_dir(output_root)
-        / "vendor"
-        / _safe_component(exported.source_exporter)
+        metadata_dir(output_root) / "vendor" / _safe_component(exported.source_exporter)
     )
     vendor_dir.mkdir(parents=True, exist_ok=True)
 
@@ -399,7 +438,9 @@ def _load_summary(summary_path: Path) -> dict:
         except (json.JSONDecodeError, OSError) as e:
             # An externally corrupted summary must not abort a save whose
             # images are already written; rebuild it from this save on.
-            log.warning("summary.json unreadable, starting fresh (%s): %s", summary_path, e)
+            log.warning(
+                "summary.json unreadable, starting fresh (%s): %s", summary_path, e
+            )
     return {"acquisitions": []}
 
 

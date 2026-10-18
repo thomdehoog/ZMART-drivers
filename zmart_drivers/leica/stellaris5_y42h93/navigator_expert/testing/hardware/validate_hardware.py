@@ -216,7 +216,9 @@ class Validator:
                 message=_compact_status(result),
                 timing=result.get("timing"),
                 driver_message=result.get("message"),
-                driver_logs=list(result.get("logs") or []) if self.show_driver_log else [],
+                driver_logs=list(result.get("logs") or [])
+                if self.show_driver_log
+                else [],
                 context=context or {},
             ),
             mutating=True,
@@ -338,7 +340,9 @@ class Validator:
             status="DONE",
             started_at=_now_iso(),
             elapsed_s=0.0,
-            message=("pass={PASS} warn={WARN} fail={FAIL} skip={SKIP}".format(**counts)),
+            message=(
+                "pass={PASS} warn={WARN} fail={FAIL} skip={SKIP}".format(**counts)
+            ),
             context={"counts": counts, "exit_code": self.exit_code()},
         )
         self._emit(rec)
@@ -402,7 +406,9 @@ class Validator:
             self._log.info(head)
         if self.show_driver_log and rec.driver_logs:
             for entry in rec.driver_logs:
-                self._log.info("    [%s] %s", entry.get("level", "info"), entry.get("msg", ""))
+                self._log.info(
+                    "    [%s] %s", entry.get("level", "info"), entry.get("msg", "")
+                )
 
 
 # --- Imports + client -------------------------------------------------------
@@ -424,7 +430,9 @@ def _bootstrap() -> tuple[Any, type]:
     return drv, MockLasxClient
 
 
-def _connect(args: argparse.Namespace, MockClient: type, log: logging.Logger) -> Any | None:
+def _connect(
+    args: argparse.Namespace, MockClient: type, log: logging.Logger
+) -> Any | None:
     """Build the LAS X client. Mock if --mock else LasxApi. Returns None on failure."""
     if args.mock:
         # Use a hermetic ProgramData fixture so the REAL limits handshake runs
@@ -437,8 +445,8 @@ def _connect(args: argparse.Namespace, MockClient: type, log: logging.Logger) ->
         return MockClient(latency=args.mock_latency)
     try:
         from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.lasx_runtime import (  # noqa: PLC0415
-    load_lasx_api_runtime,
-)
+            load_lasx_api_runtime,
+        )
 
         lasx_api = load_lasx_api_runtime()
     except (ImportError, ModuleNotFoundError, RuntimeError) as exc:
@@ -451,7 +459,9 @@ def _connect(args: argparse.Namespace, MockClient: type, log: logging.Logger) ->
         log.error("Connect raised (is LAS X running?): %s", exc)
         return None
     if not ok:
-        log.error("Connect returned False (LAS X reachable but refused the client name)")
+        log.error(
+            "Connect returned False (LAS X reachable but refused the client name)"
+        )
         return None
     try:
         from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.connect import (
@@ -472,7 +482,9 @@ def _connect(args: argparse.Namespace, MockClient: type, log: logging.Logger) ->
     return client
 
 
-def _apply_stage_limits(drv: Any, v: Validator, client: Any, args: argparse.Namespace) -> bool:
+def _apply_stage_limits(
+    drv: Any, v: Validator, client: Any, args: argparse.Namespace
+) -> bool:
     """Run the connect-time limits handshake before any movement happens.
 
     The REAL handshake (ProgramData limits + function limits, validated,
@@ -483,7 +495,9 @@ def _apply_stage_limits(drv: Any, v: Validator, client: Any, args: argparse.Name
     """
     state = v.callable(
         "limits: connect handshake",
-        lambda: drv.connect_limits_handshake(client, stage_limits_path=args.limits_config),
+        lambda: drv.connect_limits_handshake(
+            client, stage_limits_path=args.limits_config
+        ),
         context={"limits_path": args.limits_config or "<machine-local snapshot>"},
     )
     if state is None:
@@ -529,7 +543,9 @@ def _selected_job_name(
     return selected["Name"] if selected else None
 
 
-def settled_selected_job(drv: Any, client: Any, expected: str, *, window_s: float, poll_s: float) -> str | None:
+def settled_selected_job(
+    drv: Any, client: Any, expected: str, *, window_s: float, poll_s: float
+) -> str | None:
     """The CAM API's selected job once it shows *expected*, or what it shows when *window_s* has passed.
 
     LAS X switches the job at once, and the direct reader shows it at once;
@@ -579,7 +595,9 @@ def _needs_select_job_restore(
         return True
     if not isinstance(last_result, dict):
         return True
-    return not (bool(last_result.get("success")) and last_result.get("confirmed") is True)
+    return not (
+        bool(last_result.get("success")) and last_result.get("confirmed") is True
+    )
 
 
 def _job_selection_read_mode(state_reader_mode: str | None) -> str | None:
@@ -659,7 +677,9 @@ def embedded_ome_xml(path) -> bytes:
     path = Path(path)
     if path.is_dir():
         return (path / "OME" / "METADATA.ome.xml").read_bytes()
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.output import materialize
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.output import (
+        materialize,
+    )
 
     return materialize.extract_embedded_ome_xml(path)
 
@@ -717,8 +737,8 @@ def _record_log_selected_job_poll(
 ) -> None:
     """Record the experimental log-only selected-job wait."""
     from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.log_wait import (  # noqa: PLC0415
-    wait_for_selected_job_log,
-)
+        wait_for_selected_job_log,
+    )
 
     started_at = _now_iso()
     result = wait_for_selected_job_log(
@@ -733,7 +753,9 @@ def _record_log_selected_job_poll(
     if result.matched_at is not None:
         log_event_delta_s = result.matched_at - command_started_at
     log_delta = "n/a" if log_event_delta_s is None else f"{log_event_delta_s:.3f}s"
-    api_elapsed = "n/a" if api_select_elapsed_s is None else f"{api_select_elapsed_s:.3f}s"
+    api_elapsed = (
+        "n/a" if api_select_elapsed_s is None else f"{api_select_elapsed_s:.3f}s"
+    )
     message = (
         f"{result.reason}; last_reason={last_reason}; "
         f"value={result.value!r}; "
@@ -815,7 +837,9 @@ def _xy_pattern_positions(
 def _z_limit_error(z_um: float, z_mode: str, limits: dict[str, float]) -> str | None:
     """Return why a Z point is outside the calibrated stage envelope."""
     if z_mode == "galvo":
-        return _range_error(z_um, limits["z_galvo_min"], limits["z_galvo_max"], "Z galvo")
+        return _range_error(
+            z_um, limits["z_galvo_min"], limits["z_galvo_max"], "Z galvo"
+        )
     if z_mode == "zwide":
         return _range_error(z_um, limits["z_wide_min"], limits["z_wide_max"], "Z wide")
     return f"unknown z_mode {z_mode!r}"
@@ -853,7 +877,9 @@ def _bounded_numeric_candidate(
 # --- Validation phases ------------------------------------------------------
 
 
-def phase_readonly(drv: Any, v: Validator, client: Any, args: argparse.Namespace) -> str | None:
+def phase_readonly(
+    drv: Any, v: Validator, client: Any, args: argparse.Namespace
+) -> str | None:
     """Read-only checks. Returns the job name to use for write phases."""
     with v.phase("read-only"):
         v.callable("ping", lambda: drv.ping(client))
@@ -874,14 +900,20 @@ def phase_readonly(drv: Any, v: Validator, client: Any, args: argparse.Namespace
                 # returning nothing is the declared capability, not a driver
                 # fault. Enumerate the list via API so the write phases have
                 # candidates -- selected-job confirmation still exercises log.
-                v.skip("job: resolve", "job list is API-only (no log leg); enumerating via API")
+                v.skip(
+                    "job: resolve",
+                    "job list is API-only (no log leg); enumerating via API",
+                )
                 if args.read_only:
                     return None
                 jobs = _api_control_jobs_for_log_experiment(drv, v, client)
                 if not jobs:
                     return None
             elif args.state_reader_mode in {"log", "hybrid"}:
-                v.fail("job: resolve", f"{msg} with --state-reader-mode {args.state_reader_mode}")
+                v.fail(
+                    "job: resolve",
+                    f"{msg} with --state-reader-mode {args.state_reader_mode}",
+                )
                 if args.state_reader_mode == "log" and not args.read_only:
                     jobs = _api_control_jobs_for_log_experiment(drv, v, client)
                     if not jobs:
@@ -914,7 +946,11 @@ def phase_readonly(drv: Any, v: Validator, client: Any, args: argparse.Namespace
             sel = next((j for j in jobs if j.get("IsSelected")), None)
             name = sel["Name"] if sel else jobs[0]["Name"]
         v.callable("job: resolved", lambda: name, context={"job": name})
-        v.callable("settings: read", lambda: _settings(drv, client, name), context={"job": name})
+        v.callable(
+            "settings: read",
+            lambda: _settings(drv, client, name),
+            context={"job": name},
+        )
         return name
 
 
@@ -933,7 +969,9 @@ def phase_job_selection(
             v.skip("job selection: round-trip", "no jobs returned")
             return
 
-        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher import tuning
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher import (
+            tuning,
+        )
 
         names = selectable_job_names(jobs)
         # The job to come back to is read the way the driver reads it, not
@@ -985,7 +1023,11 @@ def phase_job_selection(
                 selected = v.callable(
                     "job selection: read selected job",
                     lambda name=name: settled_selected_job(
-                        drv, client, name, window_s=tuning.WINDOW_S, poll_s=tuning.POLL_S
+                        drv,
+                        client,
+                        name,
+                        window_s=tuning.WINDOW_S,
+                        poll_s=tuning.POLL_S,
                     ),
                     context=ctx,
                 )
@@ -998,7 +1040,10 @@ def phase_job_selection(
                     context={"restore_to": original},
                 )
             else:
-                v.skip("job selection: restore", f"{original!r} already confirmed by round-trip")
+                v.skip(
+                    "job selection: restore",
+                    f"{original!r} already confirmed by round-trip",
+                )
 
 
 def phase_settings(drv: Any, v: Validator, client: Any, job_name: str) -> None:
@@ -1194,7 +1239,9 @@ def _round_trip(
     ctx = {"job": job_name, "current": current, "target": target}
     v.command(f"{name}: write current", lambda: write(current), context=ctx)
     try:
-        result = v.command(f"{name}: write alternate", lambda: write(target), context=ctx)
+        result = v.command(
+            f"{name}: write alternate", lambda: write(target), context=ctx
+        )
         if not result or not result.get("success"):
             return
         if result.get("confirmed") is False:
@@ -1311,7 +1358,9 @@ def phase_xy(drv: Any, v: Validator, client: Any, args: argparse.Namespace) -> N
             )
 
 
-def phase_z(drv: Any, v: Validator, client: Any, job_name: str, args: argparse.Namespace) -> None:
+def phase_z(
+    drv: Any, v: Validator, client: Any, job_name: str, args: argparse.Namespace
+) -> None:
     """Z-galvo round-trip."""
     with v.phase("z-galvo round-trip"):
         ch = v.callable(
@@ -1373,7 +1422,9 @@ def phase_z(drv: Any, v: Validator, client: Any, job_name: str, args: argparse.N
 def phase_objective(drv: Any, v: Validator, client: Any, job_name: str) -> None:
     """Objective switch + restore."""
     with v.phase("objective round-trip"):
-        hw = v.callable("objective: read hardware", lambda: drv.get_hardware_info(client))
+        hw = v.callable(
+            "objective: read hardware", lambda: drv.get_hardware_info(client)
+        )
         ch = v.callable(
             "objective: read start",
             lambda: _settings(drv, client, job_name),
@@ -1393,13 +1444,17 @@ def phase_objective(drv: Any, v: Validator, client: Any, job_name: str) -> None:
         try:
             v.command(
                 "objective: switch alternate",
-                lambda: drv.set_objective(client, job_name, hw, slot_index=target["slotIndex"]),
+                lambda: drv.set_objective(
+                    client, job_name, hw, slot_index=target["slotIndex"]
+                ),
                 context=ctx,
             )
         finally:
             v.command(
                 "objective: restore",
-                lambda: drv.set_objective(client, job_name, hw, slot_index=current["slotIndex"]),
+                lambda: drv.set_objective(
+                    client, job_name, hw, slot_index=current["slotIndex"]
+                ),
                 context={"restore_to": current_name},
             )
 
@@ -1430,14 +1485,21 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "behind the API can be simulator mode or real hardware.",
     )
     p.add_argument(
-        "--client-name", default="PythonClient", help="LAS X client name (LasxApi.Connect)"
+        "--client-name",
+        default="PythonClient",
+        help="LAS X client name (LasxApi.Connect)",
     )
     p.add_argument("--job", help="job to validate (default: currently selected)")
     p.add_argument(
-        "--mock-latency", type=float, default=0.0, help="per-command latency for --mock (seconds)"
+        "--mock-latency",
+        type=float,
+        default=0.0,
+        help="per-command latency for --mock (seconds)",
     )
     p.add_argument(
-        "--api-delay-ms", type=int, help="override profiles.LASX_API.delay_ms for LasxApi"
+        "--api-delay-ms",
+        type=int,
+        help="override profiles.LASX_API.delay_ms for LasxApi",
     )
     p.add_argument(
         "--limits-config",
@@ -1446,19 +1508,32 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
 
     # Phase gates
-    p.add_argument("--read-only", action="store_true", help="skip all write/move/acquire phases")
-    p.add_argument("--skip-settings", action="store_true", help="skip reversible setting writes")
-    p.add_argument("--allow-xy", action="store_true", help="enable XY stage validation pattern")
+    p.add_argument(
+        "--read-only", action="store_true", help="skip all write/move/acquire phases"
+    )
+    p.add_argument(
+        "--skip-settings", action="store_true", help="skip reversible setting writes"
+    )
+    p.add_argument(
+        "--allow-xy", action="store_true", help="enable XY stage validation pattern"
+    )
     p.add_argument("--allow-z", action="store_true", help="enable Z galvo round-trip")
     p.add_argument(
-        "--allow-objective", action="store_true", help="enable objective switch + restore"
+        "--allow-objective",
+        action="store_true",
+        help="enable objective switch + restore",
     )
-    p.add_argument("--allow-acquire", action="store_true", help="enable one acquisition")
+    p.add_argument(
+        "--allow-acquire", action="store_true", help="enable one acquisition"
+    )
 
     # Move deltas
     p.add_argument("--xy-delta-um", type=float, default=25.0)
     p.add_argument(
-        "--xy-positions", type=int, default=10, help="number of XY stage targets for --allow-xy"
+        "--xy-positions",
+        type=int,
+        default=10,
+        help="number of XY stage targets for --allow-xy",
     )
     p.add_argument("--z-delta-um", type=float, default=2.0)
 
@@ -1481,14 +1556,18 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="include driver backbone log entries in records",
     )
     p.add_argument(
-        "--yes", action="store_true", help="skip interactive confirmation before live writes"
+        "--yes",
+        action="store_true",
+        help="skip interactive confirmation before live writes",
     )
     p.add_argument(
         "--allow-missing-lasx",
         action="store_true",
         help="record SKIP instead of FAIL when LasxApi cannot connect",
     )
-    p.add_argument("--log-level", default="INFO", choices=["DEBUG", "INFO", "WARNING", "ERROR"])
+    p.add_argument(
+        "--log-level", default="INFO", choices=["DEBUG", "INFO", "WARNING", "ERROR"]
+    )
     p.add_argument(
         "--state-reader-mode",
         choices=["direct", "api", "log", "hybrid"],
@@ -1589,7 +1668,9 @@ def _apply_state_reader_mode(mode: str | None, log: logging.Logger) -> None:
     log.info("state-reader mode override: %s", mode)
 
 
-def _apply_log_select_confirmation(args: argparse.Namespace, log: logging.Logger) -> None:
+def _apply_log_select_confirmation(
+    args: argparse.Namespace, log: logging.Logger
+) -> None:
     """Apply validator-only opt-in settings for production select confirmation."""
     source = args.select_job_confirm_source
     if args.enable_log_select_confirm:
@@ -1608,7 +1689,9 @@ def _apply_log_select_confirmation(args: argparse.Namespace, log: logging.Logger
         # selection has no direct confirmation: on the direct route it keeps
         # the driver's own (the profile's).
         source = args.state_reader_mode
-        log.info("select-job confirmation source implied by --state-reader-mode: %s", source)
+        log.info(
+            "select-job confirmation source implied by --state-reader-mode: %s", source
+        )
     if not (
         source is not None
         or args.log_select_cluster_max_age_s is not None
@@ -1619,12 +1702,16 @@ def _apply_log_select_confirmation(args: argparse.Namespace, log: logging.Logger
 
     updates = {
         "selected_job_confirm_source": (
-            source if source is not None else profiles.STATE_READERS.selected_job_confirm_source
+            source
+            if source is not None
+            else profiles.STATE_READERS.selected_job_confirm_source
         ),
         "selected_job_log_prime_cluster": args.prime_log_select_cluster,
     }
     if args.log_select_cluster_max_age_s is not None:
-        updates["selected_job_log_cluster_max_age_s"] = args.log_select_cluster_max_age_s
+        updates["selected_job_log_cluster_max_age_s"] = (
+            args.log_select_cluster_max_age_s
+        )
     profiles.STATE_READERS = replace(profiles.STATE_READERS, **updates)
     log.info(
         "select-job confirmation source=%s prime_cluster=%s cluster_max_age=%s",

@@ -88,7 +88,9 @@ SAMPLES = {
         match=750.5,  # |0.5| < 1.0
         miss=700.0,
         ch=lambda a: {
-            "activeSettings": [{"activeDetectors": [{"_beamRoute": "BR1", "gain": {"value": a}}]}]
+            "activeSettings": [
+                {"activeDetectors": [{"_beamRoute": "BR1", "gain": {"value": a}}]}
+            ]
         },
     ),
     "laser_intensity": dict(
@@ -100,7 +102,11 @@ SAMPLES = {
             "activeSettings": [
                 {
                     "activeLaserLines": [
-                        {"_beamRoute": "BR1", "_lineIndex": 0, "intensity": {"value": a}}
+                        {
+                            "_beamRoute": "BR1",
+                            "_lineIndex": 0,
+                            "intensity": {"value": a},
+                        }
                     ]
                 }
             ]
@@ -113,7 +119,11 @@ SAMPLES = {
         miss=560,
         ch=lambda a: {
             "activeSettings": [
-                {"filterWheels": [{"_beamRoute": "BR1", "type": "FW", "spectrumPosition": a}]}
+                {
+                    "filterWheels": [
+                        {"_beamRoute": "BR1", "type": "FW", "spectrumPosition": a}
+                    ]
+                }
             ]
         },
     ),
@@ -186,7 +196,9 @@ SAMPLES = {
         match=True,
         miss=False,
         ch=lambda a: {
-            "activeSettings": [{"activeLaserLines": [{"_beamRoute": "BR1", "shutterOpen": a}]}]
+            "activeSettings": [
+                {"activeLaserLines": [{"_beamRoute": "BR1", "shutterOpen": a}]}
+            ]
         },
     ),
     "filter_wheel_slot": dict(
@@ -196,7 +208,11 @@ SAMPLES = {
         miss=5,
         ch=lambda a: {
             "activeSettings": [
-                {"filterWheels": [{"_beamRoute": "BR1", "type": "FW", "filterIndex": a}]}
+                {
+                    "filterWheels": [
+                        {"_beamRoute": "BR1", "type": "FW", "filterIndex": a}
+                    ]
+                }
             ]
         },
     ),
@@ -230,13 +246,18 @@ def test_bespoke_confirms_absent_from_table():
 
 def test_comparator_is_one_of_the_two_known_kinds():
     for name, spec in CONFIRM_SPECS.items():
-        assert spec.compare in (confirm_specs._cmp_exact, confirm_specs._cmp_tolerance), name
+        assert spec.compare in (
+            confirm_specs._cmp_exact,
+            confirm_specs._cmp_tolerance,
+        ), name
 
 
 def test_default_tolerance_matches_wrapper_signature():
     """The descriptor's tolerance is the wrapper signature's default."""
     for name, spec in CONFIRM_SPECS.items():
-        params = inspect.signature(getattr(confirmations, f"_confirm_{name}")).parameters
+        params = inspect.signature(
+            getattr(confirmations, f"_confirm_{name}")
+        ).parameters
         if spec.compare is confirm_specs._cmp_tolerance:
             assert "tolerance" in params, name
             assert params["tolerance"].default == spec.default_tolerance, name
@@ -269,7 +290,9 @@ def _readback_returning(value):
 def test_generic_confirms_matching_readback(name, monkeypatch):
     s = SAMPLES[name]
     spec = CONFIRM_SPECS[name]
-    monkeypatch.setattr(confirmations, "_readback", _readback_returning(s["ch"](s["match"])))
+    monkeypatch.setattr(
+        confirmations, "_readback", _readback_returning(s["ch"](s["match"]))
+    )
 
     result = confirmations._confirm_readback(
         object(),
@@ -290,7 +313,9 @@ def test_generic_confirms_matching_readback(name, monkeypatch):
 def test_generic_rejects_non_matching_readback(name, monkeypatch):
     s = SAMPLES[name]
     spec = CONFIRM_SPECS[name]
-    monkeypatch.setattr(confirmations, "_readback", _readback_returning(s["ch"](s["miss"])))
+    monkeypatch.setattr(
+        confirmations, "_readback", _readback_returning(s["ch"](s["miss"]))
+    )
 
     result = confirmations._confirm_readback(
         object(),
@@ -323,16 +348,16 @@ def test_public_wrapper_confirms_match_and_rejects_miss(name, monkeypatch):
     s = SAMPLES[name]
     wrapper = getattr(confirmations, f"_confirm_{name}")
 
-    monkeypatch.setattr(confirmations, "_readback", _readback_returning(s["ch"](s["match"])))
-    ok = wrapper(
-        object(), "JOB", target=s["target"], poll_window=1.0, **s["params"]
+    monkeypatch.setattr(
+        confirmations, "_readback", _readback_returning(s["ch"](s["match"]))
     )
+    ok = wrapper(object(), "JOB", target=s["target"], poll_window=1.0, **s["params"])
     assert ok == {"success": True, "logs": []}
 
-    monkeypatch.setattr(confirmations, "_readback", _readback_returning(s["ch"](s["miss"])))
-    bad = wrapper(
-        object(), "JOB", target=s["target"], poll_window=0.02, **s["params"]
+    monkeypatch.setattr(
+        confirmations, "_readback", _readback_returning(s["ch"](s["miss"]))
     )
+    bad = wrapper(object(), "JOB", target=s["target"], poll_window=0.02, **s["params"])
     assert bad["success"] is False
     assert bad["logs"][0]["level"] == "warning"
 
@@ -340,7 +365,9 @@ def test_public_wrapper_confirms_match_and_rejects_miss(name, monkeypatch):
 def test_extraction_error_is_swallowed_until_timeout(monkeypatch):
     """A malformed readback is caught (not raised) and the window times out."""
     spec = CONFIRM_SPECS["scan_speed"]
-    monkeypatch.setattr(confirmations, "_readback", _readback_returning({"wrong": "shape"}))
+    monkeypatch.setattr(
+        confirmations, "_readback", _readback_returning({"wrong": "shape"})
+    )
 
     result = confirmations._confirm_readback(
         object(),

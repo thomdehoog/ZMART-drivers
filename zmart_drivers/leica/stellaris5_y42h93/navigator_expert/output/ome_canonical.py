@@ -220,7 +220,9 @@ def companion_xml(
     plane_filenames: dict[PlaneIndex, str],
 ) -> bytes:
     """Return OME XML describing one canonical position/timepoint."""
-    entries = [(0, idx.z, idx.c, filename) for idx, filename in sorted(plane_filenames.items())]
+    entries = [
+        (0, idx.z, idx.c, filename) for idx, filename in sorted(plane_filenames.items())
+    ]
     return _ome_xml(
         replace(metadata, size_t=1),
         image_name=image_name,
@@ -229,7 +231,9 @@ def companion_xml(
     )
 
 
-def image_xml(metadata: AcquisitionMetadata, *, image_name: str, state: dict | None = None) -> bytes:
+def image_xml(
+    metadata: AcquisitionMetadata, *, image_name: str, state: dict | None = None
+) -> bytes:
     """OME XML for a whole capture whose pixels live elsewhere (an OME-Zarr store).
 
     Every channel and every plane, with the pixels declared absent from the
@@ -361,7 +365,9 @@ def _ome_xml(
         )
         uuid_el = ET.SubElement(tiff_data, _tag("UUID"), {"FileName": filename})
         uuid_el.text = "urn:uuid:" + str(uuid.uuid5(uuid.NAMESPACE_URL, filename))
-    drive_maps = [(_append_plane(pixels, index, plane), plane) for index, plane in planes]
+    drive_maps = [
+        (_append_plane(pixels, index, plane), plane) for index, plane in planes
+    ]
     drive_maps = [(ref, plane) for ref, plane in drive_maps if ref is not None]
 
     if metadata.annotations or drive_maps or state is not None:
@@ -371,13 +377,17 @@ def _ome_xml(
         if metadata.annotations:
             ET.SubElement(image, _tag("AnnotationRef"), {"ID": VENDOR_MAP_ID})
             vendor = ET.SubElement(
-                annotations, _tag("MapAnnotation"), {"ID": VENDOR_MAP_ID, "Namespace": VENDOR_NS}
+                annotations,
+                _tag("MapAnnotation"),
+                {"ID": VENDOR_MAP_ID, "Namespace": VENDOR_NS},
             )
             value = ET.SubElement(vendor, _tag("Value"))
             for key, text in metadata.annotations:
                 ET.SubElement(value, _tag("M"), {"K": key}).text = text
         for ref, plane in drive_maps:
-            drives = ET.SubElement(annotations, _tag("MapAnnotation"), {"ID": ref, "Namespace": VENDOR_NS})
+            drives = ET.SubElement(
+                annotations, _tag("MapAnnotation"), {"ID": ref, "Namespace": VENDOR_NS}
+            )
             value = ET.SubElement(drives, _tag("Value"))
             for name, micrometres in plane.actuators:
                 ET.SubElement(value, _tag("M"), {"K": name}).text = _num(micrometres)
@@ -386,7 +396,9 @@ def _ome_xml(
         root.append(annotations)
 
     text = ET.tostring(root, encoding="unicode")
-    return b"<?xml version='1.0' encoding='utf-8'?>\n" + text.encode("ascii", "xmlcharrefreplace")
+    return b"<?xml version='1.0' encoding='utf-8'?>\n" + text.encode(
+        "ascii", "xmlcharrefreplace"
+    )
 
 
 def _append_instrument(root: ET.Element, instrument: Instrument) -> None:
@@ -416,7 +428,9 @@ def _append_instrument(root: ET.Element, instrument: Instrument) -> None:
         ET.SubElement(element, _tag("Laser"), attrs)
     for detector in instrument.detectors:
         ET.SubElement(
-            element, _tag("Detector"), {"ID": detector.id, "Model": detector.model, "Type": detector.type}
+            element,
+            _tag("Detector"),
+            {"ID": detector.id, "Model": detector.model, "Type": detector.type},
         )
     objective = instrument.objective
     if objective is not None:
@@ -470,7 +484,9 @@ def _append_channel(pixels: ET.Element, channel: ChannelMetadata) -> None:
             ET.SubElement(path, _tag("EmissionFilterRef"), {"ID": filter_id})
 
 
-def _append_plane(pixels: ET.Element, index: PlaneIndex, plane: PlaneMetadata) -> str | None:
+def _append_plane(
+    pixels: ET.Element, index: PlaneIndex, plane: PlaneMetadata
+) -> str | None:
     """One Plane; when it names where each drive stood, the ID of the annotation that will say so."""
     attrs = {"TheZ": str(index.z), "TheT": str(index.t), "TheC": str(index.c)}
     if plane.delta_t_s is not None:
@@ -493,7 +509,9 @@ def _append_plane(pixels: ET.Element, index: PlaneIndex, plane: PlaneMetadata) -
     return ref
 
 
-def _append_state_annotations(annotations: ET.Element, image: ET.Element, state: dict) -> None:
+def _append_state_annotations(
+    annotations: ET.Element, image: ET.Element, state: dict
+) -> None:
     """Embed the machine/software state as schema-valid StructuredAnnotations.
 
     Two annotations in the ``StructuredAnnotations`` block: a
@@ -513,10 +531,14 @@ def _append_state_annotations(annotations: ET.Element, image: ET.Element, state:
         m.text = _ascii(text)
 
     comment = ET.SubElement(
-        annotations, _tag("CommentAnnotation"), {"ID": STATE_JSON_ID, "Namespace": STATE_NS}
+        annotations,
+        _tag("CommentAnnotation"),
+        {"ID": STATE_JSON_ID, "Namespace": STATE_NS},
     )
     comment_value = ET.SubElement(comment, _tag("Value"))
-    comment_value.text = json.dumps(state, ensure_ascii=True, default=str, sort_keys=True)
+    comment_value.text = json.dumps(
+        state, ensure_ascii=True, default=str, sort_keys=True
+    )
 
 
 def _state_map_entries(state: dict) -> list[tuple[str, str]]:
@@ -558,7 +580,11 @@ def _state_map_entries(state: dict) -> list[tuple[str, str]]:
 
 def _state_objective_name(state: dict) -> str | None:
     """Best-effort objective name from a few known state shapes."""
-    for candidate in (state.get("position"), state.get("job_settings"), state.get("hardware")):
+    for candidate in (
+        state.get("position"),
+        state.get("job_settings"),
+        state.get("hardware"),
+    ):
         if not isinstance(candidate, dict):
             continue
         objective = candidate.get("objective")
@@ -627,7 +653,9 @@ def _channels_from_pixels(
     count = size_c if size_c is not None else _int_or_none(pixels.attrib.get("SizeC"))
     if count is not None:
         channels_by_index = {c.index: c for c in channels}
-        channels = [channels_by_index.get(i, ChannelMetadata(index=i)) for i in range(count)]
+        channels = [
+            channels_by_index.get(i, ChannelMetadata(index=i)) for i in range(count)
+        ]
     return channels
 
 
@@ -635,7 +663,9 @@ def _ensure_channels(metadata: AcquisitionMetadata) -> AcquisitionMetadata:
     channels = {c.index: c for c in metadata.channels}
     return replace(
         metadata,
-        channels=tuple(channels.get(i, ChannelMetadata(index=i)) for i in range(metadata.size_c)),
+        channels=tuple(
+            channels.get(i, ChannelMetadata(index=i)) for i in range(metadata.size_c)
+        ),
     )
 
 

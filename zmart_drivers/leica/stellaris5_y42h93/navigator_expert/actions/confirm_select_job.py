@@ -48,7 +48,11 @@ def selected_job_direct():
         log.debug("selected job: %s", why)
         return None
     except Exception as why:
-        log.warning("the direct reader failed on the selected job (%s: %s)", type(why).__name__, why)
+        log.warning(
+            "the direct reader failed on the selected job (%s: %s)",
+            type(why).__name__,
+            why,
+        )
         return None
     return selected["Name"] if selected else None
 
@@ -72,7 +76,12 @@ def confirm_select_job_direct(client, *, job_name, timeout=None, otherwise=None)
         try:
             selected = direct_reader.get_selected_job()
         except Exception as why:
-            log.debug("SelectJob '%s' | direct reader: %s: %s", job_name, type(why).__name__, why)
+            log.debug(
+                "SelectJob '%s' | direct reader: %s: %s",
+                job_name,
+                type(why).__name__,
+                why,
+            )
             if otherwise is None:
                 return {"success": False, "logs": logs, "source": "direct"}
             return otherwise(client)
@@ -145,7 +154,9 @@ def confirm_select_job(
             "source": "api",
             "reason": "inadmissible_no_transition",
         }
-    observed_after = command_started_at if command_started_at is not None else time.time()
+    observed_after = (
+        command_started_at if command_started_at is not None else time.time()
+    )
     deadline = time.monotonic() + timeout
 
     while time.monotonic() < deadline:
@@ -258,10 +269,15 @@ def select_job_confirm_legs(
             require_transition_witness=(source == "hybrid"),
         )
     if source in ("log", "hybrid"):
-        log_leg = partial(_confirm_select_job_log, job_name, command_started_at, timeout=window_s)
+        log_leg = partial(
+            _confirm_select_job_log, job_name, command_started_at, timeout=window_s
+        )
     if profile.selected_job_mode == "direct" and api_confirm is not None:
         api_confirm = partial(
-            confirm_select_job_direct, job_name=job_name, timeout=window_s, otherwise=api_confirm
+            confirm_select_job_direct,
+            job_name=job_name,
+            timeout=window_s,
+            otherwise=api_confirm,
         )
     return api_confirm, log_leg, budget_s
 
@@ -366,7 +382,11 @@ def prepare_select_job(client, job_name):
             "success": True,
             "confirmed": True,
             "message": f"'{job_name}' already selected",
-            "logs": [_make_log_entry("info", "selected job already confirmed by the direct reader")],
+            "logs": [
+                _make_log_entry(
+                    "info", "selected job already confirmed by the direct reader"
+                )
+            ],
         }, context
     if selected is not None:
         context["api_baseline_name"] = selected
@@ -377,7 +397,9 @@ def prepare_select_job(client, job_name):
         try:
             jobs = _readers.get_jobs(client, mode="api")
         except Exception:
-            log.debug("Could not check current job selection before select_job", exc_info=True)
+            log.debug(
+                "Could not check current job selection before select_job", exc_info=True
+            )
             return None, context
         for j in jobs or []:
             if j.get("IsSelected"):
@@ -399,7 +421,9 @@ def prepare_select_job(client, job_name):
             "success": True,
             "confirmed": True,
             "message": f"'{job_name}' already selected",
-            "logs": [_make_log_entry("info", "selected job already confirmed from LAS X log")],
+            "logs": [
+                _make_log_entry("info", "selected job already confirmed from LAS X log")
+            ],
         }, context
     if source == "log":
         try:
@@ -410,7 +434,9 @@ def prepare_select_job(client, job_name):
                 else:
                     log.debug("Could not enumerate jobs before log priming: %s", reason)
         except Exception:
-            log.debug("Could not prime jobs before log-backed select_job", exc_info=True)
+            log.debug(
+                "Could not prime jobs before log-backed select_job", exc_info=True
+            )
         return None, context
     try:
         name, jobs, reason = _selected_job_api_baseline(client, profile)

@@ -33,13 +33,17 @@ class StandInNavigator:
         if self.experiment_on:
             return False
         if not self.comes_back:
-            raise lasx_navigator.NavigatorUnavailable("Experiment was pressed, but the canvas could not be reached")
+            raise lasx_navigator.NavigatorUnavailable(
+                "Experiment was pressed, but the canvas could not be reached"
+            )
         self.experiment_on = True
         return True
 
     def clear_canvas(self):
         if not self.clear_works:
-            raise lasx_navigator.NavigatorUnavailable("the Navigator's Clear button did not answer")
+            raise lasx_navigator.NavigatorUnavailable(
+                "the Navigator's Clear button did not answer"
+            )
         if not self.tiles:
             return False
         self.cleared += 1
@@ -81,7 +85,9 @@ def test_a_jobs_press_that_leaves_the_canvas_shown_fails(navigator, monkeypatch)
 def test_a_canvas_that_does_not_come_back_fails(navigator):
     navigator.comes_back = False
     checks = check_buttons.run_checks()
-    assert str(checks["the driver brought the canvas back with Experiment"]).startswith("NO")
+    assert str(checks["the driver brought the canvas back with Experiment"]).startswith(
+        "NO"
+    )
 
 
 def test_a_clear_button_that_does_not_answer_fails(navigator):
@@ -98,6 +104,10 @@ def test_clear_is_not_tried_without_the_canvas(navigator, monkeypatch):
 
 
 def test_an_open_dialog_fails(navigator, monkeypatch):
-    monkeypatch.setattr(lasx_dialogs, "pending", lambda: lasx_dialogs.Dialog("now", "Warning", "Please keep minimum distance"))
+    monkeypatch.setattr(
+        lasx_dialogs,
+        "pending",
+        lambda: lasx_dialogs.Dialog("now", "Warning", "Please keep minimum distance"),
+    )
     checks = check_buttons.run_checks()
     assert str(checks["no LAS X dialog open, in its log or on screen"]).startswith("NO")

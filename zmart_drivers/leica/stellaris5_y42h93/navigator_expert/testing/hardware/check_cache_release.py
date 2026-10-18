@@ -66,13 +66,21 @@ class Cache:
         self.root, self.names = root, {}
 
     def name_of(self, number: str) -> str:
-        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.output import lasx_data_container as container
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.output import (
+            lasx_data_container as container,
+        )
 
         if number not in self.names:
             description = next(self.root.glob(f"V2LMSDC_OBJ{number}_*.tmp"), None)
             try:
-                records = container.read_records(description.read_bytes()) if description else []
-                self.names[number] = (container.first_text(records[2]) or "") if len(records) > 2 else ""
+                records = (
+                    container.read_records(description.read_bytes())
+                    if description
+                    else []
+                )
+                self.names[number] = (
+                    (container.first_text(records[2]) or "") if len(records) > 2 else ""
+                )
             except OSError:
                 self.names[number] = ""
         return self.names[number]
@@ -88,7 +96,11 @@ class Cache:
             number = re.match(r"V2LMSDC_(?:OBJ|MMF)(\d+)_", path.name)
             if number and self.name_of(number.group(1)).startswith("TileScan"):
                 hidden += size
-        return {"total": round(total / 2**20, 2), "hidden": round(hidden / 2**20, 2), "rest": round((total - hidden) / 2**20, 2)}
+        return {
+            "total": round(total / 2**20, 2),
+            "hidden": round(hidden / 2**20, 2),
+            "rest": round((total - hidden) / 2**20, 2),
+        }
 
 
 def grown(now: dict, start: dict) -> dict:
@@ -103,7 +115,9 @@ def grown(now: dict, start: dict) -> dict:
 HIDDEN_MARGIN_MB = 1.0
 
 
-def verdict(*, captures: int, done: int, errors: list, not_cleared: int, hidden_grown_mb: float) -> dict:
+def verdict(
+    *, captures: int, done: int, errors: list, not_cleared: int, hidden_grown_mb: float
+) -> dict:
     """The run's checks, by name, True when passed.
 
     A Clear press that goes through but frees nothing would still count as
@@ -118,39 +132,70 @@ def verdict(*, captures: int, done: int, errors: list, not_cleared: int, hidden_
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--job", default=None, help="the LAS X job to capture (default: the one selected in LAS X)")
+    parser.add_argument(
+        "--job",
+        default=None,
+        help="the LAS X job to capture (default: the one selected in LAS X)",
+    )
     parser.add_argument("--captures", type=int, default=50, help="how many captures")
-    parser.add_argument("--label", required=True, help="a name for this check, e.g. hires-50")
-    parser.add_argument("--save-to", default=None, help="a folder instead of the set-up data location")
-    parser.add_argument("--report-dir", default=".", help="where the report is written (default: here)")
+    parser.add_argument(
+        "--label", required=True, help="a name for this check, e.g. hires-50"
+    )
+    parser.add_argument(
+        "--save-to", default=None, help="a folder instead of the set-up data location"
+    )
+    parser.add_argument(
+        "--report-dir", default=".", help="where the report is written (default: here)"
+    )
     asked = parser.parse_args()
 
     from zmart_controller import ZmartController
 
     import zmart_drivers.leica.stellaris5_y42h93.navigator_expert.zmart_controller_plugin as driver
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.output import lasx_cache_release
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.output import lasx_data_container as container
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.zmart_adapter import zmart_adapter as adapter
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.output import (
+        lasx_cache_release,
+    )
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.output import (
+        lasx_data_container as container,
+    )
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.zmart_adapter import (
+        zmart_adapter as adapter,
+    )
 
     releases = Releases()
     logging.getLogger(lasx_cache_release.__name__).addHandler(releases)
     cache = Cache(container.data_container_root())
-    report: dict = {"job": asked.job, "label": asked.label, "captures": asked.captures,
-                    "cache folder": str(cache.root), "progress": [], "errors": []}
+    report: dict = {
+        "job": asked.job,
+        "label": asked.label,
+        "captures": asked.captures,
+        "cache folder": str(cache.root),
+        "progress": [],
+        "errors": [],
+    }
 
     adapter.IMAGE_SAVE = replace(
         adapter.IMAGE_SAVE, format="ome-zarr", projection="none", cleanup_cache=True
     )
-    session = ZmartController(driver, {"output_root": asked.save_to} if asked.save_to else {})
+    session = ZmartController(
+        driver, {"output_root": asked.save_to} if asked.save_to else {}
+    )
     try:
-        chosen = session.set_state({"changeable": {"job": asked.job}}) if asked.job else {"success": True}
+        chosen = (
+            session.set_state({"changeable": {"job": asked.job}})
+            if asked.job
+            else {"success": True}
+        )
         report["job"] = session.get_state()["content"]["changeable"].get("job")
         if not chosen["success"]:
             raise SystemExit(f"the job was not selected: {chosen['content']}")
         here = session.get_xyz()["content"]
         session.set_xyz(*(float(here[axis]["position"]) for axis in "xyz"))
         start = report["cache before, MB"] = cache.measure()
-        print(f"before: {start['total']:.1f} MB, of which hidden copies {start['hidden']:.1f} MB", flush=True)
+        print(
+            f"before: {start['total']:.1f} MB, of which hidden copies {start['hidden']:.1f} MB",
+            flush=True,
+        )
         began, failed = time.perf_counter(), 0
         for i in range(1, asked.captures + 1):
             answer = session.acquire(position_label=f"t{i:04d}")
@@ -158,33 +203,50 @@ def main() -> int:
                 failed += 1
                 report["errors"].append(f"capture {i}: {answer['content']}"[:300])
             if i % 10 == 0 or i == asked.captures:
-                step = {"captures": i, "s": round(time.perf_counter() - began, 1),
-                        "grown, MB": grown(cache.measure(), start), "failed": failed,
-                        "canvas not cleared": releases.not_cleared}
+                step = {
+                    "captures": i,
+                    "s": round(time.perf_counter() - began, 1),
+                    "grown, MB": grown(cache.measure(), start),
+                    "failed": failed,
+                    "canvas not cleared": releases.not_cleared,
+                }
                 report["progress"].append(step)
                 g = step["grown, MB"]
-                print(f"{i:4d} captures, {step['s']:6.0f} s: cache +{g['total']:.1f} MB (hidden copies "
-                      f"+{g['hidden']:.1f}, rest +{g['rest']:.1f}); failed {failed}; "
-                      f"canvas not cleared {releases.not_cleared}", flush=True)
+                print(
+                    f"{i:4d} captures, {step['s']:6.0f} s: cache +{g['total']:.1f} MB (hidden copies "
+                    f"+{g['hidden']:.1f}, rest +{g['rest']:.1f}); failed {failed}; "
+                    f"canvas not cleared {releases.not_cleared}",
+                    flush=True,
+                )
     finally:
         session.disconnect()
 
     end = report["cache after, MB"] = cache.measure()
     done = report["progress"][-1]["captures"] if report["progress"] else 0
     g = grown(end, start)
-    report["per capture, MB"] = {part: round(value / done, 3) for part, value in g.items()} if done else None
+    report["per capture, MB"] = (
+        {part: round(value / done, 3) for part, value in g.items()} if done else None
+    )
     report["canvas not cleared"] = releases.not_cleared
     report["why not cleared"] = releases.reason
     report["checks"] = verdict(
-        captures=asked.captures, done=done, errors=report["errors"],
-        not_cleared=releases.not_cleared, hidden_grown_mb=g["hidden"],
+        captures=asked.captures,
+        done=done,
+        errors=report["errors"],
+        not_cleared=releases.not_cleared,
+        hidden_grown_mb=g["hidden"],
     )
-    out = Path(asked.report_dir) / f"check_cache_release_{re.sub(r'[^A-Za-z0-9_-]', '-', asked.label)}.json"
+    out = (
+        Path(asked.report_dir)
+        / f"check_cache_release_{re.sub(r'[^A-Za-z0-9_-]', '-', asked.label)}.json"
+    )
     out.write_text(json.dumps(report, indent=1), encoding="utf-8")
     if report["per capture, MB"]:
         per = report["per capture, MB"]
-        print(f"per capture: cache +{per['total']:.2f} MB, of which hidden copies +{per['hidden']:.2f} MB, "
-              f"rest +{per['rest']:.2f} MB")
+        print(
+            f"per capture: cache +{per['total']:.2f} MB, of which hidden copies +{per['hidden']:.2f} MB, "
+            f"rest +{per['rest']:.2f} MB"
+        )
     if releases.reason:
         print(releases.reason)
     failing = [name for name, ok in report["checks"].items() if not ok]

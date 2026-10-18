@@ -85,7 +85,9 @@ def _profile():
 # =============================================================================
 
 _RE_TS = re.compile(r"^(\d{4}-\d\d-\d\d \d\d:\d\d:\d\d\.\d+)")
-_RE_XY = re.compile(r'GetStageHwPosition\s+\'<Result HwStagePosX="([^"]+)" HwStagePosY="([^"]+)"')
+_RE_XY = re.compile(
+    r'GetStageHwPosition\s+\'<Result HwStagePosX="([^"]+)" HwStagePosY="([^"]+)"'
+)
 _RE_SEL = re.compile(r'SetCurrentSelectedElementID"\s+ElementID="(\d+)"')
 _RE_ACQ = re.compile(r"AcquisitionState = (\d+)")
 _RE_CURRENT_BLOCK_NAME = re.compile(r"CurrentBlock/Name = (.*?)\s+'")
@@ -211,9 +213,13 @@ def _matrix_jobs_from_result(root):
                 "IsLightning": False,
                 "IsSelected": None,
                 "IsPause": False,
-                "FocusRange": (_as_float(af_cfg.findtext("Range")) if af_cfg is not None else 0.0),
+                "FocusRange": (
+                    _as_float(af_cfg.findtext("Range")) if af_cfg is not None else 0.0
+                ),
                 "FocusSliceCount": (
-                    _as_int(af_cfg.findtext("AutoFocusFixSliceCount")) if af_cfg is not None else 0
+                    _as_int(af_cfg.findtext("AutoFocusFixSliceCount"))
+                    if af_cfg is not None
+                    else 0
                 ),
                 "ScanMode": block.findtext("ScanMode") or "",
                 "RotationAngle": 0.0,
@@ -242,7 +248,9 @@ class Snapshot:
     hw_ts: float | None = None
     scan_state: int | None = None
     scan_ts: float | None = None
-    pending_dialog: str | None = None  # open modal dialog text (blocks the CAM API), or None
+    pending_dialog: str | None = (
+        None  # open modal dialog text (blocks the CAM API), or None
+    )
     pending_dialog_ts: float | None = None
 
 
@@ -448,7 +456,9 @@ def _current_blocks(s, apply_max_age=True, *, max_age_s=None):
     for bid, (j, ts) in items:
         if apply_max_age and _too_old(ts, s.now, max_age_s=max_age_s):
             continue
-        if newest is None or (ts is not None and ts >= newest - _profile().current_window_s):
+        if newest is None or (
+            ts is not None and ts >= newest - _profile().current_window_s
+        ):
             current.append((bid, j, ts))
 
     by_name = {}
@@ -521,7 +531,9 @@ def get_job_settings(job_name, snapshot=None, *, max_age_s=None):
     latest, ambiguous = _current_blocks(s, max_age_s=max_age_s)
     if job_name in ambiguous or job_name not in latest:
         if job_name in ambiguous:
-            log.warning("log_reader: ambiguous job name %r (>=2 current blocks)", job_name)
+            log.warning(
+                "log_reader: ambiguous job name %r (>=2 current blocks)", job_name
+            )
         return None
     _bid, j, ts = latest[job_name]
     if _too_old(ts, s.now, max_age_s=max_age_s):
@@ -547,8 +559,13 @@ def _mark_current_block(jobs, s, *, max_age_s=None):
     matches = [
         i
         for i, job in enumerate(jobs)
-        if (s.current_block_id is not None and _block_id_int(job.get("ID")) == s.current_block_id)
-        or (s.current_block_name is not None and job.get("Name") == s.current_block_name)
+        if (
+            s.current_block_id is not None
+            and _block_id_int(job.get("ID")) == s.current_block_id
+        )
+        or (
+            s.current_block_name is not None and job.get("Name") == s.current_block_name
+        )
     ]
     if len(matches) != 1:
         return False
@@ -586,7 +603,9 @@ def _matrix_jobs(s, *, max_age_s=None):
 
 
 def _current_block_selected(s, *, max_age_s=None):
-    if s.current_block_name is None or _too_old(s.current_block_ts, s.now, max_age_s=max_age_s):
+    if s.current_block_name is None or _too_old(
+        s.current_block_ts, s.now, max_age_s=max_age_s
+    ):
         return None
     out = {"Name": s.current_block_name, "IsSelected": True}
     if s.current_block_id is not None:
@@ -623,7 +642,9 @@ def get_jobs(snapshot=None, *, max_age_s=None):
     # only trust it when this cluster is the complete, unambiguous, numeric-id
     # list; a partial re-dump would shift positions and mis-map (fail closed).
     if not _mark_current_block(out, s, max_age_s=max_age_s):
-        all_names = {j.get("jobName") for (j, _t) in s.atl_by_block.values() if j.get("jobName")}
+        all_names = {
+            j.get("jobName") for (j, _t) in s.atl_by_block.values() if j.get("jobName")
+        }
         if set(latest.keys()) == all_names and ids_ok and not ambiguous:
             _mark_element_index(out, s, max_age_s=max_age_s)
     return out
@@ -681,11 +702,15 @@ def get_pending_dialog(snapshot=None):
 
 
 def get_fov(job_name, snapshot=None, *, max_age_s=None):
-    return derived.fov_from_settings(get_job_settings(job_name, snapshot, max_age_s=max_age_s))
+    return derived.fov_from_settings(
+        get_job_settings(job_name, snapshot, max_age_s=max_age_s)
+    )
 
 
 def get_base_fov(job_name, snapshot=None, *, max_age_s=None):
-    return derived.base_fov_from_settings(get_job_settings(job_name, snapshot, max_age_s=max_age_s))
+    return derived.base_fov_from_settings(
+        get_job_settings(job_name, snapshot, max_age_s=max_age_s)
+    )
 
 
 def read_zwide_um(job_name, snapshot=None, *, max_age_s=None):

@@ -53,14 +53,22 @@ class Naming:
         if not isinstance(self.stem, str) or not self.stem:
             raise ValueError("the stem must be a non-empty text")
         if len(self.stem) > STEM_LIMIT:
-            raise ValueError(f"the stem is longer than {STEM_LIMIT} characters: {self.stem!r}")
+            raise ValueError(
+                f"the stem is longer than {STEM_LIMIT} characters: {self.stem!r}"
+            )
         for field, value, maximum in (
             ("t", self.t, 999_999),
             ("c", self.c, 99),
             ("z", self.z, 99_999),
         ):
-            if isinstance(value, bool) or not isinstance(value, int) or not 0 <= value <= maximum:
-                raise ValueError(f"{field} must be a whole number from 0 through {maximum}")
+            if (
+                isinstance(value, bool)
+                or not isinstance(value, int)
+                or not 0 <= value <= maximum
+            ):
+                raise ValueError(
+                    f"{field} must be a whole number from 0 through {maximum}"
+                )
         object.__setattr__(self, "stem", _UNSAFE_STEM_RE.sub("_", self.stem))
 
 

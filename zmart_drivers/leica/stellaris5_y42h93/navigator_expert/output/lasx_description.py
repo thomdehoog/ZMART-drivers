@@ -58,10 +58,20 @@ COLOURS = {
 }
 
 #: LAS X's immersion words as OME's Immersion.
-IMMERSIONS = {"DRY": "Air", "OIL": "Oil", "WATER": "Water", "W": "Water", "GLYC": "Glycerol"}
+IMMERSIONS = {
+    "DRY": "Air",
+    "OIL": "Oil",
+    "WATER": "Water",
+    "W": "Water",
+    "GLYC": "Glycerol",
+}
 
 #: Lens corrections that the objective's name states, in OME's words.
-CORRECTIONS = (("PL APO", "PlanApo"), ("PL FLUOTAR", "PlanFluor"), ("FLUOTAR", "Fluotar"))
+CORRECTIONS = (
+    ("PL APO", "PlanApo"),
+    ("PL FLUOTAR", "PlanFluor"),
+    ("FLUOTAR", "Fluotar"),
+)
 
 #: LAS X's detector types that OME names; every other one (HyD, SiPM) is "Other".
 DETECTOR_TYPES = {"PMT": "PMT"}
@@ -75,7 +85,9 @@ def image_of(xml: str) -> ET.Element:
     root = ET.fromstring(xml)
     image = root if root.tag == "Image" else root.find(".//Image")
     if image is None or image.find("ImageDescription") is None:
-        raise RuntimeError("LAS X's description of the picture has no Image with an ImageDescription")
+        raise RuntimeError(
+            "LAS X's description of the picture has no Image with an ImageDescription"
+        )
     return image
 
 
@@ -85,7 +97,9 @@ def axes(image: ET.Element) -> dict[int, dict]:
     Refuses any other dimension and any axis not in metres.
     """
     found = {}
-    for dimension in image.findall("./ImageDescription/Dimensions/DimensionDescription"):
+    for dimension in image.findall(
+        "./ImageDescription/Dimensions/DimensionDescription"
+    ):
         dim_id = int(dimension.get("DimID", "0"))
         if dim_id not in (X_AXIS, Y_AXIS, Z_AXIS):
             raise RuntimeError(
@@ -93,7 +107,9 @@ def axes(image: ET.Element) -> dict[int, dict]:
                 "read, a time series or tile scan is taken picture by picture"
             )
         if dimension.get("Unit") != "m":
-            raise RuntimeError(f"LAS X gives an axis in {dimension.get('Unit')!r}, not metres")
+            raise RuntimeError(
+                f"LAS X gives an axis in {dimension.get('Unit')!r}, not metres"
+            )
         found[dim_id] = {
             "count": int(dimension.get("NumberOfElements")),
             "length_m": float(dimension.get("Length")),
@@ -114,13 +130,19 @@ def metadata_from_description(xml: str) -> AcquisitionMetadata:
         raise RuntimeError("LAS X's description of the picture lists no channels")
     bits = {int(channel.get("Resolution")) for channel in channels}
     if len(bits) != 1:
-        raise RuntimeError(f"the picture's channels have different bit depths: {sorted(bits)}")
+        raise RuntimeError(
+            f"the picture's channels have different bit depths: {sorted(bits)}"
+        )
     (significant_bits,) = bits
     if significant_bits > 16:
-        raise RuntimeError(f"a {significant_bits}-bit picture is not read (8 to 16 bit are)")
+        raise RuntimeError(
+            f"a {significant_bits}-bit picture is not read (8 to 16 bit are)"
+        )
 
     hardware = image.find("./Attachment[@Name='HardwareSetting']")
-    setting = hardware.find("ATLConfocalSettingDefinition") if hardware is not None else None
+    setting = (
+        hardware.find("ATLConfocalSettingDefinition") if hardware is not None else None
+    )
     if setting is None:
         raise RuntimeError("LAS X's description of the picture has no confocal setting")
     x, y = dims[X_AXIS], dims[Y_AXIS]
@@ -143,7 +165,9 @@ def metadata_from_description(xml: str) -> AcquisitionMetadata:
         # 38.55 um are 2.41 um apart, as LAS X's own plane heights say. A
         # stack taken top-down has a negative length (STELLARIS, 2026-10-15);
         # the distance between planes is the same, so its size is taken.
-        physical_size_z_um=abs(z["length_m"]) / (size_z - 1) * 1e6 if z and size_z > 1 else None,
+        physical_size_z_um=abs(z["length_m"]) / (size_z - 1) * 1e6
+        if z and size_z > 1
+        else None,
         significant_bits=significant_bits,
         acquisition_date=reading.acquisition_date(),
         channels=tuple(channel for channel, _ in described),
@@ -156,7 +180,9 @@ def metadata_from_description(xml: str) -> AcquisitionMetadata:
 class Reading:
     """One description being read: the parts of the instrument are collected as channels name them."""
 
-    def __init__(self, image: ET.Element, hardware: ET.Element, setting: ET.Element) -> None:
+    def __init__(
+        self, image: ET.Element, hardware: ET.Element, setting: ET.Element
+    ) -> None:
         self.image = image
         self.hardware = hardware
         self.setting = setting
@@ -174,16 +200,23 @@ class Reading:
         showed them).
         """
         listed = (
-            self.sequence.findall("./LDM_Block_Sequential_List/ATLConfocalSettingDefinition")
+            self.sequence.findall(
+                "./LDM_Block_Sequential_List/ATLConfocalSettingDefinition"
+            )
             if self.sequence is not None
             else []
         )
-        return listed[index] if len(listed) > 1 and index < len(listed) else self.setting
+        return (
+            listed[index] if len(listed) > 1 and index < len(listed) else self.setting
+        )
 
-    def channel(self, c: int, element: ET.Element) -> tuple[ChannelMetadata, dict[str, str]]:
+    def channel(
+        self, c: int, element: ET.Element
+    ) -> tuple[ChannelMetadata, dict[str, str]]:
         """One channel, and the facts about it OME has no field for."""
         properties = {
-            (p.findtext("Key") or ""): (p.findtext("Value") or "") for p in element.findall("ChannelProperty")
+            (p.findtext("Key") or ""): (p.findtext("Value") or "")
+            for p in element.findall("ChannelProperty")
         }
         facts = {}
         dye = properties.get("DyeName") or None
@@ -193,7 +226,8 @@ class Reading:
             (
                 d
                 for d in setting.findall("./DetectorList/Detector")
-                if d.get("Name") == properties.get("DetectorName") and d.get("IsActive") == "1"
+                if d.get("Name") == properties.get("DetectorName")
+                and d.get("IsActive") == "1"
             ),
             None,
         )
@@ -201,7 +235,9 @@ class Reading:
             "index": c,
             "name": dye.split("/", 1)[-1] if dye else properties.get("DetectorName"),
             "fluor": dye.split("/", 1)[-1] if dye else None,
-            "color": signed(COLOURS[element.get("LUTName")]) if element.get("LUTName") in COLOURS else None,
+            "color": signed(COLOURS[element.get("LUTName")])
+            if element.get("LUTName") in COLOURS
+            else None,
             "pinhole_um": number(self.setting.get("Pinhole"), 1e6),
             "acquisition_mode": "LaserScanningConfocalMicroscopy",
         }
@@ -245,7 +281,14 @@ class Reading:
 
     def laser(self, name: str) -> tuple[Laser, ET.Element] | None:
         """The laser of this name in the setting, and its element."""
-        element = next((e for e in self.setting.findall("./LaserArray/Laser") if e.get("LaserName") == name), None)
+        element = next(
+            (
+                e
+                for e in self.setting.findall("./LaserArray/Laser")
+                if e.get("LaserName") == name
+            ),
+            None,
+        )
         if element is None:
             return None
         if name not in self.lasers:
@@ -258,20 +301,29 @@ class Reading:
             )
         return self.lasers[name], element
 
-    def intensity(self, setting: ET.Element, laser: ET.Element, wavelength: float | None) -> str | None:
+    def intensity(
+        self, setting: ET.Element, laser: ET.Element, wavelength: float | None
+    ) -> str | None:
         """The intensity (in %) the laser's line was set to, as LAS X wrote it."""
         for aotf in setting.findall("./AotfList/Aotf"):
             if aotf.get("LightSourceType") != laser.get("LightSourceType"):
                 continue
             for line in aotf.findall("LaserLineSetting"):
-                if wavelength is not None and number(line.get("LaserLine")) == wavelength:
+                if (
+                    wavelength is not None
+                    and number(line.get("LaserLine")) == wavelength
+                ):
                     return line.get("IntensityDev")
         return None
 
     def band(self, detector: ET.Element) -> Filter | None:
         """The spectral band the detector caught, as a filter that passes it."""
         band = next(
-            (b for b in self.setting.findall("./Spectro/MultiBand") if b.get("Channel") == detector.get("Channel")),
+            (
+                b
+                for b in self.setting.findall("./Spectro/MultiBand")
+                if b.get("Channel") == detector.get("Channel")
+            ),
             None,
         )
         if band is None:
@@ -293,15 +345,23 @@ class Reading:
                 model=name,
                 magnification=number(self.setting.get("Magnification")),
                 lens_na=number(self.setting.get("NumericalAperture")),
-                immersion=IMMERSIONS.get((self.setting.get("Immersion") or "").upper(), "Other"),
-                correction=next((ome for words, ome in CORRECTIONS if words in name), None),
+                immersion=IMMERSIONS.get(
+                    (self.setting.get("Immersion") or "").upper(), "Other"
+                ),
+                correction=next(
+                    (ome for words, ome in CORRECTIONS if words in name), None
+                ),
                 refractive_index=number(self.setting.get("RefractionIndex")),
             )
         return Instrument(
             manufacturer="Leica Microsystems",
-            model=self.setting.get("MicroscopeModel") or self.hardware.get("SystemTypeName") or None,
+            model=self.setting.get("MicroscopeModel")
+            or self.hardware.get("SystemTypeName")
+            or None,
             serial_number=self.setting.get("SystemSerialNumber") or None,
-            type="Inverted" if self.setting.get("IsInverseMicroscopeModel") == "1" else "Upright",
+            type="Inverted"
+            if self.setting.get("IsInverseMicroscopeModel") == "1"
+            else "Upright",
             objective=objective,
             detectors=tuple(self.detectors.values()),
             lasers=tuple(self.lasers.values()),
@@ -310,7 +370,11 @@ class Reading:
 
     def time_stamps(self) -> list[int]:
         stamps = self.image.find("TimeStampList")
-        return [int(s, 16) for s in (stamps.text or "").split()] if stamps is not None else []
+        return (
+            [int(s, 16) for s in (stamps.text or "").split()]
+            if stamps is not None
+            else []
+        )
 
     def acquisition_date(self) -> str | None:
         stamps = self.time_stamps()
@@ -344,7 +408,9 @@ class Reading:
         moving = self.setting.get("ZUseModeName")
         standing = {
             drive.get("ZUseModeName"): number(drive.get("ZPosition"))
-            for drive in self.setting.findall("./AdditionalZPositionList/AdditionalZPosition")
+            for drive in self.setting.findall(
+                "./AdditionalZPositionList/AdditionalZPosition"
+            )
             if drive.get("ZUseModeName") and drive.get("ZUseModeName") != moving
         }
         x_um = number(self.setting.get("StagePosX"), 1e6)
@@ -363,19 +429,28 @@ class Reading:
             for c in range(size_c):
                 stamp = plane * size_c + c
                 planes[PlaneIndex(t=0, z=plane, c=c)] = PlaneMetadata(
-                    delta_t_s=(stamps[stamp] - stamps[0]) / 1e7 if stamp < len(stamps) else None,
+                    delta_t_s=(stamps[stamp] - stamps[0]) / 1e7
+                    if stamp < len(stamps)
+                    else None,
                     position_x_um=x_um,
                     position_y_um=y_um,
                     position_z_um=sum(heights) * 1e6 if heights else None,
-                    actuators=tuple((name, value) for name, value in actuators if value is not None),
+                    actuators=tuple(
+                        (name, value) for name, value in actuators if value is not None
+                    ),
                 )
         return planes
 
-    def annotations(self, described: list[tuple[ChannelMetadata, dict[str, str]]]) -> tuple[tuple[str, str], ...]:
+    def annotations(
+        self, described: list[tuple[ChannelMetadata, dict[str, str]]]
+    ) -> tuple[tuple[str, str], ...]:
         """The facts OME has no field for, by name, as LAS X wrote them."""
         s = self.setting
         named = [
-            ("job", self.sequence.get("BlockName") if self.sequence is not None else None),
+            (
+                "job",
+                self.sequence.get("BlockName") if self.sequence is not None else None,
+            ),
             ("software", self.hardware.get("Software")),
             ("system type", self.hardware.get("SystemTypeName")),
             ("zoom", s.get("Zoom")),
@@ -393,12 +468,22 @@ class Reading:
         ]
         for wheel in s.findall("./FilterWheel/Wheel"):
             if wheel.get("FilterWheelName"):
-                named.append((f"filter wheel {wheel.get('FilterWheelName').strip()}", (wheel.get("FilterName") or "").strip()))
+                named.append(
+                    (
+                        f"filter wheel {wheel.get('FilterWheelName').strip()}",
+                        (wheel.get("FilterName") or "").strip(),
+                    )
+                )
         carrier = self.image.find("./Attachment[@Name='CarrierInfo']/Carrier")
         if carrier is not None:
-            named.append(("carrier", " ".join(f"{k}={v}" for k, v in carrier.attrib.items())))
+            named.append(
+                ("carrier", " ".join(f"{k}={v}" for k, v in carrier.attrib.items()))
+            )
         for channel, facts in described:
-            named.extend((f"channel {channel.index} {key}", value) for key, value in facts.items())
+            named.extend(
+                (f"channel {channel.index} {key}", value)
+                for key, value in facts.items()
+            )
         return tuple((key, value) for key, value in named if value not in (None, ""))
 
 

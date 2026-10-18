@@ -32,7 +32,9 @@ def test_a_set_location_is_saved_and_loaded(machine, tmp_path):
 
     assert saved.name == "data_location.json"
     assert saved.parent.parent == machine.subsystem_root("data_location")
-    assert json.loads(saved.read_text(encoding="utf-8")) == {"folder": str(folder.resolve())}
+    assert json.loads(saved.read_text(encoding="utf-8")) == {
+        "folder": str(folder.resolve())
+    }
     assert location.data_location(machine) == folder.resolve()
 
 
@@ -51,7 +53,10 @@ def test_the_newest_location_wins(machine, tmp_path):
     ("make", "says"),
     [
         (lambda tmp: tmp / "missing", "does not exist"),
-        (lambda tmp: (tmp / "a-file").write_text("x") and tmp / "a-file", "not a folder"),
+        (
+            lambda tmp: (tmp / "a-file").write_text("x") and tmp / "a-file",
+            "not a folder",
+        ),
         (lambda tmp: Path("relative/folder"), "full path"),
         (lambda tmp: Path(r"\\server\share\data"), "network"),
     ],
@@ -70,6 +75,12 @@ def test_a_good_folder_has_no_problems(tmp_path):
 
 
 def test_the_set_up_notebook_is_there():
-    notebook = json.loads((NOTEBOOKS / "set_data_location.ipynb").read_text(encoding="utf-8"))
-    code = "".join("".join(cell["source"]) for cell in notebook["cells"] if cell["cell_type"] == "code")
+    notebook = json.loads(
+        (NOTEBOOKS / "set_data_location.ipynb").read_text(encoding="utf-8")
+    )
+    code = "".join(
+        "".join(cell["source"])
+        for cell in notebook["cells"]
+        if cell["cell_type"] == "code"
+    )
     assert "set_data_location(" in code

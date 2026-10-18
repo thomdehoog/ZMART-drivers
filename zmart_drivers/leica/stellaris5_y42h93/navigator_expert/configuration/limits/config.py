@@ -68,7 +68,10 @@ def _normalize_range(values: Any, *, path: Path, name: str) -> list[float]:
     """Validate one strict numeric ``[min, max]`` and return floats."""
     if not isinstance(values, list) or len(values) != 2:
         raise ValueError(f"{path} {name} must be [min, max], got {values!r}")
-    if any(isinstance(value, bool) or not isinstance(value, (int, float)) for value in values):
+    if any(
+        isinstance(value, bool) or not isinstance(value, (int, float))
+        for value in values
+    ):
         raise ValueError(f"{path} {name} must contain numbers, got {values!r}")
     low, high = float(values[0]), float(values[1])
     if not (math.isfinite(low) and math.isfinite(high)):
@@ -93,7 +96,9 @@ def _validate_limits(limits: dict[str, Any], *, path: Path) -> dict[str, list[fl
     for axis in _REQUIRED_AXES:
         if axis not in limits:
             raise ValueError(f"{path} stage limits missing axis: {axis!r}")
-        out[axis] = _normalize_range(limits[axis], path=path, name=f"stage limit {axis!r}")
+        out[axis] = _normalize_range(
+            limits[axis], path=path, name=f"stage limit {axis!r}"
+        )
     return out
 
 
@@ -127,13 +132,17 @@ def _normalize_typed_limit(
             f"got {values!r}"
         )
     if any(isinstance(value, float) and not math.isfinite(value) for value in values):
-        raise ValueError(f"{path} {name}.allowed contains a non-finite number: {values!r}")
+        raise ValueError(
+            f"{path} {name}.allowed contains a non-finite number: {values!r}"
+        )
     if len({json.dumps(value, sort_keys=True) for value in values}) != len(values):
         raise ValueError(f"{path} {name}.allowed contains duplicates: {values!r}")
     return {"allowed": list(values)}
 
 
-def validate_payload(payload: Any, *, path: Path = Path("limits.json")) -> dict[str, Any]:
+def validate_payload(
+    payload: Any, *, path: Path = Path("limits.json")
+) -> dict[str, Any]:
     """Validate and normalize the complete flat limits document."""
     if not isinstance(payload, dict):
         raise ValueError(f"{path} limits must be an object, got {payload!r}")
@@ -158,7 +167,10 @@ def validate_payload(payload: Any, *, path: Path = Path("limits.json")) -> dict[
             "objective_slot", objective_entry, path=path, required_kind="allowed"
         )
         slots = objective["allowed"]
-        if any(isinstance(slot, bool) or not isinstance(slot, int) or slot < 0 for slot in slots):
+        if any(
+            isinstance(slot, bool) or not isinstance(slot, int) or slot < 0
+            for slot in slots
+        ):
             raise ValueError(
                 f"{path} objective_slot.allowed must contain non-negative integers "
                 f"(turret slots count from 0), got {slots!r}"
@@ -166,7 +178,9 @@ def validate_payload(payload: Any, *, path: Path = Path("limits.json")) -> dict[
     setters: dict[str, Any] = {}
     for name in SETTER_LIMIT_KEYS:
         entry = payload[name]
-        setters[name] = [] if entry == [] else _normalize_typed_limit(name, entry, path=path)
+        setters[name] = (
+            [] if entry == [] else _normalize_typed_limit(name, entry, path=path)
+        )
 
     normalized = {
         **axes,
@@ -213,7 +227,8 @@ def load(limits_path: str | Path | None = None) -> dict[str, Any]:
     return {
         "policy": payload,
         "stage_um": {
-            axis: payload[file_key]["range"] for axis, file_key in _AXIS_FILE_KEYS.items()
+            axis: payload[file_key]["range"]
+            for axis, file_key in _AXIS_FILE_KEYS.items()
         },
     }
 
@@ -250,7 +265,9 @@ def adopt_limits(
         payload = build_limits_payload(limits)
     else:
         payload = validate_payload(limits)
-    stage_um = {axis: payload[file_key]["range"] for axis, file_key in _AXIS_FILE_KEYS.items()}
+    stage_um = {
+        axis: payload[file_key]["range"] for axis, file_key in _AXIS_FILE_KEYS.items()
+    }
     checks.check_envelope_within_backstop(stage_um)
     if machine is None:
         from ..store import MACHINE
@@ -276,7 +293,9 @@ def adopt_limits(
                     filename=f"{notebook.stem}_{stamp}{notebook.suffix}",
                     directory="notebook",
                 )
-                archived_notebook_relpaths.append(destination.relative_to(Path(temp_dir)))
+                archived_notebook_relpaths.append(
+                    destination.relative_to(Path(temp_dir))
+                )
             snapshot = machine.publish_snapshot(
                 moment, limits=payload, archive_paths=[Path(temp_dir) / "notebook"]
             )
@@ -286,5 +305,7 @@ def adopt_limits(
     return {
         "snapshot": str(snapshot),
         "limits_path": str(snapshot / "limits.json"),
-        "notebook_paths": [str(snapshot / relative) for relative in archived_notebook_relpaths],
+        "notebook_paths": [
+            str(snapshot / relative) for relative in archived_notebook_relpaths
+        ],
     }

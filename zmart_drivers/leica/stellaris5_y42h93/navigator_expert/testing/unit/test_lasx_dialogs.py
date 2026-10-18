@@ -80,7 +80,9 @@ def use(monkeypatch, windows):
 
 
 class TestNoticing:
-    def test_without_a_dialog_in_the_log_no_window_is_looked_at(self, lasx_log, monkeypatch):
+    def test_without_a_dialog_in_the_log_no_window_is_looked_at(
+        self, lasx_log, monkeypatch
+    ):
         windows = use(monkeypatch, StandInWindows())
         assert lasx_dialogs.answer_warnings() is None
         assert windows.looks == 0
@@ -106,7 +108,9 @@ class TestNoticing:
         show(lasx_log, ANSWERED)
         assert lasx_dialogs.pending() is None
 
-    def test_a_new_log_after_the_old_one_was_moved_aside_is_read_from_its_start(self, lasx_log):
+    def test_a_new_log_after_the_old_one_was_moved_aside_is_read_from_its_start(
+        self, lasx_log
+    ):
         show(lasx_log, QUIET * 50)
         assert lasx_dialogs.pending() is None
         lasx_log.write_text(SHOWN, encoding="latin-1")
@@ -118,7 +122,9 @@ class TestNoticing:
 
 
 class TestAnswering:
-    def test_a_warning_with_only_ok_is_answered_and_its_text_logged(self, lasx_log, monkeypatch, caplog):
+    def test_a_warning_with_only_ok_is_answered_and_its_text_logged(
+        self, lasx_log, monkeypatch, caplog
+    ):
         show(lasx_log)
         dialog = StandInDialog(lasx_log)
         use(monkeypatch, StandInWindows([dialog]))
@@ -130,11 +136,18 @@ class TestAnswering:
         assert "Please keep minimum distance of 8nm." in caplog.text
         assert lasx_dialogs.pending() is None
 
-    def test_a_dialog_with_another_button_is_left_open_and_refused(self, lasx_log, monkeypatch, caplog):
+    def test_a_dialog_with_another_button_is_left_open_and_refused(
+        self, lasx_log, monkeypatch, caplog
+    ):
         show(lasx_log)
-        dialog = StandInDialog(lasx_log, buttons=("ButtonMessageOk", "ButtonMessageCancel"))
+        dialog = StandInDialog(
+            lasx_log, buttons=("ButtonMessageOk", "ButtonMessageCancel")
+        )
         use(monkeypatch, StandInWindows([dialog]))
-        with caplog.at_level(logging.WARNING), pytest.raises(lasx_dialogs.DialogOpen, match="8nm"):
+        with (
+            caplog.at_level(logging.WARNING),
+            pytest.raises(lasx_dialogs.DialogOpen, match="8nm"),
+        ):
             lasx_dialogs.answer_warnings()
         assert dialog.pressed == []
         assert "Please keep minimum distance of 8nm." in caplog.text
@@ -155,7 +168,9 @@ class TestAnswering:
             lasx_dialogs.answer_warnings()
         assert first.pressed == second.pressed == []
 
-    def test_a_dialog_answered_by_hand_meanwhile_is_left_alone(self, lasx_log, monkeypatch):
+    def test_a_dialog_answered_by_hand_meanwhile_is_left_alone(
+        self, lasx_log, monkeypatch
+    ):
         show(lasx_log)
         use(monkeypatch, StandInWindows([]))
         threading.Timer(0.1, lambda: show(lasx_log, ANSWERED)).start()
@@ -164,13 +179,17 @@ class TestAnswering:
     def test_ok_pressed_but_never_recorded_is_refused(self, lasx_log, monkeypatch):
         show(lasx_log)
         dialog = StandInDialog(lasx_log)
-        dialog.press = lambda button: dialog.pressed.append(button)  # the click goes nowhere
+        dialog.press = lambda button: dialog.pressed.append(
+            button
+        )  # the click goes nowhere
         use(monkeypatch, StandInWindows([dialog]))
         monkeypatch.setattr(lasx_dialogs, "ANSWER_WAIT_S", 0.2)
         with pytest.raises(lasx_dialogs.DialogOpen, match="did not close"):
             lasx_dialogs.answer_warnings()
 
-    def test_without_windows_automation_the_dialog_is_refused_not_guessed(self, lasx_log, monkeypatch):
+    def test_without_windows_automation_the_dialog_is_refused_not_guessed(
+        self, lasx_log, monkeypatch
+    ):
         show(lasx_log)
 
         def unavailable():
@@ -185,7 +204,9 @@ class TestWhileASendWaits:
     """A command sent directly to the hardware server does not return while
     the dialog it caused is open; a watcher answers it meanwhile."""
 
-    def test_a_warning_that_opens_during_the_send_is_answered(self, lasx_log, monkeypatch):
+    def test_a_warning_that_opens_during_the_send_is_answered(
+        self, lasx_log, monkeypatch
+    ):
         dialog = StandInDialog(lasx_log)
         use(monkeypatch, StandInWindows([dialog]))
         monkeypatch.setattr(lasx_dialogs, "WATCH_INTERVAL_S", 0.01)
@@ -202,7 +223,9 @@ class TestWhileASendWaits:
         with lasx_dialogs.watching() as notes:
             blocked_send()
         assert released.is_set()
-        assert [n.dialog.text for n in notes] == ["Please keep minimum distance of 8nm."]
+        assert [n.dialog.text for n in notes] == [
+            "Please keep minimum distance of 8nm."
+        ]
 
     def test_the_watcher_stops_with_the_send(self, lasx_log, monkeypatch):
         use(monkeypatch, StandInWindows())
@@ -224,19 +247,36 @@ class TestCommands:
 
         return install_permissive_limits(MockLasxClient(), wide_stage=True)
 
-    def test_a_setting_waits_for_no_open_dialog_and_says_why(self, client, lasx_log, monkeypatch):
-        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.actions import set as cam
+    def test_a_setting_waits_for_no_open_dialog_and_says_why(
+        self, client, lasx_log, monkeypatch
+    ):
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.actions import (
+            set as cam,
+        )
 
         show(lasx_log)
-        use(monkeypatch, StandInWindows([StandInDialog(lasx_log, buttons=("ButtonMessageYes", "ButtonMessageNo"))]))
+        use(
+            monkeypatch,
+            StandInWindows(
+                [
+                    StandInDialog(
+                        lasx_log, buttons=("ButtonMessageYes", "ButtonMessageNo")
+                    )
+                ]
+            ),
+        )
         before = client._jobs["HiRes"]["zoom"]["current"]
         result = cam.set_zoom(client, "HiRes", 5.0)
         assert result["success"] is False
         assert "Please keep minimum distance of 8nm." in result["message"]
         assert client._jobs["HiRes"]["zoom"]["current"] == before
 
-    def test_a_setting_answers_an_ok_only_warning_first_and_reports_it(self, client, lasx_log, monkeypatch):
-        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.actions import set as cam
+    def test_a_setting_answers_an_ok_only_warning_first_and_reports_it(
+        self, client, lasx_log, monkeypatch
+    ):
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.actions import (
+            set as cam,
+        )
 
         show(lasx_log)
         dialog = StandInDialog(lasx_log)
@@ -244,13 +284,29 @@ class TestCommands:
         result = cam.set_zoom(client, "HiRes", 5.0)
         assert (result["success"], result["confirmed"]) == (True, True)
         assert dialog.pressed == ["ButtonMessageOk"]
-        assert any("Please keep minimum distance of 8nm." in entry["msg"] for entry in result["logs"])
+        assert any(
+            "Please keep minimum distance of 8nm." in entry["msg"]
+            for entry in result["logs"]
+        )
 
-    def test_an_acquire_is_not_started_into_an_open_dialog(self, client, lasx_log, monkeypatch):
-        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.actions import set as cam
+    def test_an_acquire_is_not_started_into_an_open_dialog(
+        self, client, lasx_log, monkeypatch
+    ):
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.actions import (
+            set as cam,
+        )
 
         show(lasx_log)
-        use(monkeypatch, StandInWindows([StandInDialog(lasx_log, buttons=("ButtonMessageOk", "ButtonMessageCancel"))]))
+        use(
+            monkeypatch,
+            StandInWindows(
+                [
+                    StandInDialog(
+                        lasx_log, buttons=("ButtonMessageOk", "ButtonMessageCancel")
+                    )
+                ]
+            ),
+        )
         result = cam.acquire(client, "HiRes")
         assert result["success"] is False
         assert "8nm" in result["message"]
@@ -264,7 +320,12 @@ class TestComInThisThread:
 
     def test_com_set_up_in_another_mode_is_used_as_it_is(self):
         def already_set_up():
-            raise OSError(0, "Cannot change thread mode after it is set", None, lasx_dialogs.RPC_E_CHANGED_MODE)
+            raise OSError(
+                0,
+                "Cannot change thread mode after it is set",
+                None,
+                lasx_dialogs.RPC_E_CHANGED_MODE,
+            )
 
         lasx_dialogs.initialise_com(already_set_up)
 
@@ -295,7 +356,9 @@ class TestComInThisThread:
         seen = {}
         monkeypatch.setattr(lasx_dialogs, "apartment", lambda: None)
         monkeypatch.delattr(sys, "coinit_flags", raising=False)
-        lasx_dialogs.import_in_this_threads_mode(lambda: seen.setdefault("flags", getattr(sys, "coinit_flags", None)))
+        lasx_dialogs.import_in_this_threads_mode(
+            lambda: seen.setdefault("flags", getattr(sys, "coinit_flags", None))
+        )
         assert seen["flags"] is None
 
 
@@ -352,11 +415,19 @@ class TestEveryFormAndWindow:
     is open until its window says otherwise."""
 
     def test_a_dialog_logged_without_the_space_is_noticed(self, lasx_log):
-        show(lasx_log, "2026-10-14 19:00:00.000 0007  Info DbTracer 'MessageBox Warning: The stage is not initialized.'\n")
+        show(
+            lasx_log,
+            "2026-10-14 19:00:00.000 0007  Info DbTracer 'MessageBox Warning: The stage is not initialized.'\n",
+        )
         assert (lasx_lasx := lasx_dialogs.pending()) is not None
-        assert (lasx_lasx.caption, lasx_lasx.text) == ("Warning", "The stage is not initialized.")
+        assert (lasx_lasx.caption, lasx_lasx.text) == (
+            "Warning",
+            "The stage is not initialized.",
+        )
 
-    def test_a_dialog_in_the_log_whose_window_appears_late_is_answered(self, lasx_log, monkeypatch):
+    def test_a_dialog_in_the_log_whose_window_appears_late_is_answered(
+        self, lasx_log, monkeypatch
+    ):
         show(lasx_log)
         dialog = StandInDialog(lasx_log)
         windows = StandInWindows([])
@@ -366,7 +437,9 @@ class TestEveryFormAndWindow:
         assert lasx_dialogs.answer_warnings() is not None
         assert dialog.pressed == ["ButtonMessageOk"]
 
-    def test_a_dialog_in_the_log_that_never_shows_is_left_open_and_refused(self, lasx_log, monkeypatch):
+    def test_a_dialog_in_the_log_that_never_shows_is_left_open_and_refused(
+        self, lasx_log, monkeypatch
+    ):
         show(lasx_log)
         monkeypatch.setattr(lasx_dialogs, "ANSWER_WAIT_S", 0.2)
         use(monkeypatch, StandInWindows([]))
@@ -378,7 +451,9 @@ class TestWatchingAllTheTime:
     """While the driver is connected, a watcher answers OK-only warnings
     whatever the driver does: writing, only reading, or waiting."""
 
-    def test_a_warning_while_the_driver_only_waits_is_answered(self, lasx_log, monkeypatch):
+    def test_a_warning_while_the_driver_only_waits_is_answered(
+        self, lasx_log, monkeypatch
+    ):
         dialog = StandInDialog(lasx_log)
         use(monkeypatch, StandInWindows([dialog]))
         monkeypatch.setattr(lasx_dialogs, "WATCH_INTERVAL_S", 0.01)
@@ -405,7 +480,9 @@ class TestWatchingAllTheTime:
         time.sleep(0.3)
         assert threading.active_count() == before
 
-    def test_a_dialog_left_for_the_operator_is_logged_once(self, lasx_log, monkeypatch, caplog):
+    def test_a_dialog_left_for_the_operator_is_logged_once(
+        self, lasx_log, monkeypatch, caplog
+    ):
         show(lasx_log, SHOWN.replace("MessageBox Warning", "MessageBox Question"))
         use(monkeypatch, StandInWindows([StandInDialog(lasx_log)]))
         monkeypatch.setattr(lasx_dialogs, "WATCH_INTERVAL_S", 0.01)
@@ -425,7 +502,9 @@ def test_presses_set_no_focus_so_las_x_stays_behind():
         made.update(cls=cls, interface=interface)
         return SimpleNamespace(AutoSetFocus=True)
 
-    client = SimpleNamespace(CUIAutomation8="CUIAutomation8", IUIAutomation2="IUIAutomation2")
+    client = SimpleNamespace(
+        CUIAutomation8="CUIAutomation8", IUIAutomation2="IUIAutomation2"
+    )
     uia = lasx_dialogs.quiet_automation(client, create)
     assert made == {"cls": "CUIAutomation8", "interface": "IUIAutomation2"}
     assert uia.AutoSetFocus is False

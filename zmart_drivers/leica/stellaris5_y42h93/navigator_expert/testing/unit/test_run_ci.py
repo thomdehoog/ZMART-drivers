@@ -66,16 +66,26 @@ def test_the_quick_hardware_run_is_the_acceptance(monkeypatch, tmp_path):
     captured = _capture_steps(run_ci, monkeypatch, tmp_path, ["--hardware"])
 
     commands = {name: cmd for name, cmd, _fatal in captured}
-    assert "limits: mock self-check (fail-closed gate proven before any hardware)" in commands
+    assert (
+        "limits: mock self-check (fail-closed gate proven before any hardware)"
+        in commands
+    )
     fatal_by_name = {name: fatal for name, _cmd, fatal in captured}
 
     installed_cmd = _command_for(captured, "validate_installed_driver.py")
     assert "--allow-move" in installed_cmd
     assert "--allow-acquire" in installed_cmd
     assert "--mock" not in installed_cmd
-    assert fatal_by_name["hardware: installed driver (register folder, connect by name)"] is True
+    assert (
+        fatal_by_name["hardware: installed driver (register folder, connect by name)"]
+        is True
+    )
 
-    adapter_cmd = next(cmd for cmd in _commands_for(captured, "validate_zmart_adapter.py") if "--allow-acquire" in cmd)
+    adapter_cmd = next(
+        cmd
+        for cmd in _commands_for(captured, "validate_zmart_adapter.py")
+        if "--allow-acquire" in cmd
+    )
     assert "--allow-acquire" in adapter_cmd
     assert "--allow-missing-lasx" not in adapter_cmd
     assert "--mock" not in adapter_cmd
@@ -93,34 +103,51 @@ def test_the_quick_hardware_run_is_the_acceptance(monkeypatch, tmp_path):
     assert f"--save-to={tmp_path / 'captures'}" in saving
     assert (tmp_path / "captures").is_dir()
     assert "--autosave-off" not in saving  # the cache route never asks about AutoSave
-    assert fatal_by_name["hardware: saving from LAS X's cache (one capture, checked)"] is True
+    assert (
+        fatal_by_name["hardware: saving from LAS X's cache (one capture, checked)"]
+        is True
+    )
 
     release = _command_for(captured, "check_cache_release.py")
     assert "--job" not in release
     assert release[release.index("--captures") + 1] == "10"
     assert "--autosave-off" not in release
     assert f"--report-dir={tmp_path}" in release
-    assert fatal_by_name["hardware: letting go of LAS X's cache (10 captures, the canvas cleared)"] is True
+    assert (
+        fatal_by_name[
+            "hardware: letting go of LAS X's cache (10 captures, the canvas cleared)"
+        ]
+        is True
+    )
 
     buttons = _command_for(captured, "check_buttons.py")
     assert f"--report-dir={tmp_path}" in buttons
-    assert fatal_by_name["hardware: the buttons the driver presses (Jobs, Experiment, Clear) and LAS X's dialogs"] is True
+    assert (
+        fatal_by_name[
+            "hardware: the buttons the driver presses (Jobs, Experiment, Clear) and LAS X's dialogs"
+        ]
+        is True
+    )
     # The canvas the button check leaves shown is what the cache checks need.
     order = [name for name, _cmd, _fatal in captured]
-    assert order.index("hardware: the buttons the driver presses (Jobs, Experiment, Clear) and LAS X's dialogs") < order.index(
-        "hardware: saving from LAS X's cache (one capture, checked)"
-    )
+    assert order.index(
+        "hardware: the buttons the driver presses (Jobs, Experiment, Clear) and LAS X's dialogs"
+    ) < order.index("hardware: saving from LAS X's cache (one capture, checked)")
 
     assert not _commands_for(captured, "probe_four_readers.py")
     assert not _commands_for(captured, "validate_readers_side_by_side.py")
     assert not _commands_for(captured, "benchmark_readers.py")
 
 
-def test_the_stage_goes_to_the_ci_baseline_before_any_step_moves_it(monkeypatch, tmp_path):
+def test_the_stage_goes_to_the_ci_baseline_before_any_step_moves_it(
+    monkeypatch, tmp_path
+):
     """After a stage initialisation the stage stands at 0, 0, outside its limits (simulator, 2026-10-15)."""
     run_ci = _load_run_ci()
     captured = _capture_steps(run_ci, monkeypatch, tmp_path, ["--hardware"])
-    hardware = [(name, cmd) for name, cmd, _fatal in captured if name.startswith("hardware:")]
+    hardware = [
+        (name, cmd) for name, cmd, _fatal in captured if name.startswith("hardware:")
+    ]
     first_name, first_cmd = hardware[0]
     assert first_name == "hardware: the stage to the CI baseline"
     assert any(part.endswith("validate_zmart_adapter.py") for part in first_cmd)
@@ -137,7 +164,12 @@ def test_the_full_hardware_run_adds_the_diagnostics(monkeypatch, tmp_path):
     readers = _command_for(captured, "benchmark_readers.py")
     assert "--check" in readers
     assert f"--out={tmp_path / 'readers'}" in readers
-    assert fatal_by_name["hardware: the direct, api and log readers side by side (reads only)"] is True
+    assert (
+        fatal_by_name[
+            "hardware: the direct, api and log readers side by side (reads only)"
+        ]
+        is True
+    )
 
     assert _command_for(captured, "check_buttons.py")
     assert _command_for(captured, "check_cache_route.py")
@@ -160,19 +192,27 @@ def test_the_full_hardware_run_adds_the_diagnostics(monkeypatch, tmp_path):
 
 def test_the_cache_checks_capture_the_job_asked_for(monkeypatch, tmp_path):
     run_ci = _load_run_ci()
-    captured = _capture_steps(run_ci, monkeypatch, tmp_path, ["--hardware", "--job", "Overview"])
+    captured = _capture_steps(
+        run_ci, monkeypatch, tmp_path, ["--hardware", "--job", "Overview"]
+    )
     for script in ("check_cache_route.py", "check_cache_release.py"):
         cmd = _command_for(captured, script)
         assert cmd[cmd.index("--job") + 1] == "Overview"
 
 
-def _commands_for(captured: list[tuple[str, list[str], bool]], script_name: str) -> list[list[str]]:
+def _commands_for(
+    captured: list[tuple[str, list[str], bool]], script_name: str
+) -> list[list[str]]:
     return [
-        cmd for _name, cmd, _fatal in captured if any(part.endswith(script_name) for part in cmd)
+        cmd
+        for _name, cmd, _fatal in captured
+        if any(part.endswith(script_name) for part in cmd)
     ]
 
 
-def _command_for(captured: list[tuple[str, list[str], bool]], script_name: str) -> list[str]:
+def _command_for(
+    captured: list[tuple[str, list[str], bool]], script_name: str
+) -> list[str]:
     matches = _commands_for(captured, script_name)
     assert len(matches) == 1
     return matches[0]

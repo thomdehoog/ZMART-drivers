@@ -85,7 +85,11 @@ def on_demand_mode(datum):
     changes, so it can still show the state from before. Pair it with
     ``fallback="api"``.
     """
-    return "direct" if getattr(_profile(), capabilities.spec(datum).mode_attr) == "direct" else "api"
+    return (
+        "direct"
+        if getattr(_profile(), capabilities.spec(datum).mode_attr) == "direct"
+        else "api"
+    )
 
 
 def _plain_or_diagnostic(reading, diagnostics):
@@ -154,7 +158,9 @@ def _api_read(fn) -> Reading:
         return Reading(value=value, source="api", observed_at=time.time(), age_s=0.0)
     except Exception as exc:
         log.debug("api reader failed", exc_info=True)
-        return Reading(value=None, source="api", observed_at=time.time(), age_s=None, error=exc)
+        return Reading(
+            value=None, source="api", observed_at=time.time(), age_s=None, error=exc
+        )
 
 
 def _snapshot_read(spec, *, max_age_s, job_name=None) -> Reading:
@@ -171,7 +177,9 @@ def _snapshot_read(spec, *, max_age_s, job_name=None) -> Reading:
         return Reading(value=value, source="log", observed_at=observed_at, age_s=age_s)
     except Exception as exc:
         log.debug("log reader failed", exc_info=True)
-        return Reading(value=None, source="log", observed_at=time.time(), age_s=None, error=exc)
+        return Reading(
+            value=None, source="log", observed_at=time.time(), age_s=None, error=exc
+        )
 
 
 class DirectAnswerDidNotCount(RuntimeError):
@@ -190,10 +198,18 @@ def direct_read(spec, direct_kwargs) -> Reading:
         value = spec.direct_fn(**direct_kwargs)
         return Reading(value=value, source="direct", observed_at=time.time(), age_s=0.0)
     except HardwareServerUnavailable as exc:
-        return Reading(value=None, source="direct", observed_at=time.time(), age_s=None, error=exc)
+        return Reading(
+            value=None, source="direct", observed_at=time.time(), age_s=None, error=exc
+        )
     except Exception as exc:
-        log.warning("the direct reader failed (%s: %s); its fallback answers", type(exc).__name__, exc)
-        return Reading(value=None, source="direct", observed_at=time.time(), age_s=None, error=exc)
+        log.warning(
+            "the direct reader failed (%s: %s); its fallback answers",
+            type(exc).__name__,
+            exc,
+        )
+        return Reading(
+            value=None, source="direct", observed_at=time.time(), age_s=None, error=exc
+        )
 
 
 def watch_direct(spec, *, succeeded, deadline, observed_after, direct_kwargs, waiting):
@@ -215,7 +231,9 @@ def watch_direct(spec, *, succeeded, deadline, observed_after, direct_kwargs, wa
                 source="direct",
                 observed_at=reading.observed_at,
                 age_s=None,
-                error=DirectAnswerDidNotCount(f"the direct reader answered {reading.value!r}"),
+                error=DirectAnswerDidNotCount(
+                    f"the direct reader answered {reading.value!r}"
+                ),
             )
         if time.monotonic() + tuning.POLL_S >= deadline:
             return None
@@ -263,7 +281,9 @@ def _api_worker(spec, client, api_kwargs, *, deadline, stop, answers):
         if not _API_TURNS.take(key, until=deadline, stop=stop):
             return
         try:
-            reading = _api_read(lambda: spec.api_fn(client, deadline=deadline, **api_kwargs))
+            reading = _api_read(
+                lambda: spec.api_fn(client, deadline=deadline, **api_kwargs)
+            )
         finally:
             _API_TURNS.give_back(key)
         answers.put(reading)
@@ -299,7 +319,9 @@ def _counts(reading, succeeded, observed_after):
         return False
 
 
-def _watch(datum, client, *, mode, succeeded, deadline, job_name, observed_after, api_kwargs):
+def _watch(
+    datum, client, *, mode, succeeded, deadline, job_name, observed_after, api_kwargs
+):
     """Watch one window: the first answer that counts, from either source, or no answer.
 
     Returns the winning Reading; when nothing counted by *deadline*, the
@@ -324,7 +346,9 @@ def _watch(datum, client, *, mode, succeeded, deadline, job_name, observed_after
         ).start()
     if "log" in legs:
         max_age_s = (
-            None if spec.log_max_age_attr is None else getattr(_profile(), spec.log_max_age_attr)
+            None
+            if spec.log_max_age_attr is None
+            else getattr(_profile(), spec.log_max_age_attr)
         )
         threading.Thread(
             target=_log_worker,
@@ -432,14 +456,18 @@ def wait_for(
         return _watch(datum, client, deadline=deadline, **kwargs)
     failed = None
     for window in range(1, tuning.WINDOWS + 1):
-        reading = _watch(datum, client, deadline=time.monotonic() + tuning.WINDOW_S, **kwargs)
+        reading = _watch(
+            datum, client, deadline=time.monotonic() + tuning.WINDOW_S, **kwargs
+        )
         if reading is not None and reading.error is None:
             return reading
         if reading is not None:
             if isinstance(reading.error, capabilities.UnsupportedSource):
                 return reading
             failed = reading
-        log.debug("%s: no answer counted in window %d/%d", datum, window, tuning.WINDOWS)
+        log.debug(
+            "%s: no answer counted in window %d/%d", datum, window, tuning.WINDOWS
+        )
     log.warning(
         "%s%s: no answer counted as a success in %d windows of %ss",
         datum,
@@ -493,7 +521,13 @@ def _derive(reading, value):
 
 
 def get_scan_status(
-    client, *, mode=None, diagnostics=False, deadline=None, accept=None, fallback="hybrid"
+    client,
+    *,
+    mode=None,
+    diagnostics=False,
+    deadline=None,
+    accept=None,
+    fallback="hybrid",
 ):
     return _routed(
         "scan_status",
@@ -525,11 +559,19 @@ def get_job_settings(
 
 
 def get_hardware_info(client, *, mode=None, diagnostics=False, deadline=None):
-    return _routed("hardware_info", client, mode=mode, diagnostics=diagnostics, deadline=deadline)
+    return _routed(
+        "hardware_info", client, mode=mode, diagnostics=diagnostics, deadline=deadline
+    )
 
 
 def get_xy(
-    client, *, mode=None, diagnostics=False, deadline=None, accept=None, fallback="hybrid"
+    client,
+    *,
+    mode=None,
+    diagnostics=False,
+    deadline=None,
+    accept=None,
+    fallback="hybrid",
 ):
     return _routed(
         "xy",
@@ -557,7 +599,12 @@ def z_um_direct(drive, *, mode=None):
     except HardwareServerUnavailable as why:
         log.debug("%s: %s; the job settings answer", drive, why)
     except Exception as why:
-        log.warning("the direct reader failed on %s (%s: %s); the job settings answer", drive, type(why).__name__, why)
+        log.warning(
+            "the direct reader failed on %s (%s: %s); the job settings answer",
+            drive,
+            type(why).__name__,
+            why,
+        )
     return None
 
 
@@ -594,19 +641,34 @@ def read_zwide_um(client, job_name, *, mode=None):
 
 def get_jobs(client, *, mode=None, diagnostics=False, deadline=None, accept=None):
     return _routed(
-        "jobs", client, mode=mode, diagnostics=diagnostics, deadline=deadline, accept=accept
+        "jobs",
+        client,
+        mode=mode,
+        diagnostics=diagnostics,
+        deadline=deadline,
+        accept=accept,
     )
 
 
 def get_job_by_name(client, job_name, *, mode=None, diagnostics=False, deadline=None):
     jobs_reading = get_jobs(client, mode=mode, diagnostics=True, deadline=deadline)
-    value = None if jobs_reading is None else derived.job_by_name(jobs_reading.value, job_name)
+    value = (
+        None
+        if jobs_reading is None
+        else derived.job_by_name(jobs_reading.value, job_name)
+    )
     reading = _derive(jobs_reading, value)
     return _plain_or_diagnostic(reading, diagnostics)
 
 
 def get_selected_job(
-    client, *, mode=None, diagnostics=False, deadline=None, accept=None, fallback="hybrid"
+    client,
+    *,
+    mode=None,
+    diagnostics=False,
+    deadline=None,
+    accept=None,
+    fallback="hybrid",
 ):
     return _routed(
         "selected_job",
@@ -623,7 +685,11 @@ def get_fov(client, job_name, *, mode=None, diagnostics=False, deadline=None):
     settings_reading = get_job_settings(
         client, job_name, mode=mode, diagnostics=True, deadline=deadline
     )
-    value = None if settings_reading is None else derived.fov_from_settings(settings_reading.value)
+    value = (
+        None
+        if settings_reading is None
+        else derived.fov_from_settings(settings_reading.value)
+    )
     reading = _derive(settings_reading, value)
     return _plain_or_diagnostic(reading, diagnostics)
 
@@ -633,7 +699,9 @@ def get_base_fov(client, job_name, *, mode=None, diagnostics=False, deadline=Non
         client, job_name, mode=mode, diagnostics=True, deadline=deadline
     )
     value = (
-        None if settings_reading is None else derived.base_fov_from_settings(settings_reading.value)
+        None
+        if settings_reading is None
+        else derived.base_fov_from_settings(settings_reading.value)
     )
     reading = _derive(settings_reading, value)
     return _plain_or_diagnostic(reading, diagnostics)

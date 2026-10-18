@@ -170,7 +170,9 @@ def race_confirmations(api_leg=None, log_leg=None, *, label="", budget_s=None):
         if winner is not None:
             loser = "log" if winner == "api" else "api"
             logs.append(
-                _make_log_entry("info", f"{label} | confirmed by {winner} leg ({elapsed:.3f}s)")
+                _make_log_entry(
+                    "info", f"{label} | confirmed by {winner} leg ({elapsed:.3f}s)"
+                )
             )
             if loser in outcomes:
                 msg = f"{label} | {loser} leg had not confirmed when the {winner} leg confirmed"
@@ -194,7 +196,9 @@ def race_confirmations(api_leg=None, log_leg=None, *, label="", budget_s=None):
             logs.append(_make_log_entry("warning", msg))
         else:
             logs.append(
-                _make_log_entry("info", f"{label} | no confirmation leg confirmed ({elapsed:.3f}s)")
+                _make_log_entry(
+                    "info", f"{label} | no confirmation leg confirmed ({elapsed:.3f}s)"
+                )
             )
         return {"success": False, "logs": logs}
 
@@ -400,7 +404,9 @@ def confirm_move_z(
         # z-stack and reads that one elsewhere.
         actual = _readers.z_um_direct(key)
         if actual is None:
-            ch = _readback(client, job_name, deadline=deadline, observed_after=observed_after)
+            ch = _readback(
+                client, job_name, deadline=deadline, observed_after=observed_after
+            )
             try:
                 actual = (
                     None
@@ -573,12 +579,16 @@ def _confirm_z_stack_definition(
                         ok = ok and abs(actual_end - exp_e) < tolerance
                     if ok:
                         log.debug(
-                            "Z-stack def confirm: matched candidate (%.2f, %.2f)", exp_b, exp_e
+                            "Z-stack def confirm: matched candidate (%.2f, %.2f)",
+                            exp_b,
+                            exp_e,
                         )
                         return {"success": True, "logs": logs}
                 log.debug("Z-stack def confirm: no candidate matched")
             except (KeyError, TypeError) as e:
-                log.debug("Z-stack def confirm: exception %s, stack=%s", e, ch.get("stack"))
+                log.debug(
+                    "Z-stack def confirm: exception %s, stack=%s", e, ch.get("stack")
+                )
         time.sleep(_timing.POLL_S)
 
     msg = (
@@ -604,9 +614,7 @@ def _confirm_z_stack_step_size(
     )
 
 
-def _confirm_z_stack_size(
-    client, job_name, target_um, tolerance=1.5, poll_window=None
-):
+def _confirm_z_stack_size(client, job_name, target_um, tolerance=1.5, poll_window=None):
     """Poll until z-stack total size matches within tolerance (micrometers).
 
     When LAS X is in "Z-Step Size" mode, actual size is quantised to
@@ -637,7 +645,10 @@ def _confirm_z_stack_size(
                 actual = ch["stack"]["size"]
                 step = ch["stack"].get("stepSize")
                 log.debug(
-                    "Z-stack size confirm: target=%.4f actual=%.6g step=%s", target_um, actual, step
+                    "Z-stack size confirm: target=%.4f actual=%.6g step=%s",
+                    target_um,
+                    actual,
+                    step,
                 )
 
                 # Direct match (number-of-steps mode, or step divides evenly)
@@ -659,7 +670,9 @@ def _confirm_z_stack_size(
 
                 log.debug("Z-stack size confirm: no match")
             except (KeyError, TypeError) as e:
-                log.debug("Z-stack size confirm: exception %s, stack=%s", e, ch.get("stack"))
+                log.debug(
+                    "Z-stack size confirm: exception %s, stack=%s", e, ch.get("stack")
+                )
         time.sleep(_timing.POLL_S)
 
     msg = f"Z-stack size timeout after {time.monotonic() - t_start:.1f}s — target={target_um}"
@@ -754,9 +767,7 @@ def _confirm_filter_wheel_spectrum(
 
 def _confirm_scan_speed(client, job_name, target, poll_window=None):
     """Poll until scan speed matches exactly (discrete integer)."""
-    return _run_spec(
-        "scan_speed", client, job_name, target, poll_window=poll_window
-    )
+    return _run_spec("scan_speed", client, job_name, target, poll_window=poll_window)
 
 
 def _confirm_scan_resonant(client, job_name, target, poll_window=None):
@@ -772,9 +783,7 @@ def _confirm_scan_resonant(client, job_name, target, poll_window=None):
 
 def _confirm_scan_mode(client, job_name, target, poll_window=None):
     """Poll until scan mode matches exactly (enum string)."""
-    return _run_spec(
-        "scan_mode", client, job_name, target, poll_window=poll_window
-    )
+    return _run_spec("scan_mode", client, job_name, target, poll_window=poll_window)
 
 
 def _confirm_sequential_mode(client, job_name, target, poll_window=None):
@@ -814,7 +823,9 @@ def _confirm_image_format(client, job_name, w, h, poll_window=None):
                 actual = ch["format"]
                 if actual == f"{w} x {h}":
                     return {"success": True, "logs": logs}
-                log.debug("ImageFormat confirm: target='%s x %s' actual='%s'", w, h, actual)
+                log.debug(
+                    "ImageFormat confirm: target='%s x %s' actual='%s'", w, h, actual
+                )
             except (KeyError, TypeError):
                 pass
         time.sleep(_timing.POLL_S)
@@ -857,7 +868,9 @@ def confirm_objective(
             try:
                 actual_slot = ch["objective"]["slotIndex"]
                 log.debug(
-                    "Objective confirm: target_slot=%s actual_slot=%s", target_slot, actual_slot
+                    "Objective confirm: target_slot=%s actual_slot=%s",
+                    target_slot,
+                    actual_slot,
                 )
                 if actual_slot == target_slot:
                     return {"success": True, "logs": logs}
@@ -923,9 +936,7 @@ def _confirm_line_average(client, job_name, si, target, poll_window=None):
     )
 
 
-def _confirm_laser_shutter(
-    client, job_name, si, beam_route, target, poll_window=None
-):
+def _confirm_laser_shutter(client, job_name, si, beam_route, target, poll_window=None):
     """Poll until laser shutter state matches exactly."""
     return _run_spec(
         "laser_shutter",
@@ -988,7 +999,11 @@ def confirm_move_xy(
     while time.monotonic() < deadline:
         pos = _reading_value_after(
             _readers.get_xy(
-                client, mode=_readers.on_demand_mode("xy"), fallback="api", diagnostics=True, deadline=deadline
+                client,
+                mode=_readers.on_demand_mode("xy"),
+                fallback="api",
+                diagnostics=True,
+                deadline=deadline,
             ),
             observed_after,
         )
@@ -1026,7 +1041,12 @@ def confirm_move_xy(
 
 
 def confirm_acquire(
-    client, *, start_timeout=15.0, heartbeat_interval=30.0, timeout=None, poll_interval=0.1
+    client,
+    *,
+    start_timeout=15.0,
+    heartbeat_interval=30.0,
+    timeout=None,
+    poll_interval=0.1,
 ):
     """Poll until acquisition completes, or return False if scan never starts.
 

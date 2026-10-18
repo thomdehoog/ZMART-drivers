@@ -65,7 +65,9 @@ _STAGE_FROM_ROTATION: dict[int, tuple[tuple[int, int], tuple[int, int]]] = {
 # A mirrored orientation is represented canonically as a left-right mirror of
 # the raw image followed by the clockwise turn. Together with the four plain
 # rotations this covers all eight D4 mappings without an ambiguous mirror axis.
-_STAGE_FROM_ORIENTATION: dict[tuple[int, bool], tuple[tuple[int, int], tuple[int, int]]] = {
+_STAGE_FROM_ORIENTATION: dict[
+    tuple[int, bool], tuple[tuple[int, int], tuple[int, int]]
+] = {
     **{(deg, False): matrix for deg, matrix in _STAGE_FROM_ROTATION.items()},
     (0, True): ((-1, 0), (0, 1)),
     (90, True): ((0, -1), (-1, 0)),
@@ -150,7 +152,9 @@ def _signed_axis(row: tuple[int, int]) -> str:
     return f"{sign}{('X', 'Y')[index]}"
 
 
-def orientation_config(orientation: Orientation, *, measured: bool = True) -> dict[str, Any]:
+def orientation_config(
+    orientation: Orientation, *, measured: bool = True
+) -> dict[str, Any]:
     """Build the minimal authoritative orientation document."""
     return {
         "schema_version": SCHEMA_VERSION,
@@ -174,10 +178,14 @@ def orientation_from_config(data: dict[str, Any]) -> Orientation:
         required = {"measured", "rotation_deg", "reflection", "sign_convention"}
         missing = sorted(required.difference(data))
         if missing:
-            raise ValueError(f"orientation schema {schema_version} missing fields: {missing}")
+            raise ValueError(
+                f"orientation schema {schema_version} missing fields: {missing}"
+            )
         if not isinstance(data["measured"], bool):
             raise TypeError("orientation field 'measured' must be boolean")
-        if not isinstance(data["rotation_deg"], int) or isinstance(data["rotation_deg"], bool):
+        if not isinstance(data["rotation_deg"], int) or isinstance(
+            data["rotation_deg"], bool
+        ):
             raise TypeError("orientation field 'rotation_deg' must be an integer")
         if not isinstance(data["reflection"], bool):
             raise TypeError("orientation field 'reflection' must be boolean")
@@ -202,7 +210,9 @@ def orientation_from_config(data: dict[str, Any]) -> Orientation:
         }
         missing = sorted(required.difference(data))
         if missing:
-            raise ValueError(f"orientation schema {schema_version} missing fields: {missing}")
+            raise ValueError(
+                f"orientation schema {schema_version} missing fields: {missing}"
+            )
         orientation = orientation_from_image_to_stage(data["image_to_stage"])
         expected = {
             "rotate_deg": int(orientation.rotate_deg),
@@ -218,7 +228,10 @@ def orientation_from_config(data: dict[str, Any]) -> Orientation:
                     f"orientation field {key!r} contradicts image_to_stage: "
                     f"got {data[key]!r}, expected {expected[key]!r}"
                 )
-        if "reflection_axis" in data and data["reflection_axis"] != expected["reflection_axis"]:
+        if (
+            "reflection_axis" in data
+            and data["reflection_axis"] != expected["reflection_axis"]
+        ):
             raise ValueError(
                 "orientation field 'reflection_axis' contradicts image_to_stage: "
                 f"got {data['reflection_axis']!r}, "

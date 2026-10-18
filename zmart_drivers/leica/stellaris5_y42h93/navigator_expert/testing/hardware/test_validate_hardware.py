@@ -31,10 +31,19 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.actions import profi
 
 def test_classify_result_statuses():
     """Driver result envelopes map to PASS / WARN / FAIL consistently."""
-    assert validate_hardware._classify_result({"success": True, "confirmed": True}) == "PASS"
+    assert (
+        validate_hardware._classify_result({"success": True, "confirmed": True})
+        == "PASS"
+    )
     assert validate_hardware._classify_result({"success": True}) == "PASS"
-    assert validate_hardware._classify_result({"success": True, "confirmed": False}) == "WARN"
-    assert validate_hardware._classify_result({"success": False, "confirmed": True}) == "FAIL"
+    assert (
+        validate_hardware._classify_result({"success": True, "confirmed": False})
+        == "WARN"
+    )
+    assert (
+        validate_hardware._classify_result({"success": False, "confirmed": True})
+        == "FAIL"
+    )
 
 
 def test_compact_status_includes_driver_timing():
@@ -140,7 +149,9 @@ def test_validate_hardware_full_mock_run(tmp_path):
     assert exit_code == 0
 
     records = [
-        json.loads(line) for line in output.read_text(encoding="utf-8").splitlines() if line.strip()
+        json.loads(line)
+        for line in output.read_text(encoding="utf-8").splitlines()
+        if line.strip()
     ]
     assert records
     assert records[-1]["name"] == "__summary__"
@@ -176,12 +187,18 @@ def test_validate_hardware_full_mock_run(tmp_path):
         record for record in records if record["name"] == "job selection: select job"
     ]
     selected_job_records = [
-        record for record in records if record["name"].startswith("job selection: confirmed ")
+        record
+        for record in records
+        if record["name"].startswith("job selection: confirmed ")
     ]
     # The autofocus job runs as a procedure, never as state, so it is not selected.
-    assert {record["context"]["job"] for record in select_job_records} == {"HiRes", "Overview"}
+    assert {record["context"]["job"] for record in select_job_records} == {
+        "HiRes",
+        "Overview",
+    }
     assert {
-        record["name"].removeprefix("job selection: confirmed ") for record in selected_job_records
+        record["name"].removeprefix("job selection: confirmed ")
+        for record in selected_job_records
     } == {"HiRes", "Overview"}
 
     # The Markdown run report is produced and carries the summary table,
@@ -230,7 +247,9 @@ def test_the_direct_reader_route_can_be_chosen(caplog):
     prior = profiles.STATE_READERS
     try:
         args = validate_hardware.parse_args(["--state-reader-mode", "direct"])
-        validate_hardware._apply_state_reader_mode(args.state_reader_mode, validate_hardware.logging.getLogger("t"))
+        validate_hardware._apply_state_reader_mode(
+            args.state_reader_mode, validate_hardware.logging.getLogger("t")
+        )
         assert profiles.STATE_READERS.xy_mode == "direct"
         assert profiles.STATE_READERS.job_settings_mode == "direct"
         assert profiles.STATE_READERS.scan_status_mode == "direct"
@@ -254,8 +273,11 @@ def test_the_direct_route_keeps_the_drivers_own_job_confirmation():
 
 def test_the_zoom_test_values_lie_in_the_jobs_own_range():
     """Whatever the job, the alternate zoom is one LAS X accepts (HiRes on the simulator: 7.5 to 48)."""
-    for zoom in ({"current": 7.5, "min": 7.5, "max": 48.0}, {"current": 1.0, "min": 0.75, "max": 48.0},
-                 {"current": 48.0, "min": 7.5, "max": 48.0}):
+    for zoom in (
+        {"current": 7.5, "min": 7.5, "max": 48.0},
+        {"current": 1.0, "min": 0.75, "max": 48.0},
+        {"current": 48.0, "min": 7.5, "max": 48.0},
+    ):
         candidates = validate_hardware.zoom_candidates(zoom)
         assert candidates
         assert all(zoom["min"] <= c <= zoom["max"] for c in candidates)
@@ -264,8 +286,11 @@ def test_the_zoom_test_values_lie_in_the_jobs_own_range():
 
 def test_job_selection_switches_between_normal_jobs_whatever_they_are_called():
     """An autofocus job is run as a procedure, never selected as state: the round trip leaves it out."""
-    jobs = [{"Name": "Focus A", "IsAutofocus": True}, {"Name": "Wide", "IsAutofocus": False},
-            {"Name": "Detail", "IsAutofocus": False, "IsSelected": True}]
+    jobs = [
+        {"Name": "Focus A", "IsAutofocus": True},
+        {"Name": "Wide", "IsAutofocus": False},
+        {"Name": "Detail", "IsAutofocus": False, "IsSelected": True},
+    ]
     assert validate_hardware.selectable_job_names(jobs) == ["Wide", "Detail"]
 
 
@@ -290,7 +315,9 @@ def test_a_capture_is_saved_as_a_file_or_as_a_store(tmp_path):
 def test_a_stores_ome_xml_is_read_from_its_ome_folder(tmp_path):
     store = tmp_path / "A1.ome.zarr"
     (store / "OME").mkdir(parents=True)
-    (store / "OME" / "METADATA.ome.xml").write_text("<OME>the capture</OME>", encoding="utf-8")
+    (store / "OME" / "METADATA.ome.xml").write_text(
+        "<OME>the capture</OME>", encoding="utf-8"
+    )
     assert validate_hardware.embedded_ome_xml(store) == b"<OME>the capture</OME>"
 
 
@@ -309,12 +336,22 @@ class LaggingJobs:
 def test_a_selected_job_the_cam_api_reports_late_still_counts():
     """LAS X switches at once; the CAM API's answer follows within 0.25 s (simulator, 2026-10-15)."""
     drv = LaggingJobs("AF Job", "Overview", lag=2)
-    assert validate_hardware.settled_selected_job(drv, None, "Overview", window_s=1.0, poll_s=0.01) == "Overview"
+    assert (
+        validate_hardware.settled_selected_job(
+            drv, None, "Overview", window_s=1.0, poll_s=0.01
+        )
+        == "Overview"
+    )
 
 
 def test_a_selected_job_the_cam_api_never_reports_is_what_it_reports():
     drv = LaggingJobs("AF Job", "Overview", lag=10_000)
-    assert validate_hardware.settled_selected_job(drv, None, "Overview", window_s=0.05, poll_s=0.01) == "AF Job"
+    assert (
+        validate_hardware.settled_selected_job(
+            drv, None, "Overview", window_s=0.05, poll_s=0.01
+        )
+        == "AF Job"
+    )
 
 
 def test_explicit_log_mode_treats_empty_job_list_as_expected():
@@ -587,7 +624,15 @@ def test_the_readbacks_ask_the_direct_reader_not_the_cam_api(tmp_path, monkeypat
         monkeypatch.setattr(drv, name, spy)
 
     exit_code = validate_hardware.main(
-        ["--mock", "--allow-xy", "--allow-z", "--output", str(tmp_path / "run.jsonl"), "--report-dir", str(tmp_path)]
+        [
+            "--mock",
+            "--allow-xy",
+            "--allow-z",
+            "--output",
+            str(tmp_path / "run.jsonl"),
+            "--report-dir",
+            str(tmp_path),
+        ]
     )
 
     assert exit_code == 0

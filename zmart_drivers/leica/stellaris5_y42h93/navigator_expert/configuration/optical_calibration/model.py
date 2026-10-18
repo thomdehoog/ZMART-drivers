@@ -108,7 +108,9 @@ def validate_calibration(config: dict[str, Any]) -> None:
     """
     extra_top_level = set(config) - {"schema_version", "objectives"}
     if extra_top_level:
-        raise ValueError(f"calibration config has unsupported fields: {sorted(extra_top_level)}")
+        raise ValueError(
+            f"calibration config has unsupported fields: {sorted(extra_top_level)}"
+        )
     objectives = _require_block(config, "objectives")
     if any(entry.get("translation_um") is not None for entry in objectives.values()):
         get_reference_slot(config)
@@ -205,7 +207,9 @@ def update_objective(
         entry["name"] = name
     if translation_um is not None:
         if len(translation_um) != 3:
-            raise ValueError(f"translation_um must have 3 values, got {translation_um!r}")
+            raise ValueError(
+                f"translation_um must have 3 values, got {translation_um!r}"
+            )
         entry["translation_um"] = [
             float(translation_um[0]),
             float(translation_um[1]),
@@ -217,7 +221,9 @@ def _entry(config: dict[str, Any], slot: int) -> dict[str, Any]:
     entry = (config.get("objectives") or {}).get(str(int(slot)))
     if entry is None:
         available = sorted(int(s) for s in config.get("objectives", {}))
-        raise ValueError(f"No calibration entry for slot {slot}. Available: {available}")
+        raise ValueError(
+            f"No calibration entry for slot {slot}. Available: {available}"
+        )
     return entry
 
 
@@ -230,7 +236,9 @@ def get_translation_um(config: dict[str, Any], slot: int) -> tuple[float, float,
             "notebooks and adopt the config."
         )
     if len(value) != 3:
-        raise ValueError(f"Slot {slot} translation_um must have 3 values, got {value!r}")
+        raise ValueError(
+            f"Slot {slot} translation_um must have 3 values, got {value!r}"
+        )
     return float(value[0]), float(value[1]), float(value[2])
 
 
@@ -261,7 +269,9 @@ def translation_delta_um(
     return (b[0] - a[0], b[1] - a[1], b[2] - a[2])
 
 
-def load_translations(calibration_name: str | None = None) -> dict[int, tuple[float, float, float]]:
+def load_translations(
+    calibration_name: str | None = None,
+) -> dict[int, tuple[float, float, float]]:
     """Per-slot objective translations (micrometres) from the active calibration.
 
     Resolves the machine-local ``calibration.json`` (or the named set selected
@@ -299,7 +309,9 @@ def get_reference_slot(config: dict[str, Any]) -> int:
             "translation_um == [0, 0, 0]"
         )
     if len(refs) > 1:
-        raise ValueError(f"calibration config has multiple zero-translation references: {refs}")
+        raise ValueError(
+            f"calibration config has multiple zero-translation references: {refs}"
+        )
     return refs[0]
 
 

@@ -40,7 +40,9 @@ def _mk_snapshot(
 ) -> Path:
     snapshot = profile.subsystem_root(subsystem) / name
     snapshot.mkdir(parents=True)
-    (snapshot / _FILENAMES[subsystem]).write_text(json.dumps(payload or {}), encoding="utf-8")
+    (snapshot / _FILENAMES[subsystem]).write_text(
+        json.dumps(payload or {}), encoding="utf-8"
+    )
     return snapshot
 
 
@@ -49,14 +51,20 @@ def _mk_flat_snapshot(profile: MachineProfile, name: str) -> Path:
     snapshot.mkdir(parents=True)
     (snapshot / "limits.json").write_text('{"limits": "old"}', encoding="utf-8")
     (snapshot / ".limits-machine").touch()
-    (snapshot / "calibration.json").write_text('{"calibration": "old"}', encoding="utf-8")
+    (snapshot / "calibration.json").write_text(
+        '{"calibration": "old"}', encoding="utf-8"
+    )
     (snapshot / "orientation.json").write_text('{"rotate_deg": 90}', encoding="utf-8")
     named = snapshot / "calibrations" / "water"
     named.mkdir(parents=True)
-    (named / "calibration.json").write_text('{"calibration": "water"}', encoding="utf-8")
+    (named / "calibration.json").write_text(
+        '{"calibration": "water"}', encoding="utf-8"
+    )
     (snapshot / "set_limits.ipynb").write_text("limits", encoding="utf-8")
     (snapshot / "set_orientation.ipynb").write_text("orientation", encoding="utf-8")
-    (snapshot / "calibrate_objective_pair.ipynb").write_text("calibration", encoding="utf-8")
+    (snapshot / "calibrate_objective_pair.ipynb").write_text(
+        "calibration", encoding="utf-8"
+    )
     return snapshot
 
 
@@ -125,7 +133,9 @@ def test_limits_do_not_seed_while_other_resolvers_seed_their_own_tree(tmp_path):
     assert not (orientation.parent / "limits.json").exists()
 
 
-def test_incomplete_limits_snapshot_does_not_seed_or_masquerade_as_machine_limits(tmp_path):
+def test_incomplete_limits_snapshot_does_not_seed_or_masquerade_as_machine_limits(
+    tmp_path,
+):
     profile = _profile(tmp_path)
     incomplete = profile.subsystem_root("limits") / "2026-07-01T14-30-00-000000Z"
     incomplete.mkdir(parents=True)
@@ -149,12 +159,18 @@ def test_flat_layout_migrates_copy_only_into_all_subsystems(tmp_path):
     assert (migrated["limits"] / "limits.json").exists()
     assert not (migrated["limits"] / ".limits-machine").exists()
     assert (migrated["limits"] / "notebook" / "set_limits.ipynb").exists()
-    assert not (migrated["limits"] / "data" / "notebook" / "set_orientation.ipynb").exists()
-    assert (migrated["calibration"] / "calibrations" / "water" / "calibration.json").exists()
+    assert not (
+        migrated["limits"] / "data" / "notebook" / "set_orientation.ipynb"
+    ).exists()
+    assert (
+        migrated["calibration"] / "calibrations" / "water" / "calibration.json"
+    ).exists()
     assert (
         migrated["calibration"] / "data" / "notebook" / "calibrate_objective_pair.ipynb"
     ).exists()
-    assert (migrated["orientation"] / "data" / "notebook" / "set_orientation.ipynb").exists()
+    assert (
+        migrated["orientation"] / "data" / "notebook" / "set_orientation.ipynb"
+    ).exists()
     assert profile.read_origin()["origin"] == {"x_um": 5}
     assert profile.migrate_flat_snapshots() == {}
 
@@ -165,7 +181,9 @@ def test_pre_api_flat_snapshot_copies_then_migrates(tmp_path):
     legacy.mkdir(parents=True)
     for filename in ("limits.json", "calibration.json", "orientation.json"):
         (legacy / filename).write_text("{}", encoding="utf-8")
-    (legacy / ".limits-machine").touch()  # legacy proof that limits were operator-published
+    (
+        legacy / ".limits-machine"
+    ).touch()  # legacy proof that limits were operator-published
 
     migrated = profile.migrate_flat_snapshots()
 
@@ -192,8 +210,12 @@ def test_origin_writes_append_timestamp_history(tmp_path):
     profile = _profile(tmp_path)
     first = profile.write_origin({"origin": {"x_um": 1}}, moment=_AT_1430)
     second = profile.write_origin({"origin": {"x_um": 9}}, moment=_AT_1500)
-    assert first == profile.origin_dir() / format_snapshot_name(_AT_1430) / "origin.json"
-    assert second == profile.origin_dir() / format_snapshot_name(_AT_1500) / "origin.json"
+    assert (
+        first == profile.origin_dir() / format_snapshot_name(_AT_1430) / "origin.json"
+    )
+    assert (
+        second == profile.origin_dir() / format_snapshot_name(_AT_1500) / "origin.json"
+    )
     assert first.exists() and second.exists()
     assert profile.origin_path() == second
     assert profile.read_origin()["origin"] == {"x_um": 9}
@@ -210,10 +232,12 @@ def test_new_snapshot_monotonicity_is_per_subsystem(tmp_path):
     _mk_snapshot(profile, "limits", format_snapshot_name(_AT_1430))
     with pytest.raises(ValueError, match="new limits snapshot"):
         profile.new_snapshot_dir(_AT_1400, "limits")
-    assert profile.new_snapshot_dir(_AT_1400, "calibration").parent == profile.subsystem_root(
-        "calibration"
+    assert profile.new_snapshot_dir(
+        _AT_1400, "calibration"
+    ).parent == profile.subsystem_root("calibration")
+    assert profile.new_snapshot_dir(_AT_1500, "limits").name == format_snapshot_name(
+        _AT_1500
     )
-    assert profile.new_snapshot_dir(_AT_1500, "limits").name == format_snapshot_name(_AT_1500)
 
 
 def test_publish_requires_exactly_one_subsystem(tmp_path):
@@ -309,7 +333,9 @@ def test_named_calibration_sets_copy_forward_inside_calibration_only(tmp_path):
     assert profile.latest_snapshot("limits") is None
 
 
-def test_named_calibration_cannot_be_selected_by_ambient_environment(tmp_path, monkeypatch):
+def test_named_calibration_cannot_be_selected_by_ambient_environment(
+    tmp_path, monkeypatch
+):
     profile = _profile(tmp_path)
     profile.publish_snapshot(
         _AT_1430,
@@ -336,11 +362,13 @@ def test_publish_rejects_non_monotonic_time_without_partial(tmp_path):
 
 def test_bundled_and_published_calibration_are_loadable(tmp_path):
     from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.optical_calibration import (
-    model,
-)
+        model,
+    )
 
     profile = _profile(tmp_path)
-    calibration = model.load_calibration(profile.bundled_default_path("calibration.json"))
+    calibration = model.load_calibration(
+        profile.bundled_default_path("calibration.json")
+    )
     snapshot = profile.publish_snapshot(_AT_1430, calibration=calibration)
     reloaded = model.load_calibration(snapshot / "calibration.json")
     assert reloaded == {"schema_version": 13, "objectives": {}}
@@ -349,4 +377,7 @@ def test_bundled_and_published_calibration_are_loadable(tmp_path):
 def test_programdata_root_precedence(tmp_path, monkeypatch):
     monkeypatch.setenv(machine.PROGRAMDATA_ROOT_ENV, str(tmp_path / "environment"))
     assert MachineProfile().root() == tmp_path / "environment"
-    assert MachineProfile(programdata_root=tmp_path / "explicit").root() == tmp_path / "explicit"
+    assert (
+        MachineProfile(programdata_root=tmp_path / "explicit").root()
+        == tmp_path / "explicit"
+    )

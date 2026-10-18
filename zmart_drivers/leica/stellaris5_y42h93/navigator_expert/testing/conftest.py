@@ -73,7 +73,9 @@ def _no_hardware_server(monkeypatch):
     )
 
     def unreachable():
-        raise hardware_server.HardwareServerUnavailable("no hardware server in the test suite")
+        raise hardware_server.HardwareServerUnavailable(
+            "no hardware server in the test suite"
+        )
 
     monkeypatch.setattr(hardware_server, "attach", unreachable)
     hardware_server.forget_connection()
@@ -101,7 +103,9 @@ def _no_lasx_window(tmp_path, monkeypatch):
     )
 
     def no_automation():
-        raise lasx_dialogs.WindowsUnavailable("no Windows UI Automation in the test suite")
+        raise lasx_dialogs.WindowsUnavailable(
+            "no Windows UI Automation in the test suite"
+        )
 
     monkeypatch.setattr(lasx_dialogs, "LASX_LOG", tmp_path / "no LAS X.log")
     monkeypatch.setattr(lasx_dialogs, "lasx_windows", no_windows)

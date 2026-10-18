@@ -42,7 +42,9 @@ def _offline(monkeypatch, tmp_path):
     )
     hermetic_mock_machine_root()
     monkeypatch.setattr(
-        adapter._session, "connect_python_client", lambda **_kw: MockLasxClient(latency=0.0)
+        adapter._session,
+        "connect_python_client",
+        lambda **_kw: MockLasxClient(latency=0.0),
     )
     return {"output_root": str(tmp_path / "out")}
 
@@ -67,7 +69,9 @@ def test_the_class_fits_the_controller_contract_offline(monkeypatch, tmp_path):
 def test_the_class_answers_what_the_module_answers(monkeypatch, tmp_path):
     """The class and the older module shape describe the same microscope the same way."""
     connection = _offline(monkeypatch, tmp_path)
-    through_class = zmart_controller.ZmartController(zmart_driver.ZmartDriver, connection)
+    through_class = zmart_controller.ZmartController(
+        zmart_driver.ZmartDriver, connection
+    )
     try:
         as_class = {
             name: getattr(through_class, name)()["content"]
@@ -93,7 +97,13 @@ def test_the_class_answers_what_the_module_answers(monkeypatch, tmp_path):
     # What is set up, where it saves among it, reaches the controller from the class too.
     assert "output_root" not in class_info
     assert class_info["setup"] == info["setup"]
-    assert set(class_info["setup"]) == {"limits", "orientation", "calibration", "origin", "data_location"}
+    assert set(class_info["setup"]) == {
+        "limits",
+        "orientation",
+        "calibration",
+        "origin",
+        "data_location",
+    }
     for item in class_info["setup"].values():
         assert isinstance(item["done"], bool) and item["says"].strip()
     assert as_class["get_xyz"]["z"]["actuators"].keys() == {"z-wide", "z-galvo"}

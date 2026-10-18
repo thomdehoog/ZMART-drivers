@@ -54,7 +54,9 @@ def save_image_source_atomic(
                 physical_size_x_um=metadata.physical_size_y_um,
                 physical_size_y_um=metadata.physical_size_x_um,
             )
-    write_plane_atomic(arr, image_dest, metadata=metadata, index=index, fix_ome=fix_ome, state=state)
+    write_plane_atomic(
+        arr, image_dest, metadata=metadata, index=index, fix_ome=fix_ome, state=state
+    )
 
 
 def write_plane_atomic(
@@ -82,7 +84,9 @@ def write_plane_atomic(
         tifffile.imwrite(str(image_tmp), arr, description=xml.decode("utf-8"))
         _validate_tiff(image_tmp, fix_ome=fix_ome)
         if not np.array_equal(tifffile.imread(str(image_tmp)), arr):
-            raise RuntimeError(f"{image_dest.name}: the pixels read back from disk are not those written; not saved")
+            raise RuntimeError(
+                f"{image_dest.name}: the pixels read back from disk are not those written; not saved"
+            )
     except BaseException:
         try:
             image_tmp.unlink(missing_ok=True)
@@ -126,7 +130,9 @@ def _validate_tiff(image_path: Path, *, fix_ome: bool) -> None:
             _ome.fix_ome_tiff(image_path)
             img_check = _ome.check_ome_tiff(image_path)
         if not ome_ok(img_check):
-            raise RuntimeError(f"OME-TIFF validation failed: {image_path} :: {img_check}")
+            raise RuntimeError(
+                f"OME-TIFF validation failed: {image_path} :: {img_check}"
+            )
 
 
 def _read_source_plane(image_src: PlaneSource | RawPlaneSource):
@@ -151,7 +157,9 @@ def _read_raw_plane(image_src: RawPlaneSource):
 
     dtype = np.dtype(image_src.dtype).newbyteorder("<")
     count = image_src.shape_yx[0] * image_src.shape_yx[1]
-    pixels = np.fromfile(str(image_src.path), dtype=dtype, count=count, offset=image_src.offset)
+    pixels = np.fromfile(
+        str(image_src.path), dtype=dtype, count=count, offset=image_src.offset
+    )
     if pixels.size != count:
         raise RuntimeError(
             f"{image_src.path} holds {pixels.size} of the {count} pixels expected "

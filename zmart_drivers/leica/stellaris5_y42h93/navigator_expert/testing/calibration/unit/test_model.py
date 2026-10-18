@@ -135,7 +135,9 @@ def test_translate_between_two_non_reference_objectives():
         },
     }
     # 2 -> 3 uses (t3 - t2) even though neither is the reference.
-    x, y = cal.translate_xy_between_objectives(100.0, 200.0, cfg, from_slot=2, to_slot=3)
+    x, y = cal.translate_xy_between_objectives(
+        100.0, 200.0, cfg, from_slot=2, to_slot=3
+    )
     assert (x, y) == (100.0 + 20.0, 200.0 + -15.0)
 
 
@@ -144,8 +146,8 @@ def test_adopt_seeds_first_used_objective_at_origin():
     # used becomes the [0,0,0] origin; the pair's translation lands on TO.
     sys.path.insert(0, str(_repo_root()))
     from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures import (
-    adopt_calibration as adopt,
-)
+        adopt_calibration as adopt,
+    )
 
     config = {
         "schema_version": 13,
@@ -225,7 +227,14 @@ def test_calibration_has_no_backlash_field(tmp_path):
     """§2b: backlash is a motion utility, not calibration state. The bundled
     default calibration.json carries no backlash block."""
     cal = _load_calibration_module()
-    bundled = _repo_root() / "navigator_expert" / "configuration" / "optical_calibration" / "defaults" / "calibration.json"
+    bundled = (
+        _repo_root()
+        / "navigator_expert"
+        / "configuration"
+        / "optical_calibration"
+        / "defaults"
+        / "calibration.json"
+    )
     assert "backlash" not in json.loads(bundled.read_text(encoding="utf-8"))
     cal.validate_calibration(_config())  # a config without backlash validates
 
@@ -264,11 +273,13 @@ def test_save_load_semantic_round_trip(tmp_path):
     assert _semantically_equal(loaded, loaded_again)
 
 
-def test_save_without_path_seeds_programdata_not_bundled_defaults(tmp_path, monkeypatch):
+def test_save_without_path_seeds_programdata_not_bundled_defaults(
+    tmp_path, monkeypatch
+):
     cal = _load_calibration_module()
     from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration import (
-    store as machine_config,
-)
+        store as machine_config,
+    )
 
     profile = machine_config.MachineProfile(programdata_root=tmp_path / "programdata")
     monkeypatch.setattr(machine_config, "MACHINE", profile)
@@ -278,17 +289,22 @@ def test_save_without_path_seeds_programdata_not_bundled_defaults(tmp_path, monk
     path = cal.save_calibration(_config(), calibration_name="lens_A")
 
     assert path == (
-        profile.latest_snapshot("calibration") / "calibrations" / "lens_A" / "calibration.json"
+        profile.latest_snapshot("calibration")
+        / "calibrations"
+        / "lens_A"
+        / "calibration.json"
     )
     assert path.exists()
     assert bundled.read_text(encoding="utf-8") == before
 
 
-def test_save_named_calibration_writes_existing_machine_local_path(tmp_path, monkeypatch):
+def test_save_named_calibration_writes_existing_machine_local_path(
+    tmp_path, monkeypatch
+):
     cal = _load_calibration_module()
     from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration import (
-    store as machine_config,
-)
+        store as machine_config,
+    )
 
     profile = machine_config.MachineProfile(programdata_root=tmp_path / "programdata")
     monkeypatch.setattr(machine_config, "MACHINE", profile)

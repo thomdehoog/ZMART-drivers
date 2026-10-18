@@ -175,7 +175,9 @@ def _wait_file_stable(path, timeout, poll_interval=0.5, stable_readings=3):
                 consecutive = 0
 
             if size != last_size:
-                since_progress = time.perf_counter()  # still growing: the budget restarts
+                since_progress = (
+                    time.perf_counter()
+                )  # still growing: the budget restarts
             last_size = size
         except OSError:
             consecutive = 0
