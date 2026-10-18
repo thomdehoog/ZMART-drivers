@@ -732,9 +732,12 @@ Leica-specific:
   named procedures and `get_info`). The adapter keeps only connecting,
   disconnecting and the table of commands.
 
-- The `output/` folder is gone, as the plan says. The shapes every driver
-  shares (`product.py`, `naming.py`, `files.py`) are in `dispatcher/`. The
-  writing of the files (`save.py`, `materialize.py`, `ome*.py`,
+- The `output/` folder is gone, as the plan says. The shape of a capture
+  (`product.py`) stays in `vendor_specific/`, because the vendor code builds it.
+  How a capture's files are named (`naming.py`) and the manifest a save hands
+  back (`saved_acquisition.py`) are with the saving, in
+  `procedures/acquisition_and_saving/`, and LAS X's own file names
+  (`files.py`) are in `vendor_specific/primitives/capture/`. The writing of the files (`save.py`, `materialize.py`, `ome*.py`,
   `command_log.py`) is in `procedures/`. What reads LAS X's own picture files
   (`lasx_data_container.py`, `lasx_cache_release.py`) is in
   `vendor_specific/primitives/capture/`, and LAS X's description of a picture

@@ -111,7 +111,8 @@ from .vendor_specific.primitive_handling.limit_rules import _stage_limits, set_s
 
 # -- acquisition/ - capture, file arrival, and save handling
 from .procedures.acquisition_and_saving.acquire import AcquisitionResult, acquire
-from .vendor_specific.product import AcquisitionMetadata, ChannelMetadata, PlaneIndex, PlaneSource, PositionIndex, SavedAcquisition, VendorMetadataSource
+from .vendor_specific.product import AcquisitionMetadata, ChannelMetadata, PlaneIndex, PlaneSource, PositionIndex, VendorMetadataSource
+from .procedures.acquisition_and_saving.saved_acquisition import SavedAcquisition
 from .procedures.acquisition_and_saving.save import save
 
 # -- logging

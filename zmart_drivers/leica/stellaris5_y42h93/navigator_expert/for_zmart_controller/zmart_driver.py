@@ -51,7 +51,7 @@ from ..procedures import session_state as _session_state
 from ..driver_setup.store import MACHINE
 from ..dispatcher import gate as _gate
 from ..driver_setup.limits import handshake as _handshake
-from ..vendor_specific.naming import run_hash
+from ..procedures.acquisition_and_saving.naming import run_hash
 from ..procedures.acquisition_and_saving import acquisition as _acquisition
 from ..procedures.absolute_coordinate_system import frame as _frame
 from ..procedures import instrument as _instrument

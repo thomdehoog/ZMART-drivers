@@ -17,7 +17,7 @@ import pytest
 import zarr
 
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.image_stage_registration import Orientation
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.naming import Naming
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.acquisition_and_saving.naming import Naming
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.product import PlaneIndex
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.acquisition_and_saving import acquire as capture
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.acquisition_and_saving import save as saving

@@ -67,7 +67,7 @@ LAS X.
   )
   ```
   The Leica package is self-contained; its filename helper lives under
-  `navigator_expert.acquisition.naming`.
+  `navigator_expert.procedures.acquisition_and_saving.naming`.
 - **Plug it into the ZMART Controller** on the LAS X computer. Register the `for_zmart_controller` folder (its `zmart_driver.json` names the class
   beside it) with the controller once; from then on every session plugs the driver in by name.
   Its settings, `CONNECTION` in that file, are all optional; the file explains each one:
@@ -201,7 +201,7 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert import (
     acquire,
     save,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.acquisition.naming import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.acquisition_and_saving.naming import (
     Naming,
     run_hash,
 )
@@ -543,11 +543,11 @@ zmart_drivers/leica/stellaris5_y42h93/navigator_expert/
 │   │                   assemblies) · hardware_server.py
 │   ├── error_classification.py   the kinds of problem, the rule that only a temporary one is
 │   │                   sent again, and the sorting of LAS X's messages into the kinds
-│   ├── product.py · naming.py · files.py   the shapes of a capture and its files
+│   ├── product.py      the shape of a capture, built by the vendor code and used by the saving
 │   ├── primitives/     the smallest reads and writes, one folder for each way of reaching LAS X:
 │   │                   direct/ (direct_reader.py, state_tree.py), api/ (api_reader.py, delivery.py),
 │   │                   log/ (log_reader.py, log_wait.py), interface/ (lasx_navigator.py,
-│   │                   lasx_dialogs.py: its buttons and dialogs), capture/ (data_container.py,
+│   │                   lasx_dialogs.py: its buttons and dialogs), capture/ (data_container.py, files.py,
 │   │                   lasx_data_container.py, lasx_cache_release.py)
 │   ├── primitive_handling/   how the dispatcher treats each command, for this microscope:
 │   │                   profiles.py (one CommandProfile per command), settings.py (one table
@@ -763,4 +763,4 @@ Copy the closest existing command of a similar shape.
 - Sibling drivers, still under construction in the main ZMART-microscopy repository:
   [ZEISS ZEN API](https://github.com/thomdehoog/ZMART-microscopy/tree/main/zmart_drivers/zeiss/zenapi) (gRPC) and
   [Nikon NIS-Elements](https://github.com/thomdehoog/ZMART-microscopy/tree/main/zmart_drivers/nikon) (socket macro).
-- Leica filename implementation: [`vendor_specific/naming.py`](vendor_specific/naming.py)
+- Leica filename implementation: [`procedures/acquisition_and_saving/naming.py`](procedures/acquisition_and_saving/naming.py)

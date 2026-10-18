@@ -369,11 +369,11 @@ EXCEPTIONS = {
     ("vendor_specific/primitive_handling/profiles.py", "current_window_s"),
     # Waiting for a finished picture's files to stop growing on disk. This is
     # about files, not about LAS X's state, and has its own decided numbers.
-    ("vendor_specific/files.py", "DEFAULT_FILE_STABILITY_TIMEOUT_S"),
-    ("vendor_specific/files.py", "DEFAULT_EXPORT_COMPLETION_TIMEOUT_S"),
-    ("vendor_specific/files.py", "DEFAULT_EXPORT_COMPLETION_POLL_INTERVAL_S"),
-    ("vendor_specific/files.py", "timeout"),
-    ("vendor_specific/files.py", "poll_interval"),
+    ("vendor_specific/primitives/capture/files.py", "DEFAULT_FILE_STABILITY_TIMEOUT_S"),
+    ("vendor_specific/primitives/capture/files.py", "DEFAULT_EXPORT_COMPLETION_TIMEOUT_S"),
+    ("vendor_specific/primitives/capture/files.py", "DEFAULT_EXPORT_COMPLETION_POLL_INTERVAL_S"),
+    ("vendor_specific/primitives/capture/files.py", "timeout"),
+    ("vendor_specific/primitives/capture/files.py", "poll_interval"),
     # The rule itself.
     ("dispatcher/dispatcher.py", "WINDOW_S"),
 }
