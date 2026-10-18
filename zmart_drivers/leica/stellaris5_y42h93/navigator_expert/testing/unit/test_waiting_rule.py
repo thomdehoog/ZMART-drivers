@@ -349,9 +349,11 @@ def test_delivery_stops_trying_once_received():
 
 def test_commands_deliver_through_the_one_helper():
     """No other code hands a message to LAS X with its own tries or timeout."""
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher import change
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitive_handling import (
+        transport,
+    )
 
-    assert change.deliver is delivery.deliver
+    assert transport.deliver is delivery.deliver
 
 
 # Whole folders, plus the change definitions that moved from actions/ to procedures/.
@@ -376,7 +378,7 @@ EXCEPTIONS = {
     ("vendor_interface/primitive_handling/profiles.py", "poll_interval"),
     ("vendor_interface/primitive_handling/profiles.py", "start_timeout"),
     # LAS X filling in the error report after a command stays at 1 s.
-    ("dispatcher/change.py", "ECHO_SETTLE_TIMEOUT_S"),
+    ("vendor_interface/primitive_handling/transport.py", "ECHO_SETTLE_TIMEOUT_S"),
     # How old a log entry may be to count as current: freshness, not a wait.
     ("vendor_interface/primitive_handling/profiles.py", "current_window_s"),
     # The rule itself.

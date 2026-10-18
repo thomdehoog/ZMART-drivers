@@ -50,6 +50,9 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface imp
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitive_handling import (
     settings as settings_table,
 )
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitive_handling import (
+    transport as transport_module,
+)
 
 # =============================================================================
 # Helpers - mock factory
@@ -553,8 +556,8 @@ class TestRetryBackoff(unittest.TestCase):
                     else None
                 ),
             ),
-            patch.object(dispatch, "deliver", return_value=True),
-            patch.object(dispatch, "_await_echo_result", return_value=True),
+            patch.object(transport_module, "deliver", return_value=True),
+            patch.object(transport_module, "_await_echo_result", return_value=True),
         ):
             r = dispatch._fire_block(
                 client,
@@ -590,8 +593,8 @@ class TestRetryBackoff(unittest.TestCase):
                     else None
                 ),
             ),
-            patch.object(dispatch, "deliver", return_value=True),
-            patch.object(dispatch, "_await_echo_result", return_value=True),
+            patch.object(transport_module, "deliver", return_value=True),
+            patch.object(transport_module, "_await_echo_result", return_value=True),
         ):
             r = dispatch._fire_block(
                 client,
@@ -626,8 +629,8 @@ class TestRetryBackoff(unittest.TestCase):
                     else None
                 ),
             ),
-            patch.object(dispatch, "deliver", return_value=True),
-            patch.object(dispatch, "_await_echo_result", return_value=True),
+            patch.object(transport_module, "deliver", return_value=True),
+            patch.object(transport_module, "_await_echo_result", return_value=True),
         ):
             r = dispatch._fire_block(
                 client,
@@ -672,8 +675,8 @@ class TestRetryBackoff(unittest.TestCase):
                     else None
                 ),
             ),
-            patch.object(dispatch, "deliver", return_value=True),
-            patch.object(dispatch, "_await_echo_result", return_value=True),
+            patch.object(transport_module, "deliver", return_value=True),
+            patch.object(transport_module, "_await_echo_result", return_value=True),
         ):
             r = dispatch._fire_block(
                 client,
@@ -708,8 +711,8 @@ class TestRetryBackoff(unittest.TestCase):
                     else None
                 ),
             ),
-            patch.object(dispatch, "deliver", return_value=True),
-            patch.object(dispatch, "_await_echo_result", return_value=True),
+            patch.object(transport_module, "deliver", return_value=True),
+            patch.object(transport_module, "_await_echo_result", return_value=True),
         ):
             dispatch._fire_block(
                 client,
@@ -743,8 +746,8 @@ class TestRetryBackoff(unittest.TestCase):
                     else None
                 ),
             ),
-            patch.object(dispatch, "deliver", return_value=True),
-            patch.object(dispatch, "_await_echo_result", return_value=True),
+            patch.object(transport_module, "deliver", return_value=True),
+            patch.object(transport_module, "_await_echo_result", return_value=True),
         ):
             r = dispatch._fire_block(
                 client,
@@ -1063,7 +1066,7 @@ class TestConfirmation(unittest.TestCase):
         with (
             patch.object(errors, "_check_api_error", return_value=None),
             patch.object(
-                dispatch._log_reader, "parse_msgbox_log", return_value=snapshot
+                transport_module._log_reader, "parse_msgbox_log", return_value=snapshot
             ),
         ):
             r = dispatch.confirm_and_fire(
@@ -1095,7 +1098,7 @@ class TestConfirmation(unittest.TestCase):
         with (
             patch.object(errors, "_check_api_error", return_value=None),
             patch.object(
-                dispatch._log_reader, "parse_msgbox_log", return_value=snapshot
+                transport_module._log_reader, "parse_msgbox_log", return_value=snapshot
             ),
         ):
             r = dispatch.confirm_and_fire(

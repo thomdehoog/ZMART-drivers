@@ -28,6 +28,7 @@ and stdlib. Nothing from dispatch or command wrappers.
 from collections.abc import Callable
 from dataclasses import dataclass
 
+from . import transport as _transport
 from .prechecks import check_idle
 from ...dispatcher.tuning import WINDOW_S, WINDOWS
 from ..error_classification import _default_error_check
@@ -248,6 +249,10 @@ class CommandProfile:
             command never hard-fails on an unconfirmed readback; only transport
             failure and an echo error-check rejection return success=False. Set
             False only for a command that must hard-fail on unconfirmed - none do.
+        transport: How the request is sent to the microscope and how its reply is
+            waited for (clear the reply, send, wait for the reply, report an open
+            dialog). The dispatcher's engine asks the transport and names no
+            microscope object itself.
     """
 
     pre_check_fn: Callable[..., dict] | None = None
@@ -267,6 +272,9 @@ class CommandProfile:
     skip_echo: bool = False
     fire_async: bool = False
     success_on_unconfirmed: bool = True
+    # How a request reaches the microscope and how its reply is waited for; see
+    # ``transport.py``. Another microscope supplies its own.
+    transport: object = _transport.LASX
 
     def __post_init__(self):
         # Async fire blanks the echo, so an echo-based error check would read a
