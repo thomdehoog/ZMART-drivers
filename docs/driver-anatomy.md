@@ -790,6 +790,17 @@ purpose, so that it cannot be forgotten.
    for LAS X. `metadata_map.py` today reads LAS X's description of a picture
    into the standard fields; translating every vendor field is the later
    metadata work.
+4. **Open issue: the direction of a saved stack has not been confirmed on a
+   microscope.** The driver saves planes with z ascending, the same direction as
+   `set_xyz`, and each plane's z is worked out from the job's stack settings, not
+   measured from the picture. That is consistent in the code and in the offline
+   tests, but nobody has yet checked on a microscope that the plane labelled
+   with a given z really was taken there. A check: take a stack of a bead at a
+   known depth, score the sharpness of every plane, and see that the sharpest
+   plane is the one whose z matches the bead's focus. The same check with the
+   stack on the other z drive would test that the two drives count the same way.
+   Whether the stage's axes are left- or right-handed in the real world is a
+   separate matter that does not affect the driver's job.
 
 **About the Leica recipes in `procedures/`.** In the plan, `procedures/` is
 written by each driver. `changes.py`, `acquire.py`, `objectives.py`,
