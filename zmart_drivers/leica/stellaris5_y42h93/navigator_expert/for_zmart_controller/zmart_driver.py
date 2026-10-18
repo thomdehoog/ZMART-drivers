@@ -50,6 +50,7 @@ from ..driver_setup.optical_calibration.model import load_objective_calibration
 from ..procedures import session_state as _session_state
 from ..driver_setup.store import MACHINE
 from ..dispatcher import gate as _gate
+from ..driver_setup.limits import handshake as _handshake
 from ..vendor_specific.naming import run_hash
 from ..procedures.acquisition_and_saving import acquisition as _acquisition
 from ..procedures.absolute_coordinate_system import frame as _frame
@@ -118,7 +119,7 @@ class ZmartDriver:
             api_delay_ms=connection.get("api_delay_ms"),
         )
         # The limits are loaded first, so nothing can move before they govern.
-        _gate.connect_handshake(client, load=connection.get("load_limits", True))
+        _handshake.connect_handshake(client, load=connection.get("load_limits", True))
         lasx_dialogs.keep_watching()
         orientation, orientation_info = load_rig_orientation()
         translations, calibration_info = load_objective_calibration(

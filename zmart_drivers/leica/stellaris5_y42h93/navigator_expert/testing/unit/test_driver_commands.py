@@ -23,6 +23,7 @@ from limits_fixtures import (
     provision_machine_limits,
 )
 
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.limits import handshake as _handshake
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.profiles import ImageSaveProfile
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.product import PlaneIndex
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling import limit_rules as limits_checks
@@ -841,8 +842,8 @@ class TestAcquire(unittest.TestCase):
             "z_focus_um": 100.0,
         }
         # The envelope the gate was handed at connect, in raw stage um.
-        gate = _gate._state_for(h.client)
-        _gate._install(
+        gate = _gate.state_of(h.client)
+        _gate.install(
             h.client,
             _gate.GateState(
                 limits=gate.limits,
@@ -2669,7 +2670,7 @@ class TestFunctionLimits(unittest.TestCase):
             stage_um=dict(DEFAULT_STAGE_UM, x=[2000.0, 50000.0]),
         )
         client = object()
-        state = _gate.connect_handshake(client)
+        state = _handshake.connect_handshake(client)
         self.assertTrue(state.ok)
         self.assertIsNone(_gate.check_refusal(client, "move_xy", {"x_um": 2500.0}))
         # Inside the template envelope, outside the machine's envelope.
@@ -2693,7 +2694,7 @@ class TestFunctionLimits(unittest.TestCase):
             json.dumps(payload), encoding="utf-8"
         )
         client = object()
-        state = _gate.connect_handshake(client)
+        state = _handshake.connect_handshake(client)
         # The invalid machine file is not used; the session is governed by the
         # bundled DEFAULT limits (loudly), never left fail-closed.
         self.assertTrue(state.ok)

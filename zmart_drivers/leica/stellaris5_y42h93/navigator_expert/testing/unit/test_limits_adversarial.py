@@ -37,6 +37,7 @@ from limits_fixtures import (
 )
 from mock_lasx_api import MockLasxClient
 
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.limits import handshake as _handshake
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling import changes as commands_mod
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.absolute_coordinate_system import compensated_changes as commands_mod_comp
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.limits import config as limits_config
@@ -166,7 +167,7 @@ _BAD_LIMITS_TEXTS = {
 @pytest.mark.parametrize("attack", sorted(_BAD_LIMITS_TEXTS))
 def test_malformed_limits_json_falls_back_to_defaults(attack, mock_client):
     _raw_snapshot(_machine_root(), limits_text=_BAD_LIMITS_TEXTS[attack])
-    state = gate.connect_handshake(mock_client)
+    state = _handshake.connect_handshake(mock_client)
     # The malformed machine file is NOT used; the session falls back to the
     # bundled DEFAULT envelope (loudly), never left fail-closed.
     assert state.ok, attack
@@ -235,7 +236,7 @@ _BAD_FUNCTION_LIMITS_TEXTS = {
 @pytest.mark.parametrize("attack", sorted(_BAD_FUNCTION_LIMITS_TEXTS))
 def test_malformed_function_limits_falls_back_to_defaults(attack, mock_client):
     _raw_snapshot(_machine_root(), limits_text=_BAD_FUNCTION_LIMITS_TEXTS[attack])
-    state = gate.connect_handshake(mock_client)
+    state = _handshake.connect_handshake(mock_client)
     # The malformed flat document is not used; defaults govern instead.
     assert state.ok, attack
     assert state.limits.describe()["is_fallback"] is True
@@ -249,7 +250,7 @@ def test_nan_in_axis_range_triggers_the_defaults_fallback(mock_client):
     """A non-finite flat axis bound never governs a move."""
     text = _with_payload(lambda p: {**p, "x_um": {"range": [float("nan"), 130000]}})
     _raw_snapshot(_machine_root(), limits_text=text)
-    state = gate.connect_handshake(mock_client)
+    state = _handshake.connect_handshake(mock_client)
     assert state.ok
     assert state.limits.describe()["is_fallback"] is True
 
@@ -262,7 +263,7 @@ def test_nan_in_axis_range_triggers_the_defaults_fallback(mock_client):
 @pytest.fixture()
 def governed_client(mock_client):
     provision_machine_limits(_machine_root())
-    state = gate.connect_handshake(mock_client)
+    state = _handshake.connect_handshake(mock_client)
     assert state.ok, state.error
     return mock_client
 
@@ -271,7 +272,7 @@ def test_objective_allow_list_checks_the_resolved_slot(mock_client):
     payload = _valid_payload()
     payload["objective_slot"] = {"allowed": [1]}
     _raw_snapshot(_machine_root(), limits_text=json.dumps(payload))
-    assert gate.connect_handshake(mock_client).ok
+    assert _handshake.connect_handshake(mock_client).ok
     hw_info = {
         "Microscope": {
             "objectives": [
@@ -301,7 +302,7 @@ def test_objective_allow_list_allows_a_listed_slot(mock_client):
     payload = _valid_payload()
     payload["objective_slot"] = {"allowed": [1]}
     _raw_snapshot(_machine_root(), limits_text=json.dumps(payload))
-    assert gate.connect_handshake(mock_client).ok
+    assert _handshake.connect_handshake(mock_client).ok
     hw_info = {
         "Microscope": {
             "objectives": [
@@ -329,7 +330,7 @@ def test_default_objective_slot_is_unrestricted(mock_client):
     actually has, slot 0 included (slots count from 0).
     """
     _raw_snapshot(_machine_root(), limits_text=json.dumps(_valid_payload()))
-    assert gate.connect_handshake(mock_client).ok
+    assert _handshake.connect_handshake(mock_client).ok
     hw_info = {
         "Microscope": {
             "objectives": [
@@ -401,7 +402,7 @@ def test_degenerate_envelope_min_equals_max_pins_the_stage(mock_client):
     provision_machine_limits(
         _machine_root(), stage_um=dict(DEFAULT_STAGE_UM, x=[50000.0, 50000.0])
     )
-    state = gate.connect_handshake(mock_client)
+    state = _handshake.connect_handshake(mock_client)
     assert state.ok, state.error
     ok = commands_mod.move_xy(mock_client, 50000, 30000, unit="um")
     assert ok["success"] is True
@@ -481,7 +482,7 @@ def test_hand_widened_limits_file_does_not_govern(mock_client):
         _machine_root(),
         limits_text=_valid_limits_text(dict(DEFAULT_STAGE_UM, y=[0.0, 400000.0])),
     )
-    state = gate.connect_handshake(mock_client)
+    state = _handshake.connect_handshake(mock_client)
     assert state.ok
     assert state.limits.describe()["is_fallback"] is True
     # a target the WIDENED file would have allowed (y within [0, 400000]) but the
@@ -502,7 +503,7 @@ def test_broken_setter_entry_widens_a_narrow_envelope_to_the_defaults(mock_clien
     payload = _valid_payload(dict(DEFAULT_STAGE_UM, x=[40000.0, 60000.0]))
     payload["set_zoom"] = [1, 10]  # non-empty setter contract is not defined
     _raw_snapshot(_machine_root(), limits_text=json.dumps(payload))
-    state = gate.connect_handshake(mock_client)
+    state = _handshake.connect_handshake(mock_client)
     assert state.ok
     assert state.limits.describe()["is_fallback"] is True
     # x=100000 violates the (rejected) machine file's narrow envelope but sits
@@ -519,7 +520,7 @@ def test_rehandshake_after_fixing_the_file_replaces_the_fallback(mock_client):
     machine envelope (is_fallback False) — no fallback state lingers, in the
     gate or in the module-global envelope."""
     profile = _raw_snapshot(_machine_root(), limits_text=_BAD_LIMITS_TEXTS["non_json"])
-    state = gate.connect_handshake(mock_client)
+    state = _handshake.connect_handshake(mock_client)
     assert state.ok
     assert state.limits.describe()["is_fallback"] is True
 
@@ -530,7 +531,7 @@ def test_rehandshake_after_fixing_the_file_replaces_the_fallback(mock_client):
         encoding="utf-8",
     )
     # ...and reconnects: the machine envelope governs again.
-    state2 = gate.connect_handshake(mock_client)
+    state2 = _handshake.connect_handshake(mock_client)
     assert state2.ok
     assert state2.limits.describe()["is_fallback"] is False
     assert motion_limits.get_stage_limits()["x_min"] == 40000.0
@@ -547,7 +548,7 @@ def test_second_handshake_rebinds_without_leaking_between_clients(tmp_path):
     client_a = MockLasxClient(latency=0.0)
     client_b = MockLasxClient(latency=0.0)
     provision_machine_limits(_machine_root())
-    state_a = gate.connect_handshake(client_a)
+    state_a = _handshake.connect_handshake(client_a)
     assert state_a.ok
     # b never handshook: it must refuse even though a's state exists
     _assert_refused(commands_mod.move_xy(client_b, 50000, 50000, unit="um"))
@@ -556,7 +557,7 @@ def test_second_handshake_rebinds_without_leaking_between_clients(tmp_path):
     profile = provision_machine_limits(
         root_b, stage_um=dict(DEFAULT_STAGE_UM, x=[40000.0, 60000.0])
     )
-    state_a2 = gate.connect_handshake(client_a, machine=profile)
+    state_a2 = _handshake.connect_handshake(client_a, machine=profile)
     assert state_a2.ok
     refused = commands_mod.move_xy(client_a, 70000, 50000, unit="um")
     assert refused["success"] is False
@@ -576,7 +577,7 @@ def test_setter_key_missing_from_machine_file_falls_back_to_defaults(mock_client
             lambda p: {k: v for k, v in p.items() if k != "set_zoom"}
         ),
     )
-    state = gate.connect_handshake(mock_client)
+    state = _handshake.connect_handshake(mock_client)
     assert state.ok
     assert state.limits.describe()["is_fallback"] is True
     # the defaults carry every setter key, so set_zoom is explicitly unlimited
@@ -586,7 +587,7 @@ def test_setter_key_missing_from_machine_file_falls_back_to_defaults(mock_client
 def test_absent_setter_falls_back_but_explicit_empty_list_is_unlimited(mock_client):
     """The flat contract uses [] for reviewed-and-unlimited setters."""
     provision_machine_limits(_machine_root())
-    state = gate.connect_handshake(mock_client)
+    state = _handshake.connect_handshake(mock_client)
     assert state.ok
     ok = commands_mod.set_zoom(mock_client, "Overview", 1.0)
     assert ok["success"] is True
@@ -713,7 +714,7 @@ def test_every_configurable_setter_enforces_before_touching_native_api(setter):
     payload = _valid_payload()
     payload[setter] = {"allowed": ["__blocked_test_value__"]}
     policy = limits_config.validate_payload(payload)
-    gate._install(
+    gate.install(
         client,
         gate.GateState(
             limits=motion_limits.LeicaLimits(
@@ -736,7 +737,7 @@ def test_every_configurable_setter_accepts_its_allowed_value(mock_client, setter
     payload = _valid_payload()
     payload[setter] = {"allowed": _SETTER_ALLOWED_VALUES[setter]}
     _raw_snapshot(_machine_root(), limits_text=json.dumps(payload))
-    assert gate.connect_handshake(mock_client).ok
+    assert _handshake.connect_handshake(mock_client).ok
 
     result = _WRAPPER_CALLS[setter](mock_client)
     assert result["success"] is True, (setter, result)
@@ -746,7 +747,7 @@ def test_setter_range_accepts_boundaries_and_refuses_outside(mock_client):
     payload = _valid_payload()
     payload["set_zoom"] = {"range": [1.0, 5.0]}
     _raw_snapshot(_machine_root(), limits_text=json.dumps(payload))
-    assert gate.connect_handshake(mock_client).ok
+    assert _handshake.connect_handshake(mock_client).ok
 
     assert commands_mod.set_zoom(mock_client, "Overview", 1.0)["success"] is True
     assert commands_mod.set_zoom(mock_client, "Overview", 5.0)["success"] is True
@@ -759,7 +760,7 @@ def test_setter_allowed_accepts_member_and_refuses_other(mock_client):
     payload = _valid_payload()
     payload["set_scan_mode"] = {"allowed": ["xyz"]}
     _raw_snapshot(_machine_root(), limits_text=json.dumps(payload))
-    assert gate.connect_handshake(mock_client).ok
+    assert _handshake.connect_handshake(mock_client).ok
 
     assert commands_mod.set_scan_mode(mock_client, "Overview", "xyz")["success"] is True
     refused = commands_mod.set_scan_mode(mock_client, "Overview", "xyzt")
@@ -772,7 +773,7 @@ def test_z_stack_definition_checks_both_endpoints_before_native_api():
     payload = _valid_payload()
     payload["set_z_stack_definition"] = {"range": [0.0, 10.0]}
     policy = limits_config.validate_payload(payload)
-    gate._install(
+    gate.install(
         client,
         gate.GateState(
             limits=motion_limits.LeicaLimits(
@@ -795,7 +796,7 @@ def test_z_stack_definition_configured_limit_refuses_value_unknown_reset():
     payload = _valid_payload()
     payload["set_z_stack_definition"] = {"range": [0.0, 10.0]}
     policy = limits_config.validate_payload(payload)
-    gate._install(
+    gate.install(
         client,
         gate.GateState(
             limits=motion_limits.LeicaLimits(
@@ -819,7 +820,7 @@ def test_installed_policy_is_independent_of_input_payload_mutation():
     installed = motion_limits.LeicaLimits(
         policy, source="test", path="limits.json", is_fallback=False
     )
-    gate._install(
+    gate.install(
         client,
         gate.GateState(limits=installed, stage_cfg=None, error=None),
     )
@@ -838,7 +839,7 @@ def test_public_gate_status_is_detached_from_installed_policy(mock_client):
     payload = _valid_payload()
     payload["set_zoom"] = {"allowed": [1.0]}
     _raw_snapshot(_machine_root(), limits_text=json.dumps(payload))
-    status = gate.connect_handshake(mock_client)
+    status = _handshake.connect_handshake(mock_client)
     _assert_refused(
         commands_mod.set_zoom(mock_client, "Overview", 5.0), needle="not allowed"
     )
@@ -857,8 +858,8 @@ def test_private_installed_policy_and_stage_snapshot_are_immutable(mock_client):
     payload = _valid_payload()
     payload["set_zoom"] = {"allowed": [1.0]}
     _raw_snapshot(_machine_root(), limits_text=json.dumps(payload))
-    assert gate.connect_handshake(mock_client).ok
-    installed = gate._state_for(mock_client)
+    assert _handshake.connect_handshake(mock_client).ok
+    installed = gate.state_of(mock_client)
 
     with pytest.raises(TypeError):
         installed.limits._policy["set_zoom"] = ("allowed", (1.0, 5.0))
@@ -964,7 +965,7 @@ def test_stale_gate_state_does_not_govern_a_new_client():
     always starts fail-closed."""
     provision_machine_limits(_machine_root())
     governed = MockLasxClient(latency=0.0)
-    assert gate.connect_handshake(governed).ok
+    assert _handshake.connect_handshake(governed).ok
     fresh = MockLasxClient(latency=0.0)
     assert gate.state_for(fresh) is None
     _assert_refused(commands_mod.move_xy(fresh, 50000, 50000, unit="um"))
@@ -1189,7 +1190,7 @@ def test_a_calibration_adopt_does_not_duplicate_other_machine_config():
     assert not (snap / "orientation.json").exists()
     assert not (snap / "function_limits.json").exists()  # the file is gone entirely
     client = MockLasxClient(latency=0.0)
-    state = gate.connect_handshake(client)
+    state = _handshake.connect_handshake(client)
     assert state.ok
 
 
@@ -1233,7 +1234,7 @@ def test_adopted_limits_report_machine_source_to_the_notebook_preflight(mock_cli
     )
     assert "source" not in merged
 
-    state = gate.connect_handshake(mock_client, machine=profile)
+    state = _handshake.connect_handshake(mock_client, machine=profile)
     assert state.ok, state.error
     limits = state.limits.describe()
     # The exact refusal expression the v4 notebook's jobs cell evaluates:
@@ -1258,7 +1259,7 @@ def test_flat_limits_round_trip_adopt_handshake_gated_move(mock_client):
     assert merged["x_um"] == {"range": [1000.0, 130000.0]}
     assert merged["objective_slot"] == []
 
-    state = gate.connect_handshake(mock_client, machine=profile)
+    state = _handshake.connect_handshake(mock_client, machine=profile)
     assert state.ok, state.error
     assert commands_mod.move_xy(mock_client, 50000, 50000, unit="um")["success"] is True
     refused = commands_mod.move_xy(mock_client, 200000, 50000, unit="um")
