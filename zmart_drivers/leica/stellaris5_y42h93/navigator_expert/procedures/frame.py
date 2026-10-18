@@ -34,7 +34,7 @@ from ..vendor_interface.primitive_handling.derived import (
     z_um_from_settings as _z_um_from_settings,
 )
 from .commands import backlash as _motion
-from .commands import changes as _commands
+from ..vendor_interface.primitive_handling import changes as _commands
 from . import session as _info
 from .session import ZmartHandle, job_catalog, note_unconfirmed, require_open  # noqa: F401
 

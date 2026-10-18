@@ -25,8 +25,11 @@ from state_tree_stand_in import StandInNodes, answer_json_read
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitive_handling import (
     readings as capabilities,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.commands import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitive_handling import (
     changes as commands,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.commands import (
+    compensated_changes as commands_comp,
 )
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitive_handling import (
     prechecks,
@@ -177,12 +180,12 @@ class TestSuccessChecks:
         ) == (True, True, 1)
 
     def test_select_job(self, client, tree):
-        result = commands.select_job(client, "Overview")
+        result = commands_comp.select_job(client, "Overview")
         assert (result["success"], result["confirmed"]) == (True, True)
         assert client._selected_job == "Overview"
 
     def test_selecting_the_selected_job_sends_nothing(self, client, tree):
-        result = commands.select_job(client, "HiRes")
+        result = commands_comp.select_job(client, "HiRes")
         assert result["success"] is True
         assert "already selected" in result["message"]
 
@@ -333,7 +336,7 @@ class TestDirectByDefault:
             "_selected_job_name_from_log",
             lambda _profile: "Overview",
         )
-        result = commands.select_job(client, "Overview")
+        result = commands_comp.select_job(client, "Overview")
         assert (result["success"], client._selected_job) == (True, "Overview")
         assert api_job_lists == []
 
@@ -351,5 +354,5 @@ class TestDirectByDefault:
             raise ValueError("CurrentSequenceList")
 
         monkeypatch.setattr(direct_reader, "get_selected_job", changed_tree)
-        result = commands.select_job(client, "Overview")
+        result = commands_comp.select_job(client, "Overview")
         assert (result["success"], client._selected_job) == (True, "Overview")

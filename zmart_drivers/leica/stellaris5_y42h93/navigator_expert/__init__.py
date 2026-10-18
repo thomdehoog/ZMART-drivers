@@ -120,7 +120,7 @@ from .vendor_interface.primitive_handling.state import (
     get_pending_dialog,
 )
 from .vendor_interface.primitive_handling.confirmations import _readback
-from .procedures.commands.changes import (
+from .vendor_interface.primitive_handling.changes import (
     set_zoom,
     set_scan_speed,
     set_scan_resonant,
@@ -128,7 +128,6 @@ from .procedures.commands.changes import (
     set_sequential_mode,
     set_scan_field_rotation,
     set_image_format,
-    set_objective,
     set_z_stack_definition,
     set_z_stack_step_size,
     set_z_stack_size,
@@ -144,6 +143,9 @@ from .procedures.commands.changes import (
     set_filter_wheel_spectrum,
     move_xy,
     move_z,
+)
+from .procedures.commands.compensated_changes import (
+    set_objective,
     select_job,
 )
 from .vendor_interface.connection.lasx_client import connect_python_client

@@ -24,9 +24,10 @@ from pathlib import Path
 import pytest
 
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.commands import (
-    changes,
+    compensated_changes,
 )
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitive_handling import (
+    changes,
     profiles,
 )
 
@@ -80,6 +81,15 @@ def _describe_callable(fn):
     return {"function": getattr(fn, "__name__", repr(fn))}
 
 
+class _AllChanges:
+    """Every named change: the single commands, and the two that correct the stage."""
+
+    def __getattr__(self, name):
+        if name in ("set_objective", "select_job"):
+            return getattr(compensated_changes, name)
+        return getattr(changes, name)
+
+
 def record(call):
     """Run ``call(changes, client)`` and describe everything it asked of the dispatcher."""
     asked = {"gate": [], "dispatch": None, "result": None}
@@ -105,12 +115,12 @@ def record(call):
         }
         return {"success": True, "confirmed": True, "message": description, "logs": []}
 
-    original = (changes._gate.check_refusal, changes._dispatch)
-    changes._gate.check_refusal, changes._dispatch = gate, dispatch
+    original = (changes._gate.check_refusal, changes.dispatch_change)
+    changes._gate.check_refusal, changes.dispatch_change = gate, dispatch
     try:
-        result = call(changes, client)
+        result = call(_AllChanges(), client)
     finally:
-        changes._gate.check_refusal, changes._dispatch = original
+        changes._gate.check_refusal, changes.dispatch_change = original
     asked["result"] = (
         {"success": result.get("success"), "message": result.get("message")}
         if asked["dispatch"] is None
