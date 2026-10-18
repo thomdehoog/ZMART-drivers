@@ -34,7 +34,9 @@ def subpixel_peak(scores: list[float] | np.ndarray, peak: int) -> float:
     if peak <= 0 or peak >= len(scores) - 1:
         return float(peak)
     y0, y1, y2 = scores[peak - 1], scores[peak], scores[peak + 1]
-    denom = 2 * (2 * y1 - y0 - y2)
+    # Vertex of the parabola through the three scores: it lies toward the larger
+    # neighbour. The curvature (y0 - 2 * y1 + y2) is negative at a maximum.
+    denom = 2 * (y0 - 2 * y1 + y2)
     if abs(denom) < 1e-10:
         return float(peak)
     return peak + (y0 - y2) / denom
