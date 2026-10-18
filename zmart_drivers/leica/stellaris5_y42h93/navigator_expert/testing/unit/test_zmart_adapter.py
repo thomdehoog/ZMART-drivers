@@ -1565,6 +1565,41 @@ class TestStateAndProcedures(unittest.TestCase):
                 adapter.run_procedure(h, {"name": "autofocus"})
 
 
+class TestConnectCardCalibrationLine(unittest.TestCase):
+    """The Connect card says whether the objective calibration is usable.
+
+    The session holds a calibration record even when loading failed, so the
+    line has to come from what the record says was loaded, not from whether a
+    record exists.
+    """
+
+    def test_a_loaded_calibration_shows_its_name(self):
+        record = {"enabled": True, "loaded": True, "name": "water_lens_setup"}
+
+        self.assertEqual(adapter._calibration_status(record), "water_lens_setup")
+
+    def test_a_loaded_calibration_without_a_name_says_found(self):
+        record = {"enabled": True, "loaded": True, "name": None}
+
+        self.assertEqual(adapter._calibration_status(record), "found")
+
+    def test_a_calibration_that_failed_to_load_says_so_even_when_it_has_a_name(self):
+        record = {"enabled": True, "loaded": False, "name": "water_lens_setup"}
+
+        line = adapter._calibration_status(record)
+
+        self.assertTrue(line.startswith("failed"))
+        self.assertIn("objective changes are refused", line)
+
+    def test_a_calibration_that_was_switched_off_says_so(self):
+        record = {"enabled": False, "loaded": False, "name": None}
+
+        self.assertEqual(adapter._calibration_status(record), "switched off")
+
+    def test_no_record_at_all_says_none_found(self):
+        self.assertEqual(adapter._calibration_status(None), "failed — none found")
+
+
 class TestGetInfoReportsNoPositions(unittest.TestCase):
     """get_info reports no tile or focus positions.
 
