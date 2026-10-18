@@ -23,21 +23,19 @@ for _p in (_HERE, _HELPERS, _REPO_ROOT):
 
 import validate_installed_driver
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.for_zmart_controller.zmart_adapter import (
-    zmart_adapter as adapter,
-)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert import connect as adapter
 
 
 def _run_mock(tmp_path, *extra):
     """Run the validator against the mock, restoring the adapter's seam afterwards."""
     output = tmp_path / "installed_mock.jsonl"
-    original_connect = adapter._session.connect_python_client
+    original_connect = adapter.connect_python_client
     try:
         exit_code = validate_installed_driver.main(
             ["--mock", "--output", str(output), "--report-dir", str(tmp_path), *extra]
         )
     finally:
-        adapter._session.connect_python_client = original_connect
+        adapter.connect_python_client = original_connect
     records = [
         json.loads(line)
         for line in output.read_text(encoding="utf-8").splitlines()

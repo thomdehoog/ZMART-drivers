@@ -124,9 +124,8 @@ def set_origin(handle: ZmartHandle) -> dict:
     This is a setup step for the driver, not a controller command. The
     operator runs it once, working with the driver directly, for example::
 
-        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.for_zmart_controller.zmart_adapter import zmart_adapter as adapter
-        handle = adapter.connect(adapter.CONNECTION)
-        adapter.set_origin(handle)
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.for_zmart_controller.zmart_driver import ZmartDriver
+        ZmartDriver().set_origin()
 
     It reads stage XY, both z drives (z-wide and z-galvo), their sum (the
     focus) and the current objective, and records them as the zero point.
@@ -302,7 +301,7 @@ def set_xyz(
 
     ΔT compensates an objective change relative to the origin's objective
     (from the calibration's translation totals); a cross-objective move with
-    no translations available REFUSES. The adapter does no limit checking of
+    no translations available REFUSES. The frame code does no limit checking of
     its own: every leg is checked inside the command that fires it, in the
     actions. A refused leg raises with an actionable alternative; legs that
     already ran stay where they arrived (each was checked too). A leg that
@@ -332,7 +331,7 @@ def set_xyz(
         z_targets = [("galvo", z_target)]
 
     # Every leg below is limit-checked inside the command it fires — the
-    # adapter carries no checks of its own. A refused leg raises here with
+    # frame code carries no checks of its own. A refused leg raises here with
     # an actionable message; legs that already ran stay where they arrived.
     arrived = _motion.arrive_xy(handle.client, abs_x, abs_y)
     if not arrived.get("confirmed"):

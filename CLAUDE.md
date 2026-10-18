@@ -23,7 +23,7 @@ Concretely:
   maintainer, but still gloss it.
 - **Operator-facing surfaces get the most care**: each driver's setup
   notebooks (for the Leica driver: `limits`, `orientation`, `calibration`),
-  the functions each driver's `zmart_adapter` offers to the ZMART Controller,
+  the methods each driver's `ZmartDriver` class offers to the ZMART Controller,
   and the READMEs. These are the front door.
 - **Docstrings state contracts plainly**: what goes in, what comes back, what
   can go wrong — in a sentence or two a non-programmer can follow.

@@ -155,7 +155,7 @@ runtime where possible. Override via the profile, not at call sites.
   timestamp tree: `limits/<datetime>/`, `calibration/<datetime>/`,
   `orientation/<datetime>/`, and `origin/<datetime>/`. The newest timestamp in each tree wins.
   Limits, calibration, and orientation seed their own repo defaults when empty. The origin has no
-  repo default: it exists only once an operator saves one, and the adapter loads the newest one at
+  repo default: it exists only once an operator saves one, and the `ZmartDriver` loads the newest one at
   connect. Setup notebooks append only to their owning tree,
   so publishing one subsystem never duplicates another. The single `limits.json` is
   flat: four typed stage-axis `range` entries, `objective_slot` with `allowed` values,
@@ -164,7 +164,7 @@ runtime where possible. Override via the profile, not at call sites.
 - **The driver loads the configs at connect** — `connect_microscope(...)` (`connect.py`)
   is the driver's own front door. It opens the CAM client and then loads this microscope's three
   machine-local configs — the **instrument limits**, the **orientation**, and the **calibration** — so the
-  whole session works from one consistent picture. The zmart adapter's `connect()` simply delegates to
+  whole session works from one consistent picture. The `ZmartDriver` class's constructor simply calls
   it. Normal image orientation is enabled by `IMAGE_SAVE` in `vendor_interface/primitive_handling/profiles.py`; only the
   orientation measurement explicitly requests raw pixels. Limits and calibration can still be skipped.
   This is a deliberate ladder: the limits notebook
@@ -186,7 +186,7 @@ runtime where possible. Override via the profile, not at call sites.
   completed its limits handshake before the native call fires. Stage commands use the four flat
   axis ranges, objective changes use `objective_slot.allowed`, and every listed setter with `[]` is
   explicitly unrestricted. Setter constraints use `range` or `allowed`. Missing or unknown entries invalidate the file and
-  trigger the defaults fallback above. Nothing built on top—adapter, controller, workflow, or
+  trigger the defaults fallback above. Nothing built on top—the `ZmartDriver` class, controller, workflow, or
   notebook—can bypass this command-layer check.
 
 ## 4. Quick start
@@ -213,7 +213,7 @@ client = connect_python_client()
 assert ping(client)
 
 # 2. Limits handshake (REQUIRED before any mutating command; run automatically
-#    by connect_microscope and the zmart adapter — shown here for the low-level
+#    by connect_microscope and the `ZmartDriver` class — shown here for the low-level
 #    API): resolves and validates an operator-published ProgramData limits.json
 #    and installs the limits gate for this client. A MISSING or INVALID file
 #    uses the bundled defaults directly (loudly), so
@@ -242,7 +242,7 @@ print(saved.image_paths)  # {PlaneIndex(t,z,c): Path, ...}
 > `{"success": ...}` dict. Saving is a deliberate second step (see §6).
 
 > The explicit `output_root` above is for the low-level driver API. Through
-> `zmart_controller`, the Leica adapter saves under this microscope's data location, set up once
+> `zmart_controller`, the Leica driver saves under this microscope's data location, set up once
 > and reported in `get_info()["setup"]["data_location"]` (or under the connection's
 > `output_root`, when a session gives one); the workflow files each capture into its own run.
 
@@ -271,15 +271,15 @@ identity orientation to obtain raw camera pixels.
 **The origin is part of the microscope's configuration.** The frame origin is the stage position
 that the ZMART controller calls (0, 0, 0). Like the limits, orientation, and calibration, it is set
 once in a setup step and then reused by every session. During that step the operator works with
-the driver directly and calls the adapter's `set_origin`:
+the driver directly and calls its `set_origin`:
 
 ```python
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.for_zmart_controller.zmart_adapter import (
-    zmart_adapter as adapter,
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.for_zmart_controller.zmart_driver import (
+    ZmartDriver,
 )
 
-handle = adapter.connect(adapter.CONNECTION)
-adapter.set_origin(handle)  # the current position becomes (0, 0, 0)
+driver = ZmartDriver()  # making the driver connects it
+driver.set_origin()  # the current position becomes (0, 0, 0)
 ```
 
 `set_origin` saves stage XY, both z drives, and the current objective to a new
@@ -385,7 +385,7 @@ schema-mismatched (it returns `None` only when the settings cannot be read at al
 Z has no hardware readback through CAM. The settings' `zPosition` is the job's stored setpoint
 and it stops refreshing for the drive that carries the job's z-stack; for that drive the Z
 extractor (`vendor_interface/primitive_handling/derived.py::z_um_from_settings`) asks LAS X's hardware server where the drive
-really is, transparently to every caller — reader, `confirm_move_z`, the adapter. If the hardware
+really is, transparently to every caller — reader, `confirm_move_z`, the `ZmartDriver` class. If the hardware
 server cannot be reached, the stacked drive is refused with a clear message instead of answered
 with the stale number. The free drive is read from the settings at no extra cost.
 `docs/design/z-readback-stacked-drive.md` has the measurements and the open items.
@@ -488,7 +488,7 @@ The `state` passed to `save()` is embedded in every plane's OME-XML **and**
 printed once per acquisition — the image name without the channel and the
 z-slice, which one state spans. Embedded, reading it costs opening a picture;
 printed, it can simply be read. `SavedAcquisition.state_paths` names what was
-written, and the adapter's acquire record carries it as `metadata`.
+written, and the acquire record carries it as `metadata`.
 
 `vendor/` is LAS X's own account of the same capture, kept verbatim as
 provenance and sha256'd in `summary.json` — never read in the normal path, and
@@ -519,7 +519,7 @@ anything is saved.
 goes is the `output_folder` that `acquire` is given, or else the data location set up once.
 
 **Extra in-place backlash rounds are off by default.** They are the driver's own setting,
-`ACQUISITION_BACKLASH_DEFAULT_ROUNDS` in the adapter, `0` unless changed there. The normal XY
+`ACQUISITION_BACKLASH_DEFAULT_ROUNDS` in `procedures/acquisition.py`, `0` unless changed there. The normal XY
 move still uses the driver's consistent final approach to the requested position.
 
 **`Naming`.** A capture is named by its stem, `{acquisition_type}_{position_label}`: the kind
@@ -540,11 +540,9 @@ bottom and the class the controller calls at the top.
 zmart_drivers/leica/stellaris5_y42h93/navigator_expert/
 ├── zmart_driver.json   the driver's name ("stellaris") and how to reach LAS X on this computer
 ├── for_zmart_controller/   everything that faces the controller:
-│   ├── zmart_driver.py     the ZmartDriver class the controller calls, one method per command
-│   ├── zmart_controller_plugin.py   the older module shape, kept until the class has run on hardware
-│   └── zmart_adapter/      connect, disconnect and the table of commands the controller calls;
-│                           the work behind them is in procedures/ (session, frame, acquisition,
-│                           instrument)
+│   └── zmart_driver.py     the ZmartDriver class the controller calls, one method per command;
+│                           the work behind each method is in procedures/ (session, frame,
+│                           acquisition, instrument)
 ├── connect.py          the connect flow: open LAS X, load this microscope's configuration
 ├── vendor_interface/   the only part that knows LAS X:
 │   ├── connection/     lasx_runtime.py (the .NET CAM assemblies), hardware_server.py
@@ -635,7 +633,6 @@ workflow sees:
   `ZmartDriver` class converts at its edge. The full list of differences from the plan is in
   `docs/driver-anatomy.md` ("Where the Leica tree still differs from the plan").
 - The setup notebooks become thin: the measuring is a procedure, the notebook only calls it.
-- `zmart_controller_plugin.py` goes, once `zmart_driver.py` has driven the real STELLARIS.
 
 ## 8. Configuration & tuning (profiles)
 
@@ -714,7 +711,7 @@ restores — with confirmation status and timing. **Bench-run instructions** (pr
 These **silently misbehave** instead of failing loudly — respect them or results are wrong without an error:
 
 1. **Movement needs a limits handshake** — a client that never handshook refuses `move_xy`/`move_z`
-   fail-closed. Through `connect_microscope` (and the adapter) the handshake always runs, falling back
+   fail-closed. Through `connect_microscope` (and so the `ZmartDriver` class) the handshake always runs, falling back
    to the bundled default envelope if the machine file is invalid, so a connected session can always
    move within the defaults; the physical backstop bounds every move regardless.
 2. **`acquire()` returns an `AcquisitionResult` and raises on failure** — not a dict; read timing via
@@ -733,8 +730,8 @@ These **silently misbehave** instead of failing loudly — respect them or resul
 9. **Adapter mutating ops are gated by the flat `limits.json` at the commands layer** — if the machine file
     fails to load/validate at connect, the session falls back to the bundled **default** envelope
     (loudly warned) rather than refusing everything; the connect-time warning names what happened
-    (see §3). Out-of-envelope moves still refuse at the commands layer, below the adapter.
-10. **The origin is loaded at connect** — `connect` loads the newest origin saved by the adapter's
+    (see §3). Out-of-envelope moves still refuse at the commands layer, below the `ZmartDriver` class.
+10. **The origin is loaded at connect** — `connect` loads the newest origin saved by the driver's
     `set_origin` setup step, so the controller never sets it. With none saved, positions are plain
     stage coordinates (with a warning); a damaged origin file stops connect with a clear error
     (see §5).

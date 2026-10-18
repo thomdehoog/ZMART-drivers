@@ -73,11 +73,9 @@ FAR_UM = 1.0e7
 
 
 def _adapter() -> Any:
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.for_zmart_controller.zmart_adapter import (
-        zmart_adapter as adapter,
-    )
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert import connect
 
-    return adapter
+    return connect
 
 
 def _go_offline(args: argparse.Namespace) -> None:
@@ -96,7 +94,7 @@ def _go_offline(args: argparse.Namespace) -> None:
     )
 
     hermetic_mock_machine_root()
-    _adapter()._session.connect_python_client = lambda **_kw: MockLasxClient(
+    _adapter().connect_python_client = lambda **_kw: MockLasxClient(
         latency=args.mock_latency
     )
     # The mock has no LAS X log stream, so a job selection can only be

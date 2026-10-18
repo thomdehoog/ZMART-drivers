@@ -12,16 +12,19 @@ import json
 import numpy as np
 import pytest
 import tifffile
+import zarr
 
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration import (
     image_stage_registration as orient,
 )
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures import (
-    materialize,
+    ome_zarr,
 )
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher.product import (
     AcquisitionMetadata,
     ChannelMetadata,
+    ExportedAcquisition,
+    ExportedPosition,
     PlaneIndex,
     PlaneSource,
 )
@@ -279,7 +282,7 @@ def test_converter_rejects_non_d4_matrix():
         orient.orientation_from_image_to_stage([[1, 1], [0, 1]])
 
 
-# --- materialize integration ----------------------------------------------
+# --- save-time integration -------------------------------------------------
 
 
 def _metadata(px_x=0.5, px_y=2.0) -> AcquisitionMetadata:
@@ -297,118 +300,86 @@ def _metadata(px_x=0.5, px_y=2.0) -> AcquisitionMetadata:
     )
 
 
-def _write_source(tmp_path) -> PlaneSource:
+def _exported(tmp_path, metadata) -> ExportedAcquisition:
+    """A one-plane capture, 4 rows by 8 columns, as LAS X would have left it."""
     src = tmp_path / "src.tif"
-    arr = np.arange(4 * 8, dtype=np.uint16).reshape(4, 8)  # H=4, W=8
+    arr = np.arange(4 * 8, dtype=np.uint16).reshape(4, 8)
     tifffile.imwrite(src, arr, photometric="minisblack")
-    return PlaneSource(path=src)
+    index = PlaneIndex(t=0, z=0, c=0)
+    return ExportedAcquisition(
+        source_root=tmp_path,
+        source_dir=tmp_path,
+        positions=[ExportedPosition(t=0, planes={index: PlaneSource(path=src)})],
+        metadata=metadata,
+        method="test",
+    )
 
 
-def _dest_pixels_and_desc(path):
-    arr = tifffile.imread(path)
-    with tifffile.TiffFile(path) as tif:
-        desc = tif.pages[0].description
-    return arr, desc
+def _save_store(tmp_path, orientation, **metadata_kwargs):
+    """Save the one-plane capture as an OME-Zarr store.
+
+    Returns the original pixels, the pixels read back from the store, the
+    store's own description of itself (OME-XML) and its voxel sizes.
+    """
+    exported = _exported(tmp_path, _metadata(**metadata_kwargs))
+    original = tifffile.imread(tmp_path / "src.tif")
+    store = ome_zarr.write_position_store(
+        exported,
+        tmp_path / "out.ome.zarr",
+        orientation=orientation,
+        where=lambda _z: {"x_um": 0.0, "y_um": 0.0, "z_um": 0.0},
+    )
+    group = zarr.open_group(str(store), mode="r")
+    pixels = np.asarray(group["0"][0, 0, 0])
+    xml = (store / "OME" / "METADATA.ome.xml").read_text(encoding="utf-8")
+    scale = group.attrs["ome"]["multiscales"][0]["datasets"][0][
+        "coordinateTransformations"
+    ][0]["scale"]
+    return original, pixels, xml, scale
 
 
 def test_save_identity_orientation_does_not_rotate(tmp_path):
-    dest = tmp_path / "out.ome.tiff"
-    materialize.save_image_source_atomic(
-        _write_source(tmp_path),
-        dest,
-        metadata=_metadata(),
-        index=PlaneIndex(t=0, z=0, c=0),
-        orientation=Orientation(),
-    )
-    arr, desc = _dest_pixels_and_desc(dest)
-    assert arr.shape == (4, 8)
-    assert 'SizeX="8"' in desc and 'SizeY="4"' in desc
+    original, pixels, xml, _scale = _save_store(tmp_path, Orientation())
+    assert np.array_equal(pixels, original)
+    assert 'SizeX="8"' in xml and 'SizeY="4"' in xml
 
 
 def test_save_quarter_turn_rotates_pixels_and_swaps_dims(tmp_path):
-    src = _write_source(tmp_path)
-    original = tifffile.imread(src.path)
-    dest = tmp_path / "out.ome.tiff"
-
-    materialize.save_image_source_atomic(
-        src,
-        dest,
-        metadata=_metadata(px_x=0.5, px_y=2.0),
-        index=PlaneIndex(t=0, z=0, c=0),
-        orientation=Orientation(rotate_deg=90),
+    original, pixels, xml, scale = _save_store(
+        tmp_path, Orientation(rotate_deg=90), px_x=0.5, px_y=2.0
     )
-
-    arr, desc = _dest_pixels_and_desc(dest)
     # pixels rotated clockwise, grid transposed 4x8 -> 8x4
-    assert arr.shape == (8, 4)
-    assert np.array_equal(arr, np.rot90(original, k=-1))
-    # OME follows: SizeX/Y from the rotated shape, PhysicalSizeX/Y swapped
-    assert 'SizeX="4"' in desc and 'SizeY="8"' in desc
-    # physical sizes swap with the axes (0.5/2.0 -> 2/0.5); "2.0" prints as "2"
-    assert 'PhysicalSizeX="2"' in desc and 'PhysicalSizeY="0.5"' in desc
+    assert pixels.shape == (8, 4)
+    assert np.array_equal(pixels, np.rot90(original, k=-1))
+    # The description follows: SizeX/Y from the rotated shape, and the
+    # physical sizes swap with the axes (0.5/2.0 -> 2/0.5).
+    assert 'SizeX="4"' in xml and 'SizeY="8"' in xml
+    assert 'PhysicalSizeX="2"' in xml and 'PhysicalSizeY="0.5"' in xml
+    assert scale[-2:] == [0.5, 2.0]  # (y, x) voxel sizes in the store itself
 
 
 def test_save_mirror_and_quarter_turn_transform_pixels_and_metadata(tmp_path):
-    src = _write_source(tmp_path)
-    original = tifffile.imread(src.path)
-    dest = tmp_path / "out.ome.tiff"
-
-    materialize.save_image_source_atomic(
-        src,
-        dest,
-        metadata=_metadata(px_x=0.5, px_y=2.0),
-        index=PlaneIndex(t=0, z=0, c=0),
-        orientation=Orientation(rotate_deg=90, mirrored=True),
+    original, pixels, xml, _scale = _save_store(
+        tmp_path, Orientation(rotate_deg=90, mirrored=True), px_x=0.5, px_y=2.0
     )
-
-    arr, desc = _dest_pixels_and_desc(dest)
-    assert np.array_equal(arr, np.rot90(np.fliplr(original), k=-1))
-    assert arr.shape == (8, 4)
-    assert 'SizeX="4"' in desc and 'SizeY="8"' in desc
-    assert 'PhysicalSizeX="2"' in desc and 'PhysicalSizeY="0.5"' in desc
+    assert np.array_equal(pixels, np.rot90(np.fliplr(original), k=-1))
+    assert pixels.shape == (8, 4)
+    assert 'SizeX="4"' in xml and 'SizeY="8"' in xml
+    assert 'PhysicalSizeX="2"' in xml and 'PhysicalSizeY="0.5"' in xml
 
 
 def test_save_half_turn_keeps_dims(tmp_path):
-    src = _write_source(tmp_path)
-    original = tifffile.imread(src.path)
-    dest = tmp_path / "out.ome.tiff"
-    materialize.save_image_source_atomic(
-        src,
-        dest,
-        metadata=_metadata(),
-        index=PlaneIndex(t=0, z=0, c=0),
-        orientation=Orientation(rotate_deg=180),
-    )
-    arr, desc = _dest_pixels_and_desc(dest)
-    assert arr.shape == (4, 8)
-    assert np.array_equal(arr, np.rot90(original, k=2))
-    assert 'SizeX="8"' in desc and 'SizeY="4"' in desc
+    original, pixels, xml, _scale = _save_store(tmp_path, Orientation(rotate_deg=180))
+    assert pixels.shape == (4, 8)
+    assert np.array_equal(pixels, np.rot90(original, k=2))
+    assert 'SizeX="8"' in xml and 'SizeY="4"' in xml
 
 
 def test_save_three_quarter_turn_rotates_and_swaps_dims(tmp_path):
-    src = _write_source(tmp_path)
-    original = tifffile.imread(src.path)
-    dest = tmp_path / "out.ome.tiff"
-    materialize.save_image_source_atomic(
-        src,
-        dest,
-        metadata=_metadata(px_x=0.5, px_y=2.0),
-        index=PlaneIndex(t=0, z=0, c=0),
-        orientation=Orientation(rotate_deg=270),
+    original, pixels, xml, _scale = _save_store(
+        tmp_path, Orientation(rotate_deg=270), px_x=0.5, px_y=2.0
     )
-    arr, desc = _dest_pixels_and_desc(dest)
-    assert arr.shape == (8, 4)  # the other axis-swapping turn
-    assert np.array_equal(arr, np.rot90(original, k=-3))
-    assert 'SizeX="4"' in desc and 'SizeY="8"' in desc
-    assert 'PhysicalSizeX="2"' in desc and 'PhysicalSizeY="0.5"' in desc
-
-
-def test_save_without_orientation_is_unrotated(tmp_path):
-    dest = tmp_path / "out.ome.tiff"
-    materialize.save_image_source_atomic(
-        _write_source(tmp_path),
-        dest,
-        metadata=_metadata(),
-        index=PlaneIndex(t=0, z=0, c=0),
-    )
-    assert tifffile.imread(dest).shape == (4, 8)
+    assert pixels.shape == (8, 4)  # the other axis-swapping turn
+    assert np.array_equal(pixels, np.rot90(original, k=-3))
+    assert 'SizeX="4"' in xml and 'SizeY="8"' in xml
+    assert 'PhysicalSizeX="2"' in xml and 'PhysicalSizeY="0.5"' in xml

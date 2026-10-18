@@ -16,20 +16,20 @@ import numpy as np
 import pytest
 import zarr
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures import (
-    acquire as capture,
-)
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.image_stage_registration import (
     Orientation,
-)
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures import (
-    save as saving,
 )
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher.naming import (
     Naming,
 )
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher.product import (
     PlaneIndex,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures import (
+    acquire as capture,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures import (
+    save as saving,
 )
 
 DATA = Path(__file__).resolve().parents[1] / "data" / "lasx_description"
@@ -114,7 +114,6 @@ def save_as_zarr(root, tmp_path, job, *, placement=None, orientation=Orientation
         tmp_path / "out",
         Naming(stem="high-res_000001_A1"),
         cache_root=root,
-        format="ome-zarr",
         placement=placement,
         orientation=orientation,
     )
@@ -153,9 +152,8 @@ class TestOneCopy:
             "high-res_000001_A1.ome.zarr"
         ]
 
-    @pytest.mark.parametrize("format", ["ome-zarr", "ome-tiff"])
     def test_a_copy_that_does_not_read_back_as_written_is_not_saved(
-        self, hires, tmp_path, monkeypatch, format
+        self, hires, tmp_path, monkeypatch
     ):
         """Nothing counts as saved, so nothing of LAS X's is let go of, unless it reads back exactly."""
         root, _ = hires
@@ -168,7 +166,6 @@ class TestOneCopy:
                 tmp_path / "out",
                 Naming(stem="high-res_000001_A1"),
                 cache_root=root,
-                format=format,
                 placement=at(0.0, 0.0, {0: 0.0}),
             )
 
@@ -364,25 +361,20 @@ def test_a_store_is_written_with_opencv_already_loaded(hires, tmp_path):
 class TestEveryFileSaysTheCanvasPosition:
     """The plane position in every file is its canvas position; the actuators stand beside it."""
 
-    def test_the_tiff_planes_carry_the_canvas_position(self, hires, tmp_path):
+    def test_the_stores_planes_carry_the_canvas_position(self, hires, tmp_path):
         ome_types = pytest.importorskip("ome_types")
-        import tifffile
 
         root, _ = hires
-        saved = saving.save(
-            None,
-            acquisition_of("HiRes"),
-            tmp_path / "out",
-            Naming(stem="high-res_000001_A1"),
-            cache_root=root,
-            format="ome-tiff",
-            orientation=Orientation(),
-            placement=at(1000.0, 2000.0, {0: 50.0}),
+        saved = save_as_zarr(
+            root, tmp_path, "HiRes", placement=at(1000.0, 2000.0, {0: 50.0})
         )
 
-        with tifffile.TiffFile(saved.image_paths[PlaneIndex(0, 0, 1)]) as tif:
-            ome = ome_types.from_xml(tif.pages[0].description, validate=True)
-        [plane] = ome.images[0].pixels.planes
+        store = saved.image_paths[PlaneIndex(0, 0, 1)]
+        ome = ome_types.from_xml(
+            (store / "OME" / "METADATA.ome.xml").read_text(encoding="utf-8"),
+            validate=True,
+        )
+        plane = next(p for p in ome.images[0].pixels.planes if p.the_c == 1)
         assert (plane.position_x, plane.position_y, plane.position_z) == (
             1000.0,
             2000.0,
@@ -423,30 +415,6 @@ class TestEveryFileSaysTheCanvasPosition:
         }["translation"]["translation"]
         assert translation[2] == pytest.approx(planes[0].position_z)
 
-    def test_without_a_canvas_position_no_plane_position_is_claimed(
-        self, hires, tmp_path
-    ):
-        ome_types = pytest.importorskip("ome_types")
-        import tifffile
-
-        root, _ = hires
-        saved = saving.save(
-            None,
-            acquisition_of("HiRes"),
-            tmp_path / "out",
-            Naming(stem="high-res_000001_A1"),
-            cache_root=root,
-            format="ome-tiff",
-            orientation=Orientation(),
-        )
-
-        with tifffile.TiffFile(saved.image_paths[PlaneIndex(0, 0, 0)]) as tif:
-            [plane] = (
-                ome_types.from_xml(tif.pages[0].description).images[0].pixels.planes
-            )
-        assert plane.position_x is None and plane.position_z is None
-        assert plane.annotation_refs, "the actuators are still there"
-
     def test_a_store_without_a_canvas_position_is_refused(self, hires, tmp_path):
         root, _ = hires
 
@@ -454,14 +422,13 @@ class TestEveryFileSaysTheCanvasPosition:
             save_as_zarr(root, tmp_path, "HiRes", placement=None)
 
 
-def save_with_projection(root, tmp_path, job, *, format, placement, projection="max"):
+def save_with_projection(root, tmp_path, job, *, placement, projection="max"):
     return saving.save(
         None,
         acquisition_of(job),
         tmp_path / "out",
         Naming(stem="high-res_000001_A1"),
         cache_root=root,
-        format=format,
         orientation=Orientation(),
         placement=placement,
         projection=projection,
@@ -483,7 +450,6 @@ class TestTheProjection:
             root,
             tmp_path,
             "AF Job",
-            format="ome-zarr",
             placement=at(1000.0, 2000.0, self.heights()),
         )
 
@@ -503,7 +469,6 @@ class TestTheProjection:
             root,
             tmp_path,
             "AF Job",
-            format="ome-zarr",
             placement=at(1000.0, 2000.0, self.heights()),
         )
 
@@ -534,7 +499,6 @@ class TestTheProjection:
             root,
             tmp_path,
             "AF Job",
-            format="ome-zarr",
             placement=at(0.0, 0.0, self.heights()),
         )
 
@@ -574,30 +538,11 @@ class TestTheProjection:
             root,
             tmp_path,
             "AF Job",
-            format="ome-zarr",
             placement=at(0.0, 0.0, self.heights()),
             projection="none",
         )
 
         assert saved.projection_paths == ()
-
-    def test_a_tiff_stack_gets_one_projection_file_a_channel(self, stack, tmp_path):
-        import tifffile
-
-        root, pixels = stack
-
-        saved = save_with_projection(
-            root,
-            tmp_path,
-            "AF Job",
-            format="ome-tiff",
-            placement=at(0.0, 0.0, self.heights()),
-        )
-
-        [path] = saved.projection_paths
-        assert path.parent == tmp_path / "out" / "projections"
-        assert path.name == "high-res_000001_A1_T000000_C00_max.ome.tiff"
-        np.testing.assert_array_equal(tifffile.imread(path), pixels.max(axis=0))
 
 
 def test_the_log_is_written_beside_data(tmp_path):

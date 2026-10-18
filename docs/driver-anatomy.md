@@ -738,41 +738,58 @@ Leica-specific:
   `configuration/coordinates.py`, as the plan says. `procedures/frame.py` only
   decides what to read and what to move.
 
-**Where the Leica tree still differs from the plan.** Each item below is
-listed on purpose, so that it cannot be forgotten. The first group changes
-behaviour and so waits for the first run on the simulator and the microscope.
-The second needs a decision.
+**Done since (October 2026).**
 
-Waits for the first run:
+- Saving is OME-Zarr only. The OME-TIFF writer and its repair code are gone.
+  The calibration and orientation steps read their frames back from the saved
+  store, by the plane number the capture gave each plane
+  (`SavedAcquisition.read_plane`), because the store holds its planes lowest
+  first.
+- The shared kinds of problem and the rule for each are in
+  `dispatcher/error_vocabulary.py` and `dispatcher/error_rules.py`. The Leica
+  sorting (`error_classification.classify_error`) produces the kinds, and the
+  engines follow the rule: only a temporary problem is sent again.
+- The gate no longer builds the Leica rulebook itself. It asks the vendor
+  interface for the table of mutating commands and for the limits to install
+  (`limit_rules.MUTATING_COMMANDS`, `build_limits`). The shared types for
+  limit trouble are in `dispatcher/limit_errors.py`.
+- The shared reader asks the API first and then the log, one after the other,
+  each in its own share of the window. A LAS X call that never returns is
+  abandoned at the end of its share, and the connection's turn is handed back
+  only when the call finally ends, so a second request is never piled onto it.
+- `ZmartDriver` opens the connection itself, and the adapter is gone.
 
-1. `dispatcher/error_vocabulary.py` and `error_rules.py` do not exist yet. The
-   Leica error sorting (`vendor_interface/error_classification.py`) still
-   decides retry or fail by itself, without the shared kinds of problem.
-2. `dispatcher/gate.py` still loads Leica's rulebook, `LeicaLimits`, and the
-   gate is still called from each change definition. The plan is a limit
-   description in the handling notes and a gate that only enforces it.
-3. The conversion between user and stage coordinates is still done inside the
-   procedures, on the session handle. The plan has the `ZmartDriver` class do it
-   at its edge, so that the procedures only see stage coordinates.
-4. The shared reader still asks the API and the log at the same time (two small
-   threads). The plan asks for one source after the other.
-5. `zmart_controller_plugin.py` and `connect.py` have no place in the plan. The
-   plugin goes once `zmart_driver.py` has driven the real STELLARIS, and
-   `connect.py` folds into the class.
+**Where the Leica tree still differs from the plan.** Each item is listed on
+purpose, so that it cannot be forgotten.
 
-Needs a decision:
+1. **The confirmation of `select_job` still races two legs.** After a job
+   change, the API and the log are checked at the same time in two threads
+   (`vendor_interface/primitive_handling/confirmations.py`, the dual-leg
+   race). The plan asks for one after the other. The tests for this are
+   written around the race, and it was run on the microscope as it is, so it
+   is left for after the first run on the simulator.
+2. **The conversion between user and stage coordinates is still in
+   `procedures/frame.py`.** The plain arithmetic is in
+   `configuration/coordinates.py`, but the procedures still take and give
+   positions in the controller's frame (the acquisition places every plane from
+   the frame position it remembers). The plan has the `ZmartDriver` class
+   convert at its edge, and also says that whether procedures should own part of
+   this is not settled. Moving it changes what every procedure receives, so it
+   needs a design decision first.
+3. **A limit is not yet a declared description.** The gate gets its rulebook
+   and table of commands from `limit_rules.py`, so it names no Leica class, but
+   the shape of a limit (axis, unit, range or allowed values) is still the
+   Leica file format.
+4. **`vendor_side/` and a full `metadata_map.py`.** `vendor_side/` is not needed
+   for LAS X. `metadata_map.py` today reads LAS X's description of a picture
+   into the standard fields; translating every vendor field is the later
+   metadata work.
 
-6. OME-TIFF. The plan says OME-Zarr only. `procedures/ome.py` and
-   `ome_canonical.py` still write OME-TIFF, and the Leica workflows use it.
-7. Where the Leica-only recipes belong. `procedures/changes.py`, `acquire.py`
-   (the LAS X capture), `objectives.py`, `objective_shift.py` and the
-   calibration procedures know LAS X and its z drives. The plan lists only
-   generic recipes under `procedures/`.
-8. `metadata_map.py` today reads the description of a picture. The plan also
-   gives it the job of translating every vendor field into the standard
-   record. That is the later metadata work.
-9. `vendor_side/` (code that runs inside the vendor software) is not needed
-   for LAS X, so it does not exist.
+**About the Leica recipes in `procedures/`.** In the plan, `procedures/` is
+written by each driver. `changes.py`, `acquire.py`, `objectives.py`,
+`objective_shift.py` and the calibration procedures know LAS X and its two z
+drives, and they belong there. A new microscope writes its own. The shared part
+is what lies below them: the dispatcher and its rules.
 
 **The order, and a safety net.** The reshaping is done in small steps, each
 followed by the offline tests and the hardware tests at the STELLARIS: first
