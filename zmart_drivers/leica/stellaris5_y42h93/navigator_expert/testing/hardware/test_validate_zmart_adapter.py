@@ -28,24 +28,15 @@ for _p in (_HERE, _HELPERS, _REPO_ROOT):
         sys.path.insert(0, str(_p))
 
 import validate_zmart_adapter
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.connection import (
-    lasx_client as adapter,
-)
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration import (
-    store as _machine,
-)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.connection import lasx_client as adapter
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup import store as _machine
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.acquisition_and_saving import save as _save
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.acquisition_and_saving import acquire as _capture
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.commands import (
-    backlash as _motion,
-)
 
 
 def _run_mock(tmp_path, *extra):
     """Run the validator against the mock, restoring global state afterwards."""
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitive_handling import (
-        profiles,
-    )
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling import profiles
 
     output = tmp_path / "adapter_mock.jsonl"
     original_connect = adapter._session.connect_python_client
@@ -210,9 +201,7 @@ def test_state_phase_does_not_switch_away_from_autofocus_job():
 
 
 def test_connect_session_leaves_output_root_for_driver_discovery():
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitive_handling import (
-        profiles,
-    )
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling import profiles
 
     original_connect = adapter._session.connect_python_client
     original_profile = profiles.STATE_READERS
@@ -230,25 +219,17 @@ def test_connect_session_leaves_output_root_for_driver_discovery():
             session.disconnect()
 
 
-@pytest.mark.parametrize(("rounds", "corrects"), [(0, False), (1, True)])
-def test_acquire_backlash_rounds_through_the_controller_seam(
-    tmp_path, rounds, corrects
-):
-    """The driver's own rounds, zero by default or positive, both cross the real Session seam.
+def test_acquire_through_the_controller_seam(tmp_path):
+    """An acquisition crosses the real Session seam and reaches the capture.
 
     Unlike the adapter-direct unit tests (which patch driver internals and pass
     ``object()`` as the client), this opens a real ``zmart_controller.ZmartController``
     against the in-process mock CAM (same connect path ``phase_acquire`` would
     use live) and only patches the I/O boundary (``_capture``/``_save``) that a
     mock CAM cannot satisfy -- so the seam decision #3 cares about (Session ->
-    ops table -> adapter) is what is actually exercised for both the default
-    and a positive ``ACQUISITION_BACKLASH_DEFAULT_ROUNDS``, the driver's own setting.
+    ops table -> adapter) is what is actually exercised.
     """
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.acquisition_and_saving import acquisition as _acquisition
-
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitive_handling import (
-        profiles,
-    )
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling import profiles
 
     original_connect = adapter._session.connect_python_client
     original_profile = profiles.STATE_READERS
@@ -262,10 +243,6 @@ def test_acquire_backlash_rounds_through_the_controller_seam(
         active_job = session.get_state()["changeable"]["job"]
         session.get_xyz()  # where the stage stands, which every saved plane is placed from
 
-        def fake_correct_backlash(client, **kwargs):
-            order.append(("backlash", client))
-            return {"success": True, "confirmed": True}
-
         def fake_capture(client, job, **kwargs):
             order.append(("capture", job))
             return SimpleNamespace(job=job, started_at=None, finished_at=None)
@@ -274,8 +251,6 @@ def test_acquire_backlash_rounds_through_the_controller_seam(
             return SimpleNamespace(image_paths={}, xml_paths={}, naming=naming)
 
         with (
-            patch.object(_acquisition, "ACQUISITION_BACKLASH_DEFAULT_ROUNDS", rounds),
-            patch.object(_motion, "correct_backlash", fake_correct_backlash),
             patch.object(_capture, "acquire", fake_capture),
             patch.object(_save, "save", fake_save),
         ):
@@ -286,11 +261,4 @@ def test_acquire_backlash_rounds_through_the_controller_seam(
         if session is not None:
             session.disconnect()
 
-    # Positive rounds fire takeup before capture; an omitted value resolves to
-    # zero and reaches capture directly through the same Session -> adapter seam.
-    if corrects:
-        assert order == [("backlash", order[0][1]), ("capture", active_job)]
-    else:
-        assert order == [("capture", active_job)]
-    assert record["settle"] == ("backlash-corrected" if corrects else "direct")
-    assert record["backlash_rounds"] == rounds
+    assert order == [("capture", active_job)]

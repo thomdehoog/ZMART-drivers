@@ -41,19 +41,13 @@ pytest.importorskip("scipy")
 
 from scipy.ndimage import gaussian_filter
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.store import (
-    MachineProfile,
-)
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.optical_calibration import (
-    calibrate_objective_pair as wf_obj,
-)
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.optical_calibration import (
-    calibration_common as cm,
-)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.store import MachineProfile
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.optical_calibration import calibrate_objective_pair as wf_obj
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.optical_calibration import calibration_common as cm
 
 NOTEBOOK_PATH = (
     Path(wf_obj.__file__).parents[2]
-    / "configuration"
+    / "driver_setup"
     / "optical_calibration"
     / "notebooks"
     / "calibrate_objective_pair.ipynb"
@@ -126,7 +120,7 @@ def _install_simulator(monkeypatch, machine) -> SimulatedScope:
     drv = cm.drv  # objective-pair workflow modules import the same driver module
 
     monkeypatch.setattr(
-        "zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.store.MACHINE",
+        "zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.store.MACHINE",
         machine,
     )
     monkeypatch.setattr(drv, "connect_python_client", lambda *a, **k: object())
@@ -196,9 +190,6 @@ def _install_simulator(monkeypatch, machine) -> SimulatedScope:
     monkeypatch.setattr(drv, "move_z", _move_z)
     monkeypatch.setattr(
         drv, "read_zwide_um", lambda client, job_name, **kw: float(sim.zwide)
-    )
-    monkeypatch.setattr(
-        cm._movement, "correct_backlash", lambda client, *, passes, **kw: None
     )
 
     # Acquisition: render real pixels from the scene, write real TIFFs, and

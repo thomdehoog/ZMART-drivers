@@ -98,7 +98,7 @@ def record_before_change(
             )
         return None
 
-    from ...vendor_interface.primitive_handling import state as _readers
+    from ...vendor_specific.primitive_handling import state as _readers
 
     if job_name is None:
         selected = _readers.get_selected_job(client) or {}
@@ -151,7 +151,7 @@ def compensate_after_change(
         }
 
     try:
-        from ...vendor_interface.primitive_handling import state as _readers
+        from ...vendor_specific.primitive_handling import state as _readers
 
         if new_slot is None:
             settings = _readers.get_job_settings(client, job_name) or {}
@@ -176,7 +176,7 @@ def compensate_after_change(
         # The delta math and the missing-pair policy live in ONE place —
         # calibration/core/model.py — shared with the adapter's per-move
         # frame mapping, so the two layers can never drift apart.
-        from ...configuration.optical_calibration import model as _cal_model
+        from ...driver_setup.optical_calibration import model as _cal_model
 
         try:
             delta = _cal_model.translation_delta_um(
@@ -201,7 +201,7 @@ def compensate_after_change(
             # The moves go through the ordinary gated wrappers, so the
             # compensated targets are checked against the machine limits
             # exactly like any other motion; a refusal fails the change.
-            from ...vendor_interface.primitive_handling import changes as _commands
+            from ...vendor_specific.primitive_handling import changes as _commands
 
             xy_result = _commands.move_xy(
                 client, before["x_um"] + delta[0], before["y_um"] + delta[1], unit="um"

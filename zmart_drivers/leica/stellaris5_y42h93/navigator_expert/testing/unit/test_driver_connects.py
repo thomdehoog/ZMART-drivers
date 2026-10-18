@@ -18,25 +18,14 @@ from mock_lasx_api import MockLasxClient
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.for_zmart_controller.zmart_driver import (
     ZmartDriver,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.connection import (
-    lasx_client,
-)
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitive_handling.profiles import (
-    IMAGE_SAVE,
-)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.connection import lasx_client
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.profiles import IMAGE_SAVE
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures import (
     session_state,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration import (
-    image_stage_registration,
-)
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.image_stage_registration import (
-    Orientation,
-    orientation_config,
-)
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.store import (
-    MachineProfile,
-)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup import image_stage_registration
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.image_stage_registration import Orientation, orientation_config
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.store import MachineProfile
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher import gate
 
 

@@ -27,7 +27,7 @@ Usage, in the driver's environment on the microscope PC::
     python check_cache_route.py --job HiRes --label hires-16bit
     python check_cache_route.py --label stack --save-to D:/ZMART-check
 
-The data location must be set up (configuration/data_location), or given
+The data location must be set up (driver_setup/data_location), or given
 with ``--save-to``. See ``sessions/SCOPE_CHECK_CACHE_ROUTE.md`` for the tests to run.
 """
 
@@ -273,9 +273,7 @@ def _described(ome) -> dict:
 
 def _laser_power(record: dict) -> list[dict]:
     """Each laser's power fields, from the capture's own setting in LAS X's description."""
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.metadata_map import (
-        image_of,
-    )
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.metadata_map import image_of
 
     description = next(
         (

@@ -22,21 +22,11 @@ matplotlib.use("Agg")
 
 pytest.importorskip("cv2")  # register_voting imports cv2/skimage
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.image_stage_registration import (
-    Orientation,
-)
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.store import (
-    MachineProfile,
-)
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.naming import (
-    build_image_name,
-)
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.optical_calibration import (
-    calibration_common as cm,
-)
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.optical_calibration import (
-    check_calibration as chk,
-)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.image_stage_registration import Orientation
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.store import MachineProfile
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.naming import build_image_name
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.optical_calibration import calibration_common as cm
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.optical_calibration import check_calibration as chk
 
 PIXEL_UM = 0.5
 JOB = "Overview"
@@ -128,7 +118,7 @@ def _patch(
         },
     )
     monkeypatch.setattr(
-        "zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.optical_calibration.adopt_calibration.compile_session_calibration",
+        "zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.optical_calibration.adopt_calibration.compile_session_calibration",
         lambda session: Path(session.paths.session_dir) / "calibration.json",
     )
     monkeypatch.setattr(chk.drv, "connect_python_client", lambda *a, **k: object())
@@ -139,7 +129,7 @@ def _patch(
     )
     monkeypatch.setattr(chk.drv, "get_hardware_info", lambda c, **k: {"ok": True})
     monkeypatch.setattr(
-        "zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.image_stage_registration.rig_orientation",
+        "zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.image_stage_registration.rig_orientation",
         Orientation,
     )
 
@@ -278,7 +268,7 @@ def test_start_session_defaults_to_machine_workspace_and_active_job(
 ):
     machine = MachineProfile(programdata_root=tmp_path / "programdata")
     monkeypatch.setattr(
-        "zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.store.MACHINE",
+        "zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.store.MACHINE",
         machine,
     )
     _patch(monkeypatch, [])

@@ -26,17 +26,9 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock, PropertyMock, patch
 
 import zmart_drivers.leica.stellaris5_y42h93.navigator_expert as drv
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.connection import (
-    lasx_client as session,
-)
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitive_handling import (
-    confirm_select_job,
-    confirmations,
-    profiles,
-)
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitive_handling import (
-    changes as commands,
-)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.connection import lasx_client as session
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling import confirm_select_job, confirmations, profiles
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling import changes as commands
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.commands import (
     compensated_changes as commands_comp,
 )
@@ -44,21 +36,11 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher import (
     confirm_loop as dispatch,
     send_loop,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitive_handling import (
-    prechecks,
-)
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitive_handling import (
-    state as readers,
-)
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface import (
-    error_classification as errors,
-)
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitive_handling import (
-    settings as settings_table,
-)
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitive_handling import (
-    transport as transport_module,
-)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling import prechecks
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling import state as readers
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific import error_classification as errors
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling import settings as settings_table
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling import transport as transport_module
 
 # =============================================================================
 # Helpers - mock factory
@@ -775,9 +757,7 @@ class TestRetryBackoff(unittest.TestCase):
         client = make_client()
         api_obj = make_api_obj()
 
-        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitive_handling.profiles import (
-            CommandProfile,
-        )
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.profiles import CommandProfile
 
         profile = CommandProfile(
             retry_backoff=2.0,
@@ -810,9 +790,7 @@ class TestRetryBackoff(unittest.TestCase):
         client = make_client()
         api_obj = make_api_obj()
 
-        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitive_handling.profiles import (
-            CommandProfile,
-        )
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.profiles import CommandProfile
 
         profile = CommandProfile(
             refire_on_unconfirmed=False,
@@ -2890,9 +2868,7 @@ class TestHybridSelectJobApiLegEndToEnd(unittest.TestCase):
     """
 
     def test_api_leg_confirms_when_log_has_no_evidence(self):
-        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitives.log import (
-            log_wait,
-        )
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitives.log import log_wait
 
         client = make_client()
         api_obj = make_api_obj()

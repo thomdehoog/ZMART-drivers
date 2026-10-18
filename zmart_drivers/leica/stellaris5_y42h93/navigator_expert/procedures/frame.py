@@ -29,12 +29,9 @@ import logging
 
 from . import coordinates
 from ..dispatcher import gate as _gate
-from ..vendor_interface.primitive_handling import state as _readers
-from ..vendor_interface.primitive_handling.derived import (
-    z_um_from_settings as _z_um_from_settings,
-)
-from .commands import backlash as _motion
-from ..vendor_interface.primitive_handling import changes as _commands
+from ..vendor_specific.primitive_handling import state as _readers
+from ..vendor_specific.primitive_handling.derived import z_um_from_settings as _z_um_from_settings
+from ..vendor_specific.primitive_handling import changes as _commands
 from . import session as _info
 from .session import ZmartHandle, job_catalog, note_unconfirmed, require_open  # noqa: F401
 
@@ -262,7 +259,9 @@ def set_xyz(
     # Every leg below is limit-checked inside the command it fires — the
     # frame code carries no checks of its own. A refused leg raises here with
     # an actionable message; legs that already ran stay where they arrived.
-    arrived = _motion.arrive_xy(handle.client, abs_x, abs_y)
+    arrived = _commands.move_xy(handle.client, abs_x, abs_y, unit="um")
+    if not arrived.get("success"):
+        raise RuntimeError(f"move_xy failed: {arrived}")
     if not arrived.get("confirmed"):
         note_unconfirmed(handle, f"set_xyz: xy to ({x}, {y})", arrived)
 

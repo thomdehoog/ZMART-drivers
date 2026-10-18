@@ -23,38 +23,21 @@ from limits_fixtures import (
     provision_machine_limits,
 )
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitive_handling.profiles import (
-    ImageSaveProfile,
-)
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.product import (
-    PlaneIndex,
-)
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitive_handling import (
-    limit_rules as limits_checks,
-)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.profiles import ImageSaveProfile
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.product import PlaneIndex
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling import limit_rules as limits_checks
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher import (
     gate as _gate,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface import (
-    parsing as _readers_parsing,
-)
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration import (
-    image_stage_registration as _orientation,
-)
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration import (
-    store as _machine,
-)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific import parsing as _readers_parsing
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup import image_stage_registration as _orientation
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup import store as _machine
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.acquisition_and_saving import command_log as _log
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.acquisition_and_saving import clear_cache as _release
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.acquisition_and_saving import save as _save
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.acquisition_and_saving import acquire as _capture
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.acquisition_and_saving import acquisition as _acquisition
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.commands import (
-    backlash as _motion,
-)
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitive_handling import (
-    changes as _commands,
-)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling import changes as _commands
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.commands import (
     compensated_changes as _commands_comp,
 )
@@ -67,14 +50,10 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures import (
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures import (
     session as _info,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitive_handling import (
-    state as _readers,
-)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling import state as _readers
 
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.connection import (
-    lasx_client as _connect_module,
-)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.connection import lasx_client as _connect_module
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures import (
     session_state as _session_state,
 )
@@ -212,9 +191,7 @@ def tearDownModule():
     _NO_LOG_ON_DISK.stop()
 
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.origin import (
-    set_origin as _set_origin,
-)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.origin import set_origin as _set_origin
 
 
 class TestRegistration(unittest.TestCase):
@@ -251,12 +228,8 @@ class TestCalibrationSelection(unittest.TestCase):
         # The driver now owns loading: the named calibration flows through
         # the driver's connection -> model.load_objective_calibration, where one
         # exact document supplies both translations and readiness provenance.
-        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration import (
-            optical_calibration as drv_session,
-        )
-        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.optical_calibration import (
-            model as cal_model,
-        )
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup import optical_calibration as drv_session
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.optical_calibration import model as cal_model
 
         cfg = {
             "schema_version": 13,
@@ -285,12 +258,8 @@ class TestCalibrationSelection(unittest.TestCase):
 
     def test_translations_and_provenance_come_from_one_calibration_read(self):
         """A snapshot adoption during connect cannot mix old math with new proof."""
-        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration import (
-            optical_calibration as drv_session,
-        )
-        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.optical_calibration import (
-            model as cal_model,
-        )
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup import optical_calibration as drv_session
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.optical_calibration import model as cal_model
 
         old = {
             "schema_version": 13,
@@ -355,10 +324,7 @@ class TestFrame(unittest.TestCase):
         import json
         import tempfile
 
-        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.store import (
-            MachineProfile,
-            is_snapshot_name,
-        )
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.store import MachineProfile, is_snapshot_name
 
         with tempfile.TemporaryDirectory() as tmp:
             profile = MachineProfile(programdata_root=Path(tmp))
@@ -400,9 +366,7 @@ class TestFrame(unittest.TestCase):
         """The newest saved origin, objective included, becomes the session's frame."""
         import tempfile
 
-        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.store import (
-            MachineProfile,
-        )
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.store import MachineProfile
 
         objective = {"slotIndex": 2, "magnification": 63, "name": "HC PL APO 63x"}
         with tempfile.TemporaryDirectory() as tmp:
@@ -429,9 +393,7 @@ class TestFrame(unittest.TestCase):
         """What set_origin captures is exactly what the next connect loads."""
         import tempfile
 
-        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.store import (
-            MachineProfile,
-        )
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.store import MachineProfile
 
         with tempfile.TemporaryDirectory() as tmp:
             profile = MachineProfile(programdata_root=Path(tmp))
@@ -454,14 +416,12 @@ class TestFrame(unittest.TestCase):
         """No origin saved yet: the frame is the absolute stage, with a warning."""
         import tempfile
 
-        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.store import (
-            MachineProfile,
-        )
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.store import MachineProfile
 
         with tempfile.TemporaryDirectory() as tmp:
             profile = MachineProfile(programdata_root=Path(tmp))
             with self.assertLogs(
-                "zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.origin.saved_origin",
+                "zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.origin.saved_origin",
                 level="WARNING",
             ) as logs:
                 h = self._connect_with_profile(profile)
@@ -472,9 +432,7 @@ class TestFrame(unittest.TestCase):
         """A damaged origin file stops connect before LAS X is contacted."""
         import tempfile
 
-        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.store import (
-            MachineProfile,
-        )
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.store import MachineProfile
 
         with tempfile.TemporaryDirectory() as tmp:
             profile = MachineProfile(programdata_root=Path(tmp))
@@ -494,9 +452,7 @@ class TestFrame(unittest.TestCase):
         """An origin missing a value or its objective is refused, not zero-filled."""
         import tempfile
 
-        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.store import (
-            MachineProfile,
-        )
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.store import MachineProfile
 
         broken = [
             ({"origin": {"x_um": 5}}, "'y_um'"),
@@ -520,9 +476,7 @@ class TestFrame(unittest.TestCase):
         """load_origin=False starts in stage coordinates, even over a damaged file."""
         import tempfile
 
-        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.store import (
-            MachineProfile,
-        )
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.store import MachineProfile
 
         with tempfile.TemporaryDirectory() as tmp:
             profile = MachineProfile(programdata_root=Path(tmp))
@@ -579,7 +533,7 @@ class TestFrame(unittest.TestCase):
         h = _handle(origin=_origin(x_um=1000.0, y_um=2000.0, z_focus_um=30.0))
         moves = {}
 
-        def fake_move_xy_with_backlash(client, x_um, y_um, **kwargs):
+        def fake_move_xy(client, x_um, y_um, **kwargs):
             moves["xy"] = (x_um, y_um)
             return {"success": True, "confirmed": True}
 
@@ -590,7 +544,7 @@ class TestFrame(unittest.TestCase):
         # current hardware: z-wide at 32, z-galvo at 3
         patches = _patch_position(z_wide_um=32.0, z_galvo_um=3.0)
         with (
-            patch.object(_motion, "arrive_xy", fake_move_xy_with_backlash),
+            patch.object(_commands, "move_xy", fake_move_xy),
             patch.object(_commands, "move_z", fake_move_z),
             patches[0],
             patches[1],
@@ -625,8 +579,8 @@ class TestFrame(unittest.TestCase):
         patches = _patch_position(z_wide_um=25.0, z_galvo_um=4.0)
         with (
             patch.object(
-                _motion,
-                "arrive_xy",
+                _commands,
+                "move_xy",
                 return_value={"success": True, "confirmed": True},
             ),
             patch.object(_commands, "move_z", fake_move_z),
@@ -646,8 +600,8 @@ class TestFrame(unittest.TestCase):
         patches = _patch_position()
         with (
             patch.object(
-                _motion,
-                "arrive_xy",
+                _commands,
+                "move_xy",
                 return_value={"success": True, "confirmed": True},
             ),
             patch.object(
@@ -676,8 +630,8 @@ class TestFrame(unittest.TestCase):
         patches = _patch_position()
         with (
             patch.object(
-                _motion,
-                "arrive_xy",
+                _commands,
+                "move_xy",
                 return_value={"success": True, "confirmed": True},
             ),
             patch.object(
@@ -733,7 +687,6 @@ class TestAcquire(unittest.TestCase):
             _acquisition.get_acquisition_settings(h),
             {"trigger": {"options": ["full"], "default": "full", "active": "full"}},
         )
-        self.assertEqual(_acquisition.ACQUISITION_BACKLASH_DEFAULT_ROUNDS, 0)
 
     def test_unknown_or_invalid_option_rejected(self):
         h = _handle(
@@ -763,7 +716,7 @@ class TestAcquire(unittest.TestCase):
                     position_label="A1",
                     acquisition_settings={"trigger": "snap"},
                 )
-            for gone in ("job", "folder", "format", "save_to", "backlash_rounds"):
+            for gone in ("job", "folder", "format", "save_to"):
                 with (
                     self.subTest(gone=gone),
                     self.assertRaisesRegex(ValueError, "unknown acquisition setting"),
@@ -851,11 +804,6 @@ class TestAcquire(unittest.TestCase):
                 patch.object(_readers, "get_hardware_info", return_value={}),
                 patch.object(
                     _commands_comp, "select_job", lambda c, j, **k: {"success": True}
-                ),
-                patch.object(
-                    _motion,
-                    "correct_backlash",
-                    lambda client, **k: {"success": True, "confirmed": True},
                 ),
                 patch.object(_capture, "acquire", lambda c, j, **k: _a_capture(j)),
                 patch.object(_save, "save", fake_save),
@@ -963,11 +911,6 @@ class TestAcquire(unittest.TestCase):
         with (
             patch.object(_readers, "get_jobs", return_value=self._jobs()),
             patch.object(_readers, "get_hardware_info", return_value={}),
-            patch.object(
-                _motion,
-                "correct_backlash",
-                lambda client, **k: {"success": True, "confirmed": True},
-            ),
             patch.object(_capture, "acquire", fake_capture),
             patch.object(_save, "save", fake_save),
             patches[0],
@@ -998,7 +941,6 @@ class TestAcquire(unittest.TestCase):
         self.assertEqual(
             calls["state"]["provenance"]["stem"], "acquisition_prescan_a1b2c3_well-7"
         )
-        self.assertEqual(record["settle"], "direct")
         self.assertEqual(record["trigger"], "full")
         self.assertNotIn("folder", record)
         self.assertEqual(
@@ -1056,11 +998,6 @@ class TestAcquire(unittest.TestCase):
                 patch.object(_readers, "get_hardware_info", return_value={}),
                 patch.object(
                     _commands_comp, "select_job", lambda *a, **k: {"success": True}
-                ),
-                patch.object(
-                    _motion,
-                    "correct_backlash",
-                    lambda client, **k: {"success": True, "confirmed": True},
                 ),
                 patch.object(
                     _capture,
@@ -1601,9 +1538,7 @@ class TestAcquire(unittest.TestCase):
         """
         from datetime import datetime, timezone
 
-        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.store import (
-            MachineProfile,
-        )
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.store import MachineProfile
 
         h = _handle(
             connection={**ZmartDriver.DEFAULT_CONNECTION, "output_root": "/tmp/out"}
@@ -1631,11 +1566,6 @@ class TestAcquire(unittest.TestCase):
                     _commands_comp,
                     "select_job",
                     lambda client, job, **k: {"success": True},
-                ),
-                patch.object(
-                    _motion,
-                    "correct_backlash",
-                    lambda client, **k: {"success": True, "confirmed": True},
                 ),
                 patch.object(
                     _capture,
@@ -1673,14 +1603,6 @@ class TestAcquire(unittest.TestCase):
             patch.object(_readers, "get_jobs", return_value=self._jobs()),
             patch.object(_readers, "get_hardware_info", return_value={}),
             patch.object(_commands_comp, "select_job", return_value={"success": True}),
-            patch.object(
-                _motion,
-                "correct_backlash",
-                side_effect=lambda client, **k: (
-                    calls.setdefault("backlash", []).append(k["passes"])
-                    or {"success": True, "confirmed": True}
-                ),
-            ),
             patch.object(_capture, "acquire", lambda client, job, **k: _a_capture(job)),
             patch.object(_save, "save", fake_save),
             patches[0],
@@ -1703,9 +1625,6 @@ class TestAcquire(unittest.TestCase):
             record1 = _acquisition.acquire(
                 h, acquisition_type="acquisition", output_folder=None
             )
-        self.assertEqual(calls.get("backlash", []), [])
-        self.assertEqual(record0["settle"], "direct")
-        self.assertEqual(record0["backlash_rounds"], 0)
         # unlabeled acquires consume the per-session counter, zero-padded
         self.assertEqual(record0["position_label"], "000000")
         self.assertEqual(record1["position_label"], "000001")
@@ -1775,80 +1694,6 @@ class TestAcquire(unittest.TestCase):
         self.assertEqual(calls["namings"][0].stem, "acquisition_named")
         self.assertEqual(record["position_label"], "000000")
 
-    def test_acquire_runs_backlash_correction_before_capture_when_enabled(self):
-        """The driver's own setting: with rounds set, the slack is taken up right before the capture."""
-        h = _handle(
-            connection={**ZmartDriver.DEFAULT_CONNECTION, "output_root": "/tmp/out"}
-        )
-        order = []
-
-        def fake_correct_backlash(client, **kwargs):
-            order.append(("backlash", client, kwargs["passes"]))
-            return {"success": True, "confirmed": True}
-
-        def fake_capture(client, job, **kwargs):
-            order.append(("capture", job))
-            return _a_capture(job)
-
-        def fake_save(client, acq, output_root, naming, **kwargs):
-            return SimpleNamespace(
-                image_paths={0: Path("/tmp/out/img.ome.tif")},
-                xml_paths={0: Path("/tmp/out/img.xml")},
-                naming=naming,
-            )
-
-        patches = _patch_position(job="HiRes")
-        with (
-            patch.object(_acquisition, "ACQUISITION_BACKLASH_DEFAULT_ROUNDS", 2),
-            patch.object(_readers, "get_jobs", return_value=self._jobs()),
-            patch.object(_motion, "correct_backlash", fake_correct_backlash),
-            patch.object(_capture, "acquire", fake_capture),
-            patch.object(_save, "save", fake_save),
-            patches[2],
-        ):
-            record = _acquisition.acquire(
-                h,
-                acquisition_type="acquisition",
-                output_folder=None,
-                position_label="7",
-            )
-        # backlash takeup -> capture, in that order: it pins the slack right
-        # before the image is taken.
-        self.assertEqual(order, [("backlash", h.client, 2), ("capture", "HiRes")])
-        self.assertEqual(record["settle"], "backlash-corrected")
-        self.assertEqual(record["backlash_rounds"], 2)
-
-    def test_zero_backlash_rounds_skips_correction(self):
-        calls = []
-        h = _handle(
-            connection={**ZmartDriver.DEFAULT_CONNECTION, "output_root": "/tmp/out"}
-        )
-        patches = _patch_position(job="Overview")
-        with (
-            patch.object(_readers, "get_jobs", return_value=self._jobs()),
-            patch.object(_motion, "correct_backlash", side_effect=calls.append),
-            patch.object(
-                _capture,
-                "acquire",
-                return_value=_a_capture("Overview"),
-            ),
-            patch.object(
-                _save,
-                "save",
-                return_value=SimpleNamespace(image_paths={}, xml_paths={}, naming=None),
-            ),
-            patches[2],
-        ):
-            record = _acquisition.acquire(
-                h,
-                acquisition_type="acquisition",
-                output_folder=None,
-                position_label="7",
-            )
-        self.assertEqual(calls, [])
-        self.assertEqual(record["settle"], "direct")
-        self.assertEqual(record["backlash_rounds"], 0)
-
     def _acquire_and_list_the_calls(self, options=None):
         """Run acquire with every step stubbed out; returns the calls it made, in order."""
         h = _handle(
@@ -1859,11 +1704,6 @@ class TestAcquire(unittest.TestCase):
         with (
             patch.object(_readers, "get_jobs", return_value=self._jobs()),
             patch.object(_commands_comp, "select_job", return_value={"success": True}),
-            patch.object(
-                _motion,
-                "correct_backlash",
-                lambda client, **k: {"success": True, "confirmed": True},
-            ),
             patch.object(
                 _capture,
                 "acquire",
@@ -2016,22 +1856,11 @@ class TestStateAndProcedures(unittest.TestCase):
         p = self._state_patches()
         with p[2]:
             procedures = _instrument.get_procedures(h)
-        self.assertIn("backlash_takeup", procedures)
+        self.assertIn("zero_z_galvo", procedures)
         self.assertNotIn("get_root", procedures)
         self.assertNotIn("get_positions", procedures)
         self.assertNotIn("get_focus_points", procedures)
         self.assertEqual(procedures["autofocus"]["jobs"], ["AF Job"])
-        with patch.object(
-            _motion,
-            "correct_backlash",
-            lambda client, **k: {"success": True, "confirmed": True},
-        ):
-            self.assertEqual(
-                _instrument.run_procedure(h, {"name": "backlash_takeup"})["ran"][
-                    "name"
-                ],
-                "backlash_takeup",
-            )
         with self.assertRaises(ValueError):
             _instrument.run_procedure(h, {"name": "nope"})
 
@@ -2230,7 +2059,7 @@ class TestObjectiveCompensation(unittest.TestCase):
 
         patches = _patch_position(z_wide_um=40.0, z_galvo_um=0.0, slot=2)
         with (
-            patch.object(_motion, "arrive_xy", fake_xy),
+            patch.object(_commands, "move_xy", fake_xy),
             patch.object(_commands, "move_z", fake_z),
             patches[0],
             patches[1],
@@ -2278,7 +2107,7 @@ class TestObjectiveCompensation(unittest.TestCase):
             slot=2,
         )
         with (
-            patch.object(_motion, "arrive_xy", fake_xy),
+            patch.object(_commands, "move_xy", fake_xy),
             patch.object(_commands, "move_z", fake_z),
             patches[0],
             patches[1],
@@ -2310,8 +2139,8 @@ class TestObjectiveCompensation(unittest.TestCase):
         patches = _patch_position(z_wide_um=40.0, z_galvo_um=0.0, slot=2)
         with (
             patch.object(
-                _motion,
-                "arrive_xy",
+                _commands,
+                "move_xy",
                 return_value={"success": True, "confirmed": True},
             ),
             patch.object(_commands, "move_z", fake_z),
@@ -2342,7 +2171,7 @@ class TestObjectiveCompensation(unittest.TestCase):
         )
         patches = _patch_position(z_wide_um=40.0, z_galvo_um=0.0, slot=2)
         with (
-            patch.object(_motion, "arrive_xy") as xy,
+            patch.object(_commands, "move_xy") as xy,
             patches[0],
             patches[1],
             patches[2],
@@ -2372,7 +2201,7 @@ class TestObjectiveCompensation(unittest.TestCase):
             return {"success": True, "confirmed": True}
 
         with (
-            patch.object(_motion, "arrive_xy", fake_xy),
+            patch.object(_commands, "move_xy", fake_xy),
             patch.object(_commands, "move_z", fake_z),
             patch.object(
                 _readers,
@@ -2413,7 +2242,7 @@ class TestObjectiveCompensation(unittest.TestCase):
         h = _handle(origin=_origin(objective={"name": "10x", "slotIndex": 1}))
         patches = _patch_position(slot=2)
         with (
-            patch.object(_motion, "arrive_xy") as xy,
+            patch.object(_commands, "move_xy") as xy,
             patches[0],
             patches[1],
             patches[2],
@@ -2457,7 +2286,7 @@ class TestObjectiveCompensation(unittest.TestCase):
         )
         patches = _patch_position(z_wide_um=0.0, z_galvo_um=0.0, slot=3)
         with (
-            patch.object(_motion, "arrive_xy") as xy,
+            patch.object(_commands, "move_xy") as xy,
             patches[0],
             patches[1],
             patches[2],
@@ -2685,8 +2514,8 @@ class TestLifecycle(unittest.TestCase):
             patches[2],
             patches[3],
             patch.object(
-                _motion,
-                "arrive_xy",
+                _commands,
+                "move_xy",
                 return_value={"success": True, "confirmed": True},
             ),
             patch.object(
@@ -2730,9 +2559,7 @@ class TestFunctionLimits(unittest.TestCase):
 
     def test_bundled_template_covers_every_declared_key(self):
         """THE completeness guard on the template: a new key cannot ship absent."""
-        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.limits import (
-            config as limits_config,
-        )
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.limits import config as limits_config
 
         path = _machine.MACHINE.bundled_default_path(_machine.LIMITS_FILENAME)
         payload = limits_config.validate_payload(
@@ -2771,7 +2598,7 @@ class TestFunctionLimits(unittest.TestCase):
         )
         patches = _patch_position(z_wide_um=0.0, z_galvo_um=0.0)
         with (
-            patch.object(_motion, "arrive_xy") as xy,
+            patch.object(_commands, "move_xy") as xy,
             patches[0],
             patches[1],
             patches[2],
@@ -2810,10 +2637,8 @@ class TestFunctionLimits(unittest.TestCase):
                 _frame.set_xyz(h, 0.0, 0.0, 0.0)
             with self.assertRaisesRegex(RuntimeError, "refused"):
                 _instrument.set_state(h, {"changeable": {"job": "HiRes"}})
-            with self.assertRaisesRegex(RuntimeError, "refused"):
-                _instrument.run_procedure(h, {"name": "backlash_takeup"})
             self.assertIn(
-                "backlash_takeup", _instrument.get_procedures(h)
+                "zero_z_galvo", _instrument.get_procedures(h)
             )  # reads fine
 
     def test_get_state_reports_limits_provenance(self):

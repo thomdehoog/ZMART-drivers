@@ -6,11 +6,7 @@ University of Zurich (thom.dehoog@zmb.uzh.ch, thomdehoog@gmail.com).
 
 import pytest
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.error_classification import (
-    Kind,
-    classify_error,
-    sends_again,
-)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.error_classification import Kind, classify_error, sends_again
 
 
 @pytest.mark.parametrize(

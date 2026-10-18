@@ -4,7 +4,7 @@ The commands here answer questions about the whole microscope rather than
 about the stage or one picture: its state (the selected job, the objectives,
 the pixel size, the limits that govern the session, and whether each setup
 step has been done), the description of the microscope in plain words, the
-named procedures it can run (backlash take-up, parking the z-galvo,
+named procedures it can run (parking the z-galvo,
 autofocus), and a short report of what the connection stands on.
 
 The *changeable* part of the state is deliberately just the selected job:
@@ -23,13 +23,12 @@ from pathlib import Path
 from typing import Any
 
 from . import session_state as _session_state
-from ..configuration import store as _machine
+from ..driver_setup import store as _machine
 from ..dispatcher import gate as _gate
-from ..vendor_interface.parsing import parse_tile_geometry as _parse_tile_geometry
-from ..vendor_interface.primitive_handling import state as _readers
+from ..vendor_specific.parsing import parse_tile_geometry as _parse_tile_geometry
+from ..vendor_specific.primitive_handling import state as _readers
 from .acquisition_and_saving import acquire as _capture
-from .commands import backlash as _motion
-from ..vendor_interface.primitive_handling import changes as _commands
+from ..vendor_specific.primitive_handling import changes as _commands
 from .commands import compensated_changes as _compensated
 from . import session as _info
 from .frame import canvas, delta_or_warn, get_xyz, hardware_snapshot
@@ -66,7 +65,7 @@ def setup_readiness(
     if not limits or limits.get("is_fallback") or limits.get("source") != "machine":
         issues.append(
             f"machine-specific limits are not active (got {limits}); publish this "
-            "machine's measured envelope with configuration/limits/notebooks/set_limits.ipynb first"
+            "machine's measured envelope with driver_setup/limits/notebooks/set_limits.ipynb first"
         )
     if not orientation.get("measured"):
         issues.append(
@@ -242,9 +241,6 @@ def get_procedures(handle: ZmartHandle) -> dict:
     require_open(handle)
     _, autofocus = job_catalog(handle)
     return {
-        "backlash_takeup": {
-            "description": "pin the XY leadscrew slack at the current position (+X +Y approach)"
-        },
         "zero_z_galvo": {
             "description": "park the z-galvo at 0 without changing the focus "
             "(its offset is transferred onto z-wide), freeing the galvo's "
@@ -263,9 +259,6 @@ def run_procedure(handle: ZmartHandle, procedure: dict) -> dict:
     """Run a procedure from :func:`get_procedures`; report what ran."""
     require_open(handle)
     name = procedure.get("name")
-    if name == "backlash_takeup":
-        _motion.correct_backlash(handle.client)
-        return {"ran": dict(procedure)}
     if name == "zero_z_galvo":
         return {"ran": dict(procedure), **_zero_z_galvo(handle)}
     if name == "autofocus":
@@ -453,7 +446,7 @@ def _setup(handle: ZmartHandle) -> dict:
             if published
             else (
                 "not published: the bundled defaults govern every move; publish this "
-                "microscope's limits with configuration/limits/notebooks/set_limits.ipynb"
+                "microscope's limits with driver_setup/limits/notebooks/set_limits.ipynb"
             ),
         },
         "orientation": {
@@ -462,7 +455,7 @@ def _setup(handle: ZmartHandle) -> dict:
             if orientation.get("measured")
             else (
                 "not measured: saved pictures are kept as the camera sees them; run "
-                "configuration/image_stage_registration/notebooks/set_orientation.ipynb"
+                "driver_setup/image_stage_registration/notebooks/set_orientation.ipynb"
             ),
         },
         "calibration": {
@@ -471,7 +464,7 @@ def _setup(handle: ZmartHandle) -> dict:
             if calibration.get("loaded") and measured_slots
             else (
                 "no measured objective calibration: a change of objective cannot keep the "
-                "sample in place; run configuration/optical_calibration/notebooks/calibrate_objective_pair.ipynb"
+                "sample in place; run driver_setup/optical_calibration/notebooks/calibrate_objective_pair.ipynb"
             ),
         },
         "origin": {

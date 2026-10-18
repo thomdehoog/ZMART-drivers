@@ -20,25 +20,15 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitive_handling import (
-    readings as capabilities,
-)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling import readings as capabilities
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.commands import (
     objective_shift,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitive_handling import (
-    profiles,
-)
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitive_handling import (
-    prechecks,
-)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling import profiles
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling import prechecks
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher import dispatcher
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitive_handling import (
-    state as readers,
-)
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitives.api import (
-    delivery,
-)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling import state as readers
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitives.api import delivery
 
 WINDOW_S = 0.5
 
@@ -349,15 +339,13 @@ def test_delivery_stops_trying_once_received():
 
 def test_commands_deliver_through_the_one_helper():
     """No other code hands a message to LAS X with its own tries or timeout."""
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitive_handling import (
-        transport,
-    )
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling import transport
 
     assert transport.deliver is delivery.deliver
 
 
 # Whole folders, plus the change definitions that moved from actions/ to procedures/.
-GUARDED = ("dispatcher", "vendor_interface")
+GUARDED = ("dispatcher", "vendor_specific")
 GUARDED_FILES = (
     "procedures/commands/compensated_changes.py",
     "procedures/acquisition_and_saving/acquire.py",
@@ -371,23 +359,23 @@ WAIT_NAME = re.compile(
 #: The waits that stay outside the rule, by decision, as (file, name).
 EXCEPTIONS = {
     # Acquisition is never sent again and watches one acquisition (ACQUIRE).
-    ("vendor_interface/primitive_handling/confirmations.py", "start_timeout"),
-    ("vendor_interface/primitive_handling/confirmations.py", "poll_interval"),
-    ("vendor_interface/primitive_handling/profiles.py", "max_retries"),
-    ("vendor_interface/primitive_handling/profiles.py", "max_confirm_attempts"),
-    ("vendor_interface/primitive_handling/profiles.py", "poll_interval"),
-    ("vendor_interface/primitive_handling/profiles.py", "start_timeout"),
+    ("vendor_specific/primitive_handling/confirmations.py", "start_timeout"),
+    ("vendor_specific/primitive_handling/confirmations.py", "poll_interval"),
+    ("vendor_specific/primitive_handling/profiles.py", "max_retries"),
+    ("vendor_specific/primitive_handling/profiles.py", "max_confirm_attempts"),
+    ("vendor_specific/primitive_handling/profiles.py", "poll_interval"),
+    ("vendor_specific/primitive_handling/profiles.py", "start_timeout"),
     # LAS X filling in the error report after a command stays at 1 s.
-    ("vendor_interface/primitive_handling/transport.py", "ECHO_SETTLE_TIMEOUT_S"),
+    ("vendor_specific/primitive_handling/transport.py", "ECHO_SETTLE_TIMEOUT_S"),
     # How old a log entry may be to count as current: freshness, not a wait.
-    ("vendor_interface/primitive_handling/profiles.py", "current_window_s"),
+    ("vendor_specific/primitive_handling/profiles.py", "current_window_s"),
     # Waiting for a finished picture's files to stop growing on disk. This is
     # about files, not about LAS X's state, and has its own decided numbers.
-    ("vendor_interface/files.py", "DEFAULT_FILE_STABILITY_TIMEOUT_S"),
-    ("vendor_interface/files.py", "DEFAULT_EXPORT_COMPLETION_TIMEOUT_S"),
-    ("vendor_interface/files.py", "DEFAULT_EXPORT_COMPLETION_POLL_INTERVAL_S"),
-    ("vendor_interface/files.py", "timeout"),
-    ("vendor_interface/files.py", "poll_interval"),
+    ("vendor_specific/files.py", "DEFAULT_FILE_STABILITY_TIMEOUT_S"),
+    ("vendor_specific/files.py", "DEFAULT_EXPORT_COMPLETION_TIMEOUT_S"),
+    ("vendor_specific/files.py", "DEFAULT_EXPORT_COMPLETION_POLL_INTERVAL_S"),
+    ("vendor_specific/files.py", "timeout"),
+    ("vendor_specific/files.py", "poll_interval"),
     # The rule itself.
     ("dispatcher/dispatcher.py", "WINDOW_S"),
 }

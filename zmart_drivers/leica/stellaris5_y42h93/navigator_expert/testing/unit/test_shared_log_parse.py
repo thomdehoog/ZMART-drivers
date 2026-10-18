@@ -15,13 +15,9 @@ from unittest.mock import patch
 
 import pytest
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitive_handling import (
-    state as readers,
-)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling import state as readers
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher import dispatcher
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitives.log import (
-    log_reader,
-)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitives.log import log_reader
 
 PARSE_S = 0.05
 
@@ -163,9 +159,7 @@ def test_a_snapshot_counts_only_for_the_log_files_it_was_parsed_from(
     monkeypatch, tmp_path
 ):
     """Pointing the reader at other files (the --mock validators do) never serves the old ones."""
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitive_handling import (
-        profiles,
-    )
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling import profiles
 
     seen = []
 

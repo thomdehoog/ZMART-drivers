@@ -13,9 +13,9 @@ the driver once on the LAS X computer, then connect by name in every session::
     mic.get_xyz()
 
 The methods only translate. The work of every command lives in the parts
-below: the readings and changes in ``vendor_interface/`` and ``dispatcher/``,
+below: the readings and changes in ``vendor_specific/`` and ``dispatcher/``,
 the recipes (including saving the files) in ``procedures/``, the microscope's
-own settings in ``configuration/``. This class opens the connection, hands
+own settings in ``driver_setup/``. This class opens the connection, hands
 each call to the procedure that does the work, and turns the answer into the
 shape the controller takes.
 
@@ -41,22 +41,22 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from ..configuration.origin import saved_origin as _saved_origin
-from ..configuration.origin import set_origin as _set_origin
-from ..configuration import data_location as _data_location
+from ..driver_setup.origin import saved_origin as _saved_origin
+from ..driver_setup.origin import set_origin as _set_origin
+from ..driver_setup import data_location as _data_location
 from .. import running_log
-from ..configuration.image_stage_registration import load_rig_orientation
-from ..configuration.optical_calibration.model import load_objective_calibration
+from ..driver_setup.image_stage_registration import load_rig_orientation
+from ..driver_setup.optical_calibration.model import load_objective_calibration
 from ..procedures import session_state as _session_state
-from ..configuration.store import MACHINE
+from ..driver_setup.store import MACHINE
 from ..dispatcher import gate as _gate
-from ..vendor_interface.naming import run_hash
+from ..vendor_specific.naming import run_hash
 from ..procedures.acquisition_and_saving import acquisition as _acquisition
 from ..procedures import frame as _frame
 from ..procedures import instrument as _instrument
 from ..procedures.session import ZmartHandle
-from ..vendor_interface.connection import lasx_client
-from ..vendor_interface.primitives.interface import lasx_dialogs
+from ..vendor_specific.connection import lasx_client
+from ..vendor_specific.primitives.interface import lasx_dialogs
 
 log = logging.getLogger(__name__)
 
@@ -283,7 +283,7 @@ class ZmartDriver:
     # --- procedures ---------------------------------------------------------------------
 
     def get_procedures(self):
-        """``True, procedures``: backlash takeup, parking the z-galvo, autofocus."""
+        """``True, procedures``: parking the z-galvo, autofocus."""
         return True, _instrument.get_procedures(self._handle)
 
     def run_procedure(self, procedure):
@@ -307,7 +307,7 @@ def _load_data_location():
     except (OSError, ValueError) as exc:
         raise RuntimeError(
             f"this microscope's saved data location could not be read ({exc}); "
-            "set it again with configuration/data_location/notebooks/set_data_location.ipynb"
+            "set it again with driver_setup/data_location/notebooks/set_data_location.ipynb"
         ) from exc
 
 
