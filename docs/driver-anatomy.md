@@ -114,11 +114,11 @@ The folder layout inside a driver:
 
 ```
 my_driver/
-    zmart_driver.json          the driver's name, how to reach the microscope on this computer,
-                               and the path of the class file below; the file you register
     __init__.py                makes the folder a package, so the parts can import each other
 
-    for_zmart_controller/      everything that faces the controller
+    for_zmart_controller/      everything that faces the controller; the folder you register
+        zmart_driver.json      the driver's name, how to reach the microscope on this computer,
+                               and the class file beside it
         __init__.py            needed: the controller imports the class file as part of the package, so its imports work
         zmart_driver.py        the ZmartDriver class the controller calls; kept thin
 
@@ -169,12 +169,14 @@ my_driver/
     README.md
 ```
 
-The class file is in a folder of its own, and not loose beside the other
-folders, so that the top of a driver is as tidy as the inside. The controller
-already allows this: it reads the class file's path from the `"driver"` key in
-`zmart_driver.json`, so a driver says `"driver": "for_zmart_controller/zmart_driver.py"`.
-Whether the controller should also find the folder by its name, so that the
-key is not needed, is a change to the controller that is still to be decided.
+Everything that faces the controller, the class file and `zmart_driver.json`,
+sits together in `for_zmart_controller/`, so that the top of a driver is as
+tidy as the inside and the controller's side is in one place. The operator
+registers that folder. The controller already allows this: it accepts a path to
+the folder or to its `zmart_driver.json`, reads the class file's name from the
+`"driver"` key (`"zmart_driver.py"` by default), and imports the class as part
+of its package. Finding the driver by the folder's name, without a path, is a
+change to the controller that is still to be decided.
 
 What changed from the first version of this layout: the `actions/` folder is
 gone, `client.py` is split into `connection.py` and the `primitives/` folder,
