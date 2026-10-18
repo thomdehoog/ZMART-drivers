@@ -1,0 +1,1119 @@
+{
+  "detector_gain": {
+    "dispatch": {
+      "confirm": {
+        "function": "_confirm_detector_gain",
+        "keywords": {
+          "beam_route": "HyD1",
+          "job_name": "J",
+          "si": 0,
+          "target": 55.0,
+          "tolerance": 1.0
+        }
+      },
+      "description": "Setting[0].Detector[HyD1].Gain -> 55.0",
+      "error_check": null,
+      "max_retries": null,
+      "profile": "DETECTOR_GAIN",
+      "request": "PyApiSetDetectorGainByJobName",
+      "writes": [
+        [
+          "JobName",
+          "J"
+        ],
+        [
+          "SettingIndex",
+          0
+        ],
+        [
+          "BeamRoute",
+          "HyD1"
+        ],
+        [
+          "GainValue",
+          55.0
+        ]
+      ]
+    },
+    "gate": [
+      [
+        "set_detector_gain",
+        {
+          "job_name": "J",
+          "value": 55.0
+        }
+      ]
+    ],
+    "result": "from the dispatcher"
+  },
+  "filter_wheel_slot": {
+    "dispatch": {
+      "confirm": {
+        "function": "_confirm_filter_wheel_slot",
+        "keywords": {
+          "beam_route": "R1",
+          "fw_type": 2,
+          "job_name": "J",
+          "si": 0,
+          "target": 3
+        }
+      },
+      "description": "FilterWheel[R1] slot -> 3",
+      "error_check": null,
+      "max_retries": null,
+      "profile": "FILTER_WHEEL_SLOT",
+      "request": "PyApiSetFilterWheelSlotByJobName",
+      "writes": [
+        [
+          "JobName",
+          "J"
+        ],
+        [
+          "SettingIndex",
+          0
+        ],
+        [
+          "BeamRoute",
+          "R1"
+        ],
+        [
+          "FilterWheelType",
+          2
+        ],
+        [
+          "SlotIndex",
+          3
+        ]
+      ]
+    },
+    "gate": [
+      [
+        "set_filter_wheel_slot",
+        {
+          "job_name": "J",
+          "value": 3
+        }
+      ]
+    ],
+    "result": "from the dispatcher"
+  },
+  "filter_wheel_spectrum": {
+    "dispatch": {
+      "confirm": {
+        "function": "_confirm_filter_wheel_spectrum",
+        "keywords": {
+          "beam_route": "R1",
+          "fw_type": 2,
+          "job_name": "J",
+          "si": 0,
+          "target": 520.0,
+          "tolerance": 1.0
+        }
+      },
+      "description": "FilterWheel[R1] spectrum -> 520.0",
+      "error_check": null,
+      "max_retries": null,
+      "profile": "FILTER_WHEEL_SPECTRUM",
+      "request": "PyApiSetFilterWheelSpectrumPositionByJobName",
+      "writes": [
+        [
+          "JobName",
+          "J"
+        ],
+        [
+          "SettingIndex",
+          0
+        ],
+        [
+          "BeamRoute",
+          "R1"
+        ],
+        [
+          "FilterWheelType",
+          2
+        ],
+        [
+          "FilterSpectrumPosition",
+          520.0
+        ]
+      ]
+    },
+    "gate": [
+      [
+        "set_filter_wheel_spectrum",
+        {
+          "job_name": "J",
+          "value": 520.0
+        }
+      ]
+    ],
+    "result": "from the dispatcher"
+  },
+  "frame_accumulation": {
+    "dispatch": {
+      "confirm": {
+        "function": "_confirm_frame_accumulation",
+        "keywords": {
+          "job_name": "J",
+          "si": 1,
+          "target": 3
+        }
+      },
+      "description": "Setting[1].FrameAccumulation -> 3",
+      "error_check": null,
+      "max_retries": null,
+      "profile": "FRAME_ACCUMULATION",
+      "request": "PyApiSetFrameAccumulationByJobName",
+      "writes": [
+        [
+          "JobName",
+          "J"
+        ],
+        [
+          "SettingIndex",
+          1
+        ],
+        [
+          "FrameAccumulation",
+          3
+        ]
+      ]
+    },
+    "gate": [
+      [
+        "set_frame_accumulation",
+        {
+          "job_name": "J",
+          "value": 3
+        }
+      ]
+    ],
+    "result": "from the dispatcher"
+  },
+  "frame_average": {
+    "dispatch": {
+      "confirm": {
+        "function": "_confirm_frame_average",
+        "keywords": {
+          "job_name": "J",
+          "si": 1,
+          "target": 2
+        }
+      },
+      "description": "Setting[1].FrameAverage -> 2",
+      "error_check": null,
+      "max_retries": null,
+      "profile": "FRAME_AVERAGE",
+      "request": "PyApiSetFrameAverageByJobName",
+      "writes": [
+        [
+          "JobName",
+          "J"
+        ],
+        [
+          "SettingIndex",
+          1
+        ],
+        [
+          "FrameAverage",
+          2
+        ]
+      ]
+    },
+    "gate": [
+      [
+        "set_frame_average",
+        {
+          "job_name": "J",
+          "value": 2
+        }
+      ]
+    ],
+    "result": "from the dispatcher"
+  },
+  "image_format_text": {
+    "dispatch": {
+      "confirm": {
+        "function": "_confirm_image_format",
+        "keywords": {
+          "h": 512,
+          "job_name": "J",
+          "w": 512
+        }
+      },
+      "description": "Format -> 512 x 512",
+      "error_check": null,
+      "max_retries": null,
+      "profile": "IMAGE_FORMAT",
+      "request": "PyApiSetImageSizeByJobName",
+      "writes": [
+        [
+          "JobName",
+          "J"
+        ],
+        [
+          "ImageWidth",
+          512
+        ],
+        [
+          "ImageHeight",
+          512
+        ],
+        [
+          "IsAutoFocusDefinition",
+          false
+        ]
+      ]
+    },
+    "gate": [
+      [
+        "set_image_format",
+        {
+          "job_name": "J",
+          "value": "512 x 512"
+        }
+      ]
+    ],
+    "result": "from the dispatcher"
+  },
+  "image_format_tuple": {
+    "dispatch": {
+      "confirm": {
+        "function": "_confirm_image_format",
+        "keywords": {
+          "h": 128,
+          "job_name": "J",
+          "w": 256
+        }
+      },
+      "description": "Format -> 256 x 128",
+      "error_check": null,
+      "max_retries": null,
+      "profile": "IMAGE_FORMAT",
+      "request": "PyApiSetImageSizeByJobName",
+      "writes": [
+        [
+          "JobName",
+          "J"
+        ],
+        [
+          "ImageWidth",
+          256
+        ],
+        [
+          "ImageHeight",
+          128
+        ],
+        [
+          "IsAutoFocusDefinition",
+          false
+        ]
+      ]
+    },
+    "gate": [
+      [
+        "set_image_format",
+        {
+          "job_name": "J",
+          "value": "256 x 128"
+        }
+      ]
+    ],
+    "result": "from the dispatcher"
+  },
+  "laser_intensity": {
+    "dispatch": {
+      "confirm": {
+        "function": "_confirm_laser_intensity",
+        "keywords": {
+          "beam_route": "R1",
+          "job_name": "J",
+          "line_index": 2,
+          "si": 0,
+          "target": 0.25,
+          "tolerance": 0.005
+        }
+      },
+      "description": "Setting[0].Laser[R1][2] -> 0.25",
+      "error_check": null,
+      "max_retries": null,
+      "profile": "LASER_INTENSITY",
+      "request": "PyApiSetLaserIntensityByJobName",
+      "writes": [
+        [
+          "JobName",
+          "J"
+        ],
+        [
+          "SettingIndex",
+          0
+        ],
+        [
+          "BeamRoute",
+          "R1"
+        ],
+        [
+          "LaserLineIndex",
+          2
+        ],
+        [
+          "IntensityValue",
+          0.25
+        ],
+        [
+          "IsRoiBackground",
+          false
+        ]
+      ]
+    },
+    "gate": [
+      [
+        "set_laser_intensity",
+        {
+          "job_name": "J",
+          "value": 0.25
+        }
+      ]
+    ],
+    "result": "from the dispatcher"
+  },
+  "laser_shutter_closed": {
+    "dispatch": {
+      "confirm": {
+        "function": "_confirm_laser_shutter",
+        "keywords": {
+          "beam_route": "R1",
+          "job_name": "J",
+          "si": 0,
+          "target": false
+        }
+      },
+      "description": "Setting[0].Shutter[R1] -> Closed",
+      "error_check": null,
+      "max_retries": null,
+      "profile": "LASER_SHUTTER",
+      "request": "PyApiSetLaserShutterByJobName",
+      "writes": [
+        [
+          "JobName",
+          "J"
+        ],
+        [
+          "SettingIndex",
+          0
+        ],
+        [
+          "BeamRoute",
+          "R1"
+        ],
+        [
+          "Activate",
+          false
+        ]
+      ]
+    },
+    "gate": [
+      [
+        "set_laser_shutter",
+        {
+          "job_name": "J",
+          "value": false
+        }
+      ]
+    ],
+    "result": "from the dispatcher"
+  },
+  "laser_shutter_open": {
+    "dispatch": {
+      "confirm": {
+        "function": "_confirm_laser_shutter",
+        "keywords": {
+          "beam_route": "R1",
+          "job_name": "J",
+          "si": 0,
+          "target": true
+        }
+      },
+      "description": "Setting[0].Shutter[R1] -> Open",
+      "error_check": null,
+      "max_retries": null,
+      "profile": "LASER_SHUTTER",
+      "request": "PyApiSetLaserShutterByJobName",
+      "writes": [
+        [
+          "JobName",
+          "J"
+        ],
+        [
+          "SettingIndex",
+          0
+        ],
+        [
+          "BeamRoute",
+          "R1"
+        ],
+        [
+          "Activate",
+          true
+        ]
+      ]
+    },
+    "gate": [
+      [
+        "set_laser_shutter",
+        {
+          "job_name": "J",
+          "value": true
+        }
+      ]
+    ],
+    "result": "from the dispatcher"
+  },
+  "line_accumulation": {
+    "dispatch": {
+      "confirm": {
+        "function": "_confirm_line_accumulation",
+        "keywords": {
+          "job_name": "J",
+          "si": 0,
+          "target": 4
+        }
+      },
+      "description": "Setting[0].LineAccumulation -> 4",
+      "error_check": null,
+      "max_retries": null,
+      "profile": "LINE_ACCUMULATION",
+      "request": "PyApiSetLineAccumulationByJobName",
+      "writes": [
+        [
+          "JobName",
+          "J"
+        ],
+        [
+          "SettingIndex",
+          0
+        ],
+        [
+          "LineAccumulation",
+          4
+        ]
+      ]
+    },
+    "gate": [
+      [
+        "set_line_accumulation",
+        {
+          "job_name": "J",
+          "value": 4
+        }
+      ]
+    ],
+    "result": "from the dispatcher"
+  },
+  "line_average": {
+    "dispatch": {
+      "confirm": {
+        "function": "_confirm_line_average",
+        "keywords": {
+          "job_name": "J",
+          "si": 0,
+          "target": 2
+        }
+      },
+      "description": "Setting[0].LineAverage -> 2",
+      "error_check": null,
+      "max_retries": null,
+      "profile": "LINE_AVERAGE",
+      "request": "PyApiSetLineAverageByJobName",
+      "writes": [
+        [
+          "JobName",
+          "J"
+        ],
+        [
+          "SettingIndex",
+          0
+        ],
+        [
+          "LineAverage",
+          2
+        ]
+      ]
+    },
+    "gate": [
+      [
+        "set_line_average",
+        {
+          "job_name": "J",
+          "value": 2
+        }
+      ]
+    ],
+    "result": "from the dispatcher"
+  },
+  "pinhole_airy": {
+    "dispatch": {
+      "confirm": {
+        "function": "_confirm_pinhole_airy",
+        "keywords": {
+          "job_name": "J",
+          "si": 0,
+          "target": 1.0,
+          "tolerance": 0.05
+        }
+      },
+      "description": "Setting[0].PinholeAiry -> 1.0",
+      "error_check": null,
+      "max_retries": null,
+      "profile": "PINHOLE_AIRY",
+      "request": "PyApiSetPinholeAUByJobName",
+      "writes": [
+        [
+          "JobName",
+          "J"
+        ],
+        [
+          "SettingIndex",
+          0
+        ],
+        [
+          "PinholeAiry",
+          1.0
+        ]
+      ]
+    },
+    "gate": [
+      [
+        "set_pinhole_airy",
+        {
+          "job_name": "J",
+          "value": 1.0
+        }
+      ]
+    ],
+    "result": "from the dispatcher"
+  },
+  "scan_field_rotation": {
+    "dispatch": {
+      "confirm": {
+        "function": "_confirm_scan_field_rotation",
+        "keywords": {
+          "job_name": "J",
+          "target": 12.5,
+          "tolerance": 0.2
+        }
+      },
+      "description": "Rotation -> 12.5",
+      "error_check": null,
+      "max_retries": null,
+      "profile": "SCAN_FIELD_ROTATION",
+      "request": "PyApiSetScanFieldRotationByJobName",
+      "writes": [
+        [
+          "JobName",
+          "J"
+        ],
+        [
+          "Rotation",
+          12.5
+        ]
+      ]
+    },
+    "gate": [
+      [
+        "set_scan_field_rotation",
+        {
+          "job_name": "J",
+          "value": 12.5
+        }
+      ]
+    ],
+    "result": "from the dispatcher"
+  },
+  "scan_mode": {
+    "dispatch": {
+      "confirm": {
+        "function": "_confirm_scan_mode",
+        "keywords": {
+          "job_name": "J",
+          "target": "xyz"
+        }
+      },
+      "description": "ScanMode -> xyz",
+      "error_check": null,
+      "max_retries": null,
+      "profile": "SCAN_MODE",
+      "request": "PyApiSetScanModeByJobName",
+      "writes": [
+        [
+          "JobName",
+          "J"
+        ],
+        [
+          "ScanModeValue",
+          "xyz"
+        ]
+      ]
+    },
+    "gate": [
+      [
+        "set_scan_mode",
+        {
+          "job_name": "J",
+          "value": "xyz"
+        }
+      ]
+    ],
+    "result": "from the dispatcher"
+  },
+  "scan_resonant_on": {
+    "dispatch": {
+      "confirm": {
+        "function": "_confirm_scan_resonant",
+        "keywords": {
+          "job_name": "J",
+          "target": true
+        }
+      },
+      "description": "Resonant -> True",
+      "error_check": {
+        "function": "_scan_resonant_error_check",
+        "keywords": {
+          "job_name": "J",
+          "target": true,
+          "timeout": 3
+        }
+      },
+      "max_retries": null,
+      "profile": "SCAN_RESONANT",
+      "request": "PyApiSetScannerToResonantByJobName",
+      "writes": [
+        [
+          "JobName",
+          "J"
+        ],
+        [
+          "EnableResonant",
+          true
+        ]
+      ]
+    },
+    "gate": [
+      [
+        "set_scan_resonant",
+        {
+          "job_name": "J",
+          "value": true
+        }
+      ]
+    ],
+    "result": "from the dispatcher"
+  },
+  "scan_speed": {
+    "dispatch": {
+      "confirm": {
+        "function": "_confirm_scan_speed",
+        "keywords": {
+          "job_name": "J",
+          "target": 400
+        }
+      },
+      "description": "ScanSpeed -> 400",
+      "error_check": null,
+      "max_retries": null,
+      "profile": "SCAN_SPEED",
+      "request": "PyApiSetScanSpeedByJobName",
+      "writes": [
+        [
+          "JobName",
+          "J"
+        ],
+        [
+          "ScanSpeed",
+          400
+        ]
+      ]
+    },
+    "gate": [
+      [
+        "set_scan_speed",
+        {
+          "job_name": "J",
+          "value": 400
+        }
+      ]
+    ],
+    "result": "from the dispatcher"
+  },
+  "sequential_empty": {
+    "dispatch": null,
+    "gate": [
+      [
+        "set_sequential_mode",
+        {
+          "job_name": "J",
+          "value": " "
+        }
+      ]
+    ],
+    "result": {
+      "message": "SequentialMode -> ' ' | Invalid: mode must be a non-empty string. Valid: ['Line', 'Frame', 'Stack']",
+      "success": false
+    }
+  },
+  "sequential_frame": {
+    "dispatch": {
+      "confirm": {
+        "function": "_confirm_sequential_mode",
+        "keywords": {
+          "job_name": "J",
+          "target": "Frame"
+        }
+      },
+      "description": "SequentialMode -> Frame",
+      "error_check": null,
+      "max_retries": null,
+      "profile": "SEQUENTIAL_MODE",
+      "request": "PyApiSetSequentialModeByJobName",
+      "writes": [
+        [
+          "JobName",
+          "J"
+        ],
+        [
+          "SequentialMode",
+          "eSequentialFrame"
+        ]
+      ]
+    },
+    "gate": [
+      [
+        "set_sequential_mode",
+        {
+          "job_name": "J",
+          "value": "Frame"
+        }
+      ]
+    ],
+    "result": "from the dispatcher"
+  },
+  "sequential_unknown": {
+    "dispatch": null,
+    "gate": [
+      [
+        "set_sequential_mode",
+        {
+          "job_name": "J",
+          "value": "Bogus"
+        }
+      ]
+    ],
+    "result": {
+      "message": "Could not map 'Bogus' to SequentialMode enum. Valid: ['Line', 'Frame', 'Stack']",
+      "success": false
+    }
+  },
+  "z_stack_definition_both": {
+    "dispatch": {
+      "confirm": {
+        "function": "_confirm_z_stack_definition",
+        "keywords": {
+          "begin_um": -5.0,
+          "end_um": 5.0,
+          "job_name": "J",
+          "tolerance": 1.0
+        }
+      },
+      "description": "Z-stack def: begin=-5.0, end=5.0",
+      "error_check": null,
+      "max_retries": null,
+      "profile": "Z_STACK_DEFINITION",
+      "request": "PyApiSetZStackDefinitionByJobName",
+      "writes": [
+        [
+          "JobName",
+          "J"
+        ],
+        [
+          "SetBegin",
+          1
+        ],
+        [
+          "BeginValue",
+          -4.9999999999999996e-06
+        ],
+        [
+          "SetEnd",
+          1
+        ],
+        [
+          "EndValue",
+          4.9999999999999996e-06
+        ]
+      ]
+    },
+    "gate": [
+      [
+        "set_z_stack_definition",
+        {
+          "job_name": "J",
+          "values": [
+            -5.0,
+            5.0
+          ]
+        }
+      ]
+    ],
+    "result": "from the dispatcher"
+  },
+  "z_stack_definition_reset": {
+    "dispatch": {
+      "confirm": {
+        "function": "_confirm_z_stack_definition",
+        "keywords": {
+          "begin_um": null,
+          "end_um": null,
+          "job_name": "J",
+          "tolerance": 1.0
+        }
+      },
+      "description": "Z-stack def: begin=None, end=None",
+      "error_check": null,
+      "max_retries": null,
+      "profile": "Z_STACK_DEFINITION",
+      "request": "PyApiSetZStackDefinitionByJobName",
+      "writes": [
+        [
+          "JobName",
+          "J"
+        ],
+        [
+          "SetBegin",
+          0
+        ],
+        [
+          "BeginValue",
+          0.0
+        ],
+        [
+          "SetEnd",
+          0
+        ],
+        [
+          "EndValue",
+          0.0
+        ]
+      ]
+    },
+    "gate": [
+      [
+        "set_z_stack_definition",
+        {
+          "job_name": "J",
+          "values": []
+        }
+      ]
+    ],
+    "result": "from the dispatcher"
+  },
+  "z_stack_definition_zero_begin": {
+    "dispatch": {
+      "confirm": {
+        "function": "_confirm_z_stack_definition",
+        "keywords": {
+          "begin_um": 0.0,
+          "end_um": null,
+          "job_name": "J",
+          "tolerance": 1.0
+        }
+      },
+      "description": "Z-stack def: begin=0.0, end=None",
+      "error_check": null,
+      "max_retries": null,
+      "profile": "Z_STACK_DEFINITION",
+      "request": "PyApiSetZStackDefinitionByJobName",
+      "writes": [
+        [
+          "JobName",
+          "J"
+        ],
+        [
+          "SetBegin",
+          1
+        ],
+        [
+          "BeginValue",
+          0.0
+        ],
+        [
+          "SetEnd",
+          2
+        ],
+        [
+          "EndValue",
+          0.0
+        ]
+      ]
+    },
+    "gate": [
+      [
+        "set_z_stack_definition",
+        {
+          "job_name": "J",
+          "values": [
+            0.0
+          ]
+        }
+      ]
+    ],
+    "result": "from the dispatcher"
+  },
+  "z_stack_size": {
+    "dispatch": {
+      "confirm": {
+        "function": "_confirm_z_stack_size",
+        "keywords": {
+          "job_name": "J",
+          "target_um": 20.0,
+          "tolerance": 1.5
+        }
+      },
+      "description": "Z-stack size -> 20.0 um",
+      "error_check": null,
+      "max_retries": null,
+      "profile": "Z_STACK_SIZE",
+      "request": "PyApiSetZStackSizeByJobName",
+      "writes": [
+        [
+          "JobName",
+          "J"
+        ],
+        [
+          "StackSize",
+          1.9999999999999998e-05
+        ]
+      ]
+    },
+    "gate": [
+      [
+        "set_z_stack_size",
+        {
+          "job_name": "J",
+          "value": 20.0
+        }
+      ]
+    ],
+    "result": "from the dispatcher"
+  },
+  "z_stack_step_size": {
+    "dispatch": {
+      "confirm": {
+        "function": "_confirm_z_stack_step_size",
+        "keywords": {
+          "job_name": "J",
+          "target": 0.5,
+          "tolerance": 0.5
+        }
+      },
+      "description": "Z-stack step -> 0.5 um",
+      "error_check": null,
+      "max_retries": null,
+      "profile": "Z_STACK_STEP_SIZE",
+      "request": "PyApiCommandSetZStackStepSizeByJobName",
+      "writes": [
+        [
+          "JobName",
+          "J"
+        ],
+        [
+          "StackStepSize",
+          5e-07
+        ]
+      ]
+    },
+    "gate": [
+      [
+        "set_z_stack_step_size",
+        {
+          "job_name": "J",
+          "value": 0.5
+        }
+      ]
+    ],
+    "result": "from the dispatcher"
+  },
+  "zoom": {
+    "dispatch": {
+      "confirm": {
+        "function": "_confirm_zoom",
+        "keywords": {
+          "job_name": "J",
+          "target": 1.5,
+          "tolerance": 0.1
+        }
+      },
+      "description": "Zoom -> 1.5",
+      "error_check": null,
+      "max_retries": null,
+      "profile": "ZOOM",
+      "request": "PyApiSetZoomByJobName",
+      "writes": [
+        [
+          "JobName",
+          "J"
+        ],
+        [
+          "ZoomValue",
+          1.5
+        ]
+      ]
+    },
+    "gate": [
+      [
+        "set_zoom",
+        {
+          "job_name": "J",
+          "value": 1.5
+        }
+      ]
+    ],
+    "result": "from the dispatcher"
+  },
+  "zoom_with_overrides": {
+    "dispatch": {
+      "confirm": {
+        "function": "_confirm_zoom",
+        "keywords": {
+          "job_name": "J",
+          "target": 1.5,
+          "tolerance": 0.01
+        }
+      },
+      "description": "Zoom -> 1.5",
+      "error_check": null,
+      "max_retries": 2,
+      "profile": "ZOOM",
+      "request": "PyApiSetZoomByJobName",
+      "writes": [
+        [
+          "JobName",
+          "J"
+        ],
+        [
+          "ZoomValue",
+          1.5
+        ]
+      ]
+    },
+    "gate": [
+      [
+        "set_zoom",
+        {
+          "job_name": "J",
+          "value": 1.5
+        }
+      ]
+    ],
+    "result": "from the dispatcher"
+  }
+}
