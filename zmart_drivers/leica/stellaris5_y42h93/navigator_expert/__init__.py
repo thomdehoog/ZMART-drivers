@@ -5,7 +5,8 @@ Package layout, the anatomy of a ZMART driver (``docs/driver-anatomy.md`` in
 this repository)::
 
     navigator_expert/
-    - zmart_controller_plugin.py  the module handed to the ZMART Controller (to become zmart_driver.py)
+    - for_zmart_controller/  the ZmartDriver class the controller makes (zmart_driver.py), and the
+                          older module shape of the same driver (zmart_controller_plugin.py)
     - zmart_adapter/      the functions behind it, one per controller command
     - connect.py          the connect flow: open LAS X, load this microscope's configuration
     - vendor_interface/   the only part that knows LAS X: the CAM API runtime, the API and

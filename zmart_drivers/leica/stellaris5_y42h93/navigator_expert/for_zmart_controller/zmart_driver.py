@@ -2,7 +2,8 @@ r"""The Leica STELLARIS 5 driver, as the ZMART Controller plugs it in.
 
 This is the class the controller makes when it connects, with one method per
 command (see the controller's "How do I plug in a ZMART-driver"). Together
-with ``zmart_driver.json`` beside it, it is all the controller needs. Install
+with ``zmart_driver.json`` at the top of the driver folder, which names this
+file, it is all the controller needs. Install
 the driver once on the LAS X computer, then connect by name in every session::
 
     from zmart_controller import mic
@@ -40,7 +41,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from .zmart_adapter import zmart_adapter as _adapter
+from ..zmart_adapter import zmart_adapter as _adapter
 
 #: The three axes, in the order the controller's canvas lists them.
 _AXES = ("x", "y", "z")

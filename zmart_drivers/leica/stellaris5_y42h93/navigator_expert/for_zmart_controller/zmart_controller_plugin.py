@@ -1,7 +1,7 @@
 r"""The Leica STELLARIS 5 driver in the older module shape, kept until the class has run on hardware.
 
 The controller now plugs a driver in through ``zmart_driver.json`` and the
-``ZmartDriver`` class in ``zmart_driver.py``, both at the top of this folder;
+``ZmartDriver`` class in ``zmart_driver.py``, next to this file;
 that is the shape to install and use. This module is the shape the
 controller accepted before: one function per command under the names the
 controller looks for, handed over directly::
@@ -38,7 +38,7 @@ Author: Thom de Hoog, Center for Microscopy and Image Analysis (ZMB),
 University of Zurich (thom.dehoog@zmb.uzh.ch, thomdehoog@gmail.com).
 """
 
-from .zmart_adapter import zmart_adapter as _adapter
+from ..zmart_adapter import zmart_adapter as _adapter
 
 # The driver's name in the controller's list of drivers, and its configuration
 # on this computer: the adapter's defaults, which you may edit here.

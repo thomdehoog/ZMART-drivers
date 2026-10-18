@@ -53,7 +53,7 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher import ( 
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface import (  # noqa: E402
     log_reader as _log_reader,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.zmart_driver import (  # noqa: E402
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.for_zmart_controller.zmart_driver import (  # noqa: E402
     ZmartDriver,
 )
 
