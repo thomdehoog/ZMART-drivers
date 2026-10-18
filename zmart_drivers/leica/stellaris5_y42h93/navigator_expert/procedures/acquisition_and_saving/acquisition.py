@@ -9,6 +9,12 @@ state of the machine in each saved plane.
 A change that was sent but could not be confirmed is recorded and the capture
 carries on, so the workflow is told rather than stopped.
 
+The operator may move the stage or change the objective in LAS X between two
+calls of the workflow, and the driver cannot see that as it happens. So
+``acquire`` reads the stage once, just before the capture, and places every
+plane from that reading. If it differs from what the workflow last saw, a note
+is added to the result, and the capture goes ahead.
+
 Author: Thom de Hoog, Center for Microscopy and Image Analysis (ZMB),
 University of Zurich (thom.dehoog@zmb.uzh.ch, thomdehoog@gmail.com).
 """
@@ -36,7 +42,7 @@ from . import acquire as _capture
 from .. import session as _info
 from ..absolute_coordinate_system.frame import get_xyz
 from ..instrument import get_state
-from ..session import ZmartHandle, require_open, try_
+from ..session import ZmartHandle, note_unconfirmed, require_open, try_
 
 log = logging.getLogger(__name__)
 
@@ -194,15 +200,27 @@ def acquire(
             "choose one with set_state({'job': ...}) and capture again"
         )
 
-    # Where the stage stands, as last read, taken before anything moves: every
-    # plane is placed from it (the state printed below reads it again, after).
-    at = handle.driven_to
+    # Where the stage stands right now, read once before the capture, so every
+    # plane is placed from what LAS X really did. The operator may have moved
+    # the stage or changed the objective in LAS X since the workflow last
+    # looked; when that happened, it is noted in the result, never hidden.
+    noted_before = len(handle.unconfirmed)
+    last_seen = handle.driven_to
+    fresh = try_(lambda: get_xyz(handle))
+    at = handle.driven_to if fresh is not None else last_seen
     if at is None:
         raise RuntimeError(
-            "the driver does not know where the stage is: read it with get_xyz or move it "
-            "with set_xyz before acquiring"
+            "the driver does not know where the stage is and could not read it: "
+            "check that LAS X answers, then capture again"
         )
-    noted_before = len(handle.unconfirmed)
+    if last_seen is not None and fresh is not None and _moved(last_seen, at):
+        note_unconfirmed(
+            handle,
+            "acquire: the stage or the objective changed",
+            "the stage position or the objective is not what get_xyz or set_xyz "
+            "last reported (changed in LAS X?); the capture is placed from the "
+            "fresh reading",
+        )
     if IMAGE_SAVE.cleanup_cache:
         _release.prepare()
 
@@ -341,6 +359,18 @@ def _when(seconds: float | None) -> str | None:
     if not isinstance(seconds, (int, float)):
         return None
     return datetime.fromtimestamp(seconds, tz=timezone.utc).isoformat()
+
+
+#: How far the stage may differ from the last reported position before the
+#: difference is worth a note. Below this it is just the stage settling.
+STAGE_CHANGE_NOTE_UM = 1.0
+
+
+def _moved(before: dict, after: dict) -> bool:
+    """Whether the stage position (in the driver's coordinates) differs by more than a settling."""
+    return any(
+        abs(after[axis] - before[axis]) > STAGE_CHANGE_NOTE_UM for axis in ("x", "y", "z")
+    )
 
 
 def _where_the_planes_are(handle: ZmartHandle, at: dict, job: str, plane_z: list[int]):
