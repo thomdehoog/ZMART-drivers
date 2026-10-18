@@ -18,19 +18,17 @@ for AutoSave.
 
 The cache belongs to LAS X and is only ever read: deleting or changing a file
 in it corrupts LAS X projects. Once the picture is saved, LAS X itself can be
-asked to let go of it, which is clean (see ``lasx_cache_release``).
+asked to let go of it, which is clean (see ``procedures/saving/clear_cache.py``).
 """
 
 from __future__ import annotations
 
-import functools
 import re
 import struct
 import time
 from pathlib import Path
 from typing import Any
 
-from . import lasx_cache_release as cache_release
 from ... import metadata_map as described
 from ...files import (
     DEFAULT_EXPORT_COMPLETION_POLL_INTERVAL_S,
@@ -119,7 +117,7 @@ def collect_lasx_data_container(
         method="lasx_data_container",
         relative_path=pixels.name,
         source_exporter="lasx_data_container",
-        release=functools.partial(cache_release.delete, int(number), name),
+        release_target=(int(number), name),
         vendor_metadata_sources=(
             VendorMetadataSource(
                 name=f"{name}.lasx-description.xml", data=xml.encode("utf-8")
@@ -153,7 +151,7 @@ def pictures_of(root: Path, acq: AcquisitionResult) -> list[tuple[Path, str, str
     with a number too. So the job the description says made the picture
     (``BlockName``) must be *acq*'s job as well.
 
-    A picture LAS X has let go of (``output.lasx_cache_release``) keeps its
+    A picture LAS X has let go of (``procedures/saving/clear_cache.py``) keeps its
     description, rewritten after the release, but not its pixels, and the
     next capture may get its name again ("HiRes009" twice, simulator,
     2026-10-14). So a picture is one only while its pixels are there; one

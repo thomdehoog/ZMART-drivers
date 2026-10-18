@@ -503,7 +503,7 @@ Container V2`): `D:\Temp2` on the STELLARIS Y42H93.
 With `cleanup_cache=True`, the profile's default since it passed on the STELLARIS (15 October
 2026), the save's last step asks LAS X itself to delete the picture it was read from: the delete of
 LAS X's own window, so the cache's files go and the project stays whole
-(`vendor_interface/primitives/capture/lasx_cache_release.py` says how). It runs only once the copy is written and read back
+(`procedures/saving/clear_cache.py` says how). It runs only once the copy is written and read back
 identical, and the Navigator canvas is then cleared, which lets go of each capture's hidden copy.
 The driver never deletes a file itself: a capture LAS X gives no way to let go of is refused before
 anything is saved.

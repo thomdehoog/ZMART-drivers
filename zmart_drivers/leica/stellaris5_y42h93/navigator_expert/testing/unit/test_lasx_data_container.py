@@ -33,9 +33,6 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.saving im
     save as acquisition,
 )
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitives.capture import (
-    lasx_cache_release as cache_release,
-)
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitives.capture import (
     lasx_data_container as container,
 )
 
@@ -335,22 +332,16 @@ class TestWaitingUntilFinished:
 
 
 class TestLettingGo:
-    """Once saved, the picture is let go of through LAS X's Data Container, never by deleting files."""
+    """The collector names the picture to let go of; letting go is a procedure (``clear_cache``)."""
 
-    def test_the_picture_read_is_the_one_let_go_of(self, cache, monkeypatch):
+    def test_the_picture_read_is_the_one_named_to_be_let_go_of(self, cache):
         two_channel_12_bit(cache)
-        asked = []
-        monkeypatch.setattr(
-            cache_release, "delete", lambda number, name: asked.append((number, name))
-        )
 
         exported = container.collect_lasx_data_container(
             None, acquisition_of("HiRes"), cache_root=cache
         )
-        exported.release()
 
-        assert exported.release is not None
-        assert asked == [(746, "HiRes002")]
+        assert exported.release_target == (746, "HiRes002")
 
 
 class TestRefusing:

@@ -23,6 +23,7 @@ from typing import Any
 
 from ...configuration.image_stage_registration import Orientation
 from ...vendor_interface import files as _files
+from . import clear_cache
 from . import materialize as _materialize
 from . import ome_zarr
 from ...vendor_interface.files import (
@@ -121,7 +122,7 @@ def save(
         timeout_s=export_completion_timeout_s,
         poll_interval_s=export_completion_poll_interval_s,
     )
-    if cleanup_cache and exported.release is None:
+    if cleanup_cache and exported.release_target is None:
         raise RuntimeError(
             f"cleanup_cache asks LAS X to let go of the capture, but {exported.source_exporter} "
             "gives no way to; nothing was saved and nothing deleted"
@@ -153,7 +154,7 @@ def save(
     # Last, once everything made from the source has been made from it.
     if cleanup_cache:
         try:
-            exported.release()
+            clear_cache.delete(*exported.release_target)
         except Exception as e:  # noqa: BLE001 -- the capture is saved; letting go is the owner's
             log.warning("cleanup_cache failed for %s: %s", exported.relative_path, e)
     return saved

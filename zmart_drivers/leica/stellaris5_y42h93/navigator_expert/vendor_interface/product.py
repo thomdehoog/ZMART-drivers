@@ -237,9 +237,10 @@ class ExportedAcquisition:
     relative_path: str | None = None
     source_exporter: str = "lasx_data_container"
     vendor_metadata_sources: tuple[VendorMetadataSource, ...] = ()
-    #: How LAS X lets go of the capture once it is saved (``cleanup_cache``);
-    #: None when there is no way to, and then letting go is refused.
-    release: Callable[[], None] | None = None
+    #: Which capture LAS X lets go of once it is saved (``cleanup_cache``): its
+    #: element number and its name. None when there is none, and then letting go
+    #: is refused. How it is done is the business of ``procedures/saving/clear_cache.py``.
+    release_target: tuple[int, str] | None = None
 
     @property
     def image_files(self) -> list[Path]:
