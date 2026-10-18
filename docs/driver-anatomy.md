@@ -188,8 +188,9 @@ micrometers" as the workflow says it:
 
 1. The workflow calls `set_xyz` on the controller, which calls the
    `ZmartDriver` method of the same name.
-2. The method converts the position from user coordinates to raw stage
-   coordinates, using the recorded origin.
+2. The method hands the position to the absolute coordinate system
+   procedure, which converts it from user coordinates to raw stage
+   coordinates, using the recorded origin and the objective offsets.
 3. The dispatcher checks the limits gate. A position outside the allowed
    range is refused here, and nothing is sent.
 4. The dispatcher sends the move through the primitive named in the handling
@@ -533,15 +534,17 @@ new version.
 
 ### Who converts the coordinates
 
-The arithmetic between raw stage coordinates and user coordinates (the origin,
-the orientation, the objective offsets) is done by the `ZmartDriver` class, at
-its edge, using the functions in `procedures/absolute_coordinate_system/coordinates.py`. What comes in
-from the controller is converted to raw coordinates before it goes further,
-and what goes out is converted to user coordinates. Everything below the
-class, the procedures and the dispatcher, then works in one system, the raw
-stage coordinates, and the limits are checked in those. The class does no
-other arithmetic. Whether some procedures should own part of this instead is
-not settled.
+The conversion is a procedure of its own, `procedures/absolute_coordinate_system/`.
+Below it, in `vendor_specific/`, the driver only reports clear readings from
+the microscope: the stage position, each z drive and the selected objective.
+The procedure turns those readings into the driver's one absolute coordinate
+system, and turns a requested position back into moves. It takes into account
+the origin that was saved, the way the z drives share the focus, and the
+measured offsets between objectives (the centring and focus offsets). The
+limits are checked on the raw stage coordinates, so no origin can move the safe
+travel range. The saving procedure then applies the measured image orientation,
+so that how the stage moves in x, y and z is also how the images come out. The
+`ZmartDriver` class does no arithmetic of its own: it calls the procedure.
 
 ### Limits do not know the microscope
 
@@ -736,9 +739,9 @@ Leica-specific:
   (`lasx_data_container.py`, `lasx_cache_release.py`) is in
   `vendor_specific/primitives/capture/`, and LAS X's description of a picture
   is read into the standard fields by `vendor_specific/metadata_map.py`.
-- The plain arithmetic between stage and user coordinates is in
-  `procedures/absolute_coordinate_system/coordinates.py`, as the plan says. `procedures/absolute_coordinate_system/frame.py` only
-  decides what to read and what to move.
+- The coordinate system is a procedure, `procedures/absolute_coordinate_system/`:
+  `coordinates.py` holds the plain arithmetic, `frame.py` decides what to read
+  and what to move, and the `ZmartDriver` class converts nothing itself.
 
 **Done since (October 2026).**
 
@@ -772,22 +775,17 @@ purpose, so that it cannot be forgotten.
 1. **The confirmation of `select_job` still races two legs.** After a job
    change, the API and the log are checked at the same time in two threads
    (`vendor_specific/primitive_handling/confirmations.py`, the dual-leg
-   race). The plan asks for one after the other. The tests for this are
-   written around the race, and it was run on the microscope as it is, so it
-   is left for after the first run on the simulator.
-2. **The conversion between user and stage coordinates is still in
-   `procedures/absolute_coordinate_system/frame.py`.** The plain arithmetic is in
-   `procedures/absolute_coordinate_system/coordinates.py`, but the procedures still take and give
-   positions in the controller's frame (the acquisition places every plane from
-   the frame position it remembers). The plan has the `ZmartDriver` class
-   convert at its edge, and also says that whether procedures should own part of
-   this is not settled. Moving it changes what every procedure receives, so it
-   needs a design decision first.
-3. **A limit is not yet a declared description.** The gate gets its rulebook
+   race). The plan asks for one after the other. Only the API leg asks LAS X
+   for anything, and it does so one request at a time; the log leg reads a
+   file, which never reaches LAS X, so the one-request-at-a-time rule still
+   holds. The tests for this are written around the race, and it was run on
+   the microscope as it is, so it is left for after the first run on the
+   simulator.
+2. **A limit is not yet a declared description.** The gate gets its rulebook
    and table of commands from `limit_rules.py`, so it names no Leica class, but
    the shape of a limit (axis, unit, range or allowed values) is still the
    Leica file format.
-4. **`vendor_side/` and a full `metadata_map.py`.** `vendor_side/` is not needed
+3. **`vendor_side/` and a full `metadata_map.py`.** `vendor_side/` is not needed
    for LAS X. `metadata_map.py` today reads LAS X's description of a picture
    into the standard fields; translating every vendor field is the later
    metadata work.
@@ -1283,21 +1281,17 @@ anatomy"). The mock's `__init__`
 (today its `connect`) shows these steps in order.
 
 **The coordinate system.** The arithmetic between raw stage coordinates and
-user coordinates (subtracting the origin, applying the registration, adding
-the objective offsets) lives once, as a pair of plain functions next to this
-configuration (`user_from_raw` and `raw_from_user` in the mock's
-`procedures/absolute_coordinate_system/coordinates.py`). The `ZmartDriver` class uses these functions
-at its edge (see "The simplified anatomy"). That way:
+user coordinates (subtracting the origin, adding the objective offsets) lives
+once, in the plain functions of `procedures/absolute_coordinate_system/coordinates.py`.
+The recipes that read and move the stage in that system sit beside them. That
+way:
 
 - the controller and the experiments speak one coordinate system, the user's;
-- everything below the class (procedures and the dispatcher) works in raw
-  stage coordinates;
+- the vendor code below the procedures reports and sends raw stage
+  coordinates only;
 - the limits gate checks raw stage coordinates, so recording a new origin can
   never move the safe travel range;
-- the class does no other arithmetic.
-
-Today the Leica driver does this arithmetic inside its controller adapter,
-which is the code that has to be thinned out.
+- the `ZmartDriver` class does no arithmetic.
 
 ## 7. The `ZmartDriver` class
 
