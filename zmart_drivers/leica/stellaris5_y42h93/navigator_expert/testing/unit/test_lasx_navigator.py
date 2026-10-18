@@ -338,7 +338,7 @@ class TestShowingTheCanvas:
         self, monkeypatch
     ):
         # Experiment pressed, but the canvas never comes: unavailable after the window, said in words.
-        monkeypatch.setattr(lasx_navigator.reader, "WINDOW_S", 0.05)
+        monkeypatch.setattr(lasx_navigator.dispatcher, "WINDOW_S", 0.05)
         window = las_x_window([], navigator_shown=False, canvas_appears=False)
         stand_in(monkeypatch, window.root)
         with pytest.raises(
