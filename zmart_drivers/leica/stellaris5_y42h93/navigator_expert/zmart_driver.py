@@ -67,7 +67,7 @@ class ZmartDriver:
     # --- describing the setup ---------------------------------------------------------
 
     def get_info(self):
-        """``True, (description, setup)``.
+        """``True, (description, setup, chooses_its_own_folder)``.
 
         The description says what the other commands cannot: what each
         setting means, in which unit and within which bounds, which
@@ -75,9 +75,11 @@ class ZmartDriver:
         come from the limits loaded at connect. ``setup`` is each thing set
         up once on this microscope (limits, orientation, objective
         calibration, origin, data location), done or not, in words.
+        ``chooses_its_own_folder`` is False: the driver writes every file
+        itself, from LAS X's cache, so it saves where ``acquire`` is told.
         """
         info = _adapter.get_info(self._handle)
-        return True, (info["description"], info["setup"])
+        return True, (info["description"], info["setup"], info["chooses_its_own_folder"])
 
     def get_actuators(self):
         """``True, (x, y, z)``: per axis the motors and the default, ``{"options": [...], "default": ...}``.
@@ -142,17 +144,22 @@ class ZmartDriver:
         """``True, settings``: how a capture is triggered, ``full`` and nothing else."""
         return True, _adapter.get_acquisition_settings(self._handle)
 
-    def acquire(self, position_label, acquisition_settings=None):
+    def acquire(self, position_label, acquisition_settings, acquisition_type, output_folder):
         """Capture here with the selected job, save, and answer ``True, (files, planes)``.
 
-        The files are flat OME-TIFF, one plane per file, each name starting
-        with the position label the workflow gave, and never overwriting an
-        earlier picture. Every
+        The files are saved in ``output_folder``, or else in this session's
+        staging folder under the data location; each name is the
+        ``acquisition_type``, then the position label the workflow gave,
+        and never overwrites an earlier picture. Every
         plane entry carries its file, its channel, depth and time index,
         and the stage position it was taken at, in the sample's frame.
         """
         answer = _adapter.acquire(
-            self._handle, position_label=position_label, acquisition_settings=acquisition_settings
+            self._handle,
+            position_label=position_label,
+            acquisition_settings=acquisition_settings,
+            acquisition_type=acquisition_type,
+            output_folder=output_folder,
         )
         return True, (answer["files"], answer["planes"])
 

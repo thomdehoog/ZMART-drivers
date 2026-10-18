@@ -77,7 +77,6 @@ class AcquisitionResult:
 class SavedAcquisition:
     """Manifest for one persisted acquisition product."""
 
-    folder: str
     position_label: str
     image_paths: tuple[Path, ...]
     metadata_path: Path | None

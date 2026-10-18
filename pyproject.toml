@@ -13,7 +13,7 @@ authors = [{ name = "Thom de Hoog", email = "thom.dehoog@zmb.uzh.ch" }]
 # Every driver plugs into the ZMART Controller. It is not on PyPI, so it is
 # installed from its own repository.
 dependencies = [
-    "zmart-controller @ git+https://github.com/thomdehoog/ZMART-controller",
+    "zmart-controller @ git+https://github.com/ZMB-UZH/ZMART-controller@v0.4.0rc1",
 ]
 classifiers = [
     "Programming Language :: Python :: 3",
@@ -68,8 +68,8 @@ test = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/thomdehoog/ZMART-drivers"
-Controller = "https://github.com/thomdehoog/ZMART-controller"
+Homepage = "https://github.com/ZMB-UZH/ZMART-drivers"
+Controller = "https://github.com/ZMB-UZH/ZMART-controller"
 
 [tool.setuptools.dynamic]
 version = { attr = "zmart_drivers.__version__" }

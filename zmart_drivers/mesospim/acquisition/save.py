@@ -2,9 +2,9 @@
 Save: persist a capture into the canonical output layout.
 =========================================================
 The mesoSPIM image writer produces frame files on the acquisition PC; ``save``
-relocates them into ``<output_root>/data/`` (or a ``folder`` inside it), named
-after the position label, and writes a JSON metadata sidecar next to them. It
-returns a :class:`SavedAcquisition` manifest.
+relocates them into the folder it is given, named
+after the acquisition type and the position label, and writes a JSON metadata
+sidecar next to them. It returns a :class:`SavedAcquisition` manifest.
 
 This is intentionally simple and dependency-light: it copies the frames the
 image writer already wrote (it does not re-encode pixels). The per-plane
@@ -40,20 +40,21 @@ def canonical_stem(name: str) -> str:
 
 def save(
     acq: AcquisitionResult,
-    output_root: str | Path,
+    data_dir: str | Path,
     *,
     position_label: str,
-    folder: str = "",
+    acquisition_type: str,
     format: str = "ome-tiff",
 ) -> SavedAcquisition:
-    """Persist ``acq``'s frames under ``<output_root>/data/`` and write metadata.
+    """Persist ``acq``'s frames in ``data_dir`` and write metadata.
 
     Args:
         acq: the :class:`AcquisitionResult` from ``capture.acquire``.
-        output_root: the workflow-owned run directory.
+        data_dir: the folder to save in: the output folder acquire was
+            given, or ``<output_root>/data``.
         position_label: names the position in the output filenames.
-        folder: a folder inside ``data`` to group the files in; empty saves
-            them straight into ``data``.
+        acquisition_type: the kind of acquisition, which starts every file
+            name and is kept in the metadata sidecar.
         format: recorded in the manifest and metadata sidecar.
 
     Returns:
@@ -62,9 +63,7 @@ def save(
     Raises:
         FileNotFoundError: a source frame file is missing on disk.
     """
-    data_dir = Path(output_root) / "data"
-    if folder:
-        data_dir = data_dir / canonical_stem(folder)
+    data_dir = Path(data_dir)
     data_dir.mkdir(parents=True, exist_ok=True)
 
     # Validate every source up front so a missing frame can't leave a partial
@@ -76,7 +75,7 @@ def save(
 
     # A distinct stem per acquisition: never silently overwrite a prior dataset
     # that shares the same label (a retry, a re-image of the same well).
-    stem = _unique_stem(data_dir, canonical_stem(position_label))
+    stem = _unique_stem(data_dir, canonical_stem(f"{acquisition_type}_{position_label}"))
 
     image_paths: list[Path] = []
     multiplane = len(sources) > 1
@@ -89,8 +88,8 @@ def save(
 
     metadata_path = data_dir / f"{stem}.json"
     payload = {
-        "folder": folder,
         "position_label": position_label,
+        "acquisition_type": acquisition_type,
         "format": format,
         "planes": acq.planes,
         "duration_s": acq.duration_s,
@@ -109,7 +108,6 @@ def save(
         data_dir,
     )
     return SavedAcquisition(
-        folder=folder,
         position_label=position_label,
         image_paths=tuple(image_paths),
         metadata_path=metadata_path,

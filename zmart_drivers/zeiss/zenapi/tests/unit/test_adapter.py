@@ -155,17 +155,19 @@ def test_state_round_trip(handle, scope_box):
 
 def test_acquire_needs_an_experiment(handle):
     with pytest.raises(ValueError, match="needs a loaded ZEN experiment"):
-        adapter.acquire(handle, position_label="a")
+        adapter.acquire(handle, acquisition_type="acquisition", output_folder=None, position_label="a")
 
 
-def test_acquire_snap_copies_czi_into_data_folder(handle, scope_box, tmp_path):
+def test_acquire_snap_copies_czi_into_the_output_folder(handle, scope_box, tmp_path):
     adapter.set_state(handle, {"changeable": {"experiment": "ZMART_Snap"}})
+    # Where the files go is acquire's output_folder, never an acquisition setting.
+    assert "folder" not in adapter.get_acquisition_settings(handle)
     rec = adapter.acquire(
-        handle,
+        handle, acquisition_type="overview", output_folder=str(tmp_path / "run" / "overview"),
         position_label="tile 3/a",
-        acquisition_settings={"folder": "overview", "timeout_s": 2},
+        acquisition_settings={"timeout_s": 2},
     )
-    dst = tmp_path / "out" / "data" / "overview" / "overview_tile_3_a.czi"
+    dst = tmp_path / "run" / "overview" / "overview_tile_3_a.czi"
     assert rec["files"] == [str(dst)] and dst.exists()
     assert "image_files" not in rec
     assert rec["copied"] is True and rec["mode"] == "snap"
@@ -175,7 +177,7 @@ def test_acquire_snap_copies_czi_into_data_folder(handle, scope_box, tmp_path):
 
 def test_acquire_stack_runs_the_whole_experiment(handle, scope_box):
     rec = adapter.acquire(
-        handle,
+        handle, acquisition_type="acquisition", output_folder=None,
         position_label="p1",
         acquisition_settings={"experiment": "ZMART_ZStack", "mode": "experiment"},
     )
@@ -191,7 +193,7 @@ def test_acquire_leaves_czi_on_zen_when_folder_unreachable(handle, scope_box, tm
     adapter.set_state(handle, {"changeable": {"experiment": "ZMART_Snap"}})
     t0 = time.perf_counter()
     rec = adapter.acquire(
-        handle, position_label="x", acquisition_settings={"timeout_s": 30}
+        handle, acquisition_type="acquisition", output_folder=None, position_label="x", acquisition_settings={"timeout_s": 30}
     )
     assert time.perf_counter() - t0 < 5  # an absent folder is reported at once, not waited for
     assert rec["copied"] is False
@@ -202,7 +204,7 @@ def test_same_experiment_is_not_loaded_twice(handle, scope_box):
     adapter.set_state(handle, {"changeable": {"experiment": "ZMART_Snap"}})
     adapter.set_state(handle, {"changeable": {"experiment": "ZMART_Snap"}})
     adapter.acquire(
-        handle, position_label="a", acquisition_settings={"experiment": "ZMART_Snap"}
+        handle, acquisition_type="acquisition", output_folder=None, position_label="a", acquisition_settings={"experiment": "ZMART_Snap"}
     )
     loads = [c for c in scope_box["scope"].calls if c[0] == "load"]
     assert len(scope_box["scope"].loaded) == 1 and loads == []  # the fake logs no load calls

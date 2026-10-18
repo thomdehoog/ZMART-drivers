@@ -159,7 +159,7 @@ drv.set_stage_limits(x=(0, 25000), y=(0, 25000), z=(0, 25000), f=(0, 25000), the
 drv.move_absolute(c, {"x": 50.0, "z": 10.0})          # µm
 
 result = drv.acquire(c, "snap", options={"folder": r"D:\out", "filename": "snap.tiff", "planes": 1})
-saved  = drv.save(result, r"D:\out\run", position_label="A1")   # relocate + JSON sidecar
+saved  = drv.save(result, r"D:\out\run\data", position_label="A1", acquisition_type="snap")   # relocate + JSON sidecar
 drv.close(c)
 ```
 

@@ -972,22 +972,31 @@ def acquire(
     *,
     position_label: str | None = None,
     acquisition_settings: dict | None = None,
+    acquisition_type: str,
+    output_folder: str | None,
 ) -> dict:
     """Run the job, wait for the export, and persist the OME-TIFF product.
 
     Args:
-        position_label: What the workflow calls this capture; every file
-            name starts with it, then the time point, channel and plane
-            (``Naming`` makes it safe for a file name). A workflow that keeps
-            the naming convention gives the whole stem,
-            ``{acquisition_type}_{hash6}_{position_label}``. When omitted, the
-            next per-session counter value ("000000", "000001", ...) is used
-            (an explicit label does NOT consume a counter value). A label
-            already used in this session's staging folder gets ``_001``,
-            ``_002``, ... so no capture is ever overwritten.
+        position_label: What the workflow calls this place. Every file name
+            is the acquisition type, then the label, then the time point,
+            channel and plane (``Naming`` makes it safe for a file name).
+            When omitted, the next per-session counter value ("000000",
+            "000001", ...) is used (an explicit label does NOT consume a
+            counter value). A name already used in the folder saved to gets
+            ``_001``, ``_002``, ... so no capture is ever overwritten.
         acquisition_settings: Values from :func:`get_acquisition_settings`:
             the trigger, which is always ``full``. Unknown keys or values
             raise.
+        acquisition_type: The kind of acquisition in the workflow's run,
+            such as ``"overview"``: always a non-empty text, which the
+            controller fills in (``"acquisition"`` when the workflow gave
+            none). It names the files and is kept in the lineage, the log
+            and the answer.
+        output_folder: Where the capture is saved, as text. The driver
+            writes every file itself, from LAS X's cache, so it saves
+            exactly there. When None, it saves in this session's staging
+            folder under the microscope's data location.
 
     The selected LAS X job is what runs; choose it with :func:`set_state`.
     The session hash (``handle.hash6``) rides along only in lineage and
@@ -1002,11 +1011,13 @@ def acquire(
     """
     _require_open(handle)
     resolved = _with_defaults(handle, acquisition_settings)
-    # Staging lives under the folder saved to, so moving a capture into its
-    # run is a rename on the same disk, never a copy. Where that is was set
-    # up once on this microscope; without it, this says how to set it up.
-    workflow_root = _info.output_root(handle)
-    output_root = Path(workflow_root) / ".staging" / handle.hash6
+    if output_folder is not None:
+        output_root = Path(output_folder)
+    else:
+        # Staging lives under the folder saved to, so moving a capture into
+        # its run is a rename on the same disk, never a copy. Where that is
+        # was set up once on this microscope; without it, this says how.
+        output_root = Path(_info.output_root(handle)) / ".staging" / handle.hash6
     # The job that runs is the one selected in LAS X: part of the state, chosen
     # with set_state or in LAS X itself, never by a capture setting.
     job = _selected_job_name(handle)
@@ -1039,7 +1050,7 @@ def acquire(
     acq = _capture.acquire(handle.client, job)
 
     label = position_label if position_label is not None else _next_position_label(handle)
-    naming = Naming(stem=free_stem(output_root, Naming(stem=label).stem))
+    naming = Naming(stem=free_stem(output_root, Naming(stem=f"{acquisition_type}_{label}").stem))
     state = _export_state(handle, stem=naming.stem, job=job)
     saved = _save.save(
         handle.client,
@@ -1048,6 +1059,7 @@ def acquire(
         naming,
         lineage={
             "position_label": label,
+            "acquisition_type": acquisition_type,
             "stem": naming.stem,
             "job": job,
             "session_hash6": handle.hash6,
@@ -1091,6 +1103,7 @@ def acquire(
     unconfirmed = list(handle.unconfirmed[noted_before:])
     log = _log.write(output_root, naming, {
         "position_label": label,
+        "acquisition_type": acquisition_type,
         "stem": naming.stem,
         "asked": dict(acquisition_settings or {}),
         "settings": resolved,
@@ -1108,6 +1121,7 @@ def acquire(
     })
     return {
         "position_label": label,
+        "acquisition_type": acquisition_type,
         "trigger": resolved["trigger"],
         "job": job,
         "format": IMAGE_SAVE.format,
@@ -1441,6 +1455,9 @@ def get_info(handle: ZmartHandle) -> dict:
     return {
         "setup": _setup(handle),
         "description": _described(handle),
+        # The driver writes every file itself, from LAS X's cache, so it
+        # saves in whatever output_folder acquire is given.
+        "chooses_its_own_folder": False,
         "selected_job": selected,
         "client": handle.connection.get("client"),
         "session_hash6": handle.hash6,
@@ -1462,7 +1479,7 @@ Settings (the changeable part of the state): job is the name of a LAS X job. A j
 
 Objectives on the turret, as slot: LAS X objective number: {objectives}.
 
-Acquiring has one trigger, full: it runs the selected LAS X job and saves what LAS X captured under this microscope's data location, each file named by the position label it was given, then the time point, the channel and the plane."""
+Acquiring has one trigger, full: it runs the selected LAS X job and saves what LAS X captured in the output folder acquire is given, or else under this microscope's data location, each file named by the acquisition type and the position label it was given, then the time point, the channel and the plane."""
 
 
 def _described(handle: ZmartHandle) -> str:

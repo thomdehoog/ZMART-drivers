@@ -161,12 +161,13 @@ def test_acquire_cleans_staging_and_does_not_duplicate(session, tmp_path):
     assert not staging.exists() or not any(staging.rglob("*.tiff"))
 
 
-def test_a_folder_setting_groups_the_files(session):
+def test_the_output_folder_groups_the_files_not_a_setting(session, tmp_path):
     from pathlib import Path
 
-    record = session.acquire(position_label="A1", acquisition_settings={"folder": "prescan"})["content"]
-    assert Path(record["files"][0]).parent.name == "prescan"
-    assert Path(record["files"][0]).parent.parent.name == "data"
+    assert "folder" not in session.get_acquisition_settings()["content"]
+    run = tmp_path / "run 1" / "prescan"
+    record = session.acquire(position_label="A1", output_folder=str(run))["content"]
+    assert record["files"] and all(Path(path).parent == run for path in record["files"])
 
 
 def test_repeated_same_label_acquire_does_not_overwrite(session):
