@@ -71,7 +71,7 @@ my_driver/
             api.py             the vendor's programming interface
             log.py             reading what the software writes in its log (reading only)
             capture.py         fetching the finished picture
-            (a file for button presses, if the microscope needs it: see the open questions)
+            interface.py       working the vendor's window: pressing buttons, answering dialogs (only where the software has no better way)
         vendor_side/           code that runs inside the vendor software, if the vendor needs it, with its installer
     dispatcher/                the same in every driver
         read.py                runs a reading, with fallback
@@ -176,7 +176,27 @@ Primitives are grouped into **families** by the way they reach the software:
 | Direct | The software's own state, read as it is held inside the program | Yes | Where the software allows it |
 | API | The vendor's programming interface (for Leica, the CAM API) | Yes | Yes |
 | Log | What the software writes in its log file | Yes | No |
-| Capture | The place where the finished picture is handed over | Yes | – |
+| Capture | The place where the finished picture is handed over, and where it is released afterwards | Yes | Releasing a picture, where the software allows it |
+| Interface | The vendor's window, worked the way a person would: pressing a button, switching a tab, answering a dialog (on Windows, through UI Automation) | Yes, what the window shows | Yes |
+
+**The interface family is the last resort.** Some things can only be done
+through the window. LAS X, for example, keeps every picture in a cache until
+it is restarted, and it offers no command that empties the part of the cache
+that the Navigator canvas holds. So the Leica driver presses the canvas's
+Clear button. Such a press is an ordinary primitive. The dispatcher runs it
+like any other change, with the limits gate and the error rules. Because a
+button press often has no readback, its handling notes may declare it
+"cannot be confirmed", which is recorded as accepted and not as confirmed (see
+part 3), or confirm it indirectly, for instance by checking that the Clear
+button can be reached.
+
+A recipe can combine families. Leica's "release a saved capture" is a
+procedure that shows the canvas while LAS X is idle (interface), deletes the
+saved picture from the cache after checking its name and after the saved copy
+has been read back identical (capture), and then clears the canvas
+(interface). It exists only for LAS X. Another vendor has no such procedure,
+or has one of its own, which is why procedures are the optional,
+microscope-specific layer.
 
 A microscope uses the families it has. A ZEISS may have a single one. The
 Leica driver has all of them. The direct readers are the closest to the real
@@ -680,9 +700,12 @@ positions repeat), or parking the z-galvo at zero while keeping the focus.
 
 **Rules.**
 
-- **A procedure uses only actions**, never the vendor interface or the
-  dispatcher directly. Every step then passes the limits gate and the error rules
-  without any extra effort.
+- **A procedure goes only through the dispatcher**, with the name of a command
+  and its values, for example a move to a position or the reading of the
+  selected job. It never calls the vendor interface directly. Every step then
+  passes the limits gate and the error rules without any extra effort. (Before
+  October 2026 this rule said "only actions"; the actions folder is gone, see
+  "The simplified anatomy".)
 - **Each procedure describes itself** with a name and a plain-language
   description. That is what `get_procedures` lists and `run_procedure` runs.
 - **The setup measurements are procedures too.** Measuring the image-to-stage
@@ -1123,15 +1146,10 @@ by any other part of the driver. The Leica driver already works this way.
 
 ## Open questions
 
-- **The family names.** The design above calls the families direct, API, log
-  and capture. If a driver needs the Windows COM interface as a family of its
+- **The family names.** The design above calls the families direct, API, log,
+  capture and interface. If a driver needs the Windows COM interface as a family of its
   own, it would be added to the list. Which name fits the Leica CAM API best
   should be settled before the files are renamed.
-
-- **Button presses.** Pressing buttons and answering dialogs in the vendor
-  software (Leica's navigator and dialog handling) does not fit the direct,
-  API, log or capture families cleanly. It needs a family of its own, or a
-  place under one of them.
 
 - **Required metadata (later).** Metadata handling comes after the primitives.
   Which fields every driver must fill in the standard metadata, and how
