@@ -87,13 +87,15 @@ def test_state_round_trip(handle, fake_api):
     assert fake_api.nosepiece == 1 and fake_api.selected_configuration == "DAPI"
 
 
-def test_acquire_saves_into_data_folder(handle, fake_api, tmp_path):
+def test_acquire_saves_into_the_output_folder(handle, fake_api, tmp_path):
+    # Where the files go is acquire's output_folder, never an acquisition setting.
+    assert "folder" not in adapter.get_acquisition_settings(handle)
     rec = adapter.acquire(
-        handle, acquisition_type="acquisition", output_folder=None,
+        handle, acquisition_type="overview", output_folder=str(tmp_path / "run" / "overview"),
         position_label="tile 3/a",
-        acquisition_settings={"folder": "overview", "optical_configuration": "FITC"},
+        acquisition_settings={"optical_configuration": "FITC"},
     )
-    path = tmp_path / "out" / "data" / "overview" / "acquisition_tile_3_a.tif"
+    path = tmp_path / "run" / "overview" / "overview_tile_3_a.tif"
     assert rec["files"] == [str(path)] and path.exists()
     assert "image_files" not in rec
     assert len(rec["planes"]) == 1 and fake_api.selected_configuration == "FITC"

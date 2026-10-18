@@ -158,19 +158,21 @@ def test_acquire_needs_an_experiment(handle):
         adapter.acquire(handle, acquisition_type="acquisition", output_folder=None, position_label="a")
 
 
-def test_acquire_snap_copies_czi_into_data_folder(handle, scope_box, tmp_path):
+def test_acquire_snap_copies_czi_into_the_output_folder(handle, scope_box, tmp_path):
     adapter.set_state(handle, {"changeable": {"experiment": "ZMART_Snap"}})
+    # Where the files go is acquire's output_folder, never an acquisition setting.
+    assert "folder" not in adapter.get_acquisition_settings(handle)
     rec = adapter.acquire(
-        handle, acquisition_type="acquisition", output_folder=None,
+        handle, acquisition_type="overview", output_folder=str(tmp_path / "run" / "overview"),
         position_label="tile 3/a",
-        acquisition_settings={"folder": "overview", "timeout_s": 2},
+        acquisition_settings={"timeout_s": 2},
     )
-    dst = tmp_path / "out" / "data" / "overview" / "acquisition_overview_tile_3_a.czi"
+    dst = tmp_path / "run" / "overview" / "overview_tile_3_a.czi"
     assert rec["files"] == [str(dst)] and dst.exists()
     assert "image_files" not in rec
     assert rec["copied"] is True and rec["mode"] == "snap"
-    assert rec["zen_image_path"] == str(tmp_path / "zen_images" / "acquisition_overview_tile_3_a.czi")
-    assert scope_box["scope"].calls[-1] == ("run_snap", "exp::ZMART_Snap", "acquisition_overview_tile_3_a")
+    assert rec["zen_image_path"] == str(tmp_path / "zen_images" / "overview_tile_3_a.czi")
+    assert scope_box["scope"].calls[-1] == ("run_snap", "exp::ZMART_Snap", "overview_tile_3_a")
 
 
 def test_acquire_stack_runs_the_whole_experiment(handle, scope_box):

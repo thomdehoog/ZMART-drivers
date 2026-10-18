@@ -543,9 +543,8 @@ def run_procedure(handle: NisHandle, procedure: dict) -> dict:
 def get_acquisition_settings(handle: NisHandle) -> dict:
     """The acquisition and saving settings this instrument offers, with the active value of each.
 
-    ``folder`` names a folder under ``<output_root>/data`` to group the files
-    in; left empty, they are saved straight into ``data``. ``z_start`` and
-    ``z_end`` turn the acquisition into a Z-stack: give both, and ``z_step``
+    Where the files go is not a setting: it is ``acquire``'s
+    ``output_folder``. ``z_start`` and ``z_end`` turn the acquisition into a Z-stack: give both, and ``z_step``
     sets the spacing. They are in the same frame as ``set_xyz`` (um from the
     origin) and must lie inside the stage limits.
 
@@ -556,7 +555,6 @@ def get_acquisition_settings(handle: NisHandle) -> dict:
     _require_open(handle)
     exposure_ms = _readers.get_exposure_ms(handle.client)
     return {
-        "folder": {"options": "any text; empty saves straight into data", "default": "", "active": ""},
         "format": {"options": list(_cmd.SAVE_FORMATS), "default": "tif", "active": "tif"},
         "optical_configuration": {
             "options": "one of the optical_configurations get_state lists; empty keeps the current one",
@@ -590,10 +588,9 @@ def acquire(
     Giving both ``z_start`` and ``z_end`` (um from the origin) takes a stack,
     spaced by ``z_step``; a stack is best saved as ``nd2`` so every plane and
     all metadata survive. NIS-Elements saves to the path the driver names, so
-    the file goes to ``<output_folder>/<folder>/<type>_<label>.<format>``, or
-    ``<output_root>/data/<folder>/...`` when no output folder is given
-    (straight into it when ``folder`` is empty). ``<type>`` is the acquisition
-    type. The controller hands both in filled in: the type is always a
+    the file goes to ``<output_folder>/<type>_<label>.<format>``, or into
+    ``<output_root>/data`` when no output folder is given. ``<type>`` is the
+    acquisition type. The controller hands both in filled in: the type is always a
     non-empty text, the folder text or None. The NIS window is closed
     afterwards by default, so windows do not pile up during a scan.
     """
@@ -602,12 +599,6 @@ def acquire(
     fmt = str(options.get("format", "tif"))
     if fmt not in _cmd.SAVE_FORMATS:
         raise ValueError(f"unknown format {fmt!r}; choose one of {_cmd.SAVE_FORMATS}")
-    folder = options.get("folder") or ""
-    if not isinstance(folder, str):
-        # A ValueError, like every other unusable acquisition setting.
-        raise ValueError(  # noqa: TRY004
-            f"acquisition setting 'folder' must be text, not {folder!r}"
-        )
     if options.get("optical_configuration"):
         _cmd.select_optical_configuration(handle.client, str(options["optical_configuration"]))
     if options.get("exposure_ms") is not None:
@@ -645,8 +636,6 @@ def acquire(
         image = _cmd.capture(handle.client, timeout=timeout)
 
     data_dir = Path(output_folder) if output_folder is not None else handle.output_root / "data"
-    if folder:
-        data_dir = data_dir / canonical_stem(folder)
     data_dir.mkdir(parents=True, exist_ok=True)
     path = data_dir / f"{canonical_stem(f'{acquisition_type}_{position_label}')}.{fmt}"
     saved = _cmd.save_image(
@@ -656,7 +645,6 @@ def acquire(
     return {
         "position_label": position_label,
         "acquisition_type": acquisition_type,
-        "folder": folder,
         "format": fmt,
         "planes": _planes(saved["path"], position, image, is_stack),
         # Every file saved, under the name the ZMART Controller's contract fixes,
@@ -712,7 +700,7 @@ Objectives on the nosepiece, by position: {objectives}.
 
 Optical configurations: {configurations}.
 
-Acquiring takes one image, or a z-stack when the acquisition type contains "stack"; a stack needs z_start and z_end (micrometres from the origin) and uses z_step. Files are saved as tif, nd2 or ome.tif in the data folder under the output folder, named by the acquisition type and the position label. A stack is best saved as nd2, which keeps every plane and all metadata."""
+Acquiring takes one image, or a z-stack when the acquisition type contains "stack"; a stack needs z_start and z_end (micrometres from the origin) and uses z_step. Files are saved as tif, nd2 or ome.tif in the output folder acquire is given (else in the data folder under the output root), named by the acquisition type and the position label. A stack is best saved as nd2, which keeps every plane and all metadata."""
 
 
 def _described(handle: NisHandle, objectives: dict) -> str:

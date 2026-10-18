@@ -521,11 +521,11 @@ def _require_experiment(handle: ZenHandle, what: str) -> None:
 def get_acquisition_settings(handle: ZenHandle) -> dict:
     """The acquisition and saving settings this instrument offers, with the active value of each.
 
-    ``folder`` groups the CZI in a folder of that name inside
-    ``<output_root>/data/`` (empty saves it straight into ``data``),
     ``experiment`` chooses the ZEN experiment (the imaging settings), ``mode``
     a single snap or the whole experiment, ``copy_to_output_root`` whether the
-    CZI is copied from ZEN's image folder into ``<output_root>/data/``.
+    CZI is copied from ZEN's image folder into ``acquire``'s
+    ``output_folder`` (``<output_root>/data/`` when none is given). Where the
+    files go is not a setting: it is ``acquire``'s ``output_folder``.
 
     Not yet as controller 0.3.0 intends: these settings still mix how to
     capture with what is state (a z-stack, the imaging settings) and with how
@@ -535,7 +535,6 @@ def get_acquisition_settings(handle: ZenHandle) -> dict:
     experiments = _safe(_readers.get_available_experiments, handle.client, default=[])
     experiment = handle.experiment.name if handle.experiment else None
     return {
-        "folder": {"options": "any text; empty saves straight into data", "default": "", "active": ""},
         "experiment": {
             "options": f"one of the ZEN experiments: {', '.join(experiments) or 'none found'}",
             "default": experiment,
@@ -550,12 +549,9 @@ def get_acquisition_settings(handle: ZenHandle) -> dict:
     }
 
 
-def canonical_stem(folder: str, position_label: str) -> str:
-    """A file-name stem safe on Windows: ``<folder>_<label>`` with odd characters replaced.
-
-    With no folder, the stem is the label alone.
-    """
-    raw = f"{folder}_{position_label}"
+def canonical_stem(acquisition_type: str, position_label: str) -> str:
+    """A file-name stem safe on Windows: ``<type>_<label>`` with odd characters replaced."""
+    raw = f"{acquisition_type}_{position_label}"
     return re.sub(r"[^A-Za-z0-9._-]+", "_", raw).strip("_") or "acquisition"
 
 
@@ -571,22 +567,15 @@ def acquire(
 
     A snap by default; the whole experiment (Z-stack, tiles, time series) when
     ``mode`` is "experiment". ZEN always writes the CZI into its own image
-    folder, as ``<type>_<folder>_<label>.czi`` (``<type>_<label>.czi`` with no
-    folder), where ``<type>`` is the acquisition type. The controller hands
-    both in filled in: the type is always a non-empty text, the folder text
-    or None. The file is then copied to ``<output_folder>/<folder>/``,
-    or ``<output_root>/data/<folder>/`` when no output folder is given, when
+    folder, as ``<type>_<label>.czi``, where ``<type>`` is the acquisition
+    type. The controller hands both in filled in: the type is always a
+    non-empty text, the folder text or None. The file is then copied into
+    ``output_folder``, or ``<output_root>/data/`` when none is given, when
     the ZEN folder is reachable from here; otherwise it stays where ZEN put
     it. ``files`` names where it is; the record names both locations.
     """
     _require_open(handle)
     options = dict(acquisition_settings or {})
-    folder = options.get("folder") or ""
-    if not isinstance(folder, str):
-        # A ValueError, like every other unusable acquisition setting.
-        raise ValueError(  # noqa: TRY004
-            f"acquisition setting 'folder' must be text, not {folder!r}"
-        )
     if options.get("experiment"):
         _use_experiment(handle, str(options["experiment"]))
     _require_experiment(handle, "acquire")
@@ -599,7 +588,7 @@ def acquire(
     timeout = float(options.get("timeout_s", 60.0))
 
     started = time.perf_counter()
-    output_name = canonical_stem(acquisition_type, canonical_stem(folder, position_label))
+    output_name = canonical_stem(acquisition_type, position_label)
     run = _cmd.run_snap if mode == "snap" else _cmd.run_experiment
     result = run(handle.client, handle.experiment, output_name=output_name)
     _raise_if_failed(result, "acquire")
@@ -610,8 +599,6 @@ def acquire(
     files = [str(zen_path)]
     if options.get("copy_to_output_root", True):
         data_dir = Path(output_folder) if output_folder is not None else handle.output_root / "data"
-        if folder:
-            data_dir = data_dir / canonical_stem(folder, "")
         data_dir.mkdir(parents=True, exist_ok=True)
         dst = data_dir / f"{result['output_name']}.czi"
         if not zen_path.parent.is_dir():
@@ -637,7 +624,6 @@ def acquire(
     return {
         "position_label": position_label,
         "acquisition_type": acquisition_type,
-        "folder": folder,
         "format": "czi",
         "mode": mode,
         "experiment": handle.experiment.name,
@@ -701,7 +687,7 @@ Objectives on the changer, by position: {objectives}.
 
 Experiments ZEN can load: {experiments}.
 
-Acquiring needs a loaded experiment. It takes a snap with that experiment, or runs the whole experiment (tiles, z-stack, time series) when the mode is "experiment" or the acquisition type mentions a stack, tiles or a time lapse. ZEN writes one CZI file, which is copied into the data folder under the output folder when ZEN's image folder can be reached from this computer."""
+Acquiring needs a loaded experiment. It takes a snap with that experiment, or runs the whole experiment (tiles, z-stack, time series) when the mode is "experiment" or the acquisition type mentions a stack, tiles or a time lapse. ZEN writes one CZI file, which is copied into the output folder acquire is given (else into the data folder under the output root) when ZEN's image folder can be reached from this computer."""
 
 
 def _objective_text(objective: dict) -> str:

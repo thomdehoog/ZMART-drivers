@@ -2,7 +2,7 @@
 Save: persist a capture into the canonical output layout.
 =========================================================
 The mesoSPIM image writer produces frame files on the acquisition PC; ``save``
-relocates them into the folder it is given (or a ``folder`` inside it), named
+relocates them into the folder it is given, named
 after the acquisition type and the position label, and writes a JSON metadata
 sidecar next to them. It returns a :class:`SavedAcquisition` manifest.
 
@@ -44,7 +44,6 @@ def save(
     *,
     position_label: str,
     acquisition_type: str,
-    folder: str = "",
     format: str = "ome-tiff",
 ) -> SavedAcquisition:
     """Persist ``acq``'s frames in ``data_dir`` and write metadata.
@@ -56,8 +55,6 @@ def save(
         position_label: names the position in the output filenames.
         acquisition_type: the kind of acquisition, which starts every file
             name and is kept in the metadata sidecar.
-        folder: a folder inside ``data_dir`` to group the files in; empty
-            saves them straight into it.
         format: recorded in the manifest and metadata sidecar.
 
     Returns:
@@ -67,8 +64,6 @@ def save(
         FileNotFoundError: a source frame file is missing on disk.
     """
     data_dir = Path(data_dir)
-    if folder:
-        data_dir = data_dir / canonical_stem(folder)
     data_dir.mkdir(parents=True, exist_ok=True)
 
     # Validate every source up front so a missing frame can't leave a partial
@@ -93,7 +88,6 @@ def save(
 
     metadata_path = data_dir / f"{stem}.json"
     payload = {
-        "folder": folder,
         "position_label": position_label,
         "acquisition_type": acquisition_type,
         "format": format,
@@ -114,7 +108,6 @@ def save(
         data_dir,
     )
     return SavedAcquisition(
-        folder=folder,
         position_label=position_label,
         image_paths=tuple(image_paths),
         metadata_path=metadata_path,

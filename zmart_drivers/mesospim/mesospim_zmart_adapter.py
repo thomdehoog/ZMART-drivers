@@ -570,7 +570,6 @@ def get_acquisition_settings(handle: MesospimHandle) -> dict:
     """
     zooms = [name for name, _px in HARDWARE.zoom_pixel_size_um]
     return {
-        "folder": {"options": "any text; empty saves straight into data", "default": "", "active": ""},
         "format": {
             "options": list(ACQUISITION.formats),
             "default": ACQUISITION.save_format,
@@ -607,17 +606,10 @@ def acquire(
     the frames into ``output_folder``, or ``<output_root>/data/`` when none is
     given, named after the acquisition type and ``position_label``. The
     controller hands both in filled in: the type is always a non-empty text,
-    the folder text or None. The ``folder`` setting puts them in a
-    folder of that name inside it.
+    the folder text or None.
     """
     options = dict(acquisition_settings or {})
     fmt = options.get("format", ACQUISITION.save_format)
-    folder = options.get("folder") or ""
-    if not isinstance(folder, str):
-        # A ValueError, like every other unusable acquisition setting.
-        raise ValueError(  # noqa: TRY004
-            f"acquisition setting 'folder' must be text, not {folder!r}"
-        )
     # Fail-closed gate BEFORE anything is applied; the absolute z bounds are
     # checked again below, once they are mapped through the frame origin.
     _check_limits(handle, "acquire", {})
@@ -678,7 +670,6 @@ def acquire(
             Path(output_folder) if output_folder is not None else handle.output_root / "data",
             position_label=position_label,
             acquisition_type=acquisition_type,
-            folder=folder,
             format=fmt,
         )
     finally:
@@ -686,7 +677,6 @@ def acquire(
     return {
         "position_label": position_label,
         "acquisition_type": acquisition_type,
-        "folder": folder,
         "format": fmt,
         "planes": _planes(handle, result, saved),
         # Every file saved, under the name the ZMART Controller's contract fixes,
@@ -768,7 +758,7 @@ Stage: x, y and z move the sample, one motor each ("motoric"), in micrometres fr
 
 Settings (the changeable part of the state): laser is the laser line ({lasers}); intensity is the laser intensity in percent, 0 to 100; filter is the emission filter ({filters}); zoom is the detection zoom ({zooms}); shutterconfig chooses which light sheet is on ({shutters}); etl_l_amplitude, etl_l_offset, etl_r_amplitude and etl_r_offset are the amplitude and offset of the electrically tunable lens of the left and the right light sheet.{camera}
 
-Acquiring captures one plane with the current settings, or a stack when z_start and z_end (micrometres from the origin) or planes are given, with z_step micrometres between planes. Laser, intensity, filter, zoom and shutterconfig may be given as acquisition settings too. The images are saved as ome-tiff, raw or h5 in the data folder under the output folder, named by the position label; the folder setting groups them in a folder of that name inside data."""
+Acquiring captures one plane with the current settings, or a stack when z_start and z_end (micrometres from the origin) or planes are given, with z_step micrometres between planes. Laser, intensity, filter, zoom and shutterconfig may be given as acquisition settings too. The images are saved as ome-tiff, raw or h5 in the output folder acquire is given (else in the data folder under the output root), named by the acquisition type and the position label."""
 
 
 def _bounds(handle: MesospimHandle, axis: str) -> str:
