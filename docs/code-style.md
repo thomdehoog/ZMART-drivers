@@ -15,8 +15,9 @@ follow the reason.
    to each other, and keep a function near the functions it works with. A
    reader should not have to jump around the file to follow one idea.
 2. **Remove dead code.** Delete code that nothing calls, and delete its tests
-   too. Git remembers it, so nothing is lost. Dead code only makes a reader
-   wonder whether it still matters.
+   too. Also delete every mention of it in READMEs, docs and comments: a file
+   tree that still lists a deleted file is as misleading as the dead code.
+   Git remembers it, so nothing is lost.
 3. **Fewer lines are better, until they hurt readability.** Cut what repeats
    or says nothing. Stop cutting when the result is harder to read than the
    longer version. Clever and short is not the aim; easy to follow is.
@@ -43,10 +44,11 @@ follow the reason.
 9. **Numbers live in one place and carry their unit.** Waiting times, retry
    counts and tolerances belong in a tuning file, and names say their unit
    (`_um`, `_s`). A number in the middle of a function is easy to miss and
-   hard to change.
-10. **Let a formatter decide the layout.** Pick one formatter and make it a
-    required check, so that nobody argues about line breaks. This guide is for
-    what a formatter cannot check.
+   hard to change. A constant that only one test uses may stay in that test.
+10. **Let a formatter decide the layout.** The formatter is `ruff format`. It
+    should be a required check, so that nobody argues about line breaks. It is
+    not required yet: it would reformat 17 files today, and those must be
+    reformatted once first. This guide is for what a formatter cannot check.
 
 ## The top of every file
 
@@ -66,9 +68,11 @@ follow the reason.
 
 ## Behaviour and structure
 
-14. **Functions return one shape of result.** A command returns its result with
-    `success`, `confirmed` and `message`, or it raises an error. It does not
-    mix the two. The controller relies on this contract.
+14. **Each kind of function keeps to one shape.** A command returns a result
+    with `success`, `confirmed` and `message`. An acquisition raises an error
+    when it fails, and the controller turns that into a failed answer. Within
+    one kind, do not mix returning and raising. The controller relies on this
+    contract.
 15. **Dependencies point one way.** Each part of a driver uses only the parts
     below it (see `docs/driver-anatomy.md`). A test enforces this, so that a
     shortcut cannot slip in unnoticed.
@@ -84,3 +88,12 @@ follow the reason.
 18. **One idea per commit, with a message in plain words.** Say what changed
     and why. Someone should be able to read the history and understand how the
     code got here.
+
+## A note on how to use this guide
+
+Rules 3, 6, 7 and 11 call for judgment, and no tool can check them. Where two
+rules pull in different directions, such as removing comments (rule 3) and
+labelling blocks (rule 6), keep the comment that tells the reader something
+the code does not, and remove the one that repeats it. Docstrings state what
+goes in, what comes back and what can go wrong, in plain sentences, and
+explain any technical word the first time it is used, as the repository's writing rules ask.
