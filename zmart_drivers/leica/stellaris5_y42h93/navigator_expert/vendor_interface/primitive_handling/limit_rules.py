@@ -38,6 +38,8 @@ from dataclasses import dataclass
 from types import MappingProxyType
 from typing import Any
 
+from ...dispatcher.limit_errors import LimitsError, LimitsStatus, LimitViolation
+
 # =============================================================================
 # Hardcoded physical backstop
 # =============================================================================
@@ -257,30 +259,6 @@ SETTER_LIMIT_KEYS = (
 )
 
 
-class LimitsError(ValueError):
-    """The limits file (or an override) is malformed or incomplete."""
-
-
-class LimitViolation(RuntimeError):
-    """A checked value is outside its configured limit."""
-
-
-@dataclass(frozen=True, slots=True)
-class LimitsStatus:
-    """Detached public provenance for the installed limits."""
-
-    source: str
-    path: str | None
-    is_fallback: bool
-
-    def describe(self) -> dict:
-        return {
-            "source": self.source,
-            "path": self.path,
-            "is_fallback": self.is_fallback,
-        }
-
-
 @dataclass(frozen=True, slots=True, init=False)
 class LeicaLimits:
     """Immutable runtime checker compiled from the flat Leica limits document."""
@@ -373,3 +351,41 @@ class LeicaLimits:
 
     def describe(self) -> dict:
         return self.status().describe()
+
+
+# =============================================================================
+# What the shared gate asks of this microscope
+# =============================================================================
+
+# Every mutating command -> its low-level policy key. The completeness suite
+# (testing/unit/test_limits_adversarial.py) enumerates the commands that
+# dispatch through the fire path and fails if any is missing here.
+MUTATING_COMMANDS = {
+    # each configurable setter maps directly to its flat JSON entry
+    **{name: name for name in SETTER_LIMIT_KEYS},
+    "set_objective": "set_objective",
+    "select_job": "set_state",
+    # stage motion
+    "move_xy": "set_xyz",
+    "move_z": "set_xyz",
+    # acquisition
+    "acquire": "acquire",
+}
+
+NOTEBOOK_POINTER = "configuration/limits/notebooks/set_limits.ipynb"
+
+
+def build_limits(stage_cfg, *, source, path, is_fallback):
+    """Check a loaded limits file against the physical backstop, apply it, and compile it.
+
+    The stage envelope must sit within the hardcoded backstop. On success the
+    envelope becomes the one the stage checks use, and the compiled
+    :class:`LeicaLimits` is returned. Raises when the file is not acceptable,
+    so the caller can fall back to the bundled defaults.
+    """
+    check_envelope_within_backstop(stage_cfg["stage_um"])
+    limits = LeicaLimits(
+        stage_cfg["policy"], source=source, path=path, is_fallback=is_fallback
+    )
+    apply_stage_limits_from_config(stage_cfg)
+    return limits

@@ -28,7 +28,8 @@ from functools import partial
 from typing import Any
 
 from ...dispatcher.envelope import _make_log_entry
-from ..error_classification import _check_api_error, _is_transient_error
+from ...dispatcher import error_rules
+from ..error_classification import _check_api_error, classify_error
 from ..parsing import parse_format
 from . import confirmations as _check
 from . import profiles as _profiles
@@ -201,7 +202,8 @@ def _scan_resonant_error_check(client, *, job_name, target, timeout=None):
             logs.append(_make_log_entry("info", msg))
             return {"success": True, "error": None, "transient": None, "logs": logs}
 
-    transient = _is_transient_error(error_msg)
+    kind = classify_error(error_msg)
+    transient = error_rules.sends_again(kind)
     log_msg = f"API error: {error_msg}"
     if details:
         log_msg += f" | details: {details}"
@@ -209,6 +211,7 @@ def _scan_resonant_error_check(client, *, job_name, target, timeout=None):
     return {
         "success": False,
         "error": error_msg,
+        "kind": kind,
         "transient": transient,
         "logs": logs,
     }

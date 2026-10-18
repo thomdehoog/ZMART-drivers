@@ -1,13 +1,14 @@
 """The shared reader: one way to wait for an answer, whichever source gives it.
 
 Every reading follows the one rule in :mod:`tuning`: four windows of three
-seconds. Within a window both sources the profile allows are watched, the
-CAM API and the LAS X log, and the first answer that counts as a success
-wins, from whichever source gives it; no source is preferred. What counts as
-a success is declared once per datum in :mod:`capabilities` (``success``),
-and a caller can narrow it with ``accept``. A read the API did not answer in
-a window is requested again at the next one. After four windows the reading
-is unknown.
+seconds. Within a window the sources the profile allows are asked one after
+the other, the CAM API first and then the LAS X log, and the first answer
+that counts as a success wins. Each source gets its own slice of the window,
+so that a slow source cannot use the whole window up. What counts as a
+success is declared once per datum in :mod:`capabilities` (``success``), and
+a caller can narrow it with ``accept``. A read the API did not answer in a
+window is requested again at the next one. After four windows the reading is
+unknown.
 
 The source family (``api``, ``log``, ``hybrid``, ``direct``) is profile policy
 and says which sources take part, never how long to wait. Asking a family for
@@ -38,7 +39,6 @@ University of Zurich (thom.dehoog@zmb.uzh.ch, thomdehoog@gmail.com).
 from __future__ import annotations
 
 import logging
-import queue
 import threading
 import time
 
@@ -103,6 +103,9 @@ class _ApiTurns:
 
 _API_TURNS = _ApiTurns()
 
+#: An event that is never set, for callers that have no reason to stop waiting for a turn.
+_NEVER_STOPPED = threading.Event()
+
 
 def _client_api_key(client):
     return id(client)
@@ -136,42 +139,60 @@ def watch_direct(spec, *, succeeded, deadline, observed_after, direct_kwargs, wa
         time.sleep(tuning.POLL_S)
 
 
-def _api_worker(spec, client, api_kwargs, *, deadline, stop, answers):
-    """Request the read, and request it again every ``POLL_S`` until stopped or the window ends.
+def _ask_api(spec, client, api_kwargs, *, until, answer_counts):
+    """Request the read, and request it again every ``POLL_S`` until an answer counts or *until*.
 
     One request at a time per connection: a busy connection is waited for,
-    never skipped. A request already sent is seen through to its answer or
-    the window's end, even when the race is won meanwhile: abandoning
-    questions mid-flight, which happened on every look the log won, made
-    LAS X drop the next one under a burst of commands (LAS X simulator,
-    2026-10-11). Once the race is won, no new request is sent.
+    never skipped. Each request runs in a small helper thread that this
+    function waits for until *until*, so that a LAS X call that never returns
+    cannot freeze the driver: the caller moves on, and the connection's turn
+    is handed back when the call finally ends, so that no second request is
+    piled onto a hung one. Returns the last reading, or None when no answer
+    came in time.
     """
     key = _client_api_key(client)
-    while not stop.is_set() and time.monotonic() < deadline:
-        if not _API_TURNS.take(key, until=deadline, stop=stop):
-            return
-        try:
-            reading = sources.api_read(
-                lambda: spec.api_fn(client, deadline=deadline, **api_kwargs)
-            )
-        finally:
-            _API_TURNS.give_back(key)
-        answers.put(reading)
-        if stop.wait(tuning.POLL_S):
-            return
+    reading = None
+    while time.monotonic() < until:
+        if not _API_TURNS.take(key, until=until, stop=_NEVER_STOPPED):
+            break
+        done = threading.Event()
+        answers = []
+
+        def request(answers=answers, done=done):
+            try:
+                answers.append(
+                    sources.api_read(
+                        lambda: spec.api_fn(client, deadline=until, **api_kwargs)
+                    )
+                )
+            finally:
+                _API_TURNS.give_back(key)
+                done.set()
+
+        threading.Thread(target=request, name="lasx-api-read", daemon=True).start()
+        if not done.wait(timeout=max(0.0, until - time.monotonic())):
+            break
+        reading = answers[0]
+        if answer_counts(reading):
+            return reading
+        time.sleep(max(0.0, min(tuning.POLL_S, until - time.monotonic())))
+    return reading
 
 
-def _log_worker(spec, job_name, max_age_s, *, deadline, stop, answers):
-    """Read the LAS X log, and again every ``POLL_S`` until stopped or the window ends.
+def _ask_log(spec, job_name, max_age_s, *, until, answer_counts):
+    """Read the LAS X log, and again every ``POLL_S`` until an answer counts or *until*.
 
-    A worker whose race is already won starts no parse. Each read takes the
-    shared live snapshot (``log_reader.LIVE_LOG``), so however many readings
-    race at once, the log is parsed by one parse at a time.
+    Each read takes the shared live snapshot (``log_reader.LIVE_LOG``), so
+    however many readings are taken at once, the log is parsed by one parse
+    at a time.
     """
-    while not stop.is_set():
-        answers.put(sources.snapshot_read(spec, max_age_s=max_age_s, job_name=job_name))
-        if stop.wait(tuning.POLL_S) or time.monotonic() >= deadline:
-            return
+    reading = None
+    while True:
+        reading = sources.snapshot_read(spec, max_age_s=max_age_s, job_name=job_name)
+        remaining = until - time.monotonic()
+        if answer_counts(reading) or remaining <= 0:
+            return reading
+        time.sleep(min(tuning.POLL_S, remaining))
 
 
 def _counts(reading, succeeded, observed_after):
@@ -192,53 +213,42 @@ def _counts(reading, succeeded, observed_after):
 def _watch(
     datum, client, *, mode, succeeded, deadline, job_name, observed_after, api_kwargs
 ):
-    """Watch one window: the first answer that counts, from either source, or no answer.
+    """Watch one window: ask each allowed source in turn, and return the first answer that counts.
 
-    Returns the winning Reading; when nothing counted by *deadline*, the
-    latest error-carrying reading with its value stripped (so diagnostics
-    show why), else None. An ``UnsupportedSource`` reading comes back at
-    once. Workers post every answer to one queue; this function blocks on
-    the queue, so it needs no interval of its own.
+    The sources are asked one after the other, the API first and then the
+    log, each within its own share of the time left until *deadline*. Returns
+    the winning Reading; when nothing counted, the latest error-carrying
+    reading with its value stripped (so diagnostics show why), else None. An
+    ``UnsupportedSource`` reading comes back at once.
     """
     spec = capabilities.spec(datum)
     legs = sources.legs(spec, datum, mode)
     if isinstance(legs, Reading):
         return legs
-    answers = queue.Queue()
-    stop = threading.Event()
-    if "api" in legs:
-        threading.Thread(
-            target=_api_worker,
-            args=(spec, client, api_kwargs),
-            kwargs=dict(deadline=deadline, stop=stop, answers=answers),
-            name=f"lasx-{datum}-api",
-            daemon=True,
-        ).start()
-    if "log" in legs:
-        max_age_s = sources.max_age_s(spec)
-        threading.Thread(
-            target=_log_worker,
-            args=(spec, job_name, max_age_s),
-            kwargs=dict(deadline=deadline, stop=stop, answers=answers),
-            name=f"lasx-{datum}-log",
-            daemon=True,
-        ).start()
+
+    def answer_counts(reading):
+        return reading is not None and _counts(reading, succeeded, observed_after)
+
     failed = None
-    try:
-        while True:
-            remaining = deadline - time.monotonic()
-            if remaining <= 0:
-                break
-            try:
-                reading = answers.get(timeout=remaining)
-            except queue.Empty:
-                break
-            if _counts(reading, succeeded, observed_after):
-                return reading
-            if reading.error is not None:
-                failed = reading._replace_value_none()
-    finally:
-        stop.set()
+    began = time.monotonic()
+    for turn, leg in enumerate(legs, start=1):
+        until = began + (deadline - began) * turn / len(legs)
+        if leg == "api":
+            reading = _ask_api(
+                spec, client, api_kwargs, until=until, answer_counts=answer_counts
+            )
+        else:
+            reading = _ask_log(
+                spec,
+                job_name,
+                sources.max_age_s(spec),
+                until=until,
+                answer_counts=answer_counts,
+            )
+        if answer_counts(reading):
+            return reading
+        if reading is not None and reading.error is not None:
+            failed = reading._replace_value_none()
     return failed
 
 
