@@ -175,9 +175,9 @@ def phase_commands(v: vh.Validator, sess: Any) -> dict[str, Any]:
                 "get_actuators: the three axes", sorted(actuators), ["x", "y", "z"]
             )
             v.compare(
-                "get_actuators: z has its two drives, z-wide the default",
+                "get_actuators: z moves with z-wide alone",
                 actuators.get("z"),
-                {"options": ["z-wide", "z-galvo"], "default": "z-wide"},
+                {"options": ["z-wide"], "default": "z-wide"},
             )
 
         xyz = v.callable("get_xyz", sess.get_xyz)
