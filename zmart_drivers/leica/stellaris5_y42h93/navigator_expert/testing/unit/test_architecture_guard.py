@@ -176,7 +176,6 @@ ALLOWED = {
     },
     "dispatcher": {
         "vendor_specific",  # the engines run the driver's handling notes and readers
-        "driver_setup",  # upward: the gate loads the limits item at connect
     },
     "procedures": {
         "vendor_specific",
@@ -186,6 +185,7 @@ ALLOWED = {
     },
     "driver_setup": {
         "vendor_specific",  # the limits item validates through the rulebook
+        "dispatcher",  # the limits handshake installs the limits in the gate
         # The measuring code of an item takes pictures and moves the stage, so it
         # uses the commands. Run-time procedures never import that measuring code
         # (see the test below): they read the saved values only.
@@ -205,6 +205,7 @@ ALLOWED = {
         "vendor_specific",
         "dispatcher",
         "procedures",
+        "driver_setup",  # the limits handshake is re-exported for the setup notebooks
     },
 }
 

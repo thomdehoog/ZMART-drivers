@@ -610,8 +610,8 @@ with `functools.partial`).
 it: `vendor_specific` → `dispatcher` → `procedures`, with `driver_setup` beside
 them. The move that put every file in its part kept the imports as they were, so a few still run
 upward today: the readers and the handling notes in `vendor_specific` use the dispatcher's tuning,
-envelope and read engine, the gate loads the limits item, and the limits item validates through
-the rulebook. `testing/unit/test_architecture_guard.py` lists each
+envelope and read engine. The dispatcher no longer imports anything from `driver_setup`: the
+limits handshake lives in `driver_setup/limits/handshake.py` and installs the limits in the gate. `testing/unit/test_architecture_guard.py` lists each
 of them and fails when a new one appears; removing them is follow-up work, one at a time.
 The connect-time flow lives in `ZmartDriver.__init__`: it opens the client, installs the limits
 gate, and loads the orientation and the calibration (the loaders are in

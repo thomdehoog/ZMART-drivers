@@ -148,7 +148,7 @@ def install_permissive_limits(client, *, wide_stage=False, **set_xyz_constraints
     is also set wide open (the old ``_wide_limits`` idiom) — note the
     hardcoded backstop still bounds every move.
     """
-    _gate._install(
+    _gate.install(
         client,
         _gate.GateState(
             limits=permissive_function_limits(**set_xyz_constraints),

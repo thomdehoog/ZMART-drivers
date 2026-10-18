@@ -103,8 +103,8 @@ from .vendor_specific.primitive_handling.changes import set_zoom, set_scan_speed
 from .procedures.absolute_coordinate_system.compensated_changes import set_objective, select_job
 from .vendor_specific.connection.lasx_client import connect_python_client
 
-# -- commands/gate - command safety gate + connect handshake
-from .dispatcher.gate import connect_handshake as connect_limits_handshake
+# -- driver_setup/limits/handshake.py - the connect-time limits handshake
+from .driver_setup.limits.handshake import connect_handshake as connect_limits_handshake
 
 # -- vendor_specific/primitive_handling/limit_rules.py - the rulebook: stage checks + the compiled limits document
 from .vendor_specific.primitive_handling.limit_rules import _stage_limits, set_stage_limits, get_stage_limits, apply_stage_limits_from_config, check_xy, check_z
