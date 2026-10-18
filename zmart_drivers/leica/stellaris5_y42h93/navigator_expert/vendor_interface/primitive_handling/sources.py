@@ -4,7 +4,7 @@ A reading in the table of :mod:`readings` can have up to three legs: the CAM
 API (asked on demand), the LAS X log (written only when a value changes) and
 the direct reader (the hardware server's state tree). This file holds the one
 function per leg that asks it once, and turns whatever happens into a
-:class:`~..dispatcher.reading.Reading`. A leg that fails never raises: the
+:class:`~..dispatcher.read.Reading`. A leg that fails never raises: the
 error rides along in the reading so the shared reader in
 ``dispatcher/read.py`` can decide what to do next.
 
@@ -17,13 +17,22 @@ from __future__ import annotations
 import logging
 import time
 
-from ...dispatcher.reading import Reading
+from ...dispatcher.read import Reading
 from ..connection.hardware_server import HardwareServerUnavailable
 from ..primitives.log import log_reader
 from . import profiles
 from . import readings as capabilities
 
 log = logging.getLogger(__name__)
+
+
+def spec(datum):
+    """The row of the table of readings for *datum*."""
+    return capabilities.spec(datum)
+
+
+#: Handed to the shared reader so that it can tell a missing leg from a failure.
+UnsupportedSource = capabilities.UnsupportedSource
 
 
 def profile():

@@ -2,7 +2,7 @@
 
 Each function asks the shared reader in ``dispatcher/read.py`` for one row of
 the table in :mod:`readings` and hands back a plain value, or, with
-``diagnostics=True``, a :class:`~...dispatcher.reading.Reading` that also says
+``diagnostics=True``, a :class:`~...dispatcher.read.Reading` that also says
 which source answered and how old the answer was. A reading that cannot be
 had comes back as None; the readers here do not raise, except where a
 function's own note says so.
@@ -15,8 +15,8 @@ from __future__ import annotations
 
 import logging
 
-from ...dispatcher.read import on_demand_mode, wait_for  # noqa: F401  used by the callers of this file
-from ...dispatcher.reading import (
+from ...dispatcher import read as _reader
+from ...dispatcher.read import (
     Reading,
     derive as _derive,
     plain_or_diagnostic as _plain_or_diagnostic,
@@ -34,6 +34,22 @@ from .derived import (  # noqa: F401  re-exported, as the readers package did
 )
 
 log = logging.getLogger(__name__)
+
+
+def wait_for(datum, client, **keywords):
+    """Wait for a reading of *datum*, asking LAS X's sources; see :func:`dispatcher.read.wait_for`."""
+    return _reader.wait_for(sources, datum, client, **keywords)
+
+
+def on_demand_mode(datum):
+    """The direct reader when the policy reads *datum* directly, else the API: the sources that answer on demand.
+
+    For readings a command waits on (whether the scanner is idle, where the
+    stage went), which the log cannot settle: it writes a value only when it
+    changes, so it can still show the state from before. Pair it with
+    ``fallback="api"``.
+    """
+    return "direct" if sources.mode_for(datum) == "direct" else "api"
 
 
 def _routed(
