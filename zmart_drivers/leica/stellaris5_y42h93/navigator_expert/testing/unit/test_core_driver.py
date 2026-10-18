@@ -775,7 +775,7 @@ class TestRetryBackoff(unittest.TestCase):
             },
         ) as mock_caf:
             commands.dispatch_change(
-                client, api_obj, "Test", profile, setup_fn=lambda m: None
+                client, api_obj, "Test", profile, command="set_zoom", values={}, setup_fn=lambda m: None
             )
 
         mock_caf.assert_called_once()
@@ -806,7 +806,7 @@ class TestRetryBackoff(unittest.TestCase):
             },
         ) as mock_caf:
             commands.dispatch_change(
-                client, api_obj, "Test", profile, setup_fn=lambda m: None
+                client, api_obj, "Test", profile, command="set_zoom", values={}, setup_fn=lambda m: None
             )
 
         _, kwargs = mock_caf.call_args
@@ -841,6 +841,8 @@ class TestRetryBackoff(unittest.TestCase):
                 api_obj,
                 "Test",
                 profile,
+                command="set_zoom",
+                values={},
                 setup_fn=lambda m: None,
                 confirm_fn=confirm,
             )
@@ -879,6 +881,8 @@ class TestRetryBackoff(unittest.TestCase):
                 api_obj,
                 "Test",
                 profile,
+                command="set_zoom",
+                values={},
                 setup_fn=lambda m: None,
                 confirm_fn=partial(confirm, poll_window=12.0),
             )

@@ -8,7 +8,8 @@ of its two engines does the work:
   reader asks again, never the hardware.
 - :func:`write` changes something on the microscope: it sends the command,
   checks for an error (``send_loop.py``), reads the value back until it matches, and
-  sends again where that is safe (``confirm_loop.py``) (``send_loop.py`` and ``confirm_loop.py``). Changing a setting or moving to an
+  sends again where that is safe (``confirm_loop.py``). It first asks the limits gate
+  (``gate.py``) and sends nothing if the limits refuse. Changing a setting or moving to an
   absolute position can be repeated. The one command that must never be sent
   again is starting an acquisition, which says so in its profile
   (``never_resend``).
@@ -133,8 +134,24 @@ def read(vendor, datum, client, **keywords):
     return reader.wait_for(vendor, datum, client, **keywords)
 
 
-def write(client, api_obj, description, **keywords):
-    """Send a change, check it, and confirm it; see :func:`confirm_loop.confirm_and_fire`."""
-    from . import confirm_loop
+def write(client, api_obj, description, *, command, values, **keywords):
+    """Send a change, check it, and confirm it; see :func:`confirm_loop.confirm_and_fire`.
 
+    ``command`` is the name of the change and ``values`` is what it would set.
+    Before anything is sent, the limits gate is asked whether this connection's
+    limits allow it. If not, nothing is sent and the answer is a refused result
+    with the reason. Because the check sits here, no change can reach the
+    microscope without passing it, whichever recipe asked.
+    """
+    from . import confirm_loop, gate
+
+    message = gate.check_refusal(client, command, values)
+    if message is not None:
+        return {
+            "success": False,
+            "confirmed": None,
+            "message": message,
+            "timing": make_timing(total_s=0.0, attempts=0),
+            "logs": [make_log_entry("error", message)],
+        }
     return confirm_loop.confirm_and_fire(client, api_obj, description, **keywords)

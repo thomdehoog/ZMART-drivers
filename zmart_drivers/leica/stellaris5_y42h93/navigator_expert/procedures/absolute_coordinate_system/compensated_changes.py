@@ -122,11 +122,8 @@ def set_objective(
     # (objective_slot; [] — the default — is unrestricted). The resolved
     # physical slot is checked regardless of whether the caller selected it
     # by slot, name, or magnification.
-    refused = _changes.limits_refusal(
-        client,
-        "set_objective",
-        {"job_name": job_name, "objective_slot": slot},
-    )
+    gated_values = {"job_name": job_name, "objective_slot": slot}
+    refused = _changes.limits_refusal(client, "set_objective", gated_values)
     if refused:
         return refused
 
@@ -162,6 +159,8 @@ def set_objective(
         api_obj,
         f"Objective -> {target_name} (slot {slot})",
         OBJECTIVE,
+        command="set_objective",
+        values=gated_values,
         setup_fn=setup,
         confirm_fn=partial(
             confirm_objective,
@@ -208,7 +207,8 @@ def select_job(client, job_name, *, compensate=None):
             ``False`` asks for a bare change. See
             :func:`objective_shift.record_before_change`.
     """
-    refused = _changes.limits_refusal(client, "select_job", {"job_name": job_name})
+    gated_values = {"job_name": job_name}
+    refused = _changes.limits_refusal(client, "select_job", gated_values)
     if refused:
         return refused
 
@@ -257,6 +257,8 @@ def select_job(client, job_name, *, compensate=None):
         api_obj,
         f"SelectJob '{job_name}'",
         SELECT_JOB,
+        command="select_job",
+        values=gated_values,
         setup_fn=setup,
         confirm_fn=api_confirm,
         log_confirm_fn=log_leg,

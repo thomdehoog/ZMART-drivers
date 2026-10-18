@@ -99,6 +99,8 @@ def dispatch_change(
     description,
     profile,
     *,
+    command,
+    values,
     setup_fn,
     confirm_fn=None,
     log_confirm_fn=None,
@@ -126,6 +128,9 @@ def dispatch_change(
         api_obj: Resolved API object.
         description: Human-readable label for logging.
         profile: CommandProfile instance with all settings.
+        command: The change's name in ``limit_rules.MUTATING_COMMANDS``.
+        values: What the change would set, as the limits gate reads it. The
+            dispatcher's write asks the gate before anything is sent.
         setup_fn: Callable(model) that writes parameters to api_obj.Model.
         confirm_fn: Override for the profile's confirm_fn. Use when
             the confirm callable needs command-specific parameters
@@ -203,6 +208,8 @@ def dispatch_change(
         client,
         api_obj,
         description,
+        command=command,
+        values=values,
         profile=effective_profile,
         setup_fn=setup_fn,
         pre_check_fn=pre_check_fn,
@@ -224,7 +231,8 @@ def _change_setting(setting, client, arguments, *, max_retries=None, tolerance=N
     if setting.normalize is not None:
         arguments = setting.normalize(arguments)
 
-    refused = limits_refusal(client, setting.command, setting.gate(arguments))
+    gated_values = setting.gate(arguments)
+    refused = limits_refusal(client, setting.command, gated_values)
     if refused:
         return refused
 
@@ -244,6 +252,8 @@ def _change_setting(setting, client, arguments, *, max_retries=None, tolerance=N
         getattr(client, setting.request),
         setting.describe.format(**arguments),
         setting.profile,
+        command=setting.command,
+        values=gated_values,
         setup_fn=lambda model: setting.write(model, arguments),
         confirm_fn=setting.confirm(arguments, tolerance),
         error_check_fn=setting.error_check(arguments) if setting.error_check else None,
@@ -679,9 +689,8 @@ def move_xy(client, x, y, unit="um", *, max_retries=None, tolerance=None):
             x_um, y_um = x * 1e6, y * 1e6
         else:
             x_um, y_um = x, y
-        refused = limits_refusal(
-            client, "move_xy", {"x_um": x_um, "y_um": y_um}, position=None
-        )
+        gated_values = {"x_um": x_um, "y_um": y_um}
+        refused = limits_refusal(client, "move_xy", gated_values, position=None)
         if refused:
             return refused
         check_xy(x_um, y_um)
@@ -727,6 +736,8 @@ def move_xy(client, x, y, unit="um", *, max_retries=None, tolerance=None):
         api_obj,
         f"MoveXY -> ({x}, {y}) {unit}",
         MOVE_XY,
+        command="move_xy",
+        values=gated_values,
         setup_fn=setup,
         confirm_fn=partial(
             confirm_move_xy,
@@ -795,9 +806,8 @@ def move_z(
 
         # Function-keyed gate, then the stage envelope + backstop — all
         # before the native call can fire.
-        refused = limits_refusal(
-            client, "move_z", {f"z_{'galvo' if z_mode == 'galvo' else 'wide'}_um": z_um}
-        )
+        gated_values = {f"z_{'galvo' if z_mode == 'galvo' else 'wide'}_um": z_um}
+        refused = limits_refusal(client, "move_z", gated_values)
         if refused:
             return refused
         check_z(z_um, z_mode)
@@ -837,6 +847,8 @@ def move_z(
         api_obj,
         f"Z -> {z} {unit} ({z_mode})",
         MOVE_Z,
+        command="move_z",
+        values=gated_values,
         setup_fn=setup,
         confirm_fn=partial(
             confirm_move_z,
@@ -883,7 +895,8 @@ def acquire(
     Returns:
         Result dict with timing in timing['total_s'].
     """
-    refused = limits_refusal(client, "acquire", {"job_name": job_name})
+    gated_values = {"job_name": job_name}
+    refused = limits_refusal(client, "acquire", gated_values)
     if refused:
         return refused
 
@@ -897,6 +910,8 @@ def acquire(
         api_obj,
         f"Acquire '{job_name}'",
         ACQUIRE,
+        command="acquire",
+        values=gated_values,
         setup_fn=setup,
         confirm_fn=partial(
             confirm_acquire,
