@@ -31,7 +31,7 @@ from ..configuration import session_state as _session_state
 from . import command_log as _log
 from ..vendor_interface.primitives.capture import lasx_cache_release as _release
 from . import save as _save
-from ..dispatcher.naming import Naming, free_stem
+from ..vendor_interface.naming import Naming, free_stem
 from ..vendor_interface.primitive_handling import state as _readers
 from ..vendor_interface.primitive_handling.profiles import IMAGE_SAVE
 from . import acquire as _capture

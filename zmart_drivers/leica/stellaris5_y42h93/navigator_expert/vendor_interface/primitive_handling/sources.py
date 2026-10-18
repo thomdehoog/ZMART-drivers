@@ -6,7 +6,7 @@ the direct reader (the hardware server's state tree). This file holds the one
 function per leg that asks it once, and turns whatever happens into a
 :class:`~..dispatcher.read.Reading`. A leg that fails never raises: the
 error rides along in the reading so the shared reader in
-``dispatcher/read.py`` can decide what to do next.
+``dispatcher/reader.py`` can decide what to do next.
 
 Author: Thom de Hoog, Center for Microscopy and Image Analysis (ZMB),
 University of Zurich (thom.dehoog@zmb.uzh.ch, thomdehoog@gmail.com).
@@ -17,7 +17,7 @@ from __future__ import annotations
 import logging
 import time
 
-from ...dispatcher.read import Reading
+from ...dispatcher.reader import Reading
 from ..connection.hardware_server import HardwareServerUnavailable
 from ..primitives.log import log_reader
 from . import profiles

@@ -319,7 +319,7 @@ permanent error, failed pre-check) and `confirmed` is `None`.
 (`out of range`, `is invalid`, `not implemented`, …) then **transient** (`being scanned`, `busy`,
 `timeout`, …); unknown → permanent (conservative). Transient errors retry up to `max_retries`.
 
-**Reading state — direct, with api / log / hybrid behind it** (`dispatcher/read.py`, over
+**Reading state — direct, with api / log / hybrid behind it** (`dispatcher/reader.py`, over
 the three readers in `vendor_interface/primitives/` (`direct/direct_reader.py`, `api/api_reader.py` and
 `log/log_reader.py`), chosen per datum by
 `StateReaderProfile`). Every reading asks the **direct** reader first, the default for every datum
@@ -336,7 +336,7 @@ an objective slot and image geometry). On the STELLARIS (15 October 2026) the di
 right where the CAM API was stale: the z-galvo position while a job had a z-galvo stack, and the
 selected job just after a switch.
 
-**Waiting on LAS X — one rule** (`dispatcher/tuning.py`): every reading, confirmation and delivery
+**Waiting on LAS X — one rule** (`dispatcher/timing.py`): every reading, confirmation and delivery
 waits **four windows of three seconds**. Within a window both sources are watched; between windows
 something is sent again — a command is fired again, an unanswered read is requested again, a
 message is delivered again. The driver looks again every `POLL_S` (0.1 s) and checks for an answer
@@ -590,7 +590,7 @@ zmart_drivers/leica/stellaris5_y42h93/navigator_expert/
 └── (the driver's CI, pytest.ini, .coveragerc and requirements-dev.txt live in testing/)
 ```
 
-**Two-layer dispatch backbone** (`dispatcher/change.py` → `confirm_and_fire`):
+**Two-layer dispatch backbone** (`dispatcher/writer.py` → `confirm_and_fire`):
 
 ```
 confirm_and_fire (outer)
@@ -758,4 +758,4 @@ Copy the closest existing command of a similar shape.
 - Sibling drivers, still under construction in the main ZMART-microscopy repository:
   [ZEISS ZEN API](https://github.com/thomdehoog/ZMART-microscopy/tree/main/zmart_drivers/zeiss/zenapi) (gRPC) and
   [Nikon NIS-Elements](https://github.com/thomdehoog/ZMART-microscopy/tree/main/zmart_drivers/nikon) (socket macro).
-- Leica filename implementation: [`dispatcher/naming.py`](dispatcher/naming.py)
+- Leica filename implementation: [`vendor_interface/naming.py`](vendor_interface/naming.py)

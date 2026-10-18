@@ -19,10 +19,10 @@ import zarr
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.image_stage_registration import (
     Orientation,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher.naming import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.naming import (
     Naming,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher.product import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.product import (
     PlaneIndex,
 )
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures import (

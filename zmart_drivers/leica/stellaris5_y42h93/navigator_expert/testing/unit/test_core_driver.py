@@ -36,7 +36,7 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures import (
     changes as commands,
 )
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher import (
-    change as dispatch,
+    writer as dispatch,
 )
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitive_handling import (
     prechecks,
@@ -546,7 +546,7 @@ class TestRetryBackoff(unittest.TestCase):
 
         with (
             patch(
-                "zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher.change.time.sleep",
+                "zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher.writer.time.sleep",
                 # patching dispatch.time.sleep rebinds the STDLIB time.sleep;
                 # leftover daemon threads (confirmation-race legs from earlier
                 # tests) also call it, so record main-thread sleeps only
@@ -583,7 +583,7 @@ class TestRetryBackoff(unittest.TestCase):
 
         with (
             patch(
-                "zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher.change.time.sleep",
+                "zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher.writer.time.sleep",
                 # patching dispatch.time.sleep rebinds the STDLIB time.sleep;
                 # leftover daemon threads (confirmation-race legs from earlier
                 # tests) also call it, so record main-thread sleeps only
@@ -619,7 +619,7 @@ class TestRetryBackoff(unittest.TestCase):
 
         with (
             patch(
-                "zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher.change.time.sleep",
+                "zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher.writer.time.sleep",
                 # patching dispatch.time.sleep rebinds the STDLIB time.sleep;
                 # leftover daemon threads (confirmation-race legs from earlier
                 # tests) also call it, so record main-thread sleeps only
@@ -665,7 +665,7 @@ class TestRetryBackoff(unittest.TestCase):
 
         with (
             patch(
-                "zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher.change.time.sleep",
+                "zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher.writer.time.sleep",
                 # patching dispatch.time.sleep rebinds the STDLIB time.sleep;
                 # leftover daemon threads (confirmation-race legs from earlier
                 # tests) also call it, so record main-thread sleeps only
@@ -701,7 +701,7 @@ class TestRetryBackoff(unittest.TestCase):
 
         with (
             patch(
-                "zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher.change.time.sleep",
+                "zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher.writer.time.sleep",
                 # patching dispatch.time.sleep rebinds the STDLIB time.sleep;
                 # leftover daemon threads (confirmation-race legs from earlier
                 # tests) also call it, so record main-thread sleeps only
@@ -736,7 +736,7 @@ class TestRetryBackoff(unittest.TestCase):
 
         with (
             patch(
-                "zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher.change.time.sleep",
+                "zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher.writer.time.sleep",
                 # patching dispatch.time.sleep rebinds the STDLIB time.sleep;
                 # leftover daemon threads (confirmation-race legs from earlier
                 # tests) also call it, so record main-thread sleeps only

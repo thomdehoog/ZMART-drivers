@@ -25,7 +25,7 @@ from limits_fixtures import (
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitive_handling.profiles import (
     ImageSaveProfile,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher.product import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.product import (
     PlaneIndex,
 )
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitive_handling import (

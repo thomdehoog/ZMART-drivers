@@ -970,7 +970,7 @@ def phase_job_selection(
             return
 
         from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher import (
-            tuning,
+            timing as tuning,
         )
 
         names = selectable_job_names(jobs)

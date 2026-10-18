@@ -29,12 +29,12 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.image_
     Orientation,
     reorient_array,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher.naming import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.naming import (
     Naming,
     build_image_name,
     parse_image_name,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher.product import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.product import (
     ExportedAcquisition,
     ExportedPosition,
 )

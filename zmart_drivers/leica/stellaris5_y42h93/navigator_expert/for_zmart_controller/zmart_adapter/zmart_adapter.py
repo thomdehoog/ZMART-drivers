@@ -42,7 +42,7 @@ from ...configuration import coordinates as _coordinates
 from ...configuration import data_location as _data_location
 from ...configuration import session_state as _session_state
 from ...dispatcher import gate as _gate
-from ...dispatcher.naming import run_hash
+from ...vendor_interface.naming import run_hash
 from ...procedures.acquisition import acquire, get_acquisition_settings
 from ...procedures.frame import get_actuators, get_xyz, set_origin, set_xyz
 from ...procedures.instrument import (

@@ -8,7 +8,7 @@ threads. Every test scripts exactly what a check for the answer sees on each
 read via a property, so the scenario is deterministic regardless of timing.
 
 Each call makes ONE request. Asking again is the routed readers' business
-(``dispatcher.read``, the one rule in ``dispatcher.tuning``), so the stray-
+(``dispatcher.reader``, the one rule in ``dispatcher.timing``), so the stray-
 reply hazard shows up across two calls: LAS X delivers read results by
 writing into a shared model with no request/response correlation, so a
 delayed reply to an *earlier* request can still land during a *later*

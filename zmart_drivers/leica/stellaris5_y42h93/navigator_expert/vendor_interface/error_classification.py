@@ -1,29 +1,71 @@
-"""
-Error classification and API error checking.
-=============================================
-Two responsibilities, both related to post-fire error handling:
+"""Sorting LAS X's trouble into kinds of problem, and deciding what a kind means.
 
-1. **Classification** — ``_is_transient_error`` decides whether an error
-   message from LAS X is transient (retry-worthy) or permanent (fail
-   immediately). Pattern lists are checked in priority order: permanent
-   patterns first, then transient patterns, unknown defaults to permanent.
+Each microscope reports trouble in its own way: LAS X writes a message into
+an echo, another vendor raises an exception, a third answers with a status.
+This file is where a driver turns what its vendor reported into one of a
+short list of kinds (:class:`Kind`), and says what each kind means for the
+driver. The only decision that can change an experiment is whether a command
+may be sent again, so that is the rule written here: a temporary problem may
+be sent again, nothing else may. The writer in ``dispatcher/`` does not
+interpret messages; it follows the "transient" answer this file gives.
 
-2. **Detection** — ``_check_api_error`` reads the ``PyApiCommandEcho``
-   model after a command fire and returns raw error information.
-   ``_default_error_check`` wraps this into the structured result dict
-   that the fire block expects from any ``error_check_fn``.
+Two responsibilities follow from that:
 
-Import restrictions: only runtime utilities and stdlib. Nothing from commands,
-profiles, prechecks, or confirmations.
+1. **Classification**: ``classify_error`` decides which kind an error message
+   from LAS X is. Pattern lists are checked in priority order: permanent
+   patterns first, then temporary patterns; an unknown message defaults to
+   permanent, which is the safe choice.
+2. **Detection**: ``_check_api_error`` reads the ``PyApiCommandEcho`` model
+   after a command fire and returns the raw error information.
+   ``_default_error_check`` wraps this into the structured result the fire
+   block expects from any ``error_check_fn``.
+
+The first four kinds are how the vendor software can fail. The others are
+outcomes the driver reaches on its own; they are listed so that every case
+has one name.
+
+Author: Thom de Hoog, Center for Microscopy and Image Analysis (ZMB),
+University of Zurich (thom.dehoog@zmb.uzh.ch, thomdehoog@gmail.com).
 """
 
 import logging
+from enum import Enum
 
-from ..dispatcher import error_rules
-from ..dispatcher.envelope import _make_log_entry
-from ..dispatcher.error_vocabulary import Kind
+from ..dispatcher.writer import _make_log_entry
 
 log = logging.getLogger(__name__)
+
+
+class Kind(str, Enum):
+    """One kind of problem."""
+
+    #: The request itself is wrong: an unknown option, a value the vendor calls invalid.
+    BAD_REQUEST = "bad_request"
+    #: The software is busy for now: a short timeout, a scan in progress. Trying again can work.
+    TEMPORARY = "temporary"
+    #: The vendor reports a failure that trying again will not fix, such as a hardware fault.
+    PERMANENT = "permanent"
+    #: The vendor software was closed or can no longer be reached.
+    CONNECTION_LOST = "connection_lost"
+    #: A request was sent but its reply never came, so it may or may not have happened.
+    OUTCOME_UNKNOWN = "outcome_unknown"
+    #: The target lies outside the allowed range, so nothing was sent.
+    REFUSED_BY_LIMITS = "refused_by_limits"
+    #: A reading could not be had (a stale log entry, a read that timed out).
+    UNKNOWN_READING = "unknown_reading"
+    #: The command was accepted, but the readback never matched.
+    UNCONFIRMED = "unconfirmed"
+    #: The user asked to stop.
+    STOPPED_BY_USER = "stopped_by_user"
+
+
+#: The kinds for which sending the same command again is safe and useful.
+_SEND_AGAIN = frozenset({Kind.TEMPORARY})
+
+
+def sends_again(kind: Kind) -> bool:
+    """Whether a command that ran into *kind* may be sent again (within its retry limit)."""
+    return kind in _SEND_AGAIN
 
 
 # =============================================================================
@@ -92,7 +134,7 @@ def classify_error(msg):
 
 def _is_transient_error(msg):
     """True when sending the command again is worthwhile (the rules say so for this kind)."""
-    return error_rules.sends_again(classify_error(msg))
+    return sends_again(classify_error(msg))
 
 
 # =============================================================================
@@ -251,7 +293,7 @@ def _default_error_check(client):
     error_msg = err.get("error", "")
     details = err.get("details", {})
     kind = classify_error(error_msg)
-    transient = error_rules.sends_again(kind)
+    transient = sends_again(kind)
     level = "warning" if transient else "error"
 
     log_msg = f"API error: {error_msg}"

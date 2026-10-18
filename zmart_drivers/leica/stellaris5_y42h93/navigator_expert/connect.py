@@ -267,7 +267,7 @@ def connect_microscope(
     from .configuration import session_state
     from .configuration.store import MACHINE
     from .dispatcher import gate as _gate
-    from .dispatcher import running_log
+    from .configuration import running_log
 
     MACHINE.ensure_layout()
     # Kept beside the saved settings so that it survives a restart of the driver.

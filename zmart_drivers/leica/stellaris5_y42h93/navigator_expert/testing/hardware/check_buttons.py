@@ -35,14 +35,14 @@ import sys
 import time
 from pathlib import Path
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher import tuning
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher import timing
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitives.interface import (
     lasx_dialogs,
     lasx_navigator,
 )
 
 #: How long a press may take to show on screen: one window, by the driver's one waiting rule.
-WAIT_S = tuning.WINDOW_S
+WAIT_S = timing.WINDOW_S
 
 
 def press_jobs() -> None:
@@ -87,7 +87,7 @@ def until(condition, seconds: float) -> bool:
     while not condition():
         if time.monotonic() >= deadline:
             return False
-        time.sleep(tuning.POLL_S)
+        time.sleep(timing.POLL_S)
     return True
 
 

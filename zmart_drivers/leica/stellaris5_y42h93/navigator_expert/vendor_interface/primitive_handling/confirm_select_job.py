@@ -17,8 +17,8 @@ import time
 from functools import partial
 
 from . import state as _readers
-from ...dispatcher import tuning as _timing
-from ...dispatcher.envelope import _make_log_entry
+from ...dispatcher import timing as _timing
+from ...dispatcher.writer import _make_log_entry
 from ..primitives.direct import direct_reader
 from ..primitives.log import log_wait
 from ..connection.hardware_server import HardwareServerUnavailable

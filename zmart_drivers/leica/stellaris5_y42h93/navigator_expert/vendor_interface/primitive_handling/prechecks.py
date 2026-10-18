@@ -20,8 +20,8 @@ import logging
 import time
 
 from . import state as _readers
-from ...dispatcher import tuning as _timing
-from ...dispatcher.envelope import _make_log_entry
+from ...dispatcher import timing as _timing
+from ...dispatcher.writer import _make_log_entry
 
 log = logging.getLogger(__name__)
 

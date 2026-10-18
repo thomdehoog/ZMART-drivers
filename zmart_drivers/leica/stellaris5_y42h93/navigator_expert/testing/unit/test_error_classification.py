@@ -1,4 +1,4 @@
-"""The shared kinds of problem, and the one rule that matters most: only a temporary problem is sent again.
+"""The kinds of problem, and the one rule that matters most: only a temporary problem is sent again.
 
 Author: Thom de Hoog, Center for Microscopy and Image Analysis (ZMB),
 University of Zurich (thom.dehoog@zmb.uzh.ch, thomdehoog@gmail.com).
@@ -6,14 +6,10 @@ University of Zurich (thom.dehoog@zmb.uzh.ch, thomdehoog@gmail.com).
 
 import pytest
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher import (
-    error_rules,
-)
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher.error_vocabulary import (
-    Kind,
-)
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.error_classification import (
+    Kind,
     classify_error,
+    sends_again,
 )
 
 
@@ -41,5 +37,5 @@ def test_a_message_that_is_both_invalid_and_busy_is_not_sent_again():
 
 
 def test_only_a_temporary_problem_is_sent_again():
-    again = [kind for kind in Kind if error_rules.sends_again(kind)]
+    again = [kind for kind in Kind if sends_again(kind)]
     assert again == [Kind.TEMPORARY]

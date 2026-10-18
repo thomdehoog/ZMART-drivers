@@ -78,7 +78,7 @@ from ..vendor_interface.primitive_handling.limit_rules import (
     MUTATING_COMMANDS,
     NOTEBOOK_POINTER,
 )
-from .limit_errors import LimitsError, LimitsStatus, LimitViolation
+from ..vendor_interface.limit_errors import LimitsError, LimitsStatus, LimitViolation
 
 log = logging.getLogger(__name__)
 

@@ -6,7 +6,7 @@ The third reader beside :mod:`api_reader` (the CAM API) and
 late like the CAM API's answers nor waiting for a log line. Its
 functions carry the other readers' names and give answers of the same
 shape, so a caller cannot tell which reader answered; the routed readers
-(``dispatcher/read.py``, ``primitive_handling/state.py``) say so in a reading's ``source``.
+(``dispatcher/reader.py``, ``primitive_handling/state.py``) say so in a reading's ``source``.
 
 Measured on the simulator, 2026-10-13: the stage in 1.1 ms (CAM API 20 ms,
 worst 57 ms), a new stage position 3.3-4.2 ms after a move (CAM API
