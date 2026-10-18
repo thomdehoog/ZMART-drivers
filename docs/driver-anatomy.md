@@ -216,8 +216,9 @@ state of the instrument, which is why they come first wherever they exist.
 ### Routes, tiers and fallback
 
 A **route** says which primitives to use for one job, in order of preference.
-It is a list of **tiers**. A tier holds one primitive, or several that run at
-the same time. For example:
+It is a list of **tiers**. In a reading, a tier holds one primitive. In a
+confirmation, a tier may hold several that run at the same time (see
+"Confirmation"). For example:
 
 ```
 read the selected job:    [ direct ]  then  [ api ]  then  [ log ]
@@ -235,11 +236,14 @@ The rules that go with routes:
   tier then takes over. "The value is not what we hoped for yet" is an answer,
   not an error, and never starts a fallback. A slower source would only be
   reporting an older state.
-- **Within a tier, the first usable answer wins.** Most tiers hold a single
-  primitive. Put several into one tier only when they are equally close to the
-  real state, and only deliberately, because any one of them may then decide.
-  A source that can lag behind, such as a log, must only count if what it saw
-  was observed after the command was sent.
+- **A reading has a single point of trust.** When the driver reads a value,
+  it does not know what to expect, so it cannot tell which of two different
+  answers is right. It therefore asks one primitive at a time, in the order of
+  the route, and believes that one. The fallback is only for when a primitive
+  cannot answer. This also means the first primitive of a route carries the
+  trust for that reading. For the Leica direct readers, the guard against one
+  of them being wrong or stuck is the side-by-side check of the readers in the
+  hardware tests, and that check is required, not optional.
 - **The result says who answered.** Every reading and every confirmation names
   the primitive and the tier it came from, so that anyone reading the command
   log can see when a fallback was used.
@@ -263,9 +267,14 @@ up.
 - If a primitive answers "not yet" until the time is up, the change is
   **unconfirmed**. Nothing else is tried, because the question has already
   been answered by the source closest to the real state.
+- **A confirmation is the one place where several primitives may run at the
+  same time.** The driver knows exactly which value it is waiting for, so any
+  primitive that sees that value can say so, and the first one to do so
+  confirms. A tier of several primitives is therefore allowed in a
+  confirmation and in nothing else. A source that can lag behind, such as a
+  log, may only count if what it saw was observed after the command was sent.
 - The usual confirmation uses the direct primitives first. A race between
-  several sources is possible, but it has to be written down for that one
-  change.
+  several sources has to be written down for that one change.
 
 What an unconfirmed change means for the workflow is unchanged (see "Settled
 since the first version"): it is recorded, and the workflow carries on. One
@@ -274,6 +283,29 @@ confirmed.** Leica's compensating stage move after an objective change, and
 the label a picture is saved under after a job change, must not run on a
 change that was only accepted. Otherwise the driver moves the stage for a
 lens that never arrived.
+
+### Who converts the coordinates
+
+The arithmetic between raw stage coordinates and user coordinates (the origin,
+the orientation, the objective offsets) is done by the `ZmartDriver` class, at
+its edge, using the functions in `configuration/coordinates.py`. What comes in
+from the controller is converted to raw coordinates before it goes further,
+and what goes out is converted to user coordinates. Everything below the
+class, the procedures and the dispatcher, then works in one system, the raw
+stage coordinates, and the limits are checked in those. The class does no
+other arithmetic. Whether some procedures should own part of this instead is
+not settled.
+
+### Limits do not know the microscope
+
+The limits gate lives in the dispatcher and is the same for every driver, so
+it cannot know the command names of any one microscope. Instead each
+primitive that changes something says what it limits in its handling notes:
+which value is limited, in which units, and under which key in the limits
+file. The gate reads that and nothing else. What may and may not be done is
+therefore decided by the primitives a driver has, and a new driver adds
+limits by writing the notes for its own primitives. Anything specific to one
+microscope belongs in the vendor interface, as far as it can.
 
 ### Error vocabulary, classification and rules
 
@@ -881,18 +913,18 @@ and an untested software version is warned about. The mock's `__init__`
 user coordinates (subtracting the origin, applying the registration, adding
 the objective offsets) lives once, as a pair of plain functions next to this
 configuration (`user_from_raw` and `raw_from_user` in the mock's
-`configuration/coordinates.py`). The actions for position use these
-functions. That way:
+`configuration/coordinates.py`). The `ZmartDriver` class uses these functions
+at its edge (see "The simplified anatomy"). That way:
 
-- everything above the actions (procedures, `zmart_driver.py`, experiments)
-  speaks one coordinate system, the user's;
+- the controller and the experiments speak one coordinate system, the user's;
+- everything below the class (procedures and the dispatcher) works in raw
+  stage coordinates;
 - the limits gate checks raw stage coordinates, so recording a new origin can
   never move the safe travel range;
-- `zmart_driver.py` does no arithmetic of its own.
+- the class does no other arithmetic.
 
-Today the Leica driver does this arithmetic inside its controller adapter.
-Moving it down into the actions means procedures and setup notebooks can no
-longer accidentally use a different coordinate system from the experiments.
+Today the Leica driver does this arithmetic inside its controller adapter,
+which is the code that has to be thinned out.
 
 ## 7. The `ZmartDriver` class
 
@@ -1184,9 +1216,16 @@ by any other part of the driver. The Leica driver already works this way.
   own, it would be added to the list. Which name fits the Leica CAM API best
   should be settled before the files are renamed.
 
-- **Required metadata (later).** Metadata handling comes after the primitives.
-  Which fields every driver must fill in the standard metadata, and how
-  "unknown" is written, are decided then.
+- **Required metadata (later).** Metadata handling comes after the primitives,
+  and it is adapted to each microscope. Which fields every driver must fill in
+  the standard metadata, and how "unknown" is written, are decided then. Until
+  then, check how much of the OME-Zarr writer relies on the Leica OME metadata
+  code.
+
+- **Calling the handling notes' own code.** Most confirmations are a row of
+  data, but a few (an objective change, a z-stack, an acquisition) need code of
+  their own. The way the dispatcher calls such a function, so that the
+  dispatcher stays free of vendor knowledge, is still to be written down.
 
 - **Axes that are neither x, y, z nor settings.** The mesoSPIM has a focus
   drive and a rotation axis. Today they are reachable only through
