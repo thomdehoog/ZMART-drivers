@@ -31,11 +31,11 @@ from typing import Any
 import numpy as np
 
 import zmart_drivers.leica.stellaris5_y42h93.navigator_expert as drv
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.setup.algorithms import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.image_stage_registration.registration import (
     register_voting,
 )
 
-from ...configuration.optical_calibration import model as _model
+from . import model as _model
 from .calibration_common import (
     SessionPaths,
     acquire_frame_to,
@@ -136,10 +136,10 @@ def start_session(
                 "session_id is required when parent_session is not provided"
             )
         if sessions_root is None:
-            from ...configuration.store import MACHINE
+            from ..store import MACHINE
 
             sessions_root = MACHINE.subsystem_root("calibration")
-        from ...configuration.store import validate_calibration_name
+        from ..store import validate_calibration_name
 
         acquisition_name = validate_calibration_name(acquisition_name)
         paths = make_session_paths(

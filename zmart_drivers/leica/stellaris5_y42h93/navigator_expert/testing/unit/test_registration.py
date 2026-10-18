@@ -24,7 +24,7 @@ import pytest
 
 pytest.importorskip("cv2")  # register_voting imports cv2/skimage at module load
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.setup.algorithms import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.image_stage_registration.registration import (
     pcc,
     register_voting,
 )

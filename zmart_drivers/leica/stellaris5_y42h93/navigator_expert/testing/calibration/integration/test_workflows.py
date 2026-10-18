@@ -35,13 +35,13 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.nam
     build_image_name,
     parse_image_name,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.setup import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.optical_calibration import (
     adopt_calibration as wf_adopt,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.setup import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.optical_calibration import (
     calibrate_objective_pair as wf_obj,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.setup import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.optical_calibration import (
     calibration_common as cm,
 )
 
@@ -775,7 +775,7 @@ def test_orientation_unmeasured_warning_signals(tmp_path, caplog, monkeypatch):
     from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration import (
         store as machine_mod,
     )
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.setup import (
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.optical_calibration import (
         calibrate_objective_pair as op,
     )
 

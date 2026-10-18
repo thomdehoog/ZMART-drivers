@@ -32,9 +32,9 @@ import numpy as np
 
 import zmart_drivers.leica.stellaris5_y42h93.navigator_expert as drv
 
-from ...configuration import image_stage_registration as _orientation
+from .. import image_stage_registration as _orientation
 from ...vendor_interface.naming import Naming, run_hash
-from ..commands import backlash as _movement
+from ...procedures.commands import backlash as _movement
 
 # matplotlib is imported lazily inside the plot helpers so test imports
 # (and headless environments) do not pull in a display backend on import.

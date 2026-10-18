@@ -29,10 +29,10 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.notebo
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.naming import (
     build_image_name,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.setup import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.optical_calibration import (
     calibration_common as cm,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.setup import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.image_stage_registration import (
     measure_orientation as wf,
 )
 

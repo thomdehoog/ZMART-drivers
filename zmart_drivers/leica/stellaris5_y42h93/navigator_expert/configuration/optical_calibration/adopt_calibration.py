@@ -16,7 +16,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from ...configuration.optical_calibration import model as calibration_model
+from . import model as calibration_model
 from .calibration_common import STAGING_SCHEMA_VERSION
 
 log = logging.getLogger(__name__)
@@ -222,7 +222,7 @@ def adopt_calibration(
 ) -> dict:
     """Compile all session acquisitions and publish the calibration snapshot."""
     if machine is None:
-        from ...configuration.store import MACHINE
+        from ..store import MACHINE
 
         machine = MACHINE
     if moment is None:
@@ -246,9 +246,7 @@ def adopt_calibration(
     source = compile_session_calibration(session, base_path=base_path)
     config = calibration_model.load_calibration(source)
     notebook_paths = tuple(notebook_paths)
-    from ...configuration.notebook_support import (
-        archive_notebook as archive_operator_notebook,
-    )
+    from ..notebook_support import archive_notebook as archive_operator_notebook
 
     session_notebooks = [
         archive_operator_notebook(path, session.paths.session_dir)
@@ -285,9 +283,7 @@ def archive_notebook(
     notebook_path: str | Path,
 ) -> list[Path]:
     """Archive a completed notebook with both session and adopted snapshot data."""
-    from ...configuration.notebook_support import (
-        archive_notebook as archive_operator_notebook,
-    )
+    from ..notebook_support import archive_notebook as archive_operator_notebook
 
     roots = (Path(session.paths.session_dir), Path(snapshot))
     return [archive_operator_notebook(notebook_path, root) for root in roots]

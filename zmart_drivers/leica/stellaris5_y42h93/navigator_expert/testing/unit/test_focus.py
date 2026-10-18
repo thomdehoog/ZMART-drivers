@@ -12,7 +12,7 @@ Author: Thom de Hoog, Center for Microscopy and Image Analysis (ZMB),
 import numpy as np
 import pytest
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.setup.algorithms.focus import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.optical_calibration.focus import (
     subpixel_peak,
 )
 
