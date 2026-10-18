@@ -29,9 +29,9 @@ from ..vendor_specific.parsing import parse_tile_geometry as _parse_tile_geometr
 from ..vendor_specific.primitive_handling import state as _readers
 from .acquisition_and_saving import acquire as _capture
 from ..vendor_specific.primitive_handling import changes as _commands
-from .commands import compensated_changes as _compensated
+from .absolute_coordinate_system import compensated_changes as _compensated
 from . import session as _info
-from .frame import canvas, delta_or_warn, get_xyz, hardware_snapshot
+from .absolute_coordinate_system.frame import canvas, delta_or_warn, get_xyz, hardware_snapshot
 from .session import ZmartHandle, job_catalog, note_unconfirmed, require_open, try_
 
 log = logging.getLogger(__name__)

@@ -29,9 +29,7 @@ from unittest.mock import patch
 import pytest
 
 import zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.state as readers
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.commands import (
-    objective_shift as shift,
-)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.absolute_coordinate_system import objective_shift as shift
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling import changes as commands_mod
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures import (
     session_state,
@@ -45,9 +43,7 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.prim
 TRUE_T = {1: (0.0, 0.0, 0.0), 2: (50.0, -30.0, 7.0), 3: (-12.5, 4.0, -3.25)}
 
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures import (
-    frame as _frame,
-)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.absolute_coordinate_system import frame as _frame
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures import (
     instrument as _instrument,
 )

@@ -10,7 +10,7 @@ same number names the same point of the sample under either objective.
 
 Everything here is plain arithmetic on numbers and dictionaries. Nothing
 talks to the microscope, so each function can be checked on paper. The
-session handling (what to read, what to move) is in ``procedures/frame.py``.
+session handling (what to read, what to move) is in ``procedures/absolute_coordinate_system/frame.py``.
 
 Author: Thom de Hoog, Center for Microscopy and Image Analysis (ZMB),
 University of Zurich (thom.dehoog@zmb.uzh.ch, thomdehoog@gmail.com).
@@ -43,7 +43,7 @@ def objective_delta_um(
     # calibration/core/model.py — shared with the driver's swap-time
     # compensation, so the two layers can never drift apart. Imported
     # lazily, matching the connection layer's calibration imports.
-    from ..driver_setup.optical_calibration import model as _cal_model
+    from ...driver_setup.optical_calibration import model as _cal_model
 
     try:
         return _cal_model.translation_delta_um(translations, origin_slot, current_slot)

@@ -19,10 +19,7 @@ University of Zurich (thom.dehoog@zmb.uzh.ch, thomdehoog@gmail.com).
 import logging
 import time
 
-from ...dispatcher.dispatcher import (
-    make_log_entry as _make_log_entry,
-    make_timing as _make_timing,
-)
+from ...dispatcher.dispatcher import make_log_entry as _make_log_entry, make_timing as _make_timing
 from ...vendor_specific.parsing import _hw_get
 from ...vendor_specific.primitive_handling import changes as _changes
 from ...vendor_specific.primitive_handling.confirm_select_job import prepare_select_job, select_job_confirm_legs

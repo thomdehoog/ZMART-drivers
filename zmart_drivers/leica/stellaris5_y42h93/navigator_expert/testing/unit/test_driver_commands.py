@@ -38,12 +38,8 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.acquisiti
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.acquisition_and_saving import acquire as _capture
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.acquisition_and_saving import acquisition as _acquisition
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling import changes as _commands
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.commands import (
-    compensated_changes as _commands_comp,
-)
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures import (
-    frame as _frame,
-)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.absolute_coordinate_system import compensated_changes as _commands_comp
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.absolute_coordinate_system import frame as _frame
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures import (
     instrument as _instrument,
 )

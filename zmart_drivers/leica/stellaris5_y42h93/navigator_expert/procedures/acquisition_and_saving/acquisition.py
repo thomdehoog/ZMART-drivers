@@ -34,7 +34,7 @@ from ...vendor_specific.primitive_handling import state as _readers
 from ...vendor_specific.primitive_handling.profiles import IMAGE_SAVE
 from . import acquire as _capture
 from .. import session as _info
-from ..frame import get_xyz
+from ..absolute_coordinate_system.frame import get_xyz
 from ..instrument import get_state
 from ..session import ZmartHandle, require_open, try_
 

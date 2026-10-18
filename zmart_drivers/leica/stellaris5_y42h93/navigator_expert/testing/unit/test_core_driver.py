@@ -29,9 +29,7 @@ import zmart_drivers.leica.stellaris5_y42h93.navigator_expert as drv
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.connection import lasx_client as session
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling import confirm_select_job, confirmations, profiles
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling import changes as commands
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.commands import (
-    compensated_changes as commands_comp,
-)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.absolute_coordinate_system import compensated_changes as commands_comp
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher import (
     confirm_loop as dispatch,
     send_loop,
