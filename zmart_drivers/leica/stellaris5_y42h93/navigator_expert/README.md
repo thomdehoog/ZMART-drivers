@@ -576,8 +576,10 @@ zmart_drivers/leica/stellaris5_y42h93/navigator_expert/
 │   ├── absolute_coordinate_system/   turns the plain readings (stage, z-wide, z-galvo, the
 │   │                   objective) into the one absolute coordinate system, with the origin and the
 │   │                   objective offsets: coordinates.py · frame.py (where the stage is and moving
-│   │                   it) · compensated_changes.py (set_objective and select_job keep the sample
-│   │                   in view) · objective_shift.py · objectives.py
+│   │                   it)
+│   ├── objective_change/   changing the objective or the job without losing the sample:
+│   │                   compensated_changes.py (set_objective and select_job) · objective_shift.py ·
+│   │                   objectives.py
 │   └── acquisition_and_saving/   taking a picture and keeping it, placed by the measured image
 │                       orientation so it lines up with the stage moves: acquisition.py · acquire.py
 │                       (the capture) · save.py · ome_zarr.py · ome_canonical.py · materialize.py ·

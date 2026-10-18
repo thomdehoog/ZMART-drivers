@@ -29,7 +29,7 @@ from unittest.mock import patch
 import pytest
 
 import zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.state as readers
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.absolute_coordinate_system import objective_shift as shift
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.objective_change import objective_shift as shift
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling import changes as commands_mod
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures import (
     session_state,
