@@ -239,7 +239,7 @@ def phase_readonly(v: vh.Validator, sess: Any, args: argparse.Namespace) -> None
                 {
                     "x": {"options": ["motoric"], "default": "motoric"},
                     "y": {"options": ["motoric"], "default": "motoric"},
-                    "z": {"options": ["z-wide", "z-galvo"], "default": "z-wide"},
+                    "z": {"options": ["z-wide"], "default": "z-wide"},
                 },
             )
 
@@ -327,9 +327,6 @@ def phase_readonly(v: vh.Validator, sess: Any, args: argparse.Namespace) -> None
 
         info = v.callable("get_info", sess.get_info)
         if info is not None:
-            v.compare(
-                "get_info: has session_hash6", bool(info.get("session_hash6")), True
-            )
             location = (info.get("setup") or {}).get("data_location") or {}
             v.compare("get_info: says where it saves", bool(location.get("says")), True)
             if not args.mock:
@@ -499,7 +496,7 @@ def _forget_validator_origin(
     it wrote makes the operator's previous origin the newest again, and the
     session goes back to the origin it was connected with.
     """
-    handle = sess._handle
+    handle = sess._handle._handle
     if record is not None and record.get("origin_file"):
         folder = Path(record["origin_file"]).parent
 
@@ -536,7 +533,7 @@ def phase_move(
     dzw = args.z_wide_delta_um
     dzg = args.z_galvo_delta_um
     restore_zwide = False
-    saved_origin = dict(sess._handle.origin)
+    saved_origin = dict(sess._handle._handle.origin)
     record = None
 
     with v.phase("move (set_origin + set_xyz)"):

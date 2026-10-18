@@ -39,14 +39,14 @@ def _run_mock(tmp_path, *extra):
     from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling import profiles
 
     output = tmp_path / "adapter_mock.jsonl"
-    original_connect = adapter._session.connect_python_client
+    original_connect = adapter.connect_python_client
     original_profile = profiles.STATE_READERS
     try:
         exit_code = validate_zmart_adapter.main(
             ["--mock", "--output", str(output), "--report-dir", str(tmp_path), *extra]
         )
     finally:
-        adapter._session.connect_python_client = original_connect
+        adapter.connect_python_client = original_connect
         profiles.STATE_READERS = original_profile
     records = [
         json.loads(line)
@@ -139,9 +139,8 @@ def test_full_mock_run_move_and_acquire(tmp_path):
         "get_info: says where it saves",
         "set_origin",
         "xy: frame x",
-        "zgalvo: frame z",
-        "zgalvo: drive moved by delta (sign check)",
-        "zwide: frame z is additive (z-wide + z-galvo)",
+        "zwide: frame z",
+        "zwide: z-galvo drive parked at 0",
         "state: switched",
         "state: restored",
     } <= set(by_name)
@@ -153,8 +152,8 @@ def test_full_mock_run_move_and_acquire(tmp_path):
     assert by_name["origin: frame x -> 0"]["status"] == "PASS"
     assert by_name["origin: remove the validator's origin record"]["status"] == "PASS"
     assert _machine.MACHINE.latest_snapshot("origin") is None
-    assert by_name["zgalvo: frame z"]["status"] == "PASS"
-    assert by_name["zwide: frame z is additive (z-wide + z-galvo)"]["status"] == "PASS"
+    assert by_name["zwide: frame z"]["status"] == "PASS"
+    assert by_name["zwide: z-galvo drive parked at 0"]["status"] == "PASS"
     assert by_name["get_info: reports no template positions"]["status"] == "PASS"
     # Acquire needs real LAS X export files, so it is skipped under the mock.
     assert by_name["phase: acquire"]["status"] == "SKIP"
@@ -203,7 +202,7 @@ def test_state_phase_does_not_switch_away_from_autofocus_job():
 def test_connect_session_leaves_output_root_for_driver_discovery():
     from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling import profiles
 
-    original_connect = adapter._session.connect_python_client
+    original_connect = adapter.connect_python_client
     original_profile = profiles.STATE_READERS
     args = argparse.Namespace(
         mock=True, mock_latency=0.0, client_name="PythonClient", api_delay_ms=None
@@ -211,9 +210,9 @@ def test_connect_session_leaves_output_root_for_driver_discovery():
     session = None
     try:
         session = validate_zmart_adapter._connect_session(args, adapter, None)
-        assert session._handle.connection.get("output_root") is None
+        assert session._handle._handle.connection.get("output_root") is None
     finally:
-        adapter._session.connect_python_client = original_connect
+        adapter.connect_python_client = original_connect
         profiles.STATE_READERS = original_profile
         if session is not None:
             session.disconnect()
@@ -231,7 +230,7 @@ def test_acquire_through_the_controller_seam(tmp_path):
     """
     from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling import profiles
 
-    original_connect = adapter._session.connect_python_client
+    original_connect = adapter.connect_python_client
     original_profile = profiles.STATE_READERS
     args = argparse.Namespace(
         mock=True, mock_latency=0.0, client_name="PythonClient", api_delay_ms=None
@@ -256,7 +255,7 @@ def test_acquire_through_the_controller_seam(tmp_path):
         ):
             record = session.acquire(position_label="1")
     finally:
-        adapter._session.connect_python_client = original_connect
+        adapter.connect_python_client = original_connect
         profiles.STATE_READERS = original_profile
         if session is not None:
             session.disconnect()
