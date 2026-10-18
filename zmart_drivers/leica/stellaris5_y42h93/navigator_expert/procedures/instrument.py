@@ -29,7 +29,7 @@ from ..vendor_specific.parsing import parse_tile_geometry as _parse_tile_geometr
 from ..vendor_specific.primitive_handling import state as _readers
 from .acquisition_and_saving import acquire as _capture
 from ..vendor_specific.primitive_handling import changes as _commands
-from .objective_change import compensated_changes as _compensated
+from .objective_change_with_compensation import compensated_changes as _compensated
 from . import session as _info
 from .absolute_coordinate_system.frame import canvas, delta_or_warn, get_xyz, hardware_snapshot, zero_z_galvo
 from .session import ZmartHandle, job_catalog, note_unconfirmed, require_open, try_

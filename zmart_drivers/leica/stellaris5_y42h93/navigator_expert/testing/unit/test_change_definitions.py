@@ -23,7 +23,7 @@ from pathlib import Path
 
 import pytest
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.objective_change import compensated_changes
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.objective_change_with_compensation import compensated_changes
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling import changes, profiles
 
 SAVED = Path(__file__).resolve().parents[1] / "data" / "change_definitions.json"

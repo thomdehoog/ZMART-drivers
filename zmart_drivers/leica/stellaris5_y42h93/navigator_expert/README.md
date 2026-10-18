@@ -591,7 +591,7 @@ zmart_drivers/leica/stellaris5_y42h93/navigator_expert/
 │   │                   objective) into the one absolute coordinate system, with the origin and the
 │   │                   objective offsets: coordinates.py · frame.py (where the stage is and moving
 │   │                   it)
-│   ├── objective_change/   changing the objective or the job without losing the sample:
+│   ├── objective_change_with_compensation/   changing the objective or the job without losing the sample:
 │   │                   compensated_changes.py (set_objective and select_job) · objective_shift.py ·
 │   │                   objectives.py
 │   └── acquisition_and_saving/   taking a picture and keeping it, placed by the measured image
