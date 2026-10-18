@@ -19,20 +19,19 @@ from mock_lasx_api import MockLasxClient
 from zmart_controller.registry import load_driver
 
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.for_zmart_controller import (
-    zmart_controller_plugin as plugin,
-)
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.for_zmart_controller import (
     zmart_driver,
 )
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitive_handling import (
     profiles,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.for_zmart_controller.zmart_adapter import (
-    zmart_adapter as adapter,
-)
 
 # The class file is in for_zmart_controller/; the driver folder, with zmart_driver.json, is one up.
 DRIVER_FOLDER = Path(zmart_driver.__file__).resolve().parent.parent
+
+
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert import (
+    connect as _connect_module,
+)
 
 
 def _offline(monkeypatch, tmp_path):
@@ -47,7 +46,7 @@ def _offline(monkeypatch, tmp_path):
     )
     hermetic_mock_machine_root()
     monkeypatch.setattr(
-        adapter._session,
+        _connect_module,
         "connect_python_client",
         lambda **_kw: MockLasxClient(latency=0.0),
     )
@@ -71,8 +70,8 @@ def test_the_class_fits_the_controller_contract_offline(monkeypatch, tmp_path):
     assert problems == []
 
 
-def test_the_class_answers_what_the_module_answers(monkeypatch, tmp_path):
-    """The class and the older module shape describe the same microscope the same way."""
+def test_the_class_describes_the_microscope_and_what_is_set_up(monkeypatch, tmp_path):
+    """The class answers the controller's questions, including what is set up once."""
     connection = _offline(monkeypatch, tmp_path)
     through_class = zmart_controller.ZmartController(
         zmart_driver.ZmartDriver, connection
@@ -85,23 +84,10 @@ def test_the_class_answers_what_the_module_answers(monkeypatch, tmp_path):
         class_info = through_class.get_info()["content"]
     finally:
         through_class.disconnect()
-    through_module = zmart_controller.ZmartController(plugin, connection)
-    try:
-        as_module = {
-            name: getattr(through_module, name)()["content"]
-            for name in ("get_actuators", "get_xyz", "get_state", "get_procedures")
-        }
-        info = through_module.get_info()["content"]
-    finally:
-        through_module.disconnect()
 
-    # The module's get_xyz adds one extra on top of the four entries per axis.
-    as_module["get_xyz"].pop("objective_translation_um")
-    assert as_class == as_module
-    assert class_info["description"] == info["description"]
-    # What is set up, where it saves among it, reaches the controller from the class too.
+    assert class_info["description"].strip()
+    # Where it saves is not part of the setup answer; the controller asks for it elsewhere.
     assert "output_root" not in class_info
-    assert class_info["setup"] == info["setup"]
     assert set(class_info["setup"]) == {
         "limits",
         "orientation",

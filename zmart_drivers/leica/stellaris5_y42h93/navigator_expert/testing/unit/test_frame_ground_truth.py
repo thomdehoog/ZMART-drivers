@@ -44,9 +44,6 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.image_
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface import (
     parsing as _readers_parsing,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.for_zmart_controller.zmart_adapter import (
-    zmart_adapter as adapter,
-)
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.commands import (
     backlash as _motion,
 )
@@ -59,6 +56,17 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.pri
 
 # The ground-truth translation table (µm). Slot 1 is the reference lens.
 TRUE_T = {1: (0.0, 0.0, 0.0), 2: (50.0, -30.0, 7.0), 3: (-12.5, 4.0, -3.25)}
+
+
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures import (
+    frame as _frame,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures import (
+    instrument as _instrument,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.session import (
+    ZmartHandle,
+)
 
 
 class SimScope:
@@ -82,9 +90,9 @@ class SimScope:
         return (self.x, self.y, self.z_wide, self.z_galvo, self.slot)
 
 
-def _handle_at(sim: SimScope) -> adapter.ZmartHandle:
+def _handle_at(sim: SimScope) -> ZmartHandle:
     """A handle whose origin is the sim's current state (like set_origin)."""
-    h = adapter.ZmartHandle(client=SimpleNamespace(), connection={}, hash6="ground1")
+    h = ZmartHandle(client=SimpleNamespace(), connection={}, hash6="ground1")
     h.origin = {
         "x_um": sim.x,
         "y_um": sim.y,
@@ -176,8 +184,8 @@ def test_viewed_point_is_origin_view_plus_frame_target(
         sim.z_wide += parked_offset
 
     with _running(sim):
-        adapter.set_xyz(h, *frame_target, with_actuators={"z": z_actuator})
-        got = adapter.get_xyz(h)
+        _frame.set_xyz(h, *frame_target, with_actuators={"z": z_actuator})
+        got = _frame.get_xyz(h)
 
     expected = tuple(o + f for o, f in zip(origin_view, frame_target, strict=True))
     assert sim.viewed_point() == pytest.approx(expected)
@@ -208,7 +216,7 @@ def test_same_target_lands_identically_from_any_history():
         sim.z_galvo += d["park"]
         sim.slot = 2  # the lens that ends up in when the move is asked for
         with _running(sim):
-            adapter.set_xyz(h, 300.0, -75.0, 9.0, with_actuators={"z": "z-wide"})
+            _frame.set_xyz(h, 300.0, -75.0, 9.0, with_actuators={"z": "z-wide"})
         landings.append(sim.viewed_point())
 
     assert landings[0] == pytest.approx(landings[1])
@@ -228,7 +236,7 @@ def test_repeated_cross_objective_moves_do_not_accumulate():
     states = []
     with _running(sim):
         for _ in range(5):
-            adapter.set_xyz(h, 120.0, 40.0, 3.0, with_actuators={"z": "z-galvo"})
+            _frame.set_xyz(h, 120.0, 40.0, 3.0, with_actuators={"z": "z-galvo"})
             states.append(sim.state())
 
     assert all(s == states[0] for s in states[1:])
@@ -254,7 +262,7 @@ def test_get_xyz_reports_truthfully_after_external_meddling():
     sim.slot = 3
 
     with _running(sim):
-        got = adapter.get_xyz(h)
+        got = _frame.get_xyz(h)
 
     truth = tuple(v - o for v, o in zip(sim.viewed_point(), origin_view, strict=True))
     assert (
@@ -273,7 +281,7 @@ def test_focus_split_does_not_change_frame_z():
         h = _handle_at(sim)
         sim.z_wide, sim.z_galvo = z_wide, z_galvo
         with _running(sim):
-            reads.append(adapter.get_xyz(h)["z"]["position"])
+            reads.append(_frame.get_xyz(h)["z"]["position"])
     assert reads[0] == pytest.approx(reads[1])
     assert reads[0] == pytest.approx(reads[2])
 
@@ -347,9 +355,9 @@ def test_zero_z_galvo_procedure_preserves_frame_z():
     sim.z_galvo = 42.0  # someone parked the galvo off-zero
 
     with _running(sim):
-        z_before = adapter.get_xyz(h)["z"]["position"]
-        result = adapter.run_procedure(h, {"name": "zero_z_galvo"})
-        z_after = adapter.get_xyz(h)["z"]["position"]
+        z_before = _frame.get_xyz(h)["z"]["position"]
+        result = _instrument.run_procedure(h, {"name": "zero_z_galvo"})
+        z_after = _frame.get_xyz(h)["z"]["position"]
 
     assert sim.z_galvo == 0.0
     assert sim.z_wide == pytest.approx(ORIGIN_STATE["z_wide"] + 42.0)
@@ -362,7 +370,7 @@ def test_zero_z_galvo_is_a_noop_when_already_zero():
     h = _handle_at(sim)
     before = sim.state()
     with _running(sim):
-        result = adapter.run_procedure(h, {"name": "zero_z_galvo"})
+        result = _instrument.run_procedure(h, {"name": "zero_z_galvo"})
     assert sim.state() == before
     assert result["transferred_um"] == 0.0
 
@@ -381,5 +389,5 @@ def test_zero_z_galvo_refused_first_leg_moves_nothing():
 
     with _running(sim), patch.object(_commands, "move_z", refusing_move_z):
         with pytest.raises(RuntimeError, match="zero_z_galvo"):
-            adapter.run_procedure(h, {"name": "zero_z_galvo"})
+            _instrument.run_procedure(h, {"name": "zero_z_galvo"})
     assert sim.state() == before
