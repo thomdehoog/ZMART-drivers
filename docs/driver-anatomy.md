@@ -460,9 +460,11 @@ with its next step. Two guardrails keep this safe:
    had succeeded.** Leica's compensating stage move after an objective change,
    and the label a picture is saved under after a job change, must not run on a
    change that was only accepted. The driver would otherwise move the stage
-   for a lens that never arrived. The skipped step is recorded and named in the
-   result. A refusal by the limits gate is safe to move past, because nothing
-   was sent.
+   for a lens that never arrived. The skipped step is recorded, and the command
+   answers `success: False` with a message that names it, because the state is
+   not what was asked for. This is a recorded result and not a crash; the
+   workflow carries on. A refusal by the limits gate is safe to move past,
+   because nothing was sent.
 
 The one exception is the check at connect (see "Pinned to one microscope and
 one software version"). It happens once, before any experiment runs, and
@@ -599,11 +601,10 @@ extra hooks are needed in the dispatcher, apart from the one primitive that
 reports the microscope's serial number and software version, described under
 "Pinned to one microscope and one software version".
 
-**The handling notes may hold code.** Most confirmations are one row of data:
+**The handling notes may hold code (decided).** Most confirmations are one row of data:
 which reading, the target, how close counts. A few need code of their own, such
 as an objective change, a z-stack or an acquisition, and these are the biggest
-part of the Leica driver today. Proposal, not yet confirmed: a handling note
-may name a function that lives in the vendor interface and has a fixed shape. It
+part of the Leica driver today. A handling note may therefore name a function that lives in the vendor interface and has a fixed shape. It
 is given the dispatcher's way of reading, the target, the tolerance and the
 time limit, and it answers whether the state was reached. The dispatcher calls
 it and does not look inside.
@@ -1486,6 +1487,12 @@ by any other part of the driver. The Leica driver already works this way.
   are what differs. Readings and changes are two files in one folder, not two
   folders. (Replaced in October 2026: the actions folder is gone; see the last
   item below.)
+- **A skipped dependent step is a failure.** When a step that depends on an
+  unconfirmed or failed step is not run, the command answers `success: False`
+  with a message naming it. It is a recorded result, not a crash.
+- **Handling notes may hold code.** The few confirmations that do not fit one
+  row of data are small functions in the vendor interface with a fixed shape,
+  which the dispatcher calls without looking inside.
 - **Never break the workflow.** A command records a failure, writes it in the
   logs and goes back to the workflow; it does not stop the run. A step that
   depends on a failed step does not run as if it had succeeded. See "What a
@@ -1538,8 +1545,8 @@ by any other part of the driver. The Leica driver already works this way.
   once" above.
 
 - **Proposals waiting for a decision.** "Taking turns with the vendor
-  software", "The running log", the limit description and the
-  handling-notes code are written as proposals in "The simplified anatomy".
+  software", "The running log" and the limit description are written as
+  proposals in "The simplified anatomy".
   Each is marked there.
 
 - **Axes that are neither x, y, z nor settings.** The mesoSPIM has a focus
