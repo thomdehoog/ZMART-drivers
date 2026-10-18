@@ -33,8 +33,8 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.pri
     prechecks,
 )
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher import tuning
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher import (
-    read as readers,
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitive_handling import (
+    state as readers,
 )
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitives.api import (
     delivery,
@@ -444,5 +444,5 @@ def test_no_wait_on_las_x_has_its_own_number():
     on LAS X anywhere else is a second rule; the named exceptions above are
     the decided ones.
     """
-    root = pathlib.Path(readers.__file__).resolve().parents[1]
+    root = pathlib.Path(__file__).resolve().parents[2]
     assert _waits_with_their_own_numbers(root) == []

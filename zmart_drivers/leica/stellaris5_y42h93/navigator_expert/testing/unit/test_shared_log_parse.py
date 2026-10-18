@@ -16,7 +16,10 @@ from unittest.mock import patch
 import pytest
 
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher import (
-    read as readers,
+    read as engine,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitive_handling import (
+    state as readers,
 )
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher import tuning
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitives.log import (
@@ -134,7 +137,7 @@ def test_a_log_worker_whose_race_is_won_starts_no_parse():
     answers = []
     spec = readers.capabilities.spec("xy")
     with patch.object(log_reader, "parse_log") as parse:
-        readers._log_worker(
+        engine._log_worker(
             spec, None, 1.0, deadline=time.monotonic() + 1.0, stop=stop, answers=answers
         )
     parse.assert_not_called()

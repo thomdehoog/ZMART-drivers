@@ -36,6 +36,8 @@ DISPATCHER = "dispatcher"
 # ``mode`` unset and consume the configured reader abstraction.
 READER_SOURCE_POLICY_MODULES = {
     Path("dispatcher/read.py"),
+    Path("vendor_interface/primitive_handling/state.py"),
+    Path("vendor_interface/primitive_handling/sources.py"),
     Path("dispatcher/change.py"),
     Path("vendor_interface/primitive_handling/readings.py"),
     Path("vendor_interface/primitive_handling/confirmations.py"),
