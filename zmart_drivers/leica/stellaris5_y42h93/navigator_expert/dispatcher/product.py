@@ -10,6 +10,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
 
 from .naming import Naming
 
@@ -279,3 +280,7 @@ class SavedAcquisition:
     state_paths: tuple[Path, ...] = ()
     #: The projections made from the capture, in ``<acquisition>/projections``.
     projection_paths: tuple[Path, ...] = ()
+    #: Reads one saved plane back as a 2-D array, by the plane number it had
+    #: when it was captured. The saved store holds its planes in another order
+    #: (lowest first), so the number the capture gave is the reliable key.
+    read_plane: Callable[[PlaneIndex], Any] | None = None

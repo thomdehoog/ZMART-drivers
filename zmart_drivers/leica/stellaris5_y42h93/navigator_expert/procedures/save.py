@@ -34,8 +34,6 @@ from ..vendor_interface.primitives.capture.lasx_data_container import (
 )
 from ..dispatcher.naming import (
     Naming,
-    build_image_name,
-    build_projection_name,
     build_state_name,
     data_dir,
     metadata_dir,
@@ -45,15 +43,13 @@ from ..dispatcher.naming import (
 from ..dispatcher.product import (
     AcquisitionResult,
     ExportedAcquisition,
-    PlaneIndex,
     SavedAcquisition,
 )
 
 log = logging.getLogger(__name__)
 
-#: What ``save`` writes the capture as: one OME-TIFF a plane, or one OME-Zarr
-#: image (``ome_zarr``). Only the one chosen is written.
-FORMATS = ("ome-tiff", "ome-zarr")
+#: What ``save`` writes a capture as: one OME-Zarr image (``ome_zarr``).
+FORMAT = "ome-zarr"
 
 #: What ``save`` projects from a capture with more than one plane, into
 #: ``<acquisition>/projections``: its max over z, or nothing.
@@ -69,14 +65,12 @@ def save(
     lineage: dict | None = None,
     state: dict | None = None,
     orientation: Orientation | None = None,
-    fix_ome: bool = True,
     cleanup_cache: bool = False,
     export_completion_timeout_s: float = DEFAULT_EXPORT_COMPLETION_TIMEOUT_S,
     export_completion_poll_interval_s: float = (
         DEFAULT_EXPORT_COMPLETION_POLL_INTERVAL_S
     ),
     cache_root: str | Path | None = None,
-    format: str | None = None,
     placement: Callable[[list[int]], Callable[[int], dict]] | None = None,
     projection: str | None = None,
 ) -> SavedAcquisition:
@@ -96,10 +90,10 @@ def save(
     the collected product's ``release``; a product without one is refused
     before anything is written, so the driver never deletes a file itself.
 
-    *format* is one of ``FORMATS`` and defaults to the profile's
-    (``IMAGE_SAVE.format``). With ``"ome-zarr"`` the capture becomes one
-    image store; *placement*, handed the planes' z numbers, answers where on
-    the sample each was taken, and places the store there.
+    The capture becomes one OME-Zarr image store. *placement*, handed the
+    planes' z numbers, answers where on the sample each was taken, and places
+    the store there. ``SavedAcquisition.read_plane`` reads a saved plane back
+    by the plane number the capture gave it.
 
     *projection* is one of ``PROJECTIONS`` and defaults to the profile's
     (``IMAGE_SAVE.projection``). A capture with more than one plane then
@@ -109,9 +103,6 @@ def save(
     """
     from ..vendor_interface.primitive_handling.profiles import IMAGE_SAVE
 
-    format = IMAGE_SAVE.format if format is None else format
-    if format not in FORMATS:
-        raise ValueError(f"unknown image format {format!r}; the formats are {FORMATS}")
     projection = IMAGE_SAVE.projection if projection is None else projection
     if projection not in PROJECTIONS:
         raise ValueError(
@@ -138,26 +129,15 @@ def save(
     exported = replace(
         exported, metadata=on_the_canvas(exported.metadata, exported, placement)
     )
-    if format == "ome-zarr":
-        saved = _persist_store(
-            exported,
-            Path(output_root),
-            naming,
-            lineage=lineage,
-            state=state,
-            orientation=orientation,
-            placement=placement,
-        )
-    else:
-        saved = _persist_export(
-            exported,
-            Path(output_root),
-            naming,
-            lineage=lineage,
-            state=state,
-            orientation=orientation,
-            fix_ome=fix_ome,
-        )
+    saved = _persist_store(
+        exported,
+        Path(output_root),
+        naming,
+        lineage=lineage,
+        state=state,
+        orientation=orientation,
+        placement=placement,
+    )
     if projection != "none" and exported.metadata.size_z > 1:
         saved = replace(
             saved,
@@ -165,7 +145,6 @@ def save(
                 exported,
                 Path(output_root),
                 naming,
-                format=format,
                 orientation=orientation,
                 placement=placement,
                 state=state,
@@ -185,12 +164,11 @@ def _persist_projection(
     output_root: Path,
     naming: Naming,
     *,
-    format: str,
     orientation: Orientation,
     placement,
     state: dict | None,
 ) -> tuple[Path, ...]:
-    """The capture's max projection in ``projections``, in the capture's own format."""
+    """The capture's max projection in ``projections``, as an OME-Zarr image."""
     indices = [index for position in exported.positions for index in position.planes]
     where = (
         placement(sorted({index.z for index in indices}))
@@ -200,26 +178,8 @@ def _persist_projection(
     projected = ome_zarr.max_projection(
         ome_zarr.gather(exported, orientation=orientation, where=where)
     )
-    folder = projections_dir(output_root)
-    if format == "ome-zarr":
-        store = folder / f"{naming.stem}.ome.zarr"
-        return (ome_zarr.write_store(projected, store, state=state),)
-    folder.mkdir(parents=True, exist_ok=True)
-    written = []
-    for (ti, ci), plane in (
-        ((index.t, index.c), projected.volume[index.t, index.c, 0])
-        for index in sorted(projected.metadata.planes)
-    ):
-        path = folder / build_projection_name(replace(naming, t=ti, c=ci), "max")
-        _materialize.write_plane_atomic(
-            plane,
-            path,
-            metadata=projected.metadata,
-            index=PlaneIndex(t=ti, z=0, c=ci),
-            state=state,
-        )
-        written.append(path)
-    return tuple(written)
+    store = projections_dir(output_root) / f"{naming.stem}.ome.zarr"
+    return (ome_zarr.write_store(projected, store, state=state),)
 
 
 def on_the_canvas(metadata, exported: ExportedAcquisition, placement) -> object:
@@ -269,9 +229,13 @@ def _persist_store(
         else None
     )
     store = data_dir(output_root) / f"{naming.stem}.ome.zarr"
-    ome_zarr.write_position_store(
-        exported, store, orientation=orientation, where=where, state=state
-    )
+    if where is None:
+        raise ValueError(
+            "an OME-Zarr store is placed by its canvas position, and none was given "
+            "(save's placement); without it the image would lie at an invented place"
+        )
+    capture = ome_zarr.gather(exported, orientation=orientation, where=where)
+    ome_zarr.write_store(capture, store, state=state)
     printed = _print_state(state, output_root, naming)
 
     summary_path = output_root / "summary.json"
@@ -298,80 +262,9 @@ def _persist_store(
             output_root / record["path"] for record in vendor_records
         ),
         state_paths=(printed,) if printed is not None else (),
-    )
-
-
-def _persist_export(
-    exported: ExportedAcquisition,
-    output_root: Path,
-    naming: Naming,
-    *,
-    lineage: dict | None,
-    state: dict | None = None,
-    orientation: Orientation | None = None,
-    fix_ome: bool,
-) -> SavedAcquisition:
-    """Shared persistence for stable exported source paths.
-
-    Flat: each 2-D plane is written directly under
-    ``data_dir(output_root)`` and its OME-XML is
-    embedded (no sidecar companion). *state* is embedded per-plane.
-    """
-    image_paths: dict[PlaneIndex, Path] = {}
-    state_paths: dict[Path, None] = {}
-    vendor_records = _persist_vendor_metadata(exported, output_root, naming)
-
-    # One load + one write instead of a full read-modify-write per plane
-    # (O(n^2) disk I/O on large grids). The finally still persists records
-    # for planes materialized before a mid-save failure.
-    summary_path = output_root / "summary.json"
-    summary = _load_summary(summary_path)
-    summary_dirty = False
-    try:
-        for pos in exported.positions:
-            for idx, image_src in sorted(pos.planes.items()):
-                plane_naming = replace(naming, t=idx.t, c=idx.c, z=idx.z)
-                image_dest = data_dir(output_root) / build_image_name(plane_naming)
-                image_dest.parent.mkdir(parents=True, exist_ok=True)
-
-                _materialize.save_image_source_atomic(
-                    image_src,
-                    image_dest,
-                    metadata=exported.metadata,
-                    index=idx,
-                    fix_ome=fix_ome,
-                    state=state,
-                    orientation=orientation,
-                )
-                image_paths[idx] = image_dest
-                printed = _print_state(state, output_root, plane_naming)
-                if printed is not None:
-                    state_paths[printed] = None
-
-                record = {
-                    "naming": _naming_to_dict(plane_naming),
-                    "image_path": _rel_posix(image_dest, output_root),
-                    "source": _rel_posix(image_src.path, exported.source_root),
-                    "source_exporter": exported.source_exporter,
-                    "canonical_metadata": True,
-                    "vendor_metadata": vendor_records,
-                    "physical_size_um": _physical_size_record(exported.metadata),
-                    "channel": _channel_record(exported.metadata, idx.c),
-                    "lineage": lineage,
-                }
-                _upsert_summary_record(summary, record)
-                summary_dirty = True
-    finally:
-        if summary_dirty:
-            _write_json_atomic(summary_path, summary)
-
-    return SavedAcquisition(
-        image_paths=image_paths,
-        naming=naming,
-        vendor_metadata_paths=tuple(
-            output_root / record["path"] for record in vendor_records
+        read_plane=lambda index: ome_zarr.read_plane(
+            store, capture.store_position[index]
         ),
-        state_paths=tuple(state_paths),
     )
 
 

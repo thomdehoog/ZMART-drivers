@@ -172,10 +172,6 @@ class ImageSaveProfile:
     """
 
     apply_orientation: bool = True
-    #: What a capture is saved as (``output.save.FORMATS``): ``"ome-tiff"``,
-    #: one file a plane, or ``"ome-zarr"``, one image store. Only the one
-    #: chosen is written.
-    format: str = "ome-zarr"
     #: What a capture with more than one plane also gets, in
     #: ``<acquisition>/projections`` (``output.save.PROJECTIONS``): its
     #: ``"max"`` projection over z, or ``"none"``.

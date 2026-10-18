@@ -338,6 +338,7 @@ def _saved_manifest(output_root, naming, image):
         image_paths=image_paths,
         xml_paths={cm.drv.PositionIndex(t=0, v=0): Path(output_root) / "mock.ome.xml"},
         naming=naming,
+        read_plane=lambda index: tifffile.imread(image_paths[index]),
     )
 
 

@@ -87,6 +87,7 @@ def _manifest(output_root, naming, image):
         image_paths={cm.drv.PlaneIndex(t=0, z=0, c=0): path},
         xml_paths={cm.drv.PositionIndex(t=0, v=0): Path(output_root) / "mock.ome.xml"},
         naming=naming,
+        read_plane=lambda index: tifffile.imread(path),
     )
 
 

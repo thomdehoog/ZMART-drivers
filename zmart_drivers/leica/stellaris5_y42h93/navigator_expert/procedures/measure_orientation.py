@@ -33,7 +33,6 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
-import tifffile
 
 import zmart_drivers.leica.stellaris5_y42h93.navigator_expert as drv
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher.naming import (
@@ -802,7 +801,7 @@ def acquire_validation_image(
 ) -> tuple[np.ndarray, Path]:
     """Acquire, save, and reload one image with this run's orientation.
 
-    The returned pixels come from the saved OME-TIFF, so displaying them checks
+    The returned pixels are read back from the saved OME-Zarr image, so displaying them checks
     the same rotation and reflection that later acquisitions will receive.
     """
     if session.orientation is None or not session.d4_accepted:
@@ -832,8 +831,9 @@ def acquire_validation_image(
             f"Validation expected one saved image; got {len(saved.image_paths)}."
         )
 
-    image_path = Path(next(iter(saved.image_paths.values())))
-    image = np.asarray(tifffile.imread(image_path))
+    index = next(iter(saved.image_paths))
+    image_path = Path(saved.image_paths[index])
+    image = np.asarray(saved.read_plane(index))
     if image.ndim == 3 and image.shape[0] == 1:
         image = image[0]
     if image.ndim != 2:
@@ -870,7 +870,7 @@ def adopt_orientation(
     """Activate a validated orientation by writing its config last."""
     if session.orientation is None or not session.d4_accepted:
         raise RuntimeError("measure and accept the orientation before adoption")
-    if not any((session.paths.session_dir / "validation").rglob("*.tif*")):
+    if not any((session.paths.session_dir / "validation").rglob("*.ome.zarr")):
         raise RuntimeError("run orientation validation before adoption")
     if session.machine is None or session.target_dir is None:
         raise RuntimeError("orientation session has no machine adoption target")
