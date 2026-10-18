@@ -1,6 +1,6 @@
 """The named readings of a LAS X session: where the stage is, which job is selected, and so on.
 
-Each function asks the shared reader in ``dispatcher/read.py`` for one row of
+Each function asks the shared reader in ``dispatcher/reader.py`` for one row of
 the table in :mod:`readings` and hands back a plain value, or, with
 ``diagnostics=True``, a :class:`~...dispatcher.read.Reading` that also says
 which source answered and how old the answer was. A reading that cannot be
@@ -15,8 +15,8 @@ from __future__ import annotations
 
 import logging
 
-from ...dispatcher import read as _reader
-from ...dispatcher.read import (
+from ...dispatcher import reader as _reader
+from ...dispatcher.reader import (
     Reading,
     derive as _derive,
     plain_or_diagnostic as _plain_or_diagnostic,

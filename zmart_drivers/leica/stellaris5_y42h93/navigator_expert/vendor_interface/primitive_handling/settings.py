@@ -27,9 +27,8 @@ from dataclasses import dataclass
 from functools import partial
 from typing import Any
 
-from ...dispatcher.envelope import _make_log_entry
-from ...dispatcher import error_rules
-from ..error_classification import _check_api_error, classify_error
+from ...dispatcher.writer import _make_log_entry
+from ..error_classification import _check_api_error, classify_error, sends_again
 from ..parsing import parse_format
 from . import confirmations as _check
 from . import profiles as _profiles
@@ -203,7 +202,7 @@ def _scan_resonant_error_check(client, *, job_name, target, timeout=None):
             return {"success": True, "error": None, "transient": None, "logs": logs}
 
     kind = classify_error(error_msg)
-    transient = error_rules.sends_again(kind)
+    transient = sends_again(kind)
     log_msg = f"API error: {error_msg}"
     if details:
         log_msg += f" | details: {details}"

@@ -143,9 +143,7 @@ def fast_timing_windows(monkeypatch):
     wait. Shipped values are unchanged; a test that needs a specific window
     patches it itself (``test_waiting_rule``).
     """
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher import (
-        tuning as timing,
-    )
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher import timing
     from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitive_handling import (
         transport,
     )

@@ -11,7 +11,7 @@ import time
 from collections.abc import Callable
 from dataclasses import dataclass
 
-from ....dispatcher import tuning
+from ....dispatcher import timing
 from . import log_reader
 
 
@@ -56,8 +56,8 @@ def wait_for_selected_job_log(
     """
 
     profile = _profile()
-    timeout_s = tuning.WINDOW_S if timeout_s is None else timeout_s
-    poll_interval_s = tuning.POLL_S if poll_interval_s is None else poll_interval_s
+    timeout_s = timing.WINDOW_S if timeout_s is None else timeout_s
+    poll_interval_s = timing.POLL_S if poll_interval_s is None else poll_interval_s
     max_age_s = (
         profile.selected_job_log_cluster_max_age_s if max_age_s is None else max_age_s
     )

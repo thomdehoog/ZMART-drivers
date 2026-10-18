@@ -8,7 +8,7 @@ import logging
 
 import pytest
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration import (
     running_log,
 )
 

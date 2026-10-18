@@ -32,12 +32,12 @@ from typing import Any
 
 from . import lasx_cache_release as cache_release
 from ... import metadata_map as described
-from ....dispatcher.files import (
+from ...files import (
     DEFAULT_EXPORT_COMPLETION_POLL_INTERVAL_S,
     DEFAULT_EXPORT_COMPLETION_TIMEOUT_S,
     MTIME_SKEW_ALLOWANCE_S,
 )
-from ....dispatcher.product import (
+from ...product import (
     AcquisitionResult,
     AcquisitionMetadata,
     ExportedAcquisition,

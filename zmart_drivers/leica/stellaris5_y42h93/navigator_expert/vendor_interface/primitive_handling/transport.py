@@ -17,7 +17,7 @@ Author: Thom de Hoog, Center for Microscopy and Image Analysis (ZMB),
 import logging
 import time
 
-from ...dispatcher import tuning as _timing
+from ...dispatcher import timing as _timing
 from ..primitives.api.delivery import deliver
 from ..primitives.interface import lasx_dialogs
 from ..primitives.log import log_reader as _log_reader

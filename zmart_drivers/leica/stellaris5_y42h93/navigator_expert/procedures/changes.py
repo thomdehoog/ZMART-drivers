@@ -45,9 +45,9 @@ from dataclasses import replace
 from functools import partial
 
 from ..dispatcher import gate as _gate
-from ..dispatcher.change import confirm_and_fire
+from ..dispatcher.writer import confirm_and_fire
 from ..vendor_interface.primitive_handling.limit_rules import check_xy, check_z
-from ..dispatcher.envelope import _make_log_entry, _make_timing
+from ..dispatcher.writer import _make_log_entry, _make_timing
 from ..vendor_interface.parsing import _hw_get
 from ..vendor_interface.primitive_handling import settings
 from . import objective_shift as _objective_shift

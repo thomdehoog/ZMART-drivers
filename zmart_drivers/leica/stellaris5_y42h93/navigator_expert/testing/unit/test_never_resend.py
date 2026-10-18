@@ -10,7 +10,7 @@ University of Zurich (thom.dehoog@zmb.uzh.ch, thomdehoog@gmail.com).
 
 from dataclasses import replace
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher.change import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher.writer import (
     _resolve_profile,
 )
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitive_handling.profiles import (

@@ -99,7 +99,7 @@ from .vendor_interface.parsing import (
     parse_format,
     parse_tile_geometry,
 )
-from .dispatcher.envelope import _make_log_entry
+from .dispatcher.writer import _make_log_entry
 from .vendor_interface.error_classification import (
     _is_transient_error,
     _check_api_error,
@@ -165,7 +165,7 @@ from .vendor_interface.primitive_handling.limit_rules import (
 
 # -- acquisition/ - capture, file arrival, and save handling
 from .procedures.acquire import AcquisitionResult, acquire
-from .dispatcher.product import (
+from .vendor_interface.product import (
     AcquisitionMetadata,
     ChannelMetadata,
     PlaneIndex,

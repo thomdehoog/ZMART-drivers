@@ -32,7 +32,7 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.pri
     state as readers,
 )
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher import (
-    read as engine,
+    reader as engine,
 )
 
 

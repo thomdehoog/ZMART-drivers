@@ -63,7 +63,7 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.pri
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitive_handling import (
     state as readers,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher import tuning
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher import timing
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitives.log import (
     log_reader as L,
 )
@@ -299,12 +299,12 @@ def _settings_diffs(af, lf):
 
 def _change_poll_params():
     """(wait_window_s, poll_interval_s) for a post-change settings readback."""
-    return tuning.WINDOWS * tuning.WINDOW_S, tuning.POLL_S
+    return timing.WINDOWS * timing.WINDOW_S, timing.POLL_S
 
 
 def _select_poll_params():
     """(wait_window_s, poll_interval_s) for a post-select-job readback."""
-    return tuning.WINDOWS * tuning.WINDOW_S, tuning.POLL_S
+    return timing.WINDOWS * timing.WINDOW_S, timing.POLL_S
 
 
 # --- phases ----------------------------------------------------------------

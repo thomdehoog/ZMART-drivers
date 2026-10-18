@@ -32,7 +32,7 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.pri
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitive_handling import (
     prechecks,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher import tuning
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher import timing
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitive_handling import (
     state as readers,
 )
@@ -46,9 +46,9 @@ WINDOW_S = 0.5
 @pytest.fixture(autouse=True)
 def short_windows(monkeypatch):
     """Four windows of 0.5 s, looking every 10 ms, checking every 1 ms."""
-    monkeypatch.setattr(tuning, "WINDOW_S", WINDOW_S)
-    monkeypatch.setattr(tuning, "POLL_S", 0.01)
-    monkeypatch.setattr(tuning, "ANSWER_POLL_S", 0.001)
+    monkeypatch.setattr(timing, "WINDOW_S", WINDOW_S)
+    monkeypatch.setattr(timing, "POLL_S", 0.01)
+    monkeypatch.setattr(timing, "ANSWER_POLL_S", 0.001)
     monkeypatch.setattr(profiles, "STATE_READERS", profiles.StateReaderProfile())
 
 
@@ -383,13 +383,13 @@ EXCEPTIONS = {
     ("vendor_interface/primitive_handling/profiles.py", "current_window_s"),
     # Waiting for a finished picture's files to stop growing on disk. This is
     # about files, not about LAS X's state, and has its own decided numbers.
-    ("dispatcher/files.py", "DEFAULT_FILE_STABILITY_TIMEOUT_S"),
-    ("dispatcher/files.py", "DEFAULT_EXPORT_COMPLETION_TIMEOUT_S"),
-    ("dispatcher/files.py", "DEFAULT_EXPORT_COMPLETION_POLL_INTERVAL_S"),
-    ("dispatcher/files.py", "timeout"),
-    ("dispatcher/files.py", "poll_interval"),
+    ("vendor_interface/files.py", "DEFAULT_FILE_STABILITY_TIMEOUT_S"),
+    ("vendor_interface/files.py", "DEFAULT_EXPORT_COMPLETION_TIMEOUT_S"),
+    ("vendor_interface/files.py", "DEFAULT_EXPORT_COMPLETION_POLL_INTERVAL_S"),
+    ("vendor_interface/files.py", "timeout"),
+    ("vendor_interface/files.py", "poll_interval"),
     # The rule itself.
-    ("dispatcher/tuning.py", "WINDOW_S"),
+    ("dispatcher/timing.py", "WINDOW_S"),
 }
 
 

@@ -22,7 +22,7 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface imp
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures import (
     ome_canonical as canonical,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher.product import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.product import (
     AcquisitionMetadata,
     PlaneIndex,
 )

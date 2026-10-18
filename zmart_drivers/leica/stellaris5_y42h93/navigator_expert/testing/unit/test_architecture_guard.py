@@ -37,10 +37,10 @@ RULEBOOK = Path("vendor_interface/primitive_handling/limit_rules.py")
 # API/log legs that the command policy races. Higher-level code must leave
 # ``mode`` unset and consume the configured reader abstraction.
 READER_SOURCE_POLICY_MODULES = {
-    Path("dispatcher/read.py"),
+    Path("dispatcher/reader.py"),
     Path("vendor_interface/primitive_handling/state.py"),
     Path("vendor_interface/primitive_handling/sources.py"),
-    Path("dispatcher/change.py"),
+    Path("dispatcher/writer.py"),
     Path("vendor_interface/primitive_handling/readings.py"),
     Path("vendor_interface/primitive_handling/confirmations.py"),
     Path("vendor_interface/primitive_handling/confirm_select_job.py"),
