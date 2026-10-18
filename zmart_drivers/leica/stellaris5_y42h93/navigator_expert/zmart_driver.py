@@ -144,9 +144,7 @@ class ZmartDriver:
         """``True, settings``: how a capture is triggered, ``full`` and nothing else."""
         return True, _adapter.get_acquisition_settings(self._handle)
 
-    def acquire(
-        self, position_label, acquisition_settings=None, acquisition_type=None, output_folder=None
-    ):
+    def acquire(self, position_label, acquisition_settings, acquisition_type, output_folder):
         """Capture here with the selected job, save, and answer ``True, (files, planes)``.
 
         The files are saved in ``output_folder``, or else in this session's

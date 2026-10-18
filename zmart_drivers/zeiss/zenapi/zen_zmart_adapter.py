@@ -49,8 +49,6 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from zmart_controller.zmart_controller import acquisition_type_or_default, output_folder_as_text
-
 from .acquisition.save import _wait_stable, zen_image_path
 from .calibration import machine as _machine
 from .commands import commands as _cmd
@@ -566,23 +564,22 @@ def acquire(
     *,
     position_label: str,
     acquisition_settings: dict | None = None,
-    acquisition_type: str | None = None,
-    output_folder: str | None = None,
+    acquisition_type: str,
+    output_folder: str | None,
 ) -> dict:
     """Acquire with the loaded ZEN experiment and bring the CZI into the output folder.
 
     A snap by default; the whole experiment (Z-stack, tiles, time series) when
     ``mode`` is "experiment". ZEN always writes the CZI into its own image
     folder, as ``<type>_<folder>_<label>.czi`` (``<type>_<label>.czi`` with no
-    folder), where ``<type>`` is the acquisition type, ``acquisition`` when
-    none is given. The file is then copied to ``<output_folder>/<folder>/``,
+    folder), where ``<type>`` is the acquisition type. The controller hands
+    both in filled in: the type is always a non-empty text, the folder text
+    or None. The file is then copied to ``<output_folder>/<folder>/``,
     or ``<output_root>/data/<folder>/`` when no output folder is given, when
     the ZEN folder is reachable from here; otherwise it stays where ZEN put
     it. ``files`` names where it is; the record names both locations.
     """
     _require_open(handle)
-    acquisition_type = acquisition_type_or_default(acquisition_type)
-    output_folder = output_folder_as_text(output_folder)
     options = dict(acquisition_settings or {})
     folder = options.get("folder") or ""
     if not isinstance(folder, str):

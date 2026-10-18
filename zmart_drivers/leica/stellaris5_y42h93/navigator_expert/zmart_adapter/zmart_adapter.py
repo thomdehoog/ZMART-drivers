@@ -78,8 +78,6 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from zmart_controller.zmart_controller import acquisition_type_or_default, output_folder_as_text
-
 try:  # driver version for embedded export state; never fail acquire over it
     from .. import __version__ as _DRIVER_VERSION
 except Exception:  # noqa: BLE001 -- best-effort provenance
@@ -974,8 +972,8 @@ def acquire(
     *,
     position_label: str | None = None,
     acquisition_settings: dict | None = None,
-    acquisition_type: str | None = None,
-    output_folder: str | None = None,
+    acquisition_type: str,
+    output_folder: str | None,
 ) -> dict:
     """Run the job, wait for the export, and persist the OME-TIFF product.
 
@@ -991,12 +989,14 @@ def acquire(
             the trigger, which is always ``full``. Unknown keys or values
             raise.
         acquisition_type: The kind of acquisition in the workflow's run,
-            such as ``"overview"``; ``"acquisition"`` when omitted. It names
-            the files and is kept in the lineage, the log and the answer.
-        output_folder: Where the capture is saved. The driver writes every
-            file itself, from LAS X's cache, so it saves exactly there. When
-            omitted, it saves in this session's staging folder under the
-            microscope's data location.
+            such as ``"overview"``: always a non-empty text, which the
+            controller fills in (``"acquisition"`` when the workflow gave
+            none). It names the files and is kept in the lineage, the log
+            and the answer.
+        output_folder: Where the capture is saved, as text. The driver
+            writes every file itself, from LAS X's cache, so it saves
+            exactly there. When None, it saves in this session's staging
+            folder under the microscope's data location.
 
     The selected LAS X job is what runs; choose it with :func:`set_state`.
     The session hash (``handle.hash6``) rides along only in lineage and
@@ -1010,8 +1010,6 @@ def acquire(
     detection, or persistence.
     """
     _require_open(handle)
-    acquisition_type = acquisition_type_or_default(acquisition_type)
-    output_folder = output_folder_as_text(output_folder)
     resolved = _with_defaults(handle, acquisition_settings)
     if output_folder is not None:
         output_root = Path(output_folder)

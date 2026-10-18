@@ -84,7 +84,7 @@ def test_procedures(handle, fake_api):
 def test_acquire_stack_saves_nd2(handle, fake_api, tmp_path):
     adapter.set_origin(handle)
     rec = adapter.acquire(
-        handle,
+        handle, acquisition_type="acquisition", output_folder=None,
         position_label="p1",
         acquisition_settings={"z_start": -10, "z_end": 10, "z_step": 2, "format": "nd2", "exposure_ms": 12},
     )
@@ -95,4 +95,4 @@ def test_acquire_stack_saves_nd2(handle, fake_api, tmp_path):
 
 def test_acquire_stack_needs_a_range(handle):
     with pytest.raises(ValueError, match="z_start"):
-        adapter.acquire(handle, position_label="p1", acquisition_settings={"z_end": 10})
+        adapter.acquire(handle, acquisition_type="acquisition", output_folder=None, position_label="p1", acquisition_settings={"z_end": 10})

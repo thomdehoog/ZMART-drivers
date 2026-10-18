@@ -46,8 +46,6 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from zmart_controller.zmart_controller import acquisition_type_or_default, output_folder_as_text
-
 from . import acquisition as _acq
 from . import commands as _cmd
 from .calibration import machine as _machine
@@ -599,20 +597,19 @@ def acquire(
     *,
     position_label: str,
     acquisition_settings: dict | None = None,
-    acquisition_type: str | None = None,
-    output_folder: str | None = None,
+    acquisition_type: str,
+    output_folder: str | None,
 ) -> dict:
     """Capture one dataset and save it, returning the record.
 
     Applies any light-path settings as state first, optionally settles the stage
     (backlash correction), captures via the mesoSPIM image writer, then relocates
     the frames into ``output_folder``, or ``<output_root>/data/`` when none is
-    given, named after the acquisition type (``acquisition`` when none is
-    given) and ``position_label``. The ``folder`` setting puts them in a
+    given, named after the acquisition type and ``position_label``. The
+    controller hands both in filled in: the type is always a non-empty text,
+    the folder text or None. The ``folder`` setting puts them in a
     folder of that name inside it.
     """
-    acquisition_type = acquisition_type_or_default(acquisition_type)
-    output_folder = output_folder_as_text(output_folder)
     options = dict(acquisition_settings or {})
     fmt = options.get("format", ACQUISITION.save_format)
     folder = options.get("folder") or ""
