@@ -20,10 +20,13 @@ existing file keeps loading without a re-adopt.
 from __future__ import annotations
 
 import json
+import logging
 import os
 from copy import deepcopy
 from pathlib import Path
 from typing import Any
+
+_log = logging.getLogger(__name__)
 
 SCHEMA_VERSION = 13
 _LEGACY_SCHEMA_VERSION = 12
@@ -389,3 +392,66 @@ def translate_xyz_between_objectives(
         to_slot=to_slot,
     )
     return x_t, y_t, z_t
+
+
+def load_objective_calibration(
+    calibration_name: str | None = None,
+    *,
+    enabled: bool = True,
+) -> tuple[dict | None, dict]:
+    """Load translations and readiness provenance from one exact document.
+
+    Resolving/loading twice can straddle an atomic snapshot adoption: old
+    translations could otherwise be paired with new ``measured_slots`` and be
+    reported ready. This function deliberately resolves one path, parses it
+    once, and derives both outputs from that immutable in-memory config.
+    """
+    # This import must stay inside the function: the package root imports this
+    # module when the driver loads, and the calibration modules import the
+    # package root — a module-level import here would be a circular import.
+    effective_name = calibration_name
+    empty_info = {
+        "enabled": enabled,
+        "loaded": False,
+        "name": effective_name,
+        "path": None,
+        "slots": [],
+        "measured_slots": [],
+    }
+    if not enabled:
+        return None, empty_info
+
+    path = None
+    try:
+        path = default_path(calibration_name).absolute()
+        config = load_calibration(path)
+        translations = {
+            int(slot): get_translation_um(config, int(slot))
+            for slot, entry in (config.get("objectives") or {}).items()
+            if entry.get("translation_um") is not None
+        }
+    except Exception as exc:  # noqa: BLE001 -- config IO / schema; degrade, don't crash connect
+        _log.warning(
+            "objective translations unavailable (%s); objective changes and "
+            "cross-objective moves will be refused",
+            exc,
+        )
+        empty_info["path"] = None if path is None else str(path)
+        # {} (not None): this session WANTED calibration but none is usable,
+        # so lens swaps refuse fail-closed. None is reserved for the explicit
+        # opt-out (enabled=False), where swaps proceed bare instead.
+        return {}, empty_info
+
+    info = {
+        "enabled": True,
+        "loaded": True,
+        "name": effective_name,
+        "path": str(path),
+        "slots": sorted(translations),
+        "measured_slots": sorted(
+            int(slot)
+            for slot, entry in (config.get("objectives") or {}).items()
+            if entry.get("translation_um") is not None
+        ),
+    }
+    return translations, info

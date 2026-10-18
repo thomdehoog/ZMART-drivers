@@ -45,7 +45,9 @@ from ..configuration.origin import saved_origin as _saved_origin
 from ..configuration.origin import set_origin as _set_origin
 from ..configuration import data_location as _data_location
 from ..configuration import running_log
-from ..configuration import session_state as _session_state
+from ..configuration.image_stage_registration import load_rig_orientation
+from ..configuration.optical_calibration.model import load_objective_calibration
+from ..procedures import session_state as _session_state
 from ..configuration.store import MACHINE
 from ..dispatcher import gate as _gate
 from ..vendor_interface.naming import run_hash
@@ -118,8 +120,8 @@ class ZmartDriver:
         # The limits are loaded first, so nothing can move before they govern.
         _gate.connect_handshake(client, load=connection.get("load_limits", True))
         lasx_dialogs.keep_watching()
-        orientation, orientation_info = _session_state.load_rig_orientation()
-        translations, calibration_info = _session_state.load_objective_calibration(
+        orientation, orientation_info = load_rig_orientation()
+        translations, calibration_info = load_objective_calibration(
             connection.get("calibration_name"),
             enabled=connection.get("load_calibration", True),
         )

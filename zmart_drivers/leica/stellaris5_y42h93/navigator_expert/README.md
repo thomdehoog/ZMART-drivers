@@ -617,7 +617,7 @@ the rulebook. `testing/unit/test_architecture_guard.py` lists each
 of them and fails when a new one appears; removing them is follow-up work, one at a time.
 The connect-time flow lives in `ZmartDriver.__init__`: it opens the client, installs the limits
 gate, and loads the orientation and the calibration (the loaders are in
-`configuration/session_state.py`).
+`procedures/session_state.py`).
 
 **What the move did not change.** The layout follows the anatomy; the behaviour is the release
 candidate's, so that the move can be reviewed and tested on hardware on its own. These are the

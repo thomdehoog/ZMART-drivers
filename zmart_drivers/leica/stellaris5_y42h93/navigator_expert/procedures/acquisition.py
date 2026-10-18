@@ -27,7 +27,7 @@ except Exception:  # noqa: BLE001 -- best-effort provenance
     _DRIVER_VERSION = None
 
 from ..configuration import image_stage_registration as _orientation
-from ..configuration import session_state as _session_state
+from . import session_state as _session_state
 from .saving import command_log as _log
 from ..vendor_interface.primitives.capture import lasx_cache_release as _release
 from .saving import save as _save
