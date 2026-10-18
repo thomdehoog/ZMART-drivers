@@ -282,17 +282,30 @@ MEASURING_MODULES = {
 }
 
 
+def _measuring_imports(path: Path) -> set[str]:
+    """The measuring modules this file imports, as ``item.module``."""
+    found = set()
+    for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
+        if not isinstance(node, ast.ImportFrom):
+            continue
+        module = node.module or ""
+        for name in MEASURING_MODULES:
+            item, leaf = name.split(".")
+            if module.endswith(f"configuration.{item}.{leaf}"):
+                found.add(name)
+            elif module.endswith(f"configuration.{item}") or module == item:
+                if any(alias.name == leaf for alias in node.names):
+                    found.add(name)
+    return found
+
+
 def test_run_time_procedures_never_import_the_measuring_code():
     """The two sides meet at the saved files in ProgramData, not in each other's code."""
-    offenders = []
-    for path in sorted((DRIVER_ROOT / "procedures").rglob("*.py")):
-        text = path.read_text(encoding="utf-8")
-        for name in MEASURING_MODULES:
-            item, module = name.split(".")
-            if f"configuration.{item}.{module}" in text or (
-                f"configuration.{item} import" in text and module in text
-            ):
-                offenders.append(f"{path.relative_to(DRIVER_ROOT)} -> {name}")
+    offenders = [
+        f"{path.relative_to(DRIVER_ROOT)} -> {name}"
+        for path in sorted((DRIVER_ROOT / "procedures").rglob("*.py"))
+        for name in sorted(_measuring_imports(path))
+    ]
     assert offenders == [], (
         f"procedures import measuring code: {offenders}; read the saved values "
         "through the item's loader instead"
