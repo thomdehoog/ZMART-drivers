@@ -530,6 +530,11 @@ moved with z-wide alone, so the offset never ends up shared between the two z dr
 (`source`), the projection -- is this microscope's `IMAGE_SAVE` profile, set up once. Where it
 goes is the `output_folder` that `acquire` is given, or else the data location set up once.
 
+**Stacks run the same way as the z moves.** A saved stack holds its planes with z ascending, the same
+direction as `set_xyz` and `get_xyz`, and each plane's `z_um` in the result says where it was taken. So how the
+stage moves in x, y and z is also how the image comes out. This says nothing about whether the stage's axes are
+left- or right-handed in the real world; that is the same for every dataset from one microscope.
+
 **`Naming`.** A capture is named by its stem, `{acquisition_type}_{position_label}`: the kind
 of acquisition `acquire` is given (`acquisition` when none is), then the workflow's label, for
 example `overview_K00_M000001_G000001_P000000_V00`. Characters that cannot be in a file name
