@@ -179,7 +179,7 @@ def test_select_job_records_before_the_switch_and_compensates_after(
         lambda c, **k: order.append("read_xy") or {"x_um": 1000.0, "y_um": 2000.0},
     )
     monkeypatch.setattr(
-        cmds,
+        cmds_comp,
         "prepare_select_job",
         lambda c, job: (
             None,
@@ -187,7 +187,7 @@ def test_select_job_records_before_the_switch_and_compensates_after(
         ),
     )
     monkeypatch.setattr(
-        cmds, "select_job_confirm_legs", lambda *a, **k: (None, None, 0.0)
+        cmds_comp, "select_job_confirm_legs", lambda *a, **k: (None, None, 0.0)
     )
 
     def fake_dispatch(*a, **k):
@@ -234,7 +234,7 @@ def test_select_job_on_an_unarmed_client_behaves_as_before(client, monkeypatch):
 
     monkeypatch.setattr(readers, "get_xy", _explode)
     monkeypatch.setattr(
-        cmds,
+        cmds_comp,
         "prepare_select_job",
         lambda c, job: (
             None,
@@ -242,11 +242,11 @@ def test_select_job_on_an_unarmed_client_behaves_as_before(client, monkeypatch):
         ),
     )
     monkeypatch.setattr(
-        cmds, "select_job_confirm_legs", lambda *a, **k: (None, None, 0.0)
+        cmds_comp, "select_job_confirm_legs", lambda *a, **k: (None, None, 0.0)
     )
     monkeypatch.setattr(
         cmds,
-        "_dispatch",
+        "dispatch_change",
         lambda *a, **k: {"success": True, "confirmed": True, "logs": []},
     )
 
@@ -269,7 +269,7 @@ def test_set_objective_records_before_and_compensates_with_the_commanded_slot(
     )
     monkeypatch.setattr(
         cmds,
-        "_dispatch",
+        "dispatch_change",
         lambda *a, **k: (
             order.append("dispatch") or {"success": True, "confirmed": True}
         ),

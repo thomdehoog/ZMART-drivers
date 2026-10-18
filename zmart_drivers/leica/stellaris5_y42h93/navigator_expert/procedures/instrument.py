@@ -27,7 +27,7 @@ from ..configuration import store as _machine
 from ..dispatcher import gate as _gate
 from ..vendor_interface.parsing import parse_tile_geometry as _parse_tile_geometry
 from ..vendor_interface.primitive_handling import state as _readers
-from .commands import acquire as _capture
+from .acquisition_and_saving import acquire as _capture
 from .commands import backlash as _motion
 from ..vendor_interface.primitive_handling import changes as _commands
 from .commands import compensated_changes as _compensated

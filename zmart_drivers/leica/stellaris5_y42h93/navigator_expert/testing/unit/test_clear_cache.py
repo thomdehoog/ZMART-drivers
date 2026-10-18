@@ -4,9 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.saving import (
-    clear_cache as release,
-)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.acquisition_and_saving import clear_cache as release
 
 
 class TestPreparing:

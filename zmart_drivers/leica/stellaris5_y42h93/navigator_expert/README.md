@@ -492,7 +492,7 @@ written, and the acquire record carries it as `metadata`.
 `vendor/` is LAS X's own account of the same capture, kept verbatim as
 provenance and sha256'd in `summary.json` — never read in the normal path, and
 there only in case the two accounts disagree.
-**OME metadata:** `procedures/saving/ome_canonical.py` writes the clean canonical ZMART OME-XML
+**OME metadata:** `procedures/acquisition_and_saving/ome_canonical.py` writes the clean canonical ZMART OME-XML
 that is stored inside each OME-Zarr image (`OME/METADATA.ome.xml`). Captures are saved as OME-Zarr
 only.
 
@@ -503,7 +503,7 @@ Container V2`): `D:\Temp2` on the STELLARIS Y42H93.
 With `cleanup_cache=True`, the profile's default since it passed on the STELLARIS (15 October
 2026), the save's last step asks LAS X itself to delete the picture it was read from: the delete of
 LAS X's own window, so the cache's files go and the project stays whole
-(`procedures/saving/clear_cache.py` says how). It runs only once the copy is written and read back
+(`procedures/acquisition_and_saving/clear_cache.py` says how). It runs only once the copy is written and read back
 identical, and the Navigator canvas is then cleared, which lets go of each capture's hidden copy.
 The driver never deletes a file itself: a capture LAS X gives no way to let go of is refused before
 anything is saved.
@@ -518,7 +518,7 @@ anything is saved.
 goes is the `output_folder` that `acquire` is given, or else the data location set up once.
 
 **Extra in-place backlash rounds are off by default.** They are the driver's own setting,
-`ACQUISITION_BACKLASH_DEFAULT_ROUNDS` in `procedures/acquisition.py`, `0` unless changed there. The normal XY
+`ACQUISITION_BACKLASH_DEFAULT_ROUNDS` in `procedures/acquisition_and_saving/acquisition.py`, `0` unless changed there. The normal XY
 move still uses the driver's consistent final approach to the requested position.
 
 **`Naming`.** A capture is named by its stem, `{acquisition_type}_{position_label}`: the kind

@@ -19,9 +19,7 @@ import pytest
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface import (
     metadata_map as described,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.saving import (
-    ome_canonical as canonical,
-)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.acquisition_and_saving import ome_canonical as canonical
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.product import (
     AcquisitionMetadata,
     PlaneIndex,

@@ -38,22 +38,14 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.pro
     ExportedAcquisition,
     ExportedPosition,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.commands import (
-    acquire as capture,
-)
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.saving import (
-    ome_canonical,
-)
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.saving import (
-    save as acquisition,
-)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.acquisition_and_saving import acquire as capture
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.acquisition_and_saving import ome_canonical
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.acquisition_and_saving import save as acquisition
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitive_handling import (
     state as readers_router,
 )
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.saving import (
-    clear_cache,
-)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.acquisition_and_saving import clear_cache
 
 
 @pytest.fixture(autouse=True)

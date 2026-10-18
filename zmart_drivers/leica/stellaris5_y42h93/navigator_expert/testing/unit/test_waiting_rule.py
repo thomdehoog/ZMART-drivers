@@ -360,7 +360,7 @@ def test_commands_deliver_through_the_one_helper():
 GUARDED = ("dispatcher", "vendor_interface")
 GUARDED_FILES = (
     "procedures/commands/compensated_changes.py",
-    "procedures/commands/acquire.py",
+    "procedures/acquisition_and_saving/acquire.py",
     "procedures/commands/objective_shift.py",
     "procedures/commands/objectives.py",
 )

@@ -22,24 +22,24 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 try:  # driver version for embedded export state; never fail acquire over it
-    from .. import __version__ as _DRIVER_VERSION
+    from ... import __version__ as _DRIVER_VERSION
 except Exception:  # noqa: BLE001 -- best-effort provenance
     _DRIVER_VERSION = None
 
-from ..configuration import image_stage_registration as _orientation
-from . import session_state as _session_state
-from .saving import command_log as _log
-from .saving import clear_cache as _release
-from .saving import save as _save
-from ..vendor_interface.naming import Naming, free_stem
-from ..vendor_interface.primitive_handling import state as _readers
-from ..vendor_interface.primitive_handling.profiles import IMAGE_SAVE
-from .commands import acquire as _capture
-from .commands import backlash as _motion
-from . import session as _info
-from .frame import get_xyz
-from .instrument import get_state
-from .session import ZmartHandle, note_unconfirmed, require_open, try_
+from ...configuration import image_stage_registration as _orientation
+from .. import session_state as _session_state
+from . import command_log as _log
+from . import clear_cache as _release
+from . import save as _save
+from ...vendor_interface.naming import Naming, free_stem
+from ...vendor_interface.primitive_handling import state as _readers
+from ...vendor_interface.primitive_handling.profiles import IMAGE_SAVE
+from . import acquire as _capture
+from ..commands import backlash as _motion
+from .. import session as _info
+from ..frame import get_xyz
+from ..instrument import get_state
+from ..session import ZmartHandle, note_unconfirmed, require_open, try_
 
 log = logging.getLogger(__name__)
 
@@ -213,7 +213,7 @@ def acquire(
             "with set_xyz before acquiring"
         )
     noted_before = len(handle.unconfirmed)
-    # What the capture's log says it did, step by step (see procedures/saving/command_log.py).
+    # What the capture's log says it did, step by step (see procedures/acquisition_and_saving/command_log.py).
     steps: dict = {}
     backlash_rounds = ACQUISITION_BACKLASH_DEFAULT_ROUNDS
     apply_backlash = backlash_rounds > 0

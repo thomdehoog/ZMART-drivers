@@ -239,7 +239,7 @@ class ExportedAcquisition:
     vendor_metadata_sources: tuple[VendorMetadataSource, ...] = ()
     #: Which capture LAS X lets go of once it is saved (``cleanup_cache``): its
     #: element number and its name. None when there is none, and then letting go
-    #: is refused. How it is done is the business of ``procedures/saving/clear_cache.py``.
+    #: is refused. How it is done is the business of ``procedures/acquisition_and_saving/clear_cache.py``.
     release_target: tuple[int, str] | None = None
 
     @property
