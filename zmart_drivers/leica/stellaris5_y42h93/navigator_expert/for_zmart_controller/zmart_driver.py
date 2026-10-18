@@ -41,7 +41,8 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from ..configuration import coordinates as _coordinates
+from ..configuration.origin import saved_origin as _saved_origin
+from ..configuration.origin import set_origin as _set_origin
 from ..configuration import data_location as _data_location
 from ..configuration import running_log
 from ..configuration import session_state as _session_state
@@ -102,7 +103,7 @@ class ZmartDriver:
         """
         connection = {**DEFAULT_CONNECTION, **(connection or {})}
         saved_origin = (
-            _coordinates.load_saved_origin()
+            _saved_origin.load_saved_origin()
             if connection.get("load_origin", True)
             else None
         )
@@ -226,7 +227,7 @@ class ZmartDriver:
         saved zero point. Returns where it was saved. See
         ``procedures/frame.py`` for the details.
         """
-        return _frame.set_origin(self._handle)
+        return _set_origin.set_origin(self._handle)
 
     # --- the settings -------------------------------------------------------------------
 
