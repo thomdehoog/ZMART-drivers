@@ -65,7 +65,7 @@ my_driver/
         error_classification.py  sort this vendor's failures into the shared kinds of problem
         primitive_handling.py  how the dispatcher treats each primitive: which to try first,
                                how to confirm, whether it may be sent again, how long to wait
-        metadata_map.py        turn the vendor's description of a picture into the standard metadata
+        metadata_map.py        translate the vendor's description of a picture into the standard fields (no hardware access)
         primitives/            the smallest single reads and writes, grouped by the way they reach the software
             direct.py          reading (and, where possible, writing) the software's own state
             api.py             the vendor's programming interface
@@ -289,6 +289,16 @@ lives in `procedures/save_zarr.py` until the shared package takes it.
 
 For this design, OME-TIFF is dropped and OME-Zarr is the only format.
 
+Saving does not need an engine of its own. The dispatcher exists to talk to
+the instrument safely: one conversation at a time, the limits check, retries
+and confirmation. Saving writes files and does not touch the instrument, so
+the only step that goes through the dispatcher is fetching the finished
+picture. The writer keeps its own safety rules: it writes each file whole,
+never overwrites an earlier picture, and checks that what it wrote reads back
+the same. The command log, the record of what was asked and what happened,
+is produced by the dispatcher (the attempts, the confirmation) and saved by
+the `acquire` procedure beside the images.
+
 The **standard metadata** is one record that every driver fills in: the pixel
 size and the z spacing, the channels and their wavelengths, the stage position
 of each plane, the objective and settings used, when the capture began and
@@ -296,6 +306,25 @@ ended, and which command produced it. A driver that cannot fill a field, for
 example the wavelength on a camera-only system, must say "unknown". It must
 not guess or leave a blank that looks like a value. Which fields are required
 is still to be decided.
+
+**Who builds the record.** The record is put together in two steps, and the
+split matters, because the metadata is more than one reading.
+
+1. **The metadata map** (in the vendor interface) translates the vendor's own
+   description of a picture into the standard fields, for example "this
+   vendor's channel entry becomes that wavelength field". It is pure
+   translation and touches no hardware.
+2. **The `acquire` procedure** assembles the whole record. The pieces come
+   from different places: the stage position, the objective and the job
+   settings are read through the dispatcher, so the fallback rules and an
+   honest "unknown" apply to each; the wavelengths and pixel size come from
+   the vendor's description through the map; and the start and end times are
+   measured by the procedure itself while it watches the acquisition, not
+   read from the microscope.
+
+A single primitive could not build this record, because it combines several
+readers. That is why assembling it is a recipe, and why the vendor interface
+keeps only the translation.
 
 ### What this means for the Leica driver
 
