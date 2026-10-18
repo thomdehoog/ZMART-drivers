@@ -307,8 +307,11 @@ example the wavelength on a camera-only system, must say "unknown". It must
 not guess or leave a blank that looks like a value. Which fields are required
 is still to be decided.
 
-**Who builds the record.** The record is put together in two steps, and the
-split matters, because the metadata is more than one reading.
+**Who builds the record (planned for later).** Metadata handling is not part of
+the first refactor. It will be built later, on top of the primitives, once they
+are in place. What follows is the plan, so that the primitives are shaped to
+allow it. The record is put together in two steps, and the split matters,
+because the metadata is more than one reading.
 
 1. **The metadata map** (in the vendor interface) translates the vendor's own
    description of a picture into the standard fields, for example "this
@@ -1130,8 +1133,9 @@ by any other part of the driver. The Leica driver already works this way.
   API, log or capture families cleanly. It needs a family of its own, or a
   place under one of them.
 
-- **Required metadata.** Which fields every driver must fill in the standard
-  metadata, and how "unknown" is written.
+- **Required metadata (later).** Metadata handling comes after the primitives.
+  Which fields every driver must fill in the standard metadata, and how
+  "unknown" is written, are decided then.
 
 - **Axes that are neither x, y, z nor settings.** The mesoSPIM has a focus
   drive and a rotation axis. Today they are reachable only through
