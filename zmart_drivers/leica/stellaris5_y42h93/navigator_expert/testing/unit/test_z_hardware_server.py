@@ -39,8 +39,11 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.con
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.parsing import (
     make_changeable_copy,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.for_zmart_controller.zmart_adapter import (
-    zmart_adapter as adapter,
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures import (
+    frame as _frame,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitive_handling import (
+    state as _readers,
 )
 
 
@@ -208,18 +211,16 @@ class TestCallers:
         self, server, monkeypatch
     ):
         server.Hardware.ZPosZGalvo = 15e-6
+        monkeypatch.setattr(_readers, "get_xy", lambda c: {"x_um": 1.0, "y_um": 2.0})
         monkeypatch.setattr(
-            adapter._readers, "get_xy", lambda c: {"x_um": 1.0, "y_um": 2.0}
+            _readers, "get_selected_job", lambda c, **k: {"Name": "AF Job 01"}
         )
         monkeypatch.setattr(
-            adapter._readers, "get_selected_job", lambda c, **k: {"Name": "AF Job 01"}
-        )
-        monkeypatch.setattr(
-            adapter._readers,
+            _readers,
             "get_job_settings",
             lambda c, j, **k: raw_settings(galvo_um=-0.01, stack_on="z-galvo"),
         )
-        snap = adapter._hardware_snapshot(type("H", (), {"client": object()})())
+        snap = _frame.hardware_snapshot(type("H", (), {"client": object()})())
         assert snap["z_galvo_um"] == pytest.approx(15.0)
         assert snap["z_wide_um"] == 4999.5
 

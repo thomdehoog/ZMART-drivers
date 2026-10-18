@@ -881,6 +881,9 @@ def test_adapter_bypass_refuses_at_the_commands_layer(clear_stage_limits):
     from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.for_zmart_controller.zmart_adapter import (
         zmart_adapter as adapter,
     )
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitive_handling import (
+        state as _readers,
+    )
 
     _raw_snapshot(_machine_root(), limits_text=_BAD_LIMITS_TEXTS["missing_axis"])
     client = MockLasxClient(latency=0.0)
@@ -891,12 +894,10 @@ def test_adapter_bypass_refuses_at_the_commands_layer(clear_stage_limits):
         "zPosition": {"z-wide": {"position": 0.0}, "z-galvo": {"position": 0.0}},
     }
     with (
+        patch.object(_readers, "get_xy", return_value={"x_um": 50000, "y_um": 30000}),
+        patch.object(_readers, "get_job_settings", return_value=settings),
         patch.object(
-            adapter._readers, "get_xy", return_value={"x_um": 50000, "y_um": 30000}
-        ),
-        patch.object(adapter._readers, "get_job_settings", return_value=settings),
-        patch.object(
-            adapter._readers,
+            _readers,
             "get_selected_job",
             return_value={"Name": "Overview", "IsSelected": True},
         ),
@@ -924,6 +925,9 @@ def test_controller_session_bypass_refuses_at_the_commands_layer(clear_stage_lim
     from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.for_zmart_controller.zmart_adapter import (
         zmart_adapter as adapter,
     )
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitive_handling import (
+        state as _readers,
+    )
 
     _raw_snapshot(_machine_root(), limits_text=_BAD_LIMITS_TEXTS["missing_axis"])
     client = MockLasxClient(latency=0.0)
@@ -933,12 +937,10 @@ def test_controller_session_bypass_refuses_at_the_commands_layer(clear_stage_lim
     }
     with (
         patch.object(adapter._session, "connect_python_client", return_value=client),
+        patch.object(_readers, "get_xy", return_value={"x_um": 50000, "y_um": 30000}),
+        patch.object(_readers, "get_job_settings", return_value=settings),
         patch.object(
-            adapter._readers, "get_xy", return_value={"x_um": 50000, "y_um": 30000}
-        ),
-        patch.object(adapter._readers, "get_job_settings", return_value=settings),
-        patch.object(
-            adapter._readers,
+            _readers,
             "get_selected_job",
             return_value={"Name": "Overview", "IsSelected": True},
         ),

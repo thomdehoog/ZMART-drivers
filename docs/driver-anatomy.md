@@ -720,14 +720,20 @@ Leica-specific:
 - The driver keeps a running log (`dispatcher/running_log.py`): a rolling text
   file in a `logs` folder beside the saved settings.
 
+- The logic that used to sit in `zmart_adapter.py` is now in `procedures/`:
+  `session.py` (the handle and the questions every command asks), `frame.py`
+  (`get_xyz`, `set_xyz`, `set_origin` and the allowed range), `acquisition.py`
+  (`acquire` and its log) and `instrument.py` (`get_state`, `set_state`, the
+  named procedures and `get_info`). The adapter keeps only connecting,
+  disconnecting and the table of commands.
+
 **Still to do.** Two things do not fit yet:
 
-1. `for_zmart_controller/zmart_adapter/zmart_adapter.py` (about 1,700 lines)
-   holds much of the logic of `get_xyz`, `set_xyz` and `acquire`. The
-   `ZmartDriver` class is already thin and only calls it. The logic has to move
-   into procedures, and the coordinate conversion into the class. This is left
-   for after the first run on the simulator, because about 300 of the offline
-   tests are written against the adapter's current shape.
+1. The coordinate arithmetic (origin, objective offset) is in `procedures/frame.py`
+   and works on the session handle. The plan is to move the pure arithmetic
+   into `configuration/coordinates.py` and let the `ZmartDriver` class convert
+   at its edge, so that the procedures work in raw stage coordinates only. That
+   changes what the procedures receive, so it waits for the first hardware run.
 2. The shared reader still asks the API and the log at the same time (two small
    threads) and takes whichever answers first. The plan above asks for one
    source after the other. That changes how a reading behaves, so it waits for

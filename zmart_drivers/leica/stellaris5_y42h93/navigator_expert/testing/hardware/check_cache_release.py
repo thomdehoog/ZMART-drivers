@@ -158,8 +158,8 @@ def main() -> int:
     from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.output import (
         lasx_data_container as container,
     )
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.for_zmart_controller.zmart_adapter import (
-        zmart_adapter as adapter,
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures import (
+        acquisition as _acquisition,
     )
 
     releases = Releases()
@@ -174,8 +174,11 @@ def main() -> int:
         "errors": [],
     }
 
-    adapter.IMAGE_SAVE = replace(
-        adapter.IMAGE_SAVE, format="ome-zarr", projection="none", cleanup_cache=True
+    _acquisition.IMAGE_SAVE = replace(
+        _acquisition.IMAGE_SAVE,
+        format="ome-zarr",
+        projection="none",
+        cleanup_cache=True,
     )
     session = ZmartController(
         driver, {"output_root": asked.save_to} if asked.save_to else {}

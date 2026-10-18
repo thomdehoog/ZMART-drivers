@@ -181,6 +181,7 @@ ALLOWED = {
         "dispatcher",
         "configuration",
         "output",
+        "__version__",  # acquisition.py records the driver version in the saved state
     },
     "output": {"vendor_interface", "dispatcher", "configuration"},
     "configuration": {
