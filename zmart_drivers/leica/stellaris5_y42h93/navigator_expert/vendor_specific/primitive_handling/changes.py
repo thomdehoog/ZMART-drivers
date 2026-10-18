@@ -4,7 +4,7 @@ Public ``set_*``, ``move_xy``, ``move_z`` and ``acquire`` functions. Each one
 is a single command to LAS X, with its limits check, its handling notes and its
 confirmation; none of them is more than one command. (The two that change the
 lens and then correct the stage, ``set_objective`` and ``select_job``, are
-recipes and live in ``procedures/commands/compensated_changes.py``.)
+recipes and live in ``procedures/absolute_coordinate_system/compensated_changes.py``.)
 
 The settings of a job (zoom, scan speed, laser intensity, and the rest) are
 all changed by the one runner, ``_change_setting``, from their entry in

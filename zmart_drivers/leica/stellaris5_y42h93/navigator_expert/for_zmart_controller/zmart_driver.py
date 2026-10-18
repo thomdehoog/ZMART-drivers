@@ -52,7 +52,7 @@ from ..driver_setup.store import MACHINE
 from ..dispatcher import gate as _gate
 from ..vendor_specific.naming import run_hash
 from ..procedures.acquisition_and_saving import acquisition as _acquisition
-from ..procedures import frame as _frame
+from ..procedures.absolute_coordinate_system import frame as _frame
 from ..procedures import instrument as _instrument
 from ..procedures.session import ZmartHandle
 from ..vendor_specific.connection import lasx_client
@@ -227,7 +227,7 @@ class ZmartDriver:
         position, both z drives and the objective in place, and saves them to
         this microscope's configuration. Every later connection starts from the
         saved zero point. Returns where it was saved. See
-        ``procedures/frame.py`` for the details.
+        ``procedures/absolute_coordinate_system/frame.py`` for the details.
         """
         return _set_origin.set_origin(self._handle)
 

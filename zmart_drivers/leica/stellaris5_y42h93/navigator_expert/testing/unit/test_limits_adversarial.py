@@ -38,9 +38,7 @@ from limits_fixtures import (
 from mock_lasx_api import MockLasxClient
 
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling import changes as commands_mod
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.commands import (
-    compensated_changes as commands_mod_comp,
-)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.absolute_coordinate_system import compensated_changes as commands_mod_comp
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.limits import config as limits_config
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.store import MachineProfile
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling import limit_rules as motion_limits
@@ -57,9 +55,7 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.conn
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.for_zmart_controller.zmart_driver import (
     ZmartDriver,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures import (
-    frame as _frame,
-)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.absolute_coordinate_system import frame as _frame
 
 
 def _connect_handle(connection=None):
@@ -1012,7 +1008,7 @@ def test_every_dispatching_wrapper_declares_and_calls_the_gate():
         ).read_text(encoding="utf-8")
     )
     recipe_tree = ast.parse(
-        (DRIVER_ROOT / "procedures" / "commands" / "compensated_changes.py").read_text(
+        (DRIVER_ROOT / "procedures" / "absolute_coordinate_system" / "compensated_changes.py").read_text(
             encoding="utf-8"
         )
     )

@@ -535,7 +535,7 @@ new version.
 
 The arithmetic between raw stage coordinates and user coordinates (the origin,
 the orientation, the objective offsets) is done by the `ZmartDriver` class, at
-its edge, using the functions in `procedures/coordinates.py`. What comes in
+its edge, using the functions in `procedures/absolute_coordinate_system/coordinates.py`. What comes in
 from the controller is converted to raw coordinates before it goes further,
 and what goes out is converted to user coordinates. Everything below the
 class, the procedures and the dispatcher, then works in one system, the raw
@@ -737,7 +737,7 @@ Leica-specific:
   `vendor_specific/primitives/capture/`, and LAS X's description of a picture
   is read into the standard fields by `vendor_specific/metadata_map.py`.
 - The plain arithmetic between stage and user coordinates is in
-  `procedures/coordinates.py`, as the plan says. `procedures/frame.py` only
+  `procedures/absolute_coordinate_system/coordinates.py`, as the plan says. `procedures/absolute_coordinate_system/frame.py` only
   decides what to read and what to move.
 
 **Done since (October 2026).**
@@ -776,8 +776,8 @@ purpose, so that it cannot be forgotten.
    written around the race, and it was run on the microscope as it is, so it
    is left for after the first run on the simulator.
 2. **The conversion between user and stage coordinates is still in
-   `procedures/frame.py`.** The plain arithmetic is in
-   `procedures/coordinates.py`, but the procedures still take and give
+   `procedures/absolute_coordinate_system/frame.py`.** The plain arithmetic is in
+   `procedures/absolute_coordinate_system/coordinates.py`, but the procedures still take and give
    positions in the controller's frame (the acquisition places every plane from
    the frame position it remembers). The plan has the `ZmartDriver` class
    convert at its edge, and also says that whether procedures should own part of
@@ -1286,7 +1286,7 @@ anatomy"). The mock's `__init__`
 user coordinates (subtracting the origin, applying the registration, adding
 the objective offsets) lives once, as a pair of plain functions next to this
 configuration (`user_from_raw` and `raw_from_user` in the mock's
-`procedures/coordinates.py`). The `ZmartDriver` class uses these functions
+`procedures/absolute_coordinate_system/coordinates.py`). The `ZmartDriver` class uses these functions
 at its edge (see "The simplified anatomy"). That way:
 
 - the controller and the experiments speak one coordinate system, the user's;

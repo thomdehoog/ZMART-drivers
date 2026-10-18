@@ -15,13 +15,9 @@ import pytest
 from limits_fixtures import install_permissive_limits
 
 import zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.state as readers
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.commands import (
-    objective_shift as shift,
-)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.absolute_coordinate_system import objective_shift as shift
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling import changes as cmds
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.commands import (
-    compensated_changes as cmds_comp,
-)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.absolute_coordinate_system import compensated_changes as cmds_comp
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures import (
     session_state,
 )
@@ -373,9 +369,7 @@ class TestSingleSourcedDelta:
         swap-time stage move equals the adapter's per-move frame offset for
         the same lens pair. Swap-then-move-to-F therefore lands exactly
         where move-to-F-alone would."""
-        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures import (
-            frame as _frame,
-        )
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.absolute_coordinate_system import frame as _frame
 
         _arm(client)
         slot = {"value": 1}

@@ -13,7 +13,7 @@ from __future__ import annotations
 import time
 
 from .. import store as _machine
-from ...procedures.frame import hardware_snapshot
+from ...procedures.absolute_coordinate_system.frame import hardware_snapshot
 from ...procedures.session import ZmartHandle, require_open
 
 

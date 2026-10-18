@@ -570,15 +570,18 @@ zmart_drivers/leica/stellaris5_y42h93/navigator_expert/
 │                       until the change took effect, and sends again if it did not; never for an
 │                       acquisition) · gate.py (when the limits are enforced)
 ├── procedures/         the recipes built on the machinery, grouped by job:
-│   ├── session.py · session_state.py · frame.py · coordinates.py · instrument.py   what the
-│   │                   ZmartDriver class calls: the session handle and what one connection loaded,
-│   │                   where the stage is and moving it (with the plain arithmetic between stage
-│   │                   and user coordinates), the state and the named procedures
-│   ├── acquisition_and_saving/   taking a picture and keeping it: acquisition.py · acquire.py (the
-│   │                   capture) · save.py · ome_zarr.py · ome_canonical.py · materialize.py ·
-│   │                   command_log.py · clear_cache.py
-│   └── commands/       compensated_changes.py (set_objective and select_job, with the stage
-│                       correction between objectives) · objectives.py · objective_shift.py
+│   ├── session.py · session_state.py · instrument.py   what the ZmartDriver class calls: the
+│   │                   session handle and what one connection loaded, the state and the named
+│   │                   procedures
+│   ├── absolute_coordinate_system/   turns the plain readings (stage, z-wide, z-galvo, the
+│   │                   objective) into the one absolute coordinate system, with the origin and the
+│   │                   objective offsets: coordinates.py · frame.py (where the stage is and moving
+│   │                   it) · compensated_changes.py (set_objective and select_job keep the sample
+│   │                   in view) · objective_shift.py · objectives.py
+│   └── acquisition_and_saving/   taking a picture and keeping it, placed by the measured image
+│                       orientation so it lines up with the stage moves: acquisition.py · acquire.py
+│                       (the capture) · save.py · ome_zarr.py · ome_canonical.py · materialize.py ·
+│                       command_log.py · clear_cache.py
 ├── driver_setup/       everything for setting up this driver on one microscope, one folder per item:
 │                       limits/, origin/, image_stage_registration/ (the picture's orientation),
 │                       optical_calibration/ and data_location/. Each holds its bundled defaults,
@@ -630,7 +633,7 @@ workflow sees:
 - The limits gate moves inside the set dispatcher, so that no change calls it itself.
 - Done since the move: the logic of the commands left `zmart_adapter.py` for `procedures/`
   (`session.py`, `frame.py`, `acquisition.py`, `instrument.py`), the `output/` folder is gone, and
-  the plain coordinate arithmetic is in `procedures/coordinates.py`. Still to do: the
+  the plain coordinate arithmetic is in `procedures/absolute_coordinate_system/coordinates.py`. Still to do: the
   `ZmartDriver` class converts at its edge. The full list of differences from the plan is in
   `docs/driver-anatomy.md` ("Where the Leica tree still differs from the plan").
 - The setup notebooks become thin: the measuring is a procedure, the notebook only calls it.
@@ -744,7 +747,7 @@ Adding a command touches four places, following the pattern every existing comma
 1. **Confirm function** (`vendor_specific/primitive_handling/confirmations.py`) — `_confirm_X(client, ...) -> {"success", "logs"}`
    (skip if no readback is possible).
 2. **CommandProfile** (`vendor_specific/primitive_handling/profiles.py`) — `MY_PARAM = _leica_setting_profile(_confirm_my_param)`.
-3. **Command wrapper** (`procedures/commands/changes.py`) — three phases (pre-checks → `_dispatch(...)` with the
+3. **Command wrapper** (`vendor_specific/primitive_handling/changes.py`) — three phases (pre-checks → `_dispatch(...)` with the
    profile + a `setup_fn` and target-bound `confirm_fn` → post-process). `_dispatch` handles
    client-binding, profile defaults, and the `confirm_and_fire` call.
 4. **Export** (`__init__.py`) — add to `__all__` and import it.

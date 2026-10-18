@@ -21,9 +21,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling import readings as capabilities
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.commands import (
-    objective_shift,
-)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.absolute_coordinate_system import objective_shift
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling import profiles
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling import prechecks
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher import dispatcher
@@ -347,10 +345,10 @@ def test_commands_deliver_through_the_one_helper():
 # Whole folders, plus the change definitions that moved from actions/ to procedures/.
 GUARDED = ("dispatcher", "vendor_specific")
 GUARDED_FILES = (
-    "procedures/commands/compensated_changes.py",
+    "procedures/absolute_coordinate_system/compensated_changes.py",
     "procedures/acquisition_and_saving/acquire.py",
-    "procedures/commands/objective_shift.py",
-    "procedures/commands/objectives.py",
+    "procedures/absolute_coordinate_system/objective_shift.py",
+    "procedures/absolute_coordinate_system/objectives.py",
 )
 WAIT_NAME = re.compile(
     r"(timeout|poll_interval|max_retries|max_confirm_attempts|grace|deadline|window_s|retry_delay)",
