@@ -83,12 +83,10 @@ CI_DEFAULT_POSITION_UM = {
 
 
 def _register_adapter() -> Any:
-    """Return the adapter module, whose seams the --mock mode swaps out."""
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.for_zmart_controller.zmart_adapter import (
-        zmart_adapter as adapter,
-    )
+    """Return the driver's connect module, whose LAS X connection the --mock mode swaps out."""
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert import connect
 
-    return adapter
+    return connect
 
 
 class _ReportingSession:
@@ -152,8 +150,8 @@ def _connect_session(
     In --mock mode the adapter's CAM connect is swapped for the in-process
     Python mock, so the whole controller -> adapter -> driver path runs offline.
     """
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.for_zmart_controller import (
-        zmart_controller_plugin as driver,
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.for_zmart_controller.zmart_driver import (
+        ZmartDriver as driver,
     )
 
     inst = {"client": args.client_name}
@@ -174,7 +172,7 @@ def _connect_session(
         # Use a hermetic ProgramData fixture so the adapter connect's REAL
         # limits handshake succeeds without touching this developer machine.
         hermetic_mock_machine_root()
-        adapter._session.connect_python_client = lambda **_kw: MockLasxClient(
+        adapter.connect_python_client = lambda **_kw: MockLasxClient(
             latency=args.mock_latency
         )
         # The mock has no LAS X log stream, so the default select-job
@@ -546,7 +544,7 @@ def phase_move(
     with v.phase("move (set_origin + set_xyz)"):
         try:
             record = v.callable(
-                "set_origin", lambda: adapter.set_origin(sess._handle), mutating=True
+                "set_origin", lambda: sess._handle.set_origin(), mutating=True
             )
             f = v.callable("get_xyz after set_origin", sess.get_xyz)
             if f is not None:

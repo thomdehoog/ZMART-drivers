@@ -15,22 +15,9 @@ from pathlib import Path
 
 import numpy as np
 import pytest
-import tifffile
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures import (
-    acquire as capture,
-)
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.image_stage_registration import (
     Orientation,
-)
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitives.capture import (
-    lasx_cache_release as cache_release,
-)
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitives.capture import (
-    lasx_data_container as container,
-)
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures import (
-    save as acquisition,
 )
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher.naming import (
     Naming,
@@ -38,6 +25,18 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher.naming im
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher.product import (
     PlaneIndex,
     RawPlaneSource,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures import (
+    acquire as capture,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures import (
+    save as acquisition,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitives.capture import (
+    lasx_cache_release as cache_release,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitives.capture import (
+    lasx_data_container as container,
 )
 
 PID = "669c"
@@ -407,7 +406,8 @@ class TestSaving:
             Orientation,
         )
 
-    def test_save_writes_one_ome_tiff_per_plane_from_the_cache(self, cache, tmp_path):
+    def test_save_writes_one_ome_zarr_store_from_the_cache(self, cache, tmp_path):
+        """Both channels land in one store, with the pixels exactly as LAS X held them."""
         pixels = two_channel_12_bit(cache)
         naming = Naming(stem="high-res_000001_000003")
 
@@ -417,16 +417,20 @@ class TestSaving:
             tmp_path / "out",
             naming,
             cache_root=cache,
-            format="ome-tiff",
+            placement=lambda _planes: (
+                lambda z: {"x_um": 0.0, "y_um": 0.0, "z_um": float(z)}
+            ),
         )
 
         assert len(saved.image_paths) == 2
+        assert len(set(saved.image_paths.values())) == 1
         for c in range(2):
-            path = saved.image_paths[PlaneIndex(0, 0, c)]
-            with tifffile.TiffFile(path) as tif:
-                np.testing.assert_array_equal(tif.asarray(), pixels[c])
-                ome = tif.pages[0].description
-            assert "http://www.openmicroscopy.org/Schemas/OME/2016-06" in ome
-            assert 'SignificantBits="12"' in ome
-            assert 'Type="uint16"' in ome
-            assert 'PhysicalSizeX="2.5"' in ome
+            np.testing.assert_array_equal(
+                saved.read_plane(PlaneIndex(0, 0, c)), pixels[c]
+            )
+        store = next(iter(saved.image_paths.values()))
+        ome = (store / "OME" / "METADATA.ome.xml").read_text(encoding="utf-8")
+        assert "http://www.openmicroscopy.org/Schemas/OME/2016-06" in ome
+        assert 'SignificantBits="12"' in ome
+        assert 'Type="uint16"' in ome
+        assert 'PhysicalSizeX="2.5"' in ome

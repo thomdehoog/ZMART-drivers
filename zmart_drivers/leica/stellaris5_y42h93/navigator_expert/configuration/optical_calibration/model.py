@@ -250,8 +250,8 @@ def translation_delta_um(
 
     This is THE one place the sign convention lives:
     ``delta = T[to_slot] − T[from_slot]``. Both consumers — the driver's
-    swap-time compensation (``commands/objective_shift.py``) and the
-    adapter's per-move frame mapping (``zmart_adapter._objective_delta_um``)
+    swap-time compensation (``procedures/objective_shift.py``) and the
+    per-move frame mapping (``procedures/frame.py``, ``objective_delta_um``)
     — call this function, so the two can never drift apart in sign or in
     missing-slot policy.
 

@@ -1068,7 +1068,7 @@ class TestAcquire(unittest.TestCase):
             )
 
     def test_saving_follows_this_microscopes_profile(self):
-        """The format, the projection and letting go of the cache are set up once.
+        """The projection and letting go of the cache are set up once.
 
         They are this microscope's ``IMAGE_SAVE`` profile, the same for every
         capture, never a choice made per capture.
@@ -1085,14 +1085,15 @@ class TestAcquire(unittest.TestCase):
         self.assertNotIn(
             "source", calls["save"]
         )  # always LAS X's cache: nothing to choose
-        self.assertEqual(calls["save"]["format"], _acquisition.IMAGE_SAVE.format)
+        # Captures are always saved as OME-Zarr: there is no format to choose.
+        self.assertNotIn("format", calls["save"])
         self.assertEqual(
             calls["save"]["projection"], _acquisition.IMAGE_SAVE.projection
         )
         self.assertIs(
             calls["save"]["cleanup_cache"], _acquisition.IMAGE_SAVE.cleanup_cache
         )
-        self.assertEqual(record["format"], _acquisition.IMAGE_SAVE.format)
+        self.assertEqual(record["format"], "ome-zarr")
 
     def test_the_capture_is_saved_in_the_output_folder_it_is_given(self):
         """The driver writes the files itself (from LAS X's cache), so it saves where it is told.
