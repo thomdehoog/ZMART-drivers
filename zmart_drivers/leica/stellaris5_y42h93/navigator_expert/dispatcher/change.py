@@ -35,31 +35,23 @@ acts on their result dicts. The only sleeping it does is backoff delay
 between transient error retries (configurable via ``retry_backoff``
 and ``retry_escalate``).
 
-Delivery goes through ``vendor_interface.primitives.api.delivery.deliver`` (the one rule:
-``WINDOWS`` tries of ``WINDOW_S``). ``_await_echo_result`` polls the echo model after transport
-delivery, waiting for LAS X to finish processing before the error
-check reads the echo fields.
+How a request is sent to the microscope, and how the reply is waited for, is the
+business of the command's ``profile.transport`` (for LAS X,
+``vendor_interface/primitive_handling/transport.py``): the engine only asks it to
+clear the reply, send, wait for the reply, and report an open dialog. The engine
+itself names no LAS X object.
 
-Import restrictions: only runtime errors/utilities, ``readers.log_reader``,
-``vendor_interface.primitives.api.delivery``, and stdlib. Nothing from command wrappers, profiles, prechecks, or confirmations.
+Import restrictions: only the tuning rule, the result envelope, and stdlib.
+Nothing from command wrappers, prechecks, or confirmations.
 """
 
 import logging
 import time
 
-from ..vendor_interface.primitives.interface import lasx_dialogs
-from ..vendor_interface.primitives.log import log_reader as _log_reader
-from ..vendor_interface.primitives.api.delivery import deliver
 from . import tuning as _timing
 from .envelope import _make_log_entry, _make_timing
 
 log = logging.getLogger(__name__)
-
-#: How long ``_await_echo_result`` checks the echo after delivery before giving
-#: up: LAS X filling in whether the command raised an error. It stays outside
-#: the window rule in ``tuning`` by decision; read at call time so tests can
-#: shrink it.
-ECHO_SETTLE_TIMEOUT_S = 1.0
 
 
 def _confirmation_detail(result):
@@ -74,90 +66,13 @@ def _confirmation_detail(result):
     return f"; last_confirmation={details!r}"
 
 
-def _dialog_warning_since(command_started_at, description):
-    """Return a post-command LAS X dialog warning, if the log can prove one.
-
-    Diagnostic only: this helper is called only on failure/unconfirmed paths,
-    and log-reader failures must never add another command failure mode.
-    """
-    try:
-        snapshot = _log_reader.parse_msgbox_log()
-        text = snapshot.pending_dialog
-        observed_at = snapshot.pending_dialog_ts
-    except Exception:  # noqa: BLE001
-        log.debug("dialog diagnostic failed", exc_info=True)
-        return None
-    if not text or observed_at is None or observed_at < command_started_at:
-        return None
-    return f"{description} | LAS X dialog appears open: {text}"
-
-
-def _append_dialog_warning(logs, command_started_at, description):
-    msg = _dialog_warning_since(command_started_at, description)
+def _append_dialog_warning(transport, logs, command_started_at, description):
+    msg = transport.dialog_warning_since(command_started_at, description)
     if msg is None:
         return ""
     log.warning(msg)
     logs.append(_make_log_entry("warning", msg))
     return f"; dialog={msg!r}"
-
-
-# =============================================================================
-# Transport helper
-# =============================================================================
-
-
-# =============================================================================
-# Echo settlement poll
-# =============================================================================
-
-
-def _await_echo_result(client, timeout=None):
-    """Poll echo model until LAS X finishes processing.
-
-    After UpdateAwaitReceipt confirms transport delivery, LAS X still
-    needs time to process the command and populate the echo fields
-    (HasError, Error, Result). This function polls until the echo
-    indicates processing is complete, or timeout.
-
-    Settlement condition: ``Result != 0 (NotDefined)`` OR
-    ``HasError is True``. Both are checked because LAS X may set
-    HasError without changing Result from NotDefined.
-
-    Args:
-        client: LAS X API client.
-        timeout: Max seconds to wait for echo settlement. None uses the
-            module-level ECHO_SETTLE_TIMEOUT_S default.
-
-    The echo is checked every ``ANSWER_POLL_S``: it is the answer to a
-    command already sent. Its one-second limit stays outside the window rule
-    on purpose.
-
-    Returns:
-        True if the echo settled (ready for error check),
-        False if timeout expired (echo still in cleared state).
-    """
-    if timeout is None:
-        timeout = ECHO_SETTLE_TIMEOUT_S
-    deadline = time.perf_counter() + timeout
-
-    while True:
-        try:
-            result_code = int(client.PyApiCommandEcho.Model.Result)
-        except Exception:
-            result_code = 0  # Unreadable -> treat as not settled
-
-        try:
-            has_error = bool(client.PyApiCommandEcho.Model.HasError)
-        except Exception:
-            has_error = False  # Unreadable -> treat as not settled
-
-        if result_code != 0 or has_error:
-            return True
-
-        if time.perf_counter() >= deadline:
-            return False
-
-        time.sleep(_timing.ANSWER_POLL_S)
 
 
 # =============================================================================
@@ -245,6 +160,7 @@ def _fire_block(
         skip_echo=skip_echo,
         fire_async=fire_async,
     )
+    transport = profile.transport
     t_pre_check = 0.0
     t_setup = 0.0
     t_fire = 0.0
@@ -310,24 +226,14 @@ def _fire_block(
         # --- Step 3: Fire + await echo ---
         t0 = time.perf_counter()
         try:
-            client.PyApiCommandEcho.Model.HasError = False
-            client.PyApiCommandEcho.Model.Error = ""
-            try:
-                client.PyApiCommandEcho.Model.Result = 0  # NotDefined
-            except Exception:
-                pass  # Some API versions may not allow Result assignment
-            fired_at = time.monotonic()
-            if profile.fire_async:
-                lasx_dialogs.answer_warnings()
-                with lasx_dialogs.watching():
-                    api_obj.UpdateAsync()
-                delivered = True
-            else:
-                delivered = deliver(api_obj, label=description)
-            for answered in lasx_dialogs.answered_since(fired_at):
-                all_logs.append(_make_log_entry("warning", answered.message))
+            transport.clear_reply(client)
+            delivered, answered = transport.send(
+                client, api_obj, description, asynchronous=profile.fire_async
+            )
+            for message in answered:
+                all_logs.append(_make_log_entry("warning", message))
             if delivered and not profile.skip_echo and not profile.fire_async:
-                if not _await_echo_result(client):
+                if not transport.await_reply(client):
                     # The echo never settled: a LAS X rejection arriving
                     # after this window is invisible to the error check
                     # below (it reads a still-cleared echo). Only the
@@ -579,7 +485,7 @@ def confirm_and_fire(
 
     if not fb["success"]:
         dialog_detail = _append_dialog_warning(
-            all_logs, command_started_at, description
+            profile.transport, all_logs, command_started_at, description
         )
         return {
             "success": False,
@@ -721,7 +627,7 @@ def confirm_and_fire(
                     "confirmed": False,
                     "message": (
                         f"{fb['message']}"
-                        f"{_append_dialog_warning(all_logs, command_started_at, description)}"
+                        f"{_append_dialog_warning(profile.transport, all_logs, command_started_at, description)}"
                     ),
                     "timing": _make_timing(
                         pre_check_s=acc_pre,
@@ -744,7 +650,9 @@ def confirm_and_fire(
         f"state readback did not confirm the requested value"
         f"{_confirmation_detail(last_confirm_result)}"
     )
-    dialog_detail = _append_dialog_warning(all_logs, command_started_at, description)
+    dialog_detail = _append_dialog_warning(
+        profile.transport, all_logs, command_started_at, description
+    )
     log.warning("%s%s (%.3fs)", msg, dialog_detail, time.perf_counter() - t_wall_start)
     all_logs.append(_make_log_entry("warning", msg))
     return {

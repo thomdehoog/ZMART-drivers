@@ -552,14 +552,16 @@ zmart_drivers/leica/stellaris5_y42h93/navigator_expert/
 │   │                   log/ (log_reader.py, log_wait.py), interface/ (lasx_navigator.py,
 │   │                   lasx_dialogs.py: its buttons and dialogs), capture/ (data_container.py)
 │   ├── primitive_handling/   how the dispatcher treats each command, for this microscope:
-│   │                   profiles.py (one CommandProfile per command), confirmations.py ·
+│   │                   profiles.py (one CommandProfile per command), settings.py (one table
+│   │                   entry per setting of a job) · transport.py (how a request is sent and
+│   │                   its reply awaited) · confirmations.py ·
 │   │                   confirm_specs.py · confirm_select_job.py (how a change is checked),
 │   │                   readings.py (which source answers each reading) · derived.py (what a value
 │   │                   means) · prechecks.py (is the scanner idle)
 │   ├── parsing.py      the strings LAS X hands back
 │   └── error_classification.py   sorting LAS X's errors
 ├── dispatcher/         the engines that run a command safely: read.py (api/log/hybrid routing),
-│                       change.py (confirm_and_fire), gate.py and checks.py (the limits gate and its
+│                       change.py (confirm_and_fire, names no LAS X object), gate.py and checks.py (the limits gate and its
 │                       rulebook), envelope.py, tuning.py (the timing constants)
 ├── procedures/         changes.py (every set_*/move_*/select_job and the acquire command) ·
 │                       acquire.py (the capture) · objectives.py · objective_shift.py ·
