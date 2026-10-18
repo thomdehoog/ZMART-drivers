@@ -41,7 +41,7 @@ each part only uses the parts below it.
 ```
   experiments and workflows, through the ZMART Controller
   ───────────────────────────────────────────────────────────────
-  zmart_driver.py     the ZmartDriver class: one method per command
+  controller_interface/   the ZmartDriver class (zmart_driver.py): one method per command
   procedures/         recipes: acquire, autofocus, the setup measurements
   dispatcher/         the shared engines that run everything safely:
                       one read at a time, the limits gate, fallback, confirmation, error rules
@@ -56,9 +56,12 @@ The folder layout inside a driver:
 
 ```
 my_driver/
-    zmart_driver.json          the driver's name, and how to reach the microscope on this computer
-    zmart_driver.py            the ZmartDriver class the controller calls; kept thin
-    __init__.py                makes the folder a package, so zmart_driver.py can import the parts
+    zmart_driver.json          the driver's name, how to reach the microscope on this computer,
+                               and the path of the class file below; the file you register
+    __init__.py                makes the folder a package, so the parts can import each other
+
+    controller_interface/      everything that faces the controller
+        zmart_driver.py        the ZmartDriver class the controller calls; kept thin
 
     vendor_interface/          the part you write for a new microscope
         connection.py          reach the vendor software, keep the link, close it
@@ -106,6 +109,13 @@ my_driver/
     experimental/              ideas that are not yet trusted on hardware
     README.md
 ```
+
+The class file is in a folder of its own, and not loose beside the other
+folders, so that the top of a driver is as tidy as the inside. The controller
+already allows this: it reads the class file's path from the `"driver"` key in
+`zmart_driver.json`, so a driver says `"driver": "controller_interface/zmart_driver.py"`.
+Whether the controller should also find the folder by its name, so that the
+key is not needed, is a change to the controller that is still to be decided.
 
 What changed from the first version of this layout: the `actions/` folder is
 gone, `client.py` is split into `connection.py` and the `primitives/` folder,
@@ -884,6 +894,8 @@ Moving it down into the actions means procedures and setup notebooks can no
 longer accidentally use a different coordinate system from the experiments.
 
 ## 7. The `ZmartDriver` class
+
+> **Note, October 2026.** The class file now lives in `controller_interface/`, not at the top of the driver folder; see the layout at the start of this document. The older `zmart_controller_plugin.py` goes away once the class has driven the real microscope.
 
 **Purpose.** To present the driver to the ZMART Controller in the shape every
 microscope shares.
