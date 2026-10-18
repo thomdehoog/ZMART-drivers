@@ -860,7 +860,7 @@ class TestAcquire(unittest.TestCase):
                 patch.object(_readers, "get_jobs", return_value=self._jobs()),
                 patch.object(_readers, "get_hardware_info", return_value={}),
                 patch.object(
-                    _commands, "select_job", lambda c, j, **k: {"success": True}
+                    _commands_comp, "select_job", lambda c, j, **k: {"success": True}
                 ),
                 patch.object(
                     _motion,
@@ -1065,7 +1065,7 @@ class TestAcquire(unittest.TestCase):
                 patch.object(_readers, "get_jobs", return_value=self._jobs()),
                 patch.object(_readers, "get_hardware_info", return_value={}),
                 patch.object(
-                    _commands, "select_job", lambda *a, **k: {"success": True}
+                    _commands_comp, "select_job", lambda *a, **k: {"success": True}
                 ),
                 patch.object(
                     _motion,
@@ -2001,7 +2001,7 @@ class TestStateAndProcedures(unittest.TestCase):
             p[1],
             p[2],
             patch.object(
-                _commands, "select_job", return_value={"success": True}
+                _commands_comp, "select_job", return_value={"success": True}
             ) as select,
         ):
             captured = _instrument.get_state(h)
