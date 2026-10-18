@@ -99,7 +99,7 @@ from .vendor_interface.parsing import (
     parse_format,
     parse_tile_geometry,
 )
-from .dispatcher.writer import _make_log_entry
+from .dispatcher.dispatcher import make_log_entry as _make_log_entry
 from .vendor_interface.error_classification import (
     _is_transient_error,
     _check_api_error,

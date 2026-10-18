@@ -36,7 +36,8 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.commands 
     changes as commands,
 )
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher import (
-    writer as dispatch,
+    confirm_loop as dispatch,
+    send_loop,
 )
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitive_handling import (
     prechecks,
@@ -546,7 +547,7 @@ class TestRetryBackoff(unittest.TestCase):
 
         with (
             patch(
-                "zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher.writer.time.sleep",
+                "zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher.send_loop.time.sleep",
                 # patching dispatch.time.sleep rebinds the STDLIB time.sleep;
                 # leftover daemon threads (confirmation-race legs from earlier
                 # tests) also call it, so record main-thread sleeps only
@@ -559,7 +560,7 @@ class TestRetryBackoff(unittest.TestCase):
             patch.object(transport_module, "deliver", return_value=True),
             patch.object(transport_module, "_await_echo_result", return_value=True),
         ):
-            r = dispatch._fire_block(
+            r = send_loop.fire_block(
                 client,
                 api_obj,
                 "Test",
@@ -583,7 +584,7 @@ class TestRetryBackoff(unittest.TestCase):
 
         with (
             patch(
-                "zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher.writer.time.sleep",
+                "zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher.send_loop.time.sleep",
                 # patching dispatch.time.sleep rebinds the STDLIB time.sleep;
                 # leftover daemon threads (confirmation-race legs from earlier
                 # tests) also call it, so record main-thread sleeps only
@@ -596,7 +597,7 @@ class TestRetryBackoff(unittest.TestCase):
             patch.object(transport_module, "deliver", return_value=True),
             patch.object(transport_module, "_await_echo_result", return_value=True),
         ):
-            r = dispatch._fire_block(
+            r = send_loop.fire_block(
                 client,
                 api_obj,
                 "Test",
@@ -619,7 +620,7 @@ class TestRetryBackoff(unittest.TestCase):
 
         with (
             patch(
-                "zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher.writer.time.sleep",
+                "zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher.send_loop.time.sleep",
                 # patching dispatch.time.sleep rebinds the STDLIB time.sleep;
                 # leftover daemon threads (confirmation-race legs from earlier
                 # tests) also call it, so record main-thread sleeps only
@@ -632,7 +633,7 @@ class TestRetryBackoff(unittest.TestCase):
             patch.object(transport_module, "deliver", return_value=True),
             patch.object(transport_module, "_await_echo_result", return_value=True),
         ):
-            r = dispatch._fire_block(
+            r = send_loop.fire_block(
                 client,
                 api_obj,
                 "Test",
@@ -665,7 +666,7 @@ class TestRetryBackoff(unittest.TestCase):
 
         with (
             patch(
-                "zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher.writer.time.sleep",
+                "zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher.send_loop.time.sleep",
                 # patching dispatch.time.sleep rebinds the STDLIB time.sleep;
                 # leftover daemon threads (confirmation-race legs from earlier
                 # tests) also call it, so record main-thread sleeps only
@@ -678,7 +679,7 @@ class TestRetryBackoff(unittest.TestCase):
             patch.object(transport_module, "deliver", return_value=True),
             patch.object(transport_module, "_await_echo_result", return_value=True),
         ):
-            r = dispatch._fire_block(
+            r = send_loop.fire_block(
                 client,
                 api_obj,
                 "Test",
@@ -701,7 +702,7 @@ class TestRetryBackoff(unittest.TestCase):
 
         with (
             patch(
-                "zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher.writer.time.sleep",
+                "zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher.send_loop.time.sleep",
                 # patching dispatch.time.sleep rebinds the STDLIB time.sleep;
                 # leftover daemon threads (confirmation-race legs from earlier
                 # tests) also call it, so record main-thread sleeps only
@@ -714,7 +715,7 @@ class TestRetryBackoff(unittest.TestCase):
             patch.object(transport_module, "deliver", return_value=True),
             patch.object(transport_module, "_await_echo_result", return_value=True),
         ):
-            dispatch._fire_block(
+            send_loop.fire_block(
                 client,
                 api_obj,
                 "Test",
@@ -736,7 +737,7 @@ class TestRetryBackoff(unittest.TestCase):
 
         with (
             patch(
-                "zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher.writer.time.sleep",
+                "zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher.send_loop.time.sleep",
                 # patching dispatch.time.sleep rebinds the STDLIB time.sleep;
                 # leftover daemon threads (confirmation-race legs from earlier
                 # tests) also call it, so record main-thread sleeps only
@@ -749,7 +750,7 @@ class TestRetryBackoff(unittest.TestCase):
             patch.object(transport_module, "deliver", return_value=True),
             patch.object(transport_module, "_await_echo_result", return_value=True),
         ):
-            r = dispatch._fire_block(
+            r = send_loop.fire_block(
                 client,
                 api_obj,
                 "Test",
@@ -2557,7 +2558,7 @@ class TestDispatchCheckExceptions(unittest.TestCase):
     """pre_check_fn / error_check_fn exceptions become structured failures."""
 
     def test_raising_pre_check_returns_failure_dict(self):
-        result = dispatch._fire_block(
+        result = send_loop.fire_block(
             None,
             SimpleNamespace(Model=SimpleNamespace()),
             "TestCmd",
@@ -2578,7 +2579,7 @@ class TestDispatchCheckExceptions(unittest.TestCase):
                 Model=SimpleNamespace(Result=0, HasError=False)
             )
         )
-        result = dispatch._fire_block(
+        result = send_loop.fire_block(
             fake_client,
             api_obj,
             "TestCmd",

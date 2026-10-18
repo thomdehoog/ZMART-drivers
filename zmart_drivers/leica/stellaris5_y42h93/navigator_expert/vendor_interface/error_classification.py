@@ -6,7 +6,7 @@ This file is where a driver turns what its vendor reported into one of a
 short list of kinds (:class:`Kind`), and says what each kind means for the
 driver. The only decision that can change an experiment is whether a command
 may be sent again, so that is the rule written here: a temporary problem may
-be sent again, nothing else may. The writer in ``dispatcher/`` does not
+be sent again, nothing else may. The send loop in ``dispatcher/`` does not
 interpret messages; it follows the "transient" answer this file gives.
 
 Two responsibilities follow from that:
@@ -31,7 +31,7 @@ University of Zurich (thom.dehoog@zmb.uzh.ch, thomdehoog@gmail.com).
 import logging
 from enum import Enum
 
-from ..dispatcher.writer import _make_log_entry
+from ..dispatcher.dispatcher import make_log_entry as _make_log_entry
 
 log = logging.getLogger(__name__)
 

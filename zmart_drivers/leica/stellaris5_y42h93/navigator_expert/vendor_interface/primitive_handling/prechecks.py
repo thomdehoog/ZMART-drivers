@@ -21,7 +21,7 @@ import time
 
 from . import state as _readers
 from ...dispatcher import dispatcher
-from ...dispatcher.writer import _make_log_entry
+from ...dispatcher.dispatcher import make_log_entry as _make_log_entry
 
 log = logging.getLogger(__name__)
 

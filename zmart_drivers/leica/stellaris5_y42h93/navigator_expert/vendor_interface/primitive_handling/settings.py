@@ -27,7 +27,7 @@ from dataclasses import dataclass
 from functools import partial
 from typing import Any
 
-from ...dispatcher.writer import _make_log_entry
+from ...dispatcher.dispatcher import make_log_entry as _make_log_entry
 from ..error_classification import _check_api_error, classify_error, sends_again
 from ..parsing import parse_format
 from . import confirmations as _check

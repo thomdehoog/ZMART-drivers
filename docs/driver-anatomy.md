@@ -755,6 +755,11 @@ Leica-specific:
   interface for the table of mutating commands and for the limits to install
   (`limit_rules.MUTATING_COMMANDS`, `build_limits`). The shared types for
   limit trouble are in `dispatcher/limit_errors.py`.
+- The dispatcher has one door (`dispatcher/dispatcher.py`, with `read` and `write`
+  and the waiting rule). Behind it are the reader, the send loop and the confirm
+  loop. The send loop sends a command and checks for an error. The confirm loop
+  reads until the change took effect and sends again if it did not, except for
+  starting an acquisition.
 - The shared reader asks the API first and then the log, one after the other,
   each in its own share of the window. A LAS X call that never returns is
   abandoned at the end of its share, and the connection's turn is handed back
