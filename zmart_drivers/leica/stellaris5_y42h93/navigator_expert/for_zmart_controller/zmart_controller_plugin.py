@@ -7,7 +7,7 @@ controller accepted before: one function per command under the names the
 controller looks for, handed over directly::
 
     import zmart_controller
-    import zmart_drivers.leica.stellaris5_y42h93.navigator_expert.zmart_controller_plugin as stellaris
+    import zmart_drivers.leica.stellaris5_y42h93.navigator_expert.for_zmart_controller.zmart_controller_plugin as stellaris
 
     mic = zmart_controller.ZmartController(stellaris, {"output_root": r"D:\images"})
 

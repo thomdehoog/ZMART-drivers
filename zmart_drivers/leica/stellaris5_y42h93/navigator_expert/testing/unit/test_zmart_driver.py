@@ -110,3 +110,41 @@ def test_the_class_answers_what_the_module_answers(monkeypatch, tmp_path):
     for item in class_info["setup"].values():
         assert isinstance(item["done"], bool) and item["says"].strip()
     assert as_class["get_xyz"]["z"]["actuators"].keys() == {"z-wide", "z-galvo"}
+
+
+def test_the_class_says_it_saves_where_it_is_told(monkeypatch, tmp_path):
+    """The driver writes every file itself, from LAS X's cache, so it can choose the folder."""
+    connection = _offline(monkeypatch, tmp_path)
+    session = zmart_controller.ZmartController(zmart_driver.ZmartDriver, connection)
+    try:
+        info = session.get_info()["content"]
+    finally:
+        session.disconnect()
+
+    assert info["chooses_its_own_folder"] is False
+
+
+def test_the_class_hands_the_type_and_the_folder_to_the_capture(monkeypatch, tmp_path):
+    connection = _offline(monkeypatch, tmp_path)
+    asked = {}
+
+    def capture(handle, **given):
+        asked.update(given)
+        return {"files": [], "planes": []}
+
+    session = zmart_controller.ZmartController(zmart_driver.ZmartDriver, connection)
+    try:
+        monkeypatch.setattr(adapter, "acquire", capture)
+        answer = session.acquire(
+            "A1", acquisition_type="overview", output_folder=str(tmp_path / "run")
+        )
+    finally:
+        session.disconnect()
+
+    assert asked == {
+        "position_label": "A1",
+        "acquisition_settings": None,
+        "acquisition_type": "overview",
+        "output_folder": str(tmp_path / "run"),
+    }
+    assert answer["content"]["acquisition_type"] == "overview"

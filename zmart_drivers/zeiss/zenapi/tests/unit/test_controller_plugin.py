@@ -119,3 +119,48 @@ def test_get_info_describes_the_microscope_in_plain_words(instrument):
     # The canvas is the travel itself; see the adapter's get_xyz for why.
     assert xyz["x"]["canvas"] == [-60000.0, 60000.0]
     assert list(xyz["x"]) == ["position", "unit", "actuator", "actuators", "canvas"]
+
+
+def test_zen_saves_in_its_own_folder_and_the_answer_says_where(instrument, tmp_path):
+    """ZEN always writes the CZI into its own image folder, so the driver says it chooses its
+    own folder; it copies the CZI into the output folder when it can reach ZEN's, and the
+    answer lists where the file really is."""
+    run = tmp_path / "run 1"
+    session = zmart_controller.ZmartController(driver, {**instrument, "experiment": "ZMART_Snap"})
+    try:
+        info = session.get_info()["content"]
+        answer = session.acquire(
+            position_label="A1",
+            acquisition_settings={"timeout_s": 2},
+            acquisition_type="overview",
+            output_folder=str(run),
+        )
+    finally:
+        session.disconnect()
+
+    assert info["chooses_its_own_folder"] is True
+    content = answer["content"]
+    assert content["acquisition_type"] == "overview"
+    assert content["zen_image_path"] == str(tmp_path / "zen_images" / "overview_A1.czi")
+    assert content["files"] == [str(run / "overview_A1.czi")]
+    assert (
+        zmart_controller.check_acquire_answer(
+            answer, output_folder=str(run), chooses_its_own_folder=True
+        )
+        == []
+    )
+
+
+def test_acquire_without_a_type_or_folder_is_an_acquisition_in_the_data_folder(
+    instrument, tmp_path
+):
+    session = zmart_controller.ZmartController(driver, {**instrument, "experiment": "ZMART_Snap"})
+    try:
+        content = session.acquire(position_label="A1", acquisition_settings={"timeout_s": 2})[
+            "content"
+        ]
+    finally:
+        session.disconnect()
+
+    assert content["acquisition_type"] == "acquisition"
+    assert content["files"] == [str(tmp_path / "out" / "data" / "acquisition_A1.czi")]

@@ -467,14 +467,22 @@ never confused with it. Everything describing the capture is under
 
 ```
 data/
-  overview_<hash6>_K00_M000001_G000001_P000000_V00_T000000_C00_Z00000.ome.tiff
+  overview_K00_M000001_G000001_P000000_V00_T000000_C00_Z00000.ome.tiff
   metadata/
-    ZMART_state/  overview_<hash6>_..._T000000_ZMART_state.json
+    ZMART_state/  overview_K00_..._T000000_ZMART_state.json
     vendor/       lasx_data_container/<picture>.lasx-description.xml
 ```
 
-Every name starts with the stem the workflow gave as the position label; the driver adds only
-the time point, channel and plane.
+Every name is the acquisition type, then the position label the workflow gave; the driver adds
+only the time point, channel and plane. `<output_root>` is the `output_folder` that `acquire` is
+given: the driver writes every file itself, from LAS X's cache, so it saves exactly there and
+`get_info` says `chooses_its_own_folder: False`. Without one, it is this session's staging folder
+under the microscope's data location.
+
+An OME-Zarr store is placed by the centre of its first voxel (OME-NGFF RFC-5): its y/x
+translation is the field centre minus `(n - 1) / 2` pixels, half a pixel in from the frame's
+corner; z is the lowest plane's own height. The plane entries of the answer and the OME-TIFF
+`PositionX`/`PositionY` are the field centre.
 
 The `state` passed to `save()` is embedded in every plane's OME-XML **and**
 printed once per acquisition — the image name without the channel and the
@@ -507,18 +515,19 @@ anything is saved.
 **Acquisition settings say only how a capture is triggered.** This driver has one trigger,
 `full`: the whole of the LAS X job that is selected. Which job that is belongs to the state
 (`set_state({"job": ...})`). How a capture is saved -- the format, where the pixels are read from
-(`source`), the projection -- is this microscope's `IMAGE_SAVE` profile, and where it goes is its
-data location, both set up once.
+(`source`), the projection -- is this microscope's `IMAGE_SAVE` profile, set up once. Where it
+goes is the `output_folder` that `acquire` is given, or else the data location set up once.
 
 **Extra in-place backlash rounds are off by default.** They are the driver's own setting,
 `ACQUISITION_BACKLASH_DEFAULT_ROUNDS` in the adapter, `0` unless changed there. The normal XY
 move still uses the driver's consistent final approach to the requested position.
 
-**`Naming`.** A capture is named by its stem, the position label the workflow gives: a workflow
-that keeps the naming convention gives `{acquisition_type}_{hash6}_{K/M/G/P/V label}`. Characters
-that cannot be in a file name become `_`, and a stem longer than 80 characters is refused before
-anything is captured, so the whole path stays within Windows' old limit. A stem already used in
-the session's staging folder gets `_001`, `_002`, ..., so no capture is ever overwritten.
+**`Naming`.** A capture is named by its stem, `{acquisition_type}_{position_label}`: the kind
+of acquisition `acquire` is given (`acquisition` when none is), then the workflow's label, for
+example `overview_K00_M000001_G000001_P000000_V00`. Characters that cannot be in a file name
+become `_`, and a stem longer than 80 characters is refused before anything is captured, so the
+whole path stays within Windows' old limit. A stem already used in the folder saved to gets
+`_001`, `_002`, ..., so no capture is ever overwritten.
 
 ## 7. Architecture
 

@@ -22,7 +22,7 @@ The public surface is **synchronous**, so operator notebooks keep the thin
     drv.set_filter(client, "515/30")
     # low-level acquire needs a folder/filename (the controller path sets these):
     acq = drv.acquire(client, "prescan", options={"folder": str(run_dir), "filename": "A1.tiff"})
-    saved = drv.save(acq, run_dir, position_label="A1")
+    saved = drv.save(acq, run_dir / "data", position_label="A1", acquisition_type="prescan")
     drv.close(client)
 
 To drive it through the vendor-neutral controller instead, hand its driver

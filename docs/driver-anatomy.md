@@ -1053,16 +1053,21 @@ confirms that the capture finished. The output part starts after that.
 **Who organises what.** Two parties organise the data, and the line between
 them matters. The driver organises *one acquisition*: it guarantees that a
 single call's product has the same shape on every microscope, a standard
-format, named after the position label, never overwriting, with a plane
-table and a log beside it. The workflow organises *the experiment*: where
-acquisitions go, how they group and in which order is the experiment's
-layout, which the driver only receives: the position label, which every
-file name starts with. The analysis engine and the viewer read
-across acquisitions, so that layout has to be one the workflow controls,
-not one each driver invents. For the same reason the kind of acquisition, a
-single image, a z-stack, a time series, is not a folder level: it is
-already in the plane table, where the z-stack has several `z` values and the
-time series several `t`.
+format, named after the acquisition type and the position label, never
+overwriting, with a plane table and a log beside it. The workflow organises
+*the experiment*: where acquisitions go, how they group and in which order is
+the experiment's layout, which the driver only receives, as the three
+parameters of `acquire` that organise a run: the `output_folder` to save in,
+the `acquisition_type` (such as `overview` or `targets`) and the
+`position_label`, which every file name is made of,
+`<acquisition_type>_<position_label>`. A driver whose vendor software always
+saves in its own place saves there, lists the real paths, and says so in
+`get_info` (`chooses_its_own_folder`); it is never refused. The analysis
+engine and the viewer read across acquisitions, so that layout has to be one
+the workflow controls, not one each driver invents. For the same reason the
+shape of an acquisition, a single image, a z-stack, a time series, is not a
+folder level: it is already in the plane table, where the z-stack has
+several `z` values and the time series several `t`.
 
 **Responsibilities.**
 
@@ -1079,10 +1084,9 @@ time series several `t`.
    the picture always has to be converted. A light-sheet volume of thousands
    of planes becomes one Zarr store, and the plane table says which planes it
    holds.
-4. **Name and place** it in the experiment's folder layout, named after the
-   position label. A second picture with the same label gets a new name; an
-   earlier one is never overwritten. The workflow files the capture into
-   its own run afterwards.
+4. **Name and place** it in the output folder `acquire` was given, named
+   after the acquisition type and the position label. A second picture with
+   the same name gets a new name; an earlier one is never overwritten.
 5. **Attach the metadata**: the position in user coordinates, the instrument
    state, and the pixel size.
 6. **Keep the command log**: for each acquisition, what was asked, what
@@ -1092,7 +1096,9 @@ time series several `t`.
 7. **Report** what was saved, in the two lists `acquire` answers with:
    `files`, the path of every file, and `planes`, one entry per image plane
    with its file, its channel, depth and time index, and the stage position
-   it was taken at, in user coordinates.
+   it was taken at, in user coordinates: the centre of the field of view. A
+   store the driver writes (OME-Zarr) is placed by the centre of its first
+   voxel (OME-NGFF RFC-5).
 
 Problems here go through the same sorting and rules. A file that never appears
 after a confirmed capture is a permanent error, and `acquire` then answers
@@ -1239,7 +1245,7 @@ methods, and each one only puts the parts above to work:
 
 | Method | Built from | Hands back |
 |---|---|---|
-| `get_info` | The machine description and the limits (part 6) | `True, (description, setup)`: the microscope in plain words, for whoever drives it, a person or a program, and what is set up once on it |
+| `get_info` | The machine description and the limits (part 6) | `True, (description, setup, chooses_its_own_folder)`: the microscope in plain words, for whoever drives it, a person or a program, what is set up once on it, and whether its software always saves in its own place |
 | `get_actuators` | The machine description | `True, (x, y, z)`: per axis `{"options": [...], "default": ...}`, the motors and the one the driver chooses when a command does not |
 | `get_xyz` | The reading for position (part 3) | `True, (x, y, z, actuators, canvas)`: the position in user coordinates, every motor's raw reading, and everywhere a picture can show |
 | `set_xyz` | The change for position (part 3), then `get_xyz` | The same as `get_xyz`, read from the microscope once the stage has arrived |
@@ -1299,8 +1305,9 @@ how the kinds from the errors table reach the experiment:
   AI agent builds its picture of the instrument from this text, so it is
   worth writing well. Bounds come from the limits, so the description never
   promises more than the driver allows.
-- **A position label names the files.** `acquire` saves under the label it
-  was given and never overwrites an earlier picture with the same label.
+- **The acquisition type and the position label name the files.** `acquire`
+  saves under `<acquisition_type>_<position_label>`, in the output folder it
+  was given, and never overwrites an earlier picture with the same name.
 - **The connection dictionary is handed to `__init__` as it is.** The driver
   fills in every key that is left out from its own defaults, so a nearly
   empty `zmart_driver.json` still connects on the microscope computer.
