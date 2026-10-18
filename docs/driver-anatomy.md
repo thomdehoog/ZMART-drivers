@@ -217,8 +217,8 @@ state of the instrument, which is why they come first wherever they exist.
 
 A **route** says which primitives to use for one job, in order of preference.
 It is a list of **tiers**. In a reading, a tier holds one primitive. In a
-confirmation, a tier may hold several that run at the same time (see
-"Confirmation"). For example:
+confirmation, a tier may hold several that are looked at in turn within the
+same time window (see "Confirmation"). For example:
 
 ```
 read the selected job:    [ direct ]  then  [ api ]  then  [ log ]
@@ -267,11 +267,13 @@ up.
 - If a primitive answers "not yet" until the time is up, the change is
   **unconfirmed**. Nothing else is tried, because the question has already
   been answered by the source closest to the real state.
-- **A confirmation is the one place where several primitives may run at the
-  same time.** The driver knows exactly which value it is waiting for, so any
+- **A confirmation is the one place where several primitives may share a
+  tier.** The driver knows exactly which value it is waiting for, so any
   primitive that sees that value can say so, and the first one to do so
-  confirms. A tier of several primitives is therefore allowed in a
-  confirmation and in nothing else. A source that can lag behind, such as a
+  confirms. The primitives are looked at one after the other, many times
+  within the window, never in parallel, because only one read reaches the
+  vendor software at a time (see part 2). A tier of several primitives is
+  allowed in a confirmation and in nothing else. A source that can lag behind, such as a
   log, may only count if what it saw was observed after the command was sent.
 - The usual confirmation uses the direct primitives first. A race between
   several sources has to be written down for that one change.
@@ -283,6 +285,16 @@ confirmed.** Leica's compensating stage move after an objective change, and
 the label a picture is saved under after a job change, must not run on a
 change that was only accepted. Otherwise the driver moves the stage for a
 lens that never arrived.
+
+### Pinned to one microscope and one software version
+
+A driver is pinned to one microscope and one version of its vendor software,
+as recorded in its machine description. At connect the driver checks both, and
+refuses to run on anything else. This is what makes it safe for a driver to
+rely on parts of the vendor software that the vendor does not document, such
+as the state that the Leica direct readers read. When the vendor software is
+upgraded, the driver is not trusted again until its readers have been checked
+against each other on the new version and the pin has been moved on purpose.
 
 ### Who converts the coordinates
 
@@ -906,7 +918,8 @@ description, image-to-stage registration and origin, limits, optical
 calibration. Loading the limits is what switches on the limits gate. After
 loading, the driver compares what the microscope reports with the machine
 description: a serial number that belongs to another instrument is refused,
-and an untested software version is warned about. The mock's `__init__`
+and so is a software version the driver is not pinned to (see "The simplified
+anatomy"). The mock's `__init__`
 (today its `connect`) shows these steps in order.
 
 **The coordinate system.** The arithmetic between raw stage coordinates and
@@ -1235,6 +1248,20 @@ by any other part of the driver. The Leica driver already works this way.
   the standard metadata, and how "unknown" is written, are decided then. Until
   then, check how much of the OME-Zarr writer relies on the Leica OME metadata
   code.
+
+- **Two programs using the microscope at once.** A setup notebook, the
+  operator page and a workflow could all try to connect together. The rule is
+  one writer at a time, but not who may connect, or what happens when a second
+  one tries. Stop (below) is part of the same question.
+
+- **Existing saved settings.** Operators already have limits, calibration and
+  origin saved on the LAS X computer, in folders whose layout and notebook
+  names this design changes. The refactor must keep loading them, or migrate
+  them, so that no one has to redo a calibration.
+
+- **Which settings produced a picture.** Each acquisition should record which
+  limits and calibration snapshot it ran with, so that a picture can be traced
+  afterwards. This is cheap to add early, before the metadata step.
 
 - **Calling the handling notes' own code.** Most confirmations are a row of
   data, but a few (an objective change, a z-stack, an acquisition) need code of
