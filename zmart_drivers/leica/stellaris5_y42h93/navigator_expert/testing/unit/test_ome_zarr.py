@@ -1,4 +1,4 @@
-"""Saving a capture as one OME-Zarr 0.5 image instead of OME-TIFF planes.
+"""Saving a capture as one OME-Zarr 0.5 image.
 
 The cache is written in LAS X's layout with LAS X's own descriptions of
 HiRes004 (two channels, 12 bit) and AF Job002 (17 planes, 16 bit), so the
@@ -525,7 +525,7 @@ class TestTheProjection:
         root, _ = hires
 
         saved = save_with_projection(
-            root, tmp_path, "HiRes", format="ome-zarr", placement=at(0.0, 0.0, {0: 0.0})
+            root, tmp_path, "HiRes", placement=at(0.0, 0.0, {0: 0.0})
         )
 
         assert saved.projection_paths == ()
