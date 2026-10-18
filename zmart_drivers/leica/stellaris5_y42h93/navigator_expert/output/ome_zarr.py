@@ -7,8 +7,10 @@ made by OME's own models (``ome-zarr-models``: OME-Zarr 0.5, checked as it
 is built) and written by zarr-python (Zarr v3). It holds:
 
 - the full-resolution pixels, axes t, c, z, y, x, z ascending;
-- the voxel size, and where the image lies on the sample (the corner of the
-  frame, its lowest plane), in the frame the workflow drives in;
+- the voxel size, and where the image lies on the sample: the centre of its
+  first voxel, half a pixel in from the frame's corner, at its lowest plane
+  (OME-NGFF RFC-5: the voxel centre is the origin of the coordinates), in
+  the frame the workflow drives in;
 - each channel's name and colour, as LAS X described them, and a display
   window from its pixels (OME-Zarr's ``omero`` block);
 - the whole capture's OME-XML (OME 2016-06: instrument, channels, the time
@@ -75,8 +77,8 @@ class Capture:
 
     ``volume`` is t, c, z, y, x with z ascending and the orientation applied;
     ``metadata`` describes exactly that volume (its planes renumbered from
-    the lowest up); ``translation`` is where the volume's first voxel lies
-    on the canvas, in t, c, z, y, x.
+    the lowest up); ``translation`` is where the centre of the volume's
+    first voxel lies on the canvas, in t, c, z, y, x.
     """
 
     volume: np.ndarray
@@ -164,12 +166,18 @@ def gather(
     ny, nx = volume.shape[-2:]
     centre = where(ascending[0]) if where is not None else {}
     lowest = heights[ascending[0]]
+    # The planes are placed by the middle of the frame; the store by the
+    # centre of its first voxel, half a pixel in from the frame's corner.
     translation = [
         0.0,
         0.0,
         lowest if lowest is not None else 0.0,
-        centre["y_um"] - ny * pixel_y / 2 if centre.get("y_um") is not None else 0.0,
-        centre["x_um"] - nx * pixel_x / 2 if centre.get("x_um") is not None else 0.0,
+        centre["y_um"] - (ny - 1) * pixel_y / 2
+        if centre.get("y_um") is not None
+        else 0.0,
+        centre["x_um"] - (nx - 1) * pixel_x / 2
+        if centre.get("x_um") is not None
+        else 0.0,
     ]
     described = replace(
         metadata,

@@ -116,3 +116,37 @@ def test_get_info_describes_the_microscope_in_plain_words(instrument):
     assert xyz["z"]["canvas"] == pytest.approx([0.0, 25000.0])
     # Each axis carries the four entries the controller fixes, in this order.
     assert list(xyz["x"]) == ["position", "unit", "actuator", "actuators", "canvas"]
+
+
+def test_acquire_saves_in_the_output_folder_under_the_acquisition_type(instrument, tmp_path):
+    """The driver copies the image writer's frames itself, so it saves where it is told."""
+    run = tmp_path / "run 1"
+    session = zmart_controller.ZmartController(driver, instrument)
+    try:
+        info = session.get_info()["content"]
+        answer = session.acquire(
+            position_label="A1", acquisition_type="overview", output_folder=str(run)
+        )
+    finally:
+        session.disconnect()
+
+    assert info["chooses_its_own_folder"] is False
+    content = answer["content"]
+    assert content["acquisition_type"] == "overview"
+    assert content["files"] and all(Path(path).parent == run for path in content["files"])
+    assert all(Path(path).name.startswith("overview_A1") for path in content["files"])
+    assert zmart_controller.check_acquire_answer(answer, output_folder=str(run)) == []
+
+
+def test_acquire_without_a_type_or_folder_is_an_acquisition_in_the_data_folder(
+    instrument, tmp_path
+):
+    session = zmart_controller.ZmartController(driver, instrument)
+    try:
+        content = session.acquire(position_label="A1")["content"]
+    finally:
+        session.disconnect()
+
+    assert content["acquisition_type"] == "acquisition"
+    assert all(Path(path).parent == tmp_path / "run" / "data" for path in content["files"])
+    assert all(Path(path).name.startswith("acquisition_A1") for path in content["files"])

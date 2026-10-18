@@ -51,7 +51,7 @@ def test_metadata_populated(client):
 
 def test_save_single_frame(client, tmp_path):
     result = acq.snap(client)
-    saved = acq.save(result, tmp_path / "run", position_label="A1")
+    saved = acq.save(result, tmp_path / "run" / "data", acquisition_type="acquisition", position_label="A1")
     assert len(saved.image_paths) == 1
     img = saved.image_paths[0]
     assert img.exists() and img.parent.name == "data"
@@ -67,7 +67,7 @@ def test_save_single_frame(client, tmp_path):
 def test_save_stack_single_file(client, tmp_path):
     # One multi-page stack in -> one file out, named by the canonical stem.
     result = acq.acquire(client, "stack", options={"z_start": 0, "z_end": 2, "z_step": 1})
-    saved = acq.save(result, tmp_path / "run", position_label="B2")
+    saved = acq.save(result, tmp_path / "run" / "data", acquisition_type="acquisition", position_label="B2")
     assert len(saved.image_paths) == 1
     img = saved.image_paths[0]
     assert "B2" in img.name and img.parent.name == "data"
@@ -101,7 +101,7 @@ def test_save_multiple_source_files_get_plane_suffixes(tmp_path):
         planes=3,
         metadata=AcquisitionMetadata(size_x=8, size_y=8, size_z=3, channels=(ChannelMetadata(0),)),
     )
-    saved = acq.save(result, tmp_path / "run", position_label="C1")
+    saved = acq.save(result, tmp_path / "run" / "data", acquisition_type="acquisition", position_label="C1")
     assert len(saved.image_paths) == 3
     names = sorted(p.name for p in saved.image_paths)
     assert names[0].endswith("_z0000.tiff")
@@ -137,7 +137,7 @@ def test_save_missing_source_raises_before_copying_any(tmp_path):
     missing = src / "missing.tiff"
     result = _result_from([good, missing], planes=2)
     with pytest.raises(FileNotFoundError):
-        acq.save(result, tmp_path / "run", position_label="A1")
+        acq.save(result, tmp_path / "run" / "data", acquisition_type="acquisition", position_label="A1")
     # nothing was copied: the data dir must be empty (no partial dataset).
     data_dir = tmp_path / "run" / "data"
     assert not data_dir.exists() or not any(data_dir.iterdir())
@@ -150,8 +150,8 @@ def test_save_same_label_gets_unique_stem(tmp_path):
     src.mkdir()
     frame = src / "f.tiff"
     tifffile.imwrite(str(frame), np.zeros((8, 8), dtype="uint16"))
-    s1 = acq.save(_result_from([frame]), tmp_path / "run", position_label="A1")
-    s2 = acq.save(_result_from([frame]), tmp_path / "run", position_label="A1")
+    s1 = acq.save(_result_from([frame]), tmp_path / "run" / "data", acquisition_type="acquisition", position_label="A1")
+    s2 = acq.save(_result_from([frame]), tmp_path / "run" / "data", acquisition_type="acquisition", position_label="A1")
     assert s1.image_paths[0] != s2.image_paths[0]
     assert s1.metadata_path != s2.metadata_path
     assert s1.image_paths[0].exists() and s2.image_paths[0].exists()
