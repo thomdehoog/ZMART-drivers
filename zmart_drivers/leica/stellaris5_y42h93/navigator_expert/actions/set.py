@@ -46,7 +46,10 @@ from ..dispatcher import gate as _gate
 from ..dispatcher.change import confirm_and_fire
 from ..dispatcher.checks import check_xy, check_z
 from ..dispatcher.envelope import _make_log_entry, _make_timing
-from ..vendor_interface.errors import _check_api_error, _is_transient_error
+from ..vendor_interface.error_classification import (
+    _check_api_error,
+    _is_transient_error,
+)
 from ..vendor_interface.parsing import _hw_get, parse_format
 from . import objective_shift as _objective_shift
 from .confirm_select_job import prepare_select_job, select_job_confirm_legs

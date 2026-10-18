@@ -315,7 +315,7 @@ command but readback didn't confirm the value within the windows (most `set_*` u
 `success` alone as "applied"** for setting commands. `success=False` means it failed to fire (transport,
 permanent error, failed pre-check) and `confirmed` is `None`.
 
-**Error classification** (`vendor_interface/errors.py`): messages are matched **permanent-first**
+**Error classification** (`vendor_interface/error_classification.py`): messages are matched **permanent-first**
 (`out of range`, `is invalid`, `not implemented`, …) then **transient** (`being scanned`, `busy`,
 `timeout`, …); unknown → permanent (conservative). Transient errors retry up to `max_retries`.
 
@@ -536,7 +536,7 @@ zmart_drivers/leica/stellaris5_y42h93/navigator_expert/
 ├── connect.py          the connect flow: open LAS X, load this microscope's configuration
 ├── vendor_interface/   the only part that knows LAS X: lasx_runtime.py (the .NET CAM assemblies),
 │                       api_reader.py and log_reader.py (the two ways to read state), log_wait.py,
-│                       parsing.py (the strings LAS X hands back), errors.py (sorting LAS X's errors)
+│                       parsing.py (the strings LAS X hands back), error_classification.py (sorting LAS X's errors)
 ├── dispatcher/         the engines that run an action safely: read.py (api/log/hybrid routing),
 │                       change.py (confirm_and_fire), gate.py and checks.py (the limits gate and its
 │                       rulebook), prechecks.py, envelope.py, tuning.py (the timing constants)
