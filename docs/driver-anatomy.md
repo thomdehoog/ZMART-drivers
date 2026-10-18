@@ -153,7 +153,7 @@ my_driver/
         registration.py
     driver_setup/
         machine_description/   each item: default.json, its check, and the notebook that sets it
-        image_stage_registration/
+        orientation/
         origin/
         limits/
         optical_calibration/
@@ -1222,7 +1222,7 @@ about procedures.
 | Folder | What it holds | How often it changes |
 |---|---|---|
 | `origin/` | The point that reads as (0, 0, 0) in user coordinates. | Often, for example for each new sample. |
-| `image_stage_registration/` | How image pixels relate to stage movement: which way each axis points, flips and 90° turns, and the pixel size. | Rarely: at installation, or after hardware changes. |
+| `orientation/` | How image pixels relate to stage movement: which way each axis points, flips and 90° turns, and the pixel size. | Rarely: at installation, or after hardware changes. |
 | `limits/` | How far each axis may travel, and the allowed values for each setting. | Rarely. |
 | `optical_calibration/` | The x, y and z offsets between objectives, so that a change of objective keeps the same spot in view. | Rarely. |
 | `machine_description/` | The fixed facts about this instrument: its objectives, detectors, axes, motors and serial number, and the vendor software versions the driver was tested with. | Only when the hardware changes. |
@@ -1273,7 +1273,7 @@ we decide how to keep one. The notebook and procedure names:
 | Item | Notebook | Procedure |
 |---|---|---|
 | `machine_description/` | `describe_machine.ipynb` | None yet: typed in, or read from the vendor software |
-| `image_stage_registration/` | `set_orientation.ipynb` | `measure_orientation` |
+| `orientation/` | `set_orientation.ipynb` | `measure_orientation` |
 | `origin/` | `set_origin.ipynb` | `record_origin` |
 | `limits/` | `set_limits.ipynb` | `measure_limits` |
 | `optical_calibration/` | `calibrate_objectives.ipynb` | `calibrate_objectives` |

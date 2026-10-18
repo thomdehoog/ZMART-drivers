@@ -57,7 +57,7 @@ from typing import Any
 import numpy as np
 
 import zmart_drivers.leica.stellaris5_y42h93.navigator_expert as drv
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.image_stage_registration.registration import VOTING_METHODS, register_voting
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.orientation.registration import VOTING_METHODS, register_voting
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.optical_calibration.focus import brenner
 
 from .calibration_common import STAGING_SCHEMA_VERSION, SessionPaths, acquire_frame_to, acquire_stack_to, make_session_paths, move_xy_and_verify, move_zwide_and_verify, now_iso, plot_brenner_curve, plot_overlay, read_active_objective, read_job_geometry, read_selected_job_name, read_stack_z_positions, write_json_atomic
@@ -351,7 +351,7 @@ def _warn_if_orientation_unmeasured() -> None:
         _log.warning(
             "orientation has not been measured on this microscope yet (still the "
             "shipped placeholder). Calibration assumes saved frames are already "
-            "turned to the stage axes; run driver_setup/image_stage_registration/notebooks/set_orientation.ipynb "
+            "turned to the stage axes; run driver_setup/orientation/notebooks/set_orientation.ipynb "
             "first, or the parcentricity XY offset may come out rotated."
         )
 

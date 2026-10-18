@@ -21,7 +21,7 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.objective
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures import (
     session_state,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.image_stage_registration import Orientation
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.orientation import Orientation
 
 TRANSLATIONS = {1: (0.0, 0.0, 0.0), 2: (10.0, -6.0, 3.0)}
 

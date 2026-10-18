@@ -18,7 +18,7 @@ this repository)::
                           coordinates (absolute_coordinate_system/), changing the objective
                           (objective_change_with_compensation/), the capture and its saving (acquisition_and_saving/)
     - driver_setup/       what is set up once per microscope, one folder per item: limits,
-                          origin, image_stage_registration, optical_calibration and
+                          origin, orientation, optical_calibration and
                           data_location, each with its defaults, loader, measuring code
                           and notebook; plus the store that finds the saved values
     - running_log.py      the driver's rolling log file

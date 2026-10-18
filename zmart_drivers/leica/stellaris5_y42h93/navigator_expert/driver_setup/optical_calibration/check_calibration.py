@@ -31,7 +31,7 @@ from typing import Any
 import numpy as np
 
 import zmart_drivers.leica.stellaris5_y42h93.navigator_expert as drv
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.image_stage_registration.registration import register_voting
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.orientation.registration import register_voting
 
 from . import model as _model
 from .calibration_common import SessionPaths, acquire_frame_to, make_session_paths, move_xy_and_verify, move_zwide_and_verify, now_iso, plot_overlay, read_active_objective, read_job_geometry, read_selected_job_name, write_json_atomic

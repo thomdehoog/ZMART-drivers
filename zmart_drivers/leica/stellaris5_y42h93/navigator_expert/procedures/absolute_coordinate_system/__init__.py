@@ -11,7 +11,7 @@ changed). When the lens or job changes, it moves the stage so the sample stays
 in view.
 
 The images are placed in the same system when they are saved: the orientation
-measured by the setup (``driver_setup/image_stage_registration``) is applied in
+measured by the setup (``driver_setup/orientation``) is applied in
 ``acquisition_and_saving`` so that a picture lines up with the stage moves.
 
 Author: Thom de Hoog, Center for Microscopy and Image Analysis (ZMB),

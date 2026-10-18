@@ -71,7 +71,7 @@ driver loads it every time it connects:
 
 | Driver | Setup, and where it is described |
 |---|---|
-| Leica | Three notebooks, each in the folder of the configuration item it sets: `driver_setup/limits/notebooks/set_limits.ipynb`, `driver_setup/image_stage_registration/notebooks/set_orientation.ipynb` and `driver_setup/optical_calibration/notebooks/calibrate_objective_pair.ipynb`; then the adapter's `set_origin`. See its README, sections 3 to 5. |
+| Leica | Three notebooks, each in the folder of the configuration item it sets: `driver_setup/limits/notebooks/set_limits.ipynb`, `driver_setup/orientation/notebooks/set_orientation.ipynb` and `driver_setup/optical_calibration/notebooks/calibrate_objective_pair.ipynb`; then the adapter's `set_origin`. See its README, sections 3 to 5. |
 | Nikon | The bridge macros (`python -m zmart_drivers.nikon.nis_elements_6_10.bridge.install`) and the adapter's `set_origin`. The travel limits come from NIS-Elements itself. See "Setting it up on the microscope PC" in its README. |
 | ZEISS | The ZEN API `config.ini`, the stage limits in `stage_limits.json` (generic defaults are copied there on the first connect and must be replaced), and the adapter's `set_origin`. See "Setting it up on the microscope PC" in its README. |
 | mesoSPIM | The Remote Scripting server in mesoSPIM-control, the limits in `stage_limits.json` and `function_limits.json` (bundled defaults until you save your own), and the adapter's `set_origin`. See its [workflow manual](zmart_drivers/mesospim/WORKFLOW.md). |

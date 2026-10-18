@@ -427,7 +427,7 @@ def _setup(handle: ZmartHandle) -> dict:
             if orientation.get("measured")
             else (
                 "not measured: saved pictures are kept as the camera sees them; run "
-                "driver_setup/image_stage_registration/notebooks/set_orientation.ipynb"
+                "driver_setup/orientation/notebooks/set_orientation.ipynb"
             ),
         },
         "calibration": {

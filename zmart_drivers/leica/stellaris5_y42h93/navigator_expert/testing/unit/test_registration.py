@@ -24,7 +24,7 @@ import pytest
 
 pytest.importorskip("cv2")  # register_voting imports cv2/skimage at module load
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.image_stage_registration.registration import pcc, register_voting
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.orientation.registration import pcc, register_voting
 
 
 def _blob_image(shape=(220, 220), seed=7) -> np.ndarray:

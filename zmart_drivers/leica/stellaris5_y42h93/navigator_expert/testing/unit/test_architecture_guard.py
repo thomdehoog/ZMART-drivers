@@ -274,8 +274,8 @@ def test_nothing_but_the_tests_imports_from_testing():
 MEASURING_MODULES = {
     "origin.set_origin",
     "limits.measure_limits",
-    "image_stage_registration.measure_orientation",
-    "image_stage_registration.registration",
+    "orientation.measure_orientation",
+    "orientation.registration",
     "optical_calibration.calibrate_objective_pair",
     "optical_calibration.calibration_common",
     "optical_calibration.check_calibration",

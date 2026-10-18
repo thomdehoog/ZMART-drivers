@@ -45,7 +45,7 @@ from pathlib import Path
 
 import numpy as np
 
-from ...driver_setup.image_stage_registration import Orientation, reorient_array
+from ...driver_setup.orientation import Orientation, reorient_array
 from . import materialize
 from . import ome_canonical as canonical
 from ...vendor_specific.product import AcquisitionMetadata, ExportedAcquisition, PlaneIndex

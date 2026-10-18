@@ -45,7 +45,7 @@ from ..driver_setup.origin import saved_origin as _saved_origin
 from ..driver_setup.origin import set_origin as _set_origin
 from ..driver_setup import data_location as _data_location
 from .. import running_log
-from ..driver_setup.image_stage_registration import load_rig_orientation
+from ..driver_setup.orientation import load_rig_orientation
 from ..driver_setup.optical_calibration.model import load_objective_calibration
 from ..procedures import session_state as _session_state
 from ..driver_setup.store import MACHINE

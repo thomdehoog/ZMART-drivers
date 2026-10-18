@@ -30,7 +30,7 @@ try:  # driver version for embedded export state; never fail acquire over it
 except Exception:  # noqa: BLE001 -- best-effort provenance
     _DRIVER_VERSION = None
 
-from ...driver_setup import image_stage_registration as _orientation
+from ...driver_setup import orientation as _orientation
 from .. import session_state as _session_state
 from . import command_log as _log
 from . import clear_cache as _release

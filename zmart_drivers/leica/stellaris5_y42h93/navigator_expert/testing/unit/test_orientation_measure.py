@@ -20,11 +20,11 @@ import tifffile
 
 pytest.importorskip("cv2")  # calibration.core.common (reused by measure) imports cv2
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.image_stage_registration import Orientation
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.orientation import Orientation
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.notebook_support import NotebookCheckpoint
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.acquisition_and_saving.naming import build_image_name
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.optical_calibration import calibration_common as cm
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.image_stage_registration import measure_orientation as wf
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.orientation import measure_orientation as wf
 
 
 @pytest.fixture
@@ -36,7 +36,7 @@ def sessions_root(tmp_path):
 _ORIENTATION_NOTEBOOKS = (
     Path(__file__).resolve().parents[2]
     / "driver_setup"
-    / "image_stage_registration"
+    / "orientation"
     / "notebooks"
 )
 
