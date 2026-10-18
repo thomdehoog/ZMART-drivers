@@ -44,7 +44,7 @@ from typing import Any
 from ..configuration.origin import saved_origin as _saved_origin
 from ..configuration.origin import set_origin as _set_origin
 from ..configuration import data_location as _data_location
-from ..configuration import running_log
+from .. import running_log
 from ..configuration.image_stage_registration import load_rig_orientation
 from ..configuration.optical_calibration.model import load_objective_calibration
 from ..procedures import session_state as _session_state
