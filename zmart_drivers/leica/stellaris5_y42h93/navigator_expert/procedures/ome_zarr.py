@@ -48,7 +48,7 @@ import numpy as np
 from ..configuration.image_stage_registration import Orientation, reorient_array
 from . import materialize
 from . import ome_canonical as canonical
-from .product import AcquisitionMetadata, ExportedAcquisition, PlaneIndex
+from ..dispatcher.product import AcquisitionMetadata, ExportedAcquisition, PlaneIndex
 
 __all__ = ["Capture", "gather", "max_projection", "write_position_store", "write_store"]
 

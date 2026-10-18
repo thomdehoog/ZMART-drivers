@@ -180,10 +180,8 @@ ALLOWED = {
         "vendor_interface",
         "dispatcher",
         "configuration",
-        "output",
         "__version__",  # acquisition.py records the driver version in the saved state
     },
-    "output": {"vendor_interface", "dispatcher", "configuration"},
     "configuration": {
         "vendor_interface",  # the limits item validates through the rulebook
     },
@@ -194,7 +192,6 @@ ALLOWED = {
         "vendor_interface",
         "dispatcher",
         "procedures",
-        "output",
         "configuration",
         "connect",
         "__version__",
@@ -203,7 +200,6 @@ ALLOWED = {
         "vendor_interface",
         "dispatcher",
         "procedures",
-        "output",
         "connect",
     },
 }

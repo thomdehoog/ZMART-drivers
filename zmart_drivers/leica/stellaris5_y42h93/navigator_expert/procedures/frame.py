@@ -26,10 +26,9 @@ University of Zurich (thom.dehoog@zmb.uzh.ch, thomdehoog@gmail.com).
 from __future__ import annotations
 
 import logging
-import math
 import time
-from typing import Any
 
+from ..configuration import coordinates
 from ..configuration import store as _machine
 from ..dispatcher import gate as _gate
 from ..vendor_interface.primitive_handling import state as _readers
@@ -65,120 +64,12 @@ _DEFAULT_ACTUATORS = {"x": "motoric", "y": "motoric", "z": "z-wide"}
 # axis says so under this key. The same spelling the controller uses.
 UNIT = "micrometer"
 
-# The values a frame origin must carry. They match what set_origin captures,
-# so an origin loaded at connect behaves exactly like a freshly captured one.
-_ORIGIN_NUMBER_KEYS = ("x_um", "y_um", "z_wide_um", "z_galvo_um", "z_focus_um")
-
-
-def load_saved_origin() -> dict | None:
-    """Read the newest saved frame origin, or return None when none exists.
-
-    The origin lives in this microscope's ``origin/<datetime>/origin.json``
-    (see ``config/machine.py``); the newest folder wins, just as for the
-    limits, orientation and calibration.
-
-    Returns:
-        The origin with the same fields :func:`set_origin` captures
-        (``x_um``, ``y_um``, ``z_wide_um``, ``z_galvo_um``, ``z_focus_um``
-        and ``objective``), or None when no origin has ever been saved. In
-        that case a warning explains that the frame is the plain stage
-        coordinates.
-
-    Raises:
-        RuntimeError: when the file exists but cannot be read, is not valid
-            JSON, or is missing one of the values above. Guessing a zero
-            origin here would quietly shift every position in the
-            experiment, so the connection stops and says how to fix it.
-    """
-    path = _machine.MACHINE.origin_path()
-    fix = (
-        "Fix or remove that file, or connect with load_origin=False and capture "
-        "the origin again with the driver's set_origin step."
-    )
-    try:
-        payload = _machine.MACHINE.read_origin()
-    except (OSError, ValueError) as exc:
-        raise RuntimeError(
-            f"the saved frame origin at {path} could not be read ({exc}). {fix}"
-        ) from exc
-    if payload is None:
-        log.warning(
-            "no frame origin has been saved on this microscope yet, so positions "
-            "are plain stage coordinates. Run the driver's set_origin step once "
-            "to choose a zero point; it will then be loaded at every connect."
-        )
-        return None
-    stored = payload.get("origin") if isinstance(payload, dict) else None
-    if not isinstance(stored, dict):
-        raise RuntimeError(
-            f"the saved frame origin at {path} has no 'origin' section. {fix}"
-        )
-    origin: dict[str, Any] = {}
-    for key in _ORIGIN_NUMBER_KEYS:
-        value = stored.get(key)
-        if (
-            isinstance(value, bool)
-            or not isinstance(value, (int, float))
-            or not math.isfinite(value)
-        ):
-            raise RuntimeError(
-                f"the saved frame origin at {path} has no usable value for {key!r} "
-                f"(found {value!r}). {fix}"
-            )
-        origin[key] = float(value)
-    # The objective is what lets the driver refuse a move under a different
-    # objective when no calibration can translate between the two, so a
-    # file that does not say which objective it was captured under is
-    # refused rather than treated as "no objective recorded".
-    if "objective" not in stored:
-        raise RuntimeError(
-            f"the saved frame origin at {path} does not record which objective it "
-            f"was captured under. {fix}"
-        )
-    objective = stored["objective"]
-    if objective is not None and not isinstance(objective, dict):
-        raise RuntimeError(
-            f"the saved frame origin at {path} records its objective in an unexpected "
-            f"form ({objective!r}). {fix}"
-        )
-    origin["objective"] = dict(objective) if objective is not None else None
-    log.info("loaded the saved frame origin from %s", path)
-    return origin
-
 
 def objective_delta_um(handle: ZmartHandle, current_objective: dict | None) -> tuple:
-    """ΔT = T[current objective] − T[origin's objective], in µm (x, y, z-focus).
-
-    Zero when the origin has no objective anchor or the objective is
-    unchanged. Raises RuntimeError when the objective HAS changed but the
-    translations are unavailable — the caller decides whether that refuses
-    (moves) or warns (reads).
-    """
-    origin_slot = (handle.origin.get("objective") or {}).get("slotIndex")
-    current_slot = (current_objective or {}).get("slotIndex")
-    if origin_slot is None or current_slot == origin_slot:
-        return (0.0, 0.0, 0.0)
-    if current_slot is None:
-        raise RuntimeError(
-            f"objective changed since the origin was captured (slot {origin_slot} -> "
-            f"unidentified) so the frame cannot be mapped; capture the origin "
-            f"again under the current objective"
-        )
-    # The delta math and the missing-pair policy live in ONE place —
-    # calibration/core/model.py — shared with the driver's swap-time
-    # compensation, so the two layers can never drift apart. Imported
-    # lazily, matching the connection layer's calibration imports.
-    from ..configuration.optical_calibration import model as _cal_model
-
-    try:
-        return _cal_model.translation_delta_um(
-            handle.translations, origin_slot, current_slot
-        )
-    except RuntimeError as exc:
-        raise RuntimeError(
-            f"objective changed since the origin was captured but {exc} — or "
-            f"capture the origin again under the current objective"
-        ) from exc
+    """ΔT for this session's origin and calibration; see :func:`coordinates.objective_delta_um`."""
+    return coordinates.objective_delta_um(
+        handle.origin, handle.translations, current_objective
+    )
 
 
 def hardware_snapshot(handle: ZmartHandle) -> dict:
@@ -360,12 +251,7 @@ def get_xyz(handle: ZmartHandle, *, with_actuators: dict | None = None) -> dict:
     chosen = _resolve_actuators(with_actuators)
     snap = hardware_snapshot(handle)
     dt = delta_or_warn(handle, snap)
-    z_focus = snap["z_wide_um"] + snap["z_galvo_um"]
-    frame = {
-        "x": snap["x_um"] - handle.origin["x_um"] - dt[0],
-        "y": snap["y_um"] - handle.origin["y_um"] - dt[1],
-        "z": z_focus - handle.origin["z_focus_um"] - dt[2],
-    }
+    frame = coordinates.frame_position(snap, handle.origin, dt)
     allowed = canvas(handle) or {}
     result = {
         axis: {
@@ -429,9 +315,7 @@ def set_xyz(
     chosen = _resolve_actuators(with_actuators)
     snap = hardware_snapshot(handle)
     dt = objective_delta_um(handle, snap.get("objective"))  # raises if unavailable
-    abs_x = handle.origin["x_um"] + x + dt[0]
-    abs_y = handle.origin["y_um"] + y + dt[1]
-    target_focus = handle.origin["z_focus_um"] + z + dt[2]
+    abs_x, abs_y, target_focus = coordinates.stage_target(x, y, z, handle.origin, dt)
     z_targets: list[tuple[str, float]]
     if chosen["z"] == "z-wide":
         z_target = target_focus - snap["z_galvo_um"]
@@ -502,14 +386,4 @@ def canvas(handle: ZmartHandle) -> dict | None:
     state = _gate.state_for(handle.client)
     if state is None or state.stage_cfg is None:
         return None
-    stage = state.stage_cfg["stage_um"]
-    galvo = stage.get("z_galvo") or [0.0, 0.0]
-    origin = handle.origin
-    return {
-        "x_um": [stage["x"][0] - origin["x_um"], stage["x"][1] - origin["x_um"]],
-        "y_um": [stage["y"][0] - origin["y_um"], stage["y"][1] - origin["y_um"]],
-        "z_um": [
-            stage["z_wide"][0] + galvo[0] - origin["z_focus_um"],
-            stage["z_wide"][1] + galvo[1] - origin["z_focus_um"],
-        ],
-    }
+    return coordinates.canvas_in_frame(state.stage_cfg["stage_um"], handle.origin)

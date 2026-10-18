@@ -34,7 +34,9 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.for_zmart_controller
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration import (
     store as _machine,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.output import save as _save
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures import (
+    save as _save,
+)
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures import (
     acquire as _capture,
 )

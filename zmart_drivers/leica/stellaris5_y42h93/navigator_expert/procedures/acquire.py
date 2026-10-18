@@ -14,7 +14,7 @@ from __future__ import annotations
 import time
 from typing import Any
 
-from ..output.product import AcquisitionResult
+from ..dispatcher.product import AcquisitionResult
 from . import changes as _commands
 
 __all__ = ["AcquisitionResult", "acquire"]

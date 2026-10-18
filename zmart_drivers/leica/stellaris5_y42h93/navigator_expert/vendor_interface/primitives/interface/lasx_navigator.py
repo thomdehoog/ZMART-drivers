@@ -4,7 +4,7 @@ Every capture leaves a hidden copy in LAS X's cache (``TileScan <n>`` in an
 experiment LAS X calls "Hidden": the pixels again, a zoom pyramid and a
 histogram, about twice a 512 x 512 capture's pixels). The Navigator canvas
 holds it while it shows the capture's tile: releasing the capture itself
-(``output/lasx_cache_release``) leaves the copy, and pressing the canvas's
+(``vendor_interface/primitives/capture/lasx_cache_release``) leaves the copy, and pressing the canvas's
 Clear button lets go of them all, while LAS X runs (simulator, 2026-10-14).
 
 No command or API call is known that clears the canvas, so the button is

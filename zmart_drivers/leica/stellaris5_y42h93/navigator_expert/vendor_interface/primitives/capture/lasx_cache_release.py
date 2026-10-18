@@ -41,10 +41,8 @@ from __future__ import annotations
 
 import logging
 
-from ..vendor_interface.primitives.interface import lasx_navigator
-from ..vendor_interface.primitives.capture.data_container import (
-    connected_data_container,
-)
+from ..interface import lasx_navigator
+from .data_container import connected_data_container
 
 log = logging.getLogger(__name__)
 

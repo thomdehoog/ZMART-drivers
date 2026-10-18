@@ -493,8 +493,8 @@ written, and the adapter's acquire record carries it as `metadata`.
 `vendor/` is LAS X's own account of the same capture, kept verbatim as
 provenance and sha256'd in `summary.json` — never read in the normal path, and
 there only in case the two accounts disagree.
-**OME metadata:** `output/ome.py` repairs known Leica OME violations (e.g. laser `Wavelength="0"`)
-in place, preserving byte formatting; `output/ome_canonical.py` writes clean canonical ZMART OME;
+**OME metadata:** `procedures/ome.py` repairs known Leica OME violations (e.g. laser `Wavelength="0"`)
+in place, preserving byte formatting; `procedures/ome_canonical.py` writes clean canonical ZMART OME;
 `save(..., fix_ome=True)` validates/repairs each written file.
 
 **LAS X's cache can be let go of once a capture is saved.** Every picture LAS X takes stays in its
@@ -504,7 +504,7 @@ Container V2`): `D:\Temp2` on the STELLARIS Y42H93.
 With `cleanup_cache=True`, the profile's default since it passed on the STELLARIS (15 October
 2026), the save's last step asks LAS X itself to delete the picture it was read from: the delete of
 LAS X's own window, so the cache's files go and the project stays whole
-(`output/lasx_cache_release.py` says how). It runs only once the copy is written and read back
+(`vendor_interface/primitives/capture/lasx_cache_release.py` says how). It runs only once the copy is written and read back
 identical, and the Navigator canvas is then cleared, which lets go of each capture's hidden copy.
 The driver never deletes a file itself: a capture LAS X gives no way to let go of is refused before
 anything is saved.
@@ -551,7 +551,8 @@ zmart_drivers/leica/stellaris5_y42h93/navigator_expert/
 │   ├── primitives/     the smallest reads and writes, one folder for each way of reaching LAS X:
 │   │                   direct/ (direct_reader.py, state_tree.py), api/ (api_reader.py, delivery.py),
 │   │                   log/ (log_reader.py, log_wait.py), interface/ (lasx_navigator.py,
-│   │                   lasx_dialogs.py: its buttons and dialogs), capture/ (data_container.py)
+│   │                   lasx_dialogs.py: its buttons and dialogs), capture/ (data_container.py,
+│   │                   lasx_data_container.py, lasx_cache_release.py)
 │   ├── primitive_handling/   how the dispatcher treats each command, for this microscope:
 │   │                   profiles.py (one CommandProfile per command), settings.py (one table
 │   │                   entry per setting of a job) · transport.py (how a request is sent and
@@ -562,23 +563,26 @@ zmart_drivers/leica/stellaris5_y42h93/navigator_expert/
 │   │                   readings) · derived.py (what a value means) · prechecks.py (is the
 │   │                   scanner idle) · limit_rules.py (what the limits allow)
 │   ├── parsing.py      the strings LAS X hands back
+│   ├── metadata_map.py LAS X's description of a picture, read into the standard fields
 │   └── error_classification.py   sorting LAS X's errors
 ├── dispatcher/         the engines that run a command safely, none of which names a LAS X object:
 │                       read.py (waits for a reading from whichever source answers), reading.py,
 │                       change.py (confirm_and_fire), gate.py (when the limits are enforced),
-│                       envelope.py, tuning.py (the timing constants)
+│                       envelope.py, tuning.py (the timing constants), and the shapes every
+│                       driver shares: product.py (what an acquisition returns) · naming.py ·
+│                       files.py
 ├── procedures/         session.py (the handle) · frame.py (get_xyz, set_xyz, set_origin) ·
-│                       acquisition.py (the acquire command and its log) · instrument.py (state,
+│                       acquisition.py (the acquire command and its log) · save.py · materialize.py ·
+│                       ome.py · ome_canonical.py · ome_zarr.py · command_log.py (saving the files) ·
+│                       instrument.py (state,
 │                       procedures, info) ·
 │                       changes.py (every set_*/move_*/select_job and the LAS X acquire command) ·
 │                       acquire.py (the capture) · objectives.py · objective_shift.py ·
 │                       backlash.py · measure_orientation.py · measure_limits.py ·
 │                       calibrate_objective_pair.py · check_calibration.py · adopt_calibration.py ·
 │                       calibration_common.py · algorithms/ (registration and focus scoring)
-├── output/             what comes out of one acquisition: lasx_data_container.py (collect) ·
-│                       lasx_cache_release.py · files.py · materialize.py · ome.py · ome_canonical.py ·
-│                       ome_zarr.py · naming.py · product.py · save.py
-├── configuration/      what is measured once per microscope. limits/, image_stage_registration/
+├── configuration/      what is measured once per microscope; coordinates.py holds the plain
+│                       arithmetic between stage and user coordinates. limits/, image_stage_registration/
 │                       and optical_calibration/ each hold their defaults/ and their notebook;
 │                       store.py resolves the machine-local snapshots under ProgramData;
 │                       session_state.py holds what one connection loaded; notebook_support.py
@@ -626,9 +630,10 @@ workflow sees:
 - A limits refusal raises `ValueError`; today parts of the gate raise `RuntimeError`.
 - The limits gate moves inside the set dispatcher, so that no change calls it itself.
 - Done since the move: the logic of the commands left `zmart_adapter.py` for `procedures/`
-  (`session.py`, `frame.py`, `acquisition.py`, `instrument.py`). Still to do: the pure coordinate
-  arithmetic (origin, orientation, objective offsets) moves to `configuration/coordinates.py` and
-  the `ZmartDriver` class converts at its edge.
+  (`session.py`, `frame.py`, `acquisition.py`, `instrument.py`), the `output/` folder is gone, and
+  the plain coordinate arithmetic is in `configuration/coordinates.py`. Still to do: the
+  `ZmartDriver` class converts at its edge. The full list of differences from the plan is in
+  `docs/driver-anatomy.md` ("Where the Leica tree still differs from the plan").
 - The setup notebooks become thin: the measuring is a procedure, the notebook only calls it.
 - `zmart_controller_plugin.py` goes, once `zmart_driver.py` has driven the real STELLARIS.
 
@@ -756,4 +761,4 @@ Copy the closest existing command of a similar shape.
 - Sibling drivers, still under construction in the main ZMART-microscopy repository:
   [ZEISS ZEN API](https://github.com/thomdehoog/ZMART-microscopy/tree/main/zmart_drivers/zeiss/zenapi) (gRPC) and
   [Nikon NIS-Elements](https://github.com/thomdehoog/ZMART-microscopy/tree/main/zmart_drivers/nikon) (socket macro).
-- Leica filename implementation: [`output/naming.py`](output/naming.py)
+- Leica filename implementation: [`dispatcher/naming.py`](dispatcher/naming.py)

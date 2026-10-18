@@ -11,7 +11,7 @@ from pathlib import Path
 from ..configuration.image_stage_registration import Orientation, reorient_array
 from . import ome as _ome
 from . import ome_canonical as _canonical
-from .product import (
+from ..dispatcher.product import (
     AcquisitionMetadata,
     PlaneIndex,
     PlaneSource,

@@ -22,15 +22,17 @@ from pathlib import Path
 from typing import Any
 
 from ..configuration.image_stage_registration import Orientation
-from . import files as _files
+from ..dispatcher import files as _files
 from . import materialize as _materialize
 from . import ome_zarr
-from .files import (
+from ..dispatcher.files import (
     DEFAULT_EXPORT_COMPLETION_POLL_INTERVAL_S,
     DEFAULT_EXPORT_COMPLETION_TIMEOUT_S,
 )
-from .lasx_data_container import collect_lasx_data_container
-from .naming import (
+from ..vendor_interface.primitives.capture.lasx_data_container import (
+    collect_lasx_data_container,
+)
+from ..dispatcher.naming import (
     Naming,
     build_image_name,
     build_projection_name,
@@ -40,7 +42,7 @@ from .naming import (
     projections_dir,
     state_dir,
 )
-from .product import (
+from ..dispatcher.product import (
     AcquisitionResult,
     ExportedAcquisition,
     PlaneIndex,
