@@ -67,7 +67,9 @@ def _leg(client, result, x_um, y_um, what, tolerance_um=20.0):
             f"{what} contradicted by the readback: the stage reads "
             f"({pos['x_um']:.2f}, {pos['y_um']:.2f}), not ({x_um:.2f}, {y_um:.2f})"
         )
-    log.warning("%s was not confirmed and the stage could not be read; carrying on", what)
+    log.warning(
+        "%s was not confirmed and the stage could not be read; carrying on", what
+    )
     return False
 
 
@@ -197,10 +199,19 @@ def correct_backlash(
         # through _leg: a leg the stage is seen to have made counts, a leg
         # the stage is seen NOT to have made raises.
         r = _commands.move_xy(
-            client, x - overshoot_um, y - overshoot_um, unit="um", tolerance=tolerance_um
+            client,
+            x - overshoot_um,
+            y - overshoot_um,
+            unit="um",
+            tolerance=tolerance_um,
         )
         confirmed &= _leg(
-            client, r, x - overshoot_um, y - overshoot_um, "backlash overshoot move", tolerance_um
+            client,
+            r,
+            x - overshoot_um,
+            y - overshoot_um,
+            "backlash overshoot move",
+            tolerance_um,
         )
         time.sleep(settle_ms / 1000.0)
         r = _commands.move_xy(client, x, y, unit="um", tolerance=tolerance_um)

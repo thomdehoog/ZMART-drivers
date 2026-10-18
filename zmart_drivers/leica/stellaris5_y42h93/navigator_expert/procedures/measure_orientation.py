@@ -179,7 +179,9 @@ def _reset_measurement_outputs(session: OrientationSession) -> None:
     )
     for directory in directories:
         if directory.parent != session_dir:
-            raise RuntimeError(f"refusing to clear data outside orientation session: {directory}")
+            raise RuntimeError(
+                f"refusing to clear data outside orientation session: {directory}"
+            )
         if directory.exists():
             shutil.rmtree(directory)
         directory.mkdir()
@@ -501,7 +503,9 @@ def write_orientation_diagnostic(
         )
 
     gallery_slots = tuple((row, column + 1) for row in range(2) for column in range(4))
-    for orientation, (row, column) in zip(_gallery_orientations(), gallery_slots, strict=True):
+    for orientation, (row, column) in zip(
+        _gallery_orientations(), gallery_slots, strict=True
+    ):
         ax = fig.add_subplot(gallery_grid[row, column])
         if row == 0:
             ax.set_title(
@@ -553,7 +557,9 @@ def _finite_registration(vote: dict) -> dict:
     """One vote's report entry, with non-finite shifts mapped to None."""
 
     def _num(value):
-        return None if value is None or not math.isfinite(float(value)) else float(value)
+        return (
+            None if value is None or not math.isfinite(float(value)) else float(value)
+        )
 
     return {
         "dx_um": _num(vote.get("dx_um")),
@@ -613,7 +619,10 @@ def measure(session: OrientationSession) -> OrientationSession:
             settle_s=session.settle_s,
         )
         img_plus_x = _acquire_raw_and_validate(
-            session, "plus_x", expected_size_px=expected_size, expected_pixel_size_um=expected_pixel
+            session,
+            "plus_x",
+            expected_size_px=expected_size,
+            expected_pixel_size_um=expected_pixel,
         )
 
         move_xy_and_verify(session.client, home_x, home_y, settle_s=session.settle_s)
@@ -624,7 +633,10 @@ def measure(session: OrientationSession) -> OrientationSession:
             settle_s=session.settle_s,
         )
         img_plus_y = _acquire_raw_and_validate(
-            session, "plus_y", expected_size_px=expected_size, expected_pixel_size_um=expected_pixel
+            session,
+            "plus_y",
+            expected_size_px=expected_size,
+            expected_pixel_size_um=expected_pixel,
         )
 
         move_xy_and_verify(session.client, home_x, home_y, settle_s=session.settle_s)
@@ -633,7 +645,9 @@ def measure(session: OrientationSession) -> OrientationSession:
         # at +X/+Y. Suppress recovery failures so the original exception is
         # what the caller sees.
         try:
-            move_xy_and_verify(session.client, home_x, home_y, settle_s=session.settle_s)
+            move_xy_and_verify(
+                session.client, home_x, home_y, settle_s=session.settle_s
+            )
         except Exception:
             pass
         raise
@@ -725,28 +739,38 @@ def measure(session: OrientationSession) -> OrientationSession:
             "residual_from_d4": session.residual_from_d4,
             "mirrored": session.is_mirrored,
             "reflection_axis": (
-                session.orientation.reflection_axis if session.orientation is not None else None
+                session.orientation.reflection_axis
+                if session.orientation is not None
+                else None
             ),
             "determinant": int(round(det)),
             "axis_signs": (
-                session.orientation.axis_signs if session.orientation is not None else None
+                session.orientation.axis_signs
+                if session.orientation is not None
+                else None
             ),
             "axis_mapping": (
-                session.orientation.axis_mapping if session.orientation is not None else None
+                session.orientation.axis_mapping
+                if session.orientation is not None
+                else None
             ),
             "accepted": session.d4_accepted,
             "failure_reason": session.failure_reason,
             "duration_s": _session_duration_s(session),
             "rotate_deg": (
-                int(session.orientation.rotate_deg) if session.orientation is not None else None
+                int(session.orientation.rotate_deg)
+                if session.orientation is not None
+                else None
             ),
             "image_to_stage": canonical_arr.astype(int).tolist(),
             "registrations": {
                 "stage_plus_x": {
-                    key: vote_x[key] for key in ("dx_um", "dy_um", "confidence", "agreeing")
+                    key: vote_x[key]
+                    for key in ("dx_um", "dy_um", "confidence", "agreeing")
                 },
                 "stage_plus_y": {
-                    key: vote_y[key] for key in ("dx_um", "dy_um", "confidence", "agreeing")
+                    key: vote_y[key]
+                    for key in ("dx_um", "dy_um", "confidence", "agreeing")
                 },
             },
             "diagnostic": DIAGNOSTIC_NAME,
@@ -766,7 +790,9 @@ def run_notebook_measurement() -> OrientationSession:
     if _NOTEBOOK_SESSION is None:
         _NOTEBOOK_SESSION = start_session()
     if _NOTEBOOK_SESSION.adopted:
-        raise RuntimeError("this notebook session is adopted; restart the kernel for a new run")
+        raise RuntimeError(
+            "this notebook session is adopted; restart the kernel for a new run"
+        )
     _NOTEBOOK_SESSION = measure(_NOTEBOOK_SESSION)
     return _NOTEBOOK_SESSION
 
@@ -780,11 +806,15 @@ def acquire_validation_image(
     the same rotation and reflection that later acquisitions will receive.
     """
     if session.orientation is None or not session.d4_accepted:
-        raise RuntimeError("Measure the orientation successfully before running validation.")
+        raise RuntimeError(
+            "Measure the orientation successfully before running validation."
+        )
 
     output_root = session.paths.session_dir / "validation"
     if output_root.parent != session.paths.session_dir:
-        raise RuntimeError(f"refusing to clear data outside orientation session: {output_root}")
+        raise RuntimeError(
+            f"refusing to clear data outside orientation session: {output_root}"
+        )
     if output_root.exists():
         shutil.rmtree(output_root)
     output_root.mkdir()
@@ -798,7 +828,9 @@ def acquire_validation_image(
         orientation=session.orientation,
     )
     if len(saved.image_paths) != 1:
-        raise ValueError(f"Validation expected one saved image; got {len(saved.image_paths)}.")
+        raise ValueError(
+            f"Validation expected one saved image; got {len(saved.image_paths)}."
+        )
 
     image_path = Path(next(iter(saved.image_paths.values())))
     image = np.asarray(tifffile.imread(image_path))
@@ -832,7 +864,9 @@ def archive_notebook(session: OrientationSession, notebook_path: str | Path) -> 
     return archive_operator_notebook(notebook_path, session.paths.session_dir)
 
 
-def adopt_orientation(session: OrientationSession, notebook_path: str | Path) -> dict[str, str]:
+def adopt_orientation(
+    session: OrientationSession, notebook_path: str | Path
+) -> dict[str, str]:
     """Activate a validated orientation by writing its config last."""
     if session.orientation is None or not session.d4_accepted:
         raise RuntimeError("measure and accept the orientation before adoption")

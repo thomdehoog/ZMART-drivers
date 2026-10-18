@@ -59,7 +59,12 @@ LAS X.
 - **Import the package** by its full name:
   ```python
   import zmart_drivers.leica.stellaris5_y42h93.navigator_expert as lasx
-  from zmart_drivers.leica.stellaris5_y42h93.navigator_expert import connect_python_client, set_zoom, acquire, save
+  from zmart_drivers.leica.stellaris5_y42h93.navigator_expert import (
+      connect_python_client,
+      set_zoom,
+      acquire,
+      save,
+  )
   ```
   The Leica package is self-contained; its filename helper lives under
   `navigator_expert.acquisition.naming`.
@@ -70,7 +75,9 @@ LAS X.
   import zmart_controller
 
   # Once, on the LAS X computer:
-  zmart_controller.register_driver("C:/ZMART-drivers/zmart_drivers/leica/stellaris5_y42h93/navigator_expert")
+  zmart_controller.register_driver(
+      "C:/ZMART-drivers/zmart_drivers/leica/stellaris5_y42h93/navigator_expert"
+  )
 
   # In every session:
   zmart_controller.mic.connect("stellaris")
@@ -82,10 +89,30 @@ LAS X.
   Each axis has four entries, and every number in them is in micrometres. For example, with the
   origin saved at stage x 63500, y 41500 and a focus of 2000 (z-wide 2000, z-galvo 0):
   ```python
-  {'x': {'position': 100.0, 'unit': 'micrometer', 'actuator': 'motoric', 'actuators': {'motoric': 63600.0},                 'canvas': [-62500.0, 66500.0]},
-   'y': {'position': 50.0,  'unit': 'micrometer', 'actuator': 'motoric', 'actuators': {'motoric': 41550.0},                 'canvas': [-40500.0, 58500.0]},
-   'z': {'position': 0.0,   'unit': 'micrometer', 'actuator': 'z-wide',  'actuators': {'z-wide': 2000.0, 'z-galvo': 0.0},  'canvas': [-2250.0, 6250.0]},
-   'objective_translation_um': [0.0, 0.0, 0.0]}
+  {
+      "x": {
+          "position": 100.0,
+          "unit": "micrometer",
+          "actuator": "motoric",
+          "actuators": {"motoric": 63600.0},
+          "canvas": [-62500.0, 66500.0],
+      },
+      "y": {
+          "position": 50.0,
+          "unit": "micrometer",
+          "actuator": "motoric",
+          "actuators": {"motoric": 41550.0},
+          "canvas": [-40500.0, 58500.0],
+      },
+      "z": {
+          "position": 0.0,
+          "unit": "micrometer",
+          "actuator": "z-wide",
+          "actuators": {"z-wide": 2000.0, "z-galvo": 0.0},
+          "canvas": [-2250.0, 6250.0],
+      },
+      "objective_translation_um": [0.0, 0.0, 0.0],
+  }
   ```
   - `position` is where the axis is, measured from the saved origin. For z it is the focus: the
     sum of the two z drives, so it reads the same whichever drive made the move. When a different
@@ -166,11 +193,20 @@ runtime where possible. Override via the profile, not at call sites.
 
 ```python
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert import (
-    connect_python_client, ping,
-    connect_limits_handshake, select_job, set_zoom, set_scan_speed,
-    move_xy, acquire, save,
+    connect_python_client,
+    ping,
+    connect_limits_handshake,
+    select_job,
+    set_zoom,
+    set_scan_speed,
+    move_xy,
+    acquire,
+    save,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.acquisition.naming import Naming, run_hash
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.acquisition.naming import (
+    Naming,
+    run_hash,
+)
 
 # 1. Connect and validate the scope
 client = connect_python_client()
@@ -184,22 +220,22 @@ assert ping(client)
 #    state.ok stays True — check state.limits.describe()["is_fallback"] if you
 #    need to know whether your measured envelope is really in force.
 state = connect_limits_handshake(client)
-assert state.ok, state.error   # False only if even the bundled defaults are unusable
+assert state.ok, state.error  # False only if even the bundled defaults are unusable
 
 # 3. Select and configure a job (live commands return a result dict)
 select_job(client, "MyExperiment")
 r = set_zoom(client, "MyExperiment", 2.0)
-assert r["success"] and r["confirmed"], r["message"]     # check BOTH — see §5
+assert r["success"] and r["confirmed"], r["message"]  # check BOTH — see §5
 set_scan_speed(client, "MyExperiment", 600)
 
 # 4. Move and acquire
 move_xy(client, 65_000, 65_000, unit="um")
-acq = acquire(client, "MyExperiment")                     # -> AcquisitionResult (RAISES on failure)
+acq = acquire(client, "MyExperiment")  # -> AcquisitionResult (RAISES on failure)
 
 # 5. Persist with Leica's private naming helper (a separate step from acquire)
 naming = Naming(stem=f"overview_{run_hash()}_K00_M000001_G000001_P000000_V00")
 saved = save(client, acq, output_root="D:/runs/demo", naming=naming)
-print(saved.image_paths)                                  # {PlaneIndex(t,z,c): Path, ...}
+print(saved.image_paths)  # {PlaneIndex(t,z,c): Path, ...}
 ```
 
 > `acquire()` returns an `AcquisitionResult` dataclass and **raises** on failure — it is *not* a
@@ -238,7 +274,9 @@ once in a setup step and then reused by every session. During that step the oper
 the driver directly and calls the adapter's `set_origin`:
 
 ```python
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.zmart_adapter import zmart_adapter as adapter
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.zmart_adapter import (
+    zmart_adapter as adapter,
+)
 
 handle = adapter.connect(adapter.CONNECTION)
 adapter.set_origin(handle)  # the current position becomes (0, 0, 0)
@@ -572,10 +610,15 @@ callables + retry/confirm tuning). Tuning a command = editing its profile; nothi
 ```python
 @dataclass(frozen=True)
 class CommandProfile:
-    pre_check_fn=None ; error_check_fn=_default_error_check ; confirm_fn=None
-    max_retries=WINDOWS-1 ; max_confirm_attempts=WINDOWS ; refire_on_unconfirmed=True
-    confirm_poll_s=WINDOW_S ; confirm_tolerance=None
-    success_on_unconfirmed=True                # exhausted readback -> unconfirmed, never hard-fail
+    pre_check_fn = None
+    error_check_fn = _default_error_check
+    confirm_fn = None
+    max_retries = WINDOWS - 1
+    max_confirm_attempts = WINDOWS
+    refire_on_unconfirmed = True
+    confirm_poll_s = WINDOW_S
+    confirm_tolerance = None
+    success_on_unconfirmed = True  # exhausted readback -> unconfirmed, never hard-fail
     # + acquisition watch / backoff / async knobs
 ```
 

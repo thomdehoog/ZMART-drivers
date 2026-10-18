@@ -104,9 +104,15 @@ def _value_summary(value: Any) -> dict[str, Any]:
             }
         return {"kind": "dict", "keys": sorted(str(k) for k in value)[:12]}
     if isinstance(value, list):
-        names = [item.get("Name") for item in value if isinstance(item, dict) and item.get("Name")]
+        names = [
+            item.get("Name")
+            for item in value
+            if isinstance(item, dict) and item.get("Name")
+        ]
         selected = [
-            item.get("Name") for item in value if isinstance(item, dict) and item.get("IsSelected")
+            item.get("Name")
+            for item in value
+            if isinstance(item, dict) and item.get("IsSelected")
         ]
         return {
             "kind": "list",
@@ -203,7 +209,9 @@ def _expected_no_leg(datum: str, mode: str) -> dict[str, Any]:
     }
 
 
-def _read_passive(client, datum: str, mode: str, job_name: str | None) -> dict[str, Any]:
+def _read_passive(
+    client, datum: str, mode: str, job_name: str | None
+) -> dict[str, Any]:
     spec = capabilities.DATUMS.get(datum)
     if spec is not None:
         if mode == "log" and spec.log_fn is None:
@@ -211,15 +219,23 @@ def _read_passive(client, datum: str, mode: str, job_name: str | None) -> dict[s
         if mode == "api" and spec.api_fn is None:
             return _expected_no_leg(datum, mode)
     if datum == "selected_job":
-        return _timed_read(lambda: readers.get_selected_job(client, mode=mode, diagnostics=True))
+        return _timed_read(
+            lambda: readers.get_selected_job(client, mode=mode, diagnostics=True)
+        )
     if datum == "xy":
         return _timed_read(lambda: readers.get_xy(client, mode=mode, diagnostics=True))
     if datum == "jobs":
-        return _timed_read(lambda: readers.get_jobs(client, mode=mode, diagnostics=True))
+        return _timed_read(
+            lambda: readers.get_jobs(client, mode=mode, diagnostics=True)
+        )
     if datum == "scan_status":
-        return _timed_read(lambda: readers.get_scan_status(client, mode=mode, diagnostics=True))
+        return _timed_read(
+            lambda: readers.get_scan_status(client, mode=mode, diagnostics=True)
+        )
     if datum == "hardware_info":
-        return _timed_read(lambda: readers.get_hardware_info(client, mode=mode, diagnostics=True))
+        return _timed_read(
+            lambda: readers.get_hardware_info(client, mode=mode, diagnostics=True)
+        )
     if datum == "job_settings":
         if not job_name:
             return {
@@ -231,7 +247,9 @@ def _read_passive(client, datum: str, mode: str, job_name: str | None) -> dict[s
                 "summary": {"kind": "skipped"},
             }
         return _timed_read(
-            lambda: readers.get_job_settings(client, job_name, mode=mode, diagnostics=True)
+            lambda: readers.get_job_settings(
+                client, job_name, mode=mode, diagnostics=True
+            )
         )
     raise ValueError(f"unknown passive datum {datum!r}")
 
@@ -242,12 +260,15 @@ def _read_all_passive(
     *,
     job_name: str | None = None,
 ) -> dict[str, dict[str, Any]]:
-    return {mode: _read_passive(client, datum, mode, job_name) for mode in PASSIVE_MODES}
+    return {
+        mode: _read_passive(client, datum, mode, job_name) for mode in PASSIVE_MODES
+    }
 
 
 def _summarize_selected(reads: dict[str, dict[str, Any]]) -> dict[str, Any]:
     return {
-        mode: _selected_name(read.get("value") if read else None) for mode, read in reads.items()
+        mode: _selected_name(read.get("value") if read else None)
+        for mode, read in reads.items()
     }
 
 
@@ -281,7 +302,9 @@ def phase_read_only(
             "passive": reads,
         }
         _emit(records, output, record)
-        cells = " | ".join(f"{mode} {_brief_read(reads[mode])}" for mode in PASSIVE_MODES)
+        cells = " | ".join(
+            f"{mode} {_brief_read(reads[mode])}" for mode in PASSIVE_MODES
+        )
         print(f"{datum:<14} {cells}")
 
     if job_name:
@@ -293,7 +316,9 @@ def phase_read_only(
             "passive": reads,
         }
         _emit(records, output, record)
-        cells = " | ".join(f"{mode} {_brief_read(reads[mode])}" for mode in PASSIVE_MODES)
+        cells = " | ".join(
+            f"{mode} {_brief_read(reads[mode])}" for mode in PASSIVE_MODES
+        )
         print(f"{'job_settings':<14} {cells}")
 
     pending = _timed_read(lambda: readers.get_pending_dialog(diagnostics=True))
@@ -385,8 +410,12 @@ def phase_job_changes(
                         "elapsed_ms": round(command_ms, 3),
                         "error": command_error,
                         "result": _jsonable(command),
-                        "success": (None if command is None else command.get("success")),
-                        "confirmed": (None if command is None else command.get("confirmed")),
+                        "success": (
+                            None if command is None else command.get("success")
+                        ),
+                        "confirmed": (
+                            None if command is None else command.get("confirmed")
+                        ),
                     },
                     "passive": reads,
                     "selected_by_reader": selected_by_reader,
@@ -402,7 +431,9 @@ def phase_job_changes(
 def _print_job_step(record: dict[str, Any]) -> None:
     selected = record["selected_by_reader"]
     command = record["command"]
-    agreeing = [mode for mode in PASSIVE_MODES if selected.get(mode) == record["target"]]
+    agreeing = [
+        mode for mode in PASSIVE_MODES if selected.get(mode) == record["target"]
+    ]
     # The command result grades the step. Passive-reader agreement is
     # reported, never judged: right after a real switch the passive readers
     # can all lag (API stale, log fail-closed), and that is expected
@@ -511,7 +542,9 @@ def phase_xy_positions(
                     "error": command_error,
                     "result": _jsonable(command),
                     "success": (None if command is None else command.get("success")),
-                    "confirmed": (None if command is None else command.get("confirmed")),
+                    "confirmed": (
+                        None if command is None else command.get("confirmed")
+                    ),
                 },
                 "passive": reads,
                 "xy_by_reader": xy_by_reader,
@@ -558,7 +591,8 @@ def _build_summary(records: list[dict[str, Any]]) -> dict[str, Any]:
         if phase == "read_only":
             passive = record.get("passive") or {}
             ok = ok and all(
-                read.get("status") not in {"error", "exception"} for read in passive.values()
+                read.get("status") not in {"error", "exception"}
+                for read in passive.values()
             )
         if ok:
             phases[phase]["ok"] += 1
@@ -577,17 +611,24 @@ def parse_args(argv=None) -> argparse.Namespace:
     )
     parser.add_argument("--client-name", default="PythonClient")
     parser.add_argument("--api-delay-ms", type=int)
-    parser.add_argument("--read-only", action="store_true", help="skip job changes and XY moves")
+    parser.add_argument(
+        "--read-only", action="store_true", help="skip job changes and XY moves"
+    )
     parser.add_argument(
         "--yes", action="store_true", help="allow reversible job changes and XY moves"
     )
     parser.add_argument("--job-a", help="first job for pairwise job changes")
     parser.add_argument("--job-b", help="second job for pairwise job changes")
     parser.add_argument(
-        "--all-jobs", action="store_true", help="select every API-visible job in each round"
+        "--all-jobs",
+        action="store_true",
+        help="select every API-visible job in each round",
     )
     parser.add_argument(
-        "--job-rounds", type=int, default=2, help="number of job-change rounds (default 2)"
+        "--job-rounds",
+        type=int,
+        default=2,
+        help="number of job-change rounds (default 2)",
     )
     parser.add_argument(
         "--positions", type=int, default=10, help="number of XY targets (default 10)"
@@ -599,10 +640,15 @@ def parse_args(argv=None) -> argparse.Namespace:
         help="radius of XY position pattern around current XY",
     )
     parser.add_argument(
-        "--xy-tolerance-um", type=float, default=20.0, help="reported XY target tolerance"
+        "--xy-tolerance-um",
+        type=float,
+        default=20.0,
+        help="reported XY target tolerance",
     )
     parser.add_argument("--output", default=None, help="JSONL output path")
-    parser.add_argument("--append", action="store_true", help="append if --output already exists")
+    parser.add_argument(
+        "--append", action="store_true", help="append if --output already exists"
+    )
     return parser.parse_args(argv)
 
 
@@ -656,7 +702,9 @@ def main(argv=None) -> int:
 
     if args.read_only or not args.yes:
         if not args.yes and not args.read_only:
-            print("\nWrites skipped. Pass --yes for two job rounds and 10 XY positions.")
+            print(
+                "\nWrites skipped. Pass --yes for two job rounds and 10 XY positions."
+            )
     else:
         phase_job_changes(
             client,

@@ -66,7 +66,9 @@ def _confirmation_detail(result):
     """Return compact non-log readback details from a confirmation result."""
     if not isinstance(result, dict):
         return ""
-    details = {key: value for key, value in result.items() if key not in {"success", "logs"}}
+    details = {
+        key: value for key, value in result.items() if key not in {"success", "logs"}
+    }
     if not details:
         return ""
     return f"; last_confirmation={details!r}"
@@ -430,7 +432,9 @@ def _fire_block(
 
         # Permanent error, or transient but out of retries
         if transient:
-            log.error("%s | Transient error exhausted retries: %s", description, error_msg)
+            log.error(
+                "%s | Transient error exhausted retries: %s", description, error_msg
+            )
         else:
             log.error("%s | Permanent error: %s", description, error_msg)
 
@@ -574,7 +578,9 @@ def confirm_and_fire(
     fb_timing = fb["timing"]
 
     if not fb["success"]:
-        dialog_detail = _append_dialog_warning(all_logs, command_started_at, description)
+        dialog_detail = _append_dialog_warning(
+            all_logs, command_started_at, description
+        )
         return {
             "success": False,
             "confirmed": None,

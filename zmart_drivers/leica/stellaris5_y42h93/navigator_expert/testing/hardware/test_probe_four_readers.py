@@ -20,7 +20,9 @@ for _p in (_HERE, _REPO_ROOT):
         sys.path.insert(0, str(_p))
 
 import probe_four_readers as probe
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.actions import get as capabilities
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.actions import (
+    get as capabilities,
+)
 
 
 def test_jobs_log_read_is_expected_skip_not_error():
@@ -47,5 +49,7 @@ def test_jobs_api_and_hybrid_legs_are_not_skipped():
         # These would attempt a real read; assert the guard does NOT short it to
         # a skip by checking the capability table the guard consults.
         spec = capabilities.DATUMS["jobs"]
-        guarded = (mode == "log" and spec.log_fn is None) or (mode == "api" and spec.api_fn is None)
+        guarded = (mode == "log" and spec.log_fn is None) or (
+            mode == "api" and spec.api_fn is None
+        )
         assert not guarded

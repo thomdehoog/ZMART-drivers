@@ -24,7 +24,9 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.image_
 )
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.output import save as saving
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.output.naming import Naming
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.output.product import PlaneIndex
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.output.product import (
+    PlaneIndex,
+)
 
 DATA = Path(__file__).resolve().parents[1] / "data" / "lasx_description"
 PID = "669c"
@@ -41,10 +43,14 @@ def text_field(text: str) -> bytes:
 def cache_holding(root: Path, name: str, description: str, pixels: np.ndarray) -> None:
     """One picture in LAS X's cache: its description and its raw pixels (c inside z)."""
     (root / f"V2LMSDC_OBJ900_{PID}.tmp").write_bytes(
-        record(b"*" + struct.pack("<i", 2)) + record(text_field(description)) + record(text_field(name))
+        record(b"*" + struct.pack("<i", 2))
+        + record(text_field(description))
+        + record(text_field(name))
     )
     raw = pixels.astype(pixels.dtype.newbyteorder("<")).tobytes()
-    (root / f"V2LMSDC_MMF900_0_{PID}.tmp").write_bytes(raw + b"\0" * (-len(raw) % 65536))
+    (root / f"V2LMSDC_MMF900_0_{PID}.tmp").write_bytes(
+        raw + b"\0" * (-len(raw) % 65536)
+    )
 
 
 @pytest.fixture
@@ -54,7 +60,12 @@ def hires(tmp_path):
     root.mkdir()
     rng = np.random.default_rng(4)
     pixels = rng.integers(0, 4096, size=(2, 512, 512), dtype=np.uint16)
-    cache_holding(root, "HiRes004", (DATA / "hires004-two-channels-12-bit.xml").read_text(encoding="utf-8"), pixels)
+    cache_holding(
+        root,
+        "HiRes004",
+        (DATA / "hires004-two-channels-12-bit.xml").read_text(encoding="utf-8"),
+        pixels,
+    )
     return root, pixels
 
 
@@ -65,13 +76,21 @@ def stack(tmp_path):
     root.mkdir()
     rng = np.random.default_rng(17)
     pixels = rng.integers(0, 65536, size=(17, 512, 512), dtype=np.uint16)
-    cache_holding(root, "AF Job002", (DATA / "af-job002-17-planes-16-bit.xml").read_text(encoding="utf-8"), pixels)
+    cache_holding(
+        root,
+        "AF Job002",
+        (DATA / "af-job002-17-planes-16-bit.xml").read_text(encoding="utf-8"),
+        pixels,
+    )
     return root, pixels
 
 
 def acquisition_of(job: str) -> capture.AcquisitionResult:
     return capture.AcquisitionResult(
-        job=job, started_at=time.time() - 1, finished_at=time.time(), command_result={"success": True}
+        job=job,
+        started_at=time.time() - 1,
+        finished_at=time.time(),
+        command_result={"success": True},
     )
 
 
@@ -105,13 +124,20 @@ class TestOneCopy:
     def test_one_store_and_no_tiff(self, hires, tmp_path):
         root, _ = hires
 
-        saved = save_as_zarr(root, tmp_path, "HiRes", placement=at(1000.0, 2000.0, {0: 50.0}))
+        saved = save_as_zarr(
+            root, tmp_path, "HiRes", placement=at(1000.0, 2000.0, {0: 50.0})
+        )
 
         data = tmp_path / "out" / "data"
-        assert sorted(p.name for p in data.iterdir() if p.name != "metadata") == ["high-res_000001_A1.ome.zarr"]
+        assert sorted(p.name for p in data.iterdir() if p.name != "metadata") == [
+            "high-res_000001_A1.ome.zarr"
+        ]
         assert not list((tmp_path / "out").rglob("*.ome.tif*"))
         store = data / "high-res_000001_A1.ome.zarr"
-        assert saved.image_paths == {PlaneIndex(0, 0, 0): store, PlaneIndex(0, 0, 1): store}
+        assert saved.image_paths == {
+            PlaneIndex(0, 0, 0): store,
+            PlaneIndex(0, 0, 1): store,
+        }
 
     def test_nothing_half_written_is_left_behind(self, hires, tmp_path):
         root, _ = hires
@@ -119,28 +145,42 @@ class TestOneCopy:
         save_as_zarr(root, tmp_path, "HiRes", placement=at(0.0, 0.0, {0: 0.0}))
 
         data = tmp_path / "out" / "data"
-        assert [p.name for p in data.iterdir() if p.name not in ("metadata",)] == ["high-res_000001_A1.ome.zarr"]
-
+        assert [p.name for p in data.iterdir() if p.name not in ("metadata",)] == [
+            "high-res_000001_A1.ome.zarr"
+        ]
 
     @pytest.mark.parametrize("format", ["ome-zarr", "ome-tiff"])
-    def test_a_copy_that_does_not_read_back_as_written_is_not_saved(self, hires, tmp_path, monkeypatch, format):
+    def test_a_copy_that_does_not_read_back_as_written_is_not_saved(
+        self, hires, tmp_path, monkeypatch, format
+    ):
         """Nothing counts as saved, so nothing of LAS X's is let go of, unless it reads back exactly."""
         root, _ = hires
         monkeypatch.setattr(np, "array_equal", lambda *_, **__: False)
 
         with pytest.raises(RuntimeError, match="read back"):
             saving.save(
-                None, acquisition_of("HiRes"), tmp_path / "out",
+                None,
+                acquisition_of("HiRes"),
+                tmp_path / "out",
                 Naming(stem="high-res_000001_A1"),
-                cache_root=root, format=format, placement=at(0.0, 0.0, {0: 0.0}),
+                cache_root=root,
+                format=format,
+                placement=at(0.0, 0.0, {0: 0.0}),
             )
 
         data = tmp_path / "out" / "data"
-        assert not data.is_dir() or [p.name for p in data.iterdir() if p.name != "metadata"] == []
+        assert (
+            not data.is_dir()
+            or [p.name for p in data.iterdir() if p.name != "metadata"] == []
+        )
 
-    def test_a_store_held_open_for_a_moment_is_still_renamed_into_place(self, hires, tmp_path, monkeypatch, caplog):
+    def test_a_store_held_open_for_a_moment_is_still_renamed_into_place(
+        self, hires, tmp_path, monkeypatch, caplog
+    ):
         """Windows refuses to rename a folder while a file in it is open; the save waits it out."""
-        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.output import ome_zarr
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.output import (
+            ome_zarr,
+        )
 
         root, _ = hires
         real_replace, refusals = ome_zarr.os.replace, []
@@ -156,12 +196,18 @@ class TestOneCopy:
             save_as_zarr(root, tmp_path, "HiRes", placement=at(0.0, 0.0, {0: 0.0}))
 
         data = tmp_path / "out" / "data"
-        assert [p.name for p in data.iterdir() if p.name != "metadata"] == ["high-res_000001_A1.ome.zarr"]
+        assert [p.name for p in data.iterdir() if p.name != "metadata"] == [
+            "high-res_000001_A1.ome.zarr"
+        ]
         assert len(refusals) == 2
         assert "renamed into place after" in caplog.text
 
-    def test_a_store_held_open_for_too_long_is_not_saved(self, hires, tmp_path, monkeypatch):
-        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.output import ome_zarr
+    def test_a_store_held_open_for_too_long_is_not_saved(
+        self, hires, tmp_path, monkeypatch
+    ):
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.output import (
+            ome_zarr,
+        )
 
         root, _ = hires
         monkeypatch.setattr(ome_zarr, "RENAME_WAIT_S", 0.3)
@@ -194,7 +240,9 @@ class TestTheStore:
 
         saved = save_as_zarr(root, tmp_path, "HiRes", placement=at(0.0, 0.0, {0: 0.0}))
 
-        level = zarr.open_group(str(saved.image_paths[PlaneIndex(0, 0, 0)]), mode="r")["0"]
+        level = zarr.open_group(str(saved.image_paths[PlaneIndex(0, 0, 0)]), mode="r")[
+            "0"
+        ]
         assert level.shape == (1, 2, 1, 512, 512)
         assert level.dtype == np.uint16
         np.testing.assert_array_equal(level[0, 0, 0], pixels[0])
@@ -203,16 +251,24 @@ class TestTheStore:
     def test_axes_scale_and_where_it_lies_on_the_sample(self, hires, tmp_path):
         root, _ = hires
 
-        saved = save_as_zarr(root, tmp_path, "HiRes", placement=at(1000.0, 2000.0, {0: 50.0}))
+        saved = save_as_zarr(
+            root, tmp_path, "HiRes", placement=at(1000.0, 2000.0, {0: 50.0})
+        )
 
-        multiscale = attributes(saved.image_paths[PlaneIndex(0, 0, 0)])["ome"]["multiscales"][0]
+        multiscale = attributes(saved.image_paths[PlaneIndex(0, 0, 0)])["ome"][
+            "multiscales"
+        ][0]
         assert [a["name"] for a in multiscale["axes"]] == ["t", "c", "z", "y", "x"]
         [level] = multiscale["datasets"]
         transforms = {t["type"]: t for t in level["coordinateTransformations"]}
-        assert transforms["scale"]["scale"][3:] == pytest.approx([2.2705078125, 2.2705078125])
+        assert transforms["scale"]["scale"][3:] == pytest.approx(
+            [2.2705078125, 2.2705078125]
+        )
         # The stage point is the middle of the frame; the store starts at its corner.
         half = 512 * 2.2705078125 / 2
-        assert transforms["translation"]["translation"][2:] == pytest.approx([50.0, 2000.0 - half, 1000.0 - half])
+        assert transforms["translation"]["translation"][2:] == pytest.approx(
+            [50.0, 2000.0 - half, 1000.0 - half]
+        )
         # The viewer builds the coarser levels itself from this one.
         assert multiscale["type"] == "mean"
 
@@ -221,7 +277,9 @@ class TestTheStore:
 
         saved = save_as_zarr(root, tmp_path, "HiRes", placement=at(0.0, 0.0, {0: 0.0}))
 
-        channels = attributes(saved.image_paths[PlaneIndex(0, 0, 0)])["ome"]["omero"]["channels"]
+        channels = attributes(saved.image_paths[PlaneIndex(0, 0, 0)])["ome"]["omero"][
+            "channels"
+        ]
         assert [c["label"] for c in channels] == ["ALEXA 405", "ALEXA 488"]
         assert [c["color"].upper() for c in channels] == ["0000FF", "00FF00"]
 
@@ -235,9 +293,13 @@ class TestTheStore:
 
         store = saved.image_paths[PlaneIndex(0, 0, 0)]
         multiscale = attributes(store)["ome"]["multiscales"][0]
-        transforms = {t["type"]: t for t in multiscale["datasets"][0]["coordinateTransformations"]}
+        transforms = {
+            t["type"]: t for t in multiscale["datasets"][0]["coordinateTransformations"]
+        }
         assert transforms["scale"]["scale"][2] == pytest.approx(step)
-        assert transforms["translation"]["translation"][2] == pytest.approx(100.0 - 16 * step)
+        assert transforms["translation"]["translation"][2] == pytest.approx(
+            100.0 - 16 * step
+        )
         level = zarr.open_group(str(store), mode="r")["0"]
         # Plane 16 is the lowest, so it comes first.
         np.testing.assert_array_equal(level[0, 0, 0], pixels[16])
@@ -247,10 +309,16 @@ class TestTheStore:
         root, pixels = hires
 
         saved = save_as_zarr(
-            root, tmp_path, "HiRes", placement=at(0.0, 0.0, {0: 0.0}), orientation=Orientation(mirrored=True)
+            root,
+            tmp_path,
+            "HiRes",
+            placement=at(0.0, 0.0, {0: 0.0}),
+            orientation=Orientation(mirrored=True),
         )
 
-        level = zarr.open_group(str(saved.image_paths[PlaneIndex(0, 0, 0)]), mode="r")["0"]
+        level = zarr.open_group(str(saved.image_paths[PlaneIndex(0, 0, 0)]), mode="r")[
+            "0"
+        ]
         np.testing.assert_array_equal(level[0, 0, 0], pixels[0][:, ::-1])
 
 
@@ -259,7 +327,12 @@ class TestTheFullMetadata:
         ome_types = pytest.importorskip("ome_types")
         root, _ = stack
 
-        saved = save_as_zarr(root, tmp_path, "AF Job", placement=at(0.0, 0.0, {z: float(z) for z in range(17)}))
+        saved = save_as_zarr(
+            root,
+            tmp_path,
+            "AF Job",
+            placement=at(0.0, 0.0, {z: float(z) for z in range(17)}),
+        )
 
         xml = saved.image_paths[PlaneIndex(0, 0, 0)] / "OME" / "METADATA.ome.xml"
         ome = ome_types.from_xml(xml.read_text(encoding="utf-8"), validate=True)
@@ -290,18 +363,30 @@ class TestEveryFileSaysTheCanvasPosition:
 
         root, _ = hires
         saved = saving.save(
-            None, acquisition_of("HiRes"), tmp_path / "out",
+            None,
+            acquisition_of("HiRes"),
+            tmp_path / "out",
             Naming(stem="high-res_000001_A1"),
-            cache_root=root, format="ome-tiff", orientation=Orientation(),
+            cache_root=root,
+            format="ome-tiff",
+            orientation=Orientation(),
             placement=at(1000.0, 2000.0, {0: 50.0}),
         )
 
         with tifffile.TiffFile(saved.image_paths[PlaneIndex(0, 0, 1)]) as tif:
             ome = ome_types.from_xml(tif.pages[0].description, validate=True)
         [plane] = ome.images[0].pixels.planes
-        assert (plane.position_x, plane.position_y, plane.position_z) == (1000.0, 2000.0, 50.0)
-        drives = {m.k: float(m.value) for a in ome.structured_annotations.map_annotations
-                  if a.id == plane.annotation_refs[0].id for m in a.value.ms}
+        assert (plane.position_x, plane.position_y, plane.position_z) == (
+            1000.0,
+            2000.0,
+            50.0,
+        )
+        drives = {
+            m.k: float(m.value)
+            for a in ome.structured_annotations.map_annotations
+            if a.id == plane.annotation_refs[0].id
+            for m in a.value.ms
+        }
         assert drives["stage x (µm)"] == pytest.approx(63500.0)
 
     def test_the_stores_ome_xml_agrees_with_its_translation(self, stack, tmp_path):
@@ -310,30 +395,48 @@ class TestEveryFileSaysTheCanvasPosition:
         step = 38.55132 / 16
         heights = {z: 10.0 + step * z for z in range(17)}
 
-        saved = save_as_zarr(root, tmp_path, "AF Job", placement=at(1000.0, 2000.0, heights))
+        saved = save_as_zarr(
+            root, tmp_path, "AF Job", placement=at(1000.0, 2000.0, heights)
+        )
 
         store = saved.image_paths[PlaneIndex(0, 0, 0)]
-        ome = ome_types.from_xml((store / "OME" / "METADATA.ome.xml").read_text(encoding="utf-8"))
+        ome = ome_types.from_xml(
+            (store / "OME" / "METADATA.ome.xml").read_text(encoding="utf-8")
+        )
         planes = sorted(ome.images[0].pixels.planes, key=lambda p: p.the_z)
-        assert [p.position_z for p in planes] == pytest.approx([heights[z] for z in range(17)])
+        assert [p.position_z for p in planes] == pytest.approx(
+            [heights[z] for z in range(17)]
+        )
         assert {(p.position_x, p.position_y) for p in planes} == {(1000.0, 2000.0)}
-        translation = {t["type"]: t for t in attributes(store)["ome"]["multiscales"][0]["datasets"][0]
-                       ["coordinateTransformations"]}["translation"]["translation"]
+        translation = {
+            t["type"]: t
+            for t in attributes(store)["ome"]["multiscales"][0]["datasets"][0][
+                "coordinateTransformations"
+            ]
+        }["translation"]["translation"]
         assert translation[2] == pytest.approx(planes[0].position_z)
 
-    def test_without_a_canvas_position_no_plane_position_is_claimed(self, hires, tmp_path):
+    def test_without_a_canvas_position_no_plane_position_is_claimed(
+        self, hires, tmp_path
+    ):
         ome_types = pytest.importorskip("ome_types")
         import tifffile
 
         root, _ = hires
         saved = saving.save(
-            None, acquisition_of("HiRes"), tmp_path / "out",
+            None,
+            acquisition_of("HiRes"),
+            tmp_path / "out",
             Naming(stem="high-res_000001_A1"),
-            cache_root=root, format="ome-tiff", orientation=Orientation(),
+            cache_root=root,
+            format="ome-tiff",
+            orientation=Orientation(),
         )
 
         with tifffile.TiffFile(saved.image_paths[PlaneIndex(0, 0, 0)]) as tif:
-            [plane] = ome_types.from_xml(tif.pages[0].description).images[0].pixels.planes
+            [plane] = (
+                ome_types.from_xml(tif.pages[0].description).images[0].pixels.planes
+            )
         assert plane.position_x is None and plane.position_z is None
         assert plane.annotation_refs, "the actuators are still there"
 
@@ -346,10 +449,15 @@ class TestEveryFileSaysTheCanvasPosition:
 
 def save_with_projection(root, tmp_path, job, *, format, placement, projection="max"):
     return saving.save(
-        None, acquisition_of(job), tmp_path / "out",
+        None,
+        acquisition_of(job),
+        tmp_path / "out",
         Naming(stem="high-res_000001_A1"),
-        cache_root=root, format=format, orientation=Orientation(),
-        placement=placement, projection=projection,
+        cache_root=root,
+        format=format,
+        orientation=Orientation(),
+        placement=placement,
+        projection=projection,
     )
 
 
@@ -364,11 +472,18 @@ class TestTheProjection:
     def test_a_stack_gets_one_projection_store(self, stack, tmp_path):
         root, pixels = stack
 
-        saved = save_with_projection(root, tmp_path, "AF Job", format="ome-zarr",
-                                     placement=at(1000.0, 2000.0, self.heights()))
+        saved = save_with_projection(
+            root,
+            tmp_path,
+            "AF Job",
+            format="ome-zarr",
+            placement=at(1000.0, 2000.0, self.heights()),
+        )
 
         projections = tmp_path / "out" / "projections"
-        assert [p.name for p in projections.iterdir()] == ["high-res_000001_A1.ome.zarr"]
+        assert [p.name for p in projections.iterdir()] == [
+            "high-res_000001_A1.ome.zarr"
+        ]
         assert saved.projection_paths == (projections / "high-res_000001_A1.ome.zarr",)
         level = zarr.open_group(str(saved.projection_paths[0]), mode="r")["0"]
         assert level.shape == (1, 1, 1, 512, 512)
@@ -377,13 +492,30 @@ class TestTheProjection:
     def test_the_projection_lies_where_the_stack_starts(self, stack, tmp_path):
         root, _ = stack
 
-        saved = save_with_projection(root, tmp_path, "AF Job", format="ome-zarr",
-                                     placement=at(1000.0, 2000.0, self.heights()))
+        saved = save_with_projection(
+            root,
+            tmp_path,
+            "AF Job",
+            format="ome-zarr",
+            placement=at(1000.0, 2000.0, self.heights()),
+        )
 
-        data = attributes(saved.image_paths[PlaneIndex(0, 0, 0)])["ome"]["multiscales"][0]["datasets"][0]
-        flat = attributes(saved.projection_paths[0])["ome"]["multiscales"][0]["datasets"][0]
-        moved = {t["type"]: t["translation"] for t in data["coordinateTransformations"] if t["type"] == "translation"}
-        flat_moved = {t["type"]: t["translation"] for t in flat["coordinateTransformations"] if t["type"] == "translation"}
+        data = attributes(saved.image_paths[PlaneIndex(0, 0, 0)])["ome"]["multiscales"][
+            0
+        ]["datasets"][0]
+        flat = attributes(saved.projection_paths[0])["ome"]["multiscales"][0][
+            "datasets"
+        ][0]
+        moved = {
+            t["type"]: t["translation"]
+            for t in data["coordinateTransformations"]
+            if t["type"] == "translation"
+        }
+        flat_moved = {
+            t["type"]: t["translation"]
+            for t in flat["coordinateTransformations"]
+            if t["type"] == "translation"
+        }
         assert flat_moved["translation"] == pytest.approx(moved["translation"])
         assert flat_moved["translation"][2] == pytest.approx(10.0)
 
@@ -391,23 +523,39 @@ class TestTheProjection:
         ome_types = pytest.importorskip("ome_types")
         root, _ = stack
 
-        saved = save_with_projection(root, tmp_path, "AF Job", format="ome-zarr",
-                                     placement=at(0.0, 0.0, self.heights()))
+        saved = save_with_projection(
+            root,
+            tmp_path,
+            "AF Job",
+            format="ome-zarr",
+            placement=at(0.0, 0.0, self.heights()),
+        )
 
         ome = ome_types.from_xml(
-            (saved.projection_paths[0] / "OME" / "METADATA.ome.xml").read_text(encoding="utf-8"), validate=True
+            (saved.projection_paths[0] / "OME" / "METADATA.ome.xml").read_text(
+                encoding="utf-8"
+            ),
+            validate=True,
         )
         assert ome.images[0].pixels.size_z == 1
-        facts = {m.k: m.value for a in ome.structured_annotations.map_annotations for m in a.value.ms}
+        facts = {
+            m.k: m.value
+            for a in ome.structured_annotations.map_annotations
+            for m in a.value.ms
+        }
         assert facts["projection"] == "max over z"
         assert facts["projected planes"] == "17"
         assert float(facts["lowest plane z (µm)"]) == pytest.approx(10.0)
-        assert float(facts["highest plane z (µm)"]) == pytest.approx(10.0 + 16 * self.STEP)
+        assert float(facts["highest plane z (µm)"]) == pytest.approx(
+            10.0 + 16 * self.STEP
+        )
 
     def test_a_single_plane_gets_no_projection(self, hires, tmp_path):
         root, _ = hires
 
-        saved = save_with_projection(root, tmp_path, "HiRes", format="ome-zarr", placement=at(0.0, 0.0, {0: 0.0}))
+        saved = save_with_projection(
+            root, tmp_path, "HiRes", format="ome-zarr", placement=at(0.0, 0.0, {0: 0.0})
+        )
 
         assert saved.projection_paths == ()
         assert not (tmp_path / "out" / "projections").exists()
@@ -415,8 +563,14 @@ class TestTheProjection:
     def test_no_projection_when_none_is_asked_for(self, stack, tmp_path):
         root, _ = stack
 
-        saved = save_with_projection(root, tmp_path, "AF Job", format="ome-zarr",
-                                     placement=at(0.0, 0.0, self.heights()), projection="none")
+        saved = save_with_projection(
+            root,
+            tmp_path,
+            "AF Job",
+            format="ome-zarr",
+            placement=at(0.0, 0.0, self.heights()),
+            projection="none",
+        )
 
         assert saved.projection_paths == ()
 
@@ -425,8 +579,13 @@ class TestTheProjection:
 
         root, pixels = stack
 
-        saved = save_with_projection(root, tmp_path, "AF Job", format="ome-tiff",
-                                     placement=at(0.0, 0.0, self.heights()))
+        saved = save_with_projection(
+            root,
+            tmp_path,
+            "AF Job",
+            format="ome-tiff",
+            placement=at(0.0, 0.0, self.heights()),
+        )
 
         [path] = saved.projection_paths
         assert path.parent == tmp_path / "out" / "projections"
@@ -435,7 +594,9 @@ class TestTheProjection:
 
 
 def test_the_log_is_written_beside_data(tmp_path):
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.output import command_log
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.output import (
+        command_log,
+    )
 
     naming = Naming(stem="high-res_000001_A1")
     path = command_log.write(tmp_path / "out", naming, {"job": "HiRes", "µ": "µm"})
@@ -450,7 +611,9 @@ def test_the_description_holds_no_empty_values(hires, tmp_path):
 
     saved = save_as_zarr(root, tmp_path, "HiRes", placement=at(0.0, 0.0, {0: 0.0}))
 
-    text = (saved.image_paths[PlaneIndex(0, 0, 0)] / "zarr.json").read_text(encoding="utf-8")
+    text = (saved.image_paths[PlaneIndex(0, 0, 0)] / "zarr.json").read_text(
+        encoding="utf-8"
+    )
     assert "null" not in text
     axes = json.loads(text)["attributes"]["ome"]["multiscales"][0]["axes"]
     assert axes[1] == {"name": "c", "type": "channel"}

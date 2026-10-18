@@ -229,7 +229,9 @@ def _dispatch(
     else:
         pre_check_fn = None
 
-    effective_error_check = error_check_fn if error_check_fn is not None else profile.error_check_fn
+    effective_error_check = (
+        error_check_fn if error_check_fn is not None else profile.error_check_fn
+    )
     api_confirm_leg = (lambda: effective_confirm(client)) if effective_confirm else None
     final_confirm_fn = race_confirmations(
         api_leg=api_confirm_leg,
@@ -256,7 +258,9 @@ def _dispatch(
         profile=effective_profile,
         setup_fn=setup_fn,
         pre_check_fn=pre_check_fn,
-        error_check_fn=(lambda: effective_error_check(client)) if effective_error_check else None,
+        error_check_fn=(lambda: effective_error_check(client))
+        if effective_error_check
+        else None,
         confirm_fn=final_confirm_fn,
     )
 
@@ -314,7 +318,9 @@ def _scan_resonant_error_check(client, *, job_name, target, timeout=None):
     error_msg = err.get("error", "")
     details = err.get("details", {})
     if _SCAN_RESONANT_NO_CHANGE in error_msg.lower():
-        confirmed = _confirm_scan_resonant(client, job_name, target, poll_window=timeout)
+        confirmed = _confirm_scan_resonant(
+            client, job_name, target, poll_window=timeout
+        )
         logs.extend(confirmed.get("logs", []))
         if confirmed.get("success"):
             msg = f"Resonant -> {target} already matched; accepting LAS X no-change response"
@@ -349,7 +355,9 @@ def set_zoom(client, job_name, value, *, max_retries=None, tolerance=None):
         max_retries: Transient error retry ceiling.
         tolerance: Readback confirmation tolerance.
     """
-    refused = _limits_refusal(client, "set_zoom", {"job_name": job_name, "value": value})
+    refused = _limits_refusal(
+        client, "set_zoom", {"job_name": job_name, "value": value}
+    )
     if refused:
         return refused
     return _dispatch_setting(
@@ -370,7 +378,9 @@ def set_zoom(client, job_name, value, *, max_retries=None, tolerance=None):
 
 def set_scan_speed(client, job_name, value, *, max_retries=None):
     """Set scan speed for the specified job."""
-    refused = _limits_refusal(client, "set_scan_speed", {"job_name": job_name, "value": value})
+    refused = _limits_refusal(
+        client, "set_scan_speed", {"job_name": job_name, "value": value}
+    )
     if refused:
         return refused
     return _dispatch_setting(
@@ -386,7 +396,9 @@ def set_scan_speed(client, job_name, value, *, max_retries=None):
 
 def set_scan_resonant(client, job_name, enable, *, max_retries=None):
     """Enable or disable resonant scanning for the specified job."""
-    refused = _limits_refusal(client, "set_scan_resonant", {"job_name": job_name, "value": enable})
+    refused = _limits_refusal(
+        client, "set_scan_resonant", {"job_name": job_name, "value": enable}
+    )
     if refused:
         return refused
     api_obj = client.PyApiSetScannerToResonantByJobName
@@ -414,7 +426,9 @@ def set_scan_resonant(client, job_name, enable, *, max_retries=None):
 
 def set_scan_mode(client, job_name, mode, *, max_retries=None):
     """Set scan mode (e.g. 'xyz', 'xyzt') for the specified job."""
-    refused = _limits_refusal(client, "set_scan_mode", {"job_name": job_name, "value": mode})
+    refused = _limits_refusal(
+        client, "set_scan_mode", {"job_name": job_name, "value": mode}
+    )
     if refused:
         return refused
     return _dispatch_setting(
@@ -430,7 +444,9 @@ def set_scan_mode(client, job_name, mode, *, max_retries=None):
 
 def set_sequential_mode(client, job_name, mode, *, max_retries=None):
     """Set sequential mode ('Line', 'Frame', or 'Stack') for the specified job."""
-    refused = _limits_refusal(client, "set_sequential_mode", {"job_name": job_name, "value": mode})
+    refused = _limits_refusal(
+        client, "set_sequential_mode", {"job_name": job_name, "value": mode}
+    )
     if refused:
         return refused
     # Phase A: input validation and enum resolution
@@ -500,7 +516,9 @@ def set_scan_field_rotation(
             _confirm_scan_field_rotation,
             job_name=job_name,
             target=angle,
-            tolerance=_profile_value(SCAN_FIELD_ROTATION, "confirm_tolerance", tolerance),
+            tolerance=_profile_value(
+                SCAN_FIELD_ROTATION, "confirm_tolerance", tolerance
+            ),
         ),
         max_retries=max_retries,
     )
@@ -642,7 +660,9 @@ def set_objective(
     # for clients the driver connected; a failed pre-read refuses the change
     # while nothing has happened yet.
     try:
-        before = _objective_shift.record_before_change(client, job_name, compensate=compensate)
+        before = _objective_shift.record_before_change(
+            client, job_name, compensate=compensate
+        )
     except Exception as exc:  # noqa: BLE001 -- fail closed before the change fires
         return {
             "success": False,
@@ -668,14 +688,19 @@ def set_objective(
         OBJECTIVE,
         setup_fn=setup,
         confirm_fn=partial(
-            confirm_objective, job_name=job_name, target_slot=slot, target_name=target_name
+            confirm_objective,
+            job_name=job_name,
+            target_slot=slot,
+            target_name=target_name,
         ),
         max_retries=max_retries,
     )
     if before is not None and result.get("success"):
         result = _objective_shift.merge_into_result(
             result,
-            _objective_shift.compensate_after_change(client, job_name, before, new_slot=slot),
+            _objective_shift.compensate_after_change(
+                client, job_name, before, new_slot=slot
+            ),
         )
     return result
 
@@ -713,7 +738,10 @@ def set_z_stack_definition(
     refused = _limits_refusal(
         client,
         "set_z_stack_definition",
-        {"job_name": job_name, "values": [v for v in (begin_um, end_um) if v is not None]},
+        {
+            "job_name": job_name,
+            "values": [v for v in (begin_um, end_um) if v is not None],
+        },
     )
     if refused:
         return refused
@@ -754,7 +782,9 @@ def set_z_stack_definition(
             job_name=job_name,
             begin_um=begin_um,
             end_um=end_um,
-            tolerance=_profile_value(Z_STACK_DEFINITION, "confirm_tolerance", tolerance),
+            tolerance=_profile_value(
+                Z_STACK_DEFINITION, "confirm_tolerance", tolerance
+            ),
         ),
         max_retries=max_retries,
     )
@@ -791,15 +821,15 @@ def set_z_stack_step_size(
     )
 
 
-def set_z_stack_size(
-    client, job_name, size_um, *, max_retries=None, tolerance=None
-):
+def set_z_stack_size(client, job_name, size_um, *, max_retries=None, tolerance=None):
     """Set z-stack total size (micrometers).
 
     Note: LAS X may recalculate z-stack geometry when size is changed.
     Confirmation may report unconfirmed if "System Optimized" is active.
     """
-    refused = _limits_refusal(client, "set_z_stack_size", {"job_name": job_name, "value": size_um})
+    refused = _limits_refusal(
+        client, "set_z_stack_size", {"job_name": job_name, "value": size_um}
+    )
     if refused:
         return refused
     api_obj = client.PyApiSetZStackSizeByJobName
@@ -829,9 +859,7 @@ def set_z_stack_size(
 # =============================================================================
 
 
-def set_frame_accumulation(
-    client, job_name, setting_index, value, *, max_retries=None
-):
+def set_frame_accumulation(client, job_name, setting_index, value, *, max_retries=None):
     """Set frame accumulation count for a specific setting index."""
     refused = _limits_refusal(
         client, "set_frame_accumulation", {"job_name": job_name, "value": value}
@@ -841,19 +869,28 @@ def set_frame_accumulation(
     return _dispatch_setting(
         client,
         "PyApiSetFrameAccumulationByJobName",
-        {"JobName": job_name, "SettingIndex": setting_index, "FrameAccumulation": value},
+        {
+            "JobName": job_name,
+            "SettingIndex": setting_index,
+            "FrameAccumulation": value,
+        },
         f"Setting[{setting_index}].FrameAccumulation -> {value}",
         FRAME_ACCUMULATION,
-        partial(_confirm_frame_accumulation, job_name=job_name, si=setting_index, target=value),
+        partial(
+            _confirm_frame_accumulation,
+            job_name=job_name,
+            si=setting_index,
+            target=value,
+        ),
         max_retries=max_retries,
     )
 
 
-def set_frame_average(
-    client, job_name, setting_index, value, *, max_retries=None
-):
+def set_frame_average(client, job_name, setting_index, value, *, max_retries=None):
     """Set frame average count for a specific setting index."""
-    refused = _limits_refusal(client, "set_frame_average", {"job_name": job_name, "value": value})
+    refused = _limits_refusal(
+        client, "set_frame_average", {"job_name": job_name, "value": value}
+    )
     if refused:
         return refused
     return _dispatch_setting(
@@ -862,14 +899,14 @@ def set_frame_average(
         {"JobName": job_name, "SettingIndex": setting_index, "FrameAverage": value},
         f"Setting[{setting_index}].FrameAverage -> {value}",
         FRAME_AVERAGE,
-        partial(_confirm_frame_average, job_name=job_name, si=setting_index, target=value),
+        partial(
+            _confirm_frame_average, job_name=job_name, si=setting_index, target=value
+        ),
         max_retries=max_retries,
     )
 
 
-def set_line_accumulation(
-    client, job_name, setting_index, value, *, max_retries=None
-):
+def set_line_accumulation(client, job_name, setting_index, value, *, max_retries=None):
     """Set line accumulation count for a specific setting index."""
     refused = _limits_refusal(
         client, "set_line_accumulation", {"job_name": job_name, "value": value}
@@ -882,16 +919,21 @@ def set_line_accumulation(
         {"JobName": job_name, "SettingIndex": setting_index, "LineAccumulation": value},
         f"Setting[{setting_index}].LineAccumulation -> {value}",
         LINE_ACCUMULATION,
-        partial(_confirm_line_accumulation, job_name=job_name, si=setting_index, target=value),
+        partial(
+            _confirm_line_accumulation,
+            job_name=job_name,
+            si=setting_index,
+            target=value,
+        ),
         max_retries=max_retries,
     )
 
 
-def set_line_average(
-    client, job_name, setting_index, value, *, max_retries=None
-):
+def set_line_average(client, job_name, setting_index, value, *, max_retries=None):
     """Set line average count for a specific setting index."""
-    refused = _limits_refusal(client, "set_line_average", {"job_name": job_name, "value": value})
+    refused = _limits_refusal(
+        client, "set_line_average", {"job_name": job_name, "value": value}
+    )
     if refused:
         return refused
     return _dispatch_setting(
@@ -900,7 +942,9 @@ def set_line_average(
         {"JobName": job_name, "SettingIndex": setting_index, "LineAverage": value},
         f"Setting[{setting_index}].LineAverage -> {value}",
         LINE_AVERAGE,
-        partial(_confirm_line_average, job_name=job_name, si=setting_index, target=value),
+        partial(
+            _confirm_line_average, job_name=job_name, si=setting_index, target=value
+        ),
         max_retries=max_retries,
     )
 
@@ -915,7 +959,9 @@ def set_pinhole_airy(
     tolerance=None,
 ):
     """Set pinhole size in Airy units for a specific setting index."""
-    refused = _limits_refusal(client, "set_pinhole_airy", {"job_name": job_name, "value": value})
+    refused = _limits_refusal(
+        client, "set_pinhole_airy", {"job_name": job_name, "value": value}
+    )
     if refused:
         return refused
     return _dispatch_setting(
@@ -951,7 +997,9 @@ def set_detector_gain(
     tolerance=None,
 ):
     """Set detector gain for a specific detector identified by beam route."""
-    refused = _limits_refusal(client, "set_detector_gain", {"job_name": job_name, "value": value})
+    refused = _limits_refusal(
+        client, "set_detector_gain", {"job_name": job_name, "value": value}
+    )
     if refused:
         return refused
     return _dispatch_setting(
@@ -994,7 +1042,9 @@ def set_laser_intensity(
     tolerance=None,
 ):
     """Set laser intensity (0.0-1.0) for a specific laser line."""
-    refused = _limits_refusal(client, "set_laser_intensity", {"job_name": job_name, "value": value})
+    refused = _limits_refusal(
+        client, "set_laser_intensity", {"job_name": job_name, "value": value}
+    )
     if refused:
         return refused
     return _dispatch_setting(
@@ -1158,7 +1208,9 @@ def set_filter_wheel_spectrum(
             beam_route=beam_route,
             fw_type=filter_wheel_type,
             target=position,
-            tolerance=_profile_value(FILTER_WHEEL_SPECTRUM, "confirm_tolerance", tolerance),
+            tolerance=_profile_value(
+                FILTER_WHEEL_SPECTRUM, "confirm_tolerance", tolerance
+            ),
         ),
         max_retries=max_retries,
     )
@@ -1200,7 +1252,9 @@ def move_xy(client, x, y, unit="um", *, max_retries=None, tolerance=None):
             x_um, y_um = x * 1e6, y * 1e6
         else:
             x_um, y_um = x, y
-        refused = _limits_refusal(client, "move_xy", {"x_um": x_um, "y_um": y_um}, position=None)
+        refused = _limits_refusal(
+            client, "move_xy", {"x_um": x_um, "y_um": y_um}, position=None
+        )
         if refused:
             return refused
         check_xy(x_um, y_um)
@@ -1229,7 +1283,9 @@ def move_xy(client, x, y, unit="um", *, max_retries=None, tolerance=None):
         mode_val = type(api_obj.Model.MoveXyMode).eMoveXY
     except Exception:
         mode_val = 2  # eMoveXY=2 (NOT 0 which is eDontMove!)
-        log.warning("MoveXyMode enum resolution failed, using int fallback: %d", mode_val)
+        log.warning(
+            "MoveXyMode enum resolution failed, using int fallback: %d", mode_val
+        )
 
     def setup(m):
         m.RelativePosition = False
@@ -1418,7 +1474,9 @@ def acquire(
         confirm_fn=partial(
             confirm_acquire,
             start_timeout=_profile_value(ACQUIRE, "start_timeout", start_timeout),
-            heartbeat_interval=_profile_value(ACQUIRE, "heartbeat_interval", heartbeat_interval),
+            heartbeat_interval=_profile_value(
+                ACQUIRE, "heartbeat_interval", heartbeat_interval
+            ),
             timeout=_profile_value(ACQUIRE, "poll_timeout", poll_timeout),
             poll_interval=_profile_value(ACQUIRE, "poll_interval", poll_interval),
         ),

@@ -4,7 +4,10 @@ from __future__ import annotations
 
 import logging
 
-from ..vendor_interface.hardware_server import HardwareServerUnavailable, read_hardware_z_um
+from ..vendor_interface.hardware_server import (
+    HardwareServerUnavailable,
+    read_hardware_z_um,
+)
 from ..vendor_interface.parsing import parse_tile_geometry
 
 log = logging.getLogger(__name__)

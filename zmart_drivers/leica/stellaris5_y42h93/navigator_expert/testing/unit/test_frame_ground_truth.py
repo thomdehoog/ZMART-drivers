@@ -105,7 +105,11 @@ def _running(sim: SimScope):
 
     def settings(*_a, **_k):
         return {
-            "objective": {"name": f"lens{sim.slot}", "magnification": 10, "slotIndex": sim.slot},
+            "objective": {
+                "name": f"lens{sim.slot}",
+                "magnification": 10,
+                "slotIndex": sim.slot,
+            },
             "zPosition": {
                 "z-wide": {"position": sim.z_wide},
                 "z-galvo": {"position": sim.z_galvo},
@@ -116,7 +120,9 @@ def _running(sim: SimScope):
         patch.object(adapter._motion, "arrive_xy", fake_arrive),
         patch.object(adapter._commands, "move_z", fake_move_z),
         patch.object(
-            adapter._readers, "get_xy", side_effect=lambda c, **k: {"x_um": sim.x, "y_um": sim.y}
+            adapter._readers,
+            "get_xy",
+            side_effect=lambda c, **k: {"x_um": sim.x, "y_um": sim.y},
         ),
         patch.object(adapter._readers, "get_job_settings", side_effect=settings),
         patch.object(
@@ -167,7 +173,11 @@ def test_viewed_point_is_origin_view_plus_frame_target(
     expected = tuple(o + f for o, f in zip(origin_view, frame_target, strict=True))
     assert sim.viewed_point() == pytest.approx(expected)
     # and the read-back agrees with what was asked, in frame terms
-    assert (got["x"]["position"], got["y"]["position"], got["z"]["position"]) == pytest.approx(frame_target)
+    assert (
+        got["x"]["position"],
+        got["y"]["position"],
+        got["z"]["position"],
+    ) == pytest.approx(frame_target)
 
 
 def test_same_target_lands_identically_from_any_history():
@@ -214,7 +224,9 @@ def test_repeated_cross_objective_moves_do_not_accumulate():
 
     assert all(s == states[0] for s in states[1:])
     # the pinned leg is absolute: origin z-wide plus the lens-pair z delta
-    assert sim.z_wide == pytest.approx(ORIGIN_STATE["z_wide"] + (TRUE_T[2][2] - TRUE_T[1][2]))
+    assert sim.z_wide == pytest.approx(
+        ORIGIN_STATE["z_wide"] + (TRUE_T[2][2] - TRUE_T[1][2])
+    )
 
 
 def test_get_xyz_reports_truthfully_after_external_meddling():
@@ -236,7 +248,11 @@ def test_get_xyz_reports_truthfully_after_external_meddling():
         got = adapter.get_xyz(h)
 
     truth = tuple(v - o for v, o in zip(sim.viewed_point(), origin_view, strict=True))
-    assert (got["x"]["position"], got["y"]["position"], got["z"]["position"]) == pytest.approx(truth)
+    assert (
+        got["x"]["position"],
+        got["y"]["position"],
+        got["z"]["position"],
+    ) == pytest.approx(truth)
 
 
 def test_focus_split_does_not_change_frame_z():
@@ -262,7 +278,9 @@ def test_swap_compensation_keeps_the_viewed_point():
     client = SimpleNamespace()
     session_state.install(
         client,
-        session_state.SessionConfig(orientation=Orientation(), translations=dict(TRUE_T)),
+        session_state.SessionConfig(
+            orientation=Orientation(), translations=dict(TRUE_T)
+        ),
     )
     try:
 
@@ -279,7 +297,9 @@ def test_swap_compensation_keeps_the_viewed_point():
 
         with (
             patch.object(
-                readers, "get_xy", side_effect=lambda c, **k: {"x_um": sim.x, "y_um": sim.y}
+                readers,
+                "get_xy",
+                side_effect=lambda c, **k: {"x_um": sim.x, "y_um": sim.y},
             ),
             patch.object(
                 readers,
@@ -291,7 +311,9 @@ def test_swap_compensation_keeps_the_viewed_point():
                 "get_job_settings",
                 side_effect=lambda c, j, **k: {"objective": {"slotIndex": sim.slot}},
             ),
-            patch.object(readers, "read_zwide_um", side_effect=lambda c, j, **k: sim.z_wide),
+            patch.object(
+                readers, "read_zwide_um", side_effect=lambda c, j, **k: sim.z_wide
+            ),
             patch.object(commands_mod, "move_xy", fake_move_xy),
             patch.object(commands_mod, "move_z", fake_move_z),
         ):

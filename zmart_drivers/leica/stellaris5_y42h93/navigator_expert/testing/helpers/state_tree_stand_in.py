@@ -66,7 +66,13 @@ SIMULATOR_SETTINGS = {
     ("Confocal", "HWParameter", "ScanRotationAngleMax"): 100.0,
     ("Acquire", "ActiveDataSource", "CurrentSerialNumber"): "STELLARIS SIMULATOR",
     ("Confocal", "HWParameter", "CurrentMultiFunctionPortPos"): 1,
-    ("Confocal", "HWParameter", "MultiFunctionPortNameList"): ("--- ", "Substrate ", "SD 470", "DD 470/640", "--- "),
+    ("Confocal", "HWParameter", "MultiFunctionPortNameList"): (
+        "--- ",
+        "Substrate ",
+        "SD 470",
+        "DD 470/640",
+        "--- ",
+    ),
     ("Confocal", "FastLiveParametersResonant", "ScanSpeedMax"): 12000,
     ("Confocal", "ServiceOnlyParameter", "CanDoAFC"): False,
     ("Microscope", "CurrentMotCorrPos"): 0.0,
@@ -78,7 +84,12 @@ SIMULATOR_SETTINGS = {
 
 
 def aotf_line(wavelength, index, intensity):
-    return {"WaveLength": wavelength, "IsLineChecked": True, "LineIndex": index, "Intensity": intensity}
+    return {
+        "WaveLength": wavelength,
+        "IsLineChecked": True,
+        "LineIndex": index,
+        "Intensity": intensity,
+    }
 
 
 #: The simulator's light sources (Confocal/LightSourceList), 2026-10-13: the UV
@@ -107,7 +118,11 @@ SIMULATOR_LIGHT_SOURCES = [
         },
         "Shutter": {"IsShutterActive": True},
         "AOTF": {
-            "AotfLine": [aotf_line(488.0, 0, 0.0), aotf_line(638.0, 1, 0.0), aotf_line(730.0, 2, 0.0)]
+            "AotfLine": [
+                aotf_line(488.0, 0, 0.0),
+                aotf_line(638.0, 1, 0.0),
+                aotf_line(730.0, 2, 0.0),
+            ]
         },
     },
     {
@@ -115,7 +130,12 @@ SIMULATOR_LIGHT_SOURCES = [
         "BeamRoute": (10, 10),
         "LaserList": {"Laser": [laser("WLL", 485.0, 685.0)]},
         "Shutter": {"IsShutterActive": True},
-        "AOTF": {"AotfLine": [aotf_line(497.0, 0, 2.000135222048726), aotf_line(681.0, 1, 0.0)]},
+        "AOTF": {
+            "AotfLine": [
+                aotf_line(497.0, 0, 2.000135222048726),
+                aotf_line(681.0, 1, 0.0),
+            ]
+        },
     },
 ]
 
@@ -145,15 +165,36 @@ SIMULATOR_DETECTION = {
         {
             "DetectionUnitList": {
                 "DetectorHWInfo": [
-                    detector((40, 2), "HyD 2", 4, 410.0, 487.0, True, "Leica/ALEXA 405", 2.5),
-                    detector((40, 3), "HyD S 3", 6, 502.0, 779.0, True, "Leica/ALEXA 488", 2.5),
+                    detector(
+                        (40, 2), "HyD 2", 4, 410.0, 487.0, True, "Leica/ALEXA 405", 2.5
+                    ),
+                    detector(
+                        (40, 3),
+                        "HyD S 3",
+                        6,
+                        502.0,
+                        779.0,
+                        True,
+                        "Leica/ALEXA 488",
+                        2.5,
+                    ),
                 ]
             }
         },
         {
             "DetectionUnitList": {
                 "DetectorHWInfo": [
-                    detector((10, 5), "Trans PMT", 3, 350.0, 800.0, False, "None", 0.0, photon_counting=False)
+                    detector(
+                        (10, 5),
+                        "Trans PMT",
+                        3,
+                        350.0,
+                        800.0,
+                        False,
+                        "None",
+                        0.0,
+                        photon_counting=False,
+                    )
                 ]
             }
         },
@@ -220,11 +261,21 @@ class StandInNodes:
         self.stage = stage  # () -> (x_m, y_m)
         self.zdrives = zdrives  # () -> {z_use_mode: metres}
         self.status = {}  # AcquisitionState, CurrentRunningBlockID, ... overriding rest values
-        self.live = dict(SIMULATOR_SETTINGS)  # path -> value (or a function giving it), the current setting's nodes
-        self.objectives = [dict(o) for o in SIMULATOR_OBJECTIVES]  # Microscope/ObjectiveList, by slot
-        self.light_sources = copy.deepcopy(SIMULATOR_LIGHT_SOURCES)  # Confocal/LightSourceList
-        self.detection = copy.deepcopy(SIMULATOR_DETECTION)  # Confocal/SpectralDetection
-        self.filter_wheels = copy.deepcopy(SIMULATOR_FILTER_WHEELS)  # Confocal/HWParameter/FilterWheelList
+        self.live = dict(
+            SIMULATOR_SETTINGS
+        )  # path -> value (or a function giving it), the current setting's nodes
+        self.objectives = [
+            dict(o) for o in SIMULATOR_OBJECTIVES
+        ]  # Microscope/ObjectiveList, by slot
+        self.light_sources = copy.deepcopy(
+            SIMULATOR_LIGHT_SOURCES
+        )  # Confocal/LightSourceList
+        self.detection = copy.deepcopy(
+            SIMULATOR_DETECTION
+        )  # Confocal/SpectralDetection
+        self.filter_wheels = copy.deepcopy(
+            SIMULATOR_FILTER_WHEELS
+        )  # Confocal/HWParameter/FilterWheelList
         self.generation = 0
         self.reads = 0
         self.node_calls = 0
@@ -270,7 +321,12 @@ class StandInNodes:
         node = 1000 + 1000 * self.generation
         for name, (block, element) in self.jobs().items():
             info = node
-            add(info, "SequenceBlockInfo", 4, children=(info + 1, info + 2, info + 3, info + 4, info + 5))
+            add(
+                info,
+                "SequenceBlockInfo",
+                4,
+                children=(info + 1, info + 2, info + 3, info + 4, info + 5),
+            )
             add(info + 1, "Name", info, name)
             add(info + 2, "Type", info, 1)
             add(info + 3, "BlockID", info, block)
@@ -351,7 +407,9 @@ class StandInNodes:
         return values.get(node_id)
 
 
-JOB_SETTINGS_READ = re.compile(r'<ATL Command="ATL_GetBlockApiInfoAsJsonString" Attribute="(\d+)"/>')
+JOB_SETTINGS_READ = re.compile(
+    r'<ATL Command="ATL_GetBlockApiInfoAsJsonString" Attribute="(\d+)"/>'
+)
 HARDWARE_INFO_READ = '<Scanner Command="GetConfocalHardwareInfoAsJson"/>'
 
 

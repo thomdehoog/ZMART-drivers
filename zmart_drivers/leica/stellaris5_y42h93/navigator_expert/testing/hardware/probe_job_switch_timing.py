@@ -61,22 +61,32 @@ def _timed_readings(t0: float):
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--yes", action="store_true", help="the stage is clear; switch jobs")
-    parser.add_argument("--rounds", type=int, default=2, help="round trips per job (default 2)")
+    parser.add_argument(
+        "--yes", action="store_true", help="the stage is clear; switch jobs"
+    )
+    parser.add_argument(
+        "--rounds", type=int, default=2, help="round trips per job (default 2)"
+    )
     args = parser.parse_args(argv)
     if not args.yes:
-        parser.error("pass --yes once the stage is clear: a job switch can move the stage")
+        parser.error(
+            "pass --yes once the stage is clear: a job switch can move the stage"
+        )
 
     t0 = time.monotonic()
     _timed_readings(t0)
-    connection = json.loads((_DRIVER_ROOT / "zmart_driver.json").read_text(encoding="utf-8"))
+    connection = json.loads(
+        (_DRIVER_ROOT / "zmart_driver.json").read_text(encoding="utf-8")
+    )
     driver = ZmartDriver(connection["connection"])
     try:
         _, (changeable, _) = driver.get_state()
         start = changeable["job"]
         _, settings = driver.get_acquisition_settings()
         others = [name for name in settings["job"]["options"] if name != start]
-        print(f"start job: {start!r}; switching to {others} and back, {args.rounds} round(s)")
+        print(
+            f"start job: {start!r}; switching to {others} and back, {args.rounds} round(s)"
+        )
         for _round in range(args.rounds):
             for target in others:
                 for job in (target, start):

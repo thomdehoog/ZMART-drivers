@@ -132,7 +132,9 @@ def start_session(
             directory.mkdir(parents=True, exist_ok=True)
     else:
         if session_id is None:
-            raise ValueError("session_id is required when parent_session is not provided")
+            raise ValueError(
+                "session_id is required when parent_session is not provided"
+            )
         if sessions_root is None:
             from ..configuration.store import MACHINE
 
@@ -165,7 +167,9 @@ def start_session(
     )
 
 
-def _require_calibrated_slot(session: CalibrationCheckSession, slot: int, name: str) -> None:
+def _require_calibrated_slot(
+    session: CalibrationCheckSession, slot: int, name: str
+) -> None:
     if slot not in session.translations:
         raise RuntimeError(
             f"objective slot {slot} ({name}) is not covered by the adopted "
@@ -193,7 +197,9 @@ def measure_reference(session: CalibrationCheckSession) -> CalibrationCheckSessi
     return session
 
 
-def measure_target_and_report(session: CalibrationCheckSession, *, show: bool = True) -> dict:
+def measure_target_and_report(
+    session: CalibrationCheckSession, *, show: bool = True
+) -> dict:
     """Return to the spot via the calibrated offset, re-image, report the leftover."""
     if session.home_xy is None or session.home_z is None or session.ref_image is None:
         raise RuntimeError("run measure_reference first")
@@ -216,7 +222,9 @@ def measure_target_and_report(session: CalibrationCheckSession, *, show: bool = 
     delta = (tgt_t[0] - ref_t[0], tgt_t[1] - ref_t[1], tgt_t[2] - ref_t[2])
     session.applied_translation_um = delta
 
-    move_xy_and_verify(session.client, session.home_xy[0] + delta[0], session.home_xy[1] + delta[1])
+    move_xy_and_verify(
+        session.client, session.home_xy[0] + delta[0], session.home_xy[1] + delta[1]
+    )
     move_zwide_and_verify(session.client, session.job_name, session.home_z + delta[2])
     session.target_image = acquire_frame_to(session, "target")
     session.target_pixel_size_um = read_job_geometry(
@@ -290,7 +298,9 @@ def _pair_offset_um(ref, ref_ps, tgt, tgt_ps):
         rows = (np.arange(h) - h / 2.0) * scale + img.shape[0] / 2.0
         cols = (np.arange(w) - w / 2.0) * scale + img.shape[1] / 2.0
         gr, gc = np.meshgrid(rows, cols, indexing="ij")
-        return map_coordinates(np.asarray(img, np.float32), [gr, gc], order=1, mode="nearest")
+        return map_coordinates(
+            np.asarray(img, np.float32), [gr, gc], order=1, mode="nearest"
+        )
 
     ref_w, tgt_w = window(ref, ref_ps), window(tgt, tgt_ps)
     if float(np.std(ref_w)) < 1e-6 or float(np.std(tgt_w)) < 1e-6:

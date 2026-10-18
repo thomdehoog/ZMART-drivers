@@ -134,7 +134,9 @@ class ZmartDriver:
 
         An unknown setting or job is refused with ``ValueError``.
         """
-        return True, _adapter.set_state(self._handle, {"changeable": dict(changeable)})["applied"]
+        return True, _adapter.set_state(self._handle, {"changeable": dict(changeable)})[
+            "applied"
+        ]
 
     # --- acquiring ----------------------------------------------------------------------
 
@@ -152,7 +154,9 @@ class ZmartDriver:
         and the stage position it was taken at, in the sample's frame.
         """
         answer = _adapter.acquire(
-            self._handle, position_label=position_label, acquisition_settings=acquisition_settings
+            self._handle,
+            position_label=position_label,
+            acquisition_settings=acquisition_settings,
         )
         return True, (answer["files"], answer["planes"])
 

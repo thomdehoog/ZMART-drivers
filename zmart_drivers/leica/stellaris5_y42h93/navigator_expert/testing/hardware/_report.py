@@ -62,7 +62,9 @@ def confirmation_of(result: dict) -> str:
     return "success"  # command has no readback confirmation concept
 
 
-_ENVELOPE_LOG = logging.getLogger("zmart_drivers.leica.stellaris5_y42h93.navigator_expert.envelope")
+_ENVELOPE_LOG = logging.getLogger(
+    "zmart_drivers.leica.stellaris5_y42h93.navigator_expert.envelope"
+)
 _ENVELOPE_LEVELS = {
     "debug": logging.DEBUG,
     "info": logging.INFO,
@@ -81,7 +83,9 @@ def replay_envelope_logs(result: dict, *, label: str = "") -> None:
     """
     prefix = f"[{label}] " if label else ""
     for entry in result.get("logs") or []:
-        level = _ENVELOPE_LEVELS.get(str(entry.get("level", "info")).lower(), logging.INFO)
+        level = _ENVELOPE_LEVELS.get(
+            str(entry.get("level", "info")).lower(), logging.INFO
+        )
         _ENVELOPE_LOG.log(level, "%s%s", prefix, entry.get("msg", entry))
 
 
@@ -342,7 +346,9 @@ class RunReport:
                 for e in problems
             ]
         else:
-            lines.append("None -- every attempted change reported success and confirmed.")
+            lines.append(
+                "None -- every attempted change reported success and confirmed."
+            )
         return lines
 
     def render(self, *, crashed: str | None = None) -> str:
@@ -376,7 +382,9 @@ class RunReport:
         if self.log_path is not None:
             lines.append(f"- **Driver log**: `{self.log_path}` (full log-line capture)")
         if crashed:
-            lines.append(f"- **CRASHED**: `{_cell(crashed)}` -- entries below are partial.")
+            lines.append(
+                f"- **CRASHED**: `{_cell(crashed)}` -- entries below are partial."
+            )
         lines += ["", "## Summary", ""]
         lines.append(
             "| Phase | Actions attempted | Passed | Warned | Failed | Skipped "
@@ -386,10 +394,14 @@ class RunReport:
         keys = ("attempted", "PASS", "WARN", "FAIL", "SKIP", "confirmed", "unconfirmed")
         totals = dict.fromkeys(keys, 0)
         for phase, c in self._phase_counts():
-            lines.append(f"| {_cell(phase)} | " + " | ".join(str(c[k]) for k in keys) + " |")
+            lines.append(
+                f"| {_cell(phase)} | " + " | ".join(str(c[k]) for k in keys) + " |"
+            )
             for k in keys:
                 totals[k] += c[k]
-        lines.append("| **total** | " + " | ".join(f"**{totals[k]}**" for k in keys) + " |")
+        lines.append(
+            "| **total** | " + " | ".join(f"**{totals[k]}**" for k in keys) + " |"
+        )
         if self.notes:
             lines += ["", "## Findings / notes", ""]
             lines += [f"- {note}" for note in self.notes]

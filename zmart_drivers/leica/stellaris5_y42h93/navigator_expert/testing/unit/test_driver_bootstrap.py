@@ -32,7 +32,9 @@ print("bootstrap-ok")
 def test_driver_imports_with_only_the_repository_root_on_path(tmp_path):
     """The Leica package imports by its full name from the repository root alone."""
     repo_root = Path(__file__).resolve().parents[6]
-    assert (repo_root / "zmart_drivers" / "__init__.py").is_file(), f"not the repo root: {repo_root}"
+    assert (repo_root / "zmart_drivers" / "__init__.py").is_file(), (
+        f"not the repo root: {repo_root}"
+    )
 
     script = tmp_path / "child.py"
     script.write_text(CHILD_SCRIPT.format(repo=str(repo_root)))

@@ -55,7 +55,11 @@ class StandInServer:
     def SendCommand2(self, xml, result):
         self.sent.append(xml)
         answer = answer_json_read(xml, self.client, self.ServerNodes)
-        return answer if answer is not None else '<Result Error="1">not a read the stand-in answers</Result>'
+        return (
+            answer
+            if answer is not None
+            else '<Result Error="1">not a read the stand-in answers</Result>'
+        )
 
 
 @pytest.fixture
@@ -89,7 +93,12 @@ class TestFromTheTree:
     def test_selected_job(self, client, tree):
         reading = readers.get_selected_job(client, diagnostics=True)
         assert reading.source == "direct"
-        assert reading.value == {"Name": "HiRes", "ID": 152, "IsSelected": True, "IsAutofocus": False}
+        assert reading.value == {
+            "Name": "HiRes",
+            "ID": 152,
+            "IsSelected": True,
+            "IsAutofocus": False,
+        }
 
     def test_both_z_drives_in_micrometres(self, client, tree):
         client._hardware_z_um.update({"z-galvo": 2.5, "z-wide": 4999.5})
@@ -99,7 +108,12 @@ class TestFromTheTree:
 
     def test_the_z_of_a_stacked_drive_is_the_true_one(self, client, tree):
         # The job settings freeze the drive carrying the stack; the tree does not.
-        client._jobs["HiRes"]["stack"] = {"begin": -10.0, "end": 10.0, "sections": 21, "mode": "z-galvo"}
+        client._jobs["HiRes"]["stack"] = {
+            "begin": -10.0,
+            "end": 10.0,
+            "sections": 21,
+            "mode": "z-galvo",
+        }
         client._hardware_z_um["z-galvo"] = 7.0
         assert readers.read_z_um(client, "HiRes", "z-galvo") == pytest.approx(7.0)
 
@@ -129,7 +143,11 @@ class TestRememberedNodes:
 
     def test_a_reloaded_experiment_is_followed(self, client, tree):
         assert readers.get_selected_job(client)["ID"] == 152
-        tree.jobs = lambda: {"AF Job": (166, 1), "Overview": (164, 2), "HiRes": (162, 3)}
+        tree.jobs = lambda: {
+            "AF Job": (166, 1),
+            "Overview": (164, 2),
+            "HiRes": (162, 3),
+        }
         tree.reload()
         assert readers.get_selected_job(client)["ID"] == 162
 
@@ -143,9 +161,18 @@ class TestSuccessChecks:
         assert readers.get_xy(client)["x_um"] == pytest.approx(50025.0)
 
     def test_move_z_on_the_stacked_drive(self, client, tree):
-        client._jobs["HiRes"]["stack"] = {"begin": -10.0, "end": 10.0, "sections": 21, "mode": "z-galvo"}
+        client._jobs["HiRes"]["stack"] = {
+            "begin": -10.0,
+            "end": 10.0,
+            "sections": 21,
+            "mode": "z-galvo",
+        }
         result = commands.move_z(client, "HiRes", 12.0, z_mode="galvo")
-        assert (result["success"], result["confirmed"], result["timing"]["attempts"]) == (True, True, 1)
+        assert (
+            result["success"],
+            result["confirmed"],
+            result["timing"]["attempts"],
+        ) == (True, True, 1)
 
     def test_select_job(self, client, tree):
         result = commands.select_job(client, "Overview")
@@ -176,15 +203,24 @@ class TestEveryDatumDirectly:
         assert reading.value == readers.get_hardware_info(client, mode="api")
 
     def test_the_selected_jobs_settings(self, client, tree):
-        reading = readers.get_job_settings(client, "HiRes", mode="direct", diagnostics=True)
+        reading = readers.get_job_settings(
+            client, "HiRes", mode="direct", diagnostics=True
+        )
         assert reading.source == "direct"
-        assert reading.value["zoom"] == readers.get_job_settings(client, "HiRes", mode="api")["zoom"]
+        assert (
+            reading.value["zoom"]
+            == readers.get_job_settings(client, "HiRes", mode="api")["zoom"]
+        )
 
     def test_the_field_of_view_through_the_settings(self, client, tree):
-        assert readers.get_fov(client, "HiRes", mode="direct") == readers.get_fov(client, "HiRes", mode="api")
+        assert readers.get_fov(client, "HiRes", mode="direct") == readers.get_fov(
+            client, "HiRes", mode="api"
+        )
 
     def test_another_jobs_settings_come_directly_too(self, client, tree):
-        reading = readers.get_job_settings(client, "Overview", mode="direct", diagnostics=True)
+        reading = readers.get_job_settings(
+            client, "Overview", mode="direct", diagnostics=True
+        )
         assert reading.source == "direct"
         assert reading.value == readers.get_job_settings(client, "Overview", mode="api")
 
@@ -196,7 +232,10 @@ class TestDirectByDefault:
         assert readers.get_scan_status(client, diagnostics=True).source == "direct"
         assert readers.get_jobs(client, diagnostics=True).source == "direct"
         assert readers.get_hardware_info(client, diagnostics=True).source == "direct"
-        assert readers.get_job_settings(client, "HiRes", diagnostics=True).source == "direct"
+        assert (
+            readers.get_job_settings(client, "HiRes", diagnostics=True).source
+            == "direct"
+        )
         assert readers.get_xy(client, diagnostics=True).source == "direct"
         assert readers.get_selected_job(client, diagnostics=True).source == "direct"
 
@@ -231,27 +270,41 @@ class TestDirectByDefault:
         client._jobs["HiRes"]["zPosition"]["z-wide"]["position"] = 123.0
         assert readers.read_z_um(client, "HiRes", "z-wide") == pytest.approx(123.0)
 
-    def test_the_idle_check_before_a_command_asks_the_direct_reader(self, client, tree, monkeypatch):
+    def test_the_idle_check_before_a_command_asks_the_direct_reader(
+        self, client, tree, monkeypatch
+    ):
         asked = []
-        monkeypatch.setattr(readers.api_reader, "get_scan_status", lambda c: asked.append(c) or "eScanIdle")
+        monkeypatch.setattr(
+            readers.api_reader,
+            "get_scan_status",
+            lambda c: asked.append(c) or "eScanIdle",
+        )
         assert prechecks.check_idle(client)["success"] is True
         assert asked == []
 
-    def test_the_end_of_a_capture_is_watched_through_the_direct_reader(self, client, tree, monkeypatch):
+    def test_the_end_of_a_capture_is_watched_through_the_direct_reader(
+        self, client, tree, monkeypatch
+    ):
         # The scan runs for three readings, then LAS X is idle again.
-        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.actions import confirmations
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.actions import (
+            confirmations,
+        )
 
         real, asked = readers.get_scan_status, []
 
         def watched(*args, **kwargs):
             asked.append((kwargs.get("mode"), kwargs.get("fallback")))
-            tree.status = {"AcquisitionState": 2 if len(asked) <= 3 else 0}  # eScanSingle, then idle
+            tree.status = {
+                "AcquisitionState": 2 if len(asked) <= 3 else 0
+            }  # eScanSingle, then idle
             reading = real(*args, **kwargs)
             asked[-1] += (reading.source if reading is not None else None,)
             return reading
 
         monkeypatch.setattr(readers, "get_scan_status", watched)
-        result = confirmations.confirm_acquire(client, start_timeout=5.0, timeout=10.0, poll_interval=0.001)
+        result = confirmations.confirm_acquire(
+            client, start_timeout=5.0, timeout=10.0, poll_interval=0.001
+        )
         assert result["success"] is True
         assert {call for call in asked} == {("direct", "api", "direct")}
 
@@ -261,7 +314,9 @@ class TestDirectByDefault:
         # The direct reader says HiRes is selected; a stale log line claims the
         # target, Overview, already is. The switch must still be made, and the
         # CAM API's job list is never read for it.
-        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.actions import confirm_select_job
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.actions import (
+            confirm_select_job,
+        )
 
         real_jobs, api_job_lists = readers.get_jobs, []
 
@@ -271,17 +326,25 @@ class TestDirectByDefault:
             return real_jobs(*args, **kwargs)
 
         monkeypatch.setattr(readers, "get_jobs", jobs)
-        monkeypatch.setattr(confirm_select_job, "_selected_job_name_from_log", lambda _profile: "Overview")
+        monkeypatch.setattr(
+            confirm_select_job,
+            "_selected_job_name_from_log",
+            lambda _profile: "Overview",
+        )
         result = commands.select_job(client, "Overview")
         assert (result["success"], client._selected_job) == (True, "Overview")
         assert api_job_lists == []
 
     def test_the_idle_check_falls_back_to_the_api_alone(self, client, monkeypatch):
         # No hardware server (the suite's conftest): the API decides, never the log, whose idle goes stale.
-        monkeypatch.setattr(readers.log_reader, "parse_log", lambda: pytest.fail("the log was asked"))
+        monkeypatch.setattr(
+            readers.log_reader, "parse_log", lambda: pytest.fail("the log was asked")
+        )
         assert prechecks.check_idle(client)["success"] is True
 
-    def test_the_selected_job_check_falls_back_on_an_unexpected_error(self, client, tree, monkeypatch):
+    def test_the_selected_job_check_falls_back_on_an_unexpected_error(
+        self, client, tree, monkeypatch
+    ):
         def changed_tree():
             raise ValueError("CurrentSequenceList")
 

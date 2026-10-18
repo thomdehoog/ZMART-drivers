@@ -34,11 +34,15 @@ OME = "{http://www.openmicroscopy.org/Schemas/OME/2016-06}"
 
 
 def metadata_of(name: str) -> AcquisitionMetadata:
-    return described.metadata_from_description((DATA / f"{name}.xml").read_text(encoding="utf-8"))
+    return described.metadata_from_description(
+        (DATA / f"{name}.xml").read_text(encoding="utf-8")
+    )
 
 
 def autosave_pixels(name: str) -> ET.Element:
-    root = ET.fromstring((DATA / f"{name}.autosave.ome.xml").read_text(encoding="utf-8"))
+    root = ET.fromstring(
+        (DATA / f"{name}.autosave.ome.xml").read_text(encoding="utf-8")
+    )
     return root.find(f".//{OME}Pixels")
 
 
@@ -50,7 +54,12 @@ class TestThePicture:
     def test_size_bit_depth_and_exact_pixel_size(self):
         metadata = metadata_of(HIRES)
 
-        assert (metadata.size_x, metadata.size_y, metadata.size_z, metadata.size_c) == (512, 512, 1, 2)
+        assert (metadata.size_x, metadata.size_y, metadata.size_z, metadata.size_c) == (
+            512,
+            512,
+            1,
+            2,
+        )
         assert metadata.pixel_type == "uint16"
         assert metadata.significant_bits == 12
         # 1.1625 mm over 512 pixels, not the 2.27 the job settings round to.
@@ -78,7 +87,9 @@ class TestThePicture:
         metadata = described.metadata_from_description(xml.replace(axis, flipped))
 
         assert metadata.physical_size_z_um == pytest.approx(38.55132 / 16)
-        heights = [metadata.planes[PlaneIndex(0, z, 0)].position_z_um for z in range(17)]
+        heights = [
+            metadata.planes[PlaneIndex(0, z, 0)].position_z_um for z in range(17)
+        ]
         assert heights[0] == pytest.approx(-19.27566 + 38.55132)
         assert heights == sorted(heights, reverse=True)
 
@@ -93,8 +104,13 @@ class TestThePicture:
     def test_every_plane_says_where_it_was_taken(self):
         metadata = metadata_of(STACK)
 
-        first, last = metadata.planes[PlaneIndex(0, 0, 0)], metadata.planes[PlaneIndex(0, 16, 0)]
-        assert (first.position_x_um, first.position_y_um) == pytest.approx((63500.0, 41500.0))
+        first, last = (
+            metadata.planes[PlaneIndex(0, 0, 0)],
+            metadata.planes[PlaneIndex(0, 16, 0)],
+        )
+        assert (first.position_x_um, first.position_y_um) == pytest.approx(
+            (63500.0, 41500.0)
+        )
         assert first.position_z_um == pytest.approx(-19.27566)
         assert last.position_z_um == pytest.approx(-19.27566 + 38.55132)
 
@@ -157,7 +173,10 @@ class TestTheInstrument:
         instrument = metadata_of(HIRES).instrument
 
         assert sorted(d.model for d in instrument.detectors) == ["HyD 2", "HyD S 3"]
-        assert sorted(laser.model for laser in instrument.lasers) == ["Laser 405", "WLL"]
+        assert sorted(laser.model for laser in instrument.lasers) == [
+            "Laser 405",
+            "WLL",
+        ]
 
 
 class TestWhatOmeHasNoFieldFor:
@@ -190,7 +209,9 @@ class TestTheOmeWritten:
         for plane in theirs.iter(f"{OME}Plane"):
             index = PlaneIndex(0, int(plane.get("TheZ")), int(plane.get("TheC")))
             ours = ET.fromstring(
-                canonical.plane_xml(metadata, index=index, filename="p.ome.tif", shape_yx=(512, 512))
+                canonical.plane_xml(
+                    metadata, index=index, filename="p.ome.tif", shape_yx=(512, 512)
+                )
             )
             pixels = ours.find(f".//{OME}Pixels")
             for key in ("SizeX", "SizeY", "Type", "SignificantBits"):
@@ -198,14 +219,26 @@ class TestTheOmeWritten:
             for axis in "XY":
                 assert math.isclose(
                     float(pixels.get(f"PhysicalSize{axis}")),
-                    in_um(theirs.get(f"PhysicalSize{axis}"), theirs.get(f"PhysicalSize{axis}Unit")),
+                    in_um(
+                        theirs.get(f"PhysicalSize{axis}"),
+                        theirs.get(f"PhysicalSize{axis}Unit"),
+                    ),
                     rel_tol=1e-12,
                 )
             [our_plane] = ours.iter(f"{OME}Plane")
             for axis in "XYZ":
-                assert in_um(our_plane.get(f"Position{axis}"), our_plane.get(f"Position{axis}Unit")) == (
-                    pytest.approx(in_um(plane.get(f"Position{axis}"), plane.get(f"Position{axis}Unit")),
-                                  rel=1e-6, abs=1e-6)
+                assert in_um(
+                    our_plane.get(f"Position{axis}"),
+                    our_plane.get(f"Position{axis}Unit"),
+                ) == (
+                    pytest.approx(
+                        in_um(
+                            plane.get(f"Position{axis}"),
+                            plane.get(f"Position{axis}Unit"),
+                        ),
+                        rel=1e-6,
+                        abs=1e-6,
+                    )
                 ), (index, axis)
         assert size_c == metadata.size_c
 
@@ -214,9 +247,15 @@ class TestTheOmeWritten:
         ome_types = pytest.importorskip("ome_types")
         metadata = metadata_of(name)
 
-        for index in (PlaneIndex(0, 0, 0), PlaneIndex(0, metadata.size_z - 1, metadata.size_c - 1)):
+        for index in (
+            PlaneIndex(0, 0, 0),
+            PlaneIndex(0, metadata.size_z - 1, metadata.size_c - 1),
+        ):
             xml = canonical.plane_xml(
-                metadata, index=index, filename="p.ome.tif", shape_yx=(512, 512),
+                metadata,
+                index=index,
+                filename="p.ome.tif",
+                shape_yx=(512, 512),
                 state={"software": {"name": "ZMART"}},
             )
             ome = ome_types.from_xml(xml.decode("ascii"), validate=True)
@@ -228,7 +267,12 @@ class TestTheOmeWritten:
     def test_the_file_text_is_plain_ascii(self):
         metadata = metadata_of(HIRES)
 
-        xml = canonical.plane_xml(metadata, index=PlaneIndex(0, 0, 0), filename="p.ome.tif", shape_yx=(512, 512))
+        xml = canonical.plane_xml(
+            metadata,
+            index=PlaneIndex(0, 0, 0),
+            filename="p.ome.tif",
+            shape_yx=(512, 512),
+        )
 
         xml.decode("ascii")
         assert b"&#181;m" in xml
@@ -237,7 +281,12 @@ class TestTheOmeWritten:
         metadata = metadata_of(HIRES)
 
         root = ET.fromstring(
-            canonical.plane_xml(metadata, index=PlaneIndex(0, 0, 1), filename="p.ome.tif", shape_yx=(512, 512))
+            canonical.plane_xml(
+                metadata,
+                index=PlaneIndex(0, 0, 1),
+                filename="p.ome.tif",
+                shape_yx=(512, 512),
+            )
         )
 
         [channel] = root.iter(f"{OME}Channel")
@@ -250,12 +299,20 @@ class TestTheOmeWritten:
         assert facts["zoom"] == "1"
 
 
-def with_z_wide_at(name: str, metres: str, *, stack_drive: str | None = None) -> AcquisitionMetadata:
+def with_z_wide_at(
+    name: str, metres: str, *, stack_drive: str | None = None
+) -> AcquisitionMetadata:
     """A fixture as if the z-wide drive had stood at *metres* (the simulator keeps it at 0)."""
     text = (DATA / f"{name}.xml").read_text(encoding="utf-8")
-    text = text.replace('ZUseModeName="z-wide" ZPosition="0"', f'ZUseModeName="z-wide" ZPosition="{metres}"')
+    text = text.replace(
+        'ZUseModeName="z-wide" ZPosition="0"',
+        f'ZUseModeName="z-wide" ZPosition="{metres}"',
+    )
     if stack_drive is not None:
-        text = text.replace('ZUseMode="1" ZUseModeName="z-galvo"', f'ZUseMode="2" ZUseModeName="{stack_drive}"')
+        text = text.replace(
+            'ZUseMode="1" ZUseModeName="z-galvo"',
+            f'ZUseMode="2" ZUseModeName="{stack_drive}"',
+        )
     return described.metadata_from_description(text)
 
 
@@ -276,7 +333,10 @@ class TestEveryPlaneSaysWhereEachDriveStood:
     def test_the_plane_height_is_both_z_drives_together(self):
         metadata = with_z_wide_at(STACK, "0.0009")
 
-        first, last = metadata.planes[PlaneIndex(0, 0, 0)], metadata.planes[PlaneIndex(0, 16, 0)]
+        first, last = (
+            metadata.planes[PlaneIndex(0, 0, 0)],
+            metadata.planes[PlaneIndex(0, 16, 0)],
+        )
         assert dict(first.actuators)["z-wide (µm)"] == pytest.approx(900.0)
         assert first.position_z_um == pytest.approx(900.0 - 19.27566)
         assert last.position_z_um == pytest.approx(900.0 + 19.27566)
@@ -288,19 +348,30 @@ class TestEveryPlaneSaysWhereEachDriveStood:
         last = dict(metadata.planes[PlaneIndex(0, 16, 0)].actuators)
         assert first["z-wide (µm)"] == pytest.approx(-19.27566)
         assert last["z-wide (µm)"] == pytest.approx(19.27566)
-        assert first["z-galvo (µm)"] == last["z-galvo (µm)"] == pytest.approx(19.275422269005238)
+        assert (
+            first["z-galvo (µm)"]
+            == last["z-galvo (µm)"]
+            == pytest.approx(19.275422269005238)
+        )
 
     def test_the_written_plane_carries_each_drive(self):
         ome_types = pytest.importorskip("ome_types")
         metadata = with_z_wide_at(HIRES, "0.0012")
 
-        xml = canonical.plane_xml(metadata, index=PlaneIndex(0, 0, 1), filename="p.ome.tif", shape_yx=(512, 512))
+        xml = canonical.plane_xml(
+            metadata,
+            index=PlaneIndex(0, 0, 1),
+            filename="p.ome.tif",
+            shape_yx=(512, 512),
+        )
 
         ome = ome_types.from_xml(xml.decode("ascii"), validate=True)
         [plane] = ome.images[0].pixels.planes
         assert plane.position_z == pytest.approx(1200.0, abs=1e-3)
         [ref] = plane.annotation_refs
-        drives = next(a for a in ome.structured_annotations.map_annotations if a.id == ref.id)
+        drives = next(
+            a for a in ome.structured_annotations.map_annotations if a.id == ref.id
+        )
         values = {m.k: m.value for m in drives.value.ms}
         assert float(values["z-wide (µm)"]) == pytest.approx(1200.0)
         assert float(values["stage x (µm)"]) == pytest.approx(63500.0)

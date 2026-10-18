@@ -57,7 +57,9 @@ class ExperimentButton:
     def __init__(self, client, element):
         pattern = element.GetCurrentPattern(client.UIA_TogglePatternId)
         if not pattern:
-            raise NavigatorUnavailable("Navigator Expert's Experiment button cannot be pressed")
+            raise NavigatorUnavailable(
+                "Navigator Expert's Experiment button cannot be pressed"
+            )
         self.toggle = pattern.QueryInterface(client.IUIAutomationTogglePattern)
 
     def is_on(self) -> bool:
@@ -115,19 +117,25 @@ def walked(path, missing: str):
     p = uia.CreatePropertyCondition
     found = uia.GetRootElement().FindFirst(
         c.TreeScope_Children,
-        uia.CreateAndCondition(p(c.UIA_NamePropertyId, "LAS X"), p(c.UIA_ClassNamePropertyId, "Window")),
+        uia.CreateAndCondition(
+            p(c.UIA_NamePropertyId, "LAS X"), p(c.UIA_ClassNamePropertyId, "Window")
+        ),
     )
     if not found:
         raise NavigatorUnavailable("LAS X's window was not found")
     for class_name, automation_id, name in path:
         condition = p(c.UIA_ClassNamePropertyId, class_name)
         if automation_id:
-            condition = uia.CreateAndCondition(condition, p(c.UIA_AutomationIdPropertyId, automation_id))
+            condition = uia.CreateAndCondition(
+                condition, p(c.UIA_AutomationIdPropertyId, automation_id)
+            )
         if name:
             condition = uia.CreateAndCondition(condition, p(c.UIA_NamePropertyId, name))
         found = found.FindFirst(c.TreeScope_Children, condition)
         if not found:
-            raise NavigatorUnavailable(f"LAS X's window holds no {class_name} {automation_id or name or ''} ({missing})")
+            raise NavigatorUnavailable(
+                f"LAS X's window holds no {class_name} {automation_id or name or ''} ({missing})"
+            )
     return c, uia, found
 
 
@@ -136,29 +144,53 @@ def find_clear_button() -> ClearButton:
     c, uia, found = walked(NAVIGATOR_PATH, "is the Navigator shown?")
     p = uia.CreatePropertyCondition
     for what, condition in (
-        ("the view Navigator", uia.CreateAndCondition(
-            p(c.UIA_AutomationIdPropertyId, "Navigator"), p(c.UIA_ClassNamePropertyId, "ViewStageOverview"))),
+        (
+            "the view Navigator",
+            uia.CreateAndCondition(
+                p(c.UIA_AutomationIdPropertyId, "Navigator"),
+                p(c.UIA_ClassNamePropertyId, "ViewStageOverview"),
+            ),
+        ),
         ("its action bar", p(c.UIA_ClassNamePropertyId, "StageOverviewActionBar")),
-        ("its Clear button", uia.CreateAndCondition(
-            p(c.UIA_ControlTypePropertyId, c.UIA_ButtonControlTypeId), p(c.UIA_NamePropertyId, "Clear"))),
+        (
+            "its Clear button",
+            uia.CreateAndCondition(
+                p(c.UIA_ControlTypePropertyId, c.UIA_ButtonControlTypeId),
+                p(c.UIA_NamePropertyId, "Clear"),
+            ),
+        ),
     ):
         found = found.FindFirst(c.TreeScope_Descendants, condition)
         if not found:
-            raise NavigatorUnavailable(f"{what} was not found in the Navigator's tab (is the Navigator shown?)")
+            raise NavigatorUnavailable(
+                f"{what} was not found in the Navigator's tab (is the Navigator shown?)"
+            )
     return ClearButton(c, found)
 
 
 def find_experiment_button() -> ExperimentButton:
     """Navigator Expert's Experiment button, by :data:`SWITCH_PATH`, never a whole-window search."""
-    c, uia, found = walked(SWITCH_PATH, "so no Experiment button; is Navigator Expert open?")
+    c, uia, found = walked(
+        SWITCH_PATH, "so no Experiment button; is Navigator Expert open?"
+    )
     p = uia.CreatePropertyCondition
-    switch = found.FindFirst(c.TreeScope_Descendants, p(c.UIA_ClassNamePropertyId, "ModuleSwitchBetweenLDMAndMatrixView"))
+    switch = found.FindFirst(
+        c.TreeScope_Descendants,
+        p(c.UIA_ClassNamePropertyId, "ModuleSwitchBetweenLDMAndMatrixView"),
+    )
     button = None
     if switch:
-        button = switch.FindFirst(c.TreeScope_Children, uia.CreateAndCondition(
-            p(c.UIA_ControlTypePropertyId, c.UIA_ButtonControlTypeId), p(c.UIA_NamePropertyId, "Experiment")))
+        button = switch.FindFirst(
+            c.TreeScope_Children,
+            uia.CreateAndCondition(
+                p(c.UIA_ControlTypePropertyId, c.UIA_ButtonControlTypeId),
+                p(c.UIA_NamePropertyId, "Experiment"),
+            ),
+        )
     if not button:
-        raise NavigatorUnavailable("Navigator Expert's Experiment button was not found (is Navigator Expert open?)")
+        raise NavigatorUnavailable(
+            "Navigator Expert's Experiment button was not found (is Navigator Expert open?)"
+        )
     return ExperimentButton(c, button)
 
 
@@ -221,5 +253,7 @@ def clear_canvas() -> bool:
         except Exception as why:  # noqa: BLE001 -- a kept element that no longer answers is found again
             kept.button = None
             if attempt == 2:
-                raise NavigatorUnavailable(f"the Navigator's Clear button did not answer: {why}") from why
+                raise NavigatorUnavailable(
+                    f"the Navigator's Clear button did not answer: {why}"
+                ) from why
     return False

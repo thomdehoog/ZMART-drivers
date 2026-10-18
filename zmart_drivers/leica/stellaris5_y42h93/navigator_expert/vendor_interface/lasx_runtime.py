@@ -55,7 +55,9 @@ def load_lasx_api_runtime() -> Any:
     refs = [System.Reflection.Assembly.LoadFile(str(path)) for path in dll_paths]
     model_type = refs[0].GetType("PYLICamApiConnector.LasxApiClientPyModel")
     if model_type is None:
-        raise RuntimeError(f"PYLICamApiConnector.LasxApiClientPyModel not found in {dll_paths[0]}")
+        raise RuntimeError(
+            f"PYLICamApiConnector.LasxApiClientPyModel not found in {dll_paths[0]}"
+        )
     version = refs[0].GetName().Version.ToString()
     model = System.Activator.CreateInstance(model_type)
     return SimpleNamespace(

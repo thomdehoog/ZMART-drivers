@@ -131,12 +131,20 @@ _BAD_LIMITS_TEXTS = {
     "legacy_schema": json.dumps(
         {"schema_version": 1, "source": "defaults", "constraints": {}, "functions": {}}
     ),
-    "missing_axis": _with_payload(lambda p: {k: v for k, v in p.items() if k != "y_um"}),
+    "missing_axis": _with_payload(
+        lambda p: {k: v for k, v in p.items() if k != "y_um"}
+    ),
     "unknown_key": _with_payload(lambda p: {**p, "theta_deg": {"range": [0, 360]}}),
-    "axis_not_a_range": _with_payload(lambda p: {**p, "x_um": {"min": 1000, "max": 130000}}),
+    "axis_not_a_range": _with_payload(
+        lambda p: {**p, "x_um": {"min": 1000, "max": 130000}}
+    ),
     "axis_wrong_length": _with_payload(lambda p: {**p, "x_um": {"range": [1000]}}),
-    "axis_wrong_type": _with_payload(lambda p: {**p, "x_um": {"allowed": [1000, 130000]}}),
-    "min_greater_than_max": _valid_limits_text(dict(DEFAULT_STAGE_UM, x=[130000, 1000])),
+    "axis_wrong_type": _with_payload(
+        lambda p: {**p, "x_um": {"allowed": [1000, 130000]}}
+    ),
+    "min_greater_than_max": _valid_limits_text(
+        dict(DEFAULT_STAGE_UM, x=[130000, 1000])
+    ),
     # json.dumps emits NaN / Infinity literals (allow_nan) — the validators must refuse.
     "nan": _valid_limits_text(dict(DEFAULT_STAGE_UM, x=[float("nan"), 130000])),
     "infinity": _valid_limits_text(dict(DEFAULT_STAGE_UM, x=[1000, float("inf")])),
@@ -157,7 +165,9 @@ def test_malformed_limits_json_falls_back_to_defaults(attack, mock_client):
     # an in-envelope move works; an out-of-envelope one still refuses, so a
     # widened/garbage file can never authorize a move the defaults forbid
     assert commands_mod.move_xy(mock_client, 50000, 50000, unit="um")["success"] is True
-    _assert_refused(commands_mod.move_xy(mock_client, 999999, 50000, unit="um"), needle="outside")
+    _assert_refused(
+        commands_mod.move_xy(mock_client, 999999, 50000, unit="um"), needle="outside"
+    )
     # reads still work
     assert mock_client.PyApiPing is not None
 
@@ -170,12 +180,16 @@ _BAD_FUNCTION_LIMITS_TEXTS = {
     "truncated": '{"x_um":',
     "non_json": "definitely not json",
     "empty_dict": "{}",
-    "missing_setter": _with_payload(lambda p: {k: v for k, v in p.items() if k != "set_zoom"}),
+    "missing_setter": _with_payload(
+        lambda p: {k: v for k, v in p.items() if k != "set_zoom"}
+    ),
     "unknown_setter": _with_payload(lambda p: {**p, "set_warp_drive": []}),
     "setter_is_null": _with_payload(lambda p: {**p, "set_zoom": None}),
     "setter_is_string": _with_payload(lambda p: {**p, "set_zoom": "unlimited"}),
     "setter_untyped_nonempty": _with_payload(lambda p: {**p, "set_zoom": [1, 10]}),
-    "setter_unknown_type": _with_payload(lambda p: {**p, "set_zoom": {"limits": [1, 10]}}),
+    "setter_unknown_type": _with_payload(
+        lambda p: {**p, "set_zoom": {"limits": [1, 10]}}
+    ),
     "setter_two_types": _with_payload(
         lambda p: {**p, "set_zoom": {"range": [1, 10], "allowed": [1, 10]}}
     ),
@@ -195,9 +209,15 @@ _BAD_FUNCTION_LIMITS_TEXTS = {
     "setter_nonfinite_allowed": _with_payload(
         lambda p: {**p, "set_zoom": {"allowed": [float("nan")]}}
     ),
-    "setter_boolean_range": _with_payload(lambda p: {**p, "set_zoom": {"range": [False, True]}}),
-    "setter_string_range": _with_payload(lambda p: {**p, "set_zoom": {"range": ["1", "5"]}}),
-    "setter_null_allowed": _with_payload(lambda p: {**p, "set_zoom": {"allowed": [None]}}),
+    "setter_boolean_range": _with_payload(
+        lambda p: {**p, "set_zoom": {"range": [False, True]}}
+    ),
+    "setter_string_range": _with_payload(
+        lambda p: {**p, "set_zoom": {"range": ["1", "5"]}}
+    ),
+    "setter_null_allowed": _with_payload(
+        lambda p: {**p, "set_zoom": {"allowed": [None]}}
+    ),
 }
 
 
@@ -209,7 +229,9 @@ def test_malformed_function_limits_falls_back_to_defaults(attack, mock_client):
     assert state.ok, attack
     assert state.limits.describe()["is_fallback"] is True
     # the default policy governs: an out-of-envelope move still refuses
-    _assert_refused(commands_mod.move_xy(mock_client, 999999, 50000, unit="um"), needle="outside")
+    _assert_refused(
+        commands_mod.move_xy(mock_client, 999999, 50000, unit="um"), needle="outside"
+    )
 
 
 def test_nan_in_axis_range_triggers_the_defaults_fallback(mock_client):
@@ -242,8 +264,18 @@ def test_objective_allow_list_checks_the_resolved_slot(mock_client):
     hw_info = {
         "Microscope": {
             "objectives": [
-                {"slotIndex": 1, "name": "10x", "magnification": 10, "objectiveNumber": 1},
-                {"slotIndex": 2, "name": "20x", "magnification": 20, "objectiveNumber": 2},
+                {
+                    "slotIndex": 1,
+                    "name": "10x",
+                    "magnification": 10,
+                    "objectiveNumber": 1,
+                },
+                {
+                    "slotIndex": 2,
+                    "name": "20x",
+                    "magnification": 20,
+                    "objectiveNumber": 2,
+                },
             ]
         }
     }
@@ -262,7 +294,12 @@ def test_objective_allow_list_allows_a_listed_slot(mock_client):
     hw_info = {
         "Microscope": {
             "objectives": [
-                {"slotIndex": 1, "name": "10x", "magnification": 10, "objectiveNumber": 1}
+                {
+                    "slotIndex": 1,
+                    "name": "10x",
+                    "magnification": 10,
+                    "objectiveNumber": 1,
+                }
             ]
         }
     }
@@ -283,14 +320,28 @@ def test_default_objective_slot_is_unrestricted(mock_client):
     hw_info = {
         "Microscope": {
             "objectives": [
-                {"slotIndex": 0, "name": "5x", "magnification": 5, "objectiveNumber": 5},
-                {"slotIndex": 2, "name": "20x", "magnification": 20, "objectiveNumber": 2},
+                {
+                    "slotIndex": 0,
+                    "name": "5x",
+                    "magnification": 5,
+                    "objectiveNumber": 5,
+                },
+                {
+                    "slotIndex": 2,
+                    "name": "20x",
+                    "magnification": 20,
+                    "objectiveNumber": 2,
+                },
             ]
         }
     }
 
-    assert commands_mod.set_objective(mock_client, "HiRes", hw_info, slot_index=0)["success"]
-    assert commands_mod.set_objective(mock_client, "HiRes", hw_info, name="20x")["success"]
+    assert commands_mod.set_objective(mock_client, "HiRes", hw_info, slot_index=0)[
+        "success"
+    ]
+    assert commands_mod.set_objective(mock_client, "HiRes", hw_info, name="20x")[
+        "success"
+    ]
 
 
 @pytest.mark.parametrize(
@@ -314,7 +365,9 @@ def test_poisoned_move_xy_targets_refuse(governed_client, x, y):
     assert _mock_stage_position(governed_client) == before  # nothing fired
 
 
-@pytest.mark.parametrize("z", [float("nan"), float("inf"), float("-inf"), None, "12", 1e18, -1e18])
+@pytest.mark.parametrize(
+    "z", [float("nan"), float("inf"), float("-inf"), None, "12", 1e18, -1e18]
+)
 @pytest.mark.parametrize("z_mode", ["galvo", "zwide"])
 def test_poisoned_move_z_targets_refuse(governed_client, z, z_mode):
     result = commands_mod.move_z(governed_client, "HiRes", z, unit="um", z_mode=z_mode)
@@ -332,7 +385,9 @@ def test_nan_never_slips_past_a_bounded_constraint():
 
 def test_degenerate_envelope_min_equals_max_pins_the_stage(mock_client):
     """min == max is legal and means exactly one allowed position."""
-    provision_machine_limits(_machine_root(), stage_um=dict(DEFAULT_STAGE_UM, x=[50000.0, 50000.0]))
+    provision_machine_limits(
+        _machine_root(), stage_um=dict(DEFAULT_STAGE_UM, x=[50000.0, 50000.0])
+    )
     state = gate.connect_handshake(mock_client)
     assert state.ok, state.error
     ok = commands_mod.move_xy(mock_client, 50000, 30000, unit="um")
@@ -354,7 +409,9 @@ def test_moves_refuse_before_any_handshake(mock_client):
     assert _mock_stage_position(mock_client) == before
 
 
-def test_manual_set_stage_limits_allows_silent_widening_but_backstop_holds(governed_client):
+def test_manual_set_stage_limits_allows_silent_widening_but_backstop_holds(
+    governed_client,
+):
     """PINS the current contract: set_stage_limits() accepts a WIDER envelope
     without complaint (an explicit operator action — flagged for review, not
     changed here). The hardcoded backstop still refuses the move the widened
@@ -416,7 +473,9 @@ def test_hand_widened_limits_file_does_not_govern(mock_client):
     assert state.limits.describe()["is_fallback"] is True
     # a target the WIDENED file would have allowed (y within [0, 400000]) but the
     # defaults forbid must still refuse — the wide value is not in force
-    _assert_refused(commands_mod.move_xy(mock_client, 50000, 300000, unit="um"), needle="outside")
+    _assert_refused(
+        commands_mod.move_xy(mock_client, 50000, 300000, unit="um"), needle="outside"
+    )
 
 
 def test_broken_setter_entry_widens_a_narrow_envelope_to_the_defaults(mock_client):
@@ -436,7 +495,9 @@ def test_broken_setter_entry_widens_a_narrow_envelope_to_the_defaults(mock_clien
     # x=100000 violates the (rejected) machine file's narrow envelope but sits
     # inside the defaults: the fallback allows it. This is the sanctioned
     # trade-off — bounded by the defaults and the backstop, not left dead.
-    assert commands_mod.move_xy(mock_client, 100000, 50000, unit="um")["success"] is True
+    assert (
+        commands_mod.move_xy(mock_client, 100000, 50000, unit="um")["success"] is True
+    )
 
 
 def test_rehandshake_after_fixing_the_file_replaces_the_fallback(mock_client):
@@ -452,14 +513,17 @@ def test_rehandshake_after_fixing_the_file_replaces_the_fallback(mock_client):
     # The operator fixes the file in the newest limits snapshot, which is what
     # the next handshake reads.
     (profile.latest_snapshot("limits") / "limits.json").write_text(
-        _valid_limits_text(dict(DEFAULT_STAGE_UM, x=[40000.0, 60000.0])), encoding="utf-8"
+        _valid_limits_text(dict(DEFAULT_STAGE_UM, x=[40000.0, 60000.0])),
+        encoding="utf-8",
     )
     # ...and reconnects: the machine envelope governs again.
     state2 = gate.connect_handshake(mock_client)
     assert state2.ok
     assert state2.limits.describe()["is_fallback"] is False
     assert motion_limits.get_stage_limits()["x_min"] == 40000.0
-    _assert_refused(commands_mod.move_xy(mock_client, 100000, 50000, unit="um"), needle="outside")
+    _assert_refused(
+        commands_mod.move_xy(mock_client, 100000, 50000, unit="um"), needle="outside"
+    )
     assert commands_mod.move_xy(mock_client, 50000, 50000, unit="um")["success"] is True
 
 
@@ -495,7 +559,9 @@ def test_setter_key_missing_from_machine_file_falls_back_to_defaults(mock_client
     ungated), so it is rejected and the complete bundled defaults govern."""
     _raw_snapshot(
         _machine_root(),
-        limits_text=_with_payload(lambda p: {k: v for k, v in p.items() if k != "set_zoom"}),
+        limits_text=_with_payload(
+            lambda p: {k: v for k, v in p.items() if k != "set_zoom"}
+        ),
     )
     state = gate.connect_handshake(mock_client)
     assert state.ok
@@ -536,10 +602,16 @@ class _Untouchable:
     """A client stand-in that fails the test if the wrapper touches it."""
 
     def __getattr__(self, name):  # pragma: no cover - reaching here IS the failure
-        raise AssertionError(f"native client touched (attribute {name!r}) before the gate refused")
+        raise AssertionError(
+            f"native client touched (attribute {name!r}) before the gate refused"
+        )
 
 
-_HW_INFO = {"Microscope": {"objectives": [{"slotIndex": 1, "name": "10x", "objectiveNumber": 1}]}}
+_HW_INFO = {
+    "Microscope": {
+        "objectives": [{"slotIndex": 1, "name": "10x", "objectiveNumber": 1}]
+    }
+}
 
 # wrapper name -> zero-state invocation (client is a poisoned _Untouchable):
 # the gate must refuse BEFORE any client attribute is touched.
@@ -548,25 +620,43 @@ _WRAPPER_CALLS = {
     "set_scan_speed": lambda c: commands_mod.set_scan_speed(c, "Overview", 400),
     "set_scan_resonant": lambda c: commands_mod.set_scan_resonant(c, "Overview", True),
     "set_scan_mode": lambda c: commands_mod.set_scan_mode(c, "Overview", "xyz"),
-    "set_sequential_mode": lambda c: commands_mod.set_sequential_mode(c, "Overview", "Frame"),
-    "set_scan_field_rotation": lambda c: commands_mod.set_scan_field_rotation(c, "Overview", 0.0),
-    "set_image_format": lambda c: commands_mod.set_image_format(c, "Overview", "512 x 512"),
-    "set_objective": lambda c: commands_mod.set_objective(c, "J", _HW_INFO, slot_index=1),
+    "set_sequential_mode": lambda c: commands_mod.set_sequential_mode(
+        c, "Overview", "Frame"
+    ),
+    "set_scan_field_rotation": lambda c: commands_mod.set_scan_field_rotation(
+        c, "Overview", 0.0
+    ),
+    "set_image_format": lambda c: commands_mod.set_image_format(
+        c, "Overview", "512 x 512"
+    ),
+    "set_objective": lambda c: commands_mod.set_objective(
+        c, "J", _HW_INFO, slot_index=1
+    ),
     "set_z_stack_definition": lambda c: commands_mod.set_z_stack_definition(
         c, "Overview", begin_um=0.0, end_um=1.0
     ),
-    "set_z_stack_step_size": lambda c: commands_mod.set_z_stack_step_size(c, "Overview", 1.0),
+    "set_z_stack_step_size": lambda c: commands_mod.set_z_stack_step_size(
+        c, "Overview", 1.0
+    ),
     "set_z_stack_size": lambda c: commands_mod.set_z_stack_size(c, "Overview", 10.0),
-    "set_frame_accumulation": lambda c: commands_mod.set_frame_accumulation(c, "Overview", 0, 2),
+    "set_frame_accumulation": lambda c: commands_mod.set_frame_accumulation(
+        c, "Overview", 0, 2
+    ),
     "set_frame_average": lambda c: commands_mod.set_frame_average(c, "Overview", 0, 2),
-    "set_line_accumulation": lambda c: commands_mod.set_line_accumulation(c, "Overview", 0, 2),
+    "set_line_accumulation": lambda c: commands_mod.set_line_accumulation(
+        c, "Overview", 0, 2
+    ),
     "set_line_average": lambda c: commands_mod.set_line_average(c, "Overview", 0, 2),
     "set_pinhole_airy": lambda c: commands_mod.set_pinhole_airy(c, "Overview", 0, 1.0),
-    "set_detector_gain": lambda c: commands_mod.set_detector_gain(c, "Overview", 0, "40;3", 100.0),
+    "set_detector_gain": lambda c: commands_mod.set_detector_gain(
+        c, "Overview", 0, "40;3", 100.0
+    ),
     "set_laser_intensity": lambda c: commands_mod.set_laser_intensity(
         c, "Overview", 0, "30", 0, 0.1
     ),
-    "set_laser_shutter": lambda c: commands_mod.set_laser_shutter(c, "Overview", 0, "30", True),
+    "set_laser_shutter": lambda c: commands_mod.set_laser_shutter(
+        c, "Overview", 0, "30", True
+    ),
     "set_filter_wheel_slot": lambda c: commands_mod.set_filter_wheel_slot(
         c, "Overview", 0, "40;3", 1, 2
     ),
@@ -613,7 +703,9 @@ def test_every_configurable_setter_enforces_before_touching_native_api(setter):
     gate._install(
         client,
         gate.GateState(
-            limits=gate.LeicaLimits(policy, source="test", path="limits.json", is_fallback=False),
+            limits=gate.LeicaLimits(
+                policy, source="test", path="limits.json", is_fallback=False
+            ),
             stage_cfg=None,
             error=None,
         ),
@@ -670,13 +762,17 @@ def test_z_stack_definition_checks_both_endpoints_before_native_api():
     gate._install(
         client,
         gate.GateState(
-            limits=gate.LeicaLimits(policy, source="test", path="limits.json", is_fallback=False),
+            limits=gate.LeicaLimits(
+                policy, source="test", path="limits.json", is_fallback=False
+            ),
             stage_cfg=None,
             error=None,
         ),
     )
 
-    refused = commands_mod.set_z_stack_definition(client, "J", begin_um=5.0, end_um=11.0)
+    refused = commands_mod.set_z_stack_definition(
+        client, "J", begin_um=5.0, end_um=11.0
+    )
     assert refused["success"] is False
     assert "11.0 outside range [0.0, 10.0]" in refused["message"]
 
@@ -689,7 +785,9 @@ def test_z_stack_definition_configured_limit_refuses_value_unknown_reset():
     gate._install(
         client,
         gate.GateState(
-            limits=gate.LeicaLimits(policy, source="test", path="limits.json", is_fallback=False),
+            limits=gate.LeicaLimits(
+                policy, source="test", path="limits.json", is_fallback=False
+            ),
             stage_cfg=None,
             error=None,
         ),
@@ -705,16 +803,22 @@ def test_installed_policy_is_independent_of_input_payload_mutation():
     payload = _valid_payload()
     payload["set_zoom"] = {"allowed": [1.0]}
     policy = limits_config.validate_payload(payload)
-    installed = gate.LeicaLimits(policy, source="test", path="limits.json", is_fallback=False)
+    installed = gate.LeicaLimits(
+        policy, source="test", path="limits.json", is_fallback=False
+    )
     gate._install(
         client,
         gate.GateState(limits=installed, stage_cfg=None, error=None),
     )
 
-    _assert_refused(commands_mod.set_zoom(client, "Overview", 5.0), needle="not allowed")
+    _assert_refused(
+        commands_mod.set_zoom(client, "Overview", 5.0), needle="not allowed"
+    )
     payload["set_zoom"]["allowed"].append(5.0)
     policy["set_zoom"]["allowed"].append(5.0)
-    _assert_refused(commands_mod.set_zoom(client, "Overview", 5.0), needle="not allowed")
+    _assert_refused(
+        commands_mod.set_zoom(client, "Overview", 5.0), needle="not allowed"
+    )
 
 
 def test_public_gate_status_is_detached_from_installed_policy(mock_client):
@@ -722,14 +826,18 @@ def test_public_gate_status_is_detached_from_installed_policy(mock_client):
     payload["set_zoom"] = {"allowed": [1.0]}
     _raw_snapshot(_machine_root(), limits_text=json.dumps(payload))
     status = gate.connect_handshake(mock_client)
-    _assert_refused(commands_mod.set_zoom(mock_client, "Overview", 5.0), needle="not allowed")
+    _assert_refused(
+        commands_mod.set_zoom(mock_client, "Overview", 5.0), needle="not allowed"
+    )
 
     assert not hasattr(status.limits, "payload")
     assert not hasattr(status.limits, "check")
     status.stage_cfg["policy"]["set_zoom"]["allowed"].append(5.0)
     second_status = gate.state_for(mock_client)
     assert second_status.stage_cfg["policy"]["set_zoom"] == {"allowed": [1.0]}
-    _assert_refused(commands_mod.set_zoom(mock_client, "Overview", 5.0), needle="not allowed")
+    _assert_refused(
+        commands_mod.set_zoom(mock_client, "Overview", 5.0), needle="not allowed"
+    )
 
 
 def test_private_installed_policy_and_stage_snapshot_are_immutable(mock_client):
@@ -745,7 +853,9 @@ def test_private_installed_policy_and_stage_snapshot_are_immutable(mock_client):
         installed.limits._policy["set_zoom"][1].append(5.0)
     with pytest.raises(TypeError):
         installed.stage_cfg["policy"]["set_zoom"] = {"allowed": [1.0, 5.0]}
-    _assert_refused(commands_mod.set_zoom(mock_client, "Overview", 5.0), needle="not allowed")
+    _assert_refused(
+        commands_mod.set_zoom(mock_client, "Overview", 5.0), needle="not allowed"
+    )
 
 
 @pytest.mark.parametrize("wrapper", sorted(gate.MUTATING_COMMANDS))
@@ -766,11 +876,11 @@ def test_adapter_bypass_refuses_at_the_commands_layer(clear_stage_limits):
     from unittest.mock import patch
 
     from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface import (
-    parsing as _cmd_settings,
-)
+        parsing as _cmd_settings,
+    )
     from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.zmart_adapter import (
-    zmart_adapter as adapter,
-)
+        zmart_adapter as adapter,
+    )
 
     _raw_snapshot(_machine_root(), limits_text=_BAD_LIMITS_TEXTS["missing_axis"])
     client = MockLasxClient(latency=0.0)
@@ -781,7 +891,9 @@ def test_adapter_bypass_refuses_at_the_commands_layer(clear_stage_limits):
         "zPosition": {"z-wide": {"position": 0.0}, "z-galvo": {"position": 0.0}},
     }
     with (
-        patch.object(adapter._readers, "get_xy", return_value={"x_um": 50000, "y_um": 30000}),
+        patch.object(
+            adapter._readers, "get_xy", return_value={"x_um": 50000, "y_um": 30000}
+        ),
         patch.object(adapter._readers, "get_job_settings", return_value=settings),
         patch.object(
             adapter._readers,
@@ -804,14 +916,14 @@ def test_controller_session_bypass_refuses_at_the_commands_layer(clear_stage_lim
     import zmart_controller
 
     from zmart_drivers.leica.stellaris5_y42h93.navigator_expert import (
-    zmart_controller_plugin as driver,
-)
+        zmart_controller_plugin as driver,
+    )
     from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface import (
-    parsing as _cmd_settings,
-)
+        parsing as _cmd_settings,
+    )
     from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.zmart_adapter import (
-    zmart_adapter as adapter,
-)
+        zmart_adapter as adapter,
+    )
 
     _raw_snapshot(_machine_root(), limits_text=_BAD_LIMITS_TEXTS["missing_axis"])
     client = MockLasxClient(latency=0.0)
@@ -821,7 +933,9 @@ def test_controller_session_bypass_refuses_at_the_commands_layer(clear_stage_lim
     }
     with (
         patch.object(adapter._session, "connect_python_client", return_value=client),
-        patch.object(adapter._readers, "get_xy", return_value={"x_um": 50000, "y_um": 30000}),
+        patch.object(
+            adapter._readers, "get_xy", return_value={"x_um": 50000, "y_um": 30000}
+        ),
         patch.object(adapter._readers, "get_job_settings", return_value=settings),
         patch.object(
             adapter._readers,
@@ -836,7 +950,9 @@ def test_controller_session_bypass_refuses_at_the_commands_layer(clear_stage_lim
             # answer, so the refusal arrives as success False with the reason.
             answer = session.set_xyz(0.0, 0.0, 0.0)
             assert answer["success"] is False
-            assert "RuntimeError" in answer["content"] and "outside" in answer["content"]
+            assert (
+                "RuntimeError" in answer["content"] and "outside" in answer["content"]
+            )
         finally:
             session.disconnect()
 
@@ -864,7 +980,9 @@ def test_mapping_is_total_over_the_key_vocabulary():
 
 def test_bundled_template_declares_exactly_the_key_vocabulary():
     template = json.loads(
-        (DRIVER_ROOT / "configuration" / "limits" / "defaults" / "limits.json").read_text(encoding="utf-8")
+        (
+            DRIVER_ROOT / "configuration" / "limits" / "defaults" / "limits.json"
+        ).read_text(encoding="utf-8")
     )
     assert set(template) == set(limits_config._REQUIRED_FILE_KEYS)
     assert all(template[name] == [] for name in limits_config.SETTER_LIMIT_KEYS)
@@ -896,7 +1014,9 @@ def test_every_dispatching_wrapper_declares_and_calls_the_gate():
         if not isinstance(node, ast.FunctionDef) or node.name.startswith("_"):
             continue
         referenced = {n.id for n in ast.walk(node) if isinstance(n, ast.Name)}
-        referenced_attrs = {n.attr for n in ast.walk(node) if isinstance(n, ast.Attribute)}
+        referenced_attrs = {
+            n.attr for n in ast.walk(node) if isinstance(n, ast.Attribute)
+        }
         if not (referenced & fire_names) and not (referenced_attrs & fire_attrs):
             continue
         assert node.name in gate.MUTATING_COMMANDS, (
@@ -908,7 +1028,10 @@ def test_every_dispatching_wrapper_declares_and_calls_the_gate():
             if isinstance(call, ast.Call)
             and (
                 (isinstance(call.func, ast.Name) and call.func.id == "_limits_refusal")
-                or (isinstance(call.func, ast.Attribute) and call.func.attr == "check_refusal")
+                or (
+                    isinstance(call.func, ast.Attribute)
+                    and call.func.attr == "check_refusal"
+                )
             )
             and len(call.args) >= 2
             and isinstance(call.args[1], ast.Constant)
@@ -928,7 +1051,9 @@ def test_every_dispatching_wrapper_declares_and_calls_the_gate():
 
 def test_backstop_allows_measured_xy_below_the_default_margin():
     template = json.loads(
-        (DRIVER_ROOT / "configuration" / "limits" / "defaults" / "limits.json").read_text(encoding="utf-8")
+        (
+            DRIVER_ROOT / "configuration" / "limits" / "defaults" / "limits.json"
+        ).read_text(encoding="utf-8")
     )
 
     for axis in ("x", "y"):
@@ -946,10 +1071,16 @@ def test_backstop_allows_measured_xy_below_the_default_margin():
 
 def test_containment_checker_accepts_the_template_and_narrower():
     motion_limits.check_envelope_within_backstop(DEFAULT_STAGE_UM)
-    motion_limits.check_envelope_within_backstop(dict(DEFAULT_STAGE_UM, x=[20000.0, 40000.0]))
-    motion_limits.check_envelope_within_backstop(dict(DEFAULT_STAGE_UM, y=[964.8553, 90000.0]))
+    motion_limits.check_envelope_within_backstop(
+        dict(DEFAULT_STAGE_UM, x=[20000.0, 40000.0])
+    )
+    motion_limits.check_envelope_within_backstop(
+        dict(DEFAULT_STAGE_UM, y=[964.8553, 90000.0])
+    )
     with pytest.raises(RuntimeError, match="backstop"):
-        motion_limits.check_envelope_within_backstop(dict(DEFAULT_STAGE_UM, y=[-1.0, 90000.0]))
+        motion_limits.check_envelope_within_backstop(
+            dict(DEFAULT_STAGE_UM, y=[-1.0, 90000.0])
+        )
     with pytest.raises(RuntimeError, match="backstop"):
         motion_limits.check_envelope_within_backstop(
             dict(DEFAULT_STAGE_UM, z_galvo=[-251.0, 250.0])
@@ -1031,7 +1162,9 @@ def test_fresh_limits_adopt_writes_complete_limits_snapshot():
     profile = MachineProfile(programdata_root=_machine_root())
     assert profile.latest_snapshot("limits") is None  # fresh machine
     limits_config.adopt_limits(
-        DEFAULT_STAGE_UM, machine=profile, moment=datetime(2026, 4, 1, tzinfo=timezone.utc)
+        DEFAULT_STAGE_UM,
+        machine=profile,
+        moment=datetime(2026, 4, 1, tzinfo=timezone.utc),
     )
     snap = profile.latest_snapshot("limits")
     files = sorted(p.name for p in snap.iterdir())
@@ -1054,7 +1187,9 @@ def test_adopted_limits_report_machine_source_to_the_notebook_preflight(mock_cli
 
     profile = MachineProfile(programdata_root=_machine_root())
     limits_config.adopt_limits(
-        DEFAULT_STAGE_UM, machine=profile, moment=datetime(2026, 6, 1, tzinfo=timezone.utc)
+        DEFAULT_STAGE_UM,
+        machine=profile,
+        moment=datetime(2026, 6, 1, tzinfo=timezone.utc),
     )
     merged = json.loads(
         (profile.latest_snapshot("limits") / "limits.json").read_text(encoding="utf-8")
@@ -1065,7 +1200,9 @@ def test_adopted_limits_report_machine_source_to_the_notebook_preflight(mock_cli
     assert state.ok, state.error
     limits = state.limits.describe()
     # The exact refusal expression the v4 notebook's jobs cell evaluates:
-    assert not (not limits or limits.get("is_fallback") or limits.get("source") != "machine")
+    assert not (
+        not limits or limits.get("is_fallback") or limits.get("source") != "machine"
+    )
 
 
 def test_flat_limits_round_trip_adopt_handshake_gated_move(mock_client):
@@ -1074,7 +1211,9 @@ def test_flat_limits_round_trip_adopt_handshake_gated_move(mock_client):
 
     profile = MachineProfile(programdata_root=_machine_root())
     limits_config.adopt_limits(
-        DEFAULT_STAGE_UM, machine=profile, moment=datetime(2026, 5, 1, tzinfo=timezone.utc)
+        DEFAULT_STAGE_UM,
+        machine=profile,
+        moment=datetime(2026, 5, 1, tzinfo=timezone.utc),
     )
     snap = profile.latest_snapshot("limits")
     merged = json.loads((snap / "limits.json").read_text(encoding="utf-8"))

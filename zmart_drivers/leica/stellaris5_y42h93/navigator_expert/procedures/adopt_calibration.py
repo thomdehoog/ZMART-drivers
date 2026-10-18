@@ -35,7 +35,9 @@ def _apply_objective_pair(
         from_slot = int(report["from_slot"])
         to_slot = int(report["to_slot"])
     except (KeyError, TypeError, ValueError) as exc:
-        raise ValueError("objective-pair report requires integer from_slot and to_slot") from exc
+        raise ValueError(
+            "objective-pair report requires integer from_slot and to_slot"
+        ) from exc
     if from_slot == to_slot:
         raise ValueError("reference and target objective slots must differ")
 
@@ -61,7 +63,9 @@ def _apply_objective_pair(
             float(report["translation_z_um"]),
         )
     except (KeyError, TypeError, ValueError) as exc:
-        raise ValueError("objective-pair report contains invalid translation values") from exc
+        raise ValueError(
+            "objective-pair report contains invalid translation values"
+        ) from exc
 
     objectives = config.get("objectives") or {}
     from_entry = objectives.get(str(from_slot), {})
@@ -124,13 +128,17 @@ def _trusted_reports(session: Any) -> list[tuple[Path, dict[str, Any]]]:
         if report.get("session_id") != session.session_id:
             raise ValueError(f"acquisition report belongs to another session: {path}")
         if report.get("acquisition_name") != path.parent.parent.name:
-            raise ValueError(f"acquisition report name does not match its folder: {path}")
+            raise ValueError(
+                f"acquisition report name does not match its folder: {path}"
+            )
         if not report.get("config_written"):
             continue
         try:
             reference_slots.add(int(report["from_slot"]))
         except (KeyError, TypeError, ValueError) as exc:
-            raise ValueError(f"acquisition report has no valid reference slot: {path}") from exc
+            raise ValueError(
+                f"acquisition report has no valid reference slot: {path}"
+            ) from exc
         loaded.append((path, report))
 
     if len(reference_slots) > 1:
@@ -149,7 +157,9 @@ def _trusted_reports(session: Any) -> list[tuple[Path, dict[str, Any]]]:
         try:
             to_slot = int(report["to_slot"])
         except (KeyError, TypeError, ValueError) as exc:
-            raise ValueError(f"acquisition report has no valid target slot: {path}") from exc
+            raise ValueError(
+                f"acquisition report has no valid target slot: {path}"
+            ) from exc
         kept = newest.get(to_slot)
         if kept is None:
             newest[to_slot] = (path, report)
@@ -189,7 +199,9 @@ def compile_session_calibration(
             "No trusted objective-pair acquisition is available in this session."
         )
 
-    source = Path(base_path) if base_path is not None else Path(session.calibration_path)
+    source = (
+        Path(base_path) if base_path is not None else Path(session.calibration_path)
+    )
     config = calibration_model.load_calibration(source)
     for _path, report in reports:
         _apply_objective_pair(
@@ -239,7 +251,8 @@ def adopt_calibration(
     )
 
     session_notebooks = [
-        archive_operator_notebook(path, session.paths.session_dir) for path in notebook_paths
+        archive_operator_notebook(path, session.paths.session_dir)
+        for path in notebook_paths
     ]
     snapshot = machine.publish_snapshot(
         moment,
@@ -260,7 +273,9 @@ def adopt_calibration(
         "snapshot": str(snapshot),
         "calibration_name": selected_name,
         "calibration_path": str(snapshot / calibration_rel),
-        "notebook_paths": [str(path) for path in (*session_notebooks, *snapshot_notebooks)],
+        "notebook_paths": [
+            str(path) for path in (*session_notebooks, *snapshot_notebooks)
+        ],
     }
 
 

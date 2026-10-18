@@ -29,6 +29,8 @@ def connected_data_container() -> Any:
     System.Reflection.Assembly.LoadFile(str(root / "LMSDataContainerWrapper.dll"))
     from LMSDataContainerWrapper import DataContainerClient, DMObjectFactory
 
-    if not DataContainerClient.CreateAndInitInstance(System.Environment.UserName, "ZMART"):
+    if not DataContainerClient.CreateAndInitInstance(
+        System.Environment.UserName, "ZMART"
+    ):
         raise RuntimeError("LAS X's Data Container did not accept the connection")
     return DMObjectFactory()

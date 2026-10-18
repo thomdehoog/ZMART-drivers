@@ -369,7 +369,9 @@ def _load_saved_origin() -> dict | None:
         return None
     stored = payload.get("origin") if isinstance(payload, dict) else None
     if not isinstance(stored, dict):
-        raise RuntimeError(f"the saved frame origin at {path} has no 'origin' section. {fix}")
+        raise RuntimeError(
+            f"the saved frame origin at {path} has no 'origin' section. {fix}"
+        )
     origin: dict[str, Any] = {}
     for key in _ORIGIN_NUMBER_KEYS:
         value = stored.get(key)
@@ -449,7 +451,9 @@ def _objective_delta_um(handle: ZmartHandle, current_objective: dict | None) -> 
     from ..configuration.optical_calibration import model as _cal_model
 
     try:
-        return _cal_model.translation_delta_um(handle.translations, origin_slot, current_slot)
+        return _cal_model.translation_delta_um(
+            handle.translations, origin_slot, current_slot
+        )
     except RuntimeError as exc:
         raise RuntimeError(
             f"objective changed since the origin was captured but {exc} — or "
@@ -506,8 +510,12 @@ def _hardware_snapshot(handle: ZmartHandle) -> dict:
         "job": job,
         "x_um": float(xy["x_um"]),
         "y_um": float(xy["y_um"]),
-        "z_wide_um": _z_um_from_settings(settings, "z-wide", client=handle.client, job_name=job),
-        "z_galvo_um": _z_um_from_settings(settings, "z-galvo", client=handle.client, job_name=job),
+        "z_wide_um": _z_um_from_settings(
+            settings, "z-wide", client=handle.client, job_name=job
+        ),
+        "z_galvo_um": _z_um_from_settings(
+            settings, "z-galvo", client=handle.client, job_name=job
+        ),
         "objective": settings.get("objective"),
     }
 
@@ -782,12 +790,21 @@ def get_xyz(handle: ZmartHandle, *, with_actuators: dict | None = None) -> dict:
         for axis in ("x", "y", "z")
     }
     result["objective_translation_um"] = list(dt)
-    handle.driven_to = {**frame, "z_wide_um": snap["z_wide_um"], "z_galvo_um": snap["z_galvo_um"]}
+    handle.driven_to = {
+        **frame,
+        "z_wide_um": snap["z_wide_um"],
+        "z_galvo_um": snap["z_galvo_um"],
+    }
     return result
 
 
 def set_xyz(
-    handle: ZmartHandle, x: float, y: float, z: float, *, with_actuators: dict | None = None
+    handle: ZmartHandle,
+    x: float,
+    y: float,
+    z: float,
+    *,
+    with_actuators: dict | None = None,
 ) -> dict:
     """Move to (x, y, z), in micrometres from the origin, then answer like :func:`get_xyz`.
 
@@ -899,6 +916,7 @@ def get_acquisition_settings(handle: ZmartHandle) -> dict:
     """
     _require_open(handle)
     return {"trigger": {"options": ["full"], "default": "full", "active": "full"}}
+
 
 def _with_defaults(handle: ZmartHandle, settings: dict | None) -> dict:
     """Validate settings against the menu, filling omissions from the active values."""
@@ -1030,7 +1048,9 @@ def acquire(
     backlash_rounds = ACQUISITION_BACKLASH_DEFAULT_ROUNDS
     apply_backlash = backlash_rounds > 0
     if apply_backlash:
-        settled = steps["backlash"] = _motion.correct_backlash(handle.client, passes=backlash_rounds)
+        settled = steps["backlash"] = _motion.correct_backlash(
+            handle.client, passes=backlash_rounds
+        )
         if not settled.get("confirmed"):
             _note_unconfirmed(handle, "acquire: backlash takeup", settled)
     if IMAGE_SAVE.cleanup_cache:
@@ -1038,7 +1058,9 @@ def acquire(
 
     acq = _capture.acquire(handle.client, job)
 
-    label = position_label if position_label is not None else _next_position_label(handle)
+    label = (
+        position_label if position_label is not None else _next_position_label(handle)
+    )
     naming = Naming(stem=free_stem(output_root, Naming(stem=label).stem))
     state = _export_state(handle, stem=naming.stem, job=job)
     saved = _save.save(
@@ -1067,7 +1089,10 @@ def acquire(
     )
 
     written = sorted(saved.image_paths.items())
-    depths = [int(getattr(index, "z", ordinal)) for ordinal, (index, _path) in enumerate(written)]
+    depths = [
+        int(getattr(index, "z", ordinal))
+        for ordinal, (index, _path) in enumerate(written)
+    ]
     taken_at = _where_the_planes_are(handle, at, job, depths)
     # Depth 0 is the lowest slice, as in a store, whichever way LAS X swept.
     upward = sorted(set(depths), key=lambda z: taken_at(z)["z_um"])
@@ -1084,28 +1109,45 @@ def acquire(
         }
         for ordinal, (index, path) in enumerate(written)
     ]
-    vendor_metadata = [str(path) for path in getattr(saved, "vendor_metadata_paths", ())]
+    vendor_metadata = [
+        str(path) for path in getattr(saved, "vendor_metadata_paths", ())
+    ]
     printed = [str(path) for path in getattr(saved, "state_paths", ())]
     projections = [str(path) for path in getattr(saved, "projection_paths", ())]
-    files = list(dict.fromkeys([*(plane["path"] for plane in planes), *projections, *vendor_metadata, *printed]))
+    files = list(
+        dict.fromkeys(
+            [
+                *(plane["path"] for plane in planes),
+                *projections,
+                *vendor_metadata,
+                *printed,
+            ]
+        )
+    )
     unconfirmed = list(handle.unconfirmed[noted_before:])
-    log = _log.write(output_root, naming, {
-        "position_label": label,
-        "stem": naming.stem,
-        "asked": dict(acquisition_settings or {}),
-        "settings": resolved,
-        "steps": steps,
-        "capture": {
-            "started": _when(acq.started_at),
-            "finished": _when(acq.finished_at),
-            "answered": getattr(acq, "command_result", None),
+    log = _log.write(
+        output_root,
+        naming,
+        {
+            "position_label": label,
+            "stem": naming.stem,
+            "asked": dict(acquisition_settings or {}),
+            "settings": resolved,
+            "steps": steps,
+            "capture": {
+                "started": _when(acq.started_at),
+                "finished": _when(acq.finished_at),
+                "answered": getattr(acq, "command_result", None),
+            },
+            "unconfirmed": unconfirmed,
+            # Paths from where the run starts, so they stay true when the
+            # capture is moved into a run folder of the same shape.
+            "planes": [
+                {**plane, "path": _from(output_root, plane["path"])} for plane in planes
+            ],
+            "files": [_from(output_root, path) for path in files],
         },
-        "unconfirmed": unconfirmed,
-        # Paths from where the run starts, so they stay true when the
-        # capture is moved into a run folder of the same shape.
-        "planes": [{**plane, "path": _from(output_root, plane["path"])} for plane in planes],
-        "files": [_from(output_root, path) for path in files],
-    })
+    )
     return {
         "position_label": label,
         "trigger": resolved["trigger"],
@@ -1184,7 +1226,11 @@ def _where_the_planes_are(handle: ZmartHandle, at: dict, job: str, plane_z: list
         slices, standing = [0.0], 0.0
 
     def where(z: int) -> dict:
-        return {"x_um": at["x"], "y_um": at["y"], "z_um": at["z"] + slices[numbers.index(z)] - standing}
+        return {
+            "x_um": at["x"],
+            "y_um": at["y"],
+            "z_um": at["z"] + slices[numbers.index(z)] - standing,
+        }
 
     return where
 
@@ -1212,7 +1258,9 @@ def get_state(handle: ZmartHandle) -> dict:
         log.warning("could not determine the selected LAS X job")
         selected = {}
     settings = (
-        _readers.get_job_settings(handle.client, selected["Name"]) if selected.get("Name") else {}
+        _readers.get_job_settings(handle.client, selected["Name"])
+        if selected.get("Name")
+        else {}
     ) or {}
     try:
         geometry = _parse_tile_geometry(settings)
@@ -1362,11 +1410,15 @@ def _zero_z_galvo(handle: ZmartHandle) -> dict:
     if offset == 0.0:
         return {"transferred_um": 0.0}
     for z_mode, target in (("zwide", snap["z_wide_um"] + offset), ("galvo", 0.0)):
-        result = _commands.move_z(handle.client, snap["job"], target, unit="um", z_mode=z_mode)
+        result = _commands.move_z(
+            handle.client, snap["job"], target, unit="um", z_mode=z_mode
+        )
         if not result.get("success"):
             raise RuntimeError(f"zero_z_galvo: move_z ({z_mode}) failed: {result}")
         if not result.get("confirmed"):
-            _note_unconfirmed(handle, f"zero_z_galvo: move_z ({z_mode}) to {target}", result)
+            _note_unconfirmed(
+                handle, f"zero_z_galvo: move_z ({z_mode}) to {target}", result
+            )
     return {"transferred_um": offset}
 
 
@@ -1386,7 +1438,9 @@ def _run_autofocus(handle: ZmartHandle, procedure: dict) -> dict:
     job = procedure.get("job")
     if job is None:
         if len(names) > 1:
-            raise ValueError(f"multiple autofocus jobs; pass 'job' (available: {names})")
+            raise ValueError(
+                f"multiple autofocus jobs; pass 'job' (available: {names})"
+            )
         job = names[0]
     elif job not in names:
         raise ValueError(f"{job!r} is not an autofocus job (available: {names})")
@@ -1405,13 +1459,19 @@ def _run_autofocus(handle: ZmartHandle, procedure: dict) -> dict:
         snap = _hardware_snapshot(handle)
     finally:
         if original is None:
-            log.warning("the job selected before autofocus was unknown, so none is restored")
+            log.warning(
+                "the job selected before autofocus was unknown, so none is restored"
+            )
         elif job != original:
             restored = _commands.select_job(handle.client, original)
             if not restored.get("success"):
-                log.warning("could not restore job %r after autofocus: %s", original, restored)
+                log.warning(
+                    "could not restore job %r after autofocus: %s", original, restored
+                )
             elif not restored.get("confirmed"):
-                _note_unconfirmed(handle, f"autofocus: restore select_job('{original}')", restored)
+                _note_unconfirmed(
+                    handle, f"autofocus: restore select_job('{original}')", restored
+                )
     focus = snap["z_wide_um"] + snap["z_galvo_um"]
     dt = _delta_or_warn(handle, snap)
     return {
@@ -1535,14 +1595,18 @@ def _setup(handle: ZmartHandle) -> dict:
     return {
         "limits": {
             "done": published,
-            "says": f"published: {limits.get('path')}" if published else (
+            "says": f"published: {limits.get('path')}"
+            if published
+            else (
                 "not published: the bundled defaults govern every move; publish this "
                 "microscope's limits with configuration/limits/notebooks/set_limits.ipynb"
             ),
         },
         "orientation": {
             "done": bool(orientation.get("measured")),
-            "says": "measured: saved pictures are turned to the stage's axes" if orientation.get("measured") else (
+            "says": "measured: saved pictures are turned to the stage's axes"
+            if orientation.get("measured")
+            else (
                 "not measured: saved pictures are kept as the camera sees them; run "
                 "configuration/image_stage_registration/notebooks/set_orientation.ipynb"
             ),
@@ -1550,14 +1614,17 @@ def _setup(handle: ZmartHandle) -> dict:
         "calibration": {
             "done": bool(calibration.get("loaded")) and bool(measured_slots),
             "says": f"{calibration.get('name') or 'loaded'}: measured for objective slots {sorted(measured_slots)}"
-            if calibration.get("loaded") and measured_slots else (
+            if calibration.get("loaded") and measured_slots
+            else (
                 "no measured objective calibration: a change of objective cannot keep the "
                 "sample in place; run configuration/optical_calibration/notebooks/calibrate_objective_pair.ipynb"
             ),
         },
         "origin": {
             "done": origin_saved,
-            "says": "saved: positions count from it" if origin_saved else (
+            "says": "saved: positions count from it"
+            if origin_saved
+            else (
                 "not saved: positions are plain stage coordinates; run the driver's set_origin step"
             ),
         },
@@ -1565,7 +1632,8 @@ def _setup(handle: ZmartHandle) -> dict:
             "done": handle.data_location is not None,
             "says": (
                 f"{handle.data_location}, as {IMAGE_SAVE.format}"
-                if handle.data_location is not None else _info.SET_UP
+                if handle.data_location is not None
+                else _info.SET_UP
             ),
         },
     }
@@ -1613,10 +1681,13 @@ def _connection_status(handle: ZmartHandle, root: Path | None) -> dict:
         )
 
     return {
-        "api": "answering" if _try(lambda: _readers.ping(handle.client)) else "failed — no answer",
+        "api": "answering"
+        if _try(lambda: _readers.ping(handle.client))
+        else "failed — no answer",
         "limits": (
             f"{limits['source']}{' (fallback)' if limits.get('is_fallback') else ''}"
-            if limits else "failed — none loaded, every move refused"
+            if limits
+            else "failed — none loaded, every move refused"
         ),
         "calibration": _calibration_status(calibration),
         "stage": _try(stage) or "failed — no reading",

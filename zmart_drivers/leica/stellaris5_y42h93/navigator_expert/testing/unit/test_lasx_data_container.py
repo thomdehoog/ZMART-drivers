@@ -92,7 +92,9 @@ def write_pixels(cache: Path, number: int, pixels: np.ndarray) -> Path:
     return path
 
 
-def two_channel_12_bit(cache: Path, number: int = 746, name: str = "HiRes002", stamps: int = 2):
+def two_channel_12_bit(
+    cache: Path, number: int = 746, name: str = "HiRes002", stamps: int = 2
+):
     """A 2-channel, 1-plane, 12-bit picture, 4 x 3 pixels, as HiRes002 was."""
     pixels = np.arange(2 * 3 * 4, dtype=np.uint16).reshape(2, 3, 4) * 100 + 7
     write_pixels(cache, number, pixels)
@@ -125,10 +127,15 @@ def cache(tmp_path: Path) -> Path:
     return root
 
 
-def acquisition_of(job: str, *, started: float | None = None) -> capture.AcquisitionResult:
+def acquisition_of(
+    job: str, *, started: float | None = None
+) -> capture.AcquisitionResult:
     started = time.time() - 1 if started is None else started
     return capture.AcquisitionResult(
-        job=job, started_at=started, finished_at=time.time(), command_result={"success": True}
+        job=job,
+        started_at=started,
+        finished_at=time.time(),
+        command_result={"success": True},
     )
 
 
@@ -161,7 +168,12 @@ class TestCollecting:
             None, acquisition_of("HiRes"), cache_root=cache
         ).metadata
 
-        assert (metadata.size_x, metadata.size_y, metadata.size_z, metadata.size_c) == (4, 3, 1, 2)
+        assert (metadata.size_x, metadata.size_y, metadata.size_z, metadata.size_c) == (
+            4,
+            3,
+            1,
+            2,
+        )
         assert metadata.size_t == 1
         assert metadata.pixel_type == "uint16"
         assert metadata.significant_bits == 12
@@ -214,14 +226,22 @@ class TestFindingThePicture:
     def test_a_job_whose_name_starts_the_same_is_not_mistaken_for_it(self, cache):
         """LAS X names a capture job + number: "HiRes2" makes "HiRes2001", which "HiRes" + digits matches too."""
         pixels = np.zeros((3, 4), np.uint8)
-        for number, name, job in ((746, "HiRes2001", "HiRes2"), (790, "HiRes003", "HiRes")):
+        for number, name, job in (
+            (746, "HiRes2001", "HiRes2"),
+            (790, "HiRes003", "HiRes"),
+        ):
             write_pixels(cache, number, pixels)
             xml = description_xml(
-                channels=[(8, "Gray", 0)], dims=[(1, 4, 1e-5, 1), (2, 3, 1e-5, 4)], time_stamps=1, job=job
+                channels=[(8, "Gray", 0)],
+                dims=[(1, 4, 1e-5, 1), (2, 3, 1e-5, 4)],
+                time_stamps=1,
+                job=job,
             )
             write_description(cache, number, name, xml)
 
-        exported = container.collect_lasx_data_container(None, acquisition_of("HiRes"), cache_root=cache)
+        exported = container.collect_lasx_data_container(
+            None, acquisition_of("HiRes"), cache_root=cache
+        )
 
         assert exported.relative_path == f"V2LMSDC_MMF790_0_{PID}.tmp"
 
@@ -236,7 +256,9 @@ class TestFindingThePicture:
                 None, acquisition_of("HiRes"), cache_root=cache, timeout_s=0.3
             )
 
-    def test_a_picture_let_go_of_is_passed_over_even_when_it_has_the_same_name(self, cache):
+    def test_a_picture_let_go_of_is_passed_over_even_when_it_has_the_same_name(
+        self, cache
+    ):
         """LAS X keeps a released picture's description, rewritten, without its pixels (simulator, 2026-10-14).
 
         It names the next capture as the released one was ("HiRes009" twice),
@@ -246,11 +268,15 @@ class TestFindingThePicture:
         (cache / f"V2LMSDC_MMF6642_0_{PID}.tmp").unlink()
         two_channel_12_bit(cache, number=6662, name="HiRes009")
 
-        exported = container.collect_lasx_data_container(None, acquisition_of("HiRes"), cache_root=cache)
+        exported = container.collect_lasx_data_container(
+            None, acquisition_of("HiRes"), cache_root=cache
+        )
 
         assert exported.relative_path == f"V2LMSDC_MMF6662_0_{PID}.tmp"
 
-    def test_an_older_picture_whose_description_is_written_again_is_passed_over(self, cache):
+    def test_an_older_picture_whose_description_is_written_again_is_passed_over(
+        self, cache
+    ):
         """LAS X writes a picture's description again about 4 s after the capture (simulator, 2026-10-15).
 
         With two captures of one job close together, the first one's description
@@ -261,7 +287,9 @@ class TestFindingThePicture:
         os.utime(cache / f"V2LMSDC_MMF10119_0_{PID}.tmp", (old, old))
         two_channel_12_bit(cache, number=10133, name="AF Job012")
 
-        exported = container.collect_lasx_data_container(None, acquisition_of("AF Job"), cache_root=cache)
+        exported = container.collect_lasx_data_container(
+            None, acquisition_of("AF Job"), cache_root=cache
+        )
 
         assert exported.relative_path == f"V2LMSDC_MMF10133_0_{PID}.tmp"
 
@@ -311,14 +339,17 @@ class TestLettingGo:
     def test_the_picture_read_is_the_one_let_go_of(self, cache, monkeypatch):
         two_channel_12_bit(cache)
         asked = []
-        monkeypatch.setattr(cache_release, "delete", lambda number, name: asked.append((number, name)))
+        monkeypatch.setattr(
+            cache_release, "delete", lambda number, name: asked.append((number, name))
+        )
 
-        exported = container.collect_lasx_data_container(None, acquisition_of("HiRes"), cache_root=cache)
+        exported = container.collect_lasx_data_container(
+            None, acquisition_of("HiRes"), cache_root=cache
+        )
         exported.release()
 
         assert exported.release is not None
         assert asked == [(746, "HiRes002")]
-
 
 
 class TestRefusing:

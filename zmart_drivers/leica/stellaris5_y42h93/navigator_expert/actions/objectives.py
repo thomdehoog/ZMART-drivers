@@ -52,7 +52,9 @@ def validate_slots(
             f"Available real objective slots: {sorted(by_slot)}"
         )
 
-    duplicates = sorted({s for s in target_slots_list if target_slots_list.count(s) > 1})
+    duplicates = sorted(
+        {s for s in target_slots_list if target_slots_list.count(s) > 1}
+    )
     if duplicates:
         raise ValueError(f"Duplicate target slot(s): {duplicates}")
 

@@ -24,8 +24,18 @@ def _write_json(path, payload):
 
 # Envelopes must sit WITHIN the hardcoded physical backstop
 # (limits.checks.STAGE_BACKSTOP_UM) or adopt_limits refuses them.
-_ENV_A = {"x": [1100, 100000], "y": [1100, 90000], "z_galvo": [-5, 5], "z_wide": [0, 50]}
-_ENV_B = {"x": [1200, 120000], "y": [1200, 95000], "z_galvo": [-10, 10], "z_wide": [0, 60]}
+_ENV_A = {
+    "x": [1100, 100000],
+    "y": [1100, 90000],
+    "z_galvo": [-5, 5],
+    "z_wide": [0, 50],
+}
+_ENV_B = {
+    "x": [1200, 120000],
+    "y": [1200, 95000],
+    "z_galvo": [-10, 10],
+    "z_wide": [0, 60],
+}
 _SEED_MOMENT = datetime(2026, 1, 1, tzinfo=timezone.utc)
 _ADOPT_MOMENT = datetime(2026, 2, 1, tzinfo=timezone.utc)
 
@@ -44,9 +54,9 @@ def test_adopt_limits_publishes_only_to_the_limits_tree(tmp_path):
     assert lim["objective_slot"] == []
     assert all(lim[name] == [] for name in limits_config.SETTER_LIMIT_KEYS)
     assert not (snap / "calibration.json").exists()
-    assert json.loads((calibration / "calibration.json").read_text(encoding="utf-8")) == {
-        "marker": "cal-A"
-    }
+    assert json.loads(
+        (calibration / "calibration.json").read_text(encoding="utf-8")
+    ) == {"marker": "cal-A"}
     # no function_limits.json anywhere
     assert not (snap / "function_limits.json").exists()
 
@@ -77,8 +87,8 @@ def test_adopt_limits_first_time_writes_complete_limits_snapshot(tmp_path):
 
 def test_adopt_limits_archives_the_saved_notebook_with_the_snapshot_timestamp(tmp_path):
     from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.store import (
-    format_snapshot_name,
-)
+        format_snapshot_name,
+    )
 
     m = MachineProfile(programdata_root=tmp_path / "programdata")
     notebook = tmp_path / "set_limits.ipynb"
@@ -92,12 +102,18 @@ def test_adopt_limits_archives_the_saved_notebook_with_the_snapshot_timestamp(tm
     )
 
     snapshot = m.latest_snapshot("limits")
-    archived = snapshot / "notebook" / f"set_limits_{format_snapshot_name(_ADOPT_MOMENT)}.ipynb"
+    archived = (
+        snapshot
+        / "notebook"
+        / f"set_limits_{format_snapshot_name(_ADOPT_MOMENT)}.ipynb"
+    )
     assert archived.read_text(encoding="utf-8") == '{"cells": [{"saved": true}]}'
     assert out["notebook_paths"] == [str(archived)]
     assert not (snapshot / notebook.name).exists()
     assert not (snapshot / "data" / "notebook").exists()
-    assert not (snapshot / "data" / "template").exists()  # the corners are in the notebook
+    assert not (
+        snapshot / "data" / "template"
+    ).exists()  # the corners are in the notebook
     assert "template_paths" not in out
 
 
@@ -105,7 +121,9 @@ def test_adopt_limits_writes_stage_ranges_before_optional_setters(tmp_path):
     m = MachineProfile(programdata_root=tmp_path)
     limits_config.adopt_limits(_ENV_B, machine=m, moment=_ADOPT_MOMENT)
 
-    payload = json.loads((m.latest_snapshot("limits") / "limits.json").read_text(encoding="utf-8"))
+    payload = json.loads(
+        (m.latest_snapshot("limits") / "limits.json").read_text(encoding="utf-8")
+    )
     assert list(payload)[:4] == ["x_um", "y_um", "z_galvo_um", "z_wide_um"]
 
 
@@ -144,7 +162,9 @@ def test_adopt_limits_validates_envelope(tmp_path):
 def test_adopt_limits_rejects_coerced_legacy_bounds(tmp_path, bad_bounds):
     m = MachineProfile(programdata_root=tmp_path)
     with pytest.raises(ValueError, match="must contain numbers"):
-        limits_config.adopt_limits(dict(_ENV_A, x=bad_bounds), machine=m, moment=_ADOPT_MOMENT)
+        limits_config.adopt_limits(
+            dict(_ENV_A, x=bad_bounds), machine=m, moment=_ADOPT_MOMENT
+        )
     assert m.latest_snapshot("limits") is None
 
 
@@ -199,7 +219,9 @@ def test_load_rejects_a_stray_backlash_block(tmp_path):
 
 def test_bundled_limits_stay_outside_programdata(tmp_path, monkeypatch):
     driver_root = Path(__file__).resolve().parents[2]
-    template_limits = driver_root / "configuration" / "limits" / "defaults" / "limits.json"
+    template_limits = (
+        driver_root / "configuration" / "limits" / "defaults" / "limits.json"
+    )
     monkeypatch.setenv("ZMART_MICROSCOPY_ROOT", str(tmp_path / "programdata"))
 
     defaults = limits_config.defaults_path()
@@ -213,7 +235,9 @@ def test_bundled_limits_stay_outside_programdata(tmp_path, monkeypatch):
     assert template["x_um"] == {"range": [1000, 130000]}
 
 
-def test_defaults_path_remains_bundled_after_machine_limits_are_published(tmp_path, monkeypatch):
+def test_defaults_path_remains_bundled_after_machine_limits_are_published(
+    tmp_path, monkeypatch
+):
     import zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.store as machine_mod
 
     monkeypatch.setenv("ZMART_MICROSCOPY_ROOT", str(tmp_path))
@@ -226,7 +250,9 @@ def test_load_defaults_to_defaults_path(tmp_path, monkeypatch):
     defaults = tmp_path / "defaults.json"
     _write_json(
         defaults,
-        merged_limits_payload({"x": [1, 2], "y": [3, 4], "z_galvo": [-5, 5], "z_wide": [0, 100]}),
+        merged_limits_payload(
+            {"x": [1, 2], "y": [3, 4], "z_galvo": [-5, 5], "z_wide": [0, 100]}
+        ),
     )
     monkeypatch.setattr(limits_config, "defaults_path", lambda: defaults)
 
@@ -257,7 +283,9 @@ def test_load_rejects_legacy_metadata(tmp_path):
 def test_limits_notebook_publishes_the_exact_flat_template():
     driver_root = Path(__file__).resolve().parents[2]
     notebook = json.loads(
-        (driver_root / "configuration" / "limits" / "notebooks" / "set_limits.ipynb").read_text(encoding="utf-8")
+        (
+            driver_root / "configuration" / "limits" / "notebooks" / "set_limits.ipynb"
+        ).read_text(encoding="utf-8")
     )
     source = "\n".join(
         "".join(cell.get("source", []))
@@ -269,13 +297,16 @@ def test_limits_notebook_publishes_the_exact_flat_template():
         node
         for node in tree.body
         if isinstance(node, ast.Assign)
-        and any(isinstance(target, ast.Name) and target.id == "LIMITS" for target in node.targets)
+        and any(
+            isinstance(target, ast.Name) and target.id == "LIMITS"
+            for target in node.targets
+        )
     )
     notebook_limits = ast.literal_eval(assignment.value)
     bundled = json.loads(
-        (driver_root / "configuration" / "limits" / "defaults" / "limits.json").read_text(
-            encoding="utf-8"
-        )
+        (
+            driver_root / "configuration" / "limits" / "defaults" / "limits.json"
+        ).read_text(encoding="utf-8")
     )
     assert notebook_limits == bundled
     imported = {
@@ -289,7 +320,9 @@ def test_limits_notebook_publishes_the_exact_flat_template():
     assert (limits_config, "validate_limits") in imported
     assert "lambda notebook: adopt_limits(" in source
     assert "validated_limits," in source
-    assert "import zmart_drivers.leica.stellaris5_y42h93.navigator_expert as drv" in source
+    assert (
+        "import zmart_drivers.leica.stellaris5_y42h93.navigator_expert as drv" in source
+    )
     assert "drv.connect_microscope(load_calibration=False)" in source
     assert "corners = CornerRecorder(client)" in source
     for number in (1, 2, 3, 4):

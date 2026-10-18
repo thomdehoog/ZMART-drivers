@@ -43,7 +43,9 @@ def readings_direct(_client):
     # the selected job's values instead, the direct column showed the selected
     # job's zoom and rotation for HiRes, 15 October 2026.) The z drive is read
     # where it truly is, as only the direct reader can.
-    values = from_settings(d.get_job_settings(JOB), d.get_xy(), d.get_selected_job(), d.get_scan_status())
+    values = from_settings(
+        d.get_job_settings(JOB), d.get_xy(), d.get_selected_job(), d.get_scan_status()
+    )
     values["z-galvo"] = d.read_z_um("z-galvo")
     return values
 
@@ -62,7 +64,9 @@ def from_settings(settings, xy, selected, status):
         "line average": first["lineAverage"] if first else None,
         "rotation": settings["scanFieldRotation"]["value"] if settings else None,
         "xy": None if xy is None else [xy["x_um"], xy["y_um"]],
-        "z-galvo": float(settings["zPosition"]["z-galvo"]["position"]) if settings and settings.get("zPosition") else None,
+        "z-galvo": float(settings["zPosition"]["z-galvo"]["position"])
+        if settings and settings.get("zPosition")
+        else None,
         "selected job": None if selected is None else selected["Name"],
         "scan status": status,
     }
@@ -74,7 +78,10 @@ def readings_api(client):
     )
 
     return from_settings(
-        a.get_job_settings(client, JOB), a.get_xy(client), a.get_selected_job(client), a.get_scan_status(client)
+        a.get_job_settings(client, JOB),
+        a.get_xy(client),
+        a.get_selected_job(client),
+        a.get_scan_status(client),
     )
 
 
@@ -85,7 +92,10 @@ def readings_log(_client):
 
     snap = lr.parse_log()
     return from_settings(
-        lr.get_job_settings(JOB, snap), lr.get_xy(snap), lr.get_selected_job(snap), lr.get_scan_status(snap)
+        lr.get_job_settings(JOB, snap),
+        lr.get_xy(snap),
+        lr.get_selected_job(snap),
+        lr.get_scan_status(snap),
     )
 
 
@@ -93,7 +103,9 @@ def poll(reader, out: Path, until: Path):
     """Read as fast as possible until *until* exists; one JSON line per reading."""
     client = None
     if reader == "api":
-        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.connect import connect_python_client
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.connect import (
+            connect_python_client,
+        )
 
         client = connect_python_client()
     read = {"direct": readings_direct, "api": readings_api, "log": readings_log}[reader]
@@ -105,22 +117,46 @@ def poll(reader, out: Path, until: Path):
                 values, error = read(client), None
             except Exception as why:  # noqa: BLE001 -- a failed reading is a result
                 values, error = None, f"{type(why).__name__}: {why}"
-            f.write(json.dumps({"t": started, "s": time.perf_counter() - t, "values": values, "error": error}) + "\n")
+            f.write(
+                json.dumps(
+                    {
+                        "t": started,
+                        "s": time.perf_counter() - t,
+                        "values": values,
+                        "error": error,
+                    }
+                )
+                + "\n"
+            )
             f.flush()
 
 
 def main() -> int:
     global JOB
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--out", required=True, help="the folder the readings are written to")
-    parser.add_argument("--job", default=None, help="the job whose settings are read (default: the one selected)")
-    parser.add_argument("--seconds", type=float, default=30, help="how long the readers read")
-    parser.add_argument("--check", action="store_true", help="write readers.md and fail when a reader is wrong")
+    parser.add_argument(
+        "--out", required=True, help="the folder the readings are written to"
+    )
+    parser.add_argument(
+        "--job",
+        default=None,
+        help="the job whose settings are read (default: the one selected)",
+    )
+    parser.add_argument(
+        "--seconds", type=float, default=30, help="how long the readers read"
+    )
+    parser.add_argument(
+        "--check",
+        action="store_true",
+        help="write readers.md and fail when a reader is wrong",
+    )
     parser.add_argument("--poll", choices=READERS, help=argparse.SUPPRESS)
     asked = parser.parse_args()
     JOB = asked.job
     if JOB is None:
-        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface import direct_reader
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface import (
+            direct_reader,
+        )
 
         JOB = direct_reader.get_selected_job()["Name"]
     out = Path(asked.out)
@@ -131,7 +167,18 @@ def main() -> int:
     out.mkdir(parents=True, exist_ok=True)
     until.unlink(missing_ok=True)
     pollers = [
-        subprocess.Popen([sys.executable, __file__, "--out", str(out), "--poll", reader, "--job", JOB])
+        subprocess.Popen(
+            [
+                sys.executable,
+                __file__,
+                "--out",
+                str(out),
+                "--poll",
+                reader,
+                "--job",
+                JOB,
+            ]
+        )
         for reader in READERS
     ]
     marks = {}
@@ -148,7 +195,9 @@ def main() -> int:
         json.dumps({"job": JOB, "marks": marks}, indent=1), encoding="utf-8"
     )
     if not asked.check:
-        print(f"readings for {asked.seconds:.0f} s; tables: python benchmark_report.py {out}")
+        print(
+            f"readings for {asked.seconds:.0f} s; tables: python benchmark_report.py {out}"
+        )
         return 0
     # The CI starts scripts with PYTHONSAFEPATH, which keeps this folder off the search path.
     sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -158,7 +207,9 @@ def main() -> int:
     found = benchmark_report.problems(out)
     for problem in found:
         print(f"  problem: {problem}")
-    print(f"\n{'ALL CHECKS PASSED' if not found else f'FAILED: {len(found)} problem(s)'}  (tables: {out / 'readers.md'})")
+    print(
+        f"\n{'ALL CHECKS PASSED' if not found else f'FAILED: {len(found)} problem(s)'}  (tables: {out / 'readers.md'})"
+    )
     return 0 if not found else 1
 
 

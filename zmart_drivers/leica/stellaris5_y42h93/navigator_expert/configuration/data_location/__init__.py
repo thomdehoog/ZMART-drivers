@@ -38,15 +38,21 @@ def check(folder: str | Path) -> list[str]:
     """What keeps *folder* from holding this microscope's data, in words; empty when nothing does."""
     path = Path(folder)
     if str(path).startswith(("\\\\", "//")):
-        return [f"{path} is on a network share; save on a local disk and copy to the share after the run"]
+        return [
+            f"{path} is on a network share; save on a local disk and copy to the share after the run"
+        ]
     if not path.is_absolute():
-        return [f"{path} is not a full path (start it with the drive, for example D:\\ZMART-data)"]
+        return [
+            f"{path} is not a full path (start it with the drive, for example D:\\ZMART-data)"
+        ]
     if not path.exists():
         return [f"{path} does not exist; make the folder first"]
     if not path.is_dir():
         return [f"{path} is not a folder"]
     if _on_a_network_drive(path):
-        return [f"{path} is on a network drive; save on a local disk and copy to the share after the run"]
+        return [
+            f"{path} is on a network drive; save on a local disk and copy to the share after the run"
+        ]
     probe = path / f".zmart-write-check-{uuid.uuid4().hex[:8]}"
     try:
         probe.write_bytes(b"")

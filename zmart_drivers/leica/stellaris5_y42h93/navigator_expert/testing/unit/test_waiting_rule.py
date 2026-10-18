@@ -34,7 +34,9 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher import (
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher import (
     read as readers,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface import delivery
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface import (
+    delivery,
+)
 
 WINDOW_S = 0.5
 
@@ -118,7 +120,9 @@ def test_a_busy_api_is_waited_for_not_skipped():
         return settings(job_name)
 
     with Patched(fresh_log({"get_job_settings": None})):
-        with patch.object(readers.api_reader, "get_job_settings", side_effect=api_settings):
+        with patch.object(
+            readers.api_reader, "get_job_settings", side_effect=api_settings
+        ):
             earlier = threading.Thread(
                 target=lambda: readers.get_job_settings(client, "Overview", mode="api"),
                 daemon=True,
@@ -224,7 +228,9 @@ def test_an_answer_that_is_not_a_success_is_requested_again_within_the_window():
     answers = iter([{"x_um": float("nan"), "y_um": 2.0}, {"x_um": 1.0, "y_um": 2.0}])
 
     with Patched(fresh_log({"get_xy": None})):
-        with patch.object(readers.api_reader, "get_xy", side_effect=lambda *a, **k: next(answers)):
+        with patch.object(
+            readers.api_reader, "get_xy", side_effect=lambda *a, **k: next(answers)
+        ):
             t0 = time.monotonic()
             assert readers.get_xy(new_client()) == {"x_um": 1.0, "y_um": 2.0}
             assert time.monotonic() - t0 < WINDOW_S / 2
@@ -260,16 +266,25 @@ def test_the_idle_check_asks_the_api_even_in_a_log_only_run():
     profiles.STATE_READERS = profiles.StateReaderProfile(
         **{
             field: "log"
-            for field in ("xy_mode", "job_settings_mode", "selected_job_mode", "scan_status_mode")
+            for field in (
+                "xy_mode",
+                "job_settings_mode",
+                "selected_job_mode",
+                "scan_status_mode",
+            )
         }
     )
-    with patch.object(readers.api_reader, "get_scan_status", return_value="eScanIdle") as api:
+    with patch.object(
+        readers.api_reader, "get_scan_status", return_value="eScanIdle"
+    ) as api:
         assert prechecks.check_idle(new_client())["success"] is True
     api.assert_called()
 
 
 def test_the_idle_check_fails_after_four_windows_of_a_busy_scanner():
-    with patch.object(readers.api_reader, "get_scan_status", return_value="eScanRunning"):
+    with patch.object(
+        readers.api_reader, "get_scan_status", return_value="eScanRunning"
+    ):
         t0 = time.monotonic()
         result = prechecks.check_idle(new_client())
         elapsed = time.monotonic() - t0
@@ -291,14 +306,22 @@ def test_a_job_switch_keeps_its_objective_while_the_api_is_busy():
         return settings(job_name, slot=3)
 
     with Patched(fresh_log({"get_job_settings": None})):
-        with patch.object(readers.api_reader, "get_job_settings", side_effect=api_settings):
+        with patch.object(
+            readers.api_reader, "get_job_settings", side_effect=api_settings
+        ):
             threading.Thread(
                 target=lambda: readers.get_job_settings(client, "Overview", mode="api"),
                 daemon=True,
             ).start()
             assert held.wait(1.0)
             threading.Timer(0.05, release.set).start()
-            before = {"slot": 3, "translations": {}, "x_um": 0.0, "y_um": 0.0, "z_wide_um": 0.0}
+            before = {
+                "slot": 3,
+                "translations": {},
+                "x_um": 0.0,
+                "y_um": 0.0,
+                "z_wide_um": 0.0,
+            }
             outcome = objective_shift.compensate_after_change(client, "HiRes", before)
     assert outcome["ok"] is True
     assert outcome["objective_changed"] is False
@@ -309,7 +332,9 @@ def test_delivery_is_four_tries_of_one_window_without_a_pause():
     api_obj.UpdateAwaitReceipt.return_value = False
     with patch("time.sleep") as sleep:
         assert delivery.deliver(api_obj) is False
-    assert [c.args for c in api_obj.UpdateAwaitReceipt.call_args_list] == [(WINDOW_S,)] * 4
+    assert [c.args for c in api_obj.UpdateAwaitReceipt.call_args_list] == [
+        (WINDOW_S,)
+    ] * 4
     sleep.assert_not_called()
 
 
@@ -371,7 +396,9 @@ def _waits_with_their_own_numbers(root):
                     positional = args.args[len(args.args) - len(args.defaults) :]
                     named += list(zip((a.arg for a in positional), args.defaults))
                     named += [
-                        (a.arg, d) for a, d in zip(args.kwonlyargs, args.kw_defaults) if d
+                        (a.arg, d)
+                        for a, d in zip(args.kwonlyargs, args.kw_defaults)
+                        if d
                     ]
                 elif isinstance(node, ast.Call):
                     named += [(kw.arg, kw.value) for kw in node.keywords if kw.arg]
@@ -384,8 +411,12 @@ def _waits_with_their_own_numbers(root):
                     ):
                         found.append(f"{rel}:{node.lineno} sleep({node.args[0].value})")
                 elif isinstance(node, (ast.Assign, ast.AnnAssign)):
-                    targets = node.targets if isinstance(node, ast.Assign) else [node.target]
-                    named += [(t.id, node.value) for t in targets if isinstance(t, ast.Name)]
+                    targets = (
+                        node.targets if isinstance(node, ast.Assign) else [node.target]
+                    )
+                    named += [
+                        (t.id, node.value) for t in targets if isinstance(t, ast.Name)
+                    ]
                 for name, value in named:
                     if (
                         WAIT_NAME.search(name)

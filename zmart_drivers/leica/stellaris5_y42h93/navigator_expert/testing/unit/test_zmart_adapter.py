@@ -22,8 +22,12 @@ from limits_fixtures import (
     provision_machine_limits,
 )
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.actions.profiles import ImageSaveProfile
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.output.product import PlaneIndex
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.actions.profiles import (
+    ImageSaveProfile,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.output.product import (
+    PlaneIndex,
+)
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher import (
     checks as limits_checks,
 )
@@ -38,7 +42,9 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.zmart_adapter import
 )
 
 
-def _origin(x_um=0.0, y_um=0.0, z_wide_um=0.0, z_galvo_um=0.0, z_focus_um=0.0, objective=None):
+def _origin(
+    x_um=0.0, y_um=0.0, z_wide_um=0.0, z_galvo_um=0.0, z_focus_um=0.0, objective=None
+):
     return {
         "x_um": x_um,
         "y_um": y_um,
@@ -57,7 +63,9 @@ def _handle(gate_constraints=None, gated=True, **overrides):
     without any gate state (the fail-closed posture of a failed handshake).
     The stage stands at the origin, as a get_xyz after connecting would read.
     """
-    h = adapter.ZmartHandle(client=object(), connection=dict(adapter.CONNECTION), hash6="000abc")
+    h = adapter.ZmartHandle(
+        client=object(), connection=dict(adapter.CONNECTION), hash6="000abc"
+    )
     h.driven_to = {"x": 0.0, "y": 0.0, "z": 0.0, "z_wide_um": 0.0, "z_galvo_um": 0.0}
     if gated:
         install_permissive_limits(h.client, **(gate_constraints or {}))
@@ -66,7 +74,9 @@ def _handle(gate_constraints=None, gated=True, **overrides):
     return h
 
 
-def _settings(z_wide_um=50.0, z_galvo_um=0.0, objective="HC PL APO 63x/1.40 OIL CS2", slot=3):
+def _settings(
+    z_wide_um=50.0, z_galvo_um=0.0, objective="HC PL APO 63x/1.40 OIL CS2", slot=3
+):
     return {
         "objective": {"name": objective, "magnification": 63, "slotIndex": slot},
         "zPosition": {
@@ -76,13 +86,19 @@ def _settings(z_wide_um=50.0, z_galvo_um=0.0, objective="HC PL APO 63x/1.40 OIL 
     }
 
 
-def _patch_position(x_um=100.0, y_um=200.0, z_wide_um=50.0, z_galvo_um=0.0, job="Overview", slot=3):
+def _patch_position(
+    x_um=100.0, y_um=200.0, z_wide_um=50.0, z_galvo_um=0.0, job="Overview", slot=3
+):
     return (
-        patch.object(adapter._readers, "get_xy", return_value={"x_um": x_um, "y_um": y_um}),
+        patch.object(
+            adapter._readers, "get_xy", return_value={"x_um": x_um, "y_um": y_um}
+        ),
         patch.object(
             adapter._readers,
             "get_job_settings",
-            return_value=_settings(z_wide_um=z_wide_um, z_galvo_um=z_galvo_um, slot=slot),
+            return_value=_settings(
+                z_wide_um=z_wide_um, z_galvo_um=z_galvo_um, slot=slot
+            ),
         ),
         patch.object(
             adapter._readers,
@@ -115,17 +131,23 @@ def _clear_limits():
     limits_checks._stage_limits.update(dict.fromkeys(limits_checks._stage_limits, None))
 
 
-
 def _a_capture(job: str) -> SimpleNamespace:
     """What a capture answers, as the driver's acquire hands it on: the job and when it ran."""
-    return SimpleNamespace(job=job, started_at=1_760_000_000.0, finished_at=1_760_000_002.5,
-                           command_result={"success": True})
+    return SimpleNamespace(
+        job=job,
+        started_at=1_760_000_000.0,
+        finished_at=1_760_000_002.5,
+        command_result={"success": True},
+    )
 
 
 _WRITE_THE_LOG = adapter._log.write
 _NO_LOG_ON_DISK = patch.object(
-    adapter._log, "write",
-    lambda output_root, naming, entry: Path("/tmp/out") / "log" / f"{naming.stem}.log.json",
+    adapter._log,
+    "write",
+    lambda output_root, naming, entry: (
+        Path("/tmp/out") / "log" / f"{naming.stem}.log.json"
+    ),
 )
 
 
@@ -137,6 +159,7 @@ def setUpModule():
 def tearDownModule():
     _NO_LOG_ON_DISK.stop()
 
+
 class TestRegistration(unittest.TestCase):
     def test_connection_profile_does_not_select_operator_calibration(self):
         self.assertNotIn("calibration_name", adapter.CONNECTION)
@@ -146,8 +169,8 @@ class TestRegistration(unittest.TestCase):
         from zmart_controller.zmart_controller import COMMANDS
 
         from zmart_drivers.leica.stellaris5_y42h93.navigator_expert import (
-    zmart_controller_plugin as driver,
-)
+            zmart_controller_plugin as driver,
+        )
 
         ops = driver_functions(driver)
         for op in COMMANDS:
@@ -164,8 +187,8 @@ class TestRegistration(unittest.TestCase):
         from zmart_controller.registry import driver_functions
 
         from zmart_drivers.leica.stellaris5_y42h93.navigator_expert import (
-    zmart_controller_plugin as driver,
-)
+            zmart_controller_plugin as driver,
+        )
 
         self.assertNotIn("set_origin", driver_functions(driver))
         self.assertTrue(callable(adapter.set_origin))
@@ -268,7 +291,9 @@ class TestFrame(unittest.TestCase):
         # Each axis carries the five entries of the controller's contract, in
         # this order, says which motor this answer used, and names every motor
         # that can move it.
-        self.assertEqual(list(pos["x"]), ["position", "unit", "actuator", "actuators", "canvas"])
+        self.assertEqual(
+            list(pos["x"]), ["position", "unit", "actuator", "actuators", "canvas"]
+        )
         self.assertEqual(pos["z"]["actuator"], "z-wide")
         self.assertEqual(pos["x"]["unit"], "micrometer")
         self.assertEqual(pos["x"]["actuators"], {"motoric": 1000.0})
@@ -279,14 +304,16 @@ class TestFrame(unittest.TestCase):
         import tempfile
 
         from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.store import (
-    MachineProfile,
-    is_snapshot_name,
-)
+            MachineProfile,
+            is_snapshot_name,
+        )
 
         with tempfile.TemporaryDirectory() as tmp:
             profile = MachineProfile(programdata_root=Path(tmp))
             h = _handle()
-            patches = _patch_position(x_um=1000.0, y_um=2000.0, z_wide_um=30.0, z_galvo_um=2.0)
+            patches = _patch_position(
+                x_um=1000.0, y_um=2000.0, z_wide_um=30.0, z_galvo_um=2.0
+            )
             with (
                 patch.object(adapter._machine, "MACHINE", profile),
                 patches[0],
@@ -311,7 +338,9 @@ class TestFrame(unittest.TestCase):
         """Connect against a throwaway machine configuration and a stand-in client."""
         with (
             patch.object(adapter._machine, "MACHINE", profile),
-            patch.object(adapter._session, "connect_python_client", return_value=object()),
+            patch.object(
+                adapter._session, "connect_python_client", return_value=object()
+            ),
         ):
             return adapter.connect(connection or dict(adapter.CONNECTION))
 
@@ -320,8 +349,8 @@ class TestFrame(unittest.TestCase):
         import tempfile
 
         from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.store import (
-    MachineProfile,
-)
+            MachineProfile,
+        )
 
         objective = {"slotIndex": 2, "magnification": 63, "name": "HC PL APO 63x"}
         with tempfile.TemporaryDirectory() as tmp:
@@ -349,13 +378,15 @@ class TestFrame(unittest.TestCase):
         import tempfile
 
         from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.store import (
-    MachineProfile,
-)
+            MachineProfile,
+        )
 
         with tempfile.TemporaryDirectory() as tmp:
             profile = MachineProfile(programdata_root=Path(tmp))
             h = _handle()
-            patches = _patch_position(x_um=1000.0, y_um=2000.0, z_wide_um=30.0, z_galvo_um=2.0)
+            patches = _patch_position(
+                x_um=1000.0, y_um=2000.0, z_wide_um=30.0, z_galvo_um=2.0
+            )
             with (
                 patch.object(adapter._machine, "MACHINE", profile),
                 patches[0],
@@ -372,8 +403,8 @@ class TestFrame(unittest.TestCase):
         import tempfile
 
         from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.store import (
-    MachineProfile,
-)
+            MachineProfile,
+        )
 
         with tempfile.TemporaryDirectory() as tmp:
             profile = MachineProfile(programdata_root=Path(tmp))
@@ -387,8 +418,8 @@ class TestFrame(unittest.TestCase):
         import tempfile
 
         from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.store import (
-    MachineProfile,
-)
+            MachineProfile,
+        )
 
         with tempfile.TemporaryDirectory() as tmp:
             profile = MachineProfile(programdata_root=Path(tmp))
@@ -396,7 +427,9 @@ class TestFrame(unittest.TestCase):
             path.write_text("{not json", encoding="utf-8")
             with (
                 patch.object(adapter._machine, "MACHINE", profile),
-                patch.object(adapter._session, "connect_microscope") as connect_microscope,
+                patch.object(
+                    adapter._session, "connect_microscope"
+                ) as connect_microscope,
             ):
                 with self.assertRaisesRegex(RuntimeError, "could not be read"):
                     adapter.connect(dict(adapter.CONNECTION))
@@ -407,14 +440,17 @@ class TestFrame(unittest.TestCase):
         import tempfile
 
         from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.store import (
-    MachineProfile,
-)
+            MachineProfile,
+        )
 
         broken = [
             ({"origin": {"x_um": 5}}, "'y_um'"),
             ({"origin": {**_origin(), "z_focus_um": "nan"}}, "'z_focus_um'"),
             ({"origin": {**_origin(), "x_um": float("inf")}}, "'x_um'"),
-            ({"origin": {k: v for k, v in _origin().items() if k != "objective"}}, "objective"),
+            (
+                {"origin": {k: v for k, v in _origin().items() if k != "objective"}},
+                "objective",
+            ),
             ({"origin": {**_origin(), "objective": "63x"}}, "objective"),
             ({"job": "Overview"}, "no 'origin' section"),
         ]
@@ -430,19 +466,23 @@ class TestFrame(unittest.TestCase):
         import tempfile
 
         from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.store import (
-    MachineProfile,
-)
+            MachineProfile,
+        )
 
         with tempfile.TemporaryDirectory() as tmp:
             profile = MachineProfile(programdata_root=Path(tmp))
             path = profile.write_origin({"origin": _origin(x_um=5.0)})
             path.write_text("{not json", encoding="utf-8")
-            h = self._connect_with_profile(profile, {**adapter.CONNECTION, "load_origin": False})
+            h = self._connect_with_profile(
+                profile, {**adapter.CONNECTION, "load_origin": False}
+            )
         self.assertEqual(h.origin, _origin())
 
     def test_get_xyz_is_origin_relative(self):
         h = _handle(origin=_origin(x_um=1000.0, y_um=2000.0, z_focus_um=30.0))
-        patches = _patch_position(x_um=1010.0, y_um=1990.0, z_wide_um=32.0, z_galvo_um=3.0)
+        patches = _patch_position(
+            x_um=1010.0, y_um=1990.0, z_wide_um=32.0, z_galvo_um=3.0
+        )
         with patches[0], patches[1], patches[2], patches[3]:
             pos = adapter.get_xyz(h)
         self.assertEqual(pos["x"]["position"], 10.0)
@@ -457,7 +497,10 @@ class TestFrame(unittest.TestCase):
             self.assertEqual(pos[axis]["unit"], "micrometer")
         self.assertNotIn("hardware", pos)
         # What it read is what a capture is labelled with, so a capture asks nothing more.
-        self.assertEqual(h.driven_to, {"x": 10.0, "y": -10.0, "z": 5.0, "z_wide_um": 32.0, "z_galvo_um": 3.0})
+        self.assertEqual(
+            h.driven_to,
+            {"x": 10.0, "y": -10.0, "z": 5.0, "z_wide_um": 32.0, "z_galvo_um": 3.0},
+        )
 
     def test_get_xyz_names_every_motor_get_actuators_lists(self):
         """The motors reported per axis are exactly the menu, so a workflow can
@@ -499,13 +542,17 @@ class TestFrame(unittest.TestCase):
             patches[2],
             patches[3],
         ):
-            record = adapter.set_xyz(h, 10.0, 20.0, 5.0, with_actuators={"z": "z-galvo"})
+            record = adapter.set_xyz(
+                h, 10.0, 20.0, 5.0, with_actuators={"z": "z-galvo"}
+            )
         self.assertEqual(moves["xy"], (1010.0, 2020.0))
         # target focus = 30 + 5 = 35; galvo absorbs it minus z-wide's 32 -> 3
         self.assertEqual(moves["z"], (3.0, "galvo"))
         # The answer is a fresh get_xyz: the (patched) readings, not the targets.
         self.assertEqual(list(record), ["x", "y", "z", "objective_translation_um"])
-        self.assertEqual(list(record["z"]), ["position", "unit", "actuator", "actuators", "canvas"])
+        self.assertEqual(
+            list(record["z"]), ["position", "unit", "actuator", "actuators", "canvas"]
+        )
         self.assertEqual(record["z"]["actuator"], "z-galvo")
         self.assertEqual(record["z"]["actuators"], {"z-wide": 32.0, "z-galvo": 3.0})
         self.assertEqual(record["z"]["position"], 5.0)  # (32 + 3) − 30
@@ -553,7 +600,11 @@ class TestFrame(unittest.TestCase):
             patch.object(
                 adapter._commands,
                 "move_z",
-                return_value={"success": True, "confirmed": False, "message": "no readback"},
+                return_value={
+                    "success": True,
+                    "confirmed": False,
+                    "message": "no readback",
+                },
             ),
             patches[0],
             patches[1],
@@ -579,7 +630,11 @@ class TestFrame(unittest.TestCase):
             patch.object(
                 adapter._commands,
                 "move_z",
-                return_value={"success": False, "confirmed": None, "message": "refused"},
+                return_value={
+                    "success": False,
+                    "confirmed": None,
+                    "message": "refused",
+                },
             ),
             patches[0],
             patches[1],
@@ -646,8 +701,13 @@ class TestAcquire(unittest.TestCase):
                     h, position_label="A1", acquisition_settings={"trigger": "snap"}
                 )
             for gone in ("job", "folder", "format", "save_to", "backlash_rounds"):
-                with self.subTest(gone=gone), self.assertRaisesRegex(ValueError, "unknown acquisition setting"):
-                    adapter.acquire(h, position_label="A1", acquisition_settings={gone: "x"})
+                with (
+                    self.subTest(gone=gone),
+                    self.assertRaisesRegex(ValueError, "unknown acquisition setting"),
+                ):
+                    adapter.acquire(
+                        h, position_label="A1", acquisition_settings={gone: "x"}
+                    )
 
     def test_without_a_data_location_nothing_is_saved_and_the_notebook_is_named(self):
         h = _handle()
@@ -668,13 +728,20 @@ class TestAcquire(unittest.TestCase):
             self.assertEqual(calls["output_root"].parent.parent, Path(tmp).resolve())
 
     def test_a_sessions_own_output_root_wins_over_the_set_up_one(self):
-        h = _handle(connection={**adapter.CONNECTION, "output_root": "/chosen/zmart"}, data_location=Path("/elsewhere"))
+        h = _handle(
+            connection={**adapter.CONNECTION, "output_root": "/chosen/zmart"},
+            data_location=Path("/elsewhere"),
+        )
         with self._capturing(output_root=None) as calls:
             adapter.acquire(h, position_label="A1")
-        self.assertEqual(calls["output_root"].parent.parent, Path("/chosen/zmart").resolve())
+        self.assertEqual(
+            calls["output_root"].parent.parent, Path("/chosen/zmart").resolve()
+        )
 
     @contextmanager
-    def _capturing(self, *, image_paths=None, projections=None, output_root=Path("/tmp/out")):
+    def _capturing(
+        self, *, image_paths=None, projections=None, output_root=Path("/tmp/out")
+    ):
         """Everything an ``acquire`` needs stood in for, so a test says one thing."""
         written = image_paths or {0: Path("/tmp/out/img.ome.tif")}
         calls = {}
@@ -683,7 +750,9 @@ class TestAcquire(unittest.TestCase):
             calls["save"] = kwargs
             calls["output_root"] = Path(output_root)
             return SimpleNamespace(
-                image_paths=dict(written), naming=naming, projection_paths=tuple(projections or ()),
+                image_paths=dict(written),
+                naming=naming,
+                projection_paths=tuple(projections or ()),
             )
 
         def fake_log(output_root, naming, entry):
@@ -695,9 +764,17 @@ class TestAcquire(unittest.TestCase):
             for stand_in in (
                 patch.object(adapter._readers, "get_jobs", return_value=self._jobs()),
                 patch.object(adapter._readers, "get_hardware_info", return_value={}),
-                patch.object(adapter._commands, "select_job", lambda c, j, **k: {"success": True}),
-                patch.object(adapter._motion, "correct_backlash", lambda client, **k: {"success": True, "confirmed": True}),
-                patch.object(adapter._capture, "acquire", lambda c, j, **k: _a_capture(j)),
+                patch.object(
+                    adapter._commands, "select_job", lambda c, j, **k: {"success": True}
+                ),
+                patch.object(
+                    adapter._motion,
+                    "correct_backlash",
+                    lambda client, **k: {"success": True, "confirmed": True},
+                ),
+                patch.object(
+                    adapter._capture, "acquire", lambda c, j, **k: _a_capture(j)
+                ),
                 patch.object(adapter._save, "save", fake_save),
                 patch.object(adapter._log, "write", fake_log),
                 *patches,
@@ -705,10 +782,14 @@ class TestAcquire(unittest.TestCase):
                 standing_in.enter_context(stand_in)
             # Where to save is otherwise this microscope's set-up data location.
             if output_root is not None:
-                standing_in.enter_context(patch.object(adapter._info, "output_root", return_value=output_root))
+                standing_in.enter_context(
+                    patch.object(adapter._info, "output_root", return_value=output_root)
+                )
             yield calls
 
-    def test_get_info_says_how_far_the_stage_can_go_and_what_the_session_stands_on(self):
+    def test_get_info_says_how_far_the_stage_can_go_and_what_the_session_stands_on(
+        self,
+    ):
         """The two things the operator page reads at connect, and the mock invented.
 
         The page sizes its canvas from ``get_info().canvas`` and lists what a
@@ -718,28 +799,46 @@ class TestAcquire(unittest.TestCase):
         limits envelope in the frame -- nothing can be imaged outside it --
         and the checks are facts the driver already holds.
         """
-        h = _handle(gate_constraints={
-            "x_um": {"min": 0, "max": 120_000}, "y_um": {"min": 0, "max": 80_000},
-            "z_wide_um": {"min": 0, "max": 10_000},
-        })
+        h = _handle(
+            gate_constraints={
+                "x_um": {"min": 0, "max": 120_000},
+                "y_um": {"min": 0, "max": 80_000},
+                "z_wide_um": {"min": 0, "max": 10_000},
+            }
+        )
         h.origin = {
-            **h.origin, "x_um": 1_000.0, "y_um": 500.0, "z_wide_um": 100.0, "z_focus_um": 100.0,
+            **h.origin,
+            "x_um": 1_000.0,
+            "y_um": 500.0,
+            "z_wide_um": 100.0,
+            "z_focus_um": 100.0,
         }
         # The envelope the gate was handed at connect, in raw stage um.
         gate = adapter._gate._state_for(h.client)
-        adapter._gate._install(h.client, adapter._gate.GateState(
-            limits=gate.limits, error=None,
-            stage_cfg={"stage_um": {
-                "x": [0.0, 120_000.0], "y": [0.0, 80_000.0],
-                "z_wide": [0.0, 10_000.0], "z_galvo": [-50.0, 50.0],
-            }},
-        ))
+        adapter._gate._install(
+            h.client,
+            adapter._gate.GateState(
+                limits=gate.limits,
+                error=None,
+                stage_cfg={
+                    "stage_um": {
+                        "x": [0.0, 120_000.0],
+                        "y": [0.0, 80_000.0],
+                        "z_wide": [0.0, 10_000.0],
+                        "z_galvo": [-50.0, 50.0],
+                    }
+                },
+            ),
+        )
         patches = _patch_position(x_um=1_000.0, y_um=500.0, z_wide_um=100.0)
         with (
             patch.object(adapter, "_selected_job_name", return_value="Overview"),
             patch.object(adapter._info, "output_root", return_value=Path("/runs")),
             patch.object(adapter._readers, "ping", return_value=True),
-            patches[0], patches[1], patches[2], patches[3],
+            patches[0],
+            patches[1],
+            patches[2],
+            patches[3],
         ):
             info = adapter.get_info(h)
 
@@ -751,12 +850,13 @@ class TestAcquire(unittest.TestCase):
 
         checks = info["connection_status"]
         self.assertEqual(checks["api"], "answering")
-        self.assertNotIn("autosave", checks)  # captures come from LAS X's cache; AutoSave is not used
+        self.assertNotIn(
+            "autosave", checks
+        )  # captures come from LAS X's cache; AutoSave is not used
         self.assertIn("um", checks["stage"])
         self.assertEqual(checks["output root"], str(Path("/runs")))
         self.assertNotIn("output_root", info)
         self.assertNotIn("failed", checks["limits"])
-
 
         h = _handle(connection={**adapter.CONNECTION, "output_root": "/tmp/out"})
         calls = {}
@@ -778,7 +878,11 @@ class TestAcquire(unittest.TestCase):
         with (
             patch.object(adapter._readers, "get_jobs", return_value=self._jobs()),
             patch.object(adapter._readers, "get_hardware_info", return_value={}),
-            patch.object(adapter._motion, "correct_backlash", lambda client, **k: {"success": True, "confirmed": True}),
+            patch.object(
+                adapter._motion,
+                "correct_backlash",
+                lambda client, **k: {"success": True, "confirmed": True},
+            ),
             patch.object(adapter._capture, "acquire", fake_capture),
             patch.object(adapter._save, "save", fake_save),
             patches[0],
@@ -809,16 +913,23 @@ class TestAcquire(unittest.TestCase):
         self.assertEqual(record["trigger"], "full")
         self.assertNotIn("folder", record)
         self.assertEqual(
-            [Path(p) for p in record["files"]], [Path("/tmp/out/img.ome.tif"), *map(Path, record["log"])]
+            [Path(p) for p in record["files"]],
+            [Path("/tmp/out/img.ome.tif"), *map(Path, record["log"])],
         )
         self.assertNotIn("images", record)
         self.assertEqual(
             record["planes"],
-            [{
-                "t": 0, "z": 0, "c": 0,
-                "path": str(Path("/tmp/out/img.ome.tif")),
-                "x_um": 0.0, "y_um": 0.0, "z_um": 0.0,
-            }],
+            [
+                {
+                    "t": 0,
+                    "z": 0,
+                    "c": 0,
+                    "path": str(Path("/tmp/out/img.ome.tif")),
+                    "x_um": 0.0,
+                    "y_um": 0.0,
+                    "z_um": 0.0,
+                }
+            ],
         )
 
     def test_files_lists_every_file_the_acquisition_saved(self):
@@ -852,18 +963,35 @@ class TestAcquire(unittest.TestCase):
             with (
                 patch.object(adapter._readers, "get_jobs", return_value=self._jobs()),
                 patch.object(adapter._readers, "get_hardware_info", return_value={}),
-                patch.object(adapter._commands, "select_job", lambda *a, **k: {"success": True}),
-                patch.object(adapter._motion, "correct_backlash", lambda client, **k: {"success": True, "confirmed": True}),
-                patch.object(adapter._capture, "acquire", lambda client, job, **k: _a_capture(job)),
+                patch.object(
+                    adapter._commands, "select_job", lambda *a, **k: {"success": True}
+                ),
+                patch.object(
+                    adapter._motion,
+                    "correct_backlash",
+                    lambda client, **k: {"success": True, "confirmed": True},
+                ),
+                patch.object(
+                    adapter._capture,
+                    "acquire",
+                    lambda client, job, **k: _a_capture(job),
+                ),
                 patch.object(adapter._save, "save", fake_save),
                 # This answer is checked for files that exist: the log is written.
                 patch.object(adapter._log, "write", _WRITE_THE_LOG),
-                patches[0], patches[1], patches[2], patches[3],
+                patches[0],
+                patches[1],
+                patches[2],
+                patches[3],
             ):
                 record = adapter.acquire(h, position_label="well-7")
 
-            self.assertEqual(record["files"], [str(image), str(vendor), str(state), *record["log"]])
-            self.assertEqual(check_acquire_answer({"success": True, "content": record}), [])
+            self.assertEqual(
+                record["files"], [str(image), str(vendor), str(state), *record["log"]]
+            )
+            self.assertEqual(
+                check_acquire_answer({"success": True, "content": record}), []
+            )
 
     def test_saving_follows_this_microscopes_profile(self):
         """The format, the projection and letting go of the cache are set up once.
@@ -875,7 +1003,9 @@ class TestAcquire(unittest.TestCase):
         h.driven_to = {"x": 0.0, "y": 0.0, "z": 0.0, "z_wide_um": 0.0}
         with self._capturing() as calls:
             record = adapter.acquire(h, position_label="A1")
-        self.assertNotIn("source", calls["save"])  # always LAS X's cache: nothing to choose
+        self.assertNotIn(
+            "source", calls["save"]
+        )  # always LAS X's cache: nothing to choose
         self.assertEqual(calls["save"]["format"], adapter.IMAGE_SAVE.format)
         self.assertEqual(calls["save"]["projection"], adapter.IMAGE_SAVE.projection)
         self.assertIs(calls["save"]["cleanup_cache"], adapter.IMAGE_SAVE.cleanup_cache)
@@ -899,8 +1029,14 @@ class TestAcquire(unittest.TestCase):
         with (
             patch.object(adapter, "IMAGE_SAVE", releasing),
             self._capturing(),
-            patch.object(adapter._release, "prepare", lambda: order.append("canvas shown")),
-            patch.object(adapter._capture, "acquire", lambda c, j, **k: order.append("captured") or _a_capture(j)),
+            patch.object(
+                adapter._release, "prepare", lambda: order.append("canvas shown")
+            ),
+            patch.object(
+                adapter._capture,
+                "acquire",
+                lambda c, j, **k: order.append("captured") or _a_capture(j),
+            ),
         ):
             adapter.acquire(h, position_label="A1")
         self.assertEqual(order, ["canvas shown", "captured"])
@@ -928,23 +1064,49 @@ class TestAcquire(unittest.TestCase):
     def test_the_capture_is_placed_where_the_answer_says_its_planes_are(self):
         """The store is placed where the answer says its planes are."""
         h = _handle()
-        h.driven_to = {"x": 10.0, "y": 20.0, "z": 100.0, "z_wide_um": 1000.0, "z_galvo_um": 0.0}
-        with self._capturing() as calls, patch.object(
-            adapter._readers, "get_job_settings",
-            return_value={"stack": {"begin": -10.0, "end": 10.0, "sections": 3, "mode": "z-galvo"}},
+        h.driven_to = {
+            "x": 10.0,
+            "y": 20.0,
+            "z": 100.0,
+            "z_wide_um": 1000.0,
+            "z_galvo_um": 0.0,
+        }
+        with (
+            self._capturing() as calls,
+            patch.object(
+                adapter._readers,
+                "get_job_settings",
+                return_value={
+                    "stack": {
+                        "begin": -10.0,
+                        "end": 10.0,
+                        "sections": 3,
+                        "mode": "z-galvo",
+                    }
+                },
+            ),
         ):
             adapter.acquire(h, position_label="A1")
             where = calls["save"]["placement"]([0, 1, 2])
             placed = [where(z) for z in (0, 2)]
 
-        self.assertEqual(placed, [
-            {"x_um": 10.0, "y_um": 20.0, "z_um": 90.0},
-            {"x_um": 10.0, "y_um": 20.0, "z_um": 110.0},
-        ])
+        self.assertEqual(
+            placed,
+            [
+                {"x_um": 10.0, "y_um": 20.0, "z_um": 90.0},
+                {"x_um": 10.0, "y_um": 20.0, "z_um": 110.0},
+            ],
+        )
 
     def test_the_projection_is_asked_for_and_listed_with_the_files(self):
         h = _handle()
-        h.driven_to = {"x": 0.0, "y": 0.0, "z": 0.0, "z_wide_um": 0.0, "z_galvo_um": 0.0}
+        h.driven_to = {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0,
+            "z_wide_um": 0.0,
+            "z_galvo_um": 0.0,
+        }
         projection = Path("/tmp/out/projections/A1.ome.zarr")
         with self._capturing(projections=[projection]) as calls:
             record = adapter.acquire(h, position_label="A1")
@@ -955,10 +1117,18 @@ class TestAcquire(unittest.TestCase):
 
     def test_every_capture_leaves_a_log_of_what_was_asked_and_done(self):
         h = _handle()
-        h.driven_to = {"x": 5.0, "y": 6.0, "z": 7.0, "z_wide_um": 0.0, "z_galvo_um": 0.0}
+        h.driven_to = {
+            "x": 5.0,
+            "y": 6.0,
+            "z": 7.0,
+            "z_wide_um": 0.0,
+            "z_galvo_um": 0.0,
+        }
         image = Path("/tmp/out/.staging") / h.hash6 / "data" / "img.ome.tif"
         with self._capturing(image_paths={0: image}) as calls:
-            record = adapter.acquire(h, position_label="A1", acquisition_settings={"trigger": "full"})
+            record = adapter.acquire(
+                h, position_label="A1", acquisition_settings={"trigger": "full"}
+            )
 
         entry = calls["log"]
         self.assertEqual(entry["asked"], {"trigger": "full"})
@@ -967,8 +1137,14 @@ class TestAcquire(unittest.TestCase):
         self.assertIn("started", entry["capture"])
         self.assertIn("finished", entry["capture"])
         self.assertEqual(
-            [{k: v for k, v in plane.items() if k != "path"} for plane in entry["planes"]],
-            [{k: v for k, v in plane.items() if k != "path"} for plane in record["planes"]],
+            [
+                {k: v for k, v in plane.items() if k != "path"}
+                for plane in entry["planes"]
+            ],
+            [
+                {k: v for k, v in plane.items() if k != "path"}
+                for plane in record["planes"]
+            ],
         )
         # Paths from the run's start, so the log stays true when the run is moved.
         self.assertEqual(entry["planes"][0]["path"], "data/img.ome.tif")
@@ -977,7 +1153,9 @@ class TestAcquire(unittest.TestCase):
         [log] = record["log"]
         self.assertTrue(log.endswith(".log.json"))
         self.assertIn(log, record["files"])
-        self.assertNotIn(log, entry["files"], "the log lists what the capture saved, not itself")
+        self.assertNotIn(
+            log, entry["files"], "the log lists what the capture saved, not itself"
+        )
 
     def test_a_plane_says_where_on_the_sample_it_was_taken(self):
         """The place the last confirmed move put the stage, in the frame.
@@ -1010,9 +1188,20 @@ class TestAcquire(unittest.TestCase):
         h = _handle()
         h.driven_to = {"x": 0.0, "y": 0.0, "z": 100.0, "z_wide_um": 1000.0}
         planes = {i: Path(f"/tmp/out/img_z{i}.ome.tif") for i in range(5)}
-        with self._capturing(image_paths=planes) as calls, patch.object(
-            adapter._readers, "get_job_settings",
-            return_value={"stack": {"begin": 990.0, "end": 1010.0, "sections": 5, "mode": "z-wide"}},
+        with (
+            self._capturing(image_paths=planes) as calls,
+            patch.object(
+                adapter._readers,
+                "get_job_settings",
+                return_value={
+                    "stack": {
+                        "begin": 990.0,
+                        "end": 1010.0,
+                        "sections": 5,
+                        "mode": "z-wide",
+                    }
+                },
+            ),
         ):
             record = adapter.acquire(h, position_label="A1")
 
@@ -1033,17 +1222,33 @@ class TestAcquire(unittest.TestCase):
         h = _handle()
         h.driven_to = {"x": 0.0, "y": 0.0, "z": 100.0, "z_wide_um": 1000.0}
         planes = {i: Path(f"/tmp/out/img_z{i}.ome.tif") for i in range(3)}
-        with self._capturing(image_paths=planes), patch.object(
-            adapter._readers, "get_job_settings",
-            return_value={"stack": {"begin": 1000.0, "end": 1020.0, "sections": 3, "mode": "z-wide"}},
+        with (
+            self._capturing(image_paths=planes),
+            patch.object(
+                adapter._readers,
+                "get_job_settings",
+                return_value={
+                    "stack": {
+                        "begin": 1000.0,
+                        "end": 1020.0,
+                        "sections": 3,
+                        "mode": "z-wide",
+                    }
+                },
+            ),
         ):
             record = adapter.acquire(h, position_label="A1")
 
         self.assertEqual([p["z_um"] for p in record["planes"]], [100.0, 110.0, 120.0])
 
     def _heights(self, h, planes, stack):
-        with self._capturing(image_paths=planes), patch.object(
-            adapter._readers, "get_job_settings", return_value={"stack": stack},
+        with (
+            self._capturing(image_paths=planes),
+            patch.object(
+                adapter._readers,
+                "get_job_settings",
+                return_value={"stack": stack},
+            ),
         ):
             record = adapter.acquire(h, position_label="A1")
         return [(p["c"], p["z"], p["z_um"]) for p in record["planes"]]
@@ -1056,19 +1261,43 @@ class TestAcquire(unittest.TestCase):
         a slice at -10 um is 10 um below where the drive stood.
         """
         h = _handle()
-        h.driven_to = {"x": 0.0, "y": 0.0, "z": 100.0, "z_wide_um": 1000.0, "z_galvo_um": 0.0}
-        planes = {PlaneIndex(t=0, z=i, c=0): Path(f"/tmp/out/img_z{i}.ome.tif") for i in range(5)}
+        h.driven_to = {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 100.0,
+            "z_wide_um": 1000.0,
+            "z_galvo_um": 0.0,
+        }
+        planes = {
+            PlaneIndex(t=0, z=i, c=0): Path(f"/tmp/out/img_z{i}.ome.tif")
+            for i in range(5)
+        }
 
-        heights = self._heights(h, planes, {"begin": -10.0, "end": 10.0, "sections": 5, "mode": "z-galvo"})
+        heights = self._heights(
+            h, planes, {"begin": -10.0, "end": 10.0, "sections": 5, "mode": "z-galvo"}
+        )
 
-        self.assertEqual([z_um for _c, _z, z_um in heights], [90.0, 95.0, 100.0, 105.0, 110.0])
+        self.assertEqual(
+            [z_um for _c, _z, z_um in heights], [90.0, 95.0, 100.0, 105.0, 110.0]
+        )
 
     def test_a_galvo_stack_is_measured_from_where_the_galvo_stood(self):
         h = _handle()
-        h.driven_to = {"x": 0.0, "y": 0.0, "z": 100.0, "z_wide_um": 1000.0, "z_galvo_um": 5.0}
-        planes = {PlaneIndex(t=0, z=i, c=0): Path(f"/tmp/out/img_z{i}.ome.tif") for i in range(3)}
+        h.driven_to = {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 100.0,
+            "z_wide_um": 1000.0,
+            "z_galvo_um": 5.0,
+        }
+        planes = {
+            PlaneIndex(t=0, z=i, c=0): Path(f"/tmp/out/img_z{i}.ome.tif")
+            for i in range(3)
+        }
 
-        heights = self._heights(h, planes, {"begin": -10.0, "end": 10.0, "sections": 3, "mode": "z-galvo"})
+        heights = self._heights(
+            h, planes, {"begin": -10.0, "end": 10.0, "sections": 3, "mode": "z-galvo"}
+        )
 
         self.assertEqual([z_um for _c, _z, z_um in heights], [85.0, 95.0, 105.0])
 
@@ -1079,24 +1308,49 @@ class TestAcquire(unittest.TestCase):
         up, and put every plane at the drive's height.
         """
         h = _handle()
-        h.driven_to = {"x": 0.0, "y": 0.0, "z": 100.0, "z_wide_um": 1000.0, "z_galvo_um": 0.0}
+        h.driven_to = {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 100.0,
+            "z_wide_um": 1000.0,
+            "z_galvo_um": 0.0,
+        }
         planes = {
             PlaneIndex(t=0, z=z, c=c): Path(f"/tmp/out/img_z{z}_c{c}.ome.tif")
-            for z in range(3) for c in range(2)
+            for z in range(3)
+            for c in range(2)
         }
 
-        heights = self._heights(h, planes, {"begin": 1000.0, "end": 1020.0, "sections": 3, "mode": "z-wide"})
+        heights = self._heights(
+            h, planes, {"begin": 1000.0, "end": 1020.0, "sections": 3, "mode": "z-wide"}
+        )
 
         self.assertEqual(
             sorted(heights),
-            [(0, 0, 100.0), (0, 1, 110.0), (0, 2, 120.0), (1, 0, 100.0), (1, 1, 110.0), (1, 2, 120.0)],
+            [
+                (0, 0, 100.0),
+                (0, 1, 110.0),
+                (0, 2, 120.0),
+                (1, 0, 100.0),
+                (1, 1, 110.0),
+                (1, 2, 120.0),
+            ],
         )
 
     def test_a_stack_that_does_not_say_its_drive_is_refused(self):
         """Which drive made the stack decides what its slices mean; unsaid, the capture fails."""
         h = _handle()
-        h.driven_to = {"x": 0.0, "y": 0.0, "z": 100.0, "z_wide_um": 1000.0, "z_galvo_um": 0.0}
-        planes = {PlaneIndex(t=0, z=i, c=0): Path(f"/tmp/out/img_z{i}.ome.tif") for i in range(3)}
+        h.driven_to = {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 100.0,
+            "z_wide_um": 1000.0,
+            "z_galvo_um": 0.0,
+        }
+        planes = {
+            PlaneIndex(t=0, z=i, c=0): Path(f"/tmp/out/img_z{i}.ome.tif")
+            for i in range(3)
+        }
 
         with self.assertRaisesRegex(RuntimeError, "cannot be placed"):
             self._heights(h, planes, {"begin": 1000.0, "end": 1020.0, "sections": 3})
@@ -1104,17 +1358,34 @@ class TestAcquire(unittest.TestCase):
     def test_a_stack_swept_downwards_counts_upwards(self):
         """Depth 0 is the lowest slice, as in the store, whichever way LAS X swept."""
         h = _handle()
-        h.driven_to = {"x": 0.0, "y": 0.0, "z": 100.0, "z_wide_um": 1000.0, "z_galvo_um": 0.0}
-        planes = {PlaneIndex(t=0, z=i, c=0): Path(f"/tmp/out/img_z{i}.ome.tif") for i in range(3)}
+        h.driven_to = {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 100.0,
+            "z_wide_um": 1000.0,
+            "z_galvo_um": 0.0,
+        }
+        planes = {
+            PlaneIndex(t=0, z=i, c=0): Path(f"/tmp/out/img_z{i}.ome.tif")
+            for i in range(3)
+        }
 
-        heights = self._heights(h, planes, {"begin": 1020.0, "end": 1000.0, "sections": 3, "mode": "z-wide"})
+        heights = self._heights(
+            h, planes, {"begin": 1020.0, "end": 1000.0, "sections": 3, "mode": "z-wide"}
+        )
 
-        self.assertEqual(sorted((z, z_um) for _c, z, z_um in heights), [(0, 100.0), (1, 110.0), (2, 120.0)])
+        self.assertEqual(
+            sorted((z, z_um) for _c, z, z_um in heights),
+            [(0, 100.0), (1, 110.0), (2, 120.0)],
+        )
 
     def test_a_capture_before_the_stage_was_read_is_refused(self):
         """Every plane says where it is; with no position read or set yet, there is none to say."""
         h = _handle(driven_to=None)
-        with self._capturing(), self.assertRaisesRegex(RuntimeError, "where the stage is"):
+        with (
+            self._capturing(),
+            self.assertRaisesRegex(RuntimeError, "where the stage is"),
+        ):
             adapter.acquire(h, position_label="A1")
 
     def test_acquire_applies_the_rigs_measured_orientation(self):
@@ -1134,15 +1405,17 @@ class TestAcquire(unittest.TestCase):
         from datetime import datetime, timezone
 
         from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.store import (
-    MachineProfile,
-)
+            MachineProfile,
+        )
 
         h = _handle(connection={**adapter.CONNECTION, "output_root": "/tmp/out"})
         seen = {}
 
         def fake_save(client, acq, output_root, naming, **kwargs):
             seen["orientation"] = kwargs.get("orientation")
-            return SimpleNamespace(image_paths={0: Path("/tmp/out/img.ome.tif")}, naming=naming)
+            return SimpleNamespace(
+                image_paths={0: Path("/tmp/out/img.ome.tif")}, naming=naming
+            )
 
         patches = _patch_position(job="Overview")
         with tempfile.TemporaryDirectory() as tmp:
@@ -1156,11 +1429,19 @@ class TestAcquire(unittest.TestCase):
                 patch.object(adapter._readers, "get_jobs", return_value=self._jobs()),
                 patch.object(adapter._readers, "get_hardware_info", return_value={}),
                 patch.object(
-                    adapter._commands, "select_job", lambda client, job, **k: {"success": True}
+                    adapter._commands,
+                    "select_job",
+                    lambda client, job, **k: {"success": True},
                 ),
-                patch.object(adapter._motion, "correct_backlash", lambda client, **k: {"success": True, "confirmed": True}),
                 patch.object(
-                    adapter._capture, "acquire", lambda client, job, **k: _a_capture(job)
+                    adapter._motion,
+                    "correct_backlash",
+                    lambda client, **k: {"success": True, "confirmed": True},
+                ),
+                patch.object(
+                    adapter._capture,
+                    "acquire",
+                    lambda client, job, **k: _a_capture(job),
                 ),
                 patch.object(adapter._save, "save", fake_save),
                 patches[0],
@@ -1172,20 +1453,26 @@ class TestAcquire(unittest.TestCase):
 
         # The measured 90-degree turn was read from the snapshot and threaded
         # into save -- not the shipped "no turn" placeholder.
-        self.assertEqual(seen["orientation"], adapter._orientation.Orientation(rotate_deg=90))
+        self.assertEqual(
+            seen["orientation"], adapter._orientation.Orientation(rotate_deg=90)
+        )
 
     def _fake_acquire_env(self, calls):
         """Patches for a fully-mocked acquire; records each save's naming."""
 
         def fake_save(client, acq, output_root, naming, **kwargs):
             calls.setdefault("namings", []).append(naming)
-            return SimpleNamespace(image_paths={0: Path("/tmp/out/img.ome.tif")}, naming=naming)
+            return SimpleNamespace(
+                image_paths={0: Path("/tmp/out/img.ome.tif")}, naming=naming
+            )
 
         patches = _patch_position(job="Overview")
         return (
             patch.object(adapter._readers, "get_jobs", return_value=self._jobs()),
             patch.object(adapter._readers, "get_hardware_info", return_value={}),
-            patch.object(adapter._commands, "select_job", return_value={"success": True}),
+            patch.object(
+                adapter._commands, "select_job", return_value={"success": True}
+            ),
             patch.object(
                 adapter._motion,
                 "correct_backlash",
@@ -1218,7 +1505,9 @@ class TestAcquire(unittest.TestCase):
         # unlabeled acquires consume the per-session counter, zero-padded
         self.assertEqual(record0["position_label"], "000000")
         self.assertEqual(record1["position_label"], "000001")
-        self.assertEqual([naming.stem for naming in calls["namings"]], ["000000", "000001"])
+        self.assertEqual(
+            [naming.stem for naming in calls["namings"]], ["000000", "000001"]
+        )
 
     def test_a_label_already_staged_gets_the_next_free_stem(self):
         """No capture is ever overwritten: the same label again gets ``_001``."""
@@ -1226,7 +1515,9 @@ class TestAcquire(unittest.TestCase):
             h = _handle(connection={**adapter.CONNECTION, "output_root": tmp})
             staged = Path(tmp).resolve() / ".staging" / h.hash6 / "data"
             staged.mkdir(parents=True)
-            (staged / "A1_T000000_C00_Z00000.ome.tiff").write_bytes(b"the first capture")
+            (staged / "A1_T000000_C00_Z00000.ome.tiff").write_bytes(
+                b"the first capture"
+            )
             calls = {}
             with ExitStack() as standing_in:
                 for stand_in in self._fake_acquire_env(calls):
@@ -1323,7 +1614,9 @@ class TestAcquire(unittest.TestCase):
         patches = _patch_position(job="Overview")
         with (
             patch.object(adapter._readers, "get_jobs", return_value=self._jobs()),
-            patch.object(adapter._commands, "select_job", return_value={"success": True}),
+            patch.object(
+                adapter._commands, "select_job", return_value={"success": True}
+            ),
             patch.object(
                 adapter._motion,
                 "correct_backlash",
@@ -1351,7 +1644,9 @@ class TestAcquire(unittest.TestCase):
         self.assertEqual(self._acquire_and_list_the_calls(), ["capture"])
 
     def test_strip_scan_fields_is_not_an_acquisition_setting(self):
-        with self.assertRaisesRegex(ValueError, "unknown acquisition setting 'strip_scan_fields'"):
+        with self.assertRaisesRegex(
+            ValueError, "unknown acquisition setting 'strip_scan_fields'"
+        ):
             self._acquire_and_list_the_calls({"strip_scan_fields": False})
 
 
@@ -1370,10 +1665,13 @@ class TestStateAndProcedures(unittest.TestCase):
 
     def _state_patches(self, jobs=("Overview", "HiRes"), af_jobs=("AF Job",)):
         catalog = [
-            {"Name": n, "IsSelected": n == "Overview", "IsAutofocus": False} for n in jobs
+            {"Name": n, "IsSelected": n == "Overview", "IsAutofocus": False}
+            for n in jobs
         ] + [{"Name": n, "IsSelected": False, "IsAutofocus": True} for n in af_jobs]
         return (
-            patch.object(adapter._readers, "get_hardware_info", return_value=dict(self._HW)),
+            patch.object(
+                adapter._readers, "get_hardware_info", return_value=dict(self._HW)
+            ),
             patch.object(
                 adapter._readers,
                 "get_selected_job",
@@ -1389,7 +1687,9 @@ class TestStateAndProcedures(unittest.TestCase):
             p[0] as hardware,
             p[1] as selected,
             p[2] as jobs,
-            patch.object(adapter._readers, "get_job_settings", return_value={}) as settings,
+            patch.object(
+                adapter._readers, "get_job_settings", return_value={}
+            ) as settings,
         ):
             state = adapter.get_state(h)
         self.assertEqual(list(state), ["changeable", "observed"])  # changeable first
@@ -1446,7 +1746,9 @@ class TestStateAndProcedures(unittest.TestCase):
             p[0],
             p[1],
             p[2],
-            patch.object(adapter._commands, "select_job", return_value={"success": True}) as select,
+            patch.object(
+                adapter._commands, "select_job", return_value={"success": True}
+            ) as select,
         ):
             captured = adapter.get_state(h)
             captured["changeable"]["job"] = "HiRes"
@@ -1475,7 +1777,11 @@ class TestStateAndProcedures(unittest.TestCase):
         self.assertNotIn("get_positions", procedures)
         self.assertNotIn("get_focus_points", procedures)
         self.assertEqual(procedures["autofocus"]["jobs"], ["AF Job"])
-        with patch.object(adapter._motion, "correct_backlash", lambda client, **k: {"success": True, "confirmed": True}):
+        with patch.object(
+            adapter._motion,
+            "correct_backlash",
+            lambda client, **k: {"success": True, "confirmed": True},
+        ):
             self.assertEqual(
                 adapter.run_procedure(h, {"name": "backlash_takeup"})["ran"]["name"],
                 "backlash_takeup",
@@ -1512,7 +1818,9 @@ class TestStateAndProcedures(unittest.TestCase):
                 ),
             ),
         ):
-            result = adapter.run_procedure(h, {"name": "autofocus"})  # single AF job: no arg
+            result = adapter.run_procedure(
+                h, {"name": "autofocus"}
+            )  # single AF job: no arg
         # select AF -> capture -> restore the original selection, in order
         self.assertEqual(
             calls, [("select", "AF Job"), ("acquire", "AF Job"), ("select", "Overview")]
@@ -1533,11 +1841,15 @@ class TestStateAndProcedures(unittest.TestCase):
             position[1],
             position[2],
             position[3],
-            patch.object(adapter._commands, "select_job", return_value={"success": True}),
+            patch.object(
+                adapter._commands, "select_job", return_value={"success": True}
+            ),
             patch.object(
                 adapter._capture,
                 "acquire",
-                return_value=SimpleNamespace(job="AF Job", started_at=0.0, finished_at=1.0),
+                return_value=SimpleNamespace(
+                    job="AF Job", started_at=0.0, finished_at=1.0
+                ),
             ),
         ):
             result = adapter.run_procedure(h, {"name": "autofocus"})
@@ -1647,7 +1959,9 @@ class TestObjectiveCompensation(unittest.TestCase):
 
     def test_cross_objective_read_applies_translation(self):
         h = self._cross_handle()
-        patches = _patch_position(x_um=1110.0, y_um=2060.0, z_wide_um=45.0, z_galvo_um=0.0, slot=2)
+        patches = _patch_position(
+            x_um=1110.0, y_um=2060.0, z_wide_um=45.0, z_galvo_um=0.0, slot=2
+        )
         with patches[0], patches[1], patches[2], patches[3]:
             pos = adapter.get_xyz(h)
         self.assertEqual(pos["x"]["position"], 10.0)  # 1110 − 1000 − 100
@@ -1679,7 +1993,9 @@ class TestObjectiveCompensation(unittest.TestCase):
             patches[2],
             patches[3],
         ):
-            record = adapter.set_xyz(h, 10.0, 10.0, 5.0, with_actuators={"z": "z-galvo"})
+            record = adapter.set_xyz(
+                h, 10.0, 10.0, 5.0, with_actuators={"z": "z-galvo"}
+            )
         self.assertEqual(moves["xy"], (1110.0, 2060.0))  # ref + F + ΔT
         # ΔT.z=10 is pinned absolutely on z-wide (30+10), while the
         # ordinary requested frame z=5 is realized by z-galvo (0+5).
@@ -1712,7 +2028,12 @@ class TestObjectiveCompensation(unittest.TestCase):
         # The selected job is now "HiRes", whose settings carry objective
         # slot 2 — the operator switched jobs, not the turret directly.
         patches = _patch_position(
-            x_um=1110.0, y_um=2060.0, z_wide_um=45.0, z_galvo_um=0.0, job="HiRes", slot=2
+            x_um=1110.0,
+            y_um=2060.0,
+            z_wide_um=45.0,
+            z_galvo_um=0.0,
+            job="HiRes",
+            slot=2,
         )
         with (
             patch.object(adapter._motion, "arrive_xy", fake_xy),
@@ -1723,7 +2044,9 @@ class TestObjectiveCompensation(unittest.TestCase):
             patches[3],
         ):
             pos = adapter.get_xyz(h)
-            record = adapter.set_xyz(h, 10.0, 10.0, 5.0, with_actuators={"z": "z-galvo"})
+            record = adapter.set_xyz(
+                h, 10.0, 10.0, 5.0, with_actuators={"z": "z-galvo"}
+            )
 
         # Read: compensated with ΔT taken from the NEW job's objective.
         self.assertEqual(pos["x"]["position"], 10.0)  # 1110 − 1000 − 100
@@ -1731,7 +2054,9 @@ class TestObjectiveCompensation(unittest.TestCase):
         self.assertEqual(pos["z"]["position"], 5.0)  # 45 − 30 − 10
         # Move: targets include ΔT, and z is driven on the selected job.
         self.assertEqual(moves["xy"], (1110.0, 2060.0))
-        self.assertEqual(moves["z"], [("HiRes", 40.0, "zwide"), ("HiRes", 5.0, "galvo")])
+        self.assertEqual(
+            moves["z"], [("HiRes", 40.0, "zwide"), ("HiRes", 5.0, "galvo")]
+        )
         self.assertEqual(record["objective_translation_um"], [100.0, 50.0, 10.0])
 
     def test_cross_objective_galvo_moves_do_not_accumulate_translation_on_zwide(self):
@@ -1812,7 +2137,10 @@ class TestObjectiveCompensation(unittest.TestCase):
             patch.object(
                 adapter._readers,
                 "get_xy",
-                side_effect=lambda client, **kw: {"x_um": state["x"], "y_um": state["y"]},
+                side_effect=lambda client, **kw: {
+                    "x_um": state["x"],
+                    "y_um": state["y"],
+                },
             ),
             patch.object(
                 adapter._readers,
@@ -1826,7 +2154,9 @@ class TestObjectiveCompensation(unittest.TestCase):
                 "get_selected_job",
                 return_value={"Name": "Overview", "IsSelected": True},
             ),
-            patch.object(_readers_parsing, "make_changeable_copy", side_effect=lambda s: s),
+            patch.object(
+                _readers_parsing, "make_changeable_copy", side_effect=lambda s: s
+            ),
         ):
             moved = adapter.set_xyz(h, 12.0, -7.0, 4.0, with_actuators={"z": "z-galvo"})
             pos = adapter.get_xyz(h)
@@ -1854,7 +2184,9 @@ class TestObjectiveCompensation(unittest.TestCase):
         xy.assert_not_called()  # refused before any motion
 
     def test_cross_objective_read_without_translations_warns_uncompensated(self):
-        h = _handle(origin=_origin(x_um=1000.0, objective={"name": "10x", "slotIndex": 1}))
+        h = _handle(
+            origin=_origin(x_um=1000.0, objective={"name": "10x", "slotIndex": 1})
+        )
         patches = _patch_position(x_um=1110.0, slot=2)
         with (
             patches[0],
@@ -1867,7 +2199,9 @@ class TestObjectiveCompensation(unittest.TestCase):
         self.assertEqual(pos["x"]["position"], 110.0)  # uncompensated, but loud
 
     def test_same_objective_needs_no_calibration(self):
-        h = _handle(origin=_origin(x_um=1000.0, objective={"name": "63x", "slotIndex": 3}))
+        h = _handle(
+            origin=_origin(x_um=1000.0, objective={"name": "63x", "slotIndex": 3})
+        )
         patches = _patch_position(x_um=1010.0, slot=3)
         with patches[0], patches[1], patches[2], patches[3]:
             pos = adapter.get_xyz(h)
@@ -1877,7 +2211,9 @@ class TestObjectiveCompensation(unittest.TestCase):
         """An out-of-range galvo target is refused inside the real move_z;
         the adapter adds the try-the-other-actuator hint."""
         h = _handle(
-            origin=_origin(x_um=10000.0, y_um=10000.0, objective={"name": "63x", "slotIndex": 3})
+            origin=_origin(
+                x_um=10000.0, y_um=10000.0, objective={"name": "63x", "slotIndex": 3}
+            )
         )
         patches = _patch_position(z_wide_um=0.0, z_galvo_um=0.0, slot=3)
         with (
@@ -1895,7 +2231,9 @@ class TestObjectiveCompensation(unittest.TestCase):
 class TestDriverSetupReadiness(unittest.TestCase):
     measured_limits = {"source": "machine", "path": "limits.json", "is_fallback": False}
 
-    def test_ready_requires_measured_orientation_loaded_calibration_and_active_slot(self):
+    def test_ready_requires_measured_orientation_loaded_calibration_and_active_slot(
+        self,
+    ):
         h = _handle(origin=_origin(objective={"slotIndex": 1, "name": "10x"}))
         adapter._session_state.install(
             h.client,
@@ -1914,11 +2252,15 @@ class TestDriverSetupReadiness(unittest.TestCase):
         )
         self.addCleanup(adapter._session_state.uninstall, h.client)
 
-        ready = adapter._setup_readiness(h, {"slotIndex": 2, "name": "20x"}, self.measured_limits)
+        ready = adapter._setup_readiness(
+            h, {"slotIndex": 2, "name": "20x"}, self.measured_limits
+        )
         self.assertTrue(ready["ready"])
         self.assertEqual(ready["issues"], [])
 
-        missing = adapter._setup_readiness(h, {"slotIndex": 3, "name": "40x"}, self.measured_limits)
+        missing = adapter._setup_readiness(
+            h, {"slotIndex": 3, "name": "40x"}, self.measured_limits
+        )
         self.assertFalse(missing["ready"])
         self.assertIn("slot 3", missing["issues"][0])
 
@@ -1954,11 +2296,15 @@ class TestDriverSetupReadiness(unittest.TestCase):
         )
         self.addCleanup(adapter._session_state.uninstall, h.client)
 
-        setup = adapter._setup_readiness(h, {"slotIndex": 2, "name": "20x"}, self.measured_limits)
+        setup = adapter._setup_readiness(
+            h, {"slotIndex": 2, "name": "20x"}, self.measured_limits
+        )
 
         self.assertFalse(setup["ready"])
         self.assertTrue(any("placeholder" in issue for issue in setup["issues"]))
-        self.assertTrue(any("calibrate_objective_pair" in issue for issue in setup["issues"]))
+        self.assertTrue(
+            any("calibrate_objective_pair" in issue for issue in setup["issues"])
+        )
 
     def test_calibration_info_without_provenance_field_fails_closed(self):
         """An info dict lacking measured_slots must count as unmeasured."""
@@ -1974,7 +2320,9 @@ class TestDriverSetupReadiness(unittest.TestCase):
         )
         self.addCleanup(adapter._session_state.uninstall, h.client)
 
-        setup = adapter._setup_readiness(h, {"slotIndex": 1, "name": "10x"}, self.measured_limits)
+        setup = adapter._setup_readiness(
+            h, {"slotIndex": 1, "name": "10x"}, self.measured_limits
+        )
 
         self.assertFalse(setup["ready"])
         self.assertTrue(any("placeholder" in issue for issue in setup["issues"]))
@@ -2047,7 +2395,9 @@ class TestLifecycle(unittest.TestCase):
         _clear_limits()
         self.addCleanup(_clear_limits)
         provision_machine_limits(os.environ["ZMART_MICROSCOPY_ROOT"])
-        with patch.object(adapter._session, "connect_python_client", return_value=object()):
+        with patch.object(
+            adapter._session, "connect_python_client", return_value=object()
+        ):
             h = adapter.connect(dict(adapter.CONNECTION))
         self.assertIsInstance(h, adapter.ZmartHandle)
         # the stage envelope was applied from the ProgramData snapshot...
@@ -2059,7 +2409,9 @@ class TestLifecycle(unittest.TestCase):
 
     def test_connect_uses_packaged_fallback_when_programdata_is_empty(self):
         """Empty ProgramData uses defaults without creating a limits snapshot."""
-        with patch.object(adapter._session, "connect_python_client", return_value=object()):
+        with patch.object(
+            adapter._session, "connect_python_client", return_value=object()
+        ):
             h = adapter.connect(dict(adapter.CONNECTION))
         self.assertIsInstance(h, adapter.ZmartHandle)
         self.assertFalse(h.closed)
@@ -2077,15 +2429,17 @@ class TestLifecycle(unittest.TestCase):
         import zmart_controller
 
         from zmart_drivers.leica.stellaris5_y42h93.navigator_expert import (
-    zmart_controller_plugin as driver,
-)
+            zmart_controller_plugin as driver,
+        )
 
         _clear_limits()
         self.addCleanup(_clear_limits)
         provision_machine_limits(os.environ["ZMART_MICROSCOPY_ROOT"])
         patches = _patch_position(x_um=1000.0, y_um=2000.0, z_wide_um=30.0)
         with (
-            patch.object(adapter._session, "connect_python_client", return_value=object()),
+            patch.object(
+                adapter._session, "connect_python_client", return_value=object()
+            ),
             patches[0],
             patches[1],
             patches[2],
@@ -2111,9 +2465,14 @@ class TestLifecycle(unittest.TestCase):
                 # The move answers a read-back in get_xyz's shape. The readers
                 # are mocked and never move, so it reads the origin itself.
                 moved = answer["content"]
-                self.assertEqual(list(moved["x"]), ["position", "unit", "actuator", "actuators", "canvas"])
+                self.assertEqual(
+                    list(moved["x"]),
+                    ["position", "unit", "actuator", "actuators", "canvas"],
+                )
                 self.assertEqual(moved["x"]["position"], 0.0)
-                self.assertEqual(moved["z"]["actuators"], {"z-wide": 30.0, "z-galvo": 0.0})
+                self.assertEqual(
+                    moved["z"]["actuators"], {"z-wide": 30.0, "z-galvo": 0.0}
+                )
                 xyz = session.get_xyz(with_actuators={"z": "z-galvo"})
                 self.assertEqual(xyz["content"], moved)
             finally:
@@ -2171,11 +2530,15 @@ class TestFunctionLimits(unittest.TestCase):
     def test_bundled_template_covers_every_declared_key(self):
         """THE completeness guard on the template: a new key cannot ship absent."""
         from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.limits import (
-    config as limits_config,
-)
+            config as limits_config,
+        )
 
-        path = adapter._machine.MACHINE.bundled_default_path(adapter._machine.LIMITS_FILENAME)
-        payload = limits_config.validate_payload(json.loads(path.read_text(encoding="utf-8")))
+        path = adapter._machine.MACHINE.bundled_default_path(
+            adapter._machine.LIMITS_FILENAME
+        )
+        payload = limits_config.validate_payload(
+            json.loads(path.read_text(encoding="utf-8"))
+        )
         self.assertEqual(set(payload), set(limits_config._REQUIRED_FILE_KEYS))
         self.assertEqual(payload["objective_slot"], [])
 
@@ -2215,7 +2578,9 @@ class TestFunctionLimits(unittest.TestCase):
             patches[2],
             patches[3],
         ):
-            with self.assertRaisesRegex(RuntimeError, r"with_actuators=\{'z': 'z-wide'\}"):
+            with self.assertRaisesRegex(
+                RuntimeError, r"with_actuators=\{'z': 'z-wide'\}"
+            ):
                 adapter.set_xyz(h, 10.0, 10.0, 300.0, with_actuators={"z": "z-galvo"})
         xy.assert_called_once()
 
@@ -2297,7 +2662,9 @@ class TestFunctionLimits(unittest.TestCase):
 
         profile = provision_machine_limits(os.environ["ZMART_MICROSCOPY_ROOT"])
         payload = json.loads(
-            (profile.latest_snapshot("limits") / "limits.json").read_text(encoding="utf-8")
+            (profile.latest_snapshot("limits") / "limits.json").read_text(
+                encoding="utf-8"
+            )
         )
         payload["theta_um"] = [0.0, 360.0]
         (profile.latest_snapshot("limits") / "limits.json").write_text(
@@ -2310,7 +2677,9 @@ class TestFunctionLimits(unittest.TestCase):
         self.assertTrue(state.ok)
         self.assertTrue(state.limits.describe()["is_fallback"])
         # A move inside the default envelope is allowed; one outside is refused.
-        self.assertIsNone(_gate.check_refusal(client, "move_xy", {"x_um": 5000.0, "y_um": 5000.0}))
+        self.assertIsNone(
+            _gate.check_refusal(client, "move_xy", {"x_um": 5000.0, "y_um": 5000.0})
+        )
         self.assertIsNotNone(
             _gate.check_refusal(client, "move_xy", {"x_um": 999999.0, "y_um": 5000.0})
         )

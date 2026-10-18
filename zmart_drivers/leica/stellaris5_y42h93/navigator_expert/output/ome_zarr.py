@@ -103,10 +103,14 @@ def write_position_store(
             "an OME-Zarr store is placed by its canvas position, and none was given "
             "(save's placement); without it the image would lie at an invented place"
         )
-    return write_store(gather(exported, orientation=orientation, where=where), store, state=state)
+    return write_store(
+        gather(exported, orientation=orientation, where=where), store, state=state
+    )
 
 
-def gather(exported: ExportedAcquisition, *, orientation: Orientation, where: Placement | None) -> Capture:
+def gather(
+    exported: ExportedAcquisition, *, orientation: Orientation, where: Placement | None
+) -> Capture:
     """Read every plane of *exported* into one volume, lowest plane first, and place it.
 
     Without *where* the planes keep the vendor's order and the volume is not
@@ -114,7 +118,11 @@ def gather(exported: ExportedAcquisition, *, orientation: Orientation, where: Pl
     OME-TIFF, never for a store.
     """
     metadata = exported.metadata
-    planes = {index: source for position in exported.positions for index, source in position.planes.items()}
+    planes = {
+        index: source
+        for position in exported.positions
+        for index, source in position.planes.items()
+    }
     times = sorted({index.t for index in planes})
     channels = sorted({index.c for index in planes})
     numbers = sorted({index.z for index in planes})
@@ -122,22 +130,37 @@ def gather(exported: ExportedAcquisition, *, orientation: Orientation, where: Pl
     heights = {z: where(z).get("z_um") if where is not None else None for z in numbers}
     # Lowest plane first: a voxel size is positive, so a stack swept
     # downwards is turned round on the way in.
-    ascending = sorted(numbers, key=lambda z: (heights[z] is None, heights[z] if heights[z] is not None else z))
+    ascending = sorted(
+        numbers,
+        key=lambda z: (heights[z] is None, heights[z] if heights[z] is not None else z),
+    )
 
-    first = materialize._read_source_plane(planes[PlaneIndex(t=times[0], z=numbers[0], c=channels[0])])
+    first = materialize._read_source_plane(
+        planes[PlaneIndex(t=times[0], z=numbers[0], c=channels[0])]
+    )
     first = reorient_array(first, orientation) if not orientation.is_identity else first
-    volume = np.empty((len(times), len(channels), len(numbers), *first.shape), dtype=first.dtype)
+    volume = np.empty(
+        (len(times), len(channels), len(numbers), *first.shape), dtype=first.dtype
+    )
     for ti, t in enumerate(times):
         for ci, c in enumerate(channels):
             for zi, z in enumerate(ascending):
-                plane = materialize._read_source_plane(planes[PlaneIndex(t=t, z=z, c=c)])
-                volume[ti, ci, zi] = reorient_array(plane, orientation) if not orientation.is_identity else plane
+                plane = materialize._read_source_plane(
+                    planes[PlaneIndex(t=t, z=z, c=c)]
+                )
+                volume[ti, ci, zi] = (
+                    reorient_array(plane, orientation)
+                    if not orientation.is_identity
+                    else plane
+                )
 
     pixel_y, pixel_x = metadata.physical_size_y_um, metadata.physical_size_x_um
     if orientation.swaps_axes:
         pixel_y, pixel_x = pixel_x, pixel_y
     if where is not None and (not pixel_x or not pixel_y):
-        raise RuntimeError("the capture does not say its pixel size, so the image cannot be placed")
+        raise RuntimeError(
+            "the capture does not say its pixel size, so the image cannot be placed"
+        )
     ny, nx = volume.shape[-2:]
     centre = where(ascending[0]) if where is not None else {}
     lowest = heights[ascending[0]]
@@ -157,7 +180,9 @@ def gather(exported: ExportedAcquisition, *, orientation: Orientation, where: Pl
         size_x=nx,
         physical_size_x_um=pixel_x,
         physical_size_y_um=pixel_y,
-        channels=tuple(replace(metadata.channel(c), index=ci) for ci, c in enumerate(channels)),
+        channels=tuple(
+            replace(metadata.channel(c), index=ci) for ci, c in enumerate(channels)
+        ),
         planes={
             PlaneIndex(t=ti, z=zi, c=ci): metadata.planes[PlaneIndex(t=t, z=z, c=c)]
             for ti, t in enumerate(times)
@@ -178,7 +203,9 @@ def max_projection(capture: Capture) -> Capture:
     """
     metadata = capture.metadata
     heights = sorted(
-        plane.position_z_um for plane in metadata.planes.values() if plane.position_z_um is not None
+        plane.position_z_um
+        for plane in metadata.planes.values()
+        if plane.position_z_um is not None
     )
     flat = {
         PlaneIndex(t=index.t, z=0, c=index.c): replace(plane, actuators=())
@@ -187,7 +214,10 @@ def max_projection(capture: Capture) -> Capture:
     }
     facts = [("projection", "max over z"), ("projected planes", str(metadata.size_z))]
     if heights:
-        facts += [("lowest plane z (µm)", canonical._num(heights[0])), ("highest plane z (µm)", canonical._num(heights[-1]))]
+        facts += [
+            ("lowest plane z (µm)", canonical._num(heights[0])),
+            ("highest plane z (µm)", canonical._num(heights[-1])),
+        ]
     return Capture(
         volume=capture.volume.max(axis=2, keepdims=True),
         metadata=replace(
@@ -209,16 +239,23 @@ def write_store(capture: Capture, store: Path, *, state: dict | None = None) -> 
     from pydantic_zarr.v3 import ArraySpec
 
     if store.exists():
-        raise RuntimeError(f"{store} already exists; a capture is never written over another")
+        raise RuntimeError(
+            f"{store} already exists; a capture is never written over another"
+        )
     volume, metadata = capture.volume, capture.metadata
     ny, nx = volume.shape[-2:]
-    names = [channel.name or f"channel {channel.index}" for channel in metadata.channels]
+    names = [
+        channel.name or f"channel {channel.index}" for channel in metadata.channels
+    ]
 
     writing = store.with_name(f".{store.name}.{uuid.uuid4().hex[:8]}.writing")
     store.parent.mkdir(parents=True, exist_ok=True)
     spec = ArraySpec.from_array(
         volume,
-        chunk_grid={"name": "regular", "configuration": {"chunk_shape": [1, 1, 1, min(PIECE, ny), min(PIECE, nx)]}},
+        chunk_grid={
+            "name": "regular",
+            "configuration": {"chunk_shape": [1, 1, 1, min(PIECE, ny), min(PIECE, nx)]},
+        },
         dimension_names=list(AXES),
         # Said outright: newer zarr refuses a multi-byte array whose byte
         # order is left to a default.
@@ -234,7 +271,15 @@ def write_store(capture: Capture, store: Path, *, state: dict | None = None) -> 
             Axis(name="y", type="space", unit="micrometer"),
             Axis(name="x", type="space", unit="micrometer"),
         ],
-        scales=[[1.0, 1.0, metadata.physical_size_z_um or 1.0, metadata.physical_size_y_um, metadata.physical_size_x_um]],
+        scales=[
+            [
+                1.0,
+                1.0,
+                metadata.physical_size_z_um or 1.0,
+                metadata.physical_size_y_um,
+                metadata.physical_size_x_um,
+            ]
+        ],
         translations=[capture.translation],
         name=store.name,
         multiscale_type="mean",
@@ -243,7 +288,9 @@ def write_store(capture: Capture, store: Path, *, state: dict | None = None) -> 
     group["0"][...] = volume
     if not np.array_equal(group["0"][...], volume):
         shutil.rmtree(writing, ignore_errors=True)
-        raise RuntimeError(f"{store.name}: the pixels read back from disk are not those written; not saved")
+        raise RuntimeError(
+            f"{store.name}: the pixels read back from disk are not those written; not saved"
+        )
     deepest = (1 << (metadata.significant_bits or volume.dtype.itemsize * 8)) - 1
     # The models write an absent value as null (a channel axis's unit, a
     # multiscale's metadata); a browser viewer refuses "unit": null, so what
@@ -257,17 +304,23 @@ def write_store(capture: Capture, store: Path, *, state: dict | None = None) -> 
                 "window": _window(volume[:, index], deepest),
                 "active": True,
             }
-            for index, (name, channel) in enumerate(zip(names, metadata.channels, strict=True))
+            for index, (name, channel) in enumerate(
+                zip(names, metadata.channels, strict=True)
+            )
         ]
     }
     group.attrs["ome"] = ome
     (writing / "OME").mkdir()
-    (writing / "OME" / "METADATA.ome.xml").write_bytes(canonical.image_xml(metadata, image_name=store.name, state=state))
+    (writing / "OME" / "METADATA.ome.xml").write_bytes(
+        canonical.image_xml(metadata, image_name=store.name, state=state)
+    )
     _rename_when_free(writing, store)
     return store
 
 
-def _rename_when_free(writing: Path, store: Path, *, wait_s: float = RENAME_WAIT_S) -> None:
+def _rename_when_free(
+    writing: Path, store: Path, *, wait_s: float = RENAME_WAIT_S
+) -> None:
     """Rename the finished *writing* folder to *store*, waiting out a passing lock on it.
 
     Windows refuses to rename a folder while any program holds one of its
@@ -287,14 +340,20 @@ def _rename_when_free(writing: Path, store: Path, *, wait_s: float = RENAME_WAIT
             continue
         waited = time.perf_counter() - started
         if waited >= 0.1:
-            log.warning("%s: renamed into place after %.1f s; something held a file in it open", store.name, waited)
+            log.warning(
+                "%s: renamed into place after %.1f s; something held a file in it open",
+                store.name,
+                waited,
+            )
         return
 
 
 def _without_empty(value):
     """*value* with every null entry left out of its dictionaries, at any depth."""
     if isinstance(value, Mapping):
-        return {key: _without_empty(item) for key, item in value.items() if item is not None}
+        return {
+            key: _without_empty(item) for key, item in value.items() if item is not None
+        }
     if isinstance(value, (list, tuple)):
         return [_without_empty(item) for item in value]
     return value

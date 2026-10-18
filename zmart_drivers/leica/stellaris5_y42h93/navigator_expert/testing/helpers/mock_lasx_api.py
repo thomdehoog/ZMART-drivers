@@ -425,7 +425,9 @@ class MockLasxClient:
         self.PyApiPing = _MockApiObject("Ping", lambda m: None, latency)
 
         # PyApiCommand — command dispatch channel
-        self.PyApiCommand = _MockApiObject("Command", self._handle_command_dispatch, latency)
+        self.PyApiCommand = _MockApiObject(
+            "Command", self._handle_command_dispatch, latency
+        )
         self.PyApiCommand.Model.Command = ""
 
         # Read API objects — use correct property names from real API
@@ -433,7 +435,9 @@ class MockLasxClient:
         # Handler is no-op: data delivery happens via command channel only.
         # The driver calls UpdateAwaitReceipt as a best-effort push, then
         # clears Settings before dispatching via command channel.
-        self.PyApiGetJobSettingsByName = _MockApiObject("GetJobSettings", lambda m: None, latency)
+        self.PyApiGetJobSettingsByName = _MockApiObject(
+            "GetJobSettings", lambda m: None, latency
+        )
         self.PyApiGetJobSettingsByName.Model.Settings = None
         self.PyApiGetJobSettingsByName.Model.JobName = ""
 
@@ -444,7 +448,9 @@ class MockLasxClient:
         self.PyApiGetConfocalHardwareInfo.Model.HWInfo = None
 
         # get_jobs reads .Jobs (not .Result)
-        self.PyApiGetJobsInformation = _MockApiObject("GetJobs", self._handle_get_jobs, latency)
+        self.PyApiGetJobsInformation = _MockApiObject(
+            "GetJobs", self._handle_get_jobs, latency
+        )
         self.PyApiGetJobsInformation.Model.Jobs = None
 
         # get_xy — direct read, model properties always live
@@ -452,15 +458,27 @@ class MockLasxClient:
         self.PyApiGetXY = type("Obj", (), {"Model": self._xy_model})()
 
         # Action API objects
-        self.PyApiSelectJobByName = _MockApiObject("SelectJob", self._handle_select_job, latency)
-        self.PyApiStartScan = _MockApiObject("StartScan", self._handle_start_scan, latency)
-        self.PyApiAcquireJob = _MockApiObject("AcquireJob", self._handle_acquire_job, latency)
+        self.PyApiSelectJobByName = _MockApiObject(
+            "SelectJob", self._handle_select_job, latency
+        )
+        self.PyApiStartScan = _MockApiObject(
+            "StartScan", self._handle_start_scan, latency
+        )
+        self.PyApiAcquireJob = _MockApiObject(
+            "AcquireJob", self._handle_acquire_job, latency
+        )
         # Experiment files: acknowledged only; the mock keeps no experiment on disk.
-        self.PyApiSaveExperiment = _MockApiObject("SaveExperiment", self._handle_acknowledge, latency)
-        self.PyApiLoadExperiment = _MockApiObject("LoadExperiment", self._handle_acknowledge, latency)
+        self.PyApiSaveExperiment = _MockApiObject(
+            "SaveExperiment", self._handle_acknowledge, latency
+        )
+        self.PyApiLoadExperiment = _MockApiObject(
+            "LoadExperiment", self._handle_acknowledge, latency
+        )
 
         # Move commands — models need enum-like properties
-        self.PyApiMoveHardwareXY = _MockApiObject("MoveStage", self._handle_move_stage, latency)
+        self.PyApiMoveHardwareXY = _MockApiObject(
+            "MoveStage", self._handle_move_stage, latency
+        )
         self.PyApiMoveHardwareXY.Model.RelativePosition = False
         self.PyApiMoveHardwareXY.Model.MoveXyMode = _MockEnumMoveXYMode("eMoveXY")
         self.PyApiMoveHardwareXY.Model.Units = _MockEnumUnits("eMicrons")
@@ -654,7 +672,9 @@ class MockLasxClient:
 
             # Check scanner busy
             if time.monotonic() < self._scan_busy_until:
-                self._echo.set_error("The parameter cannot be set while the block is being scanned")
+                self._echo.set_error(
+                    "The parameter cannot be set while the block is being scanned"
+                )
                 return
 
             job_name = getattr(model, "JobName", "")
@@ -685,7 +705,9 @@ class MockLasxClient:
         v = getattr(model, "ZoomValue", None)
         lo, hi = _VALIDATION["zoom"]
         if v is None or v < lo or v > hi:
-            self._echo.set_error(f"The zoom parameter ({v}) is out of range. Valid: [{lo}, {hi}]")
+            self._echo.set_error(
+                f"The zoom parameter ({v}) is out of range. Valid: [{lo}, {hi}]"
+            )
             return
         job["zoom"]["current"] = v
 
@@ -816,7 +838,9 @@ class MockLasxClient:
         if v is not None and (v < lo or v > hi):
             # Clamp + warning (hardware behavior)
             clamped = max(lo, min(hi, v))
-            self._echo.set_warning(f"pinhole adjusted to nearest valid value: {clamped}")
+            self._echo.set_warning(
+                f"pinhole adjusted to nearest valid value: {clamped}"
+            )
             if si < len(job["activeSettings"]):
                 job["activeSettings"][si]["pinholeAiry"]["value"] = clamped
             return

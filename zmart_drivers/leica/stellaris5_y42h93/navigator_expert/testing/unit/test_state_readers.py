@@ -204,7 +204,9 @@ class TestStateReaders(unittest.TestCase):
             patch.object(router.log_reader, "ages", return_value={"xy": 0.1}),
         ):
             first = threading.Thread(
-                target=lambda: first_result.append(readers.get_xy(client, diagnostics=True)),
+                target=lambda: first_result.append(
+                    readers.get_xy(client, diagnostics=True)
+                ),
                 daemon=True,
             )
             first.start()
@@ -304,7 +306,9 @@ class TestStateReaders(unittest.TestCase):
             )
 
         with (
-            patch.object(confirm_select_job._readers, "get_jobs", side_effect=fake_get_jobs),
+            patch.object(
+                confirm_select_job._readers, "get_jobs", side_effect=fake_get_jobs
+            ),
             patch("time.sleep"),
         ):
             result = confirm_select_job.confirm_select_job(
@@ -399,14 +403,20 @@ class TestApiModeCappedWorker(unittest.TestCase):
 
         try:
             with patch.object(router.api_reader, "get_xy", side_effect=hung_api) as api:
-                self.assertIsNone(readers.get_xy(client, mode="api"))  # parks the worker
-                self.assertIsNone(readers.get_xy(client, mode="api"))  # must not pile on
+                self.assertIsNone(
+                    readers.get_xy(client, mode="api")
+                )  # parks the worker
+                self.assertIsNone(
+                    readers.get_xy(client, mode="api")
+                )  # must not pile on
                 self.assertEqual(api.call_count, 1)
         finally:
             release.set()
 
     def test_api_mode_error_reading_carries_error_in_diagnostics(self):
-        with patch.object(router.api_reader, "get_xy", side_effect=RuntimeError("com fault")):
+        with patch.object(
+            router.api_reader, "get_xy", side_effect=RuntimeError("com fault")
+        ):
             reading = readers.get_xy(object(), mode="api", diagnostics=True)
         self.assertIsNotNone(reading)
         self.assertIsNone(reading.value)
@@ -601,7 +611,9 @@ class TestRoutedErrorAndDiagnosticShapes(unittest.TestCase):
         log_only = dataclasses.replace(capabilities.spec("xy"), api_fn=None)
         with (
             patch.dict(capabilities.DATUMS, {"xy": log_only}),
-            patch.object(router.log_reader, "parse_log", side_effect=RuntimeError("gone")),
+            patch.object(
+                router.log_reader, "parse_log", side_effect=RuntimeError("gone")
+            ),
         ):
             reading = readers.get_xy(object(), mode="hybrid", diagnostics=True)
         self.assertEqual(reading.source, "log")
@@ -628,7 +640,9 @@ class TestDerivedReaderFamilies(unittest.TestCase):
         jobs = [{"Name": "Overview"}, {"Name": "HiRes", "IsSelected": True}]
         with patch.object(router.api_reader, "get_jobs", return_value=jobs):
             plain = readers.get_job_by_name(object(), "HiRes", mode="api")
-            reading = readers.get_job_by_name(object(), "HiRes", mode="api", diagnostics=True)
+            reading = readers.get_job_by_name(
+                object(), "HiRes", mode="api", diagnostics=True
+            )
         self.assertEqual(plain, jobs[1])
         self.assertEqual(reading.value, jobs[1])
         self.assertEqual(reading.source, "api")
@@ -638,12 +652,16 @@ class TestDerivedReaderFamilies(unittest.TestCase):
         jobs = [{"Name": "Overview"}]
         with patch.object(router.api_reader, "get_jobs", return_value=jobs):
             self.assertIsNone(readers.get_job_by_name(object(), "Nope", mode="api"))
-            reading = readers.get_job_by_name(object(), "Nope", mode="api", diagnostics=True)
+            reading = readers.get_job_by_name(
+                object(), "Nope", mode="api", diagnostics=True
+            )
         self.assertIsNone(reading.value)
         self.assertEqual(reading.source, "api")
 
     def test_get_fov_and_base_fov_derive_metres_from_settings(self):
-        with patch.object(router.api_reader, "get_job_settings", return_value=self._SETTINGS):
+        with patch.object(
+            router.api_reader, "get_job_settings", return_value=self._SETTINGS
+        ):
             fov = readers.get_fov(object(), "HiRes", mode="api")
             base = readers.get_base_fov(object(), "HiRes", mode="api", diagnostics=True)
         self.assertAlmostEqual(fov[0], 100.0e-6)
@@ -653,7 +671,9 @@ class TestDerivedReaderFamilies(unittest.TestCase):
         self.assertEqual(base.source, "api")
 
     def test_read_zwide_um_returns_position_from_settings(self):
-        with patch.object(router.api_reader, "get_job_settings", return_value=self._SETTINGS):
+        with patch.object(
+            router.api_reader, "get_job_settings", return_value=self._SETTINGS
+        ):
             self.assertEqual(readers.read_zwide_um(object(), "HiRes", mode="api"), 42.5)
 
     def test_read_zwide_um_unreadable_settings_returns_none(self):

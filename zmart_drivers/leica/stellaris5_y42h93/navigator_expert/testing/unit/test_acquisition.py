@@ -43,7 +43,10 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.output.product impor
 
 @pytest.fixture(autouse=True)
 def _identity_rig_orientation(monkeypatch):
-    monkeypatch.setattr("zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.image_stage_registration.rig_orientation", Orientation)
+    monkeypatch.setattr(
+        "zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.image_stage_registration.rig_orientation",
+        Orientation,
+    )
 
 
 @pytest.fixture(autouse=True)
@@ -53,7 +56,11 @@ def saves_as_ome_tiff(monkeypatch):
 
     from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.actions import profiles
 
-    monkeypatch.setattr(profiles, "IMAGE_SAVE", replaced(profiles.IMAGE_SAVE, format="ome-tiff", cleanup_cache=False))
+    monkeypatch.setattr(
+        profiles,
+        "IMAGE_SAVE",
+        replaced(profiles.IMAGE_SAVE, format="ome-tiff", cleanup_cache=False),
+    )
 
 
 @pytest.fixture
@@ -76,7 +83,7 @@ def test_leica_private_naming_round_trips_time_channel_and_z():
 def test_leica_private_naming_rejects_unrepresentable_plane_indices(field, value):
     with pytest.raises(ValueError, match=field):
         Naming(
-        stem="overview_abc123_P0",
+            stem="overview_abc123_P0",
             **{field: value},
         )
 
@@ -165,7 +172,9 @@ def fake_export(tmp_path: Path) -> dict:
         metadata=_grid_metadata(),
         method="test",
         source_exporter="lasx_data_container",
-        vendor_metadata_sources=(drv.VendorMetadataSource(name="source.ome.xml", path=xml_path),),
+        vendor_metadata_sources=(
+            drv.VendorMetadataSource(name="source.ome.xml", path=xml_path),
+        ),
     )
 
     return {
@@ -347,7 +356,9 @@ class TestCanonicalPhysicalMetadataAuthority:
             physical_size_z_um=9.0,
         )
         with patch.object(readers_router, "get_job_settings", return_value=None):
-            out = ome_canonical.metadata_with_job_physical_sizes(metadata, "client", "Overview")
+            out = ome_canonical.metadata_with_job_physical_sizes(
+                metadata, "client", "Overview"
+            )
         assert out == metadata
 
 
@@ -395,7 +406,9 @@ class TestSave:
             metadata=metadata,
             method="test",
         )
-        monkeypatch.setattr(acquisition, "collect_lasx_data_container", lambda *a, **k: exported)
+        monkeypatch.setattr(
+            acquisition, "collect_lasx_data_container", lambda *a, **k: exported
+        )
 
         saved = drv.save(None, successful_acq, tmp_path / "out", naming)
 
@@ -437,7 +450,9 @@ class TestSave:
         summary = json.loads((output_root / "summary.json").read_text())
         assert len(summary["acquisitions"]) == 4
         rec = next(
-            r for r in summary["acquisitions"] if r["naming"]["c"] == 0 and r["naming"]["z"] == 0
+            r
+            for r in summary["acquisitions"]
+            if r["naming"]["c"] == 0 and r["naming"]["z"] == 0
         )
         assert rec["image_path"] == ("data/" + build_image_name(naming))
         assert "xml_path" not in rec
@@ -524,7 +539,9 @@ class TestSave:
                 naming,
                 format=image_format,
                 cleanup_cache=True,
-                placement=lambda _planes: lambda z: {"x_um": 0.0, "y_um": 0.0, "z_um": float(z)},
+                placement=lambda _planes: (
+                    lambda z: {"x_um": 0.0, "y_um": 0.0, "z_um": float(z)}
+                ),
             )
         assert all(p.is_file() for p in patched_export["image_paths"])
         assert patched_export["xml_path"].is_file()
@@ -539,7 +556,9 @@ class TestSave:
     ):
         """A source LAS X holds (its cache) is let go of through LAS X, its files left alone."""
         release = Mock()
-        patched_export["collect"].return_value = replace(patched_export["exported"], release=release)
+        patched_export["collect"].return_value = replace(
+            patched_export["exported"], release=release
+        )
         drv.save(
             None,
             successful_acq,
@@ -570,7 +589,9 @@ class TestSave:
         # Every read-back comparison says the pixels differ.
         monkeypatch.setattr(numpy, "array_equal", lambda *_args, **_kwargs: False)
         release = Mock()
-        patched_export["collect"].return_value = replace(patched_export["exported"], release=release)
+        patched_export["collect"].return_value = replace(
+            patched_export["exported"], release=release
+        )
         with pytest.raises(RuntimeError, match="read back"):
             drv.save(
                 None,
@@ -580,7 +601,9 @@ class TestSave:
                 format=image_format,
                 cleanup_cache=True,
                 # Where each plane lies on the canvas, which a store needs.
-                placement=lambda _planes: lambda z: {"x_um": 0.0, "y_um": 0.0, "z_um": float(z)},
+                placement=lambda _planes: (
+                    lambda z: {"x_um": 0.0, "y_um": 0.0, "z_um": float(z)}
+                ),
             )
         release.assert_not_called()
         assert all(p.is_file() for p in patched_export["image_paths"])
@@ -744,7 +767,9 @@ class TestSave:
             positions=[
                 ExportedPosition(
                     t=0,
-                    planes={drv.PlaneIndex(t=0, z=0, c=0): drv.PlaneSource(path=image_path)},
+                    planes={
+                        drv.PlaneIndex(t=0, z=0, c=0): drv.PlaneSource(path=image_path)
+                    },
                 )
             ],
             metadata=_metadata(),
@@ -889,9 +914,15 @@ class TestSave:
         drv.save(None, successful_acq, output_root, naming, state={"software": {}})
 
         data = output_root / "data"
-        assert {path.name for path in output_root.iterdir()} == {"data", "projections", "summary.json"}
+        assert {path.name for path in output_root.iterdir()} == {
+            "data",
+            "projections",
+            "summary.json",
+        }
         assert all(
-            path.suffixes == [".ome", ".tiff"] for path in data.iterdir() if path.is_file()
+            path.suffixes == [".ome", ".tiff"]
+            for path in data.iterdir()
+            if path.is_file()
         )
         assert {path.name for path in data.iterdir() if path.is_dir()} == {"metadata"}
         metadata = data / "metadata"
@@ -970,7 +1001,9 @@ class TestSave:
 class TestHelpers:
     def test_ome_ok_is_strict_about_contract_shape(self):
         assert (
-            materialize.ome_ok({"path": "x", "corrupted": False, "violations": [], "error": None})
+            materialize.ome_ok(
+                {"path": "x", "corrupted": False, "violations": [], "error": None}
+            )
             is True
         )
         assert (
@@ -980,7 +1013,9 @@ class TestHelpers:
             is False
         )
         assert (
-            materialize.ome_ok({"path": "x", "corrupted": False, "violations": [], "error": "I/O"})
+            materialize.ome_ok(
+                {"path": "x", "corrupted": False, "violations": [], "error": "I/O"}
+            )
             is False
         )
         with pytest.raises(KeyError):
@@ -1024,8 +1059,12 @@ class TestHelpers:
                 ExportedPosition(
                     t=0,
                     planes={
-                        drv.PlaneIndex(t=0, z=0, c=0): drv.PlaneSource(path=tiff, page_index=0),
-                        drv.PlaneIndex(t=0, z=0, c=1): drv.PlaneSource(path=tiff, page_index=1),
+                        drv.PlaneIndex(t=0, z=0, c=0): drv.PlaneSource(
+                            path=tiff, page_index=0
+                        ),
+                        drv.PlaneIndex(t=0, z=0, c=1): drv.PlaneSource(
+                            path=tiff, page_index=1
+                        ),
                     },
                 )
             ],
@@ -1038,7 +1077,9 @@ class TestHelpers:
                 pixel_type="uint8",
             ),
             method="test",
-            vendor_metadata_sources=(drv.VendorMetadataSource(name="source.ome.xml", path=xml),),
+            vendor_metadata_sources=(
+                drv.VendorMetadataSource(name="source.ome.xml", path=xml),
+            ),
         )
 
         assert exported.image_files == [tiff]

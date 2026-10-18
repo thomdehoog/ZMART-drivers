@@ -234,14 +234,18 @@ class ExportedAcquisition:
     def image_files(self) -> list[Path]:
         return list(
             dict.fromkeys(
-                src.path for pos in self.positions for _idx, src in sorted(pos.planes.items())
+                src.path
+                for pos in self.positions
+                for _idx, src in sorted(pos.planes.items())
             )
         )
 
     @property
     def metadata_files(self) -> list[Path]:
         return list(
-            dict.fromkeys(src.path for src in self.vendor_metadata_sources if src.path is not None)
+            dict.fromkeys(
+                src.path for src in self.vendor_metadata_sources if src.path is not None
+            )
         )
 
     @property

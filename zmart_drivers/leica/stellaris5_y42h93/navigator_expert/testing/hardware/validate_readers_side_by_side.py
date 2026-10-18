@@ -72,7 +72,14 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.par
 
 API_HANG_MS = 1500.0  # an API read slower than this is treated as a dialog-hang
 
-ROUTED_DATUMS = ("xy", "jobs", "selected_job", "scan_status", "hardware_info", "job_settings")
+ROUTED_DATUMS = (
+    "xy",
+    "jobs",
+    "selected_job",
+    "scan_status",
+    "hardware_info",
+    "job_settings",
+)
 READER_MODES = ("api", "log", "hybrid")
 
 
@@ -386,7 +393,10 @@ def phase_readonly(client, rec):
     hw_ok = (
         bool(ahw)
         and bool(lhw)
-        and (ahw.get("Microscope", {}).get("name") == lhw.get("Microscope", {}).get("name"))
+        and (
+            ahw.get("Microscope", {}).get("name")
+            == lhw.get("Microscope", {}).get("name")
+        )
     )
     rec.parity("get_hardware_info (Microscope.name)", hw_ok, log_missing=lhw is None)
 
@@ -409,7 +419,11 @@ def phase_readonly(client, rec):
             f"settings[{job}] ({len(set(af) | set(lf))} fields)",
             not diffs,
             (f"log_age={jage:.0f}s" if jage is not None else "")
-            + ("" if not diffs else f"  DIFFS {[(k, af.get(k), lf.get(k)) for k in diffs]}"),
+            + (
+                ""
+                if not diffs
+                else f"  DIFFS {[(k, af.get(k), lf.get(k)) for k in diffs]}"
+            ),
         )
         afov, lfov = drv.get_fov(client, job, mode="api"), L.get_fov(job, snap)
         rec.parity(
@@ -495,7 +509,9 @@ def _routed_agree(datum, a, b):
         if af is None or bf is None:
             return False, "unparseable settings"
         diffs = _settings_diffs(af, bf)
-        return not diffs, ("all contract fields agree" if not diffs else f"DIFFS {diffs}")
+        return not diffs, (
+            "all contract fields agree" if not diffs else f"DIFFS {diffs}"
+        )
     return a == b, ""
 
 
@@ -518,7 +534,9 @@ def phase_reader_modes(client, rec, job):
             continue
         values = {}
         for mode in READER_MODES:
-            reading, lat, err = _timed(lambda m=mode, d=datum: _routed_read(client, d, m, job))
+            reading, lat, err = _timed(
+                lambda m=mode, d=datum: _routed_read(client, d, m, job)
+            )
             value = getattr(reading, "value", None)
             age = getattr(reading, "age_s", None)
             source = getattr(reading, "source", None)
@@ -640,9 +658,9 @@ def phase_changes(client, job, rec):
             [1.0, 1.2, 0.8],
             0.05,
             lambda j, x: drv.set_pinhole_airy(client, j, 0, x),
-            lambda ch: ((ch.get("activeSettings") or [{}])[0].get("pinholeAiry") or {}).get(
-                "value"
-            ),
+            lambda ch: (
+                (ch.get("activeSettings") or [{}])[0].get("pinholeAiry") or {}
+            ).get("value"),
         ),
     ]
     for name, cands, tol, setfn, readfn in specs:
@@ -784,8 +802,8 @@ def _connect(args):
         print(f"Limits: hermetic machine root provisioned at {root}")
         return MockLasxClient(latency=args.mock_latency)
     from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.lasx_runtime import (
-    load_lasx_api_runtime,
-)
+        load_lasx_api_runtime,
+    )
 
     lasx_api = load_lasx_api_runtime()
     client = lasx_api.LasxApiClientPyModel
@@ -826,7 +844,9 @@ def main(argv=None):
         # (same pinning as validate_hardware --mock).
         from dataclasses import replace  # noqa: PLC0415
 
-        profiles.STATE_READERS = replace(profiles.STATE_READERS, selected_job_confirm_source="api")
+        profiles.STATE_READERS = replace(
+            profiles.STATE_READERS, selected_job_confirm_source="api"
+        )
 
     report = RunReport(
         script="validate_readers_side_by_side",
@@ -877,7 +897,9 @@ def main(argv=None):
         fails, skips, hangs = rec.counts()
         n = len(rec.rows)
         ok = n - len(fails) - skips
-        print(f"SUMMARY: parity {ok}/{n - skips}  skipped={skips}  API timeouts/hangs={hangs}")
+        print(
+            f"SUMMARY: parity {ok}/{n - skips}  skipped={skips}  API timeouts/hangs={hangs}"
+        )
         dlg = L.get_pending_dialog()
         if dlg:
             print(f"  NOTE: a modal dialog is open and blocking the CAM API: {dlg!r}")

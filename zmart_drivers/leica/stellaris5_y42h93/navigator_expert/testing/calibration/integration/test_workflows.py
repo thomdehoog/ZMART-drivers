@@ -71,7 +71,9 @@ _ADOPT_MOMENT = datetime(2026, 6, 1, 0, 0, 0, 0, tzinfo=timezone.utc)
 # ---------------------------------------------------------------------
 
 
-def test_calibration_capture_explicitly_passes_active_orientation(monkeypatch, tmp_path):
+def test_calibration_capture_explicitly_passes_active_orientation(
+    monkeypatch, tmp_path
+):
     expected = Orientation(rotate_deg=90, mirrored=True)
     session = SimpleNamespace(
         client=object(),
@@ -328,7 +330,9 @@ def _saved_manifest(output_root, naming, image):
             )
     else:
         image_paths = {
-            cm.drv.PlaneIndex(t=0, z=0, c=0): _write_saved_image(output_root, naming, arr)
+            cm.drv.PlaneIndex(t=0, z=0, c=0): _write_saved_image(
+                output_root, naming, arr
+            )
         }
     return SimpleNamespace(
         image_paths=image_paths,
@@ -446,7 +450,9 @@ def test_adoption_objective_translation_updates_canonical_calibration(
         moment=_ADOPT_MOMENT,
     )
 
-    current = json.loads(machine.calibration_path("water_lens_set").read_text(encoding="utf-8"))
+    current = json.loads(
+        machine.calibration_path("water_lens_set").read_text(encoding="utf-8")
+    )
     assert current["objectives"]["2"]["translation_um"] == [12.0, 17.0, 3.0]
     assert set(current["objectives"]["2"]) == {"name", "translation_um"}
     assert (
@@ -457,7 +463,9 @@ def test_adoption_objective_translation_updates_canonical_calibration(
     ).exists()
 
 
-def test_adoption_archives_notebook_beside_objective_pair(sessions_root, machine, tmp_path):
+def test_adoption_archives_notebook_beside_objective_pair(
+    sessions_root, machine, tmp_path
+):
     _seed_snapshot(machine)
     session, _ = _make_report_session(sessions_root, _valid_obj_payload())
     notebook = tmp_path / "working.ipynb"
@@ -498,7 +506,10 @@ def test_adoption_keeps_canonical_objectives_minimal(
 
     current = json.loads(machine.calibration_path().read_text(encoding="utf-8"))
     assert set(current) == {"schema_version", "objectives"}
-    assert all(set(entry) == {"name", "translation_um"} for entry in current["objectives"].values())
+    assert all(
+        set(entry) == {"name", "translation_um"}
+        for entry in current["objectives"].values()
+    )
 
 
 def test_session_calibration_compiles_all_acquisition_folders(sessions_root, machine):
@@ -548,7 +559,9 @@ def test_session_calibration_compiles_all_acquisition_folders(sessions_root, mac
     }
 
 
-def test_adoption_refuses_to_overwrite_the_established_reference(sessions_root, machine):
+def test_adoption_refuses_to_overwrite_the_established_reference(
+    sessions_root, machine
+):
     """Adopting a pair whose target is the zero-reference must fail with advice.
 
     Overwriting the reference would shift the origin every other objective is
@@ -594,7 +607,9 @@ def test_adoption_refuses_a_same_slot_pair_from_labels(sessions_root, machine):
         )
 
 
-def test_adoption_refuses_a_reference_missing_from_the_calibration(sessions_root, machine):
+def test_adoption_refuses_a_reference_missing_from_the_calibration(
+    sessions_root, machine
+):
     """A measurement from an objective the calibration does not cover cannot chain.
 
     Its target has no path back to the existing origin; silently starting a
@@ -623,8 +638,8 @@ def test_adoption_refuses_a_reference_missing_from_the_calibration(sessions_root
 def test_common_reference_adoptions_infer_every_objective_pair(sessions_root, machine):
     """10→20/40/60 measurements must imply every pair and reverse."""
     from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.optical_calibration import (
-    model as calibration_model,
-)
+        model as calibration_model,
+    )
 
     calibration_name = "shared_lens_setup"
     reference = {
@@ -679,7 +694,9 @@ def test_common_reference_adoptions_infer_every_objective_pair(sessions_root, ma
             moment=datetime(2026, 6, 1, 0, 0, ordinal, tzinfo=timezone.utc),
         )
 
-    config = calibration_model.load_calibration(machine.calibration_path(calibration_name))
+    config = calibration_model.load_calibration(
+        machine.calibration_path(calibration_name)
+    )
     assert calibration_model.get_reference_slot(config) == 1
     assert set(map(int, config["objectives"])) == {1, 2, 3, 4}
     for slot in (2, 3, 4):
@@ -696,7 +713,9 @@ def test_common_reference_adoptions_infer_every_objective_pair(sessions_root, ma
             )
             t_from = translations[from_slot]
             t_to = translations[to_slot]
-            expected = tuple(base[axis] + t_to[axis] - t_from[axis] for axis in range(3))
+            expected = tuple(
+                base[axis] + t_to[axis] - t_from[axis] for axis in range(3)
+            )
             assert actual == expected
 
 
@@ -733,7 +752,9 @@ def test_adoption_refreshes_objective_names_from_the_live_system(
         moment=_ADOPT_MOMENT,
     )
 
-    current = json.loads(machine.calibration_path("water_lens_set").read_text(encoding="utf-8"))
+    current = json.loads(
+        machine.calibration_path("water_lens_set").read_text(encoding="utf-8")
+    )
     assert current["objectives"]["1"]["name"] == "HC PL APO CS2 10x/0.40 WATER"
     assert current["objectives"]["2"]["name"] == "HC PL APO CS2 20x/0.75 WATER"
     # the translation is still applied alongside the refreshed name
@@ -862,7 +883,9 @@ def test_adoption_seeds_from_bundled_default_when_no_snapshot(sessions_root, mac
         / "lens_config_A"
         / "calibration.json"
     )
-    merged = json.loads(machine.calibration_path("lens_config_A").read_text(encoding="utf-8"))
+    merged = json.loads(
+        machine.calibration_path("lens_config_A").read_text(encoding="utf-8")
+    )
     assert merged["objectives"]["2"]["translation_um"] == [12.0, 17.0, 3.0]
     assert set(merged["objectives"]["2"]) == {"name", "translation_um"}
 
@@ -1142,7 +1165,9 @@ def _patch_objective_driver(
         session.hardware_objectives[slot] = name
         return slot, name
 
-    monkeypatch.setattr(wf_obj, "_observe_objective_for_step", _observe_objective_for_step)
+    monkeypatch.setattr(
+        wf_obj, "_observe_objective_for_step", _observe_objective_for_step
+    )
 
     return state
 
@@ -1159,7 +1184,10 @@ def test_objective_pair_defaults_to_machine_workspace_calibration_and_active_job
     machine,
 ):
     _seed_snapshot(machine)
-    monkeypatch.setattr("zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.store.MACHINE", machine)
+    monkeypatch.setattr(
+        "zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.store.MACHINE",
+        machine,
+    )
     _patch_objective_driver(monkeypatch)
     monkeypatch.setattr(
         wf_obj.drv, "get_selected_job", lambda client, **kwargs: {"Name": "Overview"}
@@ -1170,7 +1198,10 @@ def test_objective_pair_defaults_to_machine_workspace_calibration_and_active_job
         reference_slot=1,
     )
 
-    assert session.paths.session_root == machine.subsystem_root("calibration") / "obj_defaults"
+    assert (
+        session.paths.session_root
+        == machine.subsystem_root("calibration") / "obj_defaults"
+    )
     assert session.paths.session_dir == session.paths.session_root / "objective-pair"
     assert session.calibration_path == machine.calibration_path().absolute()
     assert session.calibration_name is None
@@ -1219,17 +1250,17 @@ def test_objective_pair_measure_runs_the_next_unfinished_step(monkeypatch):
 
 def test_objective_pair_notebook_only_configures_session_and_reference_slot():
     notebook_path = (
-        (
-    Path(wf_obj.__file__).parents[1]
-    / "configuration"
-    / "optical_calibration"
-    / "notebooks"
-    / "calibrate_objective_pair.ipynb"
-)
+        Path(wf_obj.__file__).parents[1]
+        / "configuration"
+        / "optical_calibration"
+        / "notebooks"
+        / "calibrate_objective_pair.ipynb"
     )
     notebook = json.loads(notebook_path.read_text(encoding="utf-8"))
     code = "\n".join(
-        "".join(cell.get("source", [])) for cell in notebook["cells"] if cell["cell_type"] == "code"
+        "".join(cell.get("source", []))
+        for cell in notebook["cells"]
+        if cell["cell_type"] == "code"
     )
 
     assert 'session_id="' in code
@@ -1245,7 +1276,10 @@ def test_objective_pair_notebook_only_configures_session_and_reference_slot():
     assert "objective_pair.measure_parfocality_reference(session)" in code
     assert "objective_pair.measure_parfocality_target(session)" in code
     assert "objective_pair.measure_parcentricity_reference(session)" in code
-    assert "summary = objective_pair.measure_parcentricity_target_and_save(session)" in code
+    assert (
+        "summary = objective_pair.measure_parcentricity_target_and_save(session)"
+        in code
+    )
     assert "objective_pair.measure(session)" not in code
     assert code.index("measure_parcentricity_target_and_save(session)") < code.index(
         "save_and_adopt"
@@ -1293,7 +1327,10 @@ def test_objective_pair_can_select_named_machine_calibration(
         calibration=cal,
         calibration_name="lens_A",
     )
-    monkeypatch.setattr("zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.store.MACHINE", machine)
+    monkeypatch.setattr(
+        "zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.store.MACHINE",
+        machine,
+    )
     _patch_objective_driver(monkeypatch)
 
     session = wf_obj.start_session(
@@ -1311,9 +1348,13 @@ def test_objective_pair_can_select_named_machine_calibration(
     )
 
 
-def test_configured_reference_must_match_existing_calibration_reference(tmp_path, sessions_root):
+def test_configured_reference_must_match_existing_calibration_reference(
+    tmp_path, sessions_root
+):
     calibration_path = tmp_path / "calibration.json"
-    calibration_path.write_text(json.dumps(_current_calibration_payload()), encoding="utf-8")
+    calibration_path.write_text(
+        json.dumps(_current_calibration_payload()), encoding="utf-8"
+    )
 
     with pytest.raises(ValueError) as exc_info:
         wf_obj.start_session(
@@ -1336,9 +1377,17 @@ def _placeholder_calibration_payload():
         "schema_version": 12,
         "last_updated": "20260527_120000",
         "objectives": {
-            "0": {"name": "40x", "translation_um": [-19.7, 33.0, 2.7], "session_id": None},
+            "0": {
+                "name": "40x",
+                "translation_um": [-19.7, 33.0, 2.7],
+                "session_id": None,
+            },
             "1": {"name": "10x", "translation_um": [0.0, 0.0, 0.0], "session_id": None},
-            "2": {"name": "20x", "translation_um": [-6.5, 21.5, -3.7], "session_id": None},
+            "2": {
+                "name": "20x",
+                "translation_um": [-6.5, 21.5, -3.7],
+                "session_id": None,
+            },
         },
     }
 
@@ -1356,8 +1405,13 @@ def test_configured_reference_may_differ_on_a_placeholder_only_calibration(
     the set to it.
     """
     calibration_path = tmp_path / "calibration.json"
-    calibration_path.write_text(json.dumps(_placeholder_calibration_payload()), encoding="utf-8")
-    monkeypatch.setattr("zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.store.MACHINE", machine)
+    calibration_path.write_text(
+        json.dumps(_placeholder_calibration_payload()), encoding="utf-8"
+    )
+    monkeypatch.setattr(
+        "zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.store.MACHINE",
+        machine,
+    )
     _patch_objective_driver(monkeypatch)
 
     session = wf_obj.start_session(
@@ -1378,10 +1432,12 @@ def test_adoption_reanchors_a_placeholder_only_calibration(sessions_root, machin
     origin, which no longer exists), and the objective names survive.
     """
     from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.optical_calibration import (
-    model as calibration_model,
-)
+        model as calibration_model,
+    )
 
-    machine.publish_snapshot(_SEED_MOMENT, calibration=_placeholder_calibration_payload())
+    machine.publish_snapshot(
+        _SEED_MOMENT, calibration=_placeholder_calibration_payload()
+    )
     payload = {
         **_valid_obj_payload(),
         "from_slot": 0,
@@ -1438,7 +1494,9 @@ def test_start_session_reports_configured_reference_slot_and_hardware_name(
     monkeypatch, tmp_path, sessions_root, capsys
 ):
     calibration_path = tmp_path / "calibration.json"
-    calibration_path.write_text(json.dumps(_current_calibration_payload()), encoding="utf-8")
+    calibration_path.write_text(
+        json.dumps(_current_calibration_payload()), encoding="utf-8"
+    )
     monkeypatch.setattr(wf_obj.drv, "connect_python_client", lambda: object())
     monkeypatch.setattr(
         wf_obj.drv,
@@ -1500,7 +1558,9 @@ def _live_objective_session():
     )
 
 
-def test_objective_cells_record_and_report_target_then_verify_both_roles(monkeypatch, capsys):
+def test_objective_cells_record_and_report_target_then_verify_both_roles(
+    monkeypatch, capsys
+):
     session = _live_objective_session()
     live = {"job": "Overview", "slot": 1, "name": session.from_objective}
     monkeypatch.setattr(
@@ -1563,7 +1623,9 @@ def test_objective_verification_refuses_wrong_slot_same_reference_as_target_and_
         wf_obj._observe_objective_for_step(session, "reference")
 
 
-def test_target_focus_rerun_with_a_different_lens_redefines_the_target(monkeypatch, capsys):
+def test_target_focus_rerun_with_a_different_lens_redefines_the_target(
+    monkeypatch, capsys
+):
     """Re-running the target focus step with another lens must not lock the session.
 
     An accidental first run with the wrong lens used to pin ``to_slot``
@@ -1636,7 +1698,9 @@ def test_target_verify_refuses_changed_lens_without_adopting_it(monkeypatch):
     assert session.to_slot is None
 
 
-def test_observe_reference_refuses_a_session_without_a_configured_reference(monkeypatch):
+def test_observe_reference_refuses_a_session_without_a_configured_reference(
+    monkeypatch,
+):
     """A session with no reference slot must refuse, never silently adopt one.
 
     Adopting whatever objective happens to be active would let a mis-set-up
@@ -1714,7 +1778,9 @@ def test_objective_pair_override_calibration_path_recorded(
     summary = wf_obj.measure_parcentricity_target_and_save(session)
 
     report = json.loads(
-        (session.paths.reports_dir / f"{session.kind}_report.json").read_text(encoding="utf-8")
+        (session.paths.reports_dir / f"{session.kind}_report.json").read_text(
+            encoding="utf-8"
+        )
     )
     # The report records the exact source we used.
     assert override.name in report["source_calibration_file"]
@@ -1853,7 +1919,9 @@ def test_objective_pair_xy_translation_arithmetic_identity(
         },
     }
     report = json.loads(
-        (session.paths.reports_dir / "objective_pair_report.json").read_text(encoding="utf-8")
+        (session.paths.reports_dir / "objective_pair_report.json").read_text(
+            encoding="utf-8"
+        )
     )
     assert report["from_slot"] == 1
     assert report["to_slot"] == 2
@@ -1869,9 +1937,7 @@ def test_objective_pair_xy_translation_arithmetic_identity(
     assert set(state["acquire_jobs"]) == {"Overview"}
     expected_passes = [] if backlash_rounds == 0 else [backlash_rounds] * 5
     expected_events = (
-        ["acquire"] * 5
-        if backlash_rounds == 0
-        else ["backlash", "acquire"] * 5
+        ["acquire"] * 5 if backlash_rounds == 0 else ["backlash", "acquire"] * 5
     )
     assert state["backlash_passes"] == expected_passes
     assert state["acquisition_events"] == expected_events
@@ -1924,13 +1990,15 @@ def test_objective_pair_weak_xy_vote_blocks_config(monkeypatch, sessions_root, m
     assert not (session.paths.session_dir / "calibration.json").exists()
 
     report = json.loads(
-        (session.paths.reports_dir / f"{session.kind}_report.json").read_text(encoding="utf-8")
+        (session.paths.reports_dir / f"{session.kind}_report.json").read_text(
+            encoding="utf-8"
+        )
     )
     assert report["config_written"] is False
     # NaN must be coerced to null on disk.
-    assert "NaN" not in (session.paths.reports_dir / f"{session.kind}_report.json").read_text(
-        encoding="utf-8"
-    )
+    assert "NaN" not in (
+        session.paths.reports_dir / f"{session.kind}_report.json"
+    ).read_text(encoding="utf-8")
     assert report["registration"]["trusted"] is False
     assert report["registration"]["image_shift_um"] == [None, None]
     assert report["translation_xy_um"] is None
@@ -2054,7 +2122,9 @@ def test_objective_pair_parcentricity_reference_moves_to_home(
     assert state["zwide"] == pytest.approx(session.focus_z_ref_um)
 
 
-def test_objective_pair_failed_rerun_removes_stale_config(monkeypatch, sessions_root, machine):
+def test_objective_pair_failed_rerun_removes_stale_config(
+    monkeypatch, sessions_root, machine
+):
     # Run 1: trusted vote -> session calibration compiled.
     # Run 2 (same session): weak vote on the parcentricity step. The
     # stale compiled calibration must be removed and adoption must raise.
@@ -2072,7 +2142,13 @@ def test_objective_pair_failed_rerun_removes_stale_config(monkeypatch, sessions_
     _seed_snapshot(machine)
 
     votes = [
-        {"dx_um": 1.0, "dy_um": -2.0, "trusted": True, "confidence": 4, "agreeing": ["pcc"]},
+        {
+            "dx_um": 1.0,
+            "dy_um": -2.0,
+            "trusted": True,
+            "confidence": 4,
+            "agreeing": ["pcc"],
+        },
         {
             "dx_um": float("nan"),
             "dy_um": float("nan"),
@@ -2689,7 +2765,9 @@ def test_objective_pair_report_has_ref_and_target_brenner_blocks(
         session_id="obj_report_brenner",
     )
     report = json.loads(
-        (session.paths.reports_dir / f"{session.kind}_report.json").read_text(encoding="utf-8")
+        (session.paths.reports_dir / f"{session.kind}_report.json").read_text(
+            encoding="utf-8"
+        )
     )
 
     # Both Brenner blocks present, populated, with matching lengths.
@@ -2711,7 +2789,9 @@ def test_objective_pair_report_has_ref_and_target_brenner_blocks(
     assert report["focus_z_target_um"] is not None
 
 
-def test_objective_pair_rerun_2a_wipes_ref_z_stack_dir(monkeypatch, sessions_root, machine):
+def test_objective_pair_rerun_2a_wipes_ref_z_stack_dir(
+    monkeypatch, sessions_root, machine
+):
     # First run with 11 ref slices; rerun 2a with 5 ref slices. The
     # wipe at the top of _clear_parfocality_reference must remove the
     # stale higher-index slices.
@@ -2749,7 +2829,9 @@ def test_objective_pair_rerun_2a_wipes_ref_z_stack_dir(monkeypatch, sessions_roo
     )
     session = wf_obj.measure_parfocality_reference(session)
     ref_dir = session.paths.data_dir / "ref_z_stack"
-    first_run_z = sorted(parse_image_name(p.name).z for p in ref_dir.rglob("*.ome.tiff"))
+    first_run_z = sorted(
+        parse_image_name(p.name).z for p in ref_dir.rglob("*.ome.tiff")
+    )
     assert first_run_z == list(range(11))
 
     # Operator reconfigures the LAS X ref stack to 5 sections and
@@ -2766,11 +2848,15 @@ def test_objective_pair_rerun_2a_wipes_ref_z_stack_dir(monkeypatch, sessions_roo
     state["stack_phase"] = "ref"
     session = wf_obj.measure_parfocality_reference(session)
 
-    second_run_z = sorted(parse_image_name(p.name).z for p in ref_dir.rglob("*.ome.tiff"))
+    second_run_z = sorted(
+        parse_image_name(p.name).z for p in ref_dir.rglob("*.ome.tiff")
+    )
     assert second_run_z == list(range(5))
 
 
-def test_objective_pair_missing_stack_positions_raises(monkeypatch, sessions_root, machine):
+def test_objective_pair_missing_stack_positions_raises(
+    monkeypatch, sessions_root, machine
+):
     # LAS X reports no stack metadata and the operator did not pass an
     # override. The workflow must raise a clear RuntimeError rather
     # than guess positions from slice count.
@@ -3200,7 +3286,9 @@ def test_objective_pair_brenner_peak_at_stack_edge_raises(
         wf_obj.measure_parfocality_reference(session)
 
 
-def test_remeasured_pair_newest_report_wins_regardless_of_folder_name(sessions_root, machine):
+def test_remeasured_pair_newest_report_wins_regardless_of_folder_name(
+    sessions_root, machine
+):
     """Re-measuring a pair under a NEW acquisition name must supersede the
     old measurement by its created_at timestamp — never by which folder
     name sorts last. The folder names here are adversarial: the older

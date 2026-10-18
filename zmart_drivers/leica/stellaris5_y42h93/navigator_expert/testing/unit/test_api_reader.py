@@ -54,7 +54,11 @@ class TestRequestCore(unittest.TestCase):
 
     def test_an_answer_is_returned_at_once(self):
         value = A._request(
-            _client(), command="Whatever", flush=lambda c: None, read=lambda c: 7, deadline=_soon()
+            _client(),
+            command="Whatever",
+            flush=lambda c: None,
+            read=lambda c: 7,
+            deadline=_soon(),
         )
         self.assertEqual(value, 7)
 
@@ -75,7 +79,11 @@ class TestRequestCore(unittest.TestCase):
         client = _client()
         client.PyApiCommand.UpdateAwaitReceipt = lambda timeout: False
         value = A._request(
-            client, command="Whatever", flush=lambda c: None, read=reads.append, deadline=_soon()
+            client,
+            command="Whatever",
+            flush=lambda c: None,
+            read=reads.append,
+            deadline=_soon(),
         )
         self.assertIsNone(value)
         self.assertEqual(reads, [])
@@ -93,7 +101,9 @@ class TestRequestCore(unittest.TestCase):
         self.assertIsNone(value)
         self.assertLess(time.monotonic() - t0, 1.0)
 
-    def test_with_a_validate_hook_a_stray_reply_is_skipped_and_the_fresh_one_accepted(self):
+    def test_with_a_validate_hook_a_stray_reply_is_skipped_and_the_fresh_one_accepted(
+        self,
+    ):
         reads = iter([{"for": "earlier"}, {"for": "this"}])
 
         def validate(value):
@@ -210,7 +220,10 @@ class TestGetXY(unittest.TestCase):
 
 class TestGetJobs(unittest.TestCase):
     def test_returns_parsed_list_on_success(self):
-        jobs = [{"Name": "Overview", "IsSelected": True}, {"Name": "HiRes", "IsSelected": False}]
+        jobs = [
+            {"Name": "Overview", "IsSelected": True},
+            {"Name": "HiRes", "IsSelected": False},
+        ]
 
         class _Model:
             @property
@@ -275,7 +288,9 @@ class TestGetJobSettingsCorrelationGuard(unittest.TestCase):
             def Settings(self, value):
                 pass
 
-        result = A.get_job_settings(self._client_with(_Model()), "NEW_JOB", deadline=_soon())
+        result = A.get_job_settings(
+            self._client_with(_Model()), "NEW_JOB", deadline=_soon()
+        )
         self.assertIsNotNone(result)
         self.assertEqual(result["jobName"], "NEW_JOB")
 

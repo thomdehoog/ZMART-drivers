@@ -6,7 +6,6 @@ This file keeps the mock-backed path, registering the driver's folder and
 connecting by name through the real controller, in the offline suite.
 """
 
-
 from __future__ import annotations
 
 import contextlib
@@ -96,7 +95,10 @@ class RecordingValidator:
 
 def test_a_capture_that_failed_is_reported_not_a_crash():
     """A failed capture answers with words, not a record: the checks say it failed, nothing breaks."""
-    failed = {"success": False, "content": "RuntimeError: this microscope does not know where to save its data"}
+    failed = {
+        "success": False,
+        "content": "RuntimeError: this microscope does not know where to save its data",
+    }
     session = SimpleNamespace(_session=SimpleNamespace(acquire=lambda **kwargs: failed))
     v = RecordingValidator()
 

@@ -166,8 +166,8 @@ def test_rig_orientation_defaults_to_identity_template(monkeypatch, tmp_path):
     # notebook, never hard-coded. A hermetic ProgramData root (no snapshot)
     # exercises that fallback without touching the machine's real config.
     from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.store import (
-    MachineProfile,
-)
+        MachineProfile,
+    )
 
     monkeypatch.setattr(
         "zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.store.MACHINE",
@@ -182,15 +182,18 @@ def test_rig_orientation_reads_the_measured_snapshot(monkeypatch, tmp_path):
     from datetime import datetime, timezone
 
     from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.store import (
-    MachineProfile,
-)
+        MachineProfile,
+    )
 
     machine = MachineProfile(programdata_root=tmp_path / "programdata")
     machine.publish_snapshot(
         datetime(2026, 7, 1, 12, 0, tzinfo=timezone.utc),
         orientation={"schema_version": 1, "rotate_deg": 270},
     )
-    monkeypatch.setattr("zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.store.MACHINE", machine)
+    monkeypatch.setattr(
+        "zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.store.MACHINE",
+        machine,
+    )
     assert orient.rig_orientation() == Orientation(rotate_deg=270)
 
 
@@ -205,7 +208,9 @@ def test_reorient_identity_unchanged():
 
 def test_reorient_quarter_turn_clockwise():
     expected = np.array([[4, 1], [5, 2], [6, 3]], dtype=np.uint16)  # (3, 2)
-    assert np.array_equal(orient.reorient_array(_A, Orientation(rotate_deg=90)), expected)
+    assert np.array_equal(
+        orient.reorient_array(_A, Orientation(rotate_deg=90)), expected
+    )
 
 
 def test_reorient_quarter_turns_are_inverse():
@@ -225,7 +230,9 @@ def test_reorient_mirror_then_quarter_turn_is_lossless():
 def test_converter_anchor_known_90_rig():
     # A measured matrix of [[0,-1],[1,0]] (a rig turned a quarter-turn) is
     # corrected by turning the saved image 90 degrees clockwise.
-    assert orient.orientation_from_image_to_stage([[0, -1], [1, 0]]) == Orientation(rotate_deg=90)
+    assert orient.orientation_from_image_to_stage([[0, -1], [1, 0]]) == Orientation(
+        rotate_deg=90
+    )
 
 
 @pytest.mark.parametrize(

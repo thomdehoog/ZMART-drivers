@@ -169,7 +169,9 @@ def check_xy(x, y):
     target, outside the session envelope, or outside the hardcoded backstop).
     """
     if _stage_limits["x_min"] is None:
-        raise RuntimeError("Stage limits not configured. Call set_stage_limits() first.")
+        raise RuntimeError(
+            "Stage limits not configured. Call set_stage_limits() first."
+        )
     x = _require_finite(x, "X")
     y = _require_finite(y, "Y")
     if x < _stage_limits["x_min"] or x > _stage_limits["x_max"]:
@@ -201,7 +203,9 @@ def check_z(z, z_mode):
         ValueError: If z_mode is not recognized.
     """
     if _stage_limits["z_galvo_min"] is None:
-        raise RuntimeError("Stage limits not configured. Call set_stage_limits() first.")
+        raise RuntimeError(
+            "Stage limits not configured. Call set_stage_limits() first."
+        )
     if z_mode == "galvo":
         axis = "z_galvo"
     elif z_mode == "zwide":
@@ -286,7 +290,9 @@ class LeicaLimits:
     path: Any
     is_fallback: bool
 
-    def __init__(self, payload: Mapping[str, Any], *, source: str, path: Any, is_fallback: bool):
+    def __init__(
+        self, payload: Mapping[str, Any], *, source: str, path: Any, is_fallback: bool
+    ):
         compiled = {}
         for name, entry in payload.items():
             if entry == []:
@@ -319,7 +325,10 @@ class LeicaLimits:
                 )
             return
         allowed = configured
-        if not any(type(value) is type(candidate) and value == candidate for candidate in allowed):
+        if not any(
+            type(value) is type(candidate) and value == candidate
+            for candidate in allowed
+        ):
             raise LimitViolation(
                 f"{name}={value!r} not allowed; expected one of {list(allowed)!r} "
                 f"({self._origin()})"
@@ -334,7 +343,9 @@ class LeicaLimits:
         if function == "set_objective":
             if "objective_slot" in values:
                 self._check_one(
-                    "objective_slot", self._policy["objective_slot"], values["objective_slot"]
+                    "objective_slot",
+                    self._policy["objective_slot"],
+                    values["objective_slot"],
                 )
             return
         if function not in SETTER_LIMIT_KEYS:

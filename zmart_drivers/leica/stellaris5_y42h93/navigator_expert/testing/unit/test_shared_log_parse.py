@@ -87,14 +87,19 @@ def test_readers_asking_during_a_parse_share_the_next_one():
         first = threading.Thread(target=lambda: results.append(log_reader.parse_log()))
         first.start()
         time.sleep(PARSE_S / 3)
-        late = [threading.Thread(target=lambda: results.append(log_reader.parse_log())) for _ in range(5)]
+        late = [
+            threading.Thread(target=lambda: results.append(log_reader.parse_log()))
+            for _ in range(5)
+        ]
         for thread in late:
             thread.start()
         for thread in [first, *late]:
             thread.join(5.0)
     assert slow.calls == 2
     assert slow.most_at_once == 1
-    assert len({id(snapshot) for snapshot in results[1:]}) == 1  # the five late ones share one
+    assert (
+        len({id(snapshot) for snapshot in results[1:]}) == 1
+    )  # the five late ones share one
 
 
 def test_explicit_files_or_lines_are_parsed_directly():
@@ -141,7 +146,9 @@ def test_sixty_racing_readings_never_overlap_two_parses():
     slow = SlowParse()
     with (
         patch.object(log_reader, "parse_files", side_effect=slow),
-        patch.object(readers.api_reader, "get_xy", return_value={"x_um": 1.0, "y_um": 2.0}),
+        patch.object(
+            readers.api_reader, "get_xy", return_value={"x_um": 1.0, "y_um": 2.0}
+        ),
     ):
         threads = [
             threading.Thread(target=lambda: readers.get_xy(object())) for _ in range(60)
@@ -154,7 +161,9 @@ def test_sixty_racing_readings_never_overlap_two_parses():
     assert slow.most_at_once == 1
 
 
-def test_a_snapshot_counts_only_for_the_log_files_it_was_parsed_from(monkeypatch, tmp_path):
+def test_a_snapshot_counts_only_for_the_log_files_it_was_parsed_from(
+    monkeypatch, tmp_path
+):
     """Pointing the reader at other files (the --mock validators do) never serves the old ones."""
     from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.actions import profiles
 
@@ -170,7 +179,8 @@ def test_a_snapshot_counts_only_for_the_log_files_it_was_parsed_from(monkeypatch
             profiles,
             "LOG_READER",
             profiles.LogReaderProfile(
-                lcs_log_path=str(tmp_path / "none.log"), msgbox_log_path=str(tmp_path / "none2.log")
+                lcs_log_path=str(tmp_path / "none.log"),
+                msgbox_log_path=str(tmp_path / "none2.log"),
             ),
         )
         other = log_reader.parse_log()

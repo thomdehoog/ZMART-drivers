@@ -104,7 +104,8 @@ def _x_laser_intensity(ch, p):
     las = next(
         line
         for line in ch["activeSettings"][p["si"]]["activeLaserLines"]
-        if line["_beamRoute"] == p["beam_route"] and line["_lineIndex"] == p["line_index"]
+        if line["_beamRoute"] == p["beam_route"]
+        and line["_lineIndex"] == p["line_index"]
     )
     return las["intensity"]["value"]
 
@@ -163,25 +164,39 @@ CONFIRM_SPECS = {
         "LaserIntensity", _x_laser_intensity, _cmp_tolerance, _SEARCH_ERRORS, 0.005
     ),
     "filter_wheel_spectrum": ConfirmSpec(
-        "FilterWheelSpectrum", _x_filter_wheel_spectrum, _cmp_tolerance, _SEARCH_ERRORS, 1
+        "FilterWheelSpectrum",
+        _x_filter_wheel_spectrum,
+        _cmp_tolerance,
+        _SEARCH_ERRORS,
+        1,
     ),
     "z_stack_step_size": ConfirmSpec(
         "Z-stack step", _x_z_stack_step_size, _cmp_tolerance, _DICT_ERRORS, 0.5
     ),
     # -- exact match ---------------------------------------------------------
     "scan_speed": ConfirmSpec("ScanSpeed", _x_scan_speed, _cmp_exact, _DICT_ERRORS),
-    "scan_resonant": ConfirmSpec("ScanResonant", _x_scan_resonant, _cmp_exact, _DICT_ERRORS),
+    "scan_resonant": ConfirmSpec(
+        "ScanResonant", _x_scan_resonant, _cmp_exact, _DICT_ERRORS
+    ),
     "scan_mode": ConfirmSpec("ScanMode", _x_scan_mode, _cmp_exact, _DICT_ERRORS),
-    "sequential_mode": ConfirmSpec("SequentialMode", _x_sequential_mode, _cmp_exact, _DICT_ERRORS),
+    "sequential_mode": ConfirmSpec(
+        "SequentialMode", _x_sequential_mode, _cmp_exact, _DICT_ERRORS
+    ),
     "frame_accumulation": ConfirmSpec(
         "FrameAccumulation", _x_frame_accumulation, _cmp_exact, _INDEXED_ERRORS
     ),
-    "frame_average": ConfirmSpec("FrameAverage", _x_frame_average, _cmp_exact, _INDEXED_ERRORS),
+    "frame_average": ConfirmSpec(
+        "FrameAverage", _x_frame_average, _cmp_exact, _INDEXED_ERRORS
+    ),
     "line_accumulation": ConfirmSpec(
         "LineAccumulation", _x_line_accumulation, _cmp_exact, _INDEXED_ERRORS
     ),
-    "line_average": ConfirmSpec("LineAverage", _x_line_average, _cmp_exact, _INDEXED_ERRORS),
-    "laser_shutter": ConfirmSpec("LaserShutter", _x_laser_shutter, _cmp_exact, _SEARCH_ERRORS),
+    "line_average": ConfirmSpec(
+        "LineAverage", _x_line_average, _cmp_exact, _INDEXED_ERRORS
+    ),
+    "laser_shutter": ConfirmSpec(
+        "LaserShutter", _x_laser_shutter, _cmp_exact, _SEARCH_ERRORS
+    ),
     "filter_wheel_slot": ConfirmSpec(
         "FilterWheelSlot", _x_filter_wheel_slot, _cmp_exact, _SEARCH_ERRORS
     ),

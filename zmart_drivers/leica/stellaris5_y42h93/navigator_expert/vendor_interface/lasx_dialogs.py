@@ -229,7 +229,12 @@ def left_open(dialog: Dialog, why: str) -> DialogOpen:
     """The :class:`DialogOpen` for *dialog*, logged the first time it is met."""
     if (dialog.at, dialog.text) not in reported:
         reported.add((dialog.at, dialog.text))
-        log.error("LAS X dialog open, not answered (%s): %s %r", why, dialog.caption, dialog.text)
+        log.error(
+            "LAS X dialog open, not answered (%s): %s %r",
+            why,
+            dialog.caption,
+            dialog.text,
+        )
     return DialogOpen(dialog, why)
 
 
@@ -251,9 +256,15 @@ def answer_open_warning() -> Answered | None:
         if time.monotonic() >= deadline:
             raise left_open(dialog, "in LAS X's log, not found on screen")
         time.sleep(tuning.ANSWER_POLL_S)
-    if dialog.caption != WARNING or len(windows) != 1 or windows[0].buttons != (OK_BUTTON,):
+    if (
+        dialog.caption != WARNING
+        or len(windows) != 1
+        or windows[0].buttons != (OK_BUTTON,)
+    ):
         buttons = [w.buttons for w in windows]
-        raise left_open(dialog, f"not a warning with OK alone: {dialog.caption}, buttons {buttons}")
+        raise left_open(
+            dialog, f"not a warning with OK alone: {dialog.caption}, buttons {buttons}"
+        )
     windows[0].press(OK_BUTTON)
     deadline = time.monotonic() + ANSWER_WAIT_S
     while pending() is not None:
@@ -319,9 +330,15 @@ def keep_watching() -> None:
                 except DialogOpen:
                     continue
                 except Exception as why:  # noqa: BLE001 -- the watcher must outlive any one look
-                    log.warning("the LAS X dialog watcher could not look: %s: %s", type(why).__name__, why)
+                    log.warning(
+                        "the LAS X dialog watcher could not look: %s: %s",
+                        type(why).__name__,
+                        why,
+                    )
 
-        thread = threading.Thread(target=watch, name="lasx-dialog-sentinel", daemon=True)
+        thread = threading.Thread(
+            target=watch, name="lasx-dialog-sentinel", daemon=True
+        )
         sentinel.update(thread=thread, stop=stop)
         thread.start()
 
@@ -341,7 +358,9 @@ def apartment() -> int | None:
     """This thread's COM mode (an ``APTTYPE``), or None when COM is not set up in it."""
     kind, qualifier = ctypes.c_int(), ctypes.c_int()
     try:
-        ctypes.oledll.ole32.CoGetApartmentType(ctypes.byref(kind), ctypes.byref(qualifier))
+        ctypes.oledll.ole32.CoGetApartmentType(
+            ctypes.byref(kind), ctypes.byref(qualifier)
+        )
     except OSError:
         return None
     return kind.value
@@ -361,7 +380,9 @@ def import_in_this_threads_mode(import_comtypes) -> None:
     if mode is None:
         import_comtypes()
         return
-    sys.coinit_flags = COINIT_MULTITHREADED if mode == APTTYPE_MTA else COINIT_APARTMENTTHREADED
+    sys.coinit_flags = (
+        COINIT_MULTITHREADED if mode == APTTYPE_MTA else COINIT_APARTMENTTHREADED
+    )
     try:
         import_comtypes()
     finally:
@@ -398,7 +419,9 @@ def automation():
 
         return client, quiet_automation(client, comtypes.client.CreateObject)
     except Exception as why:  # noqa: BLE001 -- no UI Automation, whatever the reason
-        raise WindowsUnavailable(f"Windows UI Automation is not available: {why}") from why
+        raise WindowsUnavailable(
+            f"Windows UI Automation is not available: {why}"
+        ) from why
 
 
 def quiet_automation(client, create):
@@ -422,13 +445,20 @@ class AutomatedDialog:
         self.uia, self.client, self.element = uia, client, element
         found = element.FindAll(
             client.TreeScope_Descendants,
-            uia.CreatePropertyCondition(client.UIA_ControlTypePropertyId, client.UIA_ButtonControlTypeId),
+            uia.CreatePropertyCondition(
+                client.UIA_ControlTypePropertyId, client.UIA_ButtonControlTypeId
+            ),
         )
-        self.button_elements = {found.GetElement(i).CurrentAutomationId: found.GetElement(i) for i in range(found.Length)}
+        self.button_elements = {
+            found.GetElement(i).CurrentAutomationId: found.GetElement(i)
+            for i in range(found.Length)
+        }
         self.buttons = tuple(self.button_elements)
 
     def press(self, button):
-        pattern = self.button_elements[button].GetCurrentPattern(self.client.UIA_InvokePatternId)
+        pattern = self.button_elements[button].GetCurrentPattern(
+            self.client.UIA_InvokePatternId
+        )
         pattern.QueryInterface(self.client.IUIAutomationInvokePattern).Invoke()
 
 
@@ -448,8 +478,12 @@ class AutomatedWindows:
         whatever it holds, and is pressed only if its one button is OK.
         """
         c, uia = self.client, self.uia
-        tops = uia.GetRootElement().FindAll(c.TreeScope_Children, uia.CreateTrueCondition())
-        content = uia.CreatePropertyCondition(c.UIA_AutomationIdPropertyId, "MessageBoxContent")
+        tops = uia.GetRootElement().FindAll(
+            c.TreeScope_Children, uia.CreateTrueCondition()
+        )
+        content = uia.CreatePropertyCondition(
+            c.UIA_AutomationIdPropertyId, "MessageBoxContent"
+        )
         found, names = [], {}
         for i in range(tops.Length):
             window = tops.GetElement(i)
@@ -458,7 +492,9 @@ class AutomatedWindows:
                 names[process] = process_name(process)
             if names[process] not in DIALOG_PROCESSES or window.CurrentName:
                 continue
-            if names[process] == "NavigatorExpert.exe" or window.FindFirst(c.TreeScope_Descendants, content):
+            if names[process] == "NavigatorExpert.exe" or window.FindFirst(
+                c.TreeScope_Descendants, content
+            ):
                 found.append(AutomatedDialog(uia, c, window))
         if "LMSApplication.exe" not in names.values():
             raise WindowsUnavailable("LAS X's window was not found")

@@ -31,7 +31,9 @@ TRANSLATIONS = {1: (0.0, 0.0, 0.0), 2: (10.0, -6.0, 3.0)}
 
 @pytest.fixture
 def client():
-    c = SimpleNamespace(PyApiSelectJobByName=object(), PyApiSetObjectiveSlotByJobName=object())
+    c = SimpleNamespace(
+        PyApiSelectJobByName=object(), PyApiSetObjectiveSlotByJobName=object()
+    )
     yield c
     session_state.uninstall(c)
 
@@ -39,7 +41,9 @@ def client():
 def _arm(client, translations=TRANSLATIONS):
     session_state.install(
         client,
-        session_state.SessionConfig(orientation=Orientation(), translations=translations),
+        session_state.SessionConfig(
+            orientation=Orientation(), translations=translations
+        ),
     )
 
 
@@ -49,7 +53,9 @@ def _rig(monkeypatch, *, slot):
     *slot* is a mutable dict {"value": n} so a test can swap the objective
     between the before-record and the after-compensation read.
     """
-    monkeypatch.setattr(readers, "get_xy", lambda c, **k: {"x_um": 1000.0, "y_um": 2000.0})
+    monkeypatch.setattr(
+        readers, "get_xy", lambda c, **k: {"x_um": 1000.0, "y_um": 2000.0}
+    )
     monkeypatch.setattr(
         readers,
         "get_selected_job",
@@ -103,7 +109,9 @@ def test_record_before_change_reads_position_and_objective(client, monkeypatch):
     }
 
 
-def test_compensation_adds_the_translation_difference_to_the_recorded_values(client, monkeypatch):
+def test_compensation_adds_the_translation_difference_to_the_recorded_values(
+    client, monkeypatch
+):
     _arm(client)
     slot = {"value": 1}
     _rig(monkeypatch, slot=slot)
@@ -152,7 +160,9 @@ def test_uncovered_objective_swap_fails_the_command_result(client, monkeypatch):
     assert result["objective_compensation"]["objective_changed"] is True
 
 
-def test_select_job_records_before_the_switch_and_compensates_after(client, monkeypatch):
+def test_select_job_records_before_the_switch_and_compensates_after(
+    client, monkeypatch
+):
     install_permissive_limits(client)
     _arm(client)
     order = []
@@ -166,9 +176,14 @@ def test_select_job_records_before_the_switch_and_compensates_after(client, monk
     monkeypatch.setattr(
         cmds,
         "prepare_select_job",
-        lambda c, job: (None, {"api_baseline_name": "Overview", "api_said_selected": False}),
+        lambda c, job: (
+            None,
+            {"api_baseline_name": "Overview", "api_said_selected": False},
+        ),
     )
-    monkeypatch.setattr(cmds, "select_job_confirm_legs", lambda *a, **k: (None, None, 0.0))
+    monkeypatch.setattr(
+        cmds, "select_job_confirm_legs", lambda *a, **k: (None, None, 0.0)
+    )
 
     def fake_dispatch(*a, **k):
         order.append("dispatch")
@@ -199,7 +214,11 @@ def test_select_job_records_before_the_switch_and_compensates_after(client, monk
         ("z", "HiRes", 33.0, "zwide"),
     ]
     assert result["success"]
-    assert result["objective_compensation"]["applied_translation_um"] == [10.0, -6.0, 3.0]
+    assert result["objective_compensation"]["applied_translation_um"] == [
+        10.0,
+        -6.0,
+        3.0,
+    ]
 
 
 def test_select_job_on_an_unarmed_client_behaves_as_before(client, monkeypatch):
@@ -212,11 +231,18 @@ def test_select_job_on_an_unarmed_client_behaves_as_before(client, monkeypatch):
     monkeypatch.setattr(
         cmds,
         "prepare_select_job",
-        lambda c, job: (None, {"api_baseline_name": "Overview", "api_said_selected": False}),
+        lambda c, job: (
+            None,
+            {"api_baseline_name": "Overview", "api_said_selected": False},
+        ),
     )
-    monkeypatch.setattr(cmds, "select_job_confirm_legs", lambda *a, **k: (None, None, 0.0))
     monkeypatch.setattr(
-        cmds, "_dispatch", lambda *a, **k: {"success": True, "confirmed": True, "logs": []}
+        cmds, "select_job_confirm_legs", lambda *a, **k: (None, None, 0.0)
+    )
+    monkeypatch.setattr(
+        cmds,
+        "_dispatch",
+        lambda *a, **k: {"success": True, "confirmed": True, "logs": []},
     )
 
     result = cmds.select_job(client, "HiRes")
@@ -224,7 +250,9 @@ def test_select_job_on_an_unarmed_client_behaves_as_before(client, monkeypatch):
     assert "objective_compensation" not in result
 
 
-def test_set_objective_records_before_and_compensates_with_the_commanded_slot(client, monkeypatch):
+def test_set_objective_records_before_and_compensates_with_the_commanded_slot(
+    client, monkeypatch
+):
     install_permissive_limits(client)
     _arm(client)
     order = []
@@ -237,7 +265,9 @@ def test_set_objective_records_before_and_compensates_with_the_commanded_slot(cl
     monkeypatch.setattr(
         cmds,
         "_dispatch",
-        lambda *a, **k: order.append("dispatch") or {"success": True, "confirmed": True},
+        lambda *a, **k: (
+            order.append("dispatch") or {"success": True, "confirmed": True}
+        ),
     )
     monkeypatch.setattr(
         cmds,
@@ -269,7 +299,11 @@ def test_set_objective_records_before_and_compensates_with_the_commanded_slot(cl
         ("z", "Overview", 33.0, "zwide"),
     ]
     assert result["success"]
-    assert result["objective_compensation"]["applied_translation_um"] == [10.0, -6.0, 3.0]
+    assert result["objective_compensation"]["applied_translation_um"] == [
+        10.0,
+        -6.0,
+        3.0,
+    ]
 
 
 class TestCompensateParameter:
@@ -321,16 +355,16 @@ class TestSingleSourcedDelta:
 
     def test_sign_convention_is_to_minus_from(self):
         from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.optical_calibration import (
-    model,
-)
+            model,
+        )
 
         assert model.translation_delta_um(TRANSLATIONS, 1, 2) == (10.0, -6.0, 3.0)
         assert model.translation_delta_um(TRANSLATIONS, 2, 1) == (-10.0, 6.0, -3.0)
 
     def test_uncovered_pair_raises_the_one_shared_message(self):
         from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.optical_calibration import (
-    model,
-)
+            model,
+        )
 
         with pytest.raises(RuntimeError, match="no calibration translation covers"):
             model.translation_delta_um(TRANSLATIONS, 1, 5)
@@ -343,8 +377,8 @@ class TestSingleSourcedDelta:
         the same lens pair. Swap-then-move-to-F therefore lands exactly
         where move-to-F-alone would."""
         from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.zmart_adapter import (
-    zmart_adapter as adapter,
-)
+            zmart_adapter as adapter,
+        )
 
         _arm(client)
         slot = {"value": 1}

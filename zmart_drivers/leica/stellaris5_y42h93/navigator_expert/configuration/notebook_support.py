@@ -29,7 +29,7 @@ class NotebookCheckpoint:
         display(
             Markdown(
                 '<div style="color: #c00000; background: #fff1f1; '
-                'border: 2px solid #c00000; border-radius: 4px; '
+                "border: 2px solid #c00000; border-radius: 4px; "
                 'padding: 12px; font-size: 1.25em; font-weight: 700;">'
                 "Press save (Ctrl+S) to save the notebook."
                 "</div>"
@@ -59,7 +59,11 @@ class NotebookCheckpoint:
             notebook = json.loads(self.path.read_text(encoding="utf-8"))
         except (OSError, ValueError):
             return False
-        code_cells = [cell for cell in notebook.get("cells", []) if cell.get("cell_type") == "code"]
+        code_cells = [
+            cell
+            for cell in notebook.get("cells", [])
+            if cell.get("cell_type") == "code"
+        ]
         return all(
             any(
                 marker in "".join(cell.get("source", []))
@@ -109,7 +113,9 @@ def archive_notebook(
     source = Path(notebook_path)
     relative_dir = Path(directory)
     if relative_dir.is_absolute() or ".." in relative_dir.parts:
-        raise ValueError(f"notebook archive directory must stay within the session: {directory}")
+        raise ValueError(
+            f"notebook archive directory must stay within the session: {directory}"
+        )
     notebook_dir = Path(root) / relative_dir
     notebook_dir.mkdir(parents=True, exist_ok=True)
     destination = notebook_dir / (filename or source.name)

@@ -85,8 +85,8 @@ CI_DEFAULT_POSITION_UM = {
 def _register_adapter() -> Any:
     """Return the adapter module, whose seams the --mock mode swaps out."""
     from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.zmart_adapter import (
-    zmart_adapter as adapter,
-)
+        zmart_adapter as adapter,
+    )
 
     return adapter
 
@@ -127,27 +127,34 @@ class _ReportingSession:
 
         def command(*args: Any, **kwargs: Any) -> Any:
             answer = attribute(*args, **kwargs)
-            if not isinstance(answer, dict) or not {"success", "content"} <= answer.keys():
+            if (
+                not isinstance(answer, dict)
+                or not {"success", "content"} <= answer.keys()
+            ):
                 raise RuntimeError(
                     f"{name} did not answer in the controller's shape "
                     f"{{'success': ..., 'content': ...}}; it returned {answer!r}"
                 )
             if answer["success"] is not True:
-                raise RuntimeError(f"{name} reported success={answer['success']!r}: {answer!r}")
+                raise RuntimeError(
+                    f"{name} reported success={answer['success']!r}: {answer!r}"
+                )
             return answer["content"]
 
         return command
 
 
-def _connect_session(args: argparse.Namespace, adapter: Any, output_root: str | None) -> Any:
+def _connect_session(
+    args: argparse.Namespace, adapter: Any, output_root: str | None
+) -> Any:
     """Open a controller Session for the leica instrument.
 
     In --mock mode the adapter's CAM connect is swapped for the in-process
     Python mock, so the whole controller -> adapter -> driver path runs offline.
     """
     from zmart_drivers.leica.stellaris5_y42h93.navigator_expert import (
-    zmart_controller_plugin as driver,
-)
+        zmart_controller_plugin as driver,
+    )
 
     inst = {"client": args.client_name}
     inst["api_delay_ms"] = args.api_delay_ms
@@ -173,7 +180,9 @@ def _connect_session(args: argparse.Namespace, adapter: Any, output_root: str | 
         # The mock has no LAS X log stream, so the default select-job
         # confirmation race would only ever time out waiting on log evidence
         # (same pinning as validate_hardware --mock).
-        profiles.STATE_READERS = replace(profiles.STATE_READERS, selected_job_confirm_source="api")
+        profiles.STATE_READERS = replace(
+            profiles.STATE_READERS, selected_job_confirm_source="api"
+        )
 
     return _ReportingSession(zmart_controller.ZmartController(driver, inst))
 
@@ -246,9 +255,16 @@ def phase_readonly(v: vh.Validator, sess: Any, args: argparse.Namespace) -> None
                     list(xyz[axis]),
                     ["position", "unit", "actuator", "actuators", "canvas"],
                 )
-                v.compare(f"get_xyz: {axis} used its default motor", xyz[axis]["actuator"],
-                          {"x": "motoric", "y": "motoric", "z": "z-wide"}[axis])
-                v.compare(f"get_xyz: {axis} unit is micrometer", xyz[axis]["unit"], "micrometer")
+                v.compare(
+                    f"get_xyz: {axis} used its default motor",
+                    xyz[axis]["actuator"],
+                    {"x": "motoric", "y": "motoric", "z": "z-wide"}[axis],
+                )
+                v.compare(
+                    f"get_xyz: {axis} unit is micrometer",
+                    xyz[axis]["unit"],
+                    "micrometer",
+                )
             # Every motor of each axis reports its own reading, under the
             # names get_actuators lists.
             v.compare(
@@ -287,7 +303,11 @@ def phase_readonly(v: vh.Validator, sess: Any, args: argparse.Namespace) -> None
             )
         if state is not None:
             selected_job = state["changeable"]["job"]
-            normal_jobs = [job.get("Name") for job in state["observed"].get("jobs", []) if job.get("Name")]
+            normal_jobs = [
+                job.get("Name")
+                for job in state["observed"].get("jobs", [])
+                if job.get("Name")
+            ]
             autofocus_jobs = {
                 job.get("Name")
                 for job in state["observed"].get("autofocus_jobs", [])
@@ -311,11 +331,15 @@ def phase_readonly(v: vh.Validator, sess: Any, args: argparse.Namespace) -> None
 
         info = v.callable("get_info", sess.get_info)
         if info is not None:
-            v.compare("get_info: has session_hash6", bool(info.get("session_hash6")), True)
+            v.compare(
+                "get_info: has session_hash6", bool(info.get("session_hash6")), True
+            )
             location = (info.get("setup") or {}).get("data_location") or {}
             v.compare("get_info: says where it saves", bool(location.get("says")), True)
             if not args.mock:
-                v.compare("get_info: the data location is set up", location.get("done"), True)
+                v.compare(
+                    "get_info: the data location is set up", location.get("done"), True
+                )
             v.compare(
                 "get_info: reports no template positions",
                 "tile_positions" in info or "focus_positions" in info,
@@ -357,7 +381,9 @@ def phase_ci_default_position(v: vh.Validator, sess: Any, drv: Any) -> bool:
     z-galvo cannot turn the Z-wide target negative.
     """
     with v.phase("hardware-CI default position"):
-        before = v.callable("ci default: read start", lambda: _raw_readings(sess.get_xyz()))
+        before = v.callable(
+            "ci default: read start", lambda: _raw_readings(sess.get_xyz())
+        )
         limits = v.callable("ci default: read limits", drv.get_stage_limits)
         if not before or not limits:
             return False
@@ -389,24 +415,34 @@ def phase_ci_default_position(v: vh.Validator, sess: Any, drv: Any) -> bool:
             ),
             v.command(
                 "ci default: move Z-wide",
-                lambda: drv.move_z(sess._handle.client, job, z_wide_um, unit="um", z_mode="zwide"),
+                lambda: drv.move_z(
+                    sess._handle.client, job, z_wide_um, unit="um", z_mode="zwide"
+                ),
                 context={"target_z_wide_um": z_wide_um, "non_negative": True},
             ),
             v.command(
                 "ci default: move Z-galvo",
-                lambda: drv.move_z(sess._handle.client, job, z_galvo_um, unit="um", z_mode="galvo"),
+                lambda: drv.move_z(
+                    sess._handle.client, job, z_galvo_um, unit="um", z_mode="galvo"
+                ),
                 context={"target_z_galvo_um": z_galvo_um},
             ),
         )
         if any(not result or not result.get("success") for result in commands):
             return False
 
-        after = v.callable("ci default: readback", lambda: _raw_readings(sess.get_xyz()))
+        after = v.callable(
+            "ci default: readback", lambda: _raw_readings(sess.get_xyz())
+        )
         if not after:
             return False
         checks = [
-            v.compare("ci default: X readback", after.get("x_um"), x_um, tolerance=XY_TOL_UM),
-            v.compare("ci default: Y readback", after.get("y_um"), y_um, tolerance=XY_TOL_UM),
+            v.compare(
+                "ci default: X readback", after.get("x_um"), x_um, tolerance=XY_TOL_UM
+            ),
+            v.compare(
+                "ci default: Y readback", after.get("y_um"), y_um, tolerance=XY_TOL_UM
+            ),
             v.compare(
                 "ci default: Z-wide readback",
                 after.get("z_wide_um"),
@@ -456,7 +492,9 @@ def _restore(
     )
 
 
-def _forget_validator_origin(v: vh.Validator, sess: Any, record: dict | None, saved: dict) -> None:
+def _forget_validator_origin(
+    v: vh.Validator, sess: Any, record: dict | None, saved: dict
+) -> None:
     """Undo the validator's own set_origin, on disk and in the session.
 
     ``set_origin`` saves a new origin record, and the newest record is what
@@ -512,9 +550,15 @@ def phase_move(
             )
             f = v.callable("get_xyz after set_origin", sess.get_xyz)
             if f is not None:
-                v.compare("origin: frame x -> 0", f["x"]["position"], 0.0, tolerance=XY_TOL_UM)
-                v.compare("origin: frame y -> 0", f["y"]["position"], 0.0, tolerance=XY_TOL_UM)
-                v.compare("origin: frame z -> 0", f["z"]["position"], 0.0, tolerance=Z_TOL_UM)
+                v.compare(
+                    "origin: frame x -> 0", f["x"]["position"], 0.0, tolerance=XY_TOL_UM
+                )
+                v.compare(
+                    "origin: frame y -> 0", f["y"]["position"], 0.0, tolerance=XY_TOL_UM
+                )
+                v.compare(
+                    "origin: frame z -> 0", f["z"]["position"], 0.0, tolerance=Z_TOL_UM
+                )
 
             # XY leg: hold focus via the galvo (keeps z-wide untouched on the sim).
             v.callable(
@@ -539,7 +583,9 @@ def phase_move(
             )
             f = v.callable("get_xyz after z-galvo", sess.get_xyz)
             if f is not None:
-                v.compare("zgalvo: frame z", f["z"]["position"], dzg, tolerance=Z_TOL_UM)
+                v.compare(
+                    "zgalvo: frame z", f["z"]["position"], dzg, tolerance=Z_TOL_UM
+                )
                 v.compare(
                     "zgalvo: drive moved by delta (sign check)",
                     f["z"]["actuators"]["z-galvo"] - orig["z_galvo_um"],
@@ -556,7 +602,9 @@ def phase_move(
             # z-wide leg (gated): focus target dzg+dzw via z-wide; galvo holds.
             zw_target = orig["z_wide_um"] + dzw
             zw_lo, zw_hi = limits["z_wide_min"], limits["z_wide_max"]
-            if _within(orig["z_wide_um"], zw_lo, zw_hi) and _within(zw_target, zw_lo, zw_hi):
+            if _within(orig["z_wide_um"], zw_lo, zw_hi) and _within(
+                zw_target, zw_lo, zw_hi
+            ):
                 total = dzg + dzw
                 v.callable(
                     "set_xyz: z-wide move",
@@ -623,7 +671,11 @@ def phase_state(v: vh.Validator, sess: Any) -> None:
         if not captured:
             return
         original = captured["changeable"]["job"]
-        names = [job.get("Name") for job in captured["observed"].get("jobs", []) if job.get("Name")]
+        names = [
+            job.get("Name")
+            for job in captured["observed"].get("jobs", [])
+            if job.get("Name")
+        ]
         autofocus_names = {
             job.get("Name")
             for job in captured["observed"].get("autofocus_jobs", [])
@@ -639,11 +691,17 @@ def phase_state(v: vh.Validator, sess: Any) -> None:
             return
 
         other = next(
-            (name for name in names if name != original and name not in autofocus_names),
+            (
+                name
+                for name in names
+                if name != original and name not in autofocus_names
+            ),
             None,
         )
         if other is None:
-            v.skip("state: switch", "no other normal acquisition job on this instrument")
+            v.skip(
+                "state: switch", "no other normal acquisition job on this instrument"
+            )
             return
         v.callable(
             "set_state: switch job",
@@ -651,7 +709,9 @@ def phase_state(v: vh.Validator, sess: Any) -> None:
             context={"to": other, "from": original},
             mutating=True,
         )
-        after = v.callable("get_state: after switch (settled)", lambda: _get_state_settled(sess))
+        after = v.callable(
+            "get_state: after switch (settled)", lambda: _get_state_settled(sess)
+        )
         if after:
             v.compare("state: switched", after["changeable"]["job"], other)
         v.callable(
@@ -690,9 +750,13 @@ def phase_autofocus(v: vh.Validator, sess: Any) -> None:
                 isinstance(result.get("focus_um"), (int, float)),
                 True,
             )
-        after = v.callable("get_state: after autofocus (settled)", lambda: _get_state_settled(sess))
+        after = v.callable(
+            "get_state: after autofocus (settled)", lambda: _get_state_settled(sess)
+        )
         if after:
-            v.compare("autofocus: selection restored", after["changeable"]["job"], before)
+            v.compare(
+                "autofocus: selection restored", after["changeable"]["job"], before
+            )
 
 
 def phase_acquire(v: vh.Validator, sess: Any, args: argparse.Namespace) -> None:
@@ -733,7 +797,9 @@ def phase_acquire(v: vh.Validator, sess: Any, args: argparse.Namespace) -> None:
                 lambda: vh.embedded_ome_xml(images[0]),
             )
             if embedded is not None:
-                v.compare("acquire: image carries embedded OME-XML", b"<OME" in embedded, True)
+                v.compare(
+                    "acquire: image carries embedded OME-XML", b"<OME" in embedded, True
+                )
         v.compare("acquire: the whole job ran", rec.get("trigger"), "full")
 
 
@@ -744,19 +810,29 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
-    p.add_argument("--mock", action="store_true", help="in-process Python mock (no LAS X)")
+    p.add_argument(
+        "--mock", action="store_true", help="in-process Python mock (no LAS X)"
+    )
     p.add_argument("--mock-latency", type=float, default=0.0)
     p.add_argument("--client-name", default="PythonClient")
     p.add_argument("--api-delay-ms", type=int, default=None)
 
     # phase gates
-    p.add_argument("--read-only", action="store_true", help="skip all move/state/acquire phases")
-    p.add_argument("--allow-move", action="store_true", help="set_origin + set_xyz round-trip")
     p.add_argument(
-        "--allow-state", action="store_true", help="get/set_state round-trip (switches jobs)"
+        "--read-only", action="store_true", help="skip all move/state/acquire phases"
     )
     p.add_argument(
-        "--allow-autofocus", action="store_true", help="run the autofocus procedure once"
+        "--allow-move", action="store_true", help="set_origin + set_xyz round-trip"
+    )
+    p.add_argument(
+        "--allow-state",
+        action="store_true",
+        help="get/set_state round-trip (switches jobs)",
+    )
+    p.add_argument(
+        "--allow-autofocus",
+        action="store_true",
+        help="run the autofocus procedure once",
     )
     p.add_argument("--allow-acquire", action="store_true", help="one capture+save")
     p.add_argument(
@@ -776,7 +852,9 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p.add_argument("--z-galvo-delta-um", type=float, default=2.0)
 
     # acquire
-    p.add_argument("--output-root", default=None, help="where acquire writes (default: temp)")
+    p.add_argument(
+        "--output-root", default=None, help="where acquire writes (default: temp)"
+    )
 
     # output + gating
     p.add_argument("--output", default=None, help="JSONL output path; '-' for stdout")
@@ -787,14 +865,20 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "(hardware_run_report_<YYYYMMDD-HHMMSS>.md; default: working directory)",
     )
     p.add_argument("--strict-confirmation", action="store_true")
-    p.add_argument("--yes", action="store_true", help="skip the interactive confirm before writes")
+    p.add_argument(
+        "--yes", action="store_true", help="skip the interactive confirm before writes"
+    )
     p.add_argument(
         "--allow-missing-lasx",
         action="store_true",
         help="record SKIP instead of FAIL when the CAM cannot connect",
     )
-    p.add_argument("--log-level", default="INFO", choices=["DEBUG", "INFO", "WARNING", "ERROR"])
-    p.add_argument("--state-reader-mode", choices=["api", "log", "hybrid"], default=None)
+    p.add_argument(
+        "--log-level", default="INFO", choices=["DEBUG", "INFO", "WARNING", "ERROR"]
+    )
+    p.add_argument(
+        "--state-reader-mode", choices=["api", "log", "hybrid"], default=None
+    )
     return p.parse_args(argv)
 
 
@@ -838,7 +922,10 @@ def main(argv: list[str] | None = None) -> int:
             sess = _connect_session(args, adapter, output_root)
         except Exception as exc:  # noqa: BLE001 -- .NET interop / missing LAS X
             if args.allow_missing_lasx:
-                v.skip("client: connect", f"could not connect ({type(exc).__name__}: {exc})")
+                v.skip(
+                    "client: connect",
+                    f"could not connect ({type(exc).__name__}: {exc})",
+                )
             else:
                 v.fail("client: connect", f"{type(exc).__name__}: {exc}")
             return v.exit_code()

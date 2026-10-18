@@ -52,7 +52,11 @@ def load(folder: Path):
     readings = {}
     for reader in READERS:
         path = folder / f"readings_{reader}.jsonl"
-        readings[reader] = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+        readings[reader] = [
+            json.loads(line)
+            for line in path.read_text(encoding="utf-8").splitlines()
+            if line.strip()
+        ]
     return run, readings
 
 
@@ -70,35 +74,53 @@ def report(folder: Path) -> str:
 
     # --- at rest
     section("Readers at rest")
-    lines.append("| Reader | Rounds | Failed rounds | Values without an answer | One round, ms (median / p95 / max) |")
+    lines.append(
+        "| Reader | Rounds | Failed rounds | Values without an answer | One round, ms (median / p95 / max) |"
+    )
     lines.append("|---|---|---|---|---|")
     rest = {r: between(readings[r], marks["rest"], marks["end"]) for r in READERS}
     for r in READERS:
         rows = rest[r]
         failed = [x for x in rows if x["error"]]
-        empty = sum(1 for x in rows if x["values"] for v in x["values"].values() if v is None)
+        empty = sum(
+            1 for x in rows if x["values"] for v in x["values"].values() if v is None
+        )
         values = sum(len(x["values"]) for x in rows if x["values"])
-        lines.append(f"| {r} | {len(rows)} | {len(failed)} | {empty} of {values} | {quantiles([x['s'] for x in rows if not x['error']])} |")
-    errors = {r: sorted({x["error"][:90] for x in rest[r] if x["error"]}) for r in READERS}
+        lines.append(
+            f"| {r} | {len(rows)} | {len(failed)} | {empty} of {values} | {quantiles([x['s'] for x in rows if not x['error']])} |"
+        )
+    errors = {
+        r: sorted({x["error"][:90] for x in rest[r] if x["error"]}) for r in READERS
+    }
     for r, found in errors.items():
         for e in found:
             lines.append(f"\n- {r} failed: `{e}`")
 
     section("Agreement at rest: each reader's last reading against the direct reader's")
-    last = {r: next((x["values"] for x in reversed(rest[r]) if x["values"]), None) for r in READERS}
+    last = {
+        r: next((x["values"] for x in reversed(rest[r]) if x["values"]), None)
+        for r in READERS
+    }
     lines.append("| Reading | direct | api | log |")
     lines.append("|---|---|---|---|")
     for datum in TOLERANCE:
         values = [None if last[r] is None else last[r].get(datum) for r in READERS]
         marked = [
-            f"{v}" if i == 0 or values[0] is None or shows(datum, v, values[0]) else f"**{v}**"
+            f"{v}"
+            if i == 0 or values[0] is None or shows(datum, v, values[0])
+            else f"**{v}**"
             for i, v in enumerate(values)
         ]
         lines.append(f"| {datum} | " + " | ".join(marked) + " |")
     lines.append("\nA value in bold differs from the direct reader's.")
     found = problems(folder)
     section("Check")
-    lines.extend([f"- {p}" for p in found] or ["No problems: every reader answered, and the CAM API agrees with the direct reader."])
+    lines.extend(
+        [f"- {p}" for p in found]
+        or [
+            "No problems: every reader answered, and the CAM API agrees with the direct reader."
+        ]
+    )
     return "\n".join(lines) + "\n"
 
 
@@ -125,15 +147,21 @@ def problems(folder: Path) -> list[str]:
             found.append(f"{r}: no reading while LAS X was at rest")
         failed = [x for x in rest[r] if x["error"]]
         if failed:
-            found.append(f"{r}: {len(failed)} of {len(rest[r])} readings failed, e.g. {failed[0]['error'][:120]}")
+            found.append(
+                f"{r}: {len(failed)} of {len(rest[r])} readings failed, e.g. {failed[0]['error'][:120]}"
+            )
     direct = next((x["values"] for x in reversed(rest["direct"]) if x["values"]), None)
     api = next((x["values"] for x in reversed(rest["api"]) if x["values"]), None)
     if direct and api:
         for datum in TOLERANCE:
             if datum in NOT_COMPARED:
                 continue
-            if direct.get(datum) is None or not shows(datum, api.get(datum), direct[datum]):
-                found.append(f"{datum}: the CAM API says {api.get(datum)!r}, the direct reader {direct.get(datum)!r}")
+            if direct.get(datum) is None or not shows(
+                datum, api.get(datum), direct[datum]
+            ):
+                found.append(
+                    f"{datum}: the CAM API says {api.get(datum)!r}, the direct reader {direct.get(datum)!r}"
+                )
     return found
 
 

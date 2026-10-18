@@ -94,7 +94,12 @@ class SimulatedScope:
             self.y += SWAP_DRIFT[1]
 
     def configure_stack(self, begin: float, end: float, sections: int = 11) -> None:
-        self.stack = {"begin": begin, "end": end, "sections": sections, "zDrive": "z-wide"}
+        self.stack = {
+            "begin": begin,
+            "end": end,
+            "sections": sections,
+            "zDrive": "z-wide",
+        }
 
     # -- physics -----------------------------------------------------------
     def focal_plane(self) -> float:
@@ -120,7 +125,10 @@ def _install_simulator(monkeypatch, machine) -> SimulatedScope:
     sim = SimulatedScope()
     drv = cm.drv  # objective-pair workflow modules import the same driver module
 
-    monkeypatch.setattr("zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.store.MACHINE", machine)
+    monkeypatch.setattr(
+        "zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.store.MACHINE",
+        machine,
+    )
     monkeypatch.setattr(drv, "connect_python_client", lambda *a, **k: object())
     monkeypatch.setattr(
         drv,
@@ -171,7 +179,9 @@ def _install_simulator(monkeypatch, machine) -> SimulatedScope:
             "pixels_y": IMAGE_SHAPE[0],
         },
     )
-    monkeypatch.setattr(drv, "get_xy", lambda client, **kw: {"x_um": sim.x, "y_um": sim.y})
+    monkeypatch.setattr(
+        drv, "get_xy", lambda client, **kw: {"x_um": sim.x, "y_um": sim.y}
+    )
 
     def _move_xy(client, x, y, unit="um", **kw):
         sim.x, sim.y = float(x), float(y)
@@ -184,8 +194,12 @@ def _install_simulator(monkeypatch, machine) -> SimulatedScope:
 
     monkeypatch.setattr(drv, "move_xy", _move_xy)
     monkeypatch.setattr(drv, "move_z", _move_z)
-    monkeypatch.setattr(drv, "read_zwide_um", lambda client, job_name, **kw: float(sim.zwide))
-    monkeypatch.setattr(cm._movement, "correct_backlash", lambda client, *, passes, **kw: None)
+    monkeypatch.setattr(
+        drv, "read_zwide_um", lambda client, job_name, **kw: float(sim.zwide)
+    )
+    monkeypatch.setattr(
+        cm._movement, "correct_backlash", lambda client, *, passes, **kw: None
+    )
 
     # Acquisition: render real pixels from the scene, write real TIFFs, and
     # let the real load/fit/register code consume them.
@@ -225,7 +239,11 @@ def _install_simulator(monkeypatch, machine) -> SimulatedScope:
 def _notebook_cells() -> dict[str, str]:
     """Load the real notebook and key its code cells by workflow step."""
     notebook = json.loads(NOTEBOOK_PATH.read_text(encoding="utf-8"))
-    sources = ["".join(cell["source"]) for cell in notebook["cells"] if cell["cell_type"] == "code"]
+    sources = [
+        "".join(cell["source"])
+        for cell in notebook["cells"]
+        if cell["cell_type"] == "code"
+    ]
     markers = {
         "configure": "objective_pair.start_session",
         "parfocality_ref": "measure_parfocality_reference",
@@ -257,7 +275,9 @@ def notebook_runtime(monkeypatch, tmp_path):
     # notebook path to the adopt callback (archiving then copies the real file).
     fake_bootstrap = types.ModuleType("_bootstrap")
     fake_bootstrap.NOTEBOOK_PATH = NOTEBOOK_PATH
-    fake_bootstrap.NOTEBOOK = SimpleNamespace(save_and_adopt=lambda fn: fn(str(NOTEBOOK_PATH)))
+    fake_bootstrap.NOTEBOOK = SimpleNamespace(
+        save_and_adopt=lambda fn: fn(str(NOTEBOOK_PATH))
+    )
     monkeypatch.setitem(sys.modules, "_bootstrap", fake_bootstrap)
 
     cells = _notebook_cells()
@@ -276,7 +296,11 @@ def notebook_runtime(monkeypatch, tmp_path):
 
 
 def test_notebook_cells_reconstruct_ground_truth_on_simulated_scope(notebook_runtime):
-    sim, machine, run = notebook_runtime.sim, notebook_runtime.machine, notebook_runtime.run
+    sim, machine, run = (
+        notebook_runtime.sim,
+        notebook_runtime.machine,
+        notebook_runtime.run,
+    )
 
     # Configure: reference objective in, roughly focused, stack around it.
     run("configure")

@@ -33,10 +33,14 @@ VALUES = {
 
 def write_run(folder, *, direct=None, api=None, log=None):
     folder.mkdir(parents=True, exist_ok=True)
-    (folder / "benchmark.json").write_text(json.dumps({"job": "HiRes", "marks": {"rest": 10, "end": 20}}))
+    (folder / "benchmark.json").write_text(
+        json.dumps({"job": "HiRes", "marks": {"rest": 10, "end": 20}})
+    )
     for name, rows in (("direct", direct), ("api", api), ("log", log)):
         rows = rows if rows is not None else [reading(15, dict(VALUES))]
-        (folder / f"readings_{name}.jsonl").write_text("\n".join(json.dumps(r) for r in rows))
+        (folder / f"readings_{name}.jsonl").write_text(
+            "\n".join(json.dumps(r) for r in rows)
+        )
     return folder
 
 
@@ -50,7 +54,9 @@ def test_a_failed_reading_at_rest_is_a_problem(tmp_path):
 
 
 def test_a_reading_before_the_rest_does_not_count(tmp_path):
-    folder = write_run(tmp_path, direct=[reading(5, None, "starting"), reading(15, dict(VALUES))])
+    folder = write_run(
+        tmp_path, direct=[reading(5, None, "starting"), reading(15, dict(VALUES))]
+    )
     assert benchmark_report.problems(folder) == []
 
 
@@ -65,7 +71,9 @@ def test_the_cam_apis_z_galvo_is_not_compared(tmp_path):
 
 
 def test_the_log_may_have_no_answer_for_a_value(tmp_path):
-    folder = write_run(tmp_path, log=[reading(15, {**VALUES, "zoom": None, "xy": None})])
+    folder = write_run(
+        tmp_path, log=[reading(15, {**VALUES, "zoom": None, "xy": None})]
+    )
     assert benchmark_report.problems(folder) == []
 
 

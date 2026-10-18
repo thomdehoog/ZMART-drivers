@@ -63,7 +63,9 @@ class TestCorrectBacklash:
             raise AssertionError("at= was given; the position read must not run")
 
         with (
-            patch.object(stage_movement._readers, "get_xy", side_effect=forbidden_get_xy),
+            patch.object(
+                stage_movement._readers, "get_xy", side_effect=forbidden_get_xy
+            ),
             patch.object(stage_movement._commands, "move_xy", side_effect=fake_move_xy),
             patch.object(stage_movement.time, "sleep"),
         ):
@@ -123,10 +125,14 @@ class TestCorrectBacklash:
             ),
             patch.object(stage_movement._commands, "move_xy", side_effect=fake_move_xy),
             patch.object(
-                stage_movement.time, "sleep", side_effect=lambda s: calls.append(("sleep", s))
+                stage_movement.time,
+                "sleep",
+                side_effect=lambda s: calls.append(("sleep", s)),
             ),
         ):
-            stage_movement.correct_backlash(client=None, overshoot_um=50.0, settle_ms=100)
+            stage_movement.correct_backlash(
+                client=None, overshoot_um=50.0, settle_ms=100
+            )
 
         pass_moves = [("move", 50.0, 150.0), ("sleep", 0.1), ("move", 100.0, 200.0)]
         boundary = [("sleep", 0.1)]
@@ -149,7 +155,9 @@ class TestCorrectBacklash:
                 return_value={"x_um": 0.0, "y_um": 0.0},  # at the target (0, 0)
             ),
             patch.object(
-                stage_movement._commands, "move_xy", side_effect=lambda *a, **k: next(results)
+                stage_movement._commands,
+                "move_xy",
+                side_effect=lambda *a, **k: next(results),
             ),
             patch.object(stage_movement.time, "sleep"),
         ):
@@ -172,10 +180,14 @@ class TestCorrectBacklash:
         )
         with (
             patch.object(
-                stage_movement._readers, "get_xy", side_effect=lambda *a, **k: next(readings)
+                stage_movement._readers,
+                "get_xy",
+                side_effect=lambda *a, **k: next(readings),
             ),
             patch.object(
-                stage_movement._commands, "move_xy", side_effect=lambda *a, **k: next(results)
+                stage_movement._commands,
+                "move_xy",
+                side_effect=lambda *a, **k: next(results),
             ),
             patch.object(stage_movement.time, "sleep"),
         ):
@@ -193,10 +205,14 @@ class TestCorrectBacklash:
         )
         with (
             patch.object(
-                stage_movement._readers, "get_xy", side_effect=lambda *a, **k: next(readings)
+                stage_movement._readers,
+                "get_xy",
+                side_effect=lambda *a, **k: next(readings),
             ),
             patch.object(
-                stage_movement._commands, "move_xy", side_effect=lambda *a, **k: next(results)
+                stage_movement._commands,
+                "move_xy",
+                side_effect=lambda *a, **k: next(results),
             ),
             patch.object(stage_movement.time, "sleep"),
         ):

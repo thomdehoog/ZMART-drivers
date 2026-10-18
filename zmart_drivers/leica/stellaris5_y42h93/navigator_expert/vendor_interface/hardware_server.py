@@ -75,7 +75,9 @@ def read_hardware_z_um(drive: str) -> float:
     rather than returning anything that is not a fresh position.
     """
     if drive not in Z_PROPERTY:
-        raise ValueError(f"no z drive {drive!r}; the hardware server knows {sorted(Z_PROPERTY)}")
+        raise ValueError(
+            f"no z drive {drive!r}; the hardware server knows {sorted(Z_PROPERTY)}"
+        )
     name = Z_PROPERTY[drive]
     for attempt in ("kept connection", "fresh connection"):
         try:
@@ -89,6 +91,12 @@ def read_hardware_z_um(drive: str) -> float:
                 raise HardwareServerUnavailable(
                     f"the hardware server did not answer {name}: {why}"
                 ) from why
-    if isinstance(metres, bool) or not isinstance(metres, (int, float)) or not math.isfinite(metres):
-        raise HardwareServerUnavailable(f"the hardware server answered {name} = {metres!r}")
+    if (
+        isinstance(metres, bool)
+        or not isinstance(metres, (int, float))
+        or not math.isfinite(metres)
+    ):
+        raise HardwareServerUnavailable(
+            f"the hardware server answered {name} = {metres!r}"
+        )
     return float(metres) * 1e6

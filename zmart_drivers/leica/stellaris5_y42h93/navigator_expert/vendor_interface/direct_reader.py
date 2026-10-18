@@ -47,7 +47,11 @@ from __future__ import annotations
 import json
 import math
 
-from .hardware_server import HardwareServerUnavailable, connected_server, forget_connection
+from .hardware_server import (
+    HardwareServerUnavailable,
+    connected_server,
+    forget_connection,
+)
 from .state_tree import (
     SCAN_STATES,
     STAGE_PATHS,
@@ -113,7 +117,10 @@ def settings(what, paths):
     """The values of the nodes at *paths* (a dict of name -> path), read in one go."""
 
     def reading(nodes):
-        return {name: node_value(nodes, node_at(nodes, path)) for name, path in paths.items()}
+        return {
+            name: node_value(nodes, node_at(nodes, path))
+            for name, path in paths.items()
+        }
 
     return read(what, reading)
 
@@ -131,7 +138,11 @@ def session_facts(what, paths):
 
 
 def metres(value, what):
-    if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
+    if (
+        isinstance(value, bool)
+        or not isinstance(value, (int, float))
+        or not math.isfinite(value)
+    ):
         raise HardwareServerUnavailable(f"the state tree answered {what} = {value!r}")
     return float(value)
 
@@ -140,8 +151,12 @@ def get_xy() -> dict:
     """The stage position, shaped as :func:`api_reader.get_xy` gives it: metres and micrometres."""
 
     def reading(nodes):
-        x = metres(node_value(nodes, node_at(nodes, STAGE_PATHS["x"])), "Stage/PositionX")
-        y = metres(node_value(nodes, node_at(nodes, STAGE_PATHS["y"])), "Stage/PositionY")
+        x = metres(
+            node_value(nodes, node_at(nodes, STAGE_PATHS["x"])), "Stage/PositionX"
+        )
+        y = metres(
+            node_value(nodes, node_at(nodes, STAGE_PATHS["y"])), "Stage/PositionY"
+        )
         return {"x": x, "y": y, "x_um": x * 1e6, "y_um": y * 1e6}
 
     return read("the stage position", reading)
@@ -195,7 +210,9 @@ def read_z_um(drive: str) -> float:
     job's z-stack, whose job settings stop refreshing.
     """
     if drive not in Z_USE_MODE:
-        raise ValueError(f"no z drive {drive!r}; the direct reader knows {sorted(Z_USE_MODE)}")
+        raise ValueError(
+            f"no z drive {drive!r}; the direct reader knows {sorted(Z_USE_MODE)}"
+        )
 
     def reading(nodes):
         return metres(node_value(nodes, z_drive_node(nodes, drive)), drive) * 1e6
@@ -215,13 +232,21 @@ def get_scan_status() -> str:
     ``Unknown``, which the routed readers count as no answer, as the CAM
     API's.
     """
-    state = settings("the scan status", {"state": ("Acquire", "AcquisitionState")})["state"]
-    return SCAN_STATES[state] if isinstance(state, int) and 0 <= state < len(SCAN_STATES) else "Unknown"
+    state = settings("the scan status", {"state": ("Acquire", "AcquisitionState")})[
+        "state"
+    ]
+    return (
+        SCAN_STATES[state]
+        if isinstance(state, int) and 0 <= state < len(SCAN_STATES)
+        else "Unknown"
+    )
 
 
 def get_scan_mode() -> str:
     """The scan mode (``xyz``, ``xyt`` ...), as the job settings' ``scanMode``."""
-    return settings("the scan mode", {"mode": ("Acquire", "ScanDimensionList", "ScanModeName")})["mode"]
+    return settings(
+        "the scan mode", {"mode": ("Acquire", "ScanDimensionList", "ScanModeName")}
+    )["mode"]
 
 
 def get_zoom() -> dict:
@@ -300,7 +325,9 @@ def get_objective() -> dict:
             )
         return turret[slot] | {
             "slotIndex": slot,
-            "motCorrPos": node_value(nodes, node_at(nodes, ("Microscope", "CurrentMotCorrPos"))),
+            "motCorrPos": node_value(
+                nodes, node_at(nodes, ("Microscope", "CurrentMotCorrPos"))
+            ),
         }
 
     return read("the objective", reading)
@@ -350,7 +377,9 @@ def get_z_stack() -> dict | None:
         return None
     drives = {code: drive for drive, code in Z_USE_MODE.items()}
     if found["mode"] not in drives:
-        raise HardwareServerUnavailable(f"the state tree names z-stack drive {found['mode']!r}")
+        raise HardwareServerUnavailable(
+            f"the state tree names z-stack drive {found['mode']!r}"
+        )
     begin = metres(found["begin"], "BeginValue") * 1e6
     end = metres(found["end"], "EndValue") * 1e6
     return {
@@ -375,7 +404,9 @@ def light_layout(nodes, node, kids):
         sources.append(
             {
                 "name": node_value(nodes, named(nodes, source, "LightSourceName")),
-                "route": beam_route(node_value(nodes, named(nodes, source, "BeamRoute"))),
+                "route": beam_route(
+                    node_value(nodes, named(nodes, source, "BeamRoute"))
+                ),
                 "lasers": [
                     (
                         node_value(nodes, named(nodes, laser, "LaserName")),
@@ -383,10 +414,14 @@ def light_layout(nodes, node, kids):
                         node_value(nodes, named(nodes, laser, "WavelengthMax")),
                     )
                     for laser in of_name(
-                        nodes, children(nodes, named(nodes, source, "LaserList")), "Laser"
+                        nodes,
+                        children(nodes, named(nodes, source, "LaserList")),
+                        "Laser",
                     )
                 ],
-                "shutter": named(nodes, named(nodes, source, "Shutter"), "IsShutterActive"),
+                "shutter": named(
+                    nodes, named(nodes, source, "Shutter"), "IsShutterActive"
+                ),
                 "lines": [
                     (
                         named(nodes, line, "WaveLength"),
@@ -404,7 +439,11 @@ def light_layout(nodes, node, kids):
 
 def beam_route(value):
     """LAS X's beam route as the CAM API and the log write it: ``(10, 30)`` is ``"10;30"``."""
-    return ";".join(str(part) for part in value) if isinstance(value, (tuple, list)) else str(value)
+    return (
+        ";".join(str(part) for part in value)
+        if isinstance(value, (tuple, list))
+        else str(value)
+    )
 
 
 def laser_of_line(lasers, index):
@@ -509,19 +548,25 @@ def get_bit_depth() -> int:
 def get_serial_number() -> str:
     """The instrument's serial number, as the hardware info's ``SerialNumber``."""
     return session_facts(
-        "the serial number", {"serial": ("Acquire", "ActiveDataSource", "CurrentSerialNumber")}
+        "the serial number",
+        {"serial": ("Acquire", "ActiveDataSource", "CurrentSerialNumber")},
     )["serial"]
 
 
 def get_microscope_stand() -> str:
     """The microscope stand's name, as the hardware info's ``Microscope.name``."""
-    return session_facts("the microscope stand", {"stand": ("Microscope", "CurrentMicStandName")})["stand"]
+    return session_facts(
+        "the microscope stand", {"stand": ("Microscope", "CurrentMicStandName")}
+    )["stand"]
 
 
 def objective_layout(nodes, node, kids):
     """Per slot, in order: each of :data:`OBJECTIVE_FIELDS`, read once (the turret is fixed for a session)."""
     return [
-        {key: node_value(nodes, named(nodes, info, field)) for key, field in OBJECTIVE_FIELDS.items()}
+        {
+            key: node_value(nodes, named(nodes, info, field))
+            for key, field in OBJECTIVE_FIELDS.items()
+        }
         for info in of_name(nodes, kids, "ObjectiveInfo")
     ]
 
@@ -532,7 +577,9 @@ def get_objectives() -> list[dict]:
     def reading(nodes):
         return [
             objective | {"slotIndex": slot}
-            for slot, objective in enumerate(layout(nodes, OBJECTIVES, objective_layout))
+            for slot, objective in enumerate(
+                layout(nodes, OBJECTIVES, objective_layout)
+            )
         ]
 
     return read("the objectives", reading)
@@ -574,7 +621,13 @@ DETECTION = ("Confocal", "SpectralDetection")
 DETECTOR_TYPES = {3: "PMT", 4: "HyD", 6: "SiPM"}
 
 #: Per detector, what is fixed for a session (read once, with the layout).
-FIXED_DETECTOR_FIELDS = ("Name", "BeamRoute", "Type", "CanDoPhotonCounting", "WaveLengthRangeMin")
+FIXED_DETECTOR_FIELDS = (
+    "Name",
+    "BeamRoute",
+    "Type",
+    "CanDoPhotonCounting",
+    "WaveLengthRangeMin",
+)
 
 #: Per detector, what can change (read every time): whether it is in use, its band, dye, gain and offset.
 CHANGING_DETECTOR_FIELDS = (
@@ -595,9 +648,14 @@ def detection_layout(nodes, node, kids):
     """
     return [
         {
-            "fixed": {field: node_value(nodes, named(nodes, unit, field)) for field in FIXED_DETECTOR_FIELDS},
+            "fixed": {
+                field: node_value(nodes, named(nodes, unit, field))
+                for field in FIXED_DETECTOR_FIELDS
+            },
             "active": named(nodes, unit, "IsActive"),
-            "changing": {field: named(nodes, unit, field) for field in CHANGING_DETECTOR_FIELDS},
+            "changing": {
+                field: named(nodes, unit, field) for field in CHANGING_DETECTOR_FIELDS
+            },
         }
         for spectrophotometer in of_name(nodes, kids, "Spectrophotometer")
         for unit in of_name(
@@ -620,7 +678,11 @@ def get_detectors() -> list[dict]:
 
     def reading(nodes):
         in_use = [
-            unit["fixed"] | {field: node_value(nodes, value) for field, value in unit["changing"].items()}
+            unit["fixed"]
+            | {
+                field: node_value(nodes, value)
+                for field, value in unit["changing"].items()
+            }
             for unit in layout(nodes, DETECTION, detection_layout)
             if node_value(nodes, unit["active"])
         ]
@@ -662,7 +724,9 @@ def get_detection_units() -> list[dict]:
                 "CanDoPhotonCounting": unit["CanDoPhotonCounting"],
                 "MinDetectionBandpassWidth": unit["WaveLengthRangeMin"],
             }
-            for unit in (each["fixed"] for each in layout(nodes, DETECTION, detection_layout))
+            for unit in (
+                each["fixed"] for each in layout(nodes, DETECTION, detection_layout)
+            )
         ]
 
     return read("the detection units", reading)
@@ -698,9 +762,14 @@ def installed_filter_wheels():
     """Every wheel's type and filter names, then the multi-function port's: fixed for a session."""
 
     def reading(nodes):
-        return [{"type": w["type"], "names": w["names"]} for w in layout(nodes, FILTER_WHEELS, wheel_layout)]
+        return [
+            {"type": w["type"], "names": w["names"]}
+            for w in layout(nodes, FILTER_WHEELS, wheel_layout)
+        ]
 
-    port = session_facts("the multi-function port", {"names": (*HARDWARE, "MultiFunctionPortNameList")})
+    port = session_facts(
+        "the multi-function port", {"names": (*HARDWARE, "MultiFunctionPortNameList")}
+    )
     return read("the filter wheels", reading) + [
         {"type": MULTI_FUNCTION_PORT, "names": list(port["names"] or ())}
     ]
@@ -721,8 +790,13 @@ def get_filter_wheels() -> list[dict]:
     """
 
     def reading(nodes):
-        return [node_value(nodes, wheel["slot"]) for wheel in layout(nodes, FILTER_WHEELS, wheel_layout)] + [
-            node_value(nodes, node_at(nodes, (*HARDWARE, "CurrentMultiFunctionPortPos")))
+        return [
+            node_value(nodes, wheel["slot"])
+            for wheel in layout(nodes, FILTER_WHEELS, wheel_layout)
+        ] + [
+            node_value(
+                nodes, node_at(nodes, (*HARDWARE, "CurrentMultiFunctionPortPos"))
+            )
         ]
 
     slots = read("the filter wheels", reading)
@@ -753,9 +827,20 @@ def get_light_sources() -> list[dict]:
             for _wavelength, line_index, _intensity in source["lines"]:
                 name, low, high = laser_of_line(source["lasers"], line_index)
                 lines.append(
-                    {"LaserName": name, "Index": line_index, "MinWavelength": low, "MaxWavelength": high}
+                    {
+                        "LaserName": name,
+                        "Index": line_index,
+                        "MinWavelength": low,
+                        "MaxWavelength": high,
+                    }
                 )
-            sources.append({"name": source["name"], "BeamRoute": source["route"], "LaserLines": lines})
+            sources.append(
+                {
+                    "name": source["name"],
+                    "BeamRoute": source["route"],
+                    "LaserLines": lines,
+                }
+            )
         return sources
 
     return read("the light sources", reading)
@@ -772,12 +857,18 @@ def get_base_fov() -> tuple[float, float]:
         },
     )
     zoom = float(found["zoom"] or 1)
-    return metres(found["x"], "ImageSizeX") * zoom, metres(found["y"], "ImageSizeY") * zoom
+    return metres(found["x"], "ImageSizeX") * zoom, metres(
+        found["y"], "ImageSizeY"
+    ) * zoom
 
 
 def get_afc_installed() -> bool:
     """Whether the instrument has adaptive focus control, as the hardware info's ``Microscope.AfcInstalled``."""
-    return bool(session_facts("AFC", {"afc": ("Confocal", "ServiceOnlyParameter", "CanDoAFC")})["afc"])
+    return bool(
+        session_facts("AFC", {"afc": ("Confocal", "ServiceOnlyParameter", "CanDoAFC")})[
+            "afc"
+        ]
+    )
 
 
 def ping() -> bool:
@@ -830,13 +921,17 @@ def server_answer(command: str, what: str) -> dict:
         raise
     except Exception as why:  # noqa: BLE001 -- the connection is suspect: drop it, raise the one error
         forget_connection()
-        raise HardwareServerUnavailable(f"the hardware server did not answer {what}: {why}") from why
+        raise HardwareServerUnavailable(
+            f"the hardware server did not answer {what}: {why}"
+        ) from why
     if not answer.startswith('<Result Error="">'):
         raise HardwareServerUnavailable(f"LAS X refused {what}: {answer[:200]}")
     try:
         return json.loads(answer[answer.index(">") + 1 : answer.rindex("<")])
     except ValueError as why:
-        raise HardwareServerUnavailable(f"LAS X's answer to {what} is not JSON: {answer[:200]}") from why
+        raise HardwareServerUnavailable(
+            f"LAS X's answer to {what} is not JSON: {answer[:200]}"
+        ) from why
 
 
 def get_job_settings(job_name) -> dict:
@@ -865,4 +960,6 @@ def get_job_settings(job_name) -> dict:
 
 def get_hardware_info() -> dict:
     """The instrument, whole: LAS X's description of it, in the JSON the CAM API gives too."""
-    return server_answer('<Scanner Command="GetConfocalHardwareInfoAsJson"/>', "the hardware info")
+    return server_answer(
+        '<Scanner Command="GetConfocalHardwareInfoAsJson"/>', "the hardware info"
+    )

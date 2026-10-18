@@ -64,7 +64,10 @@ _T0 = time.monotonic()
 
 
 def _say(text: str) -> None:
-    print(f"[{time.monotonic() - _T0:7.2f}s] {text}   [threads alive: {threading.active_count()}]", flush=True)
+    print(
+        f"[{time.monotonic() - _T0:7.2f}s] {text}   [threads alive: {threading.active_count()}]",
+        flush=True,
+    )
 
 
 def _time_readings() -> None:
@@ -102,7 +105,10 @@ def _time_slow_calls() -> None:
                 took = time.monotonic() - started
                 if took > SLOW_S:
                     short = module.__name__.rsplit(".", 1)[-1]
-                    print(f"  [{started - _T0:7.2f}s] SLOW {short}.{name} took {took:5.2f}s", flush=True)
+                    print(
+                        f"  [{started - _T0:7.2f}s] SLOW {short}.{name} took {took:5.2f}s",
+                        flush=True,
+                    )
 
         setattr(module, name, timed)
 
@@ -115,15 +121,23 @@ def _time_slow_calls() -> None:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--yes", action="store_true", help="the stage is clear; move and switch")
-    parser.add_argument("--moves", type=int, default=10, help="moves in the burst (default 10)")
+    parser.add_argument(
+        "--yes", action="store_true", help="the stage is clear; move and switch"
+    )
+    parser.add_argument(
+        "--moves", type=int, default=10, help="moves in the burst (default 10)"
+    )
     args = parser.parse_args(argv)
     if not args.yes:
-        parser.error("pass --yes once the stage is clear: this probe moves the stage and switches jobs")
+        parser.error(
+            "pass --yes once the stage is clear: this probe moves the stage and switches jobs"
+        )
 
     _time_readings()
     _time_slow_calls()
-    connection = json.loads((_DRIVER_ROOT / "zmart_driver.json").read_text(encoding="utf-8"))
+    connection = json.loads(
+        (_DRIVER_ROOT / "zmart_driver.json").read_text(encoding="utf-8")
+    )
     driver = ZmartDriver(connection["connection"])
     try:
         _, (changeable, _) = driver.get_state()
@@ -136,7 +150,9 @@ def main(argv: list[str] | None = None) -> int:
         _say(f"--- burst: {args.moves} XY moves of 25 um, then back to the start")
         for index in range(args.moves):
             sign = -1 if index % 2 == 0 else 1
-            driver.set_xyz(x + sign * 25, y + sign * 25, z, with_actuators={"z": "z-galvo"})
+            driver.set_xyz(
+                x + sign * 25, y + sign * 25, z, with_actuators={"z": "z-galvo"}
+            )
         driver.set_xyz(x, y, z, with_actuators={"z": "z-galvo"})
         _say("--- moves done; get_state, as the validator does before it switches")
         driver.get_state()

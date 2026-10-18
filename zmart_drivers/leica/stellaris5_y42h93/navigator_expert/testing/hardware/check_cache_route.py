@@ -44,35 +44,66 @@ from pathlib import Path
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--job", default=None, help="the LAS X job to capture (default: the one selected in LAS X)")
-    parser.add_argument("--label", required=True, help="a name for this check, e.g. hires-16bit")
-    parser.add_argument("--save-to", default=None, help="a folder instead of the set-up data location")
-    parser.add_argument("--report-dir", default=".", help="where the report is written (default: here)")
+    parser.add_argument(
+        "--job",
+        default=None,
+        help="the LAS X job to capture (default: the one selected in LAS X)",
+    )
+    parser.add_argument(
+        "--label", required=True, help="a name for this check, e.g. hires-16bit"
+    )
+    parser.add_argument(
+        "--save-to", default=None, help="a folder instead of the set-up data location"
+    )
+    parser.add_argument(
+        "--report-dir", default=".", help="where the report is written (default: here)"
+    )
     asked = parser.parse_args()
 
     import zarr
     from zmart_controller import ZmartController
 
     import zmart_drivers.leica.stellaris5_y42h93.navigator_expert.zmart_controller_plugin as driver
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.zmart_adapter import zmart_adapter as adapter
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.zmart_adapter import (
+        zmart_adapter as adapter,
+    )
 
-    report: dict = {"job": asked.job, "label": asked.label, "checks": {}, "metadata": {}}
+    report: dict = {
+        "job": asked.job,
+        "label": asked.label,
+        "checks": {},
+        "metadata": {},
+    }
     checks = report["checks"]
-    adapter.IMAGE_SAVE = replace(adapter.IMAGE_SAVE, format="ome-zarr", cleanup_cache=False)
-    session = ZmartController(driver, {"output_root": asked.save_to} if asked.save_to else {})
+    adapter.IMAGE_SAVE = replace(
+        adapter.IMAGE_SAVE, format="ome-zarr", cleanup_cache=False
+    )
+    session = ZmartController(
+        driver, {"output_root": asked.save_to} if asked.save_to else {}
+    )
     try:
-        chosen = session.set_state({"changeable": {"job": asked.job}}) if asked.job else {"success": True}
+        chosen = (
+            session.set_state({"changeable": {"job": asked.job}})
+            if asked.job
+            else {"success": True}
+        )
         report["job"] = session.get_state()["content"]["changeable"].get("job")
         if not chosen["success"]:
             report["error"] = f"the job was not selected: {chosen['content']}"
             return _finish(report, Path(asked.report_dir))
         state = session.get_state()["content"]
-        report["system"] = {k: v for k, v in (state.get("observed") or {}).items() if k in ("serial_number", "system_type", "stand")}
+        report["system"] = {
+            k: v
+            for k, v in (state.get("observed") or {}).items()
+            if k in ("serial_number", "system_type", "stand")
+        }
         here = session.get_xyz()["content"]
         session.set_xyz(*(float(here[axis]["position"]) for axis in "xyz"))
 
         started = time.perf_counter()
-        answer = session.acquire(position_label=re.sub(r"[^A-Za-z0-9_-]", "-", asked.label))
+        answer = session.acquire(
+            position_label=re.sub(r"[^A-Za-z0-9_-]", "-", asked.label)
+        )
         report["acquire_s"] = round(time.perf_counter() - started, 2)
         checks["captured and saved"] = bool(answer["success"])
         if not answer["success"]:
@@ -80,10 +111,16 @@ def main() -> int:
             return _finish(report, Path(asked.report_dir))
         record = answer["content"]
         stores = sorted({plane["path"] for plane in record["planes"]})
-        checks["one store for the capture"] = len(stores) == 1 and stores[0].endswith(".ome.zarr")
+        checks["one store for the capture"] = len(stores) == 1 and stores[0].endswith(
+            ".ome.zarr"
+        )
         store = Path(stores[0])
         level = zarr.open_group(str(store), mode="r")["0"][:]
-        report["store"] = {"path": str(store), "shape (t, c, z, y, x)": list(level.shape), "dtype": str(level.dtype)}
+        report["store"] = {
+            "path": str(store),
+            "shape (t, c, z, y, x)": list(level.shape),
+            "dtype": str(level.dtype),
+        }
 
         try:
             from ome_zarr_models.v05.image import Image
@@ -102,12 +139,17 @@ def main() -> int:
 
         report["laser power, as LAS X writes it"] = _laser_power(record)
         stack = level.shape[2] > 1
-        checks["projection beside the stack" if stack else "no projection for a single plane"] = (
-            bool(record.get("projections")) if stack else not record.get("projections")
-        )
-        checks["log beside the data"] = all(Path(p).is_file() for p in record.get("log", [])) and bool(record.get("log"))
+        checks[
+            "projection beside the stack"
+            if stack
+            else "no projection for a single plane"
+        ] = bool(record.get("projections")) if stack else not record.get("projections")
+        checks["log beside the data"] = all(
+            Path(p).is_file() for p in record.get("log", [])
+        ) and bool(record.get("log"))
         report["planes, as the driver answered"] = [
-            {k: plane.get(k) for k in ("c", "z", "x_um", "y_um", "z_um")} for plane in record["planes"]
+            {k: plane.get(k) for k in ("c", "z", "x_um", "y_um", "z_um")}
+            for plane in record["planes"]
         ]
         report["unconfirmed"] = record.get("unconfirmed")
         return _finish(report, Path(asked.report_dir))
@@ -144,33 +186,85 @@ def _described(ome) -> dict:
     detectors = {d.id: d for d in (instrument.detectors if instrument else [])}
     lasers = {laser.id: laser for laser in (instrument.lasers if instrument else [])}
     filters = {f.id: f for f in (instrument.filters if instrument else [])}
-    drives = {a.id: {m.k: m.value for m in a.value.ms} for a in (ome.structured_annotations.map_annotations if ome.structured_annotations else [])}
+    drives = {
+        a.id: {m.k: m.value for m in a.value.ms}
+        for a in (
+            ome.structured_annotations.map_annotations
+            if ome.structured_annotations
+            else []
+        )
+    }
     channels = []
     for channel in pixels.channels:
         detector = channel.detector_settings
         light = channel.light_source_settings
-        band = [filters[ref.id].transmittance_range for ref in (channel.light_path.emission_filters if channel.light_path else []) if ref.id in filters]
-        channels.append({
-            "name": channel.name, "dye": channel.fluor, "excitation nm": channel.excitation_wavelength,
-            "pinhole um": channel.pinhole_size,
-            "detector": detectors[detector.id].model if detector and detector.id in detectors else None,
-            "gain": detector.gain if detector else None, "offset": detector.offset if detector else None,
-            "laser": lasers[light.id].model if light and light.id in lasers else None,
-            "attenuation": light.attenuation if light else None,
-            "band nm": [(r.cut_in, r.cut_out) for r in band if r is not None],
-        })
-    objective = instrument.objectives[0] if instrument and instrument.objectives else None
+        band = [
+            filters[ref.id].transmittance_range
+            for ref in (
+                channel.light_path.emission_filters if channel.light_path else []
+            )
+            if ref.id in filters
+        ]
+        channels.append(
+            {
+                "name": channel.name,
+                "dye": channel.fluor,
+                "excitation nm": channel.excitation_wavelength,
+                "pinhole um": channel.pinhole_size,
+                "detector": detectors[detector.id].model
+                if detector and detector.id in detectors
+                else None,
+                "gain": detector.gain if detector else None,
+                "offset": detector.offset if detector else None,
+                "laser": lasers[light.id].model
+                if light and light.id in lasers
+                else None,
+                "attenuation": light.attenuation if light else None,
+                "band nm": [(r.cut_in, r.cut_out) for r in band if r is not None],
+            }
+        )
+    objective = (
+        instrument.objectives[0] if instrument and instrument.objectives else None
+    )
     return {
         "acquired": str(image.acquisition_date),
-        "size (x, y, z, c)": [pixels.size_x, pixels.size_y, pixels.size_z, pixels.size_c],
+        "size (x, y, z, c)": [
+            pixels.size_x,
+            pixels.size_y,
+            pixels.size_z,
+            pixels.size_c,
+        ],
         "type, significant bits": [str(pixels.type.value), pixels.significant_bits],
-        "pixel size um (x, y, z)": [pixels.physical_size_x, pixels.physical_size_y, pixels.physical_size_z],
-        "microscope": instrument.microscope.model_dump(exclude_none=True) if instrument and instrument.microscope else None,
-        "objective": objective.model_dump(include={"model", "nominal_magnification", "lens_na", "immersion", "correction"}) if objective else None,
+        "pixel size um (x, y, z)": [
+            pixels.physical_size_x,
+            pixels.physical_size_y,
+            pixels.physical_size_z,
+        ],
+        "microscope": instrument.microscope.model_dump(exclude_none=True)
+        if instrument and instrument.microscope
+        else None,
+        "objective": objective.model_dump(
+            include={
+                "model",
+                "nominal_magnification",
+                "lens_na",
+                "immersion",
+                "correction",
+            }
+        )
+        if objective
+        else None,
         "channels": channels,
         "planes": [
-            {"z": p.the_z, "c": p.the_c, "dt s": p.delta_t, "canvas x, y, z um": [p.position_x, p.position_y, p.position_z],
-             "drives": drives.get(p.annotation_refs[0].id) if p.annotation_refs else None}
+            {
+                "z": p.the_z,
+                "c": p.the_c,
+                "dt s": p.delta_t,
+                "canvas x, y, z um": [p.position_x, p.position_y, p.position_z],
+                "drives": drives.get(p.annotation_refs[0].id)
+                if p.annotation_refs
+                else None,
+            }
             for p in pixels.planes
         ],
         "facts": drives.get("Annotation:vendor-facts"),
@@ -179,26 +273,52 @@ def _described(ome) -> dict:
 
 def _laser_power(record: dict) -> list[dict]:
     """Each laser's power fields, from the capture's own setting in LAS X's description."""
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.output.lasx_description import image_of
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.output.lasx_description import (
+        image_of,
+    )
 
-    description = next((Path(p) for p in record.get("vendor_metadata", []) if p.endswith(".lasx-description.xml")), None)
+    description = next(
+        (
+            Path(p)
+            for p in record.get("vendor_metadata", [])
+            if p.endswith(".lasx-description.xml")
+        ),
+        None,
+    )
     if description is None or not description.is_file():
         return []
     image = image_of(description.read_text(encoding="utf-8"))
-    setting = image.find("./Attachment[@Name='HardwareSetting']/ATLConfocalSettingDefinition")
-    fields = ("LaserName", "Wavelength", "PowerState", "OutputPowerWatt", "OutputPowerPercentage")
+    setting = image.find(
+        "./Attachment[@Name='HardwareSetting']/ATLConfocalSettingDefinition"
+    )
+    fields = (
+        "LaserName",
+        "Wavelength",
+        "PowerState",
+        "OutputPowerWatt",
+        "OutputPowerPercentage",
+    )
     return [
         {key: laser.get(key) for key in fields if laser.get(key) is not None}
-        for laser in (setting.findall("./LaserArray/Laser") if setting is not None else [])
+        for laser in (
+            setting.findall("./LaserArray/Laser") if setting is not None else []
+        )
     ]
 
 
 def _finish(report: dict, folder: Path) -> int:
-    failed = [name for name, result in report["checks"].items() if result is False or str(result).startswith("NO")]
+    failed = [
+        name
+        for name, result in report["checks"].items()
+        if result is False or str(result).startswith("NO")
+    ]
     report["verdict"] = "ALL CHECKS PASSED" if not failed else f"FAILED: {failed}"
     out = folder / f"check_cache_route_{report['label']}.json"
     try:
-        out.write_text(json.dumps(report, indent=2, ensure_ascii=False, default=str), encoding="utf-8")
+        out.write_text(
+            json.dumps(report, indent=2, ensure_ascii=False, default=str),
+            encoding="utf-8",
+        )
     except OSError:
         out = None
     print(json.dumps(report, indent=2, ensure_ascii=False, default=str))

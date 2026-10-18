@@ -132,7 +132,12 @@ def _check_api_error(client):
         # Can't read Result enum
         if echo.HasError:
             error_msg = echo.Error if echo.Error else "(no message)"
-            return {"error": error_msg, "result": "Unknown", "result_code": -1, "details": details}
+            return {
+                "error": error_msg,
+                "result": "Unknown",
+                "result_code": -1,
+                "details": details,
+            }
         return None
 
     result_str = _RESULT_MAP.get(result_code, "Unknown")

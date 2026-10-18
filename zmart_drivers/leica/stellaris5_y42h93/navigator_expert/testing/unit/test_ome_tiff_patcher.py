@@ -65,7 +65,10 @@ def _embedded_xml(path):
 
 class TestExtractWavelengthFromId:
     def test_examples_from_docstring(self):
-        assert extract_wavelength_from_id("LightSource:499nm:SuperContVisible Light_0") == 499
+        assert (
+            extract_wavelength_from_id("LightSource:499nm:SuperContVisible Light_0")
+            == 499
+        )
         assert extract_wavelength_from_id("LightSource:405nm:UV Light_0") == 405
         assert extract_wavelength_from_id("LightSource:0") is None
 
@@ -182,7 +185,9 @@ class TestFixOmeXmlBytes:
 
 
 class TestFixOmeTiff:
-    @pytest.mark.parametrize("byteorder", ["<", ">"], ids=["little-endian", "big-endian"])
+    @pytest.mark.parametrize(
+        "byteorder", ["<", ">"], ids=["little-endian", "big-endian"]
+    )
     def test_repairs_in_place_with_pixels_intact(self, tmp_path, byteorder):
         p = _write_tiff(tmp_path / "img.ome.tif", BAD_OME_XML, byteorder=byteorder)
         pixels_before = tifffile.imread(p).copy()

@@ -49,7 +49,9 @@ _RE_LIGHTSOURCE_BLOCK = re.compile(
 )
 
 # Match <Laser ... Wavelength="0" ... />
-_RE_LASER_WAVELENGTH_ZERO = re.compile(r'(<Laser\b)([^/]*?)\bWavelength="0"([^/]*/\s*>)')
+_RE_LASER_WAVELENGTH_ZERO = re.compile(
+    r'(<Laser\b)([^/]*?)\bWavelength="0"([^/]*/\s*>)'
+)
 
 # Extract NNNnm from a LightSource ID string
 _RE_WAVELENGTH_NM = re.compile(r"(\d+)\s*nm", re.IGNORECASE)
@@ -196,7 +198,12 @@ def check_ome_tiff(path):
 
     xml_raw, _, _, _, endian_or_err = read_tiff_tag_270(data)
     if xml_raw is None:
-        return {"path": path, "corrupted": False, "violations": [], "error": endian_or_err}
+        return {
+            "path": path,
+            "corrupted": False,
+            "violations": [],
+            "error": endian_or_err,
+        }
 
     try:
         result = check_ome_xml_bytes(xml_raw)
@@ -273,7 +280,9 @@ def fix_ome_xml_bytes(xml_bytes):
 
         inferred_wl = extract_wavelength_from_id(ls_id)
         if inferred_wl is not None:
-            new_body = _RE_LASER_WAVELENGTH_ZERO.sub(rf'\1\2Wavelength="{inferred_wl}"\3', body)
+            new_body = _RE_LASER_WAVELENGTH_ZERO.sub(
+                rf'\1\2Wavelength="{inferred_wl}"\3', body
+            )
             changes.append(
                 f'LightSource "{ls_id}": '
                 f'Laser Wavelength="0" -> Wavelength="{inferred_wl}" '
@@ -282,7 +291,9 @@ def fix_ome_xml_bytes(xml_bytes):
         else:
             new_body = _RE_LASER_WAVELENGTH_ZERO.sub(
                 lambda lm: (
-                    lm.group(1) + re.sub(r'\s*Wavelength="0"', "", lm.group(2)) + lm.group(3)
+                    lm.group(1)
+                    + re.sub(r'\s*Wavelength="0"', "", lm.group(2))
+                    + lm.group(3)
                 ),
                 body,
             )
@@ -328,7 +339,9 @@ def fix_ome_tiff(input_path, output_path=None):
             "error": str(e),
         }
 
-    xml_raw, desc_offset, desc_count, desc_entry_pos, endian_or_err = read_tiff_tag_270(data)
+    xml_raw, desc_offset, desc_count, desc_entry_pos, endian_or_err = read_tiff_tag_270(
+        data
+    )
 
     if xml_raw is None:
         # No tag 270 — nothing to fix, not an error

@@ -82,7 +82,9 @@ def make_session_paths(
     # path on the rig and broke acquisition writes.
     root = Path(sessions_root).absolute()
     session_root = root / session_id
-    session_dir = session_root if acquisition_name is None else session_root / acquisition_name
+    session_dir = (
+        session_root if acquisition_name is None else session_root / acquisition_name
+    )
     paths = SessionPaths(
         session_root=session_root,
         session_dir=session_dir,
@@ -97,7 +99,9 @@ def make_session_paths(
         try:
             p.mkdir(parents=True, exist_ok=True)
         except OSError as exc:
-            raise RuntimeError(f"cannot create calibration session directory {p}: {exc}") from exc
+            raise RuntimeError(
+                f"cannot create calibration session directory {p}: {exc}"
+            ) from exc
     return paths
 
 
@@ -197,7 +201,9 @@ def move_zwide_and_verify(
     *,
     tolerance_um: float = 1.0,
 ) -> None:
-    result = drv.move_z(client, job_name, z_um, unit="um", z_mode="zwide", tolerance=tolerance_um)
+    result = drv.move_z(
+        client, job_name, z_um, unit="um", z_mode="zwide", tolerance=tolerance_um
+    )
     if not result or not result.get("success"):
         raise RuntimeError(f"move_z zwide failed: {result}")
     if result.get("confirmed") is not True:
@@ -238,7 +244,9 @@ def read_active_objective(
     objective = settings.get("objective") or {}
     slot = objective.get("slotIndex")
     if slot is None:
-        raise RuntimeError(f"could not read the active objective slot from job {job_name!r}")
+        raise RuntimeError(
+            f"could not read the active objective slot from job {job_name!r}"
+        )
     slot = int(slot)
     name = str(objective.get("name") or (known_names or {}).get(slot) or "").strip()
     if not name:
@@ -275,7 +283,9 @@ def acquire_frame_to(
     )
     img = _single_plane_image(saved, context=name)
     _idx, exported_path = next(iter(saved.image_paths.items()))
-    rel = str(Path(exported_path).relative_to(session.paths.session_dir)).replace("\\", "/")
+    rel = str(Path(exported_path).relative_to(session.paths.session_dir)).replace(
+        "\\", "/"
+    )
     session.raw_files[name] = rel
     session.exported_files[name] = str(exported_path)
     return img
@@ -316,7 +326,9 @@ def acquire_stack_to(
             "the export produced an unexpected layout."
         )
     for i, (_idx, slice_path) in enumerate(sorted(saved.image_paths.items())):
-        rel = str(Path(slice_path).relative_to(session.paths.session_dir)).replace("\\", "/")
+        rel = str(Path(slice_path).relative_to(session.paths.session_dir)).replace(
+            "\\", "/"
+        )
         session.raw_files[f"{dirname}/z_{i:03d}"] = rel
     session.exported_files[dirname] = ";".join(
         str(p) for _idx, p in sorted(saved.image_paths.items())
@@ -359,7 +371,9 @@ def _capture_for_calibration(
 
 def _single_plane_image(saved: Any, *, context: str) -> np.ndarray:
     if len(saved.image_paths) != 1:
-        raise ValueError(f"{context} expected one saved plane; got {len(saved.image_paths)}")
+        raise ValueError(
+            f"{context} expected one saved plane; got {len(saved.image_paths)}"
+        )
     _idx, path = next(iter(saved.image_paths.items()))
     img = np.asarray(tifffile.imread(path))
     if img.ndim == 3 and img.shape[0] == 1:
@@ -612,7 +626,9 @@ def plot_brenner_curve(
     else:
         fig, (ax, ax_img) = plt.subplots(1, 2, figsize=(16, 7))
     ax.plot(z_positions_um, scores, marker="o")
-    ax.axvline(peak_z_um, color="red", linestyle="--", label=f"peak z = {peak_z_um:.3f} um")
+    ax.axvline(
+        peak_z_um, color="red", linestyle="--", label=f"peak z = {peak_z_um:.3f} um"
+    )
     ax.set_xlabel("z-wide (um, absolute)")
     ax.set_ylabel("Brenner Gradient Score")
     ax.set_title("Software Autofocus")

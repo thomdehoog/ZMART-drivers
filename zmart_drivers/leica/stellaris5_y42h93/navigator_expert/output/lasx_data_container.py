@@ -59,7 +59,6 @@ DESCRIPTION = re.compile(r"V2LMSDC_OBJ(\d+)_([0-9a-fA-F]+)\.tmp")
 JOB = re.compile(r'<LDM_Block_Sequential\b[^>]*\bBlockName="([^"]*)"')
 
 
-
 def collect_lasx_data_container(
     client: Any,
     acq: AcquisitionResult,
@@ -105,7 +104,9 @@ def collect_lasx_data_container(
     number, pid = DESCRIPTION.fullmatch(path.name).groups()
     pixels = root / f"V2LMSDC_MMF{number}_0_{pid}.tmp"
     if not pixels.is_file():
-        raise RuntimeError(f"LAS X's cache has the description of {name} but not its pixels {pixels}")
+        raise RuntimeError(
+            f"LAS X's cache has the description of {name} but not its pixels {pixels}"
+        )
     # The description is the record of the capture itself, exact and from
     # the moment it was taken, so nothing is taken over from the job's
     # settings (which round the pixel size to two decimals).
@@ -120,7 +121,9 @@ def collect_lasx_data_container(
         source_exporter="lasx_data_container",
         release=functools.partial(cache_release.delete, int(number), name),
         vendor_metadata_sources=(
-            VendorMetadataSource(name=f"{name}.lasx-description.xml", data=xml.encode("utf-8")),
+            VendorMetadataSource(
+                name=f"{name}.lasx-description.xml", data=xml.encode("utf-8")
+            ),
         ),
     )
 
@@ -227,13 +230,17 @@ def planes_expected(xml: str) -> int:
     image = described.image_of(xml)
     channels = len(image.findall("./ImageDescription/Channels/ChannelDescription"))
     planes = 1
-    for dimension in image.findall("./ImageDescription/Dimensions/DimensionDescription"):
+    for dimension in image.findall(
+        "./ImageDescription/Dimensions/DimensionDescription"
+    ):
         if int(dimension.get("DimID", "0")) not in (described.X_AXIS, described.Y_AXIS):
             planes *= int(dimension.get("NumberOfElements", "1"))
     return channels * planes
 
 
-def layout(xml: str, pixels: Path) -> tuple[AcquisitionMetadata, dict[PlaneIndex, RawPlaneSource]]:
+def layout(
+    xml: str, pixels: Path
+) -> tuple[AcquisitionMetadata, dict[PlaneIndex, RawPlaneSource]]:
     """What the picture is, from its description, and where every plane is in the pixel file.
 
     Every size, step and start is the description's own; anything this
@@ -243,7 +250,11 @@ def layout(xml: str, pixels: Path) -> tuple[AcquisitionMetadata, dict[PlaneIndex
     image = described.image_of(xml)
     dims = described.axes(image)
     pixel_bytes = 1 if metadata.pixel_type == "uint8" else 2
-    nx, x_step, y_step = metadata.size_x, dims[described.X_AXIS]["step"], dims[described.Y_AXIS]["step"]
+    nx, x_step, y_step = (
+        metadata.size_x,
+        dims[described.X_AXIS]["step"],
+        dims[described.Y_AXIS]["step"],
+    )
     if x_step != pixel_bytes or y_step != nx * pixel_bytes:
         raise RuntimeError(
             f"the picture's rows are not packed {pixel_bytes}-byte pixels "

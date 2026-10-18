@@ -25,6 +25,8 @@ def write(output_root: Path | str, naming: Naming, entry: dict) -> Path:
     path = log_dir(output_root) / f"{naming.stem}.log.json"
     path.parent.mkdir(parents=True, exist_ok=True)
     writing = path.with_name(f"{path.name}.{uuid.uuid4().hex[:8]}.writing")
-    writing.write_text(json.dumps(entry, indent=2, ensure_ascii=False, default=str), encoding="utf-8")
+    writing.write_text(
+        json.dumps(entry, indent=2, ensure_ascii=False, default=str), encoding="utf-8"
+    )
     os.replace(writing, path)
     return path

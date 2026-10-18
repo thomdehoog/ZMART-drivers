@@ -95,14 +95,26 @@ class NullPointer:
 
 
 CHILDREN, DESCENDANTS = "children", "descendants"
-NAME, CLASS, AUTOMATION_ID, CONTROL_TYPE, BUTTON, TOGGLE = "name", "class", "id", "type", "button", "toggle"
+NAME, CLASS, AUTOMATION_ID, CONTROL_TYPE, BUTTON, TOGGLE = (
+    "name",
+    "class",
+    "id",
+    "type",
+    "button",
+    "toggle",
+)
 
 
 class StandInElement:
     """One element of LAS X's window: its properties and children; every search it answers is noted."""
 
     def __init__(self, searches, children=(), pattern=None, **properties):
-        self.searches, self.children, self.pattern, self.properties = searches, list(children), pattern, properties
+        self.searches, self.children, self.pattern, self.properties = (
+            searches,
+            list(children),
+            pattern,
+            properties,
+        )
 
     def matches(self, condition):
         if condition[0] == "and":
@@ -115,12 +127,18 @@ class StandInElement:
             yield from child.below()
 
     def FindFirst(self, scope, condition):
-        self.searches.append((self.properties.get(AUTOMATION_ID) or self.properties.get(CLASS), scope))
+        self.searches.append(
+            (self.properties.get(AUTOMATION_ID) or self.properties.get(CLASS), scope)
+        )
         candidates = self.children if scope == CHILDREN else self.below()
         return next((e for e in candidates if e.matches(condition)), NullPointer())
 
     def GetCurrentPattern(self, pattern_id):
-        return self.pattern if pattern_id == TOGGLE and self.pattern is not None else NullPointer()
+        return (
+            self.pattern
+            if pattern_id == TOGGLE and self.pattern is not None
+            else NullPointer()
+        )
 
 
 class StandInToggle:
@@ -140,9 +158,16 @@ class StandInToggle:
 
 class StandInAutomation:
     TreeScope_Children, TreeScope_Descendants = CHILDREN, DESCENDANTS
-    UIA_NamePropertyId, UIA_ClassNamePropertyId, UIA_AutomationIdPropertyId = NAME, CLASS, AUTOMATION_ID
+    UIA_NamePropertyId, UIA_ClassNamePropertyId, UIA_AutomationIdPropertyId = (
+        NAME,
+        CLASS,
+        AUTOMATION_ID,
+    )
     UIA_ControlTypePropertyId, UIA_ButtonControlTypeId = CONTROL_TYPE, BUTTON
-    UIA_TogglePatternId, IUIAutomationTogglePattern = TOGGLE, "IUIAutomationTogglePattern"
+    UIA_TogglePatternId, IUIAutomationTogglePattern = (
+        TOGGLE,
+        "IUIAutomationTogglePattern",
+    )
 
     def __init__(self, root):
         self.root = root
@@ -162,15 +187,25 @@ def las_x_window(searches, navigator_shown=True, canvas_appears=True):
 
     Pressing Experiment puts the canvas into the window, unless *canvas_appears* is False.
     """
+
     def e(children=(), pattern=None, **props):
         return StandInElement(searches, children, pattern, **props)
 
     clear = e(**{CONTROL_TYPE: BUTTON, NAME: "Clear"})
-    navigator = e([e([e([clear], **{CLASS: "StageOverviewActionBar"})], **{CLASS: "TabItem"})],
-                  **{CLASS: "ViewStageOverview", AUTOMATION_ID: "Navigator"})
-    tabs = [e([e([navigator], **{CLASS: "TabItem"})], **{CLASS: "TabControl", AUTOMATION_ID: "NavigatorTabControl"})]
-    start_screen = e(tabs if navigator_shown else [e(**{CLASS: "Grid"})],
-                     **{CLASS: "TabItem", AUTOMATION_ID: "WorkflowStartScreen"})
+    navigator = e(
+        [e([e([clear], **{CLASS: "StageOverviewActionBar"})], **{CLASS: "TabItem"})],
+        **{CLASS: "ViewStageOverview", AUTOMATION_ID: "Navigator"},
+    )
+    tabs = [
+        e(
+            [e([navigator], **{CLASS: "TabItem"})],
+            **{CLASS: "TabControl", AUTOMATION_ID: "NavigatorTabControl"},
+        )
+    ]
+    start_screen = e(
+        tabs if navigator_shown else [e(**{CLASS: "Grid"})],
+        **{CLASS: "TabItem", AUTOMATION_ID: "WorkflowStartScreen"},
+    )
 
     def show():
         if canvas_appears:
@@ -178,18 +213,54 @@ def las_x_window(searches, navigator_shown=True, canvas_appears=True):
 
     experiment = StandInToggle(navigator_shown, show)
     jobs = StandInToggle(not navigator_shown, lambda: None)
-    switch = e([e(pattern=jobs, **{CONTROL_TYPE: BUTTON, NAME: "Jobs"}),
-                e(pattern=experiment, **{CONTROL_TYPE: BUTTON, NAME: "Experiment"})],
-               **{CLASS: "ModuleSwitchBetweenLDMAndMatrixView"})
-    top = e([e([e([switch], **{CLASS: "TabItem", AUTOMATION_ID: "TabLDMAndMatrixSwitch"})],
-               **{CLASS: "TabControl", AUTOMATION_ID: "Tab"})],
-            **{CLASS: "ContainerTopView", AUTOMATION_ID: "TopModule"})
-    other_views = [e([e(**{CONTROL_TYPE: BUTTON, NAME: "Clear"})], **{CLASS: "TabItem", AUTOMATION_ID: "Acquire"})]
-    workflow = e([start_screen, *other_views], **{CLASS: "TabControl", AUTOMATION_ID: "WorkFlowBar"})
-    form = e([top, e([workflow], **{CLASS: "ContainerLDMMatrixView", AUTOMATION_ID: "LDMMatrix"})],
-             **{CLASS: "MainFormView"})
-    main = e([e([form], **{CLASS: "Pane", NAME: "AddIn"})], **{CLASS: "Window", NAME: "LAS X"})
-    return SimpleNamespace(root=e([main]), clear=clear, experiment=experiment, form=form)
+    switch = e(
+        [
+            e(pattern=jobs, **{CONTROL_TYPE: BUTTON, NAME: "Jobs"}),
+            e(pattern=experiment, **{CONTROL_TYPE: BUTTON, NAME: "Experiment"}),
+        ],
+        **{CLASS: "ModuleSwitchBetweenLDMAndMatrixView"},
+    )
+    top = e(
+        [
+            e(
+                [
+                    e(
+                        [switch],
+                        **{CLASS: "TabItem", AUTOMATION_ID: "TabLDMAndMatrixSwitch"},
+                    )
+                ],
+                **{CLASS: "TabControl", AUTOMATION_ID: "Tab"},
+            )
+        ],
+        **{CLASS: "ContainerTopView", AUTOMATION_ID: "TopModule"},
+    )
+    other_views = [
+        e(
+            [e(**{CONTROL_TYPE: BUTTON, NAME: "Clear"})],
+            **{CLASS: "TabItem", AUTOMATION_ID: "Acquire"},
+        )
+    ]
+    workflow = e(
+        [start_screen, *other_views],
+        **{CLASS: "TabControl", AUTOMATION_ID: "WorkFlowBar"},
+    )
+    form = e(
+        [
+            top,
+            e(
+                [workflow],
+                **{CLASS: "ContainerLDMMatrixView", AUTOMATION_ID: "LDMMatrix"},
+            ),
+        ],
+        **{CLASS: "MainFormView"},
+    )
+    main = e(
+        [e([form], **{CLASS: "Pane", NAME: "AddIn"})],
+        **{CLASS: "Window", NAME: "LAS X"},
+    )
+    return SimpleNamespace(
+        root=e([main]), clear=clear, experiment=experiment, form=form
+    )
 
 
 def stand_in(monkeypatch, root):
@@ -198,8 +269,17 @@ def stand_in(monkeypatch, root):
     lasx_navigator.forget()
 
 
-ABOVE_THE_TABS = {None, "Window", "AddIn", "MainFormView", "LDMMatrix", "WorkFlowBar", "WorkflowStartScreen", "Pane",
-                  "TopModule"}
+ABOVE_THE_TABS = {
+    None,
+    "Window",
+    "AddIn",
+    "MainFormView",
+    "LDMMatrix",
+    "WorkFlowBar",
+    "WorkflowStartScreen",
+    "Pane",
+    "TopModule",
+}
 
 
 def test_the_clear_button_is_found_along_the_navigators_path(monkeypatch):
@@ -210,7 +290,10 @@ def test_the_clear_button_is_found_along_the_navigators_path(monkeypatch):
 
 def test_a_navigator_not_shown_is_unavailable_and_named(monkeypatch):
     stand_in(monkeypatch, las_x_window([], navigator_shown=False).root)
-    with pytest.raises(lasx_navigator.NavigatorUnavailable, match="NavigatorTabControl.*is the Navigator shown"):
+    with pytest.raises(
+        lasx_navigator.NavigatorUnavailable,
+        match="NavigatorTabControl.*is the Navigator shown",
+    ):
         lasx_navigator.find_clear_button()
 
 
@@ -227,7 +310,9 @@ def test_the_window_is_never_searched_whole(monkeypatch, navigator_shown):
 
 def test_no_las_x_window_is_unavailable(monkeypatch):
     stand_in(monkeypatch, StandInElement([]))
-    with pytest.raises(lasx_navigator.NavigatorUnavailable, match="LAS X's window was not found"):
+    with pytest.raises(
+        lasx_navigator.NavigatorUnavailable, match="LAS X's window was not found"
+    ):
         lasx_navigator.find_clear_button()
 
 
@@ -240,25 +325,33 @@ class TestShowingTheCanvas:
         assert lasx_navigator.show_canvas() is False
         assert window.experiment.pressed == 0
 
-    def test_another_tab_shown_presses_experiment_and_arrives_at_the_canvas(self, monkeypatch):
+    def test_another_tab_shown_presses_experiment_and_arrives_at_the_canvas(
+        self, monkeypatch
+    ):
         window = las_x_window([], navigator_shown=False)
         stand_in(monkeypatch, window.root)
         assert lasx_navigator.show_canvas() is True
         assert window.experiment.pressed == 1
         assert lasx_navigator.find_clear_button().element is window.clear
 
-    def test_arriving_is_the_clear_button_reached_not_the_switch_pressed(self, monkeypatch):
+    def test_arriving_is_the_clear_button_reached_not_the_switch_pressed(
+        self, monkeypatch
+    ):
         # Experiment pressed, but the canvas never comes: unavailable after the window, said in words.
         monkeypatch.setattr(lasx_navigator.tuning, "WINDOW_S", 0.05)
         window = las_x_window([], navigator_shown=False, canvas_appears=False)
         stand_in(monkeypatch, window.root)
-        with pytest.raises(lasx_navigator.NavigatorUnavailable, match="Experiment was pressed.*canvas"):
+        with pytest.raises(
+            lasx_navigator.NavigatorUnavailable, match="Experiment was pressed.*canvas"
+        ):
             lasx_navigator.show_canvas()
         assert window.experiment.pressed == 1
 
     def test_no_switch_is_unavailable_and_named(self, monkeypatch):
         window = las_x_window([], navigator_shown=False)
-        window.form.children.pop(0)  # Navigator Expert's Jobs/Experiment bar is not there
+        window.form.children.pop(
+            0
+        )  # Navigator Expert's Jobs/Experiment bar is not there
         stand_in(monkeypatch, window.root)
         with pytest.raises(lasx_navigator.NavigatorUnavailable, match="Experiment"):
             lasx_navigator.show_canvas()
