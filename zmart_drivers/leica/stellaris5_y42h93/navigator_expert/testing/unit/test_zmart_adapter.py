@@ -157,8 +157,29 @@ class TestRegistration(unittest.TestCase):
         self.assertIn("disconnect", ops)
 
     def test_importing_the_adapter_registers_nothing(self):
+        """The adapter takes from the controller only the rules of acquire's two parameters.
+
+        The default acquisition type and what counts as a folder are the
+        controller's; called as a module, the adapter applies them itself.
+        It never installs, registers or connects anything.
+        """
+        import ast
+
         source = Path(adapter.__file__).read_text(encoding="utf-8")
-        self.assertNotIn("zmart_controller import", source)
+        taken = {
+            (node.module, alias.name)
+            for node in ast.walk(ast.parse(source))
+            if isinstance(node, ast.ImportFrom) and (node.module or "").startswith("zmart_controller")
+            for alias in node.names
+        }
+        self.assertEqual(
+            taken,
+            {
+                ("zmart_controller.zmart_controller", "acquisition_type_or_default"),
+                ("zmart_controller.zmart_controller", "output_folder_as_text"),
+            },
+        )
+        self.assertNotIn("register_driver", source)
 
     def test_set_origin_is_a_driver_step_not_a_controller_op(self):
         """The origin is driver configuration: the controller cannot set it."""
@@ -798,14 +819,14 @@ class TestAcquire(unittest.TestCase):
         self.assertEqual(
             Path(saved_root), Path("/tmp/out").resolve() / ".staging" / h.hash6
         )  # OS-agnostic separators
-        # Every file name starts with the label as the workflow gave it.
-        self.assertEqual(naming.stem, "prescan_a1b2c3_well-7")
+        # Every file name is the acquisition type, then the label as the workflow gave it.
+        self.assertEqual(naming.stem, "acquisition_prescan_a1b2c3_well-7")
         self.assertEqual(calls["lineage"]["position_label"], "prescan_a1b2c3_well-7")
-        self.assertEqual(calls["lineage"]["stem"], "prescan_a1b2c3_well-7")
+        self.assertEqual(calls["lineage"]["stem"], "acquisition_prescan_a1b2c3_well-7")
         self.assertEqual(calls["lineage"]["session_hash6"], h.hash6)
         # the machine/software state is captured and threaded into save()
         self.assertIsInstance(calls["state"], dict)
-        self.assertEqual(calls["state"]["provenance"]["stem"], "prescan_a1b2c3_well-7")
+        self.assertEqual(calls["state"]["provenance"]["stem"], "acquisition_prescan_a1b2c3_well-7")
         self.assertEqual(record["settle"], "direct")
         self.assertEqual(record["trigger"], "full")
         self.assertNotIn("folder", record)
@@ -881,6 +902,38 @@ class TestAcquire(unittest.TestCase):
         self.assertEqual(calls["save"]["projection"], adapter.IMAGE_SAVE.projection)
         self.assertIs(calls["save"]["cleanup_cache"], adapter.IMAGE_SAVE.cleanup_cache)
         self.assertEqual(record["format"], adapter.IMAGE_SAVE.format)
+
+    def test_the_capture_is_saved_in_the_output_folder_it_is_given(self):
+        """The driver writes the files itself (from LAS X's cache), so it saves where it is told.
+
+        The output folder replaces the session's staging folder under the
+        data location; nothing else about the capture changes.
+        """
+        h = _handle()
+        h.driven_to = {"x": 0.0, "y": 0.0, "z": 0.0, "z_wide_um": 0.0}
+        with self._capturing(output_root=None) as calls:
+            adapter.acquire(h, position_label="A1", output_folder="/runs/run-1")
+        self.assertEqual(calls["output_root"], Path("/runs/run-1"))
+
+    def test_the_acquisition_type_names_the_files_and_comes_back(self):
+        """The stem is the acquisition type, then the label; the log and the answer say the type."""
+        h = _handle()
+        h.driven_to = {"x": 0.0, "y": 0.0, "z": 0.0, "z_wide_um": 0.0}
+        with self._capturing() as calls:
+            record = adapter.acquire(h, position_label="well-7", acquisition_type="overview")
+        self.assertEqual(calls["save"]["lineage"]["stem"], "overview_well-7")
+        self.assertEqual(calls["save"]["lineage"]["acquisition_type"], "overview")
+        self.assertEqual(calls["log"]["acquisition_type"], "overview")
+        self.assertEqual(record["acquisition_type"], "overview")
+        self.assertEqual(record["position_label"], "well-7")
+
+    def test_without_a_type_the_capture_is_an_acquisition(self):
+        h = _handle()
+        h.driven_to = {"x": 0.0, "y": 0.0, "z": 0.0, "z_wide_um": 0.0}
+        with self._capturing() as calls:
+            record = adapter.acquire(h, position_label="A1")
+        self.assertEqual(calls["save"]["lineage"]["stem"], "acquisition_A1")
+        self.assertEqual(record["acquisition_type"], "acquisition")
 
     def test_letting_go_of_the_cache_follows_the_profile(self):
         """A capture read from LAS X's cache is let go of when the profile says so, never per capture."""
@@ -964,7 +1017,7 @@ class TestAcquire(unittest.TestCase):
         entry = calls["log"]
         self.assertEqual(entry["asked"], {"trigger": "full"})
         self.assertEqual(entry["settings"], {"trigger": "full"})
-        self.assertEqual(entry["stem"], "A1")
+        self.assertEqual(entry["stem"], "acquisition_A1")
         self.assertIn("started", entry["capture"])
         self.assertIn("finished", entry["capture"])
         self.assertEqual(
@@ -1219,7 +1272,9 @@ class TestAcquire(unittest.TestCase):
         # unlabeled acquires consume the per-session counter, zero-padded
         self.assertEqual(record0["position_label"], "000000")
         self.assertEqual(record1["position_label"], "000001")
-        self.assertEqual([naming.stem for naming in calls["namings"]], ["000000", "000001"])
+        self.assertEqual(
+            [naming.stem for naming in calls["namings"]], ["acquisition_000000", "acquisition_000001"]
+        )
 
     def test_a_label_already_staged_gets_the_next_free_stem(self):
         """No capture is ever overwritten: the same label again gets ``_001``."""
@@ -1227,13 +1282,13 @@ class TestAcquire(unittest.TestCase):
             h = _handle(connection={**adapter.CONNECTION, "output_root": tmp})
             staged = Path(tmp).resolve() / ".staging" / h.hash6 / "data"
             staged.mkdir(parents=True)
-            (staged / "A1_T000000_C00_Z00000.ome.tiff").write_bytes(b"the first capture")
+            (staged / "acquisition_A1_T000000_C00_Z00000.ome.tiff").write_bytes(b"the first capture")
             calls = {}
             with ExitStack() as standing_in:
                 for stand_in in self._fake_acquire_env(calls):
                     standing_in.enter_context(stand_in)
                 adapter.acquire(h, position_label="A1")
-        self.assertEqual(calls["namings"][0].stem, "A1_001")
+        self.assertEqual(calls["namings"][0].stem, "acquisition_A1_001")
 
     def test_without_a_selected_job_nothing_is_captured(self):
         """The job is state: a capture runs the selected one, and refuses when none can be read."""
@@ -1254,7 +1309,7 @@ class TestAcquire(unittest.TestCase):
                 standing_in.enter_context(stand_in)
             adapter.acquire(h, position_label="named")  # must not bump the counter
             record = adapter.acquire(h)  # still gets 000000
-        self.assertEqual(calls["namings"][0].stem, "named")
+        self.assertEqual(calls["namings"][0].stem, "acquisition_named")
         self.assertEqual(record["position_label"], "000000")
 
     def test_acquire_runs_backlash_correction_before_capture_when_enabled(self):

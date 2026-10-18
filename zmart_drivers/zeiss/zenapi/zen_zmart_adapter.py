@@ -49,6 +49,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from zmart_controller.zmart_controller import acquisition_type_or_default, output_folder_as_text
+
 from .acquisition.save import _wait_stable, zen_image_path
 from .calibration import machine as _machine
 from .commands import commands as _cmd
@@ -560,17 +562,27 @@ def canonical_stem(folder: str, position_label: str) -> str:
 
 
 def acquire(
-    handle: ZenHandle, *, position_label: str, acquisition_settings: dict | None = None
+    handle: ZenHandle,
+    *,
+    position_label: str,
+    acquisition_settings: dict | None = None,
+    acquisition_type: str | None = None,
+    output_folder: str | None = None,
 ) -> dict:
     """Acquire with the loaded ZEN experiment and bring the CZI into the output folder.
 
     A snap by default; the whole experiment (Z-stack, tiles, time series) when
-    ``mode`` is "experiment". ZEN writes ``<folder>_<label>.czi`` (or
-    ``<label>.czi`` with no folder) into its image folder; that file is then
-    copied to ``<output_root>/data/<folder>/`` (when the ZEN folder is
-    reachable from here). The record names both locations.
+    ``mode`` is "experiment". ZEN always writes the CZI into its own image
+    folder, as ``<type>_<folder>_<label>.czi`` (``<type>_<label>.czi`` with no
+    folder), where ``<type>`` is the acquisition type, ``acquisition`` when
+    none is given. The file is then copied to ``<output_folder>/<folder>/``,
+    or ``<output_root>/data/<folder>/`` when no output folder is given, when
+    the ZEN folder is reachable from here; otherwise it stays where ZEN put
+    it. ``files`` names where it is; the record names both locations.
     """
     _require_open(handle)
+    acquisition_type = acquisition_type_or_default(acquisition_type)
+    output_folder = output_folder_as_text(output_folder)
     options = dict(acquisition_settings or {})
     folder = options.get("folder") or ""
     if not isinstance(folder, str):
@@ -590,7 +602,7 @@ def acquire(
     timeout = float(options.get("timeout_s", 60.0))
 
     started = time.perf_counter()
-    output_name = canonical_stem(folder, position_label)
+    output_name = canonical_stem(acquisition_type, canonical_stem(folder, position_label))
     run = _cmd.run_snap if mode == "snap" else _cmd.run_experiment
     result = run(handle.client, handle.experiment, output_name=output_name)
     _raise_if_failed(result, "acquire")
@@ -600,7 +612,7 @@ def acquire(
     copied = False
     files = [str(zen_path)]
     if options.get("copy_to_output_root", True):
-        data_dir = handle.output_root / "data"
+        data_dir = Path(output_folder) if output_folder is not None else handle.output_root / "data"
         if folder:
             data_dir = data_dir / canonical_stem(folder, "")
         data_dir.mkdir(parents=True, exist_ok=True)
@@ -627,6 +639,7 @@ def acquire(
     position = _user_xyz(handle, _raw_xyz(handle.client))
     return {
         "position_label": position_label,
+        "acquisition_type": acquisition_type,
         "folder": folder,
         "format": "czi",
         "mode": mode,
@@ -736,6 +749,10 @@ def get_info(handle: ZenHandle) -> dict:
     return {
         "output_root": str(handle.output_root),
         "description": _described(handle, experiments),
+        # ZEN always writes the image into its own image folder; acquire
+        # copies it into the output folder only when it can reach ZEN's, and
+        # says where the file is.
+        "chooses_its_own_folder": True,
         "initial_position": dict(handle.initial_position),
         "limits": dict(handle.limits),
         "limits_file": str(handle.machine.limits_path()),

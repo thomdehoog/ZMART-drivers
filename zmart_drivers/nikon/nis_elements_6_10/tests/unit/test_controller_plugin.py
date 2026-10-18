@@ -126,3 +126,38 @@ def test_get_info_describes_the_microscope_in_plain_words(instrument):
     # The canvas is the travel NIS-Elements reports; see the adapter's _canvas.
     assert xyz["x"]["canvas"][1] == pytest.approx(57000.0)
     assert list(xyz["x"]) == ["position", "unit", "actuator", "actuators", "canvas"]
+
+
+def test_acquire_saves_in_the_output_folder_under_the_acquisition_type(instrument, tmp_path):
+    """NIS-Elements saves where the driver tells it to, so the driver saves where it is told."""
+    run = tmp_path / "run 1"
+    session = zmart_controller.ZmartController(driver, instrument)
+    try:
+        info = session.get_info()["content"]
+        answer = session.acquire(
+            position_label="A1", acquisition_type="overview", output_folder=str(run)
+        )
+    finally:
+        session.disconnect()
+
+    assert info["chooses_its_own_folder"] is False
+    content = answer["content"]
+    assert content["acquisition_type"] == "overview"
+    assert [Path(path) for path in content["files"]] == [run / "overview_A1.tif"]
+    assert Path(content["files"][0]).is_file()
+    assert zmart_controller.check_acquire_answer(answer, output_folder=str(run)) == []
+
+
+def test_acquire_without_a_type_or_folder_is_an_acquisition_in_the_data_folder(
+    instrument, tmp_path
+):
+    session = zmart_controller.ZmartController(driver, instrument)
+    try:
+        content = session.acquire(position_label="A1")["content"]
+    finally:
+        session.disconnect()
+
+    assert content["acquisition_type"] == "acquisition"
+    assert [Path(path) for path in content["files"]] == [
+        tmp_path / "out" / "data" / "acquisition_A1.tif"
+    ]

@@ -244,7 +244,7 @@ print(drv.get_config(client)["lasers"])            # [{'name':'488 nm','waveleng
 # 5. Capture and persist (two steps). The low-level acquire needs a folder/filename
 #    so the mesoSPIM image writer has somewhere to write.
 acq   = drv.acquire(client, "snap", options={"folder": "D:/runs/demo", "filename": "A1.tiff", "planes": 1})
-saved = drv.save(acq, "D:/runs/demo", position_label="A1")     # relocates the frames + a JSON sidecar
+saved = drv.save(acq, "D:/runs/demo/data", position_label="A1", acquisition_type="snap")   # relocates the frames + a JSON sidecar
 print(saved.image_paths)
 
 drv.close(client)
@@ -420,7 +420,7 @@ acquire(client, label="snap", *, options=None, state=None) -> AcquisitionResult 
 snap(client, *, options=None) -> AcquisitionResult                                            # single frame (planes=1)
 run_acquisition_list(client, acquisitions: list[dict]) -> dict                                # multi-tile/-channel
 build_acquisition(state: dict, options=None) -> dict                                          # compose an Acquisition dict
-save(acq, output_root, *, position_label, folder="", format="ome-tiff") -> SavedAcquisition   # relocate frames + JSON sidecar
+save(acq, data_dir, *, position_label, acquisition_type, folder="", format="ome-tiff") -> SavedAcquisition   # relocate frames + JSON sidecar
 canonical_stem(name) -> str
 ```
 `options` may set `folder`/`filename` (where the image writer writes — the controller path fills these in) and
@@ -430,7 +430,10 @@ only arrives once the run finishes, far beyond the default per-request timeout).
 `AcquisitionResult`, `AcquisitionMetadata`, `ChannelMetadata`, `SavedAcquisition` (`acquisition/product.py`).
 
 > `save()` takes **no client** — it just relocates the files the writer already produced, into
-> `<output_root>/data/` under a stable, collision-safe stem, with a JSON metadata sidecar. It does not
+> the folder it is given under a stable, collision-safe stem (`<acquisition_type>_<position_label>`),
+> with a JSON metadata sidecar. Through the controller that folder is the `output_folder` `acquire`
+> is given, or else `<output_root>/data/`; the driver copies the frames itself, so `get_info` says
+> `chooses_its_own_folder: False`. It does not
 > re-encode pixels (the OME rewrite is a documented seam; see [§12](#12-extending-the-driver)).
 
 ### Config & limits
@@ -467,7 +470,7 @@ zmart_drivers/mesospim/
 ├── readers/        readers.py   get_* reads + the Reading freshness gate
 ├── config/         profiles.py  CONNECTION/HARDWARE/ACQUISITION + CommandProfile instances (MOVE/MOVE_ROTATION/SET_STATE)
 ├── acquisition/    product.py   typed results     capture.py  build/acquire/snap/run_acquisition_list
-│                   save.py      relocate the writer's frames into <output_root>/data/ + JSON sidecar
+│                   save.py      relocate the writer's frames into the output folder + JSON sidecar
 │                   connection/scripts.py  the injected-script templates (the mesoSPIM vocabulary, client-side)
 ├── mesospim_zmart_adapter.py  ZMART controller adapter — one function per command (connect, set_xyz, acquire, get/set_state, …)
 ├── zmart_controller_plugin.py                  the module handed to zmart_controller.set_instrument

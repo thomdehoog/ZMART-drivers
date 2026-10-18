@@ -93,7 +93,7 @@ def test_acquire_saves_into_data_folder(handle, fake_api, tmp_path):
         position_label="tile 3/a",
         acquisition_settings={"folder": "overview", "optical_configuration": "FITC"},
     )
-    path = tmp_path / "out" / "data" / "overview" / "tile_3_a.tif"
+    path = tmp_path / "out" / "data" / "overview" / "acquisition_tile_3_a.tif"
     assert rec["files"] == [str(path)] and path.exists()
     assert "image_files" not in rec
     assert len(rec["planes"]) == 1 and fake_api.selected_configuration == "FITC"

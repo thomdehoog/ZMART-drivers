@@ -53,6 +53,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from zmart_controller.zmart_controller import acquisition_type_or_default, output_folder_as_text
+
 from .calibration import machine as _machine
 from .commands import commands as _cmd
 from .connection.session import close as _close
@@ -577,19 +579,28 @@ def canonical_stem(name: str) -> str:
 
 
 def acquire(
-    handle: NisHandle, *, position_label: str, acquisition_settings: dict | None = None
+    handle: NisHandle,
+    *,
+    position_label: str,
+    acquisition_settings: dict | None = None,
+    acquisition_type: str | None = None,
+    output_folder: str | None = None,
 ) -> dict:
     """Take one image (or a Z-stack) and save it; return the record.
 
     Optionally switches the optical configuration and sets the exposure first.
     Giving both ``z_start`` and ``z_end`` (um from the origin) takes a stack,
     spaced by ``z_step``; a stack is best saved as ``nd2`` so every plane and
-    all metadata survive. The file goes to
-    ``<output_root>/data/<folder>/<label>.<format>`` (straight into ``data``
-    when ``folder`` is empty), and the NIS window is closed afterwards by
-    default, so windows do not pile up during a scan.
+    all metadata survive. NIS-Elements saves to the path the driver names, so
+    the file goes to ``<output_folder>/<folder>/<type>_<label>.<format>``, or
+    ``<output_root>/data/<folder>/...`` when no output folder is given
+    (straight into it when ``folder`` is empty). ``<type>`` is the acquisition
+    type, ``acquisition`` when none is given. The NIS window is closed
+    afterwards by default, so windows do not pile up during a scan.
     """
     _require_open(handle)
+    acquisition_type = acquisition_type_or_default(acquisition_type)
+    output_folder = output_folder_as_text(output_folder)
     options = dict(acquisition_settings or {})
     fmt = str(options.get("format", "tif"))
     if fmt not in _cmd.SAVE_FORMATS:
@@ -636,17 +647,18 @@ def acquire(
     else:
         image = _cmd.capture(handle.client, timeout=timeout)
 
-    data_dir = handle.output_root / "data"
+    data_dir = Path(output_folder) if output_folder is not None else handle.output_root / "data"
     if folder:
         data_dir = data_dir / canonical_stem(folder)
     data_dir.mkdir(parents=True, exist_ok=True)
-    path = data_dir / f"{canonical_stem(position_label)}.{fmt}"
+    path = data_dir / f"{canonical_stem(f'{acquisition_type}_{position_label}')}.{fmt}"
     saved = _cmd.save_image(
         handle.client, str(path), format=fmt, close=bool(options.get("close_after_save", True))
     )
     position = _frame_xyz(handle, _readings(handle))
     return {
         "position_label": position_label,
+        "acquisition_type": acquisition_type,
         "folder": folder,
         "format": fmt,
         "planes": _planes(saved["path"], position, image, is_stack),
@@ -744,6 +756,9 @@ def get_info(handle: NisHandle) -> dict:
     return {
         "output_root": str(handle.output_root),
         "description": _described(handle, objectives),
+        # NIS-Elements saves to the path the driver names, so acquire saves
+        # in whatever output_folder it is given.
+        "chooses_its_own_folder": False,
         "initial_position": dict(handle.initial_position),
         "limits": dict(handle.limits),
         "objectives": objectives,

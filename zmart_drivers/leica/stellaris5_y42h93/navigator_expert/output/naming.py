@@ -36,9 +36,9 @@ def run_hash(start_time: float | None = None) -> str:
 class Naming:
     """The name of one capture's files: the workflow's stem, then which plane.
 
-    ``stem`` is what the workflow called the capture, given to ``acquire`` as
-    the position label, for example
-    ``overview_a1b2c3_K00_M000000_G000000_P000001_V00``. The driver adds only
+    ``stem`` is what the workflow called the capture: the acquisition type
+    and the position label ``acquire`` was given, for example
+    ``overview_K00_M000000_G000000_P000001_V00``. The driver adds only
     the time point, channel and plane (``t``, ``c``, ``z``), so a workflow
     names its files the same way on every microscope. Characters that cannot
     be in a file name become ``_``.

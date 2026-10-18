@@ -65,7 +65,7 @@ def test_full_round_trip(session, gateway, tmp_path):
     assert answer["success"] is True
     rec = answer["content"]
     assert rec["copied"] is True
-    assert rec["files"] == [str(tmp_path / "out" / "data" / "overview" / "overview_A1.czi")]
+    assert rec["files"] == [str(tmp_path / "out" / "data" / "overview" / "acquisition_overview_A1.czi")]
     assert rec["position"] == pytest.approx({"x": 250.0, "y": -250.0, "z": 12.5})
     assert zmart_controller.check_acquire_answer(answer) == []
 

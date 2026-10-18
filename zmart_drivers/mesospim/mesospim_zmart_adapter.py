@@ -46,6 +46,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from zmart_controller.zmart_controller import acquisition_type_or_default, output_folder_as_text
+
 from . import acquisition as _acq
 from . import commands as _cmd
 from .calibration import machine as _machine
@@ -597,14 +599,20 @@ def acquire(
     *,
     position_label: str,
     acquisition_settings: dict | None = None,
+    acquisition_type: str | None = None,
+    output_folder: str | None = None,
 ) -> dict:
     """Capture one dataset and save it, returning the record.
 
     Applies any light-path settings as state first, optionally settles the stage
     (backlash correction), captures via the mesoSPIM image writer, then relocates
-    the frames into ``<output_root>/data/``, named after ``position_label``.
-    The ``folder`` setting puts them in a folder of that name inside ``data``.
+    the frames into ``output_folder``, or ``<output_root>/data/`` when none is
+    given, named after the acquisition type (``acquisition`` when none is
+    given) and ``position_label``. The ``folder`` setting puts them in a
+    folder of that name inside it.
     """
+    acquisition_type = acquisition_type_or_default(acquisition_type)
+    output_folder = output_folder_as_text(output_folder)
     options = dict(acquisition_settings or {})
     fmt = options.get("format", ACQUISITION.save_format)
     folder = options.get("folder") or ""
@@ -670,8 +678,9 @@ def acquire(
     try:
         saved = _acq.save(
             result,
-            handle.output_root,
+            Path(output_folder) if output_folder is not None else handle.output_root / "data",
             position_label=position_label,
+            acquisition_type=acquisition_type,
             folder=folder,
             format=fmt,
         )
@@ -679,6 +688,7 @@ def acquire(
         shutil.rmtree(staging, ignore_errors=True)
     return {
         "position_label": position_label,
+        "acquisition_type": acquisition_type,
         "folder": folder,
         "format": fmt,
         "planes": _planes(handle, result, saved),
@@ -807,6 +817,9 @@ def get_info(handle: MesospimHandle) -> dict:
     return {
         "output_root": str(handle.output_root),
         "description": _described(handle),
+        # The driver copies the image writer's frames into place itself, so
+        # acquire saves in whatever output_folder it is given.
+        "chooses_its_own_folder": False,
         "initial_positions": [dict(p) for p in handle.initial_positions],
         "focus_um": pos.get("f"),
         "rotation_deg": pos.get("theta"),
