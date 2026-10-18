@@ -23,17 +23,19 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures import (
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.image_stage_registration import (
     Orientation,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.output import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitives.capture import (
     lasx_cache_release as cache_release,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.output import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitives.capture import (
     lasx_data_container as container,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.output import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures import (
     save as acquisition,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.output.naming import Naming
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.output.product import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher.naming import (
+    Naming,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher.product import (
     PlaneIndex,
     RawPlaneSource,
 )
@@ -140,7 +142,7 @@ def acquisition_of(
 
 
 def plane(source: RawPlaneSource) -> np.ndarray:
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.output import (
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures import (
         materialize,
     )
 

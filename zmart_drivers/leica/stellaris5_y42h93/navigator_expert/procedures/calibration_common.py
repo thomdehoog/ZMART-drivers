@@ -34,7 +34,7 @@ import tifffile
 import zmart_drivers.leica.stellaris5_y42h93.navigator_expert as drv
 
 from ..configuration import image_stage_registration as _orientation
-from ..output.naming import Naming, run_hash
+from ..dispatcher.naming import Naming, run_hash
 from . import backlash as _movement
 
 # matplotlib is imported lazily inside the plot helpers so test imports

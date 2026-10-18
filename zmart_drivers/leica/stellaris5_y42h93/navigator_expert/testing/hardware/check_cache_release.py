@@ -66,7 +66,7 @@ class Cache:
         self.root, self.names = root, {}
 
     def name_of(self, number: str) -> str:
-        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.output import (
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitives.capture import (
             lasx_data_container as container,
         )
 
@@ -152,10 +152,10 @@ def main() -> int:
     from zmart_controller import ZmartController
 
     import zmart_drivers.leica.stellaris5_y42h93.navigator_expert.for_zmart_controller.zmart_controller_plugin as driver
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.output import (
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitives.capture import (
         lasx_cache_release,
     )
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.output import (
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitives.capture import (
         lasx_data_container as container,
     )
     from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures import (

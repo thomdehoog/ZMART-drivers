@@ -13,10 +13,11 @@ this repository)::
                           parsers, the sorting of LAS X's errors, and primitive_handling/, which
                           says how each command is treated
     - dispatcher/         the engines that run a command safely: read.py, change.py, the
-                          limits gate and rulebook, tuning
+                          limits gate, tuning, and the shapes every driver shares (product,
+                          naming, files)
     - procedures/         the changes (changes.py) and the recipes built on them: the capture,
-                          backlash, the setup measurements, and the pure algorithms they use
-    - output/             what comes out of one acquisition: LAS X export, OME, naming, save
+                          saving the files (OME), backlash, the setup measurements, and the
+                          pure algorithms they use
     - configuration/      what is measured once per microscope: limits,
                           image_stage_registration, optical_calibration (each with its
                           defaults and notebook), the store, the per-connection state
@@ -165,7 +166,7 @@ from .vendor_interface.primitive_handling.limit_rules import (
 
 # -- acquisition/ - capture, file arrival, and save handling
 from .procedures.acquire import AcquisitionResult, acquire
-from .output.product import (
+from .dispatcher.product import (
     AcquisitionMetadata,
     ChannelMetadata,
     PlaneIndex,
@@ -174,7 +175,7 @@ from .output.product import (
     SavedAcquisition,
     VendorMetadataSource,
 )
-from .output.save import save
+from .procedures.save import save
 
 # -- logging
 import logging

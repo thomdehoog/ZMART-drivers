@@ -25,7 +25,7 @@ from limits_fixtures import (
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitive_handling.profiles import (
     ImageSaveProfile,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.output.product import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher.product import (
     PlaneIndex,
 )
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitive_handling import (
@@ -46,13 +46,15 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration import
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration import (
     store as _machine,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.output import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures import (
     command_log as _log,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.output import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitives.capture import (
     lasx_cache_release as _release,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.output import save as _save
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures import (
+    save as _save,
+)
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures import (
     acquire as _capture,
 )
@@ -443,7 +445,10 @@ class TestFrame(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as tmp:
             profile = MachineProfile(programdata_root=Path(tmp))
-            with self.assertLogs(_frame.log, level="WARNING") as logs:
+            with self.assertLogs(
+                "zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.coordinates",
+                level="WARNING",
+            ) as logs:
                 h = self._connect_with_profile(profile)
         self.assertEqual(h.origin, _origin())
         self.assertIn("no frame origin has been saved", "\n".join(logs.output))

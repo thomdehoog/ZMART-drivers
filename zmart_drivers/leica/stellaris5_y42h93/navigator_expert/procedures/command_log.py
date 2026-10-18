@@ -15,7 +15,7 @@ import os
 import uuid
 from pathlib import Path
 
-from .naming import Naming, log_dir
+from ..dispatcher.naming import Naming, log_dir
 
 __all__ = ["write"]
 

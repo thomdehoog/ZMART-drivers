@@ -13,12 +13,11 @@ the driver once on the LAS X computer, then connect by name in every session::
     mic.get_xyz()
 
 The methods only translate. The work of every command lives in the parts
-below: the readings and changes in ``actions/``, the recipes in
-``procedures/``, the files in ``output/``, the microscope's own settings in
-``configuration/``. Today the methods reach those parts through the
-functions in ``zmart_adapter/``, which still hold the coordinate arithmetic
-and the connect flow; folding that into the parts is the next step of the
-refactor, not this one.
+below: the readings and changes in ``vendor_interface/`` and ``dispatcher/``,
+the recipes (including saving the files) in ``procedures/``, the microscope's
+own settings in ``configuration/``. Today the methods reach those parts
+through the short command table in ``zmart_adapter/``; folding that table
+into this class is the next step of the refactor.
 
 Each method hands back ``True`` and the values when the microscope did what
 was asked. When it did not, the function behind the method raises:

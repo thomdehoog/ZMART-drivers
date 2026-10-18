@@ -36,7 +36,7 @@ import numpy as np
 import tifffile
 
 import zmart_drivers.leica.stellaris5_y42h93.navigator_expert as drv
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.output.naming import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher.naming import (
     Naming,
     run_hash,
 )

@@ -26,7 +26,7 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.image_
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.notebook_support import (
     NotebookCheckpoint,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.output.naming import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher.naming import (
     build_image_name,
 )
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures import (

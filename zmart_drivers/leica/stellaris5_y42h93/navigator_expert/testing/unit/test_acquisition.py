@@ -23,19 +23,19 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.image_
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitive_handling import (
     state as readers_router,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.output import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures import (
     materialize,
     ome_canonical,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.output import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures import (
     save as acquisition,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.output.naming import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher.naming import (
     Naming,
     build_image_name,
     parse_image_name,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.output.product import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher.product import (
     ExportedAcquisition,
     ExportedPosition,
 )

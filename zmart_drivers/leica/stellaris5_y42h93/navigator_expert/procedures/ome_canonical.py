@@ -23,7 +23,7 @@ from typing import Any
 from ..vendor_interface.primitive_handling import state as _readers
 from ..vendor_interface import parsing as _parsing
 from . import ome as _ome
-from .product import (
+from ..dispatcher.product import (
     AcquisitionMetadata,
     ChannelMetadata,
     Instrument,

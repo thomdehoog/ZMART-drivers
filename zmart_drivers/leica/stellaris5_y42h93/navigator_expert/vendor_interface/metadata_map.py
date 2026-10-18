@@ -26,7 +26,7 @@ from __future__ import annotations
 import datetime
 import xml.etree.ElementTree as ET
 
-from .product import (
+from ..dispatcher.product import (
     AcquisitionMetadata,
     ChannelMetadata,
     Detector,

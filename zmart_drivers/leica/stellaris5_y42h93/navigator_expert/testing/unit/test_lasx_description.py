@@ -16,13 +16,13 @@ from pathlib import Path
 
 import pytest
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.output import (
-    lasx_description as described,
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface import (
+    metadata_map as described,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.output import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures import (
     ome_canonical as canonical,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.output.product import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher.product import (
     AcquisitionMetadata,
     PlaneIndex,
 )

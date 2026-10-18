@@ -38,11 +38,11 @@ from pathlib import Path
 from typing import Any
 
 from ... import connect as _session
+from ...configuration import coordinates as _coordinates
 from ...configuration import data_location as _data_location
 from ...configuration import session_state as _session_state
 from ...dispatcher import gate as _gate
-from ...output.naming import run_hash
-from ...procedures import frame as _frame
+from ...dispatcher.naming import run_hash
 from ...procedures.acquisition import acquire, get_acquisition_settings
 from ...procedures.frame import get_actuators, get_xyz, set_origin, set_xyz
 from ...procedures.instrument import (
@@ -141,7 +141,9 @@ def connect(connection: dict | None = None) -> ZmartHandle:
     """
     connection = {**CONNECTION, **(connection or {})}
     saved_origin = (
-        _frame.load_saved_origin() if connection.get("load_origin", True) else None
+        _coordinates.load_saved_origin()
+        if connection.get("load_origin", True)
+        else None
     )
     saved_location = _load_data_location()
     client = _session.connect_microscope(

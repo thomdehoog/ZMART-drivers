@@ -15,7 +15,7 @@ import numpy as np
 import pytest
 import tifffile
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.output.ome import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.ome import (
     check_ome_tiff,
     check_ome_xml_bytes,
     check_ome_xml_file,

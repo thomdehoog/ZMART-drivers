@@ -31,13 +31,13 @@ from pathlib import Path
 from typing import Any
 
 from . import lasx_cache_release as cache_release
-from . import lasx_description as described
-from .files import (
+from ... import metadata_map as described
+from ....dispatcher.files import (
     DEFAULT_EXPORT_COMPLETION_POLL_INTERVAL_S,
     DEFAULT_EXPORT_COMPLETION_TIMEOUT_S,
     MTIME_SKEW_ALLOWANCE_S,
 )
-from .product import (
+from ....dispatcher.product import (
     AcquisitionResult,
     AcquisitionMetadata,
     ExportedAcquisition,
