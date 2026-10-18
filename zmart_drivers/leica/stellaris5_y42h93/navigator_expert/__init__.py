@@ -16,7 +16,7 @@ this repository)::
                           confirm loops and the limits gate
     - procedures/         the recipes built on the commands: the session, the frame and its
                           coordinates (absolute_coordinate_system/), changing the objective
-                          (objective_change/), the capture and its saving (acquisition_and_saving/)
+                          (objective_change_with_compensation/), the capture and its saving (acquisition_and_saving/)
     - driver_setup/       what is set up once per microscope, one folder per item: limits,
                           origin, image_stage_registration, optical_calibration and
                           data_location, each with its defaults, loader, measuring code
@@ -100,7 +100,7 @@ from .vendor_specific.error_classification import _is_transient_error, _check_ap
 from .vendor_specific.primitive_handling.state import Reading, get_scan_status, ping, get_job_settings, get_hardware_info, get_xy, read_zwide_um, get_jobs, get_job_by_name, get_selected_job, get_fov, get_base_fov, get_lasx_settings, get_pending_dialog
 from .vendor_specific.primitive_handling.confirmations import _readback
 from .vendor_specific.primitive_handling.changes import set_zoom, set_scan_speed, set_scan_resonant, set_scan_mode, set_sequential_mode, set_scan_field_rotation, set_image_format, set_z_stack_definition, set_z_stack_step_size, set_z_stack_size, set_frame_accumulation, set_frame_average, set_line_accumulation, set_line_average, set_pinhole_airy, set_detector_gain, set_laser_intensity, set_laser_shutter, set_filter_wheel_slot, set_filter_wheel_spectrum, move_xy, move_z
-from .procedures.objective_change.compensated_changes import set_objective, select_job
+from .procedures.objective_change_with_compensation.compensated_changes import set_objective, select_job
 from .vendor_specific.connection.lasx_client import connect_python_client
 
 # -- driver_setup/limits/handshake.py - the connect-time limits handshake

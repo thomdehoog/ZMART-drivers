@@ -15,9 +15,9 @@ import pytest
 from limits_fixtures import install_permissive_limits
 
 import zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.state as readers
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.objective_change import objective_shift as shift
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.objective_change_with_compensation import objective_shift as shift
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling import changes as cmds
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.objective_change import compensated_changes as cmds_comp
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.objective_change_with_compensation import compensated_changes as cmds_comp
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures import (
     session_state,
 )
@@ -171,7 +171,7 @@ def test_select_job_records_before_the_switch_and_compensates_after(
         lambda c, **k: order.append("read_xy") or {"x_um": 1000.0, "y_um": 2000.0},
     )
     monkeypatch.setattr(
-        cmds_comp,
+        cmds,
         "prepare_select_job",
         lambda c, job: (
             None,
@@ -179,7 +179,7 @@ def test_select_job_records_before_the_switch_and_compensates_after(
         ),
     )
     monkeypatch.setattr(
-        cmds_comp, "select_job_confirm_legs", lambda *a, **k: (None, None, 0.0)
+        cmds, "select_job_confirm_legs", lambda *a, **k: (None, None, 0.0)
     )
 
     def fake_dispatch(*a, **k):
@@ -226,7 +226,7 @@ def test_select_job_on_an_unarmed_client_behaves_as_before(client, monkeypatch):
 
     monkeypatch.setattr(readers, "get_xy", _explode)
     monkeypatch.setattr(
-        cmds_comp,
+        cmds,
         "prepare_select_job",
         lambda c, job: (
             None,
@@ -234,7 +234,7 @@ def test_select_job_on_an_unarmed_client_behaves_as_before(client, monkeypatch):
         ),
     )
     monkeypatch.setattr(
-        cmds_comp, "select_job_confirm_legs", lambda *a, **k: (None, None, 0.0)
+        cmds, "select_job_confirm_legs", lambda *a, **k: (None, None, 0.0)
     )
     monkeypatch.setattr(
         cmds,

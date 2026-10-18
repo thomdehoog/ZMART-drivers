@@ -39,7 +39,7 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.acquisiti
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.acquisition_and_saving import acquire as _capture
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.acquisition_and_saving import acquisition as _acquisition
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling import changes as _commands
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.objective_change import compensated_changes as _commands_comp
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.objective_change_with_compensation import compensated_changes as _commands_comp
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.absolute_coordinate_system import frame as _frame
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures import (
     instrument as _instrument,
@@ -525,6 +525,28 @@ class TestFrame(unittest.TestCase):
         # the z-galvo cannot be chosen to move with
         with self.assertRaises(ValueError):
             _frame.get_xyz(h, with_actuators={"z": "z-galvo"})
+
+    def test_set_xyz_says_so_when_the_jobs_stack_is_on_the_galvo(self):
+        h = _handle(origin=_origin(x_um=1000.0, y_um=2000.0, z_focus_um=30.0))
+        patches = _patch_position(z_wide_um=32.0, z_galvo_um=0.0)
+        stack_on_galvo = {**_settings(z_wide_um=32.0), "stack": {"mode": "z-galvo"}}
+        with (
+            patch.object(
+                _commands, "move_xy", return_value={"success": True, "confirmed": True}
+            ),
+            patch.object(
+                _commands, "move_z", return_value={"success": True, "confirmed": True}
+            ),
+            patches[0],
+            patch.object(_readers, "get_job_settings", return_value=stack_on_galvo),
+            patches[2],
+            patches[3],
+        ):
+            _frame.set_xyz(h, 0.0, 0.0, 5.0)
+        self.assertEqual(
+            [n["what"] for n in h.unconfirmed],
+            ["set_xyz: the job's z-stack is on the z-galvo"],
+        )
 
     def test_set_xyz_parks_a_galvo_that_is_not_at_zero_first(self):
         h = _handle(origin=_origin(x_um=1000.0, y_um=2000.0, z_focus_um=30.0))

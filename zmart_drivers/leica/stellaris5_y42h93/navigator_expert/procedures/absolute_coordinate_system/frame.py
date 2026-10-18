@@ -30,7 +30,7 @@ import logging
 from . import coordinates
 from ...dispatcher import gate as _gate
 from ...vendor_specific.primitive_handling import state as _readers
-from ...vendor_specific.primitive_handling.derived import z_um_from_settings as _z_um_from_settings
+from ...vendor_specific.primitive_handling.derived import stack_drive as _stack_drive, z_um_from_settings as _z_um_from_settings
 from ...vendor_specific.primitive_handling import changes as _commands
 from .. import session as _info
 from ..session import ZmartHandle, job_catalog, note_unconfirmed, require_open  # noqa: F401
@@ -99,6 +99,7 @@ def hardware_snapshot(handle: ZmartHandle) -> dict:
             settings, "z-galvo", client=handle.client, job_name=job
         ),
         "objective": settings.get("objective"),
+        "stack_drive": _stack_drive(settings),
     }
 
 
@@ -274,6 +275,16 @@ def set_xyz(
     if abs(snap["z_galvo_um"]) > Z_GALVO_PARKED_TOLERANCE_UM:
         zero_z_galvo(handle)
         snap = hardware_snapshot(handle)
+    if snap.get("stack_drive") == "z-galvo":
+        # The driver moves the focus with z-wide only. LAS X offers no request
+        # to change which drive the job's z-stack uses, so this can only be
+        # said, not fixed: the operator sets the stack to z-wide in LAS X.
+        note_unconfirmed(
+            handle,
+            "set_xyz: the job's z-stack is on the z-galvo",
+            "the selected job takes its z-stack with the z-galvo; the driver moves "
+            "the focus with z-wide only, so set the job's z drive to z-wide in LAS X",
+        )
     dt = objective_delta_um(handle, snap.get("objective"))  # raises if unavailable
     abs_x, abs_y, target_focus = coordinates.stage_target(x, y, z, handle.origin, dt)
     # The focus is moved with z-wide alone: it takes up the whole difference

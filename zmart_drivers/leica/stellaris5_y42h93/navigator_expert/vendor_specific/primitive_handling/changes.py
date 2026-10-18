@@ -2,9 +2,10 @@
 
 Public ``set_*``, ``move_xy``, ``move_z`` and ``acquire`` functions. Each one
 is a single command to LAS X, with its limits check, its handling notes and its
-confirmation; none of them is more than one command. (The two that change the
-lens and then correct the stage, ``set_objective`` and ``select_job``, are
-recipes and live in ``procedures/objective_change/compensated_changes.py``.)
+confirmation; none of them is more than one command. (``set_objective`` and
+``select_job`` are here too, as the bare commands. The recipes that also move
+the stage to keep the sample in view are in
+``procedures/objective_change_with_compensation/compensated_changes.py``.)
 
 The settings of a job (zoom, scan speed, laser intensity, and the rest) are
 all changed by the one runner, ``_change_setting``, from their entry in
@@ -49,10 +50,13 @@ from functools import partial
 from ...dispatcher import dispatcher as _dispatcher
 from ...dispatcher import gate as _gate
 from ...dispatcher.dispatcher import make_log_entry as _make_log_entry, make_timing as _make_timing
+from ..parsing import _hw_get
 from . import settings
-from .confirmations import confirm_acquire, confirm_move_xy, confirm_move_z, race_confirmations
+from .confirm_select_job import prepare_select_job, select_job_confirm_legs
+from .confirmations import confirm_acquire, confirm_move_xy, confirm_move_z, confirm_objective, race_confirmations
 from .limit_rules import check_xy, check_z
-from .profiles import ACQUIRE, MOVE_XY, MOVE_Z
+from .objectives import objective_by_slot
+from .profiles import ACQUIRE, MOVE_XY, MOVE_Z, OBJECTIVE, SELECT_JOB
 
 log = logging.getLogger(__name__)
 
@@ -923,3 +927,202 @@ def acquire(
             poll_interval=profile_value(ACQUIRE, "poll_interval", poll_interval),
         ),
     )
+
+
+# =============================================================================
+# The objective and the job: plain changes, without the stage correction
+# =============================================================================
+#
+# These are the bare commands: one change to LAS X each, with the limits check,
+# the handling notes and the confirmation. The recipes that also keep the
+# sample in view (``procedures/objective_change_with_compensation/compensated_changes.py``) are
+# built on them. ``before_fire`` is how such a recipe takes its reading just
+# before the command is sent: it is called once everything has been checked,
+# and if it returns a refusal, nothing is sent.
+
+
+def _resolve_objective(hw_info, slot_index=None, name=None, magnification=None):
+    """Resolve an objective to (slot, display_name) from hardware info.
+
+    Any one of *slot_index*, *name*, or *magnification* identifies the
+    objective.  Returns ``(None, None)`` if not found.
+    """
+    # Empty turret slots (objectiveNumber 0) are excluded by objective_by_slot;
+    # sending those to LAS X can trigger modal error dialogs that block the app.
+    for obj in objective_by_slot(hw_info).values():
+        s = _hw_get(obj, "slotIndex")
+        n = _hw_get(obj, "name", "").strip()
+        m = _hw_get(obj, "magnification")
+
+        if slot_index is not None and s == slot_index:
+            return s, n
+        if name is not None and n == name.strip():
+            return s, n
+        if magnification is not None and m == magnification:
+            return s, n
+
+    return None, None
+
+
+def set_objective(
+    client,
+    job_name,
+    hw_info,
+    slot_index=None,
+    name=None,
+    magnification=None,
+    *,
+    max_retries=None,
+    before_fire=None,
+):
+    """Set the objective by slot index, name, or magnification (no stage correction).
+
+    Resolves the input to a slot index, then fires the command. Exactly one
+    of slot_index, name, or magnification must be provided.
+
+    ``before_fire`` is called with ``{"slot": ..., "name": ...}`` once the
+    objective is resolved and the limits allow it, just before the command is
+    sent. It may return a refusal result; then nothing is sent.
+    """
+    # The limits gate is consulted once, below, after the selector resolves
+    # to a physical slot — that one check covers both the fail-closed
+    # session state and the objective allow-list. (Malformed selectors get
+    # a usage error first; they fire nothing, so nothing needs gating.)
+    selectors = [v for v in (slot_index, name, magnification) if v is not None]
+    if len(selectors) != 1:
+        return {
+            "success": False,
+            "confirmed": None,
+            "message": (
+                "exactly one of slot_index, name, or magnification must be "
+                f"provided (got {len(selectors)})"
+            ),
+            "timing": _make_timing(total_s=0.0, attempts=0),
+            "logs": [],
+        }
+    slot, target_name = _resolve_objective(
+        hw_info, slot_index=slot_index, name=name, magnification=magnification
+    )
+
+    if slot is None:
+        available = [
+            (_hw_get(o, "slotIndex"), _hw_get(o, "name", "").strip())
+            for o in objective_by_slot(hw_info).values()
+        ]
+        return {
+            "success": False,
+            "confirmed": None,
+            "message": f"Could not find objective: slot_index={slot_index}, "
+            f"name={name}, mag={magnification}. "
+            f"Available: {available}",
+            "timing": _make_timing(total_s=0.0, attempts=0),
+            "logs": [],
+        }
+
+    # The flat limits file may fence automation to specific slots
+    # (objective_slot; [] — the default — is unrestricted). The resolved
+    # physical slot is checked regardless of whether the caller selected it
+    # by slot, name, or magnification.
+    gated_values = {"job_name": job_name, "objective_slot": slot}
+    refused = limits_refusal(client, "set_objective", gated_values)
+    if refused:
+        return refused
+
+    if before_fire is not None:
+        refused = before_fire({"slot": slot, "name": target_name})
+        if refused:
+            refused.setdefault("timing", _make_timing(total_s=0.0, attempts=0))
+            return refused
+
+    api_obj = client.PyApiSetObjectiveSlotByJobName
+
+    def setup(m):
+        m.JobName = job_name
+        m.ObjectiveSlotIndex = slot
+
+    return dispatch_change(
+        client,
+        api_obj,
+        f"Objective -> {target_name} (slot {slot})",
+        OBJECTIVE,
+        command="set_objective",
+        values=gated_values,
+        setup_fn=setup,
+        confirm_fn=partial(
+            confirm_objective,
+            job_name=job_name,
+            target_slot=slot,
+            target_name=target_name,
+        ),
+        max_retries=max_retries,
+    )
+
+
+def select_job(client, job_name, *, before_fire=None):
+    """Select a job by name (no stage correction).
+
+    Routes through the dispatcher. The SELECT_JOB profile pre-checks scanner
+    idle before firing (``check_idle``), and confirms like every command:
+    four windows of ``WINDOW_S``, fired again between. Source policy
+    (direct / api / log / hybrid) lives entirely in the confirmation layer:
+    ``prepare_select_job`` owns the "already selected" decision and the api
+    baseline, and ``select_job_confirm_legs`` builds the confirmation legs.
+
+    ``before_fire`` is called with the prepared context (it carries
+    ``api_baseline_name``, the job that was selected before) once the limits
+    allow the change and the job is not already selected, just before the
+    command is sent. It may return a refusal result; then nothing is sent.
+    """
+    gated_values = {"job_name": job_name}
+    refused = limits_refusal(client, "select_job", gated_values)
+    if refused:
+        return refused
+
+    t0 = time.perf_counter()
+    noop, context = prepare_select_job(client, job_name)
+    if noop is not None:
+        noop["timing"] = _make_timing(total_s=time.perf_counter() - t0, attempts=0)
+        return noop
+
+    if before_fire is not None:
+        refused = before_fire(context)
+        if refused:
+            refused.setdefault(
+                "timing", _make_timing(total_s=time.perf_counter() - t0, attempts=0)
+            )
+            return refused
+
+    api_obj = client.PyApiSelectJobByName
+
+    def setup(m):
+        m.JobName = job_name
+
+    command_started_at = time.time()
+    api_confirm, log_leg, budget_s = select_job_confirm_legs(
+        job_name,
+        command_started_at=command_started_at,
+        api_baseline_name=context["api_baseline_name"],
+        timeout=SELECT_JOB.confirm_poll_s,
+    )
+    result = dispatch_change(
+        client,
+        api_obj,
+        f"SelectJob '{job_name}'",
+        SELECT_JOB,
+        command="select_job",
+        values=gated_values,
+        setup_fn=setup,
+        confirm_fn=api_confirm,
+        log_confirm_fn=log_leg,
+        confirm_race_budget_s=budget_s,
+    )
+    if context["api_said_selected"]:
+        result.setdefault("logs", []).append(
+            _make_log_entry(
+                "info",
+                "API reported target already selected before SelectJob, "
+                "but the log-participating confirmation still fired the "
+                "command",
+            )
+        )
+    return result
