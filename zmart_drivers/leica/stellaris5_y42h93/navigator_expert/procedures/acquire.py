@@ -12,20 +12,12 @@ when a named LAS X job was acquired and returns that context for
 from __future__ import annotations
 
 import time
-from dataclasses import dataclass
 from typing import Any
 
-from . import set as _commands
+from ..output.product import AcquisitionResult
+from . import changes as _commands
 
-
-@dataclass(frozen=True)
-class AcquisitionResult:
-    """Save-agnostic result of one LAS X AcquireJob command."""
-
-    job: str
-    started_at: float
-    finished_at: float
-    command_result: dict
+__all__ = ["AcquisitionResult", "acquire"]
 
 
 def acquire(

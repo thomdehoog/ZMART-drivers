@@ -20,8 +20,8 @@ for _p in (_HERE, _REPO_ROOT):
         sys.path.insert(0, str(_p))
 
 import probe_four_readers as probe
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.actions import (
-    get as capabilities,
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitive_handling import (
+    readings as capabilities,
 )
 
 

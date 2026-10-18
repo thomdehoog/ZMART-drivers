@@ -28,9 +28,9 @@ and stdlib. Nothing from dispatch or command wrappers.
 from collections.abc import Callable
 from dataclasses import dataclass
 
-from ..dispatcher.prechecks import check_idle
-from ..dispatcher.tuning import WINDOW_S, WINDOWS
-from ..vendor_interface.error_classification import _default_error_check
+from .prechecks import check_idle
+from ...dispatcher.tuning import WINDOW_S, WINDOWS
+from ..error_classification import _default_error_check
 from .confirmations import (
     _confirm_detector_gain,
     _confirm_filter_wheel_slot,

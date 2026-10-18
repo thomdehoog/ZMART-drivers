@@ -22,7 +22,7 @@ from limits_fixtures import (
     provision_machine_limits,
 )
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.actions.profiles import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitive_handling.profiles import (
     ImageSaveProfile,
 )
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.output.product import (

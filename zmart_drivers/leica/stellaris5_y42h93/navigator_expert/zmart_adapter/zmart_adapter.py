@@ -84,10 +84,12 @@ except Exception:  # noqa: BLE001 -- best-effort provenance
     _DRIVER_VERSION = None
 
 from .. import connect as _session
-from ..actions import acquire as _capture
-from ..actions import set as _commands
-from ..actions.derived import z_um_from_settings as _z_um_from_settings
-from ..actions.profiles import IMAGE_SAVE
+from ..procedures import acquire as _capture
+from ..procedures import changes as _commands
+from ..vendor_interface.primitive_handling.derived import (
+    z_um_from_settings as _z_um_from_settings,
+)
+from ..vendor_interface.primitive_handling.profiles import IMAGE_SAVE
 from ..configuration import image_stage_registration as _orientation
 from ..configuration import session_state as _session_state
 from ..configuration import store as _machine

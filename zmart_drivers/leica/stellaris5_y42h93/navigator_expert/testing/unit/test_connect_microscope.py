@@ -19,7 +19,7 @@ from mock_lasx_api import MockLasxClient
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert import (
     connect as drv_session,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.actions.profiles import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitive_handling.profiles import (
     IMAGE_SAVE,
 )
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration import (

@@ -52,8 +52,11 @@ from ..vendor_interface.error_classification import (
 )
 from ..vendor_interface.parsing import _hw_get, parse_format
 from . import objective_shift as _objective_shift
-from .confirm_select_job import prepare_select_job, select_job_confirm_legs
-from .confirmations import (
+from ..vendor_interface.primitive_handling.confirm_select_job import (
+    prepare_select_job,
+    select_job_confirm_legs,
+)
+from ..vendor_interface.primitive_handling.confirmations import (
     _confirm_detector_gain,
     _confirm_filter_wheel_slot,
     _confirm_filter_wheel_spectrum,
@@ -81,7 +84,7 @@ from .confirmations import (
     race_confirmations,
 )
 from .objectives import objective_by_slot
-from .profiles import (
+from ..vendor_interface.primitive_handling.profiles import (
     ACQUIRE,
     DETECTOR_GAIN,
     FILTER_WHEEL_SLOT,

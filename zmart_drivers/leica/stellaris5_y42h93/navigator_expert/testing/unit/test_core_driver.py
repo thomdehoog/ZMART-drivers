@@ -27,18 +27,18 @@ from unittest.mock import MagicMock, PropertyMock, patch
 
 import zmart_drivers.leica.stellaris5_y42h93.navigator_expert as drv
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert import connect as session
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.actions import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitive_handling import (
     confirm_select_job,
     confirmations,
     profiles,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.actions import (
-    set as commands,
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures import (
+    changes as commands,
 )
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher import (
     change as dispatch,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitive_handling import (
     prechecks,
 )
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher import (
@@ -763,7 +763,7 @@ class TestRetryBackoff(unittest.TestCase):
         client = make_client()
         api_obj = make_api_obj()
 
-        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.actions.profiles import (
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitive_handling.profiles import (
             CommandProfile,
         )
 
@@ -798,7 +798,7 @@ class TestRetryBackoff(unittest.TestCase):
         client = make_client()
         api_obj = make_api_obj()
 
-        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.actions.profiles import (
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitive_handling.profiles import (
             CommandProfile,
         )
 

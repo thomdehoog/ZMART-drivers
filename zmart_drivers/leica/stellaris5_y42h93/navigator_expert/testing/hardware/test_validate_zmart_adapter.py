@@ -35,7 +35,9 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.zmart_adapter import
 
 def _run_mock(tmp_path, *extra):
     """Run the validator against the mock, restoring global state afterwards."""
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.actions import profiles
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitive_handling import (
+        profiles,
+    )
 
     output = tmp_path / "adapter_mock.jsonl"
     original_connect = adapter._session.connect_python_client
@@ -200,7 +202,9 @@ def test_state_phase_does_not_switch_away_from_autofocus_job():
 
 
 def test_connect_session_leaves_output_root_for_driver_discovery():
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.actions import profiles
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitive_handling import (
+        profiles,
+    )
 
     original_connect = adapter._session.connect_python_client
     original_profile = profiles.STATE_READERS
@@ -232,7 +236,9 @@ def test_acquire_backlash_rounds_through_the_controller_seam(
     ops table -> adapter) is what is actually exercised for both the default
     and a positive ``ACQUISITION_BACKLASH_DEFAULT_ROUNDS``, the driver's own setting.
     """
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.actions import profiles
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitive_handling import (
+        profiles,
+    )
 
     original_connect = adapter._session.connect_python_client
     original_profile = profiles.STATE_READERS

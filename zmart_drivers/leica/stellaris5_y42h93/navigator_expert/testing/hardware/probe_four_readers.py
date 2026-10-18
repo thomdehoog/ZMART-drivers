@@ -36,8 +36,8 @@ from typing import Any
 sys.path.insert(0, str(Path(__file__).resolve().parents[6]))  # the repository root
 
 import zmart_drivers.leica.stellaris5_y42h93.navigator_expert as drv
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.actions import (
-    get as capabilities,
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitive_handling import (
+    readings as capabilities,
 )
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher import (
     read as readers,

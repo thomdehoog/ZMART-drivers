@@ -16,7 +16,7 @@ import time
 import unittest
 from unittest.mock import patch
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.actions import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitive_handling import (
     confirm_select_job,
     confirmations,
     profiles,

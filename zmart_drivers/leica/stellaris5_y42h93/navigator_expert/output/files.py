@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from ..actions.acquire import AcquisitionResult
+    from .product import AcquisitionResult
 
 log = logging.getLogger(__name__)
 

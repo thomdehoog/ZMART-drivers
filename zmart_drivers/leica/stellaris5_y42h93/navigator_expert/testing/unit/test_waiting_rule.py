@@ -20,17 +20,19 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.actions import (
-    get as capabilities,
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitive_handling import (
+    readings as capabilities,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.actions import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures import (
     objective_shift,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitive_handling import (
     profiles,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitive_handling import (
     prechecks,
-    tuning,
 )
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher import tuning
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher import (
     read as readers,
 )
@@ -352,7 +354,14 @@ def test_commands_deliver_through_the_one_helper():
     assert change.deliver is delivery.deliver
 
 
-GUARDED = ("actions", "dispatcher", "vendor_interface")
+# Whole folders, plus the change definitions that moved from actions/ to procedures/.
+GUARDED = ("dispatcher", "vendor_interface")
+GUARDED_FILES = (
+    "procedures/changes.py",
+    "procedures/acquire.py",
+    "procedures/objective_shift.py",
+    "procedures/objectives.py",
+)
 WAIT_NAME = re.compile(
     r"(timeout|poll_interval|max_retries|max_confirm_attempts|grace|deadline|window_s|retry_delay)",
     re.IGNORECASE,
@@ -360,16 +369,16 @@ WAIT_NAME = re.compile(
 #: The waits that stay outside the rule, by decision, as (file, name).
 EXCEPTIONS = {
     # Acquisition is never sent again and watches one acquisition (ACQUIRE).
-    ("actions/confirmations.py", "start_timeout"),
-    ("actions/confirmations.py", "poll_interval"),
-    ("actions/profiles.py", "max_retries"),
-    ("actions/profiles.py", "max_confirm_attempts"),
-    ("actions/profiles.py", "poll_interval"),
-    ("actions/profiles.py", "start_timeout"),
+    ("vendor_interface/primitive_handling/confirmations.py", "start_timeout"),
+    ("vendor_interface/primitive_handling/confirmations.py", "poll_interval"),
+    ("vendor_interface/primitive_handling/profiles.py", "max_retries"),
+    ("vendor_interface/primitive_handling/profiles.py", "max_confirm_attempts"),
+    ("vendor_interface/primitive_handling/profiles.py", "poll_interval"),
+    ("vendor_interface/primitive_handling/profiles.py", "start_timeout"),
     # LAS X filling in the error report after a command stays at 1 s.
     ("dispatcher/change.py", "ECHO_SETTLE_TIMEOUT_S"),
     # How old a log entry may be to count as current: freshness, not a wait.
-    ("actions/profiles.py", "current_window_s"),
+    ("vendor_interface/primitive_handling/profiles.py", "current_window_s"),
     # The rule itself.
     ("dispatcher/tuning.py", "WINDOW_S"),
 }
@@ -386,44 +395,43 @@ def _literal_number(node):
 def _waits_with_their_own_numbers(root):
     """Every literal number given to a wait-shaped name, or slept, outside the rule."""
     found = []
-    for folder in GUARDED:
-        for path in sorted((root / folder).rglob("*.py")):
-            rel = path.relative_to(root).as_posix()
-            for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
-                named = []
-                if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                    args = node.args
-                    positional = args.args[len(args.args) - len(args.defaults) :]
-                    named += list(zip((a.arg for a in positional), args.defaults))
-                    named += [
-                        (a.arg, d)
-                        for a, d in zip(args.kwonlyargs, args.kw_defaults)
-                        if d
-                    ]
-                elif isinstance(node, ast.Call):
-                    named += [(kw.arg, kw.value) for kw in node.keywords if kw.arg]
-                    func = node.func
-                    if (
-                        isinstance(func, ast.Attribute)
-                        and func.attr == "sleep"
-                        and node.args
-                        and _literal_number(node.args[0])
-                    ):
-                        found.append(f"{rel}:{node.lineno} sleep({node.args[0].value})")
-                elif isinstance(node, (ast.Assign, ast.AnnAssign)):
-                    targets = (
-                        node.targets if isinstance(node, ast.Assign) else [node.target]
-                    )
-                    named += [
-                        (t.id, node.value) for t in targets if isinstance(t, ast.Name)
-                    ]
-                for name, value in named:
-                    if (
-                        WAIT_NAME.search(name)
-                        and _literal_number(value)
-                        and (rel, name) not in EXCEPTIONS
-                    ):
-                        found.append(f"{rel}:{node.lineno} {name}={value.value}")
+    paths = [p for folder in GUARDED for p in sorted((root / folder).rglob("*.py"))]
+    paths += [root / name for name in GUARDED_FILES]
+    for path in paths:
+        rel = path.relative_to(root).as_posix()
+        for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
+            named = []
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                args = node.args
+                positional = args.args[len(args.args) - len(args.defaults) :]
+                named += list(zip((a.arg for a in positional), args.defaults))
+                named += [
+                    (a.arg, d) for a, d in zip(args.kwonlyargs, args.kw_defaults) if d
+                ]
+            elif isinstance(node, ast.Call):
+                named += [(kw.arg, kw.value) for kw in node.keywords if kw.arg]
+                func = node.func
+                if (
+                    isinstance(func, ast.Attribute)
+                    and func.attr == "sleep"
+                    and node.args
+                    and _literal_number(node.args[0])
+                ):
+                    found.append(f"{rel}:{node.lineno} sleep({node.args[0].value})")
+            elif isinstance(node, (ast.Assign, ast.AnnAssign)):
+                targets = (
+                    node.targets if isinstance(node, ast.Assign) else [node.target]
+                )
+                named += [
+                    (t.id, node.value) for t in targets if isinstance(t, ast.Name)
+                ]
+            for name, value in named:
+                if (
+                    WAIT_NAME.search(name)
+                    and _literal_number(value)
+                    and (rel, name) not in EXCEPTIONS
+                ):
+                    found.append(f"{rel}:{node.lineno} {name}={value.value}")
     return found
 
 

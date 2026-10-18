@@ -19,9 +19,9 @@ from command wrappers, profiles, or confirmations.
 import logging
 import time
 
-from . import read as _readers
-from . import tuning as _timing
-from .envelope import _make_log_entry
+from ...dispatcher import read as _readers
+from ...dispatcher import tuning as _timing
+from ...dispatcher.envelope import _make_log_entry
 
 log = logging.getLogger(__name__)
 

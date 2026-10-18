@@ -38,10 +38,10 @@ _REPO_ROOT = Path(__file__).resolve().parents[6]
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.actions import (  # noqa: E402
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitive_handling import (
     confirm_select_job as _confirm_select_job,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.actions import (  # noqa: E402
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures import (
     objective_shift as _objective_shift,
 )
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher import (  # noqa: E402

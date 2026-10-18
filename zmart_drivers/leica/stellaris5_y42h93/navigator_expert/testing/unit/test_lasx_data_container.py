@@ -17,7 +17,7 @@ import numpy as np
 import pytest
 import tifffile
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.actions import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures import (
     acquire as capture,
 )
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.image_stage_registration import (

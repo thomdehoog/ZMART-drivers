@@ -29,11 +29,11 @@ from unittest.mock import patch
 import pytest
 
 import zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher.read as readers
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.actions import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures import (
     objective_shift as shift,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.actions import (
-    set as commands_mod,
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures import (
+    changes as commands_mod,
 )
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration import (
     session_state,

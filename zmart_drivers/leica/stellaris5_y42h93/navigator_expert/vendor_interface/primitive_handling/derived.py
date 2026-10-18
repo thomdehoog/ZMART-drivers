@@ -4,11 +4,8 @@ from __future__ import annotations
 
 import logging
 
-from ..vendor_interface.connection.hardware_server import (
-    HardwareServerUnavailable,
-    read_hardware_z_um,
-)
-from ..vendor_interface.parsing import parse_tile_geometry
+from ..connection.hardware_server import HardwareServerUnavailable, read_hardware_z_um
+from ..parsing import parse_tile_geometry
 
 log = logging.getLogger(__name__)
 
@@ -83,7 +80,7 @@ def stack_slices_um(settings, expected: int) -> list[float] | None:
     describe the *expected* planes that came back -- a guessed position would
     place a picture somewhere nobody imaged.
     """
-    from ..vendor_interface.parsing import make_changeable_copy
+    from ..parsing import make_changeable_copy
 
     try:
         stack = (make_changeable_copy(settings) or {}).get("stack")
@@ -110,7 +107,7 @@ def stack_slices_um(settings, expected: int) -> list[float] | None:
 
 def stack_drive(settings) -> str | None:
     """Which z drive makes the job's stack: ``"z-wide"``, ``"z-galvo"``, or None when unsaid."""
-    from ..vendor_interface.parsing import make_changeable_copy
+    from ..parsing import make_changeable_copy
 
     try:
         stack = (make_changeable_copy(settings) or {}).get("stack") or {}
@@ -147,7 +144,7 @@ def z_um_from_settings(settings, key, *, client=None, job_name=None):
     unavailable (almost always means the job is not selected or the
     LAS X version does not expose Z readback in this shape).
     """
-    from ..vendor_interface.parsing import make_changeable_copy
+    from ..parsing import make_changeable_copy
 
     ch = make_changeable_copy(settings)
     if ch and (ch.get("stack") or {}).get("zDrive") == key:

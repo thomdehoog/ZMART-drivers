@@ -888,8 +888,8 @@ def phase_readonly(
         v.callable("get_hardware_info", lambda: drv.get_hardware_info(client))
         v.callable("get_xy", lambda: drv.get_xy(client))
 
-        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.actions import (
-            get as capabilities,
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitive_handling import (
+            readings as capabilities,
         )
 
         jobs_has_log_leg = capabilities.DATUMS["jobs"].log_fn is not None
@@ -1655,7 +1655,9 @@ def _apply_state_reader_mode(mode: str | None, log: logging.Logger) -> None:
     """Override all profile-routed passive state readers for this run."""
     if mode is None:
         return
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.actions import profiles
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitive_handling import (
+        profiles,
+    )
 
     profiles.STATE_READERS = profiles.StateReaderProfile(
         xy_mode=mode,
@@ -1698,7 +1700,9 @@ def _apply_log_select_confirmation(
         or args.prime_log_select_cluster
     ):
         return
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.actions import profiles
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitive_handling import (
+        profiles,
+    )
 
     updates = {
         "selected_job_confirm_source": (

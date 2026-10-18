@@ -170,7 +170,7 @@ def _resolve_profile(profile=None, **overrides):
     from dataclasses import replace
 
     if profile is None:
-        from ..actions.profiles import COMMAND_DEFAULT
+        from ..vendor_interface.primitive_handling.profiles import COMMAND_DEFAULT
 
         profile = COMMAND_DEFAULT
     changes = {name: value for name, value in overrides.items() if value is not None}
