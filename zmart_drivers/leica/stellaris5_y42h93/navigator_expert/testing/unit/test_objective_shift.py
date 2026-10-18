@@ -15,10 +15,10 @@ import pytest
 from limits_fixtures import install_permissive_limits
 
 import zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitive_handling.state as readers
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.commands import (
     objective_shift as shift,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.commands import (
     changes as cmds,
 )
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration import (

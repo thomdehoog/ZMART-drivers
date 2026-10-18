@@ -39,20 +39,20 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.nam
     Naming,
     run_hash,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.algorithms import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.setup.algorithms import (
     D4_RESIDUAL_MAX,
     classify_d4,
     register_voting,
 )
 
-from ..configuration.image_stage_registration import (
+from ...configuration.image_stage_registration import (
     SCHEMA_VERSION,
     Orientation,
     orientation_config,
     orientation_from_image_to_stage,
     reorient_array,
 )
-from ..configuration.notebook_support import (
+from ...configuration.notebook_support import (
     archive_notebook as archive_operator_notebook,
 )
 from .calibration_common import (
@@ -119,7 +119,7 @@ def start_session(
         raise ValueError(f"stage_move_um must be > 0, got {stage_move_um}")
 
     if machine is None:
-        from ..configuration.store import MACHINE
+        from ...configuration.store import MACHINE
 
         machine = MACHINE
     moment = moment or datetime.now(timezone.utc)

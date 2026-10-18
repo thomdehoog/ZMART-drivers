@@ -493,9 +493,9 @@ written, and the acquire record carries it as `metadata`.
 `vendor/` is LAS X's own account of the same capture, kept verbatim as
 provenance and sha256'd in `summary.json` — never read in the normal path, and
 there only in case the two accounts disagree.
-**OME metadata:** `procedures/ome.py` repairs known Leica OME violations (e.g. laser `Wavelength="0"`)
-in place, preserving byte formatting; `procedures/ome_canonical.py` writes clean canonical ZMART OME;
-`save(..., fix_ome=True)` validates/repairs each written file.
+**OME metadata:** `procedures/saving/ome_canonical.py` writes the clean canonical ZMART OME-XML
+that is stored inside each OME-Zarr image (`OME/METADATA.ome.xml`). Captures are saved as OME-Zarr
+only.
 
 **LAS X's cache can be let go of once a capture is saved.** Every picture LAS X takes stays in its
 Data Container cache until LAS X restarts, so a long time course fills the disk twice. The cache
@@ -546,6 +546,9 @@ zmart_drivers/leica/stellaris5_y42h93/navigator_expert/
 ├── connect.py          the connect flow: open LAS X, load this microscope's configuration
 ├── vendor_interface/   the only part that knows LAS X:
 │   ├── connection/     lasx_runtime.py (the .NET CAM assemblies), hardware_server.py
+│   ├── error_classification.py   the kinds of problem, the rule that only a temporary one is
+│   │                   sent again, and the sorting of LAS X's messages into the kinds
+│   ├── product.py · naming.py · files.py   the shapes of a capture and its files
 │   ├── primitives/     the smallest reads and writes, one folder for each way of reaching LAS X:
 │   │                   direct/ (direct_reader.py, state_tree.py), api/ (api_reader.py, delivery.py),
 │   │                   log/ (log_reader.py, log_wait.py), interface/ (lasx_navigator.py,
@@ -563,22 +566,23 @@ zmart_drivers/leica/stellaris5_y42h93/navigator_expert/
 │   ├── parsing.py      the strings LAS X hands back
 │   ├── metadata_map.py LAS X's description of a picture, read into the standard fields
 │   └── error_classification.py   sorting LAS X's errors
-├── dispatcher/         the engines that run a command safely, none of which names a LAS X object:
-│                       read.py (waits for a reading from whichever source answers), reading.py,
-│                       change.py (confirm_and_fire), gate.py (when the limits are enforced),
-│                       envelope.py, tuning.py (the timing constants), and the shapes every
-│                       driver shares: product.py (what an acquisition returns) · naming.py ·
-│                       files.py
-├── procedures/         session.py (the handle) · frame.py (get_xyz, set_xyz, set_origin) ·
-│                       acquisition.py (the acquire command and its log) · save.py · materialize.py ·
-│                       ome.py · ome_canonical.py · ome_zarr.py · command_log.py (saving the files) ·
-│                       instrument.py (state,
-│                       procedures, info) ·
-│                       changes.py (every set_*/move_*/select_job and the LAS X acquire command) ·
-│                       acquire.py (the capture) · objectives.py · objective_shift.py ·
-│                       backlash.py · measure_orientation.py · measure_limits.py ·
-│                       calibrate_objective_pair.py · check_calibration.py · adopt_calibration.py ·
-│                       calibration_common.py · algorithms/ (registration and focus scoring)
+├── dispatcher/         the machinery that runs a command safely, and nothing else. It names no LAS X
+│                       object: reader.py (waits for a reading from whichever source answers; holds
+│                       the Reading record and the waiting rule of four windows of three seconds) ·
+│                       writer.py (sends a command, checks for errors, confirms it, sends it
+│                       again where that is safe; holds the shape of a command's result) ·
+│                       gate.py (when the limits are enforced)
+├── procedures/         the recipes built on the machinery, grouped by job:
+│   ├── session.py · frame.py · acquisition.py · instrument.py   what the ZmartDriver class
+│   │                   calls: the session handle, where the stage is and moving it, taking and
+│   │                   saving a picture, the state and the named procedures
+│   ├── commands/       changes.py (every set_*/move_*/select_job and the LAS X acquire command) ·
+│   │                   acquire.py (the capture) · objectives.py · objective_shift.py · backlash.py
+│   ├── saving/         save.py · ome_zarr.py · ome_canonical.py · materialize.py · command_log.py
+│   └── setup/          the measurements done once per microscope: measure_orientation.py ·
+│                       measure_limits.py · calibrate_objective_pair.py · check_calibration.py ·
+│                       adopt_calibration.py · calibration_common.py · algorithms/ (registration
+│                       and focus scoring)
 ├── configuration/      what is measured once per microscope; coordinates.py holds the plain
 │                       arithmetic between stage and user coordinates. limits/, image_stage_registration/
 │                       and optical_calibration/ each hold their defaults/ and their notebook;
@@ -743,7 +747,7 @@ Adding a command touches four places, following the pattern every existing comma
 1. **Confirm function** (`vendor_interface/primitive_handling/confirmations.py`) — `_confirm_X(client, ...) -> {"success", "logs"}`
    (skip if no readback is possible).
 2. **CommandProfile** (`vendor_interface/primitive_handling/profiles.py`) — `MY_PARAM = _leica_setting_profile(_confirm_my_param)`.
-3. **Command wrapper** (`procedures/changes.py`) — three phases (pre-checks → `_dispatch(...)` with the
+3. **Command wrapper** (`procedures/commands/changes.py`) — three phases (pre-checks → `_dispatch(...)` with the
    profile + a `setup_fn` and target-bound `confirm_fn` → post-process). `_dispatch` handles
    client-binding, profile defaults, and the `confirm_and_fire` call.
 4. **Export** (`__init__.py`) — add to `__all__` and import it.

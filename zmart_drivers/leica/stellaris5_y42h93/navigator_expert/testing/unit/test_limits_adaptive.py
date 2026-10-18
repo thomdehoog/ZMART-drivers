@@ -12,7 +12,7 @@ from unittest.mock import patch
 
 import pytest
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.setup import (
     measure_limits as adaptive,
 )
 

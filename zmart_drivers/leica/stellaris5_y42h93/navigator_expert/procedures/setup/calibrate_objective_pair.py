@@ -57,7 +57,7 @@ from typing import Any
 import numpy as np
 
 import zmart_drivers.leica.stellaris5_y42h93.navigator_expert as drv
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.algorithms import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.setup.algorithms import (
     VOTING_METHODS,
     brenner,
     register_voting,
@@ -173,7 +173,7 @@ def start_session(
             "backlash_rounds must be a whole number greater than or equal to 0"
         )
 
-    from ..configuration.store import MACHINE, validate_calibration_name
+    from ...configuration.store import MACHINE, validate_calibration_name
 
     if sessions_root is None:
         sessions_root = MACHINE.subsystem_root("calibration")
@@ -193,7 +193,7 @@ def start_session(
         # for the report's source_calibration_file field.
         resolved_path = Path(calibration_path).absolute()
 
-    from ..configuration.optical_calibration import model as _calibration_model
+    from ...configuration.optical_calibration import model as _calibration_model
 
     existing_config = _calibration_model.load_calibration(resolved_path)
     try:
@@ -239,7 +239,7 @@ def start_session(
     # the adopted calibration so a named set never carries stale objective names.
     # Slots whose hardware record has no usable name are left out: an empty
     # name must never overwrite the human-set name already in the config.
-    from . import objectives as _objectives
+    from ..commands import objectives as _objectives
 
     hardware_objectives = {
         slot: name
@@ -372,7 +372,7 @@ def _warn_if_orientation_unmeasured() -> None:
     existed — is trusted as measured, so upgrading the driver never starts
     warning on a rig that was already set up.
     """
-    from ..configuration.store import MACHINE
+    from ...configuration.store import MACHINE
 
     try:
         raw = json.loads(MACHINE.orientation_path().read_text(encoding="utf-8"))

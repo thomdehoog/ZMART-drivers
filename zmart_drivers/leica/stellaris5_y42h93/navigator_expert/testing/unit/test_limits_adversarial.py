@@ -36,7 +36,7 @@ from limits_fixtures import (
 )
 from mock_lasx_api import MockLasxClient
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.commands import (
     changes as commands_mod,
 )
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.limits import (
@@ -999,11 +999,13 @@ def test_generated_machine_payload_matches_the_vocabulary():
 
 
 def test_every_dispatching_wrapper_declares_and_calls_the_gate():
-    """AST completeness sweep over procedures/changes.py: any public function that
+    """AST completeness sweep over procedures/commands/changes.py: any public function that
     reaches the fire path (_dispatch/_dispatch_setting/confirm_and_fire)
     must (a) be declared in gate.MUTATING_COMMANDS and
     (b) call the gate with ITS OWN name — a new command cannot ship ungated."""
-    source = (DRIVER_ROOT / "procedures" / "changes.py").read_text(encoding="utf-8")
+    source = (DRIVER_ROOT / "procedures" / "commands" / "changes.py").read_text(
+        encoding="utf-8"
+    )
     tree = ast.parse(source)
     fire_names = {"_dispatch", "_dispatch_setting", "confirm_and_fire"}
     # Raw-receipt fires must not escape the
@@ -1160,7 +1162,7 @@ def test_backlash_is_not_config_and_the_primitive_uses_its_default_params():
     there is no config path (and so no NaN-backlash path) left in limits."""
     import inspect
 
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures import (
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.commands import (
         backlash as movement,
     )
 

@@ -122,7 +122,7 @@ from .vendor_interface.primitive_handling.state import (
     get_pending_dialog,
 )
 from .vendor_interface.primitive_handling.confirmations import _readback
-from .procedures.changes import (
+from .procedures.commands.changes import (
     set_zoom,
     set_scan_speed,
     set_scan_resonant,
@@ -164,7 +164,7 @@ from .vendor_interface.primitive_handling.limit_rules import (
 )
 
 # -- acquisition/ - capture, file arrival, and save handling
-from .procedures.acquire import AcquisitionResult, acquire
+from .procedures.commands.acquire import AcquisitionResult, acquire
 from .vendor_interface.product import (
     AcquisitionMetadata,
     ChannelMetadata,
@@ -174,7 +174,7 @@ from .vendor_interface.product import (
     SavedAcquisition,
     VendorMetadataSource,
 )
-from .procedures.save import save
+from .procedures.saving.save import save
 
 # -- logging
 import logging

@@ -27,9 +27,9 @@ from ..configuration import store as _machine
 from ..dispatcher import gate as _gate
 from ..vendor_interface.parsing import parse_tile_geometry as _parse_tile_geometry
 from ..vendor_interface.primitive_handling import state as _readers
-from . import acquire as _capture
-from . import backlash as _motion
-from . import changes as _commands
+from .commands import acquire as _capture
+from .commands import backlash as _motion
+from .commands import changes as _commands
 from . import session as _info
 from .frame import canvas, delta_or_warn, get_xyz, hardware_snapshot
 from .session import ZmartHandle, job_catalog, note_unconfirmed, require_open, try_

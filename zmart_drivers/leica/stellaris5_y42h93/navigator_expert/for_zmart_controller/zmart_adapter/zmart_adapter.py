@@ -22,7 +22,7 @@ wraps them for the controller. Failures are always raised, never reported as
 ``success: False``.
 
 Limits are enforced below this file, in the change definitions themselves
-(``procedures/changes.py`` and ``dispatcher/gate.py``). A failed limits
+(``procedures/commands/changes.py`` and ``dispatcher/gate.py``). A failed limits
 handshake at connect leaves the session read-only: every command that would
 move or change something refuses with the recorded reason.
 

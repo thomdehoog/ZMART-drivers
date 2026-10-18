@@ -17,7 +17,7 @@ import zarr
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration import (
     image_stage_registration as orient,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.saving import (
     ome_zarr,
 )
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.product import (

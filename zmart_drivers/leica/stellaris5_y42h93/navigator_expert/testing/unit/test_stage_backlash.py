@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 import pytest
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.commands import (
     backlash as stage_movement,
 )
 

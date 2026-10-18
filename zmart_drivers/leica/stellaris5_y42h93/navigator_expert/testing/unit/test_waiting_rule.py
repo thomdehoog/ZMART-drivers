@@ -23,7 +23,7 @@ import pytest
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitive_handling import (
     readings as capabilities,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.commands import (
     objective_shift,
 )
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitive_handling import (
@@ -359,10 +359,10 @@ def test_commands_deliver_through_the_one_helper():
 # Whole folders, plus the change definitions that moved from actions/ to procedures/.
 GUARDED = ("dispatcher", "vendor_interface")
 GUARDED_FILES = (
-    "procedures/changes.py",
-    "procedures/acquire.py",
-    "procedures/objective_shift.py",
-    "procedures/objectives.py",
+    "procedures/commands/changes.py",
+    "procedures/commands/acquire.py",
+    "procedures/commands/objective_shift.py",
+    "procedures/commands/objectives.py",
 )
 WAIT_NAME = re.compile(
     r"(timeout|poll_interval|max_retries|max_confirm_attempts|grace|deadline|window_s|retry_delay)",
@@ -389,7 +389,7 @@ EXCEPTIONS = {
     ("vendor_interface/files.py", "timeout"),
     ("vendor_interface/files.py", "poll_interval"),
     # The rule itself.
-    ("dispatcher/timing.py", "WINDOW_S"),
+    ("dispatcher/reader.py", "WINDOW_S"),
 }
 
 

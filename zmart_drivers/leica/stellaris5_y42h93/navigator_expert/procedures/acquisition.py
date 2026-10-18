@@ -28,14 +28,14 @@ except Exception:  # noqa: BLE001 -- best-effort provenance
 
 from ..configuration import image_stage_registration as _orientation
 from ..configuration import session_state as _session_state
-from . import command_log as _log
+from .saving import command_log as _log
 from ..vendor_interface.primitives.capture import lasx_cache_release as _release
-from . import save as _save
+from .saving import save as _save
 from ..vendor_interface.naming import Naming, free_stem
 from ..vendor_interface.primitive_handling import state as _readers
 from ..vendor_interface.primitive_handling.profiles import IMAGE_SAVE
-from . import acquire as _capture
-from . import backlash as _motion
+from .commands import acquire as _capture
+from .commands import backlash as _motion
 from . import session as _info
 from .frame import get_xyz
 from .instrument import get_state
@@ -213,7 +213,7 @@ def acquire(
             "with set_xyz before acquiring"
         )
     noted_before = len(handle.unconfirmed)
-    # What the capture's log says it did, step by step (see procedures/command_log.py).
+    # What the capture's log says it did, step by step (see procedures/saving/command_log.py).
     steps: dict = {}
     backlash_rounds = ACQUISITION_BACKLASH_DEFAULT_ROUNDS
     apply_backlash = backlash_rounds > 0

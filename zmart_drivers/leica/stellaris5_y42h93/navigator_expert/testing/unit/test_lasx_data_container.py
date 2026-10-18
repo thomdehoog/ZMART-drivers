@@ -26,10 +26,10 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.pro
     PlaneIndex,
     RawPlaneSource,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.commands import (
     acquire as capture,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.saving import (
     save as acquisition,
 )
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitives.capture import (
@@ -141,7 +141,7 @@ def acquisition_of(
 
 
 def plane(source: RawPlaneSource) -> np.ndarray:
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures import (
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.saving import (
         materialize,
     )
 

@@ -46,9 +46,9 @@ READER_SOURCE_POLICY_MODULES = {
     Path("vendor_interface/primitive_handling/confirm_select_job.py"),
     # Calibration geometry is saved for good, so it is read from the API
     # and never from a log entry that may be stale (review finding M4).
-    Path("procedures/calibration_common.py"),
+    Path("procedures/setup/calibration_common.py"),
     # The stage limits are saved for good too: the corners are read from the API.
-    Path("procedures/measure_limits.py"),
+    Path("procedures/setup/measure_limits.py"),
     # Whether a command may fire is the API's to decide: the idle check.
     Path("vendor_interface/primitive_handling/prechecks.py"),
 }
@@ -68,30 +68,32 @@ def _driver_sources():
 def test_native_stage_motion_fires_only_from_the_actions():
     """The native CAM motion functions are the stage's real door.
 
-    Only the change definitions in ``procedures/changes.py`` may touch them: that
+    Only the change definitions in ``procedures/commands/changes.py`` may touch them: that
     is where the limit checks run, immediately before the native call. A
     native-motion reference anywhere else would be a second, unchecked door.
     """
     offenders = [
         str(rel)
         for rel, text in _driver_sources()
-        if "PyApiMoveHardware" in text and rel != Path("procedures/changes.py")
+        if "PyApiMoveHardware" in text and rel != Path("procedures/commands/changes.py")
     ]
     assert offenders == [], (
-        f"native stage motion referenced outside procedures/changes.py: {offenders}; "
+        f"native stage motion referenced outside procedures/commands/changes.py: {offenders}; "
         f"route the move through the move_xy / move_z actions instead"
     )
 
 
 def test_limit_checks_are_called_only_from_the_changes_and_the_dispatcher():
     """``check_xy`` / ``check_z`` are *defined* in the dispatcher's rulebook and
-    *called* only from the change definitions in ``procedures/changes.py`` (and
+    *called* only from the change definitions in ``procedures/commands/changes.py`` (and
     the backlash procedure, which composes checked moves). A call anywhere else
     is a second whistle: a copy of enforcement that can drift out of sync with
     the real one."""
     allowed = {
-        Path("procedures/changes.py"),  # the change definitions: where the checks run
-        Path("procedures/backlash.py"),  # composes checked moves
+        Path(
+            "procedures/commands/changes.py"
+        ),  # the change definitions: where the checks run
+        Path("procedures/commands/backlash.py"),  # composes checked moves
     }
     offenders = []
     for rel, text in _driver_sources():
@@ -100,7 +102,7 @@ def test_limit_checks_are_called_only_from_the_changes_and_the_dispatcher():
         if "check_xy(" in text or "check_z(" in text:
             offenders.append(str(rel))
     assert offenders == [], (
-        f"limit checks called outside procedures/changes.py and dispatcher/: {offenders}; "
+        f"limit checks called outside procedures/commands/changes.py and dispatcher/: {offenders}; "
         f"the changes already check every move; delete the duplicate call"
     )
 
@@ -246,14 +248,14 @@ def test_each_part_only_imports_what_the_anatomy_allows():
 
 
 def test_a_reading_never_uses_a_change():
-    """A get never calls a set: vendor_interface/primitive_handling/readings.py must not import procedures/changes.py."""
+    """A get never calls a set: vendor_interface/primitive_handling/readings.py must not import procedures/commands/changes.py."""
     readings = DRIVER_ROOT / "vendor_interface" / "primitive_handling" / "readings.py"
     tree = ast.parse(readings.read_text(encoding="utf-8"))
     for node in ast.walk(tree):
         if isinstance(node, ast.ImportFrom):
             names = [node.module or "", *(a.name for a in node.names)]
             assert "changes" not in names, (
-                "vendor_interface/primitive_handling/readings.py imports procedures/changes.py"
+                "vendor_interface/primitive_handling/readings.py imports procedures/commands/changes.py"
             )
 
 

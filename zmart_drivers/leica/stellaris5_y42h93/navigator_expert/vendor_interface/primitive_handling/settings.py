@@ -13,7 +13,7 @@ this file keeps those facts in one place, as a table:
 - ``write``: how the request is filled in, field by field and in order;
 - ``confirm``: how the result is checked by reading the state back.
 
-``procedures/changes.py`` holds the one runner that uses every entry, and the
+``procedures/commands/changes.py`` holds the one runner that uses every entry, and the
 named functions (``set_zoom`` and the others) that operators call.
 
 Author: Thom de Hoog, Center for Microscopy and Image Analysis (ZMB),

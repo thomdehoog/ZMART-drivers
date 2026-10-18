@@ -20,10 +20,10 @@ from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
-from ..vendor_interface.primitive_handling import state as _readers
-from ..vendor_interface import parsing as _parsing
-from ..vendor_interface.primitives.capture import tiff_tag as _ome
-from ..vendor_interface.product import (
+from ...vendor_interface.primitive_handling import state as _readers
+from ...vendor_interface import parsing as _parsing
+from ...vendor_interface.primitives.capture import tiff_tag as _ome
+from ...vendor_interface.product import (
     AcquisitionMetadata,
     ChannelMetadata,
     Instrument,

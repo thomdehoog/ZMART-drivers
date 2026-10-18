@@ -31,10 +31,10 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.store 
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.naming import (
     build_image_name,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.setup import (
     calibration_common as cm,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.setup import (
     check_calibration as chk,
 )
 
@@ -128,7 +128,7 @@ def _patch(
         },
     )
     monkeypatch.setattr(
-        "zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.adopt_calibration.compile_session_calibration",
+        "zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.setup.adopt_calibration.compile_session_calibration",
         lambda session: Path(session.paths.session_dir) / "calibration.json",
     )
     monkeypatch.setattr(chk.drv, "connect_python_client", lambda *a, **k: object())
