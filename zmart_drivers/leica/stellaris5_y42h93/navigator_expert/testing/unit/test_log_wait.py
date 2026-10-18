@@ -5,7 +5,7 @@ import unittest
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitive_handling import (
     profiles,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher import reader
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher import dispatcher
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitives.log import (
     log_reader,
 )
@@ -187,8 +187,8 @@ class TestLogWait(unittest.TestCase):
         )
 
         self.assertTrue(result.success)
-        self.assertEqual(result.diagnostics["timeout_s"], reader.WINDOW_S)
-        self.assertEqual(result.diagnostics["poll_interval_s"], reader.POLL_S)
+        self.assertEqual(result.diagnostics["timeout_s"], dispatcher.WINDOW_S)
+        self.assertEqual(result.diagnostics["poll_interval_s"], dispatcher.POLL_S)
 
 
 if __name__ == "__main__":

@@ -17,7 +17,7 @@ follows three phases:
 
     **Phase A** - Pre-checks: input validation, limit checks, enum
         resolution, early-exit optimizations.
-    **Phase B** - Backbone: calls ``confirm_and_fire`` with the command's
+    **Phase B** - Backbone: calls the dispatcher's ``write`` with the command's
         profile.
     **Phase C** - Post-processing: attach extra data to the result dict
         (e.g. ``move_xy`` attaches the target position).
@@ -45,7 +45,7 @@ from dataclasses import replace
 from functools import partial
 
 from ...dispatcher import gate as _gate
-from ...dispatcher.writer import confirm_and_fire
+from ...dispatcher import dispatcher as _dispatcher
 from ...vendor_interface.primitive_handling.limit_rules import check_xy, check_z
 from ...dispatcher.writer import _make_log_entry, _make_timing
 from ...vendor_interface.parsing import _hw_get
@@ -126,7 +126,7 @@ def _dispatch(
     max_confirm_attempts=None,
     error_check_fn=None,
 ):
-    """Call confirm_and_fire with a profile's settings.
+    """Call the dispatcher's write with a profile's settings.
 
     This is the single internal helper that all command wrappers call.
     It binds ``client`` into each profile callable via lambda, producing
@@ -167,7 +167,7 @@ def _dispatch(
             Use only for command-specific LAS X echo semantics.
 
     Returns:
-        Result dict from confirm_and_fire.
+        Result dict from the dispatcher's write.
     """
     # Resolve confirm_fn: explicit override > profile default > None
     effective_confirm = confirm_fn if confirm_fn is not None else profile.confirm_fn
@@ -216,7 +216,7 @@ def _dispatch(
         overrides["retry_escalate"] = retry_escalate
     effective_profile = replace(profile, **overrides) if overrides else profile
 
-    return confirm_and_fire(
+    return _dispatcher.write(
         client,
         api_obj,
         description,

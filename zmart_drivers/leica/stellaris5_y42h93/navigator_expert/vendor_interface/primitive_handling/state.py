@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import logging
 
-from ...dispatcher import reader as _reader
+from ...dispatcher import dispatcher as _door
 from ...dispatcher.reader import (
     Reading,
     derive as _derive,
@@ -37,8 +37,8 @@ log = logging.getLogger(__name__)
 
 
 def wait_for(datum, client, **keywords):
-    """Wait for a reading of *datum*, asking LAS X's sources; see :func:`dispatcher.read.wait_for`."""
-    return _reader.wait_for(sources, datum, client, **keywords)
+    """Wait for a reading of *datum*, asking LAS X's sources; see :func:`dispatcher.dispatcher.read`."""
+    return _door.read(sources, datum, client, **keywords)
 
 
 def on_demand_mode(datum):
