@@ -59,6 +59,7 @@ def _saved_manifest(output_root, naming, image):
         image_paths={cm.drv.PlaneIndex(t=0, z=0, c=0): image_path},
         xml_paths={cm.drv.PositionIndex(t=0, v=0): Path(output_root) / "mock.ome.xml"},
         naming=naming,
+        read_plane=lambda index: tifffile.imread(image_path),
     )
 
 
@@ -558,8 +559,8 @@ def test_successful_run_becomes_active_only_after_validation_and_adoption(
     )
     assert not (session.paths.session_dir / "configs").exists()
 
-    validation = session.paths.session_dir / "validation" / "check.ome.tiff"
-    tifffile.imwrite(validation, np.zeros((4, 4), dtype=np.uint16))
+    validation = session.paths.session_dir / "validation" / "check.ome.zarr"
+    validation.mkdir(parents=True)
     notebook = tmp_path / "set_orientation.ipynb"
     notebook.write_text('{"cells": []}', encoding="utf-8")
     adopted = wf.adopt_orientation(session, notebook)
@@ -712,7 +713,11 @@ def test_validation_stays_in_run_and_reloads_saved_image(tmp_path, monkeypatch):
         image_path = Path(output_root) / build_image_name(naming)
         image_path.parent.mkdir(parents=True, exist_ok=True)
         tifffile.imwrite(image_path, expected_image)
-        return SimpleNamespace(image_paths={object(): image_path})
+        index = object()
+        return SimpleNamespace(
+            image_paths={index: image_path},
+            read_plane=lambda _index: expected_image,
+        )
 
     monkeypatch.setattr(wf.drv, "save", _save)
 
