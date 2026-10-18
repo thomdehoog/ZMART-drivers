@@ -29,7 +29,8 @@ from ..vendor_interface.parsing import parse_tile_geometry as _parse_tile_geomet
 from ..vendor_interface.primitive_handling import state as _readers
 from .commands import acquire as _capture
 from .commands import backlash as _motion
-from .commands import changes as _commands
+from ..vendor_interface.primitive_handling import changes as _commands
+from .commands import compensated_changes as _compensated
 from . import session as _info
 from .frame import canvas, delta_or_warn, get_xyz, hardware_snapshot
 from .session import ZmartHandle, job_catalog, note_unconfirmed, require_open, try_
@@ -225,7 +226,7 @@ def set_state(handle: ZmartHandle, state: dict) -> dict:
             raise ValueError(
                 f"job {job!r} no longer exists on this instrument (available: {names})"
             )
-        result = _commands.select_job(handle.client, job)
+        result = _compensated.select_job(handle.client, job)
         if not result.get("success"):
             raise RuntimeError(f"select_job('{job}') failed: {result}")
         if not result.get("confirmed"):
@@ -325,7 +326,7 @@ def _run_autofocus(handle: ZmartHandle, procedure: dict) -> dict:
 
     original = _info.selected_job_name(handle)
     if job != original:
-        selected = _commands.select_job(handle.client, job)
+        selected = _compensated.select_job(handle.client, job)
         if not selected.get("success"):
             raise RuntimeError(f"select_job('{job}') failed: {selected}")
         if not selected.get("confirmed"):
@@ -341,7 +342,7 @@ def _run_autofocus(handle: ZmartHandle, procedure: dict) -> dict:
                 "the job selected before autofocus was unknown, so none is restored"
             )
         elif job != original:
-            restored = _commands.select_job(handle.client, original)
+            restored = _compensated.select_job(handle.client, original)
             if not restored.get("success"):
                 log.warning(
                     "could not restore job %r after autofocus: %s", original, restored

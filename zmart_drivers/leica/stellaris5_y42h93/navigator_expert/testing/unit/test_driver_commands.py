@@ -62,8 +62,11 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures import (
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.commands import (
     backlash as _motion,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.commands import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitive_handling import (
     changes as _commands,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.commands import (
+    compensated_changes as _commands_comp,
 )
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures import (
     frame as _frame,
@@ -258,7 +261,7 @@ class TestCalibrationSelection(unittest.TestCase):
         # The driver now owns loading: the named calibration flows through
         # the driver's connection -> model.load_objective_calibration, where one
         # exact document supplies both translations and readiness provenance.
-        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures import (
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration import (
             optical_calibration as drv_session,
         )
         from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.optical_calibration import (
@@ -292,7 +295,7 @@ class TestCalibrationSelection(unittest.TestCase):
 
     def test_translations_and_provenance_come_from_one_calibration_read(self):
         """A snapshot adoption during connect cannot mix old math with new proof."""
-        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures import (
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration import (
             optical_calibration as drv_session,
         )
         from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.optical_calibration import (
@@ -1635,7 +1638,7 @@ class TestAcquire(unittest.TestCase):
                 patch.object(_readers, "get_jobs", return_value=self._jobs()),
                 patch.object(_readers, "get_hardware_info", return_value={}),
                 patch.object(
-                    _commands,
+                    _commands_comp,
                     "select_job",
                     lambda client, job, **k: {"success": True},
                 ),
@@ -1679,7 +1682,7 @@ class TestAcquire(unittest.TestCase):
         return (
             patch.object(_readers, "get_jobs", return_value=self._jobs()),
             patch.object(_readers, "get_hardware_info", return_value={}),
-            patch.object(_commands, "select_job", return_value={"success": True}),
+            patch.object(_commands_comp, "select_job", return_value={"success": True}),
             patch.object(
                 _motion,
                 "correct_backlash",
@@ -1865,7 +1868,7 @@ class TestAcquire(unittest.TestCase):
         patches = _patch_position(job="Overview")
         with (
             patch.object(_readers, "get_jobs", return_value=self._jobs()),
-            patch.object(_commands, "select_job", return_value={"success": True}),
+            patch.object(_commands_comp, "select_job", return_value={"success": True}),
             patch.object(
                 _motion,
                 "correct_backlash",
@@ -1985,7 +1988,7 @@ class TestStateAndProcedures(unittest.TestCase):
     def test_set_state_refuses_an_autofocus_job(self):
         h = _handle()
         p = self._state_patches()
-        with p[0], p[1], p[2], patch.object(_commands, "select_job") as select:
+        with p[0], p[1], p[2], patch.object(_commands_comp, "select_job") as select:
             with self.assertRaisesRegex(ValueError, "autofocus"):
                 _instrument.set_state(h, {"changeable": {"job": "AF Job"}})
         select.assert_not_called()
@@ -2013,7 +2016,7 @@ class TestStateAndProcedures(unittest.TestCase):
     def test_set_state_refuses_a_job_that_no_longer_exists(self):
         h = _handle()
         p = self._state_patches(jobs=("Overview",))
-        with p[0], p[1], p[2], patch.object(_commands, "select_job") as select:
+        with p[0], p[1], p[2], patch.object(_commands_comp, "select_job") as select:
             with self.assertRaisesRegex(ValueError, "no longer exists"):
                 _instrument.set_state(h, {"changeable": {"job": "Gone"}})
         select.assert_not_called()
@@ -2056,7 +2059,7 @@ class TestStateAndProcedures(unittest.TestCase):
             position[2],
             position[3],
             patch.object(
-                _commands,
+                _commands_comp,
                 "select_job",
                 side_effect=lambda client, job, **k: (
                     calls.append(("select", job)) or {"success": True}
@@ -2094,7 +2097,7 @@ class TestStateAndProcedures(unittest.TestCase):
             position[1],
             position[2],
             position[3],
-            patch.object(_commands, "select_job", return_value={"success": True}),
+            patch.object(_commands_comp, "select_job", return_value={"success": True}),
             patch.object(
                 _capture,
                 "acquire",

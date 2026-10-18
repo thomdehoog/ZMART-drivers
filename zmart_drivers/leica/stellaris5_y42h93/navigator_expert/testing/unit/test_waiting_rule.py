@@ -359,7 +359,7 @@ def test_commands_deliver_through_the_one_helper():
 # Whole folders, plus the change definitions that moved from actions/ to procedures/.
 GUARDED = ("dispatcher", "vendor_interface")
 GUARDED_FILES = (
-    "procedures/commands/changes.py",
+    "procedures/commands/compensated_changes.py",
     "procedures/commands/acquire.py",
     "procedures/commands/objective_shift.py",
     "procedures/commands/objectives.py",

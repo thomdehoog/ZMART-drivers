@@ -37,8 +37,11 @@ from limits_fixtures import (
 )
 from mock_lasx_api import MockLasxClient
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.commands import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitive_handling import (
     changes as commands_mod,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.commands import (
+    compensated_changes as commands_mod_comp,
 )
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.limits import (
     config as limits_config,
@@ -302,7 +305,7 @@ def test_objective_allow_list_checks_the_resolved_slot(mock_client):
         }
     }
 
-    refused = commands_mod.set_objective(mock_client, "HiRes", hw_info, name="20x")
+    refused = commands_mod_comp.set_objective(mock_client, "HiRes", hw_info, name="20x")
     assert refused["success"] is False
     assert "objective_slot=2" in refused["message"]
     assert "expected one of [1]" in refused["message"]
@@ -326,7 +329,9 @@ def test_objective_allow_list_allows_a_listed_slot(mock_client):
         }
     }
 
-    result = commands_mod.set_objective(mock_client, "HiRes", hw_info, slot_index=1)
+    result = commands_mod_comp.set_objective(
+        mock_client, "HiRes", hw_info, slot_index=1
+    )
     assert result["success"] is True
 
 
@@ -358,10 +363,10 @@ def test_default_objective_slot_is_unrestricted(mock_client):
         }
     }
 
-    assert commands_mod.set_objective(mock_client, "HiRes", hw_info, slot_index=0)[
+    assert commands_mod_comp.set_objective(mock_client, "HiRes", hw_info, slot_index=0)[
         "success"
     ]
-    assert commands_mod.set_objective(mock_client, "HiRes", hw_info, name="20x")[
+    assert commands_mod_comp.set_objective(mock_client, "HiRes", hw_info, name="20x")[
         "success"
     ]
 
@@ -651,7 +656,7 @@ _WRAPPER_CALLS = {
     "set_image_format": lambda c: commands_mod.set_image_format(
         c, "Overview", "512 x 512"
     ),
-    "set_objective": lambda c: commands_mod.set_objective(
+    "set_objective": lambda c: commands_mod_comp.set_objective(
         c, "J", _HW_INFO, slot_index=1
     ),
     "set_z_stack_definition": lambda c: commands_mod.set_z_stack_definition(
@@ -688,7 +693,7 @@ _WRAPPER_CALLS = {
     "move_xy": lambda c: commands_mod.move_xy(c, 50000, 50000, unit="um"),
     "move_z": lambda c: commands_mod.move_z(c, "J", 0.0, unit="um", z_mode="galvo"),
     "acquire": lambda c: commands_mod.acquire(c, "J"),
-    "select_job": lambda c: commands_mod.select_job(c, "Overview"),
+    "select_job": lambda c: commands_mod_comp.select_job(c, "Overview"),
 }
 
 _SETTER_ALLOWED_VALUES = {
@@ -1015,29 +1020,41 @@ def test_generated_machine_payload_matches_the_vocabulary():
 
 
 def test_every_dispatching_wrapper_declares_and_calls_the_gate():
-    """AST completeness sweep over procedures/commands/changes.py: any public function that
+    """AST completeness sweep over the single-command changes and the two recipes: any public function that
     reaches the fire path (_dispatch/_dispatch_setting/the dispatcher's write)
     must (a) be declared in gate.MUTATING_COMMANDS and
     (b) call the gate with ITS OWN name — a new command cannot ship ungated."""
-    source = (DRIVER_ROOT / "procedures" / "commands" / "changes.py").read_text(
-        encoding="utf-8"
+    vendor_tree = ast.parse(
+        (
+            DRIVER_ROOT / "vendor_interface" / "primitive_handling" / "changes.py"
+        ).read_text(encoding="utf-8")
     )
-    tree = ast.parse(source)
-    fire_names = {"_dispatch", "_dispatch_setting", "write"}
+    recipe_tree = ast.parse(
+        (DRIVER_ROOT / "procedures" / "commands" / "compensated_changes.py").read_text(
+            encoding="utf-8"
+        )
+    )
+    tree = vendor_tree
+    fire_names = {"dispatch_change", "_dispatch_setting", "write"}
+    fire_attr_names = {"dispatch_change"}
     # Raw-receipt fires must not escape the
     # sweep either: a wrapper that skips the dispatch helpers and calls
     # api_obj.UpdateAwaitReceipt()/UpdateAsync() directly still reaches
     # hardware.
     fire_attrs = {"UpdateAwaitReceipt", "UpdateAsync"}
     checked = []
-    for node in tree.body:
+    for node in [*vendor_tree.body, *recipe_tree.body]:
         if not isinstance(node, ast.FunctionDef) or node.name.startswith("_"):
             continue
         referenced = {n.id for n in ast.walk(node) if isinstance(n, ast.Name)}
         referenced_attrs = {
             n.attr for n in ast.walk(node) if isinstance(n, ast.Attribute)
         }
-        if not (referenced & fire_names) and not (referenced_attrs & fire_attrs):
+        if (
+            not (referenced & fire_names)
+            and not (referenced_attrs & fire_attrs)
+            and not (referenced_attrs & fire_attr_names)
+        ):
             continue
         assert node.name in gate.MUTATING_COMMANDS, (
             f"{node.name} dispatches to the fire path but has no MUTATING_COMMANDS entry"
@@ -1047,10 +1064,10 @@ def test_every_dispatching_wrapper_declares_and_calls_the_gate():
             for call in ast.walk(node)
             if isinstance(call, ast.Call)
             and (
-                (isinstance(call.func, ast.Name) and call.func.id == "_limits_refusal")
+                (isinstance(call.func, ast.Name) and call.func.id == "limits_refusal")
                 or (
                     isinstance(call.func, ast.Attribute)
-                    and call.func.attr == "check_refusal"
+                    and call.func.attr in ("check_refusal", "limits_refusal")
                 )
             )
             and len(call.args) >= 2

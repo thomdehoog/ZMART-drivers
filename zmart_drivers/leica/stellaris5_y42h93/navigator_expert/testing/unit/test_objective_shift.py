@@ -18,8 +18,11 @@ import zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.p
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.commands import (
     objective_shift as shift,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.commands import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitive_handling import (
     changes as cmds,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.commands import (
+    compensated_changes as cmds_comp,
 )
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures import (
     session_state,
@@ -192,7 +195,7 @@ def test_select_job_records_before_the_switch_and_compensates_after(
         slot["value"] = 2  # the new job carries the other objective
         return {"success": True, "confirmed": True, "logs": []}
 
-    monkeypatch.setattr(cmds, "_dispatch", fake_dispatch)
+    monkeypatch.setattr(cmds, "dispatch_change", fake_dispatch)
     monkeypatch.setattr(
         cmds,
         "move_xy",
@@ -206,7 +209,7 @@ def test_select_job_records_before_the_switch_and_compensates_after(
         ),
     )
 
-    result = cmds.select_job(client, "HiRes")
+    result = cmds_comp.select_job(client, "HiRes")
 
     # Measured before the switch, switched, then moved by exactly ΔT.
     assert order == [
@@ -247,7 +250,7 @@ def test_select_job_on_an_unarmed_client_behaves_as_before(client, monkeypatch):
         lambda *a, **k: {"success": True, "confirmed": True, "logs": []},
     )
 
-    result = cmds.select_job(client, "HiRes")
+    result = cmds_comp.select_job(client, "HiRes")
     assert result["success"]
     assert "objective_compensation" not in result
 
@@ -292,7 +295,7 @@ def test_set_objective_records_before_and_compensates_with_the_commanded_slot(
         }
     }
 
-    result = cmds.set_objective(client, "Overview", hw_info, slot_index=2)
+    result = cmds_comp.set_objective(client, "Overview", hw_info, slot_index=2)
 
     assert order == [
         "read_xy",

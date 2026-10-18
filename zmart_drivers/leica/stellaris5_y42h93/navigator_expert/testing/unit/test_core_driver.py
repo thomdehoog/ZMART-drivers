@@ -34,8 +34,11 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.pri
     confirmations,
     profiles,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.commands import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitive_handling import (
     changes as commands,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.commands import (
+    compensated_changes as commands_comp,
 )
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher import (
     confirm_loop as dispatch,
@@ -793,7 +796,7 @@ class TestRetryBackoff(unittest.TestCase):
                 "logs": [],
             },
         ) as mock_caf:
-            commands._dispatch(
+            commands.dispatch_change(
                 client, api_obj, "Test", profile, setup_fn=lambda m: None
             )
 
@@ -826,7 +829,7 @@ class TestRetryBackoff(unittest.TestCase):
                 "logs": [],
             },
         ) as mock_caf:
-            commands._dispatch(
+            commands.dispatch_change(
                 client, api_obj, "Test", profile, setup_fn=lambda m: None
             )
 
@@ -857,7 +860,7 @@ class TestRetryBackoff(unittest.TestCase):
                 "logs": [],
             },
         ) as mock_caf:
-            commands._dispatch(
+            commands.dispatch_change(
                 client,
                 api_obj,
                 "Test",
@@ -895,7 +898,7 @@ class TestRetryBackoff(unittest.TestCase):
                 "logs": [],
             },
         ) as mock_caf:
-            commands._dispatch(
+            commands.dispatch_change(
                 client,
                 api_obj,
                 "Test",
@@ -2791,10 +2794,10 @@ class TestConfirmSelectJob(unittest.TestCase):
             patch.object(profiles, "STATE_READERS", profile),
             patch.object(readers, "get_jobs", side_effect=fake_get_jobs),
             patch.object(
-                commands, "_dispatch", return_value=dispatched
+                commands, "dispatch_change", return_value=dispatched
             ) as dispatch_mock,
         ):
-            result = commands.select_job(client, "Overview")
+            result = commands_comp.select_job(client, "Overview")
 
         self.assertEqual(result, dispatched)
         self.assertEqual(calls[0]["mode"], "api")
@@ -2814,10 +2817,10 @@ class TestConfirmSelectJob(unittest.TestCase):
             ),
             patch.object(readers, "get_jobs") as get_jobs,
             patch.object(
-                commands, "_dispatch", return_value=dispatched
+                commands, "dispatch_change", return_value=dispatched
             ) as dispatch_mock,
         ):
-            result = commands.select_job(client, "Overview")
+            result = commands_comp.select_job(client, "Overview")
 
         self.assertEqual(result, dispatched)
         get_jobs.assert_not_called()
@@ -2859,10 +2862,10 @@ class TestConfirmSelectJob(unittest.TestCase):
                 side_effect=fake_settings,
             ),
             patch.object(
-                commands, "_dispatch", return_value=dispatched
+                commands, "dispatch_change", return_value=dispatched
             ) as dispatch_mock,
         ):
-            result = commands.select_job(client, "Overview")
+            result = commands_comp.select_job(client, "Overview")
 
         self.assertEqual(result, dispatched)
         self.assertEqual(
@@ -2878,7 +2881,7 @@ class TestHybridSelectJobApiLegEndToEnd(unittest.TestCase):
     """CF-01 regression: the hybrid race's api leg must actually reach the
     CAM client through the routed readers while the race is running.
 
-    Wires ``commands.select_job`` through the real dispatch backbone and
+    Wires ``commands_comp.select_job`` through the real dispatch backbone and
     the real reader router — only the raw CAM reader and the log poll are
     faked. Before the fix, the race held the client's in-flight claim for
     the api leg's entire duration, so the leg's own routed ``get_jobs``
@@ -2940,7 +2943,7 @@ class TestHybridSelectJobApiLegEndToEnd(unittest.TestCase):
                 return_value=silent_log,
             ),
         ):
-            result = commands.select_job(client, "HiRes")
+            result = commands_comp.select_job(client, "HiRes")
 
         self.assertTrue(result["success"])
         self.assertTrue(

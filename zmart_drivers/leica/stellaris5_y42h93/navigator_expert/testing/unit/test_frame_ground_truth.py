@@ -32,7 +32,7 @@ import zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.p
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.commands import (
     objective_shift as shift,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.commands import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitive_handling import (
     changes as commands_mod,
 )
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures import (
@@ -47,7 +47,7 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface imp
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.commands import (
     backlash as _motion,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.commands import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitive_handling import (
     changes as _commands,
 )
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitive_handling import (
