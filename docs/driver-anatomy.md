@@ -61,6 +61,7 @@ my_driver/
     __init__.py                makes the folder a package, so the parts can import each other
 
     for_zmart_controller/      everything that faces the controller
+        __init__.py            needed: the controller imports the class file as part of the package, so its imports work
         zmart_driver.py        the ZmartDriver class the controller calls; kept thin
 
     vendor_interface/          the part you write for a new microscope
