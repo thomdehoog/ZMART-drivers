@@ -47,6 +47,9 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher import (
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface import (
     error_classification as errors,
 )
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitive_handling import (
+    settings as settings_table,
+)
 
 # =============================================================================
 # Helpers - mock factory
@@ -1843,11 +1846,11 @@ class TestSetFunctionWiring(unittest.TestCase):
     def test_scan_resonant_no_change_error_accepted_when_readback_matches(self):
         client = self._resonant_no_change_client()
         with patch.object(
-            commands,
+            settings_table._check,
             "_confirm_scan_resonant",
             return_value={"success": True, "logs": []},
         ) as confirm:
-            result = commands._scan_resonant_error_check(
+            result = settings_table._scan_resonant_error_check(
                 client, job_name="HiRes", target=False, timeout=0.1
             )
 
@@ -1858,11 +1861,11 @@ class TestSetFunctionWiring(unittest.TestCase):
     def test_scan_resonant_no_change_error_fails_when_readback_disagrees(self):
         client = self._resonant_no_change_client()
         with patch.object(
-            commands,
+            settings_table._check,
             "_confirm_scan_resonant",
             return_value={"success": False, "logs": []},
         ):
-            result = commands._scan_resonant_error_check(
+            result = settings_table._scan_resonant_error_check(
                 client, job_name="HiRes", target=False, timeout=0.1
             )
 
