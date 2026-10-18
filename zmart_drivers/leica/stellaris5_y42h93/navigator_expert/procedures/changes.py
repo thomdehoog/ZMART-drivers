@@ -1,40 +1,42 @@
 """
-Command wrappers.
-=================
+The changes the driver can make to LAS X, as named functions.
+==============================================================
 Public ``set_*``, ``move_*``, ``acquire``, and ``select_job`` functions.
-Each wrapper follows a three-phase pattern:
+
+The settings of a job (zoom, scan speed, laser intensity, and the rest) are
+all changed by the one runner, ``_change_setting``, from their entry in
+``vendor_interface/primitive_handling/settings.py``: that table says which LAS X
+request to fill in, in which order, how the result is checked, and which values
+the limits gate is shown. Each ``set_*`` function here only gives the setting
+its name, its arguments and its documentation.
+
+The functions that are more than a table entry stay here in full, because they
+are recipes: ``set_objective`` and ``select_job`` (which keep the sample point in
+view after the lens changes), ``move_xy``, ``move_z`` and ``acquire``. Every one
+follows three phases:
 
     **Phase A** - Pre-checks: input validation, limit checks, enum
-        resolution, early-exit optimizations. Stays in the wrapper.
+        resolution, early-exit optimizations.
     **Phase B** - Backbone: calls ``confirm_and_fire`` with the command's
-        profile. Replaces all bespoke dispatch code.
+        profile.
     **Phase C** - Post-processing: attach extra data to the result dict
-        (e.g. ``move_xy`` attaches position readback).
+        (e.g. ``move_xy`` attaches the target position).
 
-Every command unpacks its profile and binds ``client`` via lambda.
-The binding pattern is identical across all commands - no exceptions::
-
-    pre_check_fn  = lambda: profile.pre_check_fn(client)
-    error_check_fn = lambda: profile.error_check_fn(client)
-    confirm_fn    = lambda: profile.confirm_fn(client, ...)
-
-Numeric command tuning comes from ``profiles.py``. Wrapper keyword
-arguments are explicit overrides for tests and unusual hardware runs;
+Numeric command tuning comes from the profiles in
+``vendor_interface/primitive_handling/profiles.py``. Keyword arguments such as
+``max_retries`` are explicit overrides for tests and unusual hardware runs;
 ``None`` means "use the profile".
 
 Result contract: with the profiles' ``success_on_unconfirmed=True``
-(deliberate — see ``CommandProfile``), ``result["success"]`` means the
+(deliberate - see ``CommandProfile``), ``result["success"]`` means the
 command was *accepted*, not that it took effect. A caller that needs
 proof the setting/move landed must check ``result["confirmed"]``.
 
-Low-level limits gate: every mutating wrapper here declares its policy key in
-``gate.MUTATING_COMMANDS`` and calls
-``_limits_refusal`` in Phase A — fail-closed BEFORE the native call can
-fire (no limits handshake / invalid machine-local limits / constraint
-violation all refuse with a result dict). See ``commands/gate.py``.
-
-Import restrictions: only command helpers, runtime profiles/utilities, limits,
-the gate, readers, and confirmations.
+Low-level limits gate: every mutating command declares its policy key in
+``gate.MUTATING_COMMANDS`` and calls ``_limits_refusal`` in Phase A - closed
+BEFORE the native call can fire (no limits handshake / invalid machine-local
+limits / constraint violation all refuse with a result dict). See
+``dispatcher/gate.py``.
 """
 
 import logging
@@ -46,37 +48,14 @@ from ..dispatcher import gate as _gate
 from ..dispatcher.change import confirm_and_fire
 from ..dispatcher.checks import check_xy, check_z
 from ..dispatcher.envelope import _make_log_entry, _make_timing
-from ..vendor_interface.error_classification import (
-    _check_api_error,
-    _is_transient_error,
-)
-from ..vendor_interface.parsing import _hw_get, parse_format
+from ..vendor_interface.parsing import _hw_get
+from ..vendor_interface.primitive_handling import settings
 from . import objective_shift as _objective_shift
 from ..vendor_interface.primitive_handling.confirm_select_job import (
     prepare_select_job,
     select_job_confirm_legs,
 )
 from ..vendor_interface.primitive_handling.confirmations import (
-    _confirm_detector_gain,
-    _confirm_filter_wheel_slot,
-    _confirm_filter_wheel_spectrum,
-    _confirm_frame_accumulation,
-    _confirm_frame_average,
-    _confirm_image_format,
-    _confirm_laser_intensity,
-    _confirm_laser_shutter,
-    _confirm_line_accumulation,
-    _confirm_line_average,
-    _confirm_pinhole_airy,
-    _confirm_scan_field_rotation,
-    _confirm_scan_mode,
-    _confirm_scan_resonant,
-    _confirm_scan_speed,
-    _confirm_sequential_mode,
-    _confirm_z_stack_definition,
-    _confirm_z_stack_size,
-    _confirm_z_stack_step_size,
-    _confirm_zoom,
     confirm_acquire,
     confirm_move_xy,
     confirm_move_z,
@@ -86,30 +65,10 @@ from ..vendor_interface.primitive_handling.confirmations import (
 from .objectives import objective_by_slot
 from ..vendor_interface.primitive_handling.profiles import (
     ACQUIRE,
-    DETECTOR_GAIN,
-    FILTER_WHEEL_SLOT,
-    FILTER_WHEEL_SPECTRUM,
-    FRAME_ACCUMULATION,
-    FRAME_AVERAGE,
-    IMAGE_FORMAT,
-    LASER_INTENSITY,
-    LASER_SHUTTER,
-    LINE_ACCUMULATION,
-    LINE_AVERAGE,
     MOVE_XY,
     MOVE_Z,
     OBJECTIVE,
-    PINHOLE_AIRY,
-    SCAN_FIELD_ROTATION,
-    SCAN_MODE,
-    SCAN_RESONANT,
-    SCAN_SPEED,
     SELECT_JOB,
-    SEQUENTIAL_MODE,
-    Z_STACK_DEFINITION,
-    Z_STACK_SIZE,
-    Z_STACK_STEP_SIZE,
-    ZOOM,
 )
 
 log = logging.getLogger(__name__)
@@ -271,83 +230,46 @@ def _dispatch(
     )
 
 
-def _dispatch_setting(
-    client,
-    api_attr,
-    field_map,
-    description,
-    profile,
-    confirm_fn,
-    *,
-    max_retries=None,
-):
-    """Fire a pure field-write setting command through the backbone.
+def _change_setting(setting, client, arguments, *, max_retries=None, tolerance=None):
+    """Change one LAS X setting, following its entry in ``primitive_handling/settings.py``.
 
-    The boilerplate is identical for every pure-delegation setter: resolve
-    the PyApi object, write a fixed map of model fields *in order*, and
-    dispatch with the command's profile and a target-bound confirm. ``field_map``
-    is an ordered ``{model_attr: value}`` mapping (insertion order is the write
-    order, matching the original hand-written ``setup`` bodies).
-
-    Setters that compute fields, resolve/cast enums, convert units, or validate
-    inputs keep their own bodies and call ``_dispatch`` directly — they do not
-    route through here.
+    The steps are the same for every setting: tidy the arguments, show the new
+    value to the limits gate (nothing is sent if the gate refuses), check that
+    the value can be sent at all, then send it through the dispatcher and read
+    the state back. What differs from one setting to the next is in its entry.
     """
-    api_obj = getattr(client, api_attr)
+    if setting.normalize is not None:
+        arguments = setting.normalize(arguments)
 
-    def setup(m):
-        for attr, value in field_map.items():
-            setattr(m, attr, value)
+    refused = _limits_refusal(client, setting.command, setting.gate(arguments))
+    if refused:
+        return refused
+
+    if setting.validate is not None:
+        problem = setting.validate(arguments)
+        if problem is not None:
+            return {
+                "success": False,
+                "confirmed": None,
+                "message": problem,
+                "timing": _make_timing(total_s=0.0, attempts=0),
+                "logs": [],
+            }
 
     return _dispatch(
         client,
-        api_obj,
-        description,
-        profile,
-        setup_fn=setup,
-        confirm_fn=confirm_fn,
+        getattr(client, setting.request),
+        setting.describe.format(**arguments),
+        setting.profile,
+        setup_fn=lambda model: setting.write(model, arguments),
+        confirm_fn=setting.confirm(arguments, tolerance),
+        error_check_fn=setting.error_check(arguments) if setting.error_check else None,
         max_retries=max_retries,
     )
 
 
-_SCAN_RESONANT_NO_CHANGE = "desired state does not differ from the current state"
-
-
-def _scan_resonant_error_check(client, *, job_name, target, timeout=None):
-    """Accept LAS X's resonant no-change echo only when readback agrees."""
-    logs = []
-    err = _check_api_error(client)
-
-    if err is None:
-        return {"success": True, "error": None, "transient": None, "logs": logs}
-
-    error_msg = err.get("error", "")
-    details = err.get("details", {})
-    if _SCAN_RESONANT_NO_CHANGE in error_msg.lower():
-        confirmed = _confirm_scan_resonant(
-            client, job_name, target, poll_window=timeout
-        )
-        logs.extend(confirmed.get("logs", []))
-        if confirmed.get("success"):
-            msg = f"Resonant -> {target} already matched; accepting LAS X no-change response"
-            logs.append(_make_log_entry("info", msg))
-            return {"success": True, "error": None, "transient": None, "logs": logs}
-
-    transient = _is_transient_error(error_msg)
-    log_msg = f"API error: {error_msg}"
-    if details:
-        log_msg += f" | details: {details}"
-    logs.append(_make_log_entry("warning" if transient else "error", log_msg))
-    return {
-        "success": False,
-        "error": error_msg,
-        "transient": transient,
-        "logs": logs,
-    }
-
-
 # =============================================================================
-# Set functions - Job-level
+# Settings of a job - one named function each, all through the runner above
 # =============================================================================
 
 
@@ -361,144 +283,66 @@ def set_zoom(client, job_name, value, *, max_retries=None, tolerance=None):
         max_retries: Transient error retry ceiling.
         tolerance: Readback confirmation tolerance.
     """
-    refused = _limits_refusal(
-        client, "set_zoom", {"job_name": job_name, "value": value}
-    )
-    if refused:
-        return refused
-    return _dispatch_setting(
+    return _change_setting(
+        settings.ZOOM,
         client,
-        "PyApiSetZoomByJobName",
-        {"JobName": job_name, "ZoomValue": value},
-        f"Zoom -> {value}",
-        ZOOM,
-        partial(
-            _confirm_zoom,
-            job_name=job_name,
-            target=value,
-            tolerance=_profile_value(ZOOM, "confirm_tolerance", tolerance),
-        ),
+        {
+            "job_name": job_name,
+            "value": value,
+        },
         max_retries=max_retries,
+        tolerance=tolerance,
     )
 
 
 def set_scan_speed(client, job_name, value, *, max_retries=None):
     """Set scan speed for the specified job."""
-    refused = _limits_refusal(
-        client, "set_scan_speed", {"job_name": job_name, "value": value}
-    )
-    if refused:
-        return refused
-    return _dispatch_setting(
+    return _change_setting(
+        settings.SCAN_SPEED,
         client,
-        "PyApiSetScanSpeedByJobName",
-        {"JobName": job_name, "ScanSpeed": value},
-        f"ScanSpeed -> {value}",
-        SCAN_SPEED,
-        partial(_confirm_scan_speed, job_name=job_name, target=value),
+        {
+            "job_name": job_name,
+            "value": value,
+        },
         max_retries=max_retries,
     )
 
 
 def set_scan_resonant(client, job_name, enable, *, max_retries=None):
     """Enable or disable resonant scanning for the specified job."""
-    refused = _limits_refusal(
-        client, "set_scan_resonant", {"job_name": job_name, "value": enable}
-    )
-    if refused:
-        return refused
-    api_obj = client.PyApiSetScannerToResonantByJobName
-
-    def setup(m):
-        m.JobName = job_name
-        m.EnableResonant = enable
-
-    return _dispatch(
+    return _change_setting(
+        settings.SCAN_RESONANT,
         client,
-        api_obj,
-        f"Resonant -> {enable}",
-        SCAN_RESONANT,
-        setup_fn=setup,
-        confirm_fn=partial(_confirm_scan_resonant, job_name=job_name, target=enable),
-        error_check_fn=partial(
-            _scan_resonant_error_check,
-            job_name=job_name,
-            target=enable,
-            timeout=SCAN_RESONANT.confirm_poll_s,
-        ),
+        {
+            "job_name": job_name,
+            "enable": enable,
+        },
         max_retries=max_retries,
     )
 
 
 def set_scan_mode(client, job_name, mode, *, max_retries=None):
     """Set scan mode (e.g. 'xyz', 'xyzt') for the specified job."""
-    refused = _limits_refusal(
-        client, "set_scan_mode", {"job_name": job_name, "value": mode}
-    )
-    if refused:
-        return refused
-    return _dispatch_setting(
+    return _change_setting(
+        settings.SCAN_MODE,
         client,
-        "PyApiSetScanModeByJobName",
-        {"JobName": job_name, "ScanModeValue": mode},
-        f"ScanMode -> {mode}",
-        SCAN_MODE,
-        partial(_confirm_scan_mode, job_name=job_name, target=mode),
+        {
+            "job_name": job_name,
+            "mode": mode,
+        },
         max_retries=max_retries,
     )
 
 
 def set_sequential_mode(client, job_name, mode, *, max_retries=None):
     """Set sequential mode ('Line', 'Frame', or 'Stack') for the specified job."""
-    refused = _limits_refusal(
-        client, "set_sequential_mode", {"job_name": job_name, "value": mode}
-    )
-    if refused:
-        return refused
-    # Phase A: input validation and enum resolution
-    if not isinstance(mode, str) or not mode.strip():
-        return {
-            "success": False,
-            "confirmed": None,
-            "message": f"SequentialMode -> {repr(mode)} | Invalid: mode must be a "
-            f"non-empty string. Valid: ['Line', 'Frame', 'Stack']",
-            "timing": _make_timing(total_s=0.0, attempts=0),
-            "logs": [],
-        }
-
-    _enum_map = {
-        "Line": "eSequentialLine",
-        "Frame": "eSequentialFrame",
-        "Stack": "eSequentialStack",
-    }
-    enum_val = _enum_map.get(mode)
-    if enum_val is None:
-        return {
-            "success": False,
-            "confirmed": None,
-            "message": f"Could not map {repr(mode)} to SequentialMode enum. "
-            f"Valid: {list(_enum_map.keys())}",
-            "timing": _make_timing(total_s=0.0, attempts=0),
-            "logs": [],
-        }
-
-    api_obj = client.PyApiSetSequentialModeByJobName
-
-    def setup(m):
-        m.JobName = job_name
-        try:
-            current = m.SequentialMode
-            m.SequentialMode = getattr(type(current), enum_val, enum_val)
-        except (AttributeError, TypeError):
-            m.SequentialMode = enum_val
-
-    return _dispatch(
+    return _change_setting(
+        settings.SEQUENTIAL_MODE,
         client,
-        api_obj,
-        f"SequentialMode -> {mode}",
-        SEQUENTIAL_MODE,
-        setup_fn=setup,
-        confirm_fn=partial(_confirm_sequential_mode, job_name=job_name, target=mode),
+        {
+            "job_name": job_name,
+            "mode": mode,
+        },
         max_retries=max_retries,
     )
 
@@ -507,26 +351,15 @@ def set_scan_field_rotation(
     client, job_name, angle, *, max_retries=None, tolerance=None
 ):
     """Set scan field rotation angle (degrees) for the specified job."""
-    refused = _limits_refusal(
-        client, "set_scan_field_rotation", {"job_name": job_name, "value": angle}
-    )
-    if refused:
-        return refused
-    return _dispatch_setting(
+    return _change_setting(
+        settings.SCAN_FIELD_ROTATION,
         client,
-        "PyApiSetScanFieldRotationByJobName",
-        {"JobName": job_name, "Rotation": angle},
-        f"Rotation -> {angle}",
-        SCAN_FIELD_ROTATION,
-        partial(
-            _confirm_scan_field_rotation,
-            job_name=job_name,
-            target=angle,
-            tolerance=_profile_value(
-                SCAN_FIELD_ROTATION, "confirm_tolerance", tolerance
-            ),
-        ),
+        {
+            "job_name": job_name,
+            "angle": angle,
+        },
         max_retries=max_retries,
+        tolerance=tolerance,
     )
 
 
@@ -536,36 +369,300 @@ def set_image_format(client, job_name, format_str, *, max_retries=None):
     Args:
         format_str: Either a string like '512 x 512' or a tuple (w, h).
     """
-    if isinstance(format_str, tuple):
-        w, h = format_str
-    else:
-        w, h = parse_format(format_str)
-    # Gate the COMMANDED value, not the raw input spelling: '512x512',
-    # '512 x 512', and (512, 512) all command the same format, so they must
-    # all be checked as the same canonical 'W x H' string a limits file lists.
-    refused = _limits_refusal(
-        client, "set_image_format", {"job_name": job_name, "value": f"{w} x {h}"}
-    )
-    if refused:
-        return refused
-
-    api_obj = client.PyApiSetImageSizeByJobName
-
-    def setup(m):
-        m.JobName = job_name
-        m.ImageWidth = w
-        m.ImageHeight = h
-        m.IsAutoFocusDefinition = False
-
-    return _dispatch(
+    return _change_setting(
+        settings.IMAGE_FORMAT,
         client,
-        api_obj,
-        f"Format -> {w} x {h}",
-        IMAGE_FORMAT,
-        setup_fn=setup,
-        confirm_fn=partial(_confirm_image_format, job_name=job_name, w=w, h=h),
+        {
+            "job_name": job_name,
+            "format_str": format_str,
+        },
         max_retries=max_retries,
     )
+
+
+def set_z_stack_definition(
+    client,
+    job_name,
+    begin_um=None,
+    end_um=None,
+    old_begin_um=None,
+    old_end_um=None,
+    *,
+    max_retries=None,
+    tolerance=None,
+):
+    """Set z-stack begin/end positions (micrometers).
+
+    Args:
+        begin_um, end_um: New positions; None leaves the field untouched
+            (unless the matching old_* flag requests a reset).
+        old_begin_um, old_end_um: Reset *flags*, not values — passing any
+            non-None value asks LAS X to reset that field to its default
+            (SetBegin/SetEnd = 0). The numeric value itself is never sent.
+
+    Note: confirm_fn is provided but LAS X may recalculate z-stack
+    geometry (size, end) after setting begin/end. Confirmation may
+    report unconfirmed even though the command was accepted; reset
+    outcomes are not confirmed at all (only non-None targets are).
+    """
+    return _change_setting(
+        settings.Z_STACK_DEFINITION,
+        client,
+        {
+            "job_name": job_name,
+            "begin_um": begin_um,
+            "end_um": end_um,
+            "old_begin_um": old_begin_um,
+            "old_end_um": old_end_um,
+        },
+        max_retries=max_retries,
+        tolerance=tolerance,
+    )
+
+
+def set_z_stack_step_size(
+    client, job_name, step_size_um, *, max_retries=None, tolerance=None
+):
+    """Set z-stack step size (micrometers)."""
+    return _change_setting(
+        settings.Z_STACK_STEP_SIZE,
+        client,
+        {
+            "job_name": job_name,
+            "step_size_um": step_size_um,
+        },
+        max_retries=max_retries,
+        tolerance=tolerance,
+    )
+
+
+def set_z_stack_size(client, job_name, size_um, *, max_retries=None, tolerance=None):
+    """Set z-stack total size (micrometers).
+
+    Note: LAS X may recalculate z-stack geometry when size is changed.
+    Confirmation may report unconfirmed if "System Optimized" is active.
+    """
+    return _change_setting(
+        settings.Z_STACK_SIZE,
+        client,
+        {
+            "job_name": job_name,
+            "size_um": size_um,
+        },
+        max_retries=max_retries,
+        tolerance=tolerance,
+    )
+
+
+def set_frame_accumulation(client, job_name, setting_index, value, *, max_retries=None):
+    """Set frame accumulation count for a specific setting index."""
+    return _change_setting(
+        settings.FRAME_ACCUMULATION,
+        client,
+        {
+            "job_name": job_name,
+            "setting_index": setting_index,
+            "value": value,
+        },
+        max_retries=max_retries,
+    )
+
+
+def set_frame_average(client, job_name, setting_index, value, *, max_retries=None):
+    """Set frame average count for a specific setting index."""
+    return _change_setting(
+        settings.FRAME_AVERAGE,
+        client,
+        {
+            "job_name": job_name,
+            "setting_index": setting_index,
+            "value": value,
+        },
+        max_retries=max_retries,
+    )
+
+
+def set_line_accumulation(client, job_name, setting_index, value, *, max_retries=None):
+    """Set line accumulation count for a specific setting index."""
+    return _change_setting(
+        settings.LINE_ACCUMULATION,
+        client,
+        {
+            "job_name": job_name,
+            "setting_index": setting_index,
+            "value": value,
+        },
+        max_retries=max_retries,
+    )
+
+
+def set_line_average(client, job_name, setting_index, value, *, max_retries=None):
+    """Set line average count for a specific setting index."""
+    return _change_setting(
+        settings.LINE_AVERAGE,
+        client,
+        {
+            "job_name": job_name,
+            "setting_index": setting_index,
+            "value": value,
+        },
+        max_retries=max_retries,
+    )
+
+
+def set_pinhole_airy(
+    client,
+    job_name,
+    setting_index,
+    value,
+    *,
+    max_retries=None,
+    tolerance=None,
+):
+    """Set pinhole size in Airy units for a specific setting index."""
+    return _change_setting(
+        settings.PINHOLE_AIRY,
+        client,
+        {
+            "job_name": job_name,
+            "setting_index": setting_index,
+            "value": value,
+        },
+        max_retries=max_retries,
+        tolerance=tolerance,
+    )
+
+
+def set_detector_gain(
+    client,
+    job_name,
+    setting_index,
+    beam_route,
+    value,
+    *,
+    max_retries=None,
+    tolerance=None,
+):
+    """Set detector gain for a specific detector identified by beam route."""
+    return _change_setting(
+        settings.DETECTOR_GAIN,
+        client,
+        {
+            "job_name": job_name,
+            "setting_index": setting_index,
+            "beam_route": beam_route,
+            "value": value,
+        },
+        max_retries=max_retries,
+        tolerance=tolerance,
+    )
+
+
+def set_laser_intensity(
+    client,
+    job_name,
+    setting_index,
+    beam_route,
+    line_index,
+    value,
+    *,
+    max_retries=None,
+    tolerance=None,
+):
+    """Set laser intensity (0.0-1.0) for a specific laser line."""
+    return _change_setting(
+        settings.LASER_INTENSITY,
+        client,
+        {
+            "job_name": job_name,
+            "setting_index": setting_index,
+            "beam_route": beam_route,
+            "line_index": line_index,
+            "value": value,
+        },
+        max_retries=max_retries,
+        tolerance=tolerance,
+    )
+
+
+def set_laser_shutter(
+    client,
+    job_name,
+    setting_index,
+    beam_route,
+    activate,
+    *,
+    max_retries=None,
+):
+    """Open or close laser shutter for a specific beam route."""
+    return _change_setting(
+        settings.LASER_SHUTTER,
+        client,
+        {
+            "job_name": job_name,
+            "setting_index": setting_index,
+            "beam_route": beam_route,
+            "activate": activate,
+        },
+        max_retries=max_retries,
+    )
+
+
+def set_filter_wheel_slot(
+    client,
+    job_name,
+    setting_index,
+    beam_route,
+    filter_wheel_type,
+    slot_index,
+    *,
+    max_retries=None,
+):
+    """Set filter wheel to a specific slot."""
+    return _change_setting(
+        settings.FILTER_WHEEL_SLOT,
+        client,
+        {
+            "job_name": job_name,
+            "setting_index": setting_index,
+            "beam_route": beam_route,
+            "filter_wheel_type": filter_wheel_type,
+            "slot_index": slot_index,
+        },
+        max_retries=max_retries,
+    )
+
+
+def set_filter_wheel_spectrum(
+    client,
+    job_name,
+    setting_index,
+    beam_route,
+    filter_wheel_type,
+    position,
+    *,
+    max_retries=None,
+    tolerance=None,
+):
+    """Set filter wheel spectrum position (nm)."""
+    return _change_setting(
+        settings.FILTER_WHEEL_SPECTRUM,
+        client,
+        {
+            "job_name": job_name,
+            "setting_index": setting_index,
+            "beam_route": beam_route,
+            "filter_wheel_type": filter_wheel_type,
+            "position": position,
+        },
+        max_retries=max_retries,
+        tolerance=tolerance,
+    )
+
+
+# =============================================================================
+# Changing the objective
+# =============================================================================
 
 
 def _resolve_objective(hw_info, slot_index=None, name=None, magnification=None):
@@ -709,517 +806,6 @@ def set_objective(
             ),
         )
     return result
-
-
-# =============================================================================
-# Set functions - Z-Stack
-# =============================================================================
-
-
-def set_z_stack_definition(
-    client,
-    job_name,
-    begin_um=None,
-    end_um=None,
-    old_begin_um=None,
-    old_end_um=None,
-    *,
-    max_retries=None,
-    tolerance=None,
-):
-    """Set z-stack begin/end positions (micrometers).
-
-    Args:
-        begin_um, end_um: New positions; None leaves the field untouched
-            (unless the matching old_* flag requests a reset).
-        old_begin_um, old_end_um: Reset *flags*, not values — passing any
-            non-None value asks LAS X to reset that field to its default
-            (SetBegin/SetEnd = 0). The numeric value itself is never sent.
-
-    Note: confirm_fn is provided but LAS X may recalculate z-stack
-    geometry (size, end) after setting begin/end. Confirmation may
-    report unconfirmed even though the command was accepted; reset
-    outcomes are not confirmed at all (only non-None targets are).
-    """
-    refused = _limits_refusal(
-        client,
-        "set_z_stack_definition",
-        {
-            "job_name": job_name,
-            "values": [v for v in (begin_um, end_um) if v is not None],
-        },
-    )
-    if refused:
-        return refused
-    # Determine set flags: 0=reset, 1=set, 2=ignore
-    if begin_um is not None:
-        set_begin = 1
-    elif old_begin_um is not None:
-        set_begin = 0
-    else:
-        set_begin = 2
-
-    if end_um is not None:
-        set_end = 1
-    elif old_end_um is not None:
-        set_end = 0
-    else:
-        set_end = 2
-
-    def setup(m):
-        m.JobName = job_name
-        m.SetBegin = set_begin
-        # Explicit None check: begin_um=0.0 is a valid z-position.
-        # Using (begin_um or 0) would treat 0.0 as falsy.
-        m.BeginValue = (begin_um if begin_um is not None else 0) * 1e-6
-        m.SetEnd = set_end
-        m.EndValue = (end_um if end_um is not None else 0) * 1e-6
-
-    api_obj = client.PyApiSetZStackDefinitionByJobName
-
-    return _dispatch(
-        client,
-        api_obj,
-        f"Z-stack def: begin={begin_um}, end={end_um}",
-        Z_STACK_DEFINITION,
-        setup_fn=setup,
-        confirm_fn=partial(
-            _confirm_z_stack_definition,
-            job_name=job_name,
-            begin_um=begin_um,
-            end_um=end_um,
-            tolerance=_profile_value(
-                Z_STACK_DEFINITION, "confirm_tolerance", tolerance
-            ),
-        ),
-        max_retries=max_retries,
-    )
-
-
-def set_z_stack_step_size(
-    client, job_name, step_size_um, *, max_retries=None, tolerance=None
-):
-    """Set z-stack step size (micrometers)."""
-    refused = _limits_refusal(
-        client, "set_z_stack_step_size", {"job_name": job_name, "value": step_size_um}
-    )
-    if refused:
-        return refused
-    api_obj = client.PyApiCommandSetZStackStepSizeByJobName
-
-    def setup(m):
-        m.JobName = job_name
-        m.StackStepSize = step_size_um * 1e-6
-
-    return _dispatch(
-        client,
-        api_obj,
-        f"Z-stack step -> {step_size_um} um",
-        Z_STACK_STEP_SIZE,
-        setup_fn=setup,
-        confirm_fn=partial(
-            _confirm_z_stack_step_size,
-            job_name=job_name,
-            target=step_size_um,
-            tolerance=_profile_value(Z_STACK_STEP_SIZE, "confirm_tolerance", tolerance),
-        ),
-        max_retries=max_retries,
-    )
-
-
-def set_z_stack_size(client, job_name, size_um, *, max_retries=None, tolerance=None):
-    """Set z-stack total size (micrometers).
-
-    Note: LAS X may recalculate z-stack geometry when size is changed.
-    Confirmation may report unconfirmed if "System Optimized" is active.
-    """
-    refused = _limits_refusal(
-        client, "set_z_stack_size", {"job_name": job_name, "value": size_um}
-    )
-    if refused:
-        return refused
-    api_obj = client.PyApiSetZStackSizeByJobName
-
-    def setup(m):
-        m.JobName = job_name
-        m.StackSize = size_um * 1e-6
-
-    return _dispatch(
-        client,
-        api_obj,
-        f"Z-stack size -> {size_um} um",
-        Z_STACK_SIZE,
-        setup_fn=setup,
-        confirm_fn=partial(
-            _confirm_z_stack_size,
-            job_name=job_name,
-            target_um=size_um,
-            tolerance=_profile_value(Z_STACK_SIZE, "confirm_tolerance", tolerance),
-        ),
-        max_retries=max_retries,
-    )
-
-
-# =============================================================================
-# Set functions - Per-setting
-# =============================================================================
-
-
-def set_frame_accumulation(client, job_name, setting_index, value, *, max_retries=None):
-    """Set frame accumulation count for a specific setting index."""
-    refused = _limits_refusal(
-        client, "set_frame_accumulation", {"job_name": job_name, "value": value}
-    )
-    if refused:
-        return refused
-    return _dispatch_setting(
-        client,
-        "PyApiSetFrameAccumulationByJobName",
-        {
-            "JobName": job_name,
-            "SettingIndex": setting_index,
-            "FrameAccumulation": value,
-        },
-        f"Setting[{setting_index}].FrameAccumulation -> {value}",
-        FRAME_ACCUMULATION,
-        partial(
-            _confirm_frame_accumulation,
-            job_name=job_name,
-            si=setting_index,
-            target=value,
-        ),
-        max_retries=max_retries,
-    )
-
-
-def set_frame_average(client, job_name, setting_index, value, *, max_retries=None):
-    """Set frame average count for a specific setting index."""
-    refused = _limits_refusal(
-        client, "set_frame_average", {"job_name": job_name, "value": value}
-    )
-    if refused:
-        return refused
-    return _dispatch_setting(
-        client,
-        "PyApiSetFrameAverageByJobName",
-        {"JobName": job_name, "SettingIndex": setting_index, "FrameAverage": value},
-        f"Setting[{setting_index}].FrameAverage -> {value}",
-        FRAME_AVERAGE,
-        partial(
-            _confirm_frame_average, job_name=job_name, si=setting_index, target=value
-        ),
-        max_retries=max_retries,
-    )
-
-
-def set_line_accumulation(client, job_name, setting_index, value, *, max_retries=None):
-    """Set line accumulation count for a specific setting index."""
-    refused = _limits_refusal(
-        client, "set_line_accumulation", {"job_name": job_name, "value": value}
-    )
-    if refused:
-        return refused
-    return _dispatch_setting(
-        client,
-        "PyApiSetLineAccumulationByJobName",
-        {"JobName": job_name, "SettingIndex": setting_index, "LineAccumulation": value},
-        f"Setting[{setting_index}].LineAccumulation -> {value}",
-        LINE_ACCUMULATION,
-        partial(
-            _confirm_line_accumulation,
-            job_name=job_name,
-            si=setting_index,
-            target=value,
-        ),
-        max_retries=max_retries,
-    )
-
-
-def set_line_average(client, job_name, setting_index, value, *, max_retries=None):
-    """Set line average count for a specific setting index."""
-    refused = _limits_refusal(
-        client, "set_line_average", {"job_name": job_name, "value": value}
-    )
-    if refused:
-        return refused
-    return _dispatch_setting(
-        client,
-        "PyApiSetLineAverageByJobName",
-        {"JobName": job_name, "SettingIndex": setting_index, "LineAverage": value},
-        f"Setting[{setting_index}].LineAverage -> {value}",
-        LINE_AVERAGE,
-        partial(
-            _confirm_line_average, job_name=job_name, si=setting_index, target=value
-        ),
-        max_retries=max_retries,
-    )
-
-
-def set_pinhole_airy(
-    client,
-    job_name,
-    setting_index,
-    value,
-    *,
-    max_retries=None,
-    tolerance=None,
-):
-    """Set pinhole size in Airy units for a specific setting index."""
-    refused = _limits_refusal(
-        client, "set_pinhole_airy", {"job_name": job_name, "value": value}
-    )
-    if refused:
-        return refused
-    return _dispatch_setting(
-        client,
-        "PyApiSetPinholeAUByJobName",
-        {"JobName": job_name, "SettingIndex": setting_index, "PinholeAiry": value},
-        f"Setting[{setting_index}].PinholeAiry -> {value}",
-        PINHOLE_AIRY,
-        partial(
-            _confirm_pinhole_airy,
-            job_name=job_name,
-            si=setting_index,
-            target=value,
-            tolerance=_profile_value(PINHOLE_AIRY, "confirm_tolerance", tolerance),
-        ),
-        max_retries=max_retries,
-    )
-
-
-# =============================================================================
-# Set functions - Detector
-# =============================================================================
-
-
-def set_detector_gain(
-    client,
-    job_name,
-    setting_index,
-    beam_route,
-    value,
-    *,
-    max_retries=None,
-    tolerance=None,
-):
-    """Set detector gain for a specific detector identified by beam route."""
-    refused = _limits_refusal(
-        client, "set_detector_gain", {"job_name": job_name, "value": value}
-    )
-    if refused:
-        return refused
-    return _dispatch_setting(
-        client,
-        "PyApiSetDetectorGainByJobName",
-        {
-            "JobName": job_name,
-            "SettingIndex": setting_index,
-            "BeamRoute": beam_route,
-            "GainValue": value,
-        },
-        f"Setting[{setting_index}].Detector[{beam_route}].Gain -> {value}",
-        DETECTOR_GAIN,
-        partial(
-            _confirm_detector_gain,
-            job_name=job_name,
-            si=setting_index,
-            beam_route=beam_route,
-            target=value,
-            tolerance=_profile_value(DETECTOR_GAIN, "confirm_tolerance", tolerance),
-        ),
-        max_retries=max_retries,
-    )
-
-
-# =============================================================================
-# Set functions - Laser
-# =============================================================================
-
-
-def set_laser_intensity(
-    client,
-    job_name,
-    setting_index,
-    beam_route,
-    line_index,
-    value,
-    *,
-    max_retries=None,
-    tolerance=None,
-):
-    """Set laser intensity (0.0-1.0) for a specific laser line."""
-    refused = _limits_refusal(
-        client, "set_laser_intensity", {"job_name": job_name, "value": value}
-    )
-    if refused:
-        return refused
-    return _dispatch_setting(
-        client,
-        "PyApiSetLaserIntensityByJobName",
-        {
-            "JobName": job_name,
-            "SettingIndex": setting_index,
-            "BeamRoute": beam_route,
-            "LaserLineIndex": line_index,
-            "IntensityValue": value,
-            "IsRoiBackground": False,
-        },
-        f"Setting[{setting_index}].Laser[{beam_route}][{line_index}] -> {value}",
-        LASER_INTENSITY,
-        partial(
-            _confirm_laser_intensity,
-            job_name=job_name,
-            si=setting_index,
-            beam_route=beam_route,
-            line_index=line_index,
-            target=value,
-            tolerance=_profile_value(LASER_INTENSITY, "confirm_tolerance", tolerance),
-        ),
-        max_retries=max_retries,
-    )
-
-
-def set_laser_shutter(
-    client,
-    job_name,
-    setting_index,
-    beam_route,
-    activate,
-    *,
-    max_retries=None,
-):
-    """Open or close laser shutter for a specific beam route."""
-    refused = _limits_refusal(
-        client, "set_laser_shutter", {"job_name": job_name, "value": activate}
-    )
-    if refused:
-        return refused
-    label = "Open" if activate else "Closed"
-    return _dispatch_setting(
-        client,
-        "PyApiSetLaserShutterByJobName",
-        {
-            "JobName": job_name,
-            "SettingIndex": setting_index,
-            "BeamRoute": beam_route,
-            "Activate": activate,
-        },
-        f"Setting[{setting_index}].Shutter[{beam_route}] -> {label}",
-        LASER_SHUTTER,
-        partial(
-            _confirm_laser_shutter,
-            job_name=job_name,
-            si=setting_index,
-            beam_route=beam_route,
-            target=activate,
-        ),
-        max_retries=max_retries,
-    )
-
-
-# =============================================================================
-# Set functions - Filter Wheel
-# =============================================================================
-
-
-def set_filter_wheel_slot(
-    client,
-    job_name,
-    setting_index,
-    beam_route,
-    filter_wheel_type,
-    slot_index,
-    *,
-    max_retries=None,
-):
-    """Set filter wheel to a specific slot."""
-    refused = _limits_refusal(
-        client, "set_filter_wheel_slot", {"job_name": job_name, "value": slot_index}
-    )
-    if refused:
-        return refused
-    api_obj = client.PyApiSetFilterWheelSlotByJobName
-
-    def setup(m):
-        m.JobName = job_name
-        m.SettingIndex = setting_index
-        m.BeamRoute = beam_route
-        # Cast int to .NET enum type
-        try:
-            fw_type = type(m.FilterWheelType)(filter_wheel_type)
-        except Exception:
-            fw_type = filter_wheel_type
-        m.FilterWheelType = fw_type
-        m.SlotIndex = slot_index
-
-    return _dispatch(
-        client,
-        api_obj,
-        f"FilterWheel[{beam_route}] slot -> {slot_index}",
-        FILTER_WHEEL_SLOT,
-        setup_fn=setup,
-        confirm_fn=partial(
-            _confirm_filter_wheel_slot,
-            job_name=job_name,
-            si=setting_index,
-            beam_route=beam_route,
-            fw_type=filter_wheel_type,
-            target=slot_index,
-        ),
-        max_retries=max_retries,
-    )
-
-
-def set_filter_wheel_spectrum(
-    client,
-    job_name,
-    setting_index,
-    beam_route,
-    filter_wheel_type,
-    position,
-    *,
-    max_retries=None,
-    tolerance=None,
-):
-    """Set filter wheel spectrum position (nm)."""
-    refused = _limits_refusal(
-        client, "set_filter_wheel_spectrum", {"job_name": job_name, "value": position}
-    )
-    if refused:
-        return refused
-    api_obj = client.PyApiSetFilterWheelSpectrumPositionByJobName
-
-    def setup(m):
-        m.JobName = job_name
-        m.SettingIndex = setting_index
-        m.BeamRoute = beam_route
-        # Cast int to .NET enum type
-        try:
-            fw_type = type(m.FilterWheelType)(filter_wheel_type)
-        except Exception:
-            fw_type = filter_wheel_type
-        m.FilterWheelType = fw_type
-        m.FilterSpectrumPosition = position
-
-    return _dispatch(
-        client,
-        api_obj,
-        f"FilterWheel[{beam_route}] spectrum -> {position}",
-        FILTER_WHEEL_SPECTRUM,
-        setup_fn=setup,
-        confirm_fn=partial(
-            _confirm_filter_wheel_spectrum,
-            job_name=job_name,
-            si=setting_index,
-            beam_route=beam_route,
-            fw_type=filter_wheel_type,
-            target=position,
-            tolerance=_profile_value(
-                FILTER_WHEEL_SPECTRUM, "confirm_tolerance", tolerance
-            ),
-        ),
-        max_retries=max_retries,
-    )
 
 
 # =============================================================================

@@ -1040,6 +1040,46 @@ def test_every_dispatching_wrapper_declares_and_calls_the_gate():
             f"{node.name} never calls the limits gate with its own name"
         )
         checked.append(node.name)
+    # The settings of a job go through one runner, so their functions do not
+    # call the gate themselves. Each must hand the runner the table entry that
+    # carries its own name, and the runner must show the gate that name.
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitive_handling import (
+        settings as settings_table,
+    )
+
+    for node in tree.body:
+        if not isinstance(node, ast.FunctionDef) or node.name.startswith("_"):
+            continue
+        for call in ast.walk(node):
+            if (
+                isinstance(call, ast.Call)
+                and isinstance(call.func, ast.Name)
+                and call.func.id == "_change_setting"
+            ):
+                entry = getattr(settings_table, call.args[0].attr)
+                assert entry.command == node.name, (
+                    f"{node.name} hands the runner the entry for {entry.command}"
+                )
+                assert node.name in gate.MUTATING_COMMANDS
+                checked.append(node.name)
+
+    runner = next(
+        n
+        for n in tree.body
+        if isinstance(n, ast.FunctionDef) and n.name == "_change_setting"
+    )
+    shown_to_gate = [
+        call.args[1]
+        for call in ast.walk(runner)
+        if isinstance(call, ast.Call)
+        and isinstance(call.func, ast.Name)
+        and call.func.id == "_limits_refusal"
+    ]
+    assert shown_to_gate and all(
+        isinstance(arg, ast.Attribute) and arg.attr == "command"
+        for arg in shown_to_gate
+    ), "the settings runner must show the limits gate the entry's own command name"
+
     # sanity: the sweep actually saw the whole wrapper set
     assert set(checked) == set(gate.MUTATING_COMMANDS)
 
