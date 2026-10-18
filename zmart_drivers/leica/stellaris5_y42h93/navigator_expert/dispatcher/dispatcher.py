@@ -7,19 +7,21 @@ of its two engines does the work:
   the sources one after the other (``reader.py``) and is safe to repeat: the
   reader asks again, never the hardware.
 - :func:`write` changes something on the microscope: it sends the command,
-  checks for an error, reads the value back until it matches, and sends again
-  where that is safe (``writer.py``). Changing a setting or moving to an
+  checks for an error (``send_loop.py``), reads the value back until it matches, and
+  sends again where that is safe (``confirm_loop.py``) (``send_loop.py`` and ``confirm_loop.py``). Changing a setting or moving to an
   absolute position can be repeated. The one command that must never be sent
   again is starting an acquisition, which says so in its profile
   (``never_resend``).
 
-The writer uses the reader to confirm a change, which is why the two share one
+The confirm loop uses the reader to confirm a change, which is why the two share one
 waiting rule, kept here. This file knows nothing of any one microscope: the
 microscope's own sources, command profiles and error sorting are handed in.
 
 Author: Thom de Hoog, Center for Microscopy and Image Analysis (ZMB),
 University of Zurich (thom.dehoog@zmb.uzh.ch, thomdehoog@gmail.com).
 """
+
+import time
 
 # =============================================================================
 # The waiting rule: how long the driver waits, whichever source answers
@@ -62,6 +64,68 @@ POLL_S = 0.1
 ANSWER_POLL_S = 0.01
 
 
+# =============================================================================
+# The shape every command result shares: timing and log entries
+# =============================================================================
+
+
+def make_log_entry(level, msg):
+    """Build a timestamped log entry dict.
+
+    Every pluggable function in the pipeline accumulates these entries in
+    its ``logs`` list. The backbone collects them into a single ordered
+    trace so the caller has full visibility into what happened.
+
+    Args:
+        level: One of "debug", "info", "warning", "error".
+        msg: Human-readable log message.
+
+    Returns:
+        {"ts": float, "level": str, "msg": str}
+    """
+    return {"ts": time.time(), "level": level, "msg": msg}
+
+
+def make_timing(
+    pre_check_s=0.0,
+    setup_s=0.0,
+    fire_s=0.0,
+    check_s=0.0,
+    confirm_s=0.0,
+    total_s=0.0,
+    attempts=1,
+    confirm_attempts=0,
+    method="async",
+):
+    """Build a timing dict for command result envelopes.
+
+    Args:
+        pre_check_s: Time spent in pre-fire check (e.g. idle wait).
+        setup_s: Time writing parameters to the model.
+        fire_s: Time for UpdateAwaitReceipt transport.
+        check_s: Time for API error check.
+        confirm_s: Time spent in confirm_fn.
+        total_s: Wall-clock time for the entire operation.
+        attempts: Number of fire-block attempts (1 + retries).
+        confirm_attempts: Number of confirm-wrapper attempts.
+        method: 'sync' or 'async'.
+
+    Returns:
+        Timing dict with all keys above.
+    """
+    return {
+        "pre_check_s": pre_check_s,
+        "setup_s": setup_s,
+        "fire_s": fire_s,
+        "check_s": check_s,
+        "confirm_s": confirm_s,
+        "total_s": total_s,
+        "attempts": attempts,
+        "confirm_attempts": confirm_attempts,
+        "method": method,
+    }
+
+
 def read(vendor, datum, client, **keywords):
     """Wait for a reading of *datum* from the microscope's sources; see :func:`reader.wait_for`."""
     from . import reader
@@ -70,7 +134,7 @@ def read(vendor, datum, client, **keywords):
 
 
 def write(client, api_obj, description, **keywords):
-    """Send a change, check it, and confirm it; see :func:`writer.confirm_and_fire`."""
-    from . import writer
+    """Send a change, check it, and confirm it; see :func:`confirm_loop.confirm_and_fire`."""
+    from . import confirm_loop
 
-    return writer.confirm_and_fire(client, api_obj, description, **keywords)
+    return confirm_loop.confirm_and_fire(client, api_obj, description, **keywords)

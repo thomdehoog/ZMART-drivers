@@ -568,11 +568,13 @@ zmart_drivers/leica/stellaris5_y42h93/navigator_expert/
 │   ├── metadata_map.py LAS X's description of a picture, read into the standard fields
 │   └── error_classification.py   sorting LAS X's errors
 ├── dispatcher/         the machinery that runs a command safely, and nothing else. It names no LAS X
-│                       object: reader.py (waits for a reading from whichever source answers; holds
-│                       the Reading record and the waiting rule of four windows of three seconds) ·
-│                       writer.py (sends a command, checks for errors, confirms it, sends it
-│                       again where that is safe; holds the shape of a command's result) ·
-│                       gate.py (when the limits are enforced)
+│                       object: dispatcher.py (the one door: read() and write(); the waiting rule of
+│                       four windows of three seconds; the shape of a command's result) ·
+│                       reader.py (asks the microscope's sources one after the other until an answer
+│                       counts; holds the Reading record) · send_loop.py (sends a command, checks for
+│                       an error, sends again if the problem is temporary) · confirm_loop.py (reads
+│                       until the change took effect, and sends again if it did not; never for an
+│                       acquisition) · gate.py (when the limits are enforced)
 ├── procedures/         the recipes built on the machinery, grouped by job:
 │   ├── session.py · frame.py · acquisition.py · instrument.py   what the ZmartDriver class
 │   │                   calls: the session handle, where the stage is and moving it, taking and

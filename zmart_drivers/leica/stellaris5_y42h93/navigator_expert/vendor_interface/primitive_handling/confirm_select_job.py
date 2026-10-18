@@ -18,7 +18,7 @@ from functools import partial
 
 from . import state as _readers
 from ...dispatcher import dispatcher
-from ...dispatcher.writer import _make_log_entry
+from ...dispatcher.dispatcher import make_log_entry as _make_log_entry
 from ..primitives.direct import direct_reader
 from ..primitives.log import log_wait
 from ..connection.hardware_server import HardwareServerUnavailable

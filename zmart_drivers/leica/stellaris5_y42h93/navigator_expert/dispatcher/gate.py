@@ -49,7 +49,7 @@ reason (which names the notebook that creates the files:
 ``configuration/limits/notebooks/set_limits.ipynb``). A client that never handshook at
 all (no ``connect_handshake`` ran) still refuses fail-closed.
 
-Single-writer invariant: like command dispatch (``dispatch.py``) and the
+Single-writer invariant: like command dispatch (``confirm_loop.py``) and the
 stage-envelope module global (``vendor_interface/primitive_handling/limit_rules.py``), this registry assumes
 ONE instrument per process. The registry is keyed by ``id(client)`` and holds
 a strong reference to the client (CAM clients are process-lifetime), so an id

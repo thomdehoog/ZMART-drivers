@@ -42,7 +42,7 @@ import time
 
 from . import state as _readers
 from ...dispatcher import dispatcher
-from ...dispatcher.writer import _make_log_entry
+from ...dispatcher.dispatcher import make_log_entry as _make_log_entry
 from ..error_classification import _check_api_error, _is_transient_error
 from ..parsing import make_changeable_copy
 from .confirm_specs import CONFIRM_SPECS

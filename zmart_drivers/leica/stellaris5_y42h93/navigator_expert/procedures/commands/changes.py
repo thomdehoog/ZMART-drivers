@@ -47,7 +47,10 @@ from functools import partial
 from ...dispatcher import gate as _gate
 from ...dispatcher import dispatcher as _dispatcher
 from ...vendor_interface.primitive_handling.limit_rules import check_xy, check_z
-from ...dispatcher.writer import _make_log_entry, _make_timing
+from ...dispatcher.dispatcher import (
+    make_log_entry as _make_log_entry,
+    make_timing as _make_timing,
+)
 from ...vendor_interface.parsing import _hw_get
 from ...vendor_interface.primitive_handling import settings
 from . import objective_shift as _objective_shift
