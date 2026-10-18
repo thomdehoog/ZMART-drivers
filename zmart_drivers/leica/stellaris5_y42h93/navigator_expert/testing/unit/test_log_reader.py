@@ -19,7 +19,7 @@ import unittest
 from datetime import datetime, timedelta
 
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.actions import profiles
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitives.log import (
     log_reader as L,
 )
 

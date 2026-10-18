@@ -45,8 +45,8 @@ import os
 import time
 import xml.etree.ElementTree as ET
 
-from ..actions import derived
-from ..dispatcher import tuning
+from ....actions import derived
+from ....dispatcher import tuning
 from .delivery import deliver
 
 log = logging.getLogger(__name__)

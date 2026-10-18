@@ -29,10 +29,10 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.actions import (
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.actions.derived import (
     z_um_from_settings,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.connection import (
     hardware_server,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.hardware_server import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.connection.hardware_server import (
     HardwareServerUnavailable,
     read_hardware_z_um,
 )

@@ -2878,7 +2878,7 @@ class TestHybridSelectJobApiLegEndToEnd(unittest.TestCase):
     """
 
     def test_api_leg_confirms_when_log_has_no_evidence(self):
-        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface import (
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitives.log import (
             log_wait,
         )
 

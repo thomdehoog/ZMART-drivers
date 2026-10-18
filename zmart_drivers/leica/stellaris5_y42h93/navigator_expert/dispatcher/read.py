@@ -41,8 +41,10 @@ from ..actions.derived import (  # noqa: F401  re-exported, as the readers packa
     stack_drive,
     stack_slices_um,
 )
-from ..vendor_interface import api_reader, direct_reader, log_reader
-from ..vendor_interface.hardware_server import HardwareServerUnavailable
+from ..vendor_interface.primitives.api import api_reader
+from ..vendor_interface.primitives.direct import direct_reader
+from ..vendor_interface.primitives.log import log_reader
+from ..vendor_interface.connection.hardware_server import HardwareServerUnavailable
 from . import tuning
 
 log = logging.getLogger(__name__)

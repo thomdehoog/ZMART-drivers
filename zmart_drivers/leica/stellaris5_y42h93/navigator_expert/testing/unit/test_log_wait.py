@@ -4,10 +4,10 @@ import unittest
 
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.actions import profiles
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher import tuning
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitives.log import (
     log_reader,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.log_wait import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitives.log.log_wait import (
     wait_for_selected_job_log,
 )
 

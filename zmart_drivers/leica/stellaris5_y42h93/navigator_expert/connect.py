@@ -13,7 +13,7 @@ import logging
 from typing import Any
 
 from .dispatcher import read as _readers
-from .vendor_interface import lasx_dialogs
+from .vendor_interface.primitives.interface import lasx_dialogs
 
 _log = logging.getLogger(__name__)
 
@@ -71,7 +71,7 @@ def connect_python_client(
     Raises ``ConnectionError`` if the connect call returns False, or
     ``RuntimeError`` if the subsequent ping fails.
     """
-    from .vendor_interface.lasx_runtime import load_lasx_api_runtime
+    from .vendor_interface.connection.lasx_runtime import load_lasx_api_runtime
 
     _lasx_api = load_lasx_api_runtime()
     client = _lasx_api.LasxApiClientPyModel

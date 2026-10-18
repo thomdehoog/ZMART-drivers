@@ -34,7 +34,7 @@ READERS = ("direct", "api", "log")
 
 
 def readings_direct(_client):
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface import (
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitives.direct import (
         direct_reader as d,
     )
 
@@ -73,7 +73,7 @@ def from_settings(settings, xy, selected, status):
 
 
 def readings_api(client):
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface import (
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitives.api import (
         api_reader as a,
     )
 
@@ -86,7 +86,7 @@ def readings_api(client):
 
 
 def readings_log(_client):
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface import (
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitives.log import (
         log_reader as lr,
     )
 
@@ -154,7 +154,7 @@ def main() -> int:
     asked = parser.parse_args()
     JOB = asked.job
     if JOB is None:
-        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface import (
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitives.direct import (
             direct_reader,
         )
 

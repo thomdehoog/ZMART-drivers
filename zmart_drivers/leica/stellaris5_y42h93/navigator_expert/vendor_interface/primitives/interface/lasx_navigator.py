@@ -39,7 +39,7 @@ import logging
 import threading
 import time
 
-from ..dispatcher import tuning
+from ....dispatcher import tuning
 from .lasx_dialogs import WindowsUnavailable, automation
 
 log = logging.getLogger(__name__)

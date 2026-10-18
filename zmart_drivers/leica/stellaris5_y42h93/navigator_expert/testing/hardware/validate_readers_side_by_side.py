@@ -62,7 +62,7 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher import (
     read as readers,
 )
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher import tuning
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitives.log import (
     log_reader as L,
 )
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.parsing import (
@@ -801,7 +801,7 @@ def _connect(args):
         print("Connect: mock (in-process MockLasxClient)")
         print(f"Limits: hermetic machine root provisioned at {root}")
         return MockLasxClient(latency=args.mock_latency)
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.lasx_runtime import (
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.connection.lasx_runtime import (
         load_lasx_api_runtime,
     )
 

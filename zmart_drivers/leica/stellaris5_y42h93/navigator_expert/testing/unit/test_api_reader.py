@@ -1,5 +1,5 @@
 """
-Unit tests for vendor_interface.api_reader (offline, no driver, no hardware).
+Unit tests for vendor_interface.primitives.api.api_reader (offline, no driver, no hardware).
 ===========================================================================
 Exercises the one-request skeleton (``_request``) directly, plus the four
 public readers built on it (get_xy, get_jobs, get_hardware_info,
@@ -26,7 +26,7 @@ import time
 import unittest
 from types import SimpleNamespace
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.primitives.api import (
     api_reader as A,
 )
 

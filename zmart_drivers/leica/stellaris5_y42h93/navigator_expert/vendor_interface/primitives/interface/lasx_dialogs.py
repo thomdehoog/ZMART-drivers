@@ -32,7 +32,7 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 
-from ..dispatcher import tuning
+from ....dispatcher import tuning
 
 log = logging.getLogger(__name__)
 

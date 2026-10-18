@@ -123,17 +123,17 @@ my_driver/
         zmart_driver.py        the ZmartDriver class the controller calls; kept thin
 
     vendor_interface/          the part you write for a new microscope
-        connection.py          reach the vendor software, keep the link, close it
+        connection/            reach the vendor software, keep the link, close it (a single connection.py when it is small)
         error_classification.py  sort this vendor's failures into the shared kinds of problem
         primitive_handling.py  how the dispatcher treats each primitive: which to try first,
                                how to confirm, whether it may be sent again, how long to wait
         metadata_map.py        translate the vendor's description of a picture into the standard fields (no hardware access)
-        primitives/            the smallest single reads and writes, grouped by the way they reach the software
-            direct.py          reading (and, where possible, writing) the software's own state
-            api.py             the vendor's programming interface
-            log.py             reading what the software writes in its log (reading only)
-            capture.py         fetching the finished picture
-            interface.py       working the vendor's window: pressing buttons, answering dialogs (only where the software has no better way)
+        primitives/            the smallest single reads and writes, one folder for each way of reaching the software
+            direct/            reading (and, where possible, writing) the software's own state
+            api/               the vendor's programming interface
+            log/               reading what the software writes in its log (reading only)
+            capture/           fetching the finished picture
+            interface/         working the vendor's window: pressing buttons, answering dialogs (only where the software has no better way)
         vendor_side/           code that runs inside the vendor software, if the vendor needs it, with its installer
     dispatcher/                the same in every driver
         read.py                runs a reading, with fallback
@@ -684,6 +684,12 @@ that wrote into them). Scan fields are not something this driver does, so that
 code was removed. The stacked z drive is now read only from LAS X's hardware
 server, and refused with a clear message when the server cannot be reached.
 The hardware server is always present on the STELLARIS, so this loses nothing.
+The first reshaping steps are done too: the file that sorts LAS X's errors is
+`error_classification.py`, the class the controller calls is in
+`for_zmart_controller/`, and the vendor interface is grouped into `connection/` and
+`primitives/` with one folder for each family (direct, api, log, interface,
+capture). Each step changed only names and places, and the offline tests gave the
+same result before and after.
 
 **Still to do.** Three things do not fit yet:
 

@@ -11,7 +11,7 @@ import time
 from collections.abc import Callable
 from dataclasses import dataclass
 
-from ..dispatcher import tuning
+from ....dispatcher import tuning
 from . import log_reader
 
 
@@ -29,7 +29,7 @@ class LogPollResult:
 
 
 def _profile():
-    from ..actions import profiles
+    from ....actions import profiles
 
     return profiles.STATE_READERS
 

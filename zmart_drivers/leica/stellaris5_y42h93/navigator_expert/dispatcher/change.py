@@ -35,21 +35,21 @@ acts on their result dicts. The only sleeping it does is backoff delay
 between transient error retries (configurable via ``retry_backoff``
 and ``retry_escalate``).
 
-Delivery goes through ``vendor_interface.delivery.deliver`` (the one rule:
+Delivery goes through ``vendor_interface.primitives.api.delivery.deliver`` (the one rule:
 ``WINDOWS`` tries of ``WINDOW_S``). ``_await_echo_result`` polls the echo model after transport
 delivery, waiting for LAS X to finish processing before the error
 check reads the echo fields.
 
 Import restrictions: only runtime errors/utilities, ``readers.log_reader``,
-``vendor_interface.delivery``, and stdlib. Nothing from command wrappers, profiles, prechecks, or confirmations.
+``vendor_interface.primitives.api.delivery``, and stdlib. Nothing from command wrappers, profiles, prechecks, or confirmations.
 """
 
 import logging
 import time
 
-from ..vendor_interface import lasx_dialogs
-from ..vendor_interface import log_reader as _log_reader
-from ..vendor_interface.delivery import deliver
+from ..vendor_interface.primitives.interface import lasx_dialogs
+from ..vendor_interface.primitives.log import log_reader as _log_reader
+from ..vendor_interface.primitives.api.delivery import deliver
 from . import tuning as _timing
 from .envelope import _make_log_entry, _make_timing
 
