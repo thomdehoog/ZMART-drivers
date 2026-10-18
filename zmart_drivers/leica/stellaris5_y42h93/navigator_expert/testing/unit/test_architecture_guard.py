@@ -188,7 +188,6 @@ ALLOWED = {
     "configuration": {
         "vendor_interface",  # the limits item validates through the rulebook
     },
-    "connect": {"vendor_interface", "dispatcher", "configuration"},
     # Everything that faces the controller: the ZmartDriver class and, until its
     # logic moves into the procedures, the adapter folder inside it.
     "for_zmart_controller": {
@@ -196,14 +195,12 @@ ALLOWED = {
         "dispatcher",
         "procedures",
         "configuration",
-        "connect",
         "__version__",
     },
     "__init__": {
         "vendor_interface",
         "dispatcher",
         "procedures",
-        "connect",
     },
 }
 

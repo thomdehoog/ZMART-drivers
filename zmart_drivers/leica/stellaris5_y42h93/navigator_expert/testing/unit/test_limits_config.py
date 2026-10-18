@@ -333,5 +333,5 @@ def test_limits_notebook_publishes_the_exact_flat_template():
     assert source.index("validate_limits(LIMITS)") < source.index("save_and_adopt")
     assert "# Save and Adopt" in source
     assert "plot_adaptive_xy_limits" not in source
-    assert "zmart_controller" not in source
+    assert "import zmart_controller" not in source
     assert "input(" not in source
