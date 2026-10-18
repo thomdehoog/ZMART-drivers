@@ -22,7 +22,6 @@ from limits_fixtures import (
     provision_machine_limits,
 )
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert import scanfields
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.actions.profiles import ImageSaveProfile
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.output.product import PlaneIndex
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher import (
@@ -1317,12 +1316,11 @@ class TestAcquire(unittest.TestCase):
         self.assertEqual(record["settle"], "direct")
         self.assertEqual(record["backlash_rounds"], 0)
 
-    def _acquire_with_template_touch_forbidden(self, options=None):
-        """Run acquire with every template entry point failing loudly; returns the calls."""
+    def _acquire_and_list_the_calls(self, options=None):
+        """Run acquire with every step stubbed out; returns the calls it made, in order."""
         h = _handle(connection={**adapter.CONNECTION, "output_root": "/tmp/out"})
         calls = []
         patches = _patch_position(job="Overview")
-        forbidden = AssertionError("acquire touched the scanning template")
         with (
             patch.object(adapter._readers, "get_jobs", return_value=self._jobs()),
             patch.object(adapter._commands, "select_job", return_value={"success": True}),
@@ -1343,21 +1341,18 @@ class TestAcquire(unittest.TestCase):
                 "save",
                 return_value=SimpleNamespace(image_paths={}, xml_paths={}, naming=None),
             ),
-            patch.object(scanfields, "get_template_state", side_effect=forbidden),
-            patch.object(scanfields, "strip_template", side_effect=forbidden),
-            patch.object(scanfields, "save_experiment", side_effect=forbidden),
             patches[2],
         ):
             adapter.acquire(h, position_label="1", acquisition_settings=options)
         return calls
 
-    def test_acquire_never_touches_the_scanning_template(self):
-        """Positions are never made in the Navigator Expert, so nothing is stripped."""
-        self.assertEqual(self._acquire_with_template_touch_forbidden(), ["capture"])
+    def test_acquire_only_captures_and_saves(self):
+        """Positions are never made in the Navigator Expert, so an acquisition is one capture."""
+        self.assertEqual(self._acquire_and_list_the_calls(), ["capture"])
 
     def test_strip_scan_fields_is_not_an_acquisition_setting(self):
         with self.assertRaisesRegex(ValueError, "unknown acquisition setting 'strip_scan_fields'"):
-            self._acquire_with_template_touch_forbidden({"strip_scan_fields": False})
+            self._acquire_and_list_the_calls({"strip_scan_fields": False})
 
 
 class TestStateAndProcedures(unittest.TestCase):
@@ -1528,10 +1523,9 @@ class TestStateAndProcedures(unittest.TestCase):
         self.assertEqual(result["frame_z_um"], 43.5)  # all-zero origin
         self.assertEqual(result["duration_s"], 2.5)
 
-    def test_autofocus_never_touches_the_scanning_template(self):
+    def test_autofocus_runs_on_its_autofocus_job(self):
         h = _handle()
         p = self._state_patches()
-        forbidden = AssertionError("autofocus touched the scanning template")
         position = _patch_position()
         with (
             p[2],
@@ -1539,8 +1533,6 @@ class TestStateAndProcedures(unittest.TestCase):
             position[1],
             position[2],
             position[3],
-            patch.object(scanfields, "get_template_state", side_effect=forbidden),
-            patch.object(scanfields, "strip_template", side_effect=forbidden),
             patch.object(adapter._commands, "select_job", return_value={"success": True}),
             patch.object(
                 adapter._capture,
@@ -1573,28 +1565,21 @@ class TestStateAndProcedures(unittest.TestCase):
                 adapter.run_procedure(h, {"name": "autofocus"})
 
 
-class TestGetInfoLeavesTheTemplateAlone(unittest.TestCase):
-    """get_info never reads the LAS X scanning template.
+class TestGetInfoReportsNoPositions(unittest.TestCase):
+    """get_info reports no tile or focus positions.
 
-    Positions are never made in the Navigator Expert, so there are no tile or
-    focus positions to report, and connecting no longer saves the experiment.
+    Positions are never made in the Navigator Expert, so there are none to report.
     """
 
-    def test_get_info_never_touches_the_template_and_reports_no_positions(self):
+    def test_get_info_reports_no_positions(self):
         h = _handle()
         h.connection["output_root"] = "/tmp/zmart-test"
-        forbidden = AssertionError("get_info touched the scanning template")
         with (
             patch.object(adapter, "_selected_job_name", return_value="Overview"),
-            patch.object(scanfields, "find_scanning_templates_dir", side_effect=forbidden),
-            patch.object(scanfields, "save_experiment", side_effect=forbidden),
-            patch.object(scanfields, "parse_scan_positions", side_effect=forbidden),
-            patch.object(scanfields, "get_template_state", side_effect=forbidden),
         ):
             info = adapter.get_info(h)
         self.assertNotIn("tile_positions", info)
         self.assertNotIn("focus_positions", info)
-        self.assertFalse(hasattr(adapter, "_scanfields"))  # the adapter does not import it
         self.assertEqual(info["selected_job"], "Overview")
 
 

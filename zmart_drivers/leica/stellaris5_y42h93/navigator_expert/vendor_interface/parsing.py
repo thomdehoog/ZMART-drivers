@@ -3,7 +3,7 @@
 Pure functions with no API-object knowledge: safe type conversion, format
 strings ("512 x 512"), the micron-unit mojibake repair, and the tile
 geometry derived from raw job settings. Shared by the readers, the command
-wrappers, scanfields, and acquisition — all the places LAS X text arrives.
+wrappers, and acquisition — all the places LAS X text arrives.
 
 ``make_changeable_copy`` is the largest parser here: it transforms the raw
 job-settings JSON from ``get_job_settings`` into a flat, navigable dict

@@ -6,8 +6,7 @@ model — so nothing built on top (adapter, controller, workflows, notebooks)
 can interfere with or bypass them. The rules themselves (what is allowed:
 ``LeicaLimits`` and the stage checks) live in ``limits/checks.py``; this
 module owns the *moment* of enforcement — per-connection state and refusal.
-The wrappers in ``commands.py`` (and the two experiment-file mutators in
-``scanfields/files.py``) call :func:`check_refusal` before anything fires.
+The wrappers in ``actions/`` call :func:`check_refusal` before anything fires.
 
 Wrapper -> key mapping
 ----------------------
@@ -23,19 +22,9 @@ only the command chokepoint vocabulary—it is not the JSON shape.
 - ``select_job``                                -> handshake/state gate only
 - ``move_xy`` / ``move_z``                      -> ``set_xyz``
 - ``acquire``                                   -> ``acquire``
-- ``move_galvo_to_pixel``                       -> ``move_galvo_to_pixel``
-  (LRP pan write; its hardcoded ``config.galvo.PAN_LIMIT`` stays the sanctioned
-  numeric check; the gate adds the fail-closed handshake state)
-- ``save_experiment`` / ``load_experiment``     -> their own keys (direct
-  ``PyApi{Save,Load}Experiment`` fires; loading a template changes what
-  ``acquire`` will scan)
 
 ``set_origin`` fires no native command, and procedure effects flow through the
 same gated movement/acquisition wrappers. They therefore need no JSON entries.
-
-Offline ``experimental/lrp_edits`` and template-file edits do not command
-hardware at write time; they are gated at the point LAS X executes them
-(``load_experiment`` / job selection / ``acquire``), not at file write.
 
 State model
 -----------
@@ -101,15 +90,11 @@ MUTATING_COMMANDS = {
     **{name: name for name in _limits_config.SETTER_LIMIT_KEYS},
     "set_objective": "set_objective",
     "select_job": "set_state",
-    # stage / galvo motion
+    # stage motion
     "move_xy": "set_xyz",
     "move_z": "set_xyz",
-    "move_galvo_to_pixel": "move_galvo_to_pixel",
     # acquisition
     "acquire": "acquire",
-    # experiment file round-trips (scanfields/files.py)
-    "save_experiment": "save_experiment",
-    "load_experiment": "load_experiment",
 }
 
 

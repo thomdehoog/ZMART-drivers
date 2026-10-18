@@ -20,8 +20,6 @@ this repository)::
     - configuration/      what is measured once per microscope: limits,
                           image_stage_registration, optical_calibration (each with its
                           defaults and notebook), the store, the per-connection state
-    - scanfields/         LAS X scan-field files, parsing, planning, strip/restore
-    - experimental/       LRP mutation helpers without live-state readback
     - testing/            the mock LAS X API, the offline suite, the hardware validators
 """
 
@@ -78,49 +76,14 @@ __all__ = [
     "set_filter_wheel_slot",
     "set_filter_wheel_spectrum",
     "move_xy",
-    "move_galvo_to_pixel",
     "move_z",
     # acquisition, not a command: acquire RAISES on failure and returns an
     # AcquisitionResult, never a result dict (see acquisition.capture)
     "acquire",
     "select_job",
-    # scan fields
-    "find_scanning_templates_dir",
-    "save_experiment",
-    "load_experiment",
-    "strip_template",
-    "restore_template",
-    "get_template_state",
-    "strip_template_in_place",
-    "apply_lrp_change",
-    "reorder_jobs",
-    "save_and_read_lrp",
-    # position parsers/planning
-    "parse_lrp",
-    "parse_scan_positions",
-    "parse_acquisition_positions",
-    "parse_base_grid",
-    "parse_focus_points",
-    "parse_rgn_geometries",
-    "parse_rgn_tile_colors",
-    "parse_matrix_settings",
-    "plan_tiles_from_geometries",
-    # experimental LRP edits (scan)
-    "lrp_set_zoom",
-    "reset_pan",
-    # experimental LRP edits (ROI)
-    "lrp_clear_rois",
-    "lrp_add_roi",
-    "make_rectangle",
-    "make_ellipse",
-    "make_polygon",
-    "roi_translation_to_pan",
-    "galvo_pan_for_pixel",
-    "mask_contour_to_roi",
     # session helpers
     "connect_python_client",
     "connect_microscope",
-    "disable_roi_scan",
     # acquisition workflow
     "AcquisitionResult",
     "PlaneIndex",
@@ -178,7 +141,6 @@ from .actions.set import (
     set_filter_wheel_slot,
     set_filter_wheel_spectrum,
     move_xy,
-    move_galvo_to_pixel,
     move_z,
     select_job,
 )
@@ -197,29 +159,6 @@ from .dispatcher.checks import (
     check_z,
 )
 
-# -- scanfields/ - LAS X scan-field file operations and parsing
-from .scanfields.files import (
-    find_scanning_templates_dir,
-    save_experiment,
-    load_experiment,
-    get_template_state,
-    save_and_read_lrp,
-)
-from .scanfields.strip_restore import strip_template, restore_template
-from .scanfields.strip_restore import strip_template_in_place
-from .scanfields.transaction import apply_lrp_change, reorder_jobs
-from .scanfields.lrp import parse_lrp
-from .scanfields.parsers import (
-    parse_scan_positions,
-    parse_acquisition_positions,
-    parse_base_grid,
-    parse_focus_points,
-    parse_rgn_geometries,
-    parse_rgn_tile_colors,
-    parse_matrix_settings,
-)
-from .scanfields.planning import plan_tiles_from_geometries
-
 # -- acquisition/ - capture, file arrival, and save handling
 from .actions.acquire import AcquisitionResult, acquire
 from .output.product import (
@@ -232,20 +171,6 @@ from .output.product import (
     VendorMetadataSource,
 )
 from .output.save import save
-
-# -- experimental/lrp_edits/ - LRP mutation helpers
-from .experimental.lrp_edits.scan import lrp_set_zoom, reset_pan
-from .experimental.lrp_edits.roi import (
-    lrp_clear_rois,
-    lrp_add_roi,
-    make_rectangle,
-    make_ellipse,
-    make_polygon,
-    roi_translation_to_pan,
-    galvo_pan_for_pixel,
-    mask_contour_to_roi,
-    disable_roi_scan,
-)
 
 # -- logging
 import logging

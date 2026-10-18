@@ -38,7 +38,6 @@ the gate, readers, and confirmations.
 """
 
 import logging
-import math
 import time
 from dataclasses import replace
 from functools import partial
@@ -78,7 +77,6 @@ from .confirmations import (
     confirm_objective,
     race_confirmations,
 )
-from .galvo import PAN_LIMIT
 from .objectives import objective_by_slot
 from .profiles import (
     ACQUIRE,
@@ -1259,141 +1257,6 @@ def move_xy(client, x, y, unit="um", *, max_retries=None, tolerance=None):
     # Target position (not a readback - check r["confirmed"] for verification status)
     r["position"] = {"x": x_um * 1e-6, "y": y_um * 1e-6, "x_um": x_um, "y_um": y_um}
     return r
-
-
-# ── Galvo pan limits ────────────────────────────────────────────────
-# Single source: config.galvo.PAN_LIMIT (max pan value in either axis,
-# objective-independent; see the galvo pan calibration header there).
-_PAN_LIMIT = PAN_LIMIT
-
-
-def move_galvo_to_pixel(client, px, py, *, job_name=None, pixel_size_um=None, image_size=None):
-    """Pan the galvo so the pixel ``(px, py)`` of the current frame appears at FOV centre.
-
-    The primary galvo navigation primitive: take a pixel coordinate from
-    whatever image is currently loaded and pan there. No stage XY round-trip,
-    no calibration matrix - pan is image-frame, derived from documented LAS X
-    invariants (see ``galvo_pan_for_pixel``). The stage does not move.
-
-    The pan is composed *atomically* with whatever pan was previously written
-    (read-modify-write inside one ``apply_lrp_change`` transaction): if the
-    frame was already acquired at non-zero pan, this still recentres on
-    ``(px, py)`` of that frame.
-
-    ``pixel_size_um`` and ``image_size`` default to the active acquisition's
-    geometry (``parse_tile_geometry`` from ``get_job_settings``); pass them
-    explicitly only if the caller has cached values.
-
-    Returns a dict with ``success``, ``pan`` (the absolute pan written),
-    ``delta_pan`` (what was added), ``pan_scale_um``, ``message``. Returns
-    ``success=False`` with ``message`` if the resulting absolute pan would
-    exceed the angular limit (``_PAN_LIMIT``); the caller should stage-move
-    closer first.
-    """
-    from ..dispatcher.read import get_base_fov, get_job_settings, get_selected_job
-    from ..experimental.lrp_edits.roi import galvo_pan_for_pixel
-    from ..experimental.lrp_edits.scan import lrp_get_pan, lrp_set_pan
-    from ..scanfields.files import TEMPLATE_XML
-    from ..scanfields.transaction import apply_lrp_change
-    from ..vendor_interface.parsing import parse_tile_geometry
-    from .galvo import pan_scale_um_from_base_fov
-
-    # Function-keyed gate (fail-closed state check up front; the composed
-    # absolute pan is checked again against the file inside the transaction,
-    # once it is known).
-    refused = _gate.check_refusal(client, "move_galvo_to_pixel", {})
-    if refused is not None:
-        log.error(refused)
-        return {
-            "success": False,
-            "pan": None,
-            "delta_pan": None,
-            "pan_scale_um": None,
-            "message": refused,
-        }
-
-    if job_name is None:
-        # The selected-job API can lag behind LAS X on the real scope; use the
-        # routed profile for "what is active now?", then pin job metadata below.
-        sel = get_selected_job(client)
-        job_name = sel.get("Name") if sel else None
-    if not job_name:
-        return {
-            "success": False,
-            "pan": None,
-            "delta_pan": None,
-            "pan_scale_um": None,
-            "message": "No job name provided and no job selected",
-        }
-
-    if pixel_size_um is None or image_size is None:
-        geo = parse_tile_geometry(get_job_settings(client, job_name) or {})
-        pixel_size_um = pixel_size_um if pixel_size_um is not None else float(geo["pixel_w_um"])
-        image_size = image_size if image_size is not None else int(geo["pixels_x"])
-
-    base_fov_m = get_base_fov(client, job_name)
-    if not base_fov_m:
-        return {
-            "success": False,
-            "pan": None,
-            "delta_pan": None,
-            "pan_scale_um": None,
-            "message": "Could not read base FOV to resolve pan scale",
-        }
-    pan_scale_um = pan_scale_um_from_base_fov(base_fov_m[0] * 1e6)
-
-    d_pan_x, d_pan_y = galvo_pan_for_pixel(
-        px,
-        py,
-        pixel_size_um=pixel_size_um,
-        image_size=image_size,
-        pan_scale_um=pan_scale_um,
-    )
-
-    new_pan = [None, None]
-
-    def _edit(p):
-        cur_x, cur_y = lrp_get_pan(p, job_name)
-        new_pan[0] = cur_x + d_pan_x
-        new_pan[1] = cur_y + d_pan_y
-        # NaN compares False against the angular limit below, so a poisoned
-        # pixel target (or a corrupt current pan) would otherwise be written
-        # into the LRP verbatim — refuse non-finite pans outright.
-        if not (math.isfinite(new_pan[0]) and math.isfinite(new_pan[1])):
-            raise RuntimeError(
-                f"resulting pan ({new_pan[0]!r}, {new_pan[1]!r}) is not finite; "
-                f"refusing the galvo pan (poisoned pixel target or corrupt current pan)"
-            )
-        if abs(new_pan[0]) > _PAN_LIMIT or abs(new_pan[1]) > _PAN_LIMIT:
-            raise RuntimeError(
-                f"resulting pan ({new_pan[0]:+.5f}, {new_pan[1]:+.5f}) "
-                f"exceeds angular limit ±{_PAN_LIMIT}; stage-move closer first."
-            )
-        lrp_set_pan(p, new_pan[0], new_pan[1], job_name)
-
-    try:
-        # Use the default confirm_delays from apply_lrp_change rather
-        # than a shortened tuple. A shorter retry budget runs out when
-        # LAS X is slow late in a long session - the ROI cookbook with
-        # the default budget keeps working in those same conditions.
-        r = apply_lrp_change(client, TEMPLATE_XML, _edit)
-    except RuntimeError as e:
-        return {
-            "success": False,
-            "pan": tuple(new_pan),
-            "delta_pan": (d_pan_x, d_pan_y),
-            "pan_scale_um": pan_scale_um,
-            "message": str(e),
-        }
-
-    success = r is not None and r.get("success", False)
-    return {
-        "success": success,
-        "pan": tuple(new_pan),
-        "delta_pan": (d_pan_x, d_pan_y),
-        "pan_scale_um": pan_scale_um,
-        "message": "OK" if success else "apply_lrp_change failed",
-    }
 
 
 def move_z(

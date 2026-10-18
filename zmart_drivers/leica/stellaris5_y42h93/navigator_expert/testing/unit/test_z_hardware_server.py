@@ -2,13 +2,12 @@
 Unit tests: the stacked drive's Z is read from LAS X's hardware server first.
 ================================================================================
 Once a job's z-stack is on a drive, LAS X stops refreshing that drive's
-``zPosition`` in the job settings. The saved experiment (``.lrp``) records
-the last command, costs a save, and is not where the drive is. LAS X's
-hardware server reports the drive's true position
-(``Hardware.ZPosZGalvo`` / ``ZPosZDrive``, metres; measured on the simulator
-2026-10-12: galvo -2.38e-10 m while the job settings said 0). So for the
-stacked drive the reader asks the hardware server first and falls back to the
-``.lrp`` only when the server cannot be reached. The free drive is untouched.
+``zPosition`` in the job settings. LAS X's hardware server reports the
+drive's true position (``Hardware.ZPosZGalvo`` / ``ZPosZDrive``, metres;
+measured on the simulator 2026-10-12: galvo -2.38e-10 m while the job
+settings said 0). So for the stacked drive the reader asks the hardware
+server, and refuses when the server cannot be reached, rather than return
+the stale number. The free drive is untouched.
 
 The suite's conftest makes the hardware server unreachable for every test;
 the tests here hand in a stand-in server instead.
@@ -19,11 +18,10 @@ import time
 from unittest.mock import patch
 
 import pytest
-from z_readback_settings import raw_settings, saved
+from z_readback_settings import raw_settings
 
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.actions import (
     confirmations,
-    derived,
 )
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.actions import (
     set as commands,
@@ -87,10 +85,6 @@ def server(monkeypatch):
     return stand_in
 
 
-def no_save(client, **kwargs):
-    pytest.fail("the experiment must not be saved when the hardware server answers")
-
-
 class TestReadHardwareZ:
     def test_galvo_in_micrometres(self, server):
         server.Hardware.ZPosZGalvo = SIMULATOR_GALVO_M
@@ -143,8 +137,7 @@ class TestReadHardwareZ:
 
 
 class TestStackedDrive:
-    def test_reads_the_hardware_server_and_never_saves(self, server, monkeypatch):
-        monkeypatch.setattr(derived, "save_and_read_lrp", no_save)
+    def test_reads_the_hardware_server(self, server, monkeypatch):
         server.Hardware.ZPosZGalvo = 15e-6
         settings = raw_settings(galvo_um=-0.01, stack_on="z-galvo")
         assert z_um_from_settings(
@@ -152,7 +145,6 @@ class TestStackedDrive:
         ) == pytest.approx(15.0)
 
     def test_the_stacked_z_wide_too(self, server, monkeypatch):
-        monkeypatch.setattr(derived, "save_and_read_lrp", no_save)
         server.Hardware.ZPosZDrive = 5.0095e-3
         settings = raw_settings(wide_um=4999.5, stack_on="z-wide")
         assert z_um_from_settings(
@@ -164,14 +156,11 @@ class TestStackedDrive:
         settings = raw_settings(stack_on="z-galvo")
         assert z_um_from_settings(settings, "z-galvo") == pytest.approx(2.0)
 
-    def test_falls_back_to_the_saved_experiment_without_a_server(self, monkeypatch):
-        monkeypatch.setattr(
-            derived, "save_and_read_lrp", lambda c, **k: saved("AF Job 01", "z-galvo", 15.0)
-        )
+    def test_refuses_when_the_server_cannot_be_reached(self):
+        # The suite's conftest makes the server unreachable, as on a PC without LAS X.
         settings = raw_settings(galvo_um=-0.01, stack_on="z-galvo")
-        assert z_um_from_settings(
-            settings, "z-galvo", client=object(), job_name="AF Job 01"
-        ) == pytest.approx(15.0)
+        with pytest.raises(RuntimeError, match="hardware server could not be reached"):
+            z_um_from_settings(settings, "z-galvo", client=object(), job_name="AF Job 01")
 
 
 class TestFreeDrive:
@@ -187,7 +176,6 @@ class TestFreeDrive:
 
 class TestCallers:
     def test_confirm_move_z_confirms_where_the_drive_is(self, server, monkeypatch):
-        monkeypatch.setattr(derived, "save_and_read_lrp", no_save)
         server.Hardware.ZPosZGalvo = 50e-6
         ch = make_changeable_copy(raw_settings(galvo_um=-0.01, stack_on="z-galvo"))
         with patch.object(confirmations, "_readback", return_value=ch):
@@ -197,7 +185,6 @@ class TestCallers:
         assert result["success"] is True
 
     def test_confirm_move_z_does_not_confirm_a_drive_that_stayed(self, server, monkeypatch):
-        monkeypatch.setattr(derived, "save_and_read_lrp", no_save)
         server.Hardware.ZPosZGalvo = 0.0
         ch = make_changeable_copy(raw_settings(galvo_um=-0.01, stack_on="z-galvo"))
         with patch.object(confirmations, "_readback", return_value=ch):
@@ -207,7 +194,6 @@ class TestCallers:
         assert result["success"] is False
 
     def test_adapter_snapshot_reads_the_stacked_drive_from_the_server(self, server, monkeypatch):
-        monkeypatch.setattr(derived, "save_and_read_lrp", no_save)
         server.Hardware.ZPosZGalvo = 15e-6
         monkeypatch.setattr(adapter._readers, "get_xy", lambda c: {"x_um": 1.0, "y_um": 2.0})
         monkeypatch.setattr(
@@ -236,7 +222,6 @@ class TestMoveZEndToEnd:
             if job.get("stack"):
                 job["stack"]["mode"] = "z-galvo"
         install_permissive_limits(client, wide_stage=True)
-        monkeypatch.setattr(derived, "save_and_read_lrp", no_save)
         server.Hardware.ZPosZGalvo = 12e-6
         t0 = time.perf_counter()
         result = commands.move_z(client, "HiRes", 12.0, z_mode="galvo")

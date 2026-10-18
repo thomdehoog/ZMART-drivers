@@ -255,16 +255,6 @@ class TestCommands:
         assert result["success"] is False
         assert "8nm" in result["message"]
 
-    def test_an_experiment_save_is_not_sent_into_an_open_dialog(self, client, lasx_log, monkeypatch, tmp_path):
-        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.scanfields import files
-
-        show(lasx_log)
-        use(monkeypatch, StandInWindows([StandInDialog(lasx_log, buttons=("ButtonMessageOk", "ButtonMessageCancel"))]))
-        sent = []
-        client.PyApiSaveExperiment.UpdateAwaitReceipt = lambda timeout: sent.append(1) or True
-        assert files.save_experiment(client, "x.xml", tmp_path, timeout=0.2) is None
-        assert sent == []
-
 
 class TestComInThisThread:
     """The driver's thread has COM set up already, by pywin32 and the CAM API,

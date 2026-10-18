@@ -1,4 +1,4 @@
-"""Job settings and saved-experiment data shaped as LAS X gives them, for the Z readback tests."""
+"""Job settings shaped as LAS X gives them, for the Z readback tests."""
 
 
 def raw_settings(*, galvo_um=0.0, wide_um=4999.5, stack_on=None):
@@ -21,14 +21,3 @@ def raw_settings(*, galvo_um=0.0, wide_um=4999.5, stack_on=None):
             "mode": stack_on,
         }
     return settings
-
-
-def saved(job_name, drive, z_um):
-    """Parsed-.lrp shaped data with one job's Master ZPosition (metres)."""
-    return {
-        "sequence_name": "collecting pattern",
-        "sequence_elements": [],
-        "jobs": {
-            job_name: {"Master": {"attrs": {"ZPosition": repr(z_um * 1e-6), "ZUseModeName": drive}}}
-        },
-    }

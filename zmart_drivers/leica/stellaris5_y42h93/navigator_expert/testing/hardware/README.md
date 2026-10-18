@@ -81,8 +81,7 @@ release or after a change to the readers:
   hybrid routes as well. Those routes stay diagnostic: they document
   bench-specific reader disagreements without failing the run.
 
-Hardware validation uses only production driver modules, nothing under
-`experimental/`.
+Hardware validation uses only production driver modules.
 
 Before the first stage-moving validator, hardware CI enforces and verifies the raw
 four-axis baseline **X = 63,500 um, Y = 41,500 um, Z-wide = 0 um, Z-galvo =

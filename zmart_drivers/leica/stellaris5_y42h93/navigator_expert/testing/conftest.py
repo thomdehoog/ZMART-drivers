@@ -1,6 +1,5 @@
 """Shared pytest setup and immutable test-data accessors."""
 
-import shutil
 import sys
 from pathlib import Path
 
@@ -42,8 +41,6 @@ def _hermetic_machine_root(tmp_path_factory, monkeypatch):
     """
     root = tmp_path_factory.mktemp("zmart_microscopy_root")
     monkeypatch.setenv("ZMART_MICROSCOPY_ROOT", str(root))
-GENERAL_WORKFLOW_DATA = TEST_DATA / "general_workflow"
-SCANFIELD_PARSING_DATA = TEST_DATA / "scanfield_parsing"
 
 
 def pytest_report_header(config):
@@ -169,13 +166,3 @@ def fresh_live_log(monkeypatch):
     )
 
     monkeypatch.setattr(log_reader, "LIVE_LOG", log_reader.SharedParse())
-
-
-@pytest.fixture
-def general_workflow_data(tmp_path):
-    """Return a writable temp copy of the canonical offline workflow bundle."""
-    if not GENERAL_WORKFLOW_DATA.is_dir():
-        pytest.skip(f"test data not found: {GENERAL_WORKFLOW_DATA}")
-    dst = tmp_path / "general_workflow"
-    shutil.copytree(GENERAL_WORKFLOW_DATA, dst)
-    return dst

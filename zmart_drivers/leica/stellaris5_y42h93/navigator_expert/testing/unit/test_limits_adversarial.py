@@ -49,9 +49,6 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher import (
     checks as motion_limits,
 )
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher import gate
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.scanfields import (
-    files as scanfield_files,
-)
 
 DRIVER_ROOT = Path(__file__).resolve().parents[2]
 
@@ -325,50 +322,6 @@ def test_poisoned_move_z_targets_refuse(governed_client, z, z_mode):
     assert result["message"]
 
 
-@pytest.mark.parametrize("px,py", [(float("nan"), 10), (10, float("nan"))])
-def test_poisoned_pixel_target_cannot_compose_a_nan_galvo_pan(governed_client, px, py):
-    """NaN compares False against the angular pan limit, and the machine
-    file carries no pan constraint — so a NaN pixel target must be refused
-    by the composed-pan finiteness check, never written into the LRP that
-    LAS X executes."""
-    from unittest.mock import patch
-
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher import (
-        read as readers,
-    )
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.experimental.lrp_edits import (
-        scan as lrp_scan,
-    )
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.scanfields import (
-        transaction as lrp_transaction,
-    )
-
-    written = []
-
-    def fake_apply_lrp_change(client, template_xml, edit_fn):
-        # Mirror the real transaction's contract: run the edit; an exception
-        # from the edit propagates (load_experiment then never fires).
-        edit_fn("dummy.lrp")
-        return {"success": True}
-
-    with (
-        patch.object(readers, "get_selected_job", return_value={"Name": "Overview"}),
-        patch.object(readers, "get_job_settings", return_value={"settings": "raw"}),
-        patch.object(readers, "get_base_fov", return_value=(0.000512, 0.000512)),
-        patch(
-            "zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.parsing.parse_tile_geometry",
-            return_value={"pixel_w_um": 1.0, "pixels_x": 512},
-        ),
-        patch.object(lrp_scan, "lrp_get_pan", return_value=(0.0, 0.0)),
-        patch.object(lrp_scan, "lrp_set_pan", side_effect=lambda *a: written.append(a)),
-        patch.object(lrp_transaction, "apply_lrp_change", side_effect=fake_apply_lrp_change),
-    ):
-        result = commands_mod.move_galvo_to_pixel(governed_client, px, py)
-    assert result["success"] is False, result
-    assert "not finite" in result["message"], result["message"]
-    assert written == []  # the poisoned pan never reached the LRP
-
-
 def test_nan_never_slips_past_a_bounded_constraint():
     """NaN compares False against every bound; flat validation must refuse it."""
     payload = limits_config.build_limits_payload(DEFAULT_STAGE_UM)
@@ -622,11 +575,8 @@ _WRAPPER_CALLS = {
     ),
     "move_xy": lambda c: commands_mod.move_xy(c, 50000, 50000, unit="um"),
     "move_z": lambda c: commands_mod.move_z(c, "J", 0.0, unit="um", z_mode="galvo"),
-    "move_galvo_to_pixel": lambda c: commands_mod.move_galvo_to_pixel(c, 10, 10),
     "acquire": lambda c: commands_mod.acquire(c, "J"),
     "select_job": lambda c: commands_mod.select_job(c, "Overview"),
-    "save_experiment": lambda c: scanfield_files.save_experiment(c, "t.xml", "/nonexistent"),
-    "load_experiment": lambda c: scanfield_files.load_experiment(c, "t.xml"),
 }
 
 _SETTER_ALLOWED_VALUES = {
@@ -803,12 +753,9 @@ def test_every_mutating_wrapper_refuses_fail_closed_without_state(wrapper):
     """Direct-commands bypass: no handshake -> refusal BEFORE the client is
     touched, for every declared mutating wrapper."""
     result = _WRAPPER_CALLS[wrapper](_Untouchable())
-    if wrapper in ("save_experiment", "load_experiment"):
-        assert result is None  # their contract: None = failure (refusal logged)
-    else:
-        assert isinstance(result, dict)
-        assert result["success"] is False
-        assert "refused" in result["message"]
+    assert isinstance(result, dict)
+    assert result["success"] is False
+    assert "refused" in result["message"]
 
 
 def test_adapter_bypass_refuses_at_the_commands_layer(clear_stage_limits):
@@ -934,12 +881,12 @@ def test_generated_machine_payload_matches_the_vocabulary():
 def test_every_dispatching_wrapper_declares_and_calls_the_gate():
     """AST completeness sweep over actions/set.py: any public function that
     reaches the fire path (_dispatch/_dispatch_setting/confirm_and_fire)
-    or the LRP transaction must (a) be declared in gate.MUTATING_COMMANDS and
+    must (a) be declared in gate.MUTATING_COMMANDS and
     (b) call the gate with ITS OWN name — a new command cannot ship ungated."""
     source = (DRIVER_ROOT / "actions" / "set.py").read_text(encoding="utf-8")
     tree = ast.parse(source)
-    fire_names = {"_dispatch", "_dispatch_setting", "confirm_and_fire", "apply_lrp_change"}
-    # Raw-receipt fires (the scanfields/files.py shape) must not escape the
+    fire_names = {"_dispatch", "_dispatch_setting", "confirm_and_fire"}
+    # Raw-receipt fires must not escape the
     # sweep either: a wrapper that skips the dispatch helpers and calls
     # api_obj.UpdateAwaitReceipt()/UpdateAsync() directly still reaches
     # hardware.
@@ -970,26 +917,8 @@ def test_every_dispatching_wrapper_declares_and_calls_the_gate():
             f"{node.name} never calls the limits gate with its own name"
         )
         checked.append(node.name)
-    # sanity: the sweep actually saw the wrapper set (all but the two
-    # scanfields file mutators, which live in scanfields/files.py)
-    assert set(checked) == set(gate.MUTATING_COMMANDS) - {"save_experiment", "load_experiment"}
-
-
-def test_scanfield_file_mutators_call_the_gate():
-    source = (DRIVER_ROOT / "scanfields" / "files.py").read_text(encoding="utf-8")
-    tree = ast.parse(source)
-    for name in ("save_experiment", "load_experiment"):
-        node = next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == name)
-        literals = {
-            call.args[1].value
-            for call in ast.walk(node)
-            if isinstance(call, ast.Call)
-            and isinstance(call.func, ast.Attribute)
-            and call.func.attr == "check_refusal"
-            and len(call.args) >= 2
-            and isinstance(call.args[1], ast.Constant)
-        }
-        assert name in literals, f"{name} never calls the limits gate with its own name"
+    # sanity: the sweep actually saw the whole wrapper set
+    assert set(checked) == set(gate.MUTATING_COMMANDS)
 
 
 # =============================================================================

@@ -2710,51 +2710,6 @@ class TestHybridSelectJobApiLegEndToEnd(unittest.TestCase):
         self.assertTrue(any("confirmed by api leg" in m for m in messages))
 
 
-class TestCommandReaderSafety(unittest.TestCase):
-    def test_move_galvo_to_pixel_uses_configured_reader_policy(self):
-        client = make_client()
-        calls = {"selected": [], "settings": [], "base_fov": []}
-
-        def fake_get_selected_job(client, **kwargs):
-            calls["selected"].append(kwargs)
-            return {"Name": "Overview"}
-
-        def fake_get_job_settings(client, job_name, **kwargs):
-            calls["settings"].append((job_name, kwargs))
-            return {"settings": "raw"}
-
-        def fake_get_base_fov(client, job_name, **kwargs):
-            calls["base_fov"].append((job_name, kwargs))
-            return (0.000512, 0.000512)
-
-        def fake_apply_lrp_change(client, template_xml, edit_fn):
-            return {"success": True}
-
-        with (
-            patch.object(readers, "get_selected_job", side_effect=fake_get_selected_job),
-            patch.object(readers, "get_job_settings", side_effect=fake_get_job_settings),
-            patch.object(readers, "get_base_fov", side_effect=fake_get_base_fov),
-            patch(
-                "zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_interface.parsing.parse_tile_geometry",
-                return_value={"pixel_w_um": 1.0, "pixels_x": 512},
-            ),
-            patch(
-                "zmart_drivers.leica.stellaris5_y42h93.navigator_expert.experimental.lrp_edits.roi.galvo_pan_for_pixel",
-                return_value=(0.0, 0.0),
-            ),
-            patch(
-                "zmart_drivers.leica.stellaris5_y42h93.navigator_expert.scanfields.transaction.apply_lrp_change",
-                side_effect=fake_apply_lrp_change,
-            ),
-        ):
-            result = commands.move_galvo_to_pixel(client, 10, 20)
-
-        self.assertTrue(result["success"])
-        self.assertNotIn("mode", calls["selected"][0])
-        self.assertNotIn("mode", calls["settings"][0][1])
-        self.assertNotIn("mode", calls["base_fov"][0][1])
-
-
 # =============================================================================
 # 20. _make_log_entry
 # =============================================================================
