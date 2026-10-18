@@ -30,7 +30,7 @@ from pathlib import Path
 from typing import Any
 
 from ... import metadata_map as described
-from ...files import DEFAULT_EXPORT_COMPLETION_POLL_INTERVAL_S, DEFAULT_EXPORT_COMPLETION_TIMEOUT_S, MTIME_SKEW_ALLOWANCE_S
+from .files import DEFAULT_EXPORT_COMPLETION_POLL_INTERVAL_S, DEFAULT_EXPORT_COMPLETION_TIMEOUT_S, MTIME_SKEW_ALLOWANCE_S
 from ...product import AcquisitionResult, AcquisitionMetadata, ExportedAcquisition, ExportedPosition, PlaneIndex, RawPlaneSource, VendorMetadataSource
 
 __all__ = ["collect_lasx_data_container", "data_container_root"]

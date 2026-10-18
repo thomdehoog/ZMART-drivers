@@ -35,7 +35,7 @@ from typing import Any
 import numpy as np
 
 import zmart_drivers.leica.stellaris5_y42h93.navigator_expert as drv
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.naming import Naming, run_hash
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.acquisition_and_saving.naming import Naming, run_hash
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.image_stage_registration.registration import D4_RESIDUAL_MAX, classify_d4, register_voting
 
 from . import SCHEMA_VERSION, Orientation, orientation_config, orientation_from_image_to_stage, reorient_array

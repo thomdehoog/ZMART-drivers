@@ -13,7 +13,7 @@ import os
 import uuid
 from pathlib import Path
 
-from ...vendor_specific.naming import Naming, log_dir
+from .naming import Naming, log_dir
 
 __all__ = ["write"]
 

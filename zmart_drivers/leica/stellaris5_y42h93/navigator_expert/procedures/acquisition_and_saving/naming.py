@@ -1,4 +1,12 @@
-"""Leica-private flat OME-TIFF filename convention."""
+"""How a capture's files and folders are named.
+
+A capture is named by its stem, then the time point, channel and plane. This
+file also says where in the output folder the data, the metadata, the state
+and the projections go.
+
+Author: Thom de Hoog, Center for Microscopy and Image Analysis (ZMB),
+University of Zurich (thom.dehoog@zmb.uzh.ch, thomdehoog@gmail.com).
+"""
 
 from __future__ import annotations
 

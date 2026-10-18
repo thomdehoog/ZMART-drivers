@@ -26,7 +26,7 @@ import zarr
 
 import zmart_drivers.leica.stellaris5_y42h93.navigator_expert as drv
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.image_stage_registration import Orientation, reorient_array
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.naming import Naming, build_image_name, parse_image_name
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.acquisition_and_saving.naming import Naming, build_image_name, parse_image_name
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.product import ExportedAcquisition, ExportedPosition
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.acquisition_and_saving import acquire as capture
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.acquisition_and_saving import ome_canonical

@@ -29,7 +29,7 @@ from .. import session_state as _session_state
 from . import command_log as _log
 from . import clear_cache as _release
 from . import save as _save
-from ...vendor_specific.naming import Naming, free_stem
+from .naming import Naming, free_stem
 from ...vendor_specific.primitive_handling import state as _readers
 from ...vendor_specific.primitive_handling.profiles import IMAGE_SAVE
 from . import acquire as _capture
