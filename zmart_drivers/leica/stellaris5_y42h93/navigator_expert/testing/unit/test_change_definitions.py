@@ -90,7 +90,7 @@ def record(call):
     asked = {"gate": [], "dispatch": None, "result": None}
     client = RecordingClient()
 
-    def gate(_client, command, values):
+    def gate(_client, command, values, _setup_hint=None):
         asked["gate"].append([command, values])
         return None
 

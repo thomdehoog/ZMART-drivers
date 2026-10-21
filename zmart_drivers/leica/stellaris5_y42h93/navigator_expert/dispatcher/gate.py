@@ -5,7 +5,8 @@ as possible — at the command wrapper that populates the native CAM function's
 model — so nothing built on top (adapter, controller, workflows, notebooks)
 can interfere with or bypass them. The rules themselves (what is allowed:
 ``LeicaLimits`` and the stage checks) live in ``vendor_specific/primitive_handling/limit_rules.py``; this
-module owns the *moment* of enforcement — per-connection state and refusal.
+module owns the *moment* of enforcement — per-connection state and refusal. It
+knows no microscope: the installed limits object answers ``check_command``.
 The wrappers in ``actions/`` call :func:`check_refusal` before anything fires.
 
 Wrapper -> key mapping
@@ -61,8 +62,7 @@ from dataclasses import dataclass
 from types import MappingProxyType
 from typing import Any
 
-from ..vendor_specific.primitive_handling.limit_rules import MUTATING_COMMANDS, NOTEBOOK_POINTER
-from ..vendor_specific.limit_errors import LimitsError, LimitsStatus, LimitViolation
+from .limit_errors import LimitsError, LimitsStatus, LimitViolation
 
 log = logging.getLogger(__name__)
 
@@ -164,7 +164,9 @@ def describe(client: Any) -> dict | None:
     return state.limits.describe()
 
 
-def check_refusal(client: Any, command: str, values: Mapping[str, Any]) -> str | None:
+def check_refusal(
+    client: Any, command: str, values: Mapping[str, Any], setup_hint: str | None = None
+) -> str | None:
     """Gate one mutating command; returns the refusal message, or None to fire.
 
     Fail-closed on every failure mode: no handshake ever ran for this client,
@@ -172,20 +174,20 @@ def check_refusal(client: Any, command: str, values: Mapping[str, Any]) -> str |
     violate the file's constraints. The caller (a command wrapper) must not
     fire the native call when this returns a message; wrappers turn it into
     their fail-closed result-dict idiom, the adapter/controller raise.
+    *setup_hint*, when given, says where the operator creates the limits files;
+    the vendor part knows that, so it hands it in.
     """
-    key = MUTATING_COMMANDS[command]  # KeyError = unmapped wrapper = programming error
     state = state_of(client)
     if state is None:
         return (
             f"{command} refused: no limits are installed for this session — run the "
-            f"connect limits handshake first (navigator_expert.connect_limits_handshake, "
-            f"done automatically by the zmart adapter's connect). The machine-local "
-            f"limits files are created with {NOTEBOOK_POINTER}."
+            "connect-time limits handshake first (the driver does this when it connects)."
+            + (f" The machine-local limits files are created with {setup_hint}." if setup_hint else "")
         )
     if state.limits is None:
         return f"{command} refused: {state.error}"
     try:
-        state.limits.check(key, values)
+        state.limits.check_command(command, values)
     except (LimitsError, LimitViolation) as exc:
         return f"{command} refused: {exc}"
     return None

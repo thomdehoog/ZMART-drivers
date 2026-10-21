@@ -174,9 +174,9 @@ ALLOWED = {
         # envelope and read engine
         "dispatcher",
     },
-    "dispatcher": {
-        "vendor_specific",  # the engines run the driver's handling notes and readers
-    },
+    # The engines know no microscope: the vendor part hands in its sources,
+    # profiles, error sorting, waiting numbers and limits.
+    "dispatcher": set(),
     "procedures": {
         "vendor_specific",
         "dispatcher",

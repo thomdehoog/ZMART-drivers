@@ -54,7 +54,7 @@ from ..parsing import _hw_get
 from . import settings
 from .confirm_select_job import prepare_select_job, select_job_confirm_legs
 from .confirmations import confirm_acquire, confirm_move_xy, confirm_move_z, confirm_objective, race_confirmations
-from .limit_rules import check_xy, check_z
+from .limit_rules import NOTEBOOK_POINTER, check_xy, check_z
 from .objectives import objective_by_slot
 from .profiles import ACQUIRE, MOVE_XY, MOVE_Z, OBJECTIVE, SELECT_JOB
 
@@ -73,7 +73,7 @@ def limits_refusal(client, command, values, **extra):
     result dict (``success=False``, the native call must NOT fire). ``extra``
     lets a wrapper add its contract-specific keys (e.g. ``position=None``).
     """
-    message = _gate.check_refusal(client, command, values)
+    message = _gate.check_refusal(client, command, values, NOTEBOOK_POINTER)
     if message is None:
         return None
     log.error(message)

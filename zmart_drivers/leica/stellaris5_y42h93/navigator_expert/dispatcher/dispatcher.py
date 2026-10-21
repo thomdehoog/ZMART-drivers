@@ -104,7 +104,8 @@ def write(client, api_obj, description, *, command, values, **keywords):
     """
     from . import confirm_loop, gate
 
-    message = gate.check_refusal(client, command, values)
+    hint = getattr(keywords.get("profile"), "limits_setup_hint", None)
+    message = gate.check_refusal(client, command, values, hint)
     if message is not None:
         return {
             "success": False,

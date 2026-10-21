@@ -30,6 +30,7 @@ from dataclasses import dataclass
 
 from . import transport as _transport
 from .prechecks import check_idle
+from .limit_rules import NOTEBOOK_POINTER
 from .. import tuning
 from ..tuning import WINDOW_S, WINDOWS
 from ..error_classification import _default_error_check
@@ -259,6 +260,9 @@ class CommandProfile:
     # The waiting rule (windows, window length, poll times) the engines follow
     # for this command; see ``vendor_specific/tuning.py``.
     waiting: object = tuning
+    # Where the operator creates the limits files, said when a command is refused
+    # because no limits are installed.
+    limits_setup_hint: str = NOTEBOOK_POINTER
     # A command that must reach the microscope at most once, because sending it
     # twice would do the work twice (an acquisition would save two data sets).
     # Whatever else a caller asks for, such a command is never sent again: not
