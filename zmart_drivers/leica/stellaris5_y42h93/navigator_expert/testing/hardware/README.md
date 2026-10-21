@@ -63,8 +63,9 @@ ready.
    cache grew over the run (a press that frees nothing). The procedure
    shows Navigator Expert's Experiment tab, where the canvas is, just
    before it clears, when another tab is shown. (Until 21 October 2026 the
-   driver did this before each capture; this order has not yet been run on
-   the simulator.)
+   driver did this before each capture. The new order passed on the
+   simulator on 21 October 2026: every canvas cleared, and the hidden copies
+   did not grow.)
 
 The captures of steps 6 and 7 go under the reports folder, so the run needs
 no data location.

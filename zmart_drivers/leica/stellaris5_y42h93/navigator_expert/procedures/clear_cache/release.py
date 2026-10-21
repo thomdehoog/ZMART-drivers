@@ -35,7 +35,10 @@ release also clears the canvas (``vendor_specific.primitives.interface.lasx_navi
 lets go of the hidden copies too (simulator, 2026-10-14). The canvas can be
 cleared only while LAS X shows it, so :func:`prepare` shows it just before the
 release, while LAS X is idle. A canvas that cannot be shown or cleared is
-logged; the capture is taken and released all the same.
+logged; the picture is released all the same.
+
+Author: Thom de Hoog, Center for Microscopy and Image Analysis (ZMB),
+University of Zurich (thom.dehoog@zmb.uzh.ch, thomdehoog@gmail.com).
 """
 
 from __future__ import annotations
@@ -49,11 +52,11 @@ log = logging.getLogger(__name__)
 
 
 def prepare() -> None:
-    """Show the Navigator canvas before a capture that will be released, so that its Clear can be pressed after."""
+    """Show the Navigator canvas just before the release, so that its Clear can be pressed."""
     try:
         if lasx_navigator.show_canvas():
             log.info(
-                "Navigator Expert's Experiment tab shown, so the canvas can be cleared after the capture"
+                "Navigator Expert's Experiment tab shown, so the canvas can be cleared"
             )
     except lasx_navigator.NavigatorUnavailable as why:
         log.warning(
