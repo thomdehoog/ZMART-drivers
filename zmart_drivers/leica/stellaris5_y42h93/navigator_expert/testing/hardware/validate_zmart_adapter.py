@@ -40,6 +40,7 @@ exit 1 on any FAIL, or WARN with --strict-confirmation).
 from __future__ import annotations
 
 import argparse
+import json
 import math
 import shutil
 import sys
@@ -766,7 +767,15 @@ def phase_acquire(v: vh.Validator, sess: Any, args: argparse.Namespace) -> None:
                 v.compare(
                     "acquire: image carries embedded OME-XML", b"<OME" in embedded, True
                 )
-        v.compare("acquire: the whole job ran", rec.get("trigger"), "full")
+        # The controller answers with the files and the planes only; how the
+        # capture was triggered is written in its log, one of those files.
+        logs = [Path(p) for p in rec.get("files") or [] if p.endswith(".log.json")]
+        entry = json.loads(logs[0].read_text(encoding="utf-8")) if logs else {}
+        v.compare(
+            "acquire: the whole job ran",
+            (entry.get("settings") or {}).get("trigger"),
+            "full",
+        )
 
 
 # --- CLI --------------------------------------------------------------------
