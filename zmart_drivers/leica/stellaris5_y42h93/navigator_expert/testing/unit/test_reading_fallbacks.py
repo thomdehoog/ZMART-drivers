@@ -29,7 +29,7 @@ def use_profile(monkeypatch):
 
 def test_the_shipped_fallbacks():
     shipped = profiles.StateReaderProfile()
-    assert shipped.reading_fallback == "hybrid"
+    assert shipped.reading_fallback == "api"
     assert shipped.waiting_fallback == "api"
     assert shipped.selected_job_confirm_fallback == "hybrid"
 

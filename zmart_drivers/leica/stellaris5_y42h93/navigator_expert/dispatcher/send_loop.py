@@ -6,7 +6,8 @@ This is the first of the two loops of a change. It runs four steps:
 2. **Setup**: have the transport write the command's values into the request.
 3. **Fire**: send the request. How a request is sent and its reply awaited is
    the business of the command's ``profile.transport`` (for LAS X,
-   ``vendor_specific/primitive_handling/profiles/transport.py``); this file only asks
+   ``vendor_specific/primitive_handling/profiles/routes.py``, which may hold more than
+   one way of sending, tried in order); this file only asks
    it to fill in the request, clear the reply, send, wait for the reply and
    report an open dialog.
 4. **Error check**: read what the microscope answered. A temporary problem is
