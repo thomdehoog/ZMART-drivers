@@ -13,8 +13,10 @@ through but frees nothing is caught there.
 
 On the LAS X simulator (2026-10-14) a hidden copy took 1.3 to 2 times its
 capture's pixels, and all of them were let go of at every release. The canvas
-can be cleared only while LAS X shows it, so before each capture the driver
-shows Navigator Expert's Experiment tab, when another one is shown.
+can be cleared only while LAS X shows it, so ``clear_cache`` first shows
+Navigator Expert's Experiment tab, when another one is shown. Run with that
+order on the simulator, 2026-10-21: ten captures, every canvas cleared, and the
+hidden copies did not grow.
 
 It never edits a LAS X file: it selects the job, moves the stage to where it
 already stands (so every capture gets its canvas position), and captures.
