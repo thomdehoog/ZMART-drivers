@@ -234,7 +234,10 @@ class TestApiLegRoutedReads(unittest.TestCase):
         api_key = engine._client_api_key(client)
         self.assertTrue(
             engine._API_TURNS.take(
-                api_key, until=time.monotonic() + 1.0, stop=threading.Event()
+                api_key,
+                until=time.monotonic() + 1.0,
+                stop=threading.Event(),
+                poll_s=0.01,
             )
         )
         self.addCleanup(engine._API_TURNS.give_back, api_key)

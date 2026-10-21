@@ -22,6 +22,7 @@ from ..connection.hardware_server import HardwareServerUnavailable
 from ..primitives.log import log_reader
 from . import profiles
 from . import readings as capabilities
+from .. import tuning
 
 log = logging.getLogger(__name__)
 
@@ -30,6 +31,9 @@ def spec(datum):
     """The row of the table of readings for *datum*."""
     return capabilities.spec(datum)
 
+
+#: How long the shared reader waits: the numbers of this microscope's waiting rule.
+waiting = tuning
 
 #: Handed to the shared reader so that it can tell a missing leg from a failure.
 UnsupportedSource = capabilities.UnsupportedSource

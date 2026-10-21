@@ -30,7 +30,8 @@ from dataclasses import dataclass
 
 from . import transport as _transport
 from .prechecks import check_idle
-from ...dispatcher.dispatcher import WINDOW_S, WINDOWS
+from .. import tuning
+from ..tuning import WINDOW_S, WINDOWS
 from ..error_classification import _default_error_check
 from .confirmations import _confirm_detector_gain, _confirm_filter_wheel_slot, _confirm_filter_wheel_spectrum, _confirm_frame_accumulation, _confirm_frame_average, _confirm_image_format, _confirm_laser_intensity, _confirm_laser_shutter, _confirm_line_accumulation, _confirm_line_average, _confirm_pinhole_airy, _confirm_scan_field_rotation, _confirm_scan_mode, _confirm_scan_resonant, _confirm_scan_speed, _confirm_sequential_mode, _confirm_z_stack_definition, _confirm_z_stack_size, _confirm_z_stack_step_size, _confirm_zoom, confirm_acquire, confirm_move_xy, confirm_move_z, confirm_objective
 
@@ -57,7 +58,7 @@ class StateReaderProfile:
     capability table and source preference belongs here.
 
     Nothing here says how long to wait or how often to look: that is the one
-    rule in ``dispatcher.tuning``. A mode says which sources take part; a
+    rule in ``vendor_specific/tuning.py``. A mode says which sources take part; a
     ``*_log_max_age_s`` says how old a log answer may be and still count,
     because each kind of state goes stale at its own pace.
 
@@ -231,6 +232,8 @@ class CommandProfile:
             waited for (clear the reply, send, wait for the reply, report an open
             dialog). The dispatcher's engine asks the transport and names no
             microscope object itself.
+        waiting: The waiting rule the engines follow: any object with the four
+            numbers ``WINDOWS``, ``WINDOW_S``, ``POLL_S`` and ``ANSWER_POLL_S``.
     """
 
     pre_check_fn: Callable[..., dict] | None = None
@@ -253,6 +256,9 @@ class CommandProfile:
     # How a request reaches the microscope and how its reply is waited for; see
     # ``transport.py``. Another microscope supplies its own.
     transport: object = _transport.LASX
+    # The waiting rule (windows, window length, poll times) the engines follow
+    # for this command; see ``vendor_specific/tuning.py``.
+    waiting: object = tuning
     # A command that must reach the microscope at most once, because sending it
     # twice would do the work twice (an acquisition would save two data sets).
     # Whatever else a caller asks for, such a command is never sent again: not

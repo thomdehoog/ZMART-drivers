@@ -20,8 +20,8 @@ import logging
 import time
 
 from . import state as _readers
-from ...dispatcher import dispatcher
 from ...dispatcher.dispatcher import make_log_entry as _make_log_entry
+from .. import tuning
 
 log = logging.getLogger(__name__)
 
@@ -57,7 +57,7 @@ def check_idle(client):
     status = None if reading is None else reading.value
     msg = (
         f"Scanner not idle after {time.perf_counter() - t0:.1f}s "
-        f"({dispatcher.WINDOWS} windows of {dispatcher.WINDOW_S}s, last status: {status or 'unknown'})"
+        f"({tuning.WINDOWS} windows of {tuning.WINDOW_S}s, last status: {status or 'unknown'})"
     )
     log.warning(msg)
     return {"success": False, "logs": [_make_log_entry("warning", msg)]}

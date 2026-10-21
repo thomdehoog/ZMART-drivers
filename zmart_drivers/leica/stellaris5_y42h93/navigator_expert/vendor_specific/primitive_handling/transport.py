@@ -17,10 +17,10 @@ Author: Thom de Hoog, Center for Microscopy and Image Analysis (ZMB),
 import logging
 import time
 
-from ...dispatcher import dispatcher
 from ..primitives.api.delivery import deliver
 from ..primitives.interface import lasx_dialogs
 from ..primitives.log import log_reader as _log_reader
+from .. import tuning
 
 log = logging.getLogger(__name__)
 
@@ -73,7 +73,7 @@ def _await_echo_result(client, timeout=None):
         if time.perf_counter() >= deadline:
             return False
 
-        time.sleep(dispatcher.ANSWER_POLL_S)
+        time.sleep(tuning.ANSWER_POLL_S)
 
 
 class LasxTransport:
