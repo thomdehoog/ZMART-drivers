@@ -19,7 +19,7 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.for_zmart_controller
     ZmartDriver,
 )
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.connection import lasx_client
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.profiles import IMAGE_SAVE
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.profiles.profiles import IMAGE_SAVE
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures import (
     session_state,
 )

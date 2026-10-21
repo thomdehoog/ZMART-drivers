@@ -38,7 +38,7 @@ def test_write_refuses_a_client_with_no_limits_and_sends_nothing():
 def test_every_change_hands_its_name_and_values_to_the_dispatcher():
     """Each call to ``dispatch_change`` says which command it is and what it sets."""
     sources = [
-        DRIVER_ROOT / "vendor_specific" / "primitive_handling" / "changes.py",
+        DRIVER_ROOT / "vendor_specific" / "primitive_handling" / "settings" / "changes.py",
         DRIVER_ROOT / "procedures" / "objective_change_with_compensation" / "compensated_changes.py",
     ]
     calls = 0

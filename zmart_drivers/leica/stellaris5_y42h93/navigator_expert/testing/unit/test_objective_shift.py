@@ -14,9 +14,9 @@ from types import SimpleNamespace
 import pytest
 from limits_fixtures import install_permissive_limits
 
-import zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.state as readers
+import zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings.state as readers
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.objective_change_with_compensation import objective_shift as shift
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling import changes as cmds
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.settings import changes as cmds
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.objective_change_with_compensation import compensated_changes as cmds_comp
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures import (
     session_state,

@@ -29,9 +29,9 @@ import logging
 
 from . import coordinates
 from ...dispatcher import gate as _gate
-from ...vendor_specific.primitive_handling import state as _readers
-from ...vendor_specific.primitive_handling.derived import stack_drive as _stack_drive, z_um_from_settings as _z_um_from_settings
-from ...vendor_specific.primitive_handling import changes as _commands
+from ...vendor_specific.primitive_handling.readings import state as _readers
+from ...vendor_specific.primitive_handling.readings.derived import stack_drive as _stack_drive, z_um_from_settings as _z_um_from_settings
+from ...vendor_specific.primitive_handling.settings import changes as _commands
 from .. import session as _info
 from ..session import ZmartHandle, job_catalog, note_unconfirmed, require_open  # noqa: F401
 

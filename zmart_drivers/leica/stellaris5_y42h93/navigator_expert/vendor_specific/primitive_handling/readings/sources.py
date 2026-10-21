@@ -19,12 +19,12 @@ import threading
 import time
 from functools import partial
 
-from ...dispatcher.reader import Reading, counts
-from ..connection.hardware_server import HardwareServerUnavailable
-from ..primitives.log import log_reader
-from . import profiles
+from ....dispatcher.reader import Reading, counts
+from ...connection.hardware_server import HardwareServerUnavailable
+from ...primitives.log import log_reader
+from ..profiles import profiles
 from . import readings as capabilities
-from .. import tuning
+from ... import tuning
 
 log = logging.getLogger(__name__)
 

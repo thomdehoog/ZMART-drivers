@@ -13,7 +13,7 @@ this file keeps those facts in one place, as a table:
 - ``write``: how the request is filled in, field by field and in order;
 - ``confirm``: how the result is checked by reading the state back.
 
-``vendor_specific/primitive_handling/changes.py`` holds the one runner that uses every entry, and the
+``vendor_specific/primitive_handling/settings/changes.py`` holds the one runner that uses every entry, and the
 named functions (``set_zoom`` and the others) that operators call.
 
 Author: Thom de Hoog, Center for Microscopy and Image Analysis (ZMB),
@@ -27,12 +27,12 @@ from dataclasses import dataclass
 from functools import partial
 from typing import Any
 
-from ...dispatcher.dispatcher import make_log_entry as _make_log_entry
-from ..error_classification import _check_api_error, classify_error, sends_again
-from ..parsing import parse_format
-from . import confirmations as _check
-from . import profiles as _profiles
-from .profiles import CommandProfile
+from ....dispatcher.dispatcher import make_log_entry as _make_log_entry
+from ...error_classification import _check_api_error, classify_error, sends_again
+from ...parsing import parse_format
+from ..confirmations import confirmations as _check
+from ..profiles import profiles as _profiles
+from ..profiles.profiles import CommandProfile
 
 
 @dataclass(frozen=True)

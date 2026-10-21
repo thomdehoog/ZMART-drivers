@@ -15,7 +15,7 @@ import time
 from typing import Any
 
 from ...vendor_specific.product import AcquisitionResult
-from ...vendor_specific.primitive_handling import changes as _commands
+from ...vendor_specific.primitive_handling.settings import changes as _commands
 
 __all__ = ["AcquisitionResult", "acquire"]
 

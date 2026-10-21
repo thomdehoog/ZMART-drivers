@@ -708,16 +708,16 @@ Leica-specific:
 
 - `dispatcher/read.py` only waits for an answer from whichever source gives
   one. Asking the API, the log or the direct reader once is in
-  `vendor_specific/primitive_handling/sources.py`, and the named readings
-  (`get_xy`, `get_jobs` and the others) are in `primitive_handling/state.py`.
+  `vendor_specific/primitive_handling/readings/sources.py`, and the named readings
+  (`get_xy`, `get_jobs` and the others) are in `primitive_handling/readings/state.py`.
 - `dispatcher/change.py` sends a request and awaits its reply through a
   `transport` that each command profile carries. The LAS X version of it is in
-  `primitive_handling/transport.py`.
+  `primitive_handling/profiles/transport.py`.
 - The Leica limits rulebook (`LeicaLimits` and the stage checks) is in
-  `primitive_handling/limit_rules.py`. `dispatcher/gate.py` keeps only the
+  `primitive_handling/settings/limit_rules.py`. `dispatcher/gate.py` keeps only the
   moment of enforcement.
 - The settings of a job (zoom, scan speed, gain and the rest) are one table in
-  `primitive_handling/settings.py`, changed by one runner in
+  `primitive_handling/settings/settings.py`, changed by one runner in
   `procedures/changes.py`. Only the real recipes (`set_objective`, `move_xy`,
   `move_z`, `acquire`, `select_job`) are still written by hand.
 - A command profile can say `never_resend`. The acquisition does, and nothing a
@@ -778,7 +778,7 @@ purpose, so that it cannot be forgotten.
 1. **The fallback for confirming `select_job` still races two legs.** The
    direct reader confirms a job change alone, as it is first choice for every
    read. Only when it cannot answer do the API and the log run together in two
-   threads (`vendor_specific/primitive_handling/confirmations.py`, the dual-leg
+   threads (`vendor_specific/primitive_handling/confirmations/confirmations.py`, the dual-leg
    race), as before. The log leg reads a file, which never reaches LAS X, so
    the one-request-at-a-time rule still holds. The tests for the race are kept,
    and the new default is to be checked on the simulator first.

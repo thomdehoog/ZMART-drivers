@@ -26,9 +26,9 @@ from . import session_state as _session_state
 from ..driver_setup import store as _machine
 from ..dispatcher import gate as _gate
 from ..vendor_specific.parsing import parse_tile_geometry as _parse_tile_geometry
-from ..vendor_specific.primitive_handling import state as _readers
+from ..vendor_specific.primitive_handling.readings import state as _readers
 from .acquisition import acquire as _capture
-from ..vendor_specific.primitive_handling import changes as _commands
+from ..vendor_specific.primitive_handling.settings import changes as _commands
 from .objective_change_with_compensation import compensated_changes as _compensated
 from . import session as _info
 from .absolute_coordinate_system.frame import canvas, delta_or_warn, get_xyz, hardware_snapshot, zero_z_galvo

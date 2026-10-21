@@ -142,12 +142,12 @@ LAS X.
 | LAS X dialog / MessageBox log | `C:\ProgramData\Leica Microsystems\LAS X\MatrixScreener.log` |
 | CAM API assemblies (runtime) | `C:\Program Files\Leica Microsystems CMS GmbH\LAS X\AddIns\NavigatorExpert` |
 
-Defaults live in `vendor_specific/primitive_handling/profiles.py` (`LogReaderProfile`, `LasxApiProfile`) and are discovered at
+Defaults live in `vendor_specific/primitive_handling/profiles/profiles.py` (`LogReaderProfile`, `LasxApiProfile`) and are discovered at
 runtime where possible. Override via the profile, not at call sites.
 
 ## 3. Configuration
 
-- **Connection** — `LasxApiProfile` (`vendor_specific/primitive_handling/profiles.py`): `runtime_root` (the add-in dir) and
+- **Connection** — `LasxApiProfile` (`vendor_specific/primitive_handling/profiles/profiles.py`): `runtime_root` (the add-in dir) and
   `delay_ms` (Leica's client-side pacing knob `DelayInMilliseconds`, default 250 ms).
 - **Log reader** — `LogReaderProfile`: the `lcsCommand.log` / `MatrixScreener.log` paths + freshness windows.
 - **Machine-local calibration & limits** — `driver_setup/store.py` resolves the instrument's calibration
@@ -164,7 +164,7 @@ runtime where possible. Override via the profile, not at call sites.
 - **The driver loads the configs at connect** — making a `ZmartDriver` is the connection. Its
   constructor opens the CAM client (`vendor_specific/connection/lasx_client.py`) and then loads this
   microscope's three machine-local configs — the **instrument limits**, the **orientation**, and the
-  **calibration** — so the whole session works from one consistent picture. Normal image orientation is enabled by `IMAGE_SAVE` in `vendor_specific/primitive_handling/profiles.py`; only the
+  **calibration** — so the whole session works from one consistent picture. Normal image orientation is enabled by `IMAGE_SAVE` in `vendor_specific/primitive_handling/profiles/profiles.py`; only the
   orientation measurement explicitly requests raw pixels. Limits and calibration can still be skipped.
   This is a deliberate ladder: the limits notebook
   is bounded only by the physical backstop, `set_orientation` is bounded by limits, and
@@ -330,7 +330,7 @@ Expert's autofocus job. Only when it fails (LAS X not reachable, an answer that 
 the others answer: `api` (CAM read requests, one at a time per connection), `log` (parse LAS X logs
 — never blocks the CAM API, can be stale), `hybrid` (watch both, the first answer that counts as a
 success wins). A reading says which source answered. What counts as a success is declared once
-per datum in `vendor_specific/primitive_handling/readings.py` (job settings, for example, must name the job asked about and carry
+per datum in `vendor_specific/primitive_handling/readings/readings.py` (job settings, for example, must name the job asked about and carry
 an objective slot and image geometry). On the STELLARIS (15 October 2026) the direct reader was
 right where the CAM API was stale: the z-galvo position while a job had a z-galvo stack, and the
 selected job just after a switch.
@@ -383,7 +383,7 @@ schema-mismatched (it returns `None` only when the settings cannot be read at al
 
 Z has no hardware readback through CAM. The settings' `zPosition` is the job's stored setpoint
 and it stops refreshing for the drive that carries the job's z-stack; for that drive the Z
-extractor (`vendor_specific/primitive_handling/derived.py::z_um_from_settings`) asks LAS X's hardware server where the drive
+extractor (`vendor_specific/primitive_handling/readings/derived.py::z_um_from_settings`) asks LAS X's hardware server where the drive
 really is, transparently to every caller — reader, `confirm_move_z`, the `ZmartDriver` class. If the hardware
 server cannot be reached, the stacked drive is refused with a clear message instead of answered
 with the stale number. The free drive is read from the settings at no extra cost.
@@ -663,7 +663,7 @@ workflow sees:
 
 ## 8. Configuration & tuning (profiles)
 
-Every command has a frozen `CommandProfile` in `vendor_specific/primitive_handling/profiles.py` — its complete recipe (pluggable
+Every command has a frozen `CommandProfile` in `vendor_specific/primitive_handling/profiles/profiles.py` — its complete recipe (pluggable
 callables + retry/confirm tuning). Tuning a command = editing its profile; nothing else changes.
 
 ```python
@@ -767,10 +767,10 @@ These **silently misbehave** instead of failing loudly — respect them or resul
 
 Adding a command touches four places, following the pattern every existing command uses:
 
-1. **Confirm function** (`vendor_specific/primitive_handling/confirmations.py`) — `_confirm_X(client, ...) -> {"success", "logs"}`
+1. **Confirm function** (`vendor_specific/primitive_handling/confirmations/confirmations.py`) — `_confirm_X(client, ...) -> {"success", "logs"}`
    (skip if no readback is possible).
-2. **CommandProfile** (`vendor_specific/primitive_handling/profiles.py`) — `MY_PARAM = _leica_setting_profile(_confirm_my_param)`.
-3. **Command wrapper** (`vendor_specific/primitive_handling/changes.py`) — three phases (pre-checks → `_dispatch(...)` with the
+2. **CommandProfile** (`vendor_specific/primitive_handling/profiles/profiles.py`) — `MY_PARAM = _leica_setting_profile(_confirm_my_param)`.
+3. **Command wrapper** (`vendor_specific/primitive_handling/settings/changes.py`) — three phases (pre-checks → `_dispatch(...)` with the
    profile + a `setup_fn` and target-bound `confirm_fn` → post-process). `_dispatch` handles
    client-binding, profile defaults, and the `confirm_and_fire` call.
 4. **Export** (`__init__.py`) — add to `__all__` and import it.

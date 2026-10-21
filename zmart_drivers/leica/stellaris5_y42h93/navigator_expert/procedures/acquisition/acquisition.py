@@ -36,8 +36,8 @@ from ..save_data import command_log as _log
 from ..clear_cache import release as _release
 from ..save_data import save as _save
 from ..save_data.naming import Naming, free_stem
-from ...vendor_specific.primitive_handling import state as _readers
-from ...vendor_specific.primitive_handling.profiles import IMAGE_SAVE
+from ...vendor_specific.primitive_handling.readings import state as _readers
+from ...vendor_specific.primitive_handling.profiles.profiles import IMAGE_SAVE
 from . import acquire as _capture
 from .. import session as _info
 from ..absolute_coordinate_system.frame import get_xyz
