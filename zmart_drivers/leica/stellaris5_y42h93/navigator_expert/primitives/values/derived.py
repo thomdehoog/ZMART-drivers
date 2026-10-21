@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 
 from ...connection.hardware_server import HardwareServerUnavailable, read_hardware_z_um
+from ..api import saved_experiment
 from .parsing import parse_tile_geometry
 
 log = logging.getLogger(__name__)
@@ -128,13 +129,15 @@ def z_um_from_settings(settings, key, *, client=None, job_name=None):
     The settings' ``zPosition`` is the job's stored z reference. LAS X keeps
     it current for a drive that carries no z-stack and stops refreshing it
     for the drive the job's stack is on (measured on the simulator
-    2026-08-25/26; the CAM API offers no other Z readout). So for that one
-    drive the value here is stale by construction, and this function reads
-    it from LAS X's hardware server instead, which reports where the drive
-    truly is, in milliseconds. The free drive costs nothing extra: the
-    decision is a lookup on the ``stack`` block already in *settings*. When
-    the hardware server cannot be reached, a stacked drive is refused rather
-    than answered with the stale number.
+    2026-08-25/26). So for that one drive the value here is stale by
+    construction, and this function reads it from LAS X's hardware server
+    instead, which reports where the drive truly is, in milliseconds. When the
+    hardware server cannot be reached, it reads the experiment LAS X saves
+    (``api.saved_experiment``, which needs *client* and *job_name*): the
+    position last commanded through the job. The free drive costs nothing
+    extra: the decision is a lookup on the ``stack`` block already in
+    *settings*. A stacked drive that neither answers is refused rather than
+    answered with the stale number.
 
     Canonical home of the z-readback shape quirk: LAS X sometimes nests the
     value as ``{'position': ...}`` rather than a bare float, so after
@@ -151,9 +154,23 @@ def z_um_from_settings(settings, key, *, client=None, job_name=None):
         try:
             return read_hardware_z_um(key)
         except HardwareServerUnavailable as why:
+            unreachable = why
+        if client is None or job_name is None:
             raise RuntimeError(
-                f"{key} carries {job_name!r}'s z-stack, so its settings value is stale, and "
-                f"LAS X's hardware server could not be reached ({why}) - no current Z available"
+                f"{key} carries the job's z-stack and LAS X's hardware server could not be "
+                f"reached ({unreachable}); reading the saved experiment needs the client and the job"
+            )
+        log.info(
+            "%s carries the z-stack and the hardware server cannot be reached; reading the saved experiment",
+            key,
+        )
+        try:
+            return saved_experiment.read_z_um(client, job_name, key)
+        except RuntimeError as why:
+            raise RuntimeError(
+                f"{key} carries {job_name!r}'s z-stack, so its settings value is stale; LAS X's "
+                f"hardware server could not be reached ({unreachable}), and the saved experiment "
+                f"did not answer ({why}) - no current Z available"
             ) from why
     if not ch or "zPosition" not in ch:
         raise RuntimeError("zPosition not in job settings - LAS X version mismatch?")

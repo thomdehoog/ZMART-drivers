@@ -379,7 +379,10 @@ success wins). A reading says which source answered. What counts as a success is
 per datum in `operations/readings/reading_table.py` (job settings, for example, must name the job asked about and carry
 an objective slot and image geometry). On the STELLARIS (15 October 2026) the direct reader was
 right where the CAM API was stale: the z-galvo position while a job had a z-galvo stack, and the
-selected job just after a switch.
+selected job just after a switch. For the drive that carries the job's z-stack, the CAM API and the
+log stay stale by construction, so without the direct reader that one position comes from the
+experiment LAS X saves (`primitives/api/saved_experiment.py`): the position last commanded through
+the job.
 
 **Waiting on LAS X — one rule** (`dispatcher/timing.py`): every reading, confirmation and delivery
 waits **four windows of three seconds**. Within a window both sources are watched; between windows
@@ -610,7 +613,9 @@ reading likewise asks the direct reader first and then the CAM API.
 - **Acquire** names a Data Container project for its image. The direct route chooses one that is open
   in LAS X: the project of the last image, else the one remembered from an earlier acquire, else
   the newest open project, else a new `ZMART_Experiment<N>`.
-- **Save and load of an experiment file** are not offered by this driver.
+- **An experiment file is saved only to read the stacked z drive**, when the hardware server cannot be
+  reached: under one name, `{ScanningTemplate}_ZMART_z`, in Navigator Expert's ScanningTemplates
+  folder, overwritten each time. Loading an experiment is not offered.
 
 **Where the routes are set up.** `operations/sending/routes.py` lists the
 ways of sending that exist (`ROUTES`: `direct` and `cam`) and the order they are tried

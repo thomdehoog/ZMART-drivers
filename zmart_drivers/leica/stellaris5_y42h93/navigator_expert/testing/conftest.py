@@ -101,7 +101,7 @@ def _no_hardware_server(monkeypatch):
 
 @pytest.fixture(autouse=True)
 def _no_lasx_window(tmp_path, monkeypatch):
-    """Keep every test away from LAS X's own log, windows and Navigator.
+    """Keep every test away from LAS X's own log, windows, Navigator and saved experiments.
 
     On a microscope PC LAS X is open: a test would read its real ``LAS X.log``
     and could press a real dialog's button. Tests that need either hand in a
@@ -123,7 +123,12 @@ def _no_lasx_window(tmp_path, monkeypatch):
             "no Windows UI Automation in the test suite"
         )
 
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.primitives.api import (
+        saved_experiment,
+    )
+
     monkeypatch.setattr(lasx_dialogs, "LASX_LOG", tmp_path / "no LAS X.log")
+    monkeypatch.setattr(saved_experiment, "FOLDER", str(tmp_path / "ScanningTemplates"))
     monkeypatch.setattr(lasx_dialogs, "lasx_windows", no_windows)
     monkeypatch.setattr(lasx_navigator, "automation", no_automation)
     lasx_navigator.forget()

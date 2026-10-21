@@ -6,8 +6,9 @@ Once a job's z-stack is on a drive, LAS X stops refreshing that drive's
 drive's true position (``Hardware.ZPosZGalvo`` / ``ZPosZDrive``, metres;
 measured on the simulator 2026-10-12: galvo -2.38e-10 m while the job
 settings said 0). So for the stacked drive the reader asks the hardware
-server, and refuses when the server cannot be reached, rather than return
-the stale number. The free drive is untouched.
+server, and when the server cannot be reached, the experiment LAS X saves
+(its ``.lrp`` holds each job's ``ZPosition``). It refuses when neither
+answers, rather than return the stale number. The free drive is untouched.
 
 The suite's conftest makes the hardware server unreachable for every test;
 the tests here hand in a stand-in server instead.
@@ -15,11 +16,14 @@ the tests here hand in a stand-in server instead.
 
 import math
 import time
+from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 import pytest
 from z_readback_settings import raw_settings
 
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.primitives.api import saved_experiment
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.primitives.values.derived import (
     z_um_from_settings,
 )
@@ -43,6 +47,33 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.changes i
 
 #: What the simulator's hardware server answered on 2026-10-12, at rest.
 SIMULATOR_GALVO_M = -2.384185222837308e-10
+
+
+#: An experiment the simulator saved (2026-10-21), cut to its jobs' z attributes:
+#: AF Job, Overview and HiRes, each with ZPosition -2.38e-10 m on z-galvo.
+SAVED_LRP = Path(__file__).resolve().parents[1] / "data" / "saved_experiment.lrp"
+
+
+class SavingClient:
+    """A LAS X client whose ``PyApiSaveExperiment`` writes the saved experiment, as LAS X does."""
+
+    def __init__(self, writes=True):
+        self.saved = []
+        self.writes = writes
+        client = self
+
+        class Save:
+            Model = SimpleNamespace(ExperimentName=None)
+
+            def UpdateAwaitReceipt(self, _window_s):
+                client.saved.append(self.Model.ExperimentName)
+                if client.writes:
+                    folder = Path(saved_experiment.FOLDER)
+                    folder.mkdir(parents=True, exist_ok=True)
+                    (folder / (saved_experiment.NAME + ".lrp")).write_bytes(SAVED_LRP.read_bytes())
+                return True
+
+        self.PyApiSaveExperiment = Save()
 
 
 class StandInHardware:
@@ -153,13 +184,36 @@ class TestStackedDrive:
         settings = raw_settings(stack_on="z-galvo")
         assert z_um_from_settings(settings, "z-galvo") == pytest.approx(2.0)
 
-    def test_refuses_when_the_server_cannot_be_reached(self):
+    def test_reads_the_saved_experiment_when_the_server_cannot_be_reached(self):
         # The suite's conftest makes the server unreachable, as on a PC without LAS X.
         settings = raw_settings(galvo_um=-0.01, stack_on="z-galvo")
-        with pytest.raises(RuntimeError, match="hardware server could not be reached"):
-            z_um_from_settings(
-                settings, "z-galvo", client=object(), job_name="AF Job 01"
-            )
+        lasx = SavingClient()
+
+        z = z_um_from_settings(settings, "z-galvo", client=lasx, job_name="HiRes")
+
+        assert z == pytest.approx(SIMULATOR_GALVO_M * 1e6)
+        assert lasx.saved == [saved_experiment.NAME + ".xml"]
+
+    def test_refuses_when_neither_the_server_nor_a_saved_experiment_answers(self):
+        settings = raw_settings(galvo_um=-0.01, stack_on="z-galvo")
+        with pytest.raises(RuntimeError, match="hardware server could not be reached.*saved experiment"):
+            z_um_from_settings(settings, "z-galvo", client=SavingClient(writes=False), job_name="HiRes")
+
+    def test_a_saved_experiment_that_holds_the_other_drive_is_refused(self):
+        # The simulator's jobs hold their ZPosition for z-galvo; z-wide carries this stack.
+        settings = raw_settings(wide_um=4999.5, stack_on="z-wide")
+        with pytest.raises(RuntimeError, match="z-galvo, not for 'z-wide'"):
+            z_um_from_settings(settings, "z-wide", client=SavingClient(), job_name="HiRes")
+
+    def test_a_job_the_saved_experiment_does_not_hold_is_refused(self):
+        settings = raw_settings(stack_on="z-galvo")
+        with pytest.raises(RuntimeError, match="no job 'Elsewhere'"):
+            z_um_from_settings(settings, "z-galvo", client=SavingClient(), job_name="Elsewhere")
+
+    def test_without_a_client_the_experiment_cannot_be_saved(self):
+        settings = raw_settings(stack_on="z-galvo")
+        with pytest.raises(RuntimeError, match="needs the client and the job"):
+            z_um_from_settings(settings, "z-galvo")
 
 
 class TestFreeDrive:

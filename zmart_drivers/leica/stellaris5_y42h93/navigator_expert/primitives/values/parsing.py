@@ -14,6 +14,7 @@ confirmations in ``operations/changes/`` read their readback through it.
 """
 
 import re
+import xml.etree.ElementTree as ET
 
 
 def _safe_float(val, default=None):
@@ -304,3 +305,25 @@ def make_changeable_copy(settings):
         ch["time"] = dict(time_raw)
 
     return ch
+
+def saved_z_um(lrp_text: str, job_name: str, drive: str) -> float:
+    """*job_name*'s ``ZPosition`` for *drive* (µm), from the text of an experiment LAS X saved (``.lrp``).
+
+    Each job's Master setting holds one ``ZPosition``, in metres, for the drive
+    its ``ZUseModeName`` names (``"z-galvo"`` or ``"z-wide"``): the position
+    last commanded through the job. A job that is not there, or whose
+    position is for the other drive, is refused rather than answered under
+    the wrong label.
+    """
+    for block in ET.fromstring(lrp_text).iter("LDM_Block_Sequence_Block"):
+        sequential = block.find(".//LDM_Block_Sequential")
+        if sequential is None or sequential.get("BlockName") != job_name:
+            continue
+        master = block.find(".//LDM_Block_Sequential_Master/ATLConfocalSettingDefinition")
+        held = None if master is None else master.get("ZUseModeName")
+        if held != drive:
+            raise RuntimeError(
+                f"the saved experiment holds {job_name!r}'s ZPosition for {held}, not for {drive!r}"
+            )
+        return float(master.get("ZPosition")) * 1e6
+    raise RuntimeError(f"the saved experiment has no job {job_name!r}")
