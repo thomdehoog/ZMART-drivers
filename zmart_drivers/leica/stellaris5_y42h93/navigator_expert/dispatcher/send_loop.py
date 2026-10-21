@@ -58,14 +58,12 @@ def append_dialog_warning(transport, logs, command_started_at, description):
     return f"; dialog={msg!r}"
 
 
-def resolve_profile(profile=None, **overrides):
-    """Resolve all command tuning from profiles, then apply explicit overrides."""
+def resolve_profile(profile, **overrides):
+    """Apply explicit overrides to a command's profile; the microscope hands the profile in."""
     from dataclasses import replace
 
     if profile is None:
-        from ..vendor_specific.primitive_handling.profiles import COMMAND_DEFAULT
-
-        profile = COMMAND_DEFAULT
+        raise ValueError("a command profile must be handed in: the dispatcher has no default of its own")
     changes = {name: value for name, value in overrides.items() if value is not None}
     return replace(profile, **changes) if changes else profile
 

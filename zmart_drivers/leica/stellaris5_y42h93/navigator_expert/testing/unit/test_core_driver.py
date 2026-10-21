@@ -272,6 +272,19 @@ class TestDefaultErrorCheck(unittest.TestCase):
         self.assertTrue(result["transient"])
 
 
+
+def _fire_block(*args, **keywords):
+    """Run the send step with this microscope's default command profile."""
+    keywords.setdefault("profile", profiles.COMMAND_DEFAULT)
+    return send_loop.fire_block(*args, **keywords)
+
+
+def _fire(*args, **keywords):
+    """Run the engine with this microscope's default command profile, which the engine no longer supplies itself."""
+    keywords.setdefault("profile", profiles.COMMAND_DEFAULT)
+    return dispatch.confirm_and_fire(*args, **keywords)
+
+
 # =============================================================================
 # 3. confirm_and_fire - core flow
 # =============================================================================
@@ -282,7 +295,7 @@ class TestConfirmAndFire(unittest.TestCase):
         client = make_client()
         api_obj = make_api_obj()
         with patch.object(errors, "_check_api_error", return_value=None):
-            r = dispatch.confirm_and_fire(
+            r = _fire(
                 client,
                 api_obj,
                 "Test",
@@ -299,7 +312,7 @@ class TestConfirmAndFire(unittest.TestCase):
         client = make_client()
         api_obj = make_api_obj()
         with patch.object(errors, "_check_api_error", return_value=None):
-            r = dispatch.confirm_and_fire(
+            r = _fire(
                 client, api_obj, "Test", max_retries=0, pre_check_fn=_idle_pre_check
             )
         t = r["timing"]
@@ -324,7 +337,7 @@ class TestConfirmAndFire(unittest.TestCase):
         api_obj = make_api_obj()
         perm_error = {"error": "out of range", "result": "Failure", "result_code": 2}
         with patch.object(errors, "_check_api_error", return_value=perm_error):
-            r = dispatch.confirm_and_fire(
+            r = _fire(
                 client,
                 api_obj,
                 "Zoom -> 999",
@@ -345,7 +358,7 @@ class TestConfirmAndFire(unittest.TestCase):
             "result_code": 2,
         }
         with patch.object(errors, "_check_api_error", return_value=trans_error):
-            r = dispatch.confirm_and_fire(
+            r = _fire(
                 client,
                 api_obj,
                 "Zoom -> 5",
@@ -372,7 +385,7 @@ class TestConfirmAndFire(unittest.TestCase):
             return trans_error if call_count[0] == 1 else None
 
         with patch.object(errors, "_check_api_error", side_effect=mock_check):
-            r = dispatch.confirm_and_fire(
+            r = _fire(
                 client,
                 api_obj,
                 "Zoom -> 5",
@@ -388,7 +401,7 @@ class TestConfirmAndFire(unittest.TestCase):
         api_obj = make_api_obj()
         trans_error = {"error": "busy", "result": "Failure", "result_code": 2}
         with patch.object(errors, "_check_api_error", return_value=trans_error):
-            r = dispatch.confirm_and_fire(
+            r = _fire(
                 client,
                 api_obj,
                 "Test",
@@ -415,7 +428,7 @@ class TestConfirmAndFire(unittest.TestCase):
             return trans_error if call_count[0] <= 2 else None
 
         with patch.object(errors, "_check_api_error", side_effect=mock_check):
-            dispatch.confirm_and_fire(
+            _fire(
                 client,
                 api_obj,
                 "Test",
@@ -433,7 +446,7 @@ class TestConfirmAndFire(unittest.TestCase):
         def bad_setup(m):
             raise ValueError("bad value")
 
-        r = dispatch.confirm_and_fire(
+        r = _fire(
             client,
             api_obj,
             "Test",
@@ -448,7 +461,7 @@ class TestConfirmAndFire(unittest.TestCase):
         client = make_client()
         api_obj = make_api_obj()
         with patch.object(errors, "_check_api_error", return_value=None):
-            r = dispatch.confirm_and_fire(
+            r = _fire(
                 client,
                 api_obj,
                 "Test",
@@ -466,7 +479,7 @@ class TestConfirmAndFire(unittest.TestCase):
         def failing_pre_check():
             return {"success": False, "logs": []}
 
-        r = dispatch.confirm_and_fire(
+        r = _fire(
             client, api_obj, "Test", max_retries=0, pre_check_fn=failing_pre_check
         )
         self.assertFalse(r["success"])
@@ -476,7 +489,7 @@ class TestConfirmAndFire(unittest.TestCase):
         client = make_client()
         api_obj = make_api_obj()
         with patch.object(errors, "_check_api_error", return_value=None):
-            r = dispatch.confirm_and_fire(
+            r = _fire(
                 client, api_obj, "Test", max_retries=0, pre_check_fn=_idle_pre_check
             )
         self.assertIn("confirmed", r)
@@ -545,7 +558,7 @@ class TestRetryBackoff(unittest.TestCase):
             patch.object(transport_module, "deliver", return_value=True),
             patch.object(transport_module, "_await_echo_result", return_value=True),
         ):
-            r = send_loop.fire_block(
+            r = _fire_block(
                 client,
                 api_obj,
                 "Test",
@@ -582,7 +595,7 @@ class TestRetryBackoff(unittest.TestCase):
             patch.object(transport_module, "deliver", return_value=True),
             patch.object(transport_module, "_await_echo_result", return_value=True),
         ):
-            r = send_loop.fire_block(
+            r = _fire_block(
                 client,
                 api_obj,
                 "Test",
@@ -618,7 +631,7 @@ class TestRetryBackoff(unittest.TestCase):
             patch.object(transport_module, "deliver", return_value=True),
             patch.object(transport_module, "_await_echo_result", return_value=True),
         ):
-            r = send_loop.fire_block(
+            r = _fire_block(
                 client,
                 api_obj,
                 "Test",
@@ -664,7 +677,7 @@ class TestRetryBackoff(unittest.TestCase):
             patch.object(transport_module, "deliver", return_value=True),
             patch.object(transport_module, "_await_echo_result", return_value=True),
         ):
-            r = send_loop.fire_block(
+            r = _fire_block(
                 client,
                 api_obj,
                 "Test",
@@ -700,7 +713,7 @@ class TestRetryBackoff(unittest.TestCase):
             patch.object(transport_module, "deliver", return_value=True),
             patch.object(transport_module, "_await_echo_result", return_value=True),
         ):
-            send_loop.fire_block(
+            _fire_block(
                 client,
                 api_obj,
                 "Test",
@@ -735,7 +748,7 @@ class TestRetryBackoff(unittest.TestCase):
             patch.object(transport_module, "deliver", return_value=True),
             patch.object(transport_module, "_await_echo_result", return_value=True),
         ):
-            r = send_loop.fire_block(
+            r = _fire_block(
                 client,
                 api_obj,
                 "Test",
@@ -991,7 +1004,7 @@ class TestConfirmation(unittest.TestCase):
         api_obj = make_api_obj()
         confirm_fn = MagicMock(return_value={"success": True, "logs": []})
         with patch.object(errors, "_check_api_error", return_value=None):
-            r = dispatch.confirm_and_fire(
+            r = _fire(
                 client,
                 api_obj,
                 "Test",
@@ -1007,7 +1020,7 @@ class TestConfirmation(unittest.TestCase):
         client = make_client()
         api_obj = make_api_obj()
         with patch.object(errors, "_check_api_error", return_value=None):
-            r = dispatch.confirm_and_fire(
+            r = _fire(
                 client,
                 api_obj,
                 "Test",
@@ -1025,7 +1038,7 @@ class TestConfirmation(unittest.TestCase):
         api_obj = make_api_obj()
         confirm_fn = MagicMock(return_value={"success": False, "logs": []})
         with patch.object(errors, "_check_api_error", return_value=None):
-            r = dispatch.confirm_and_fire(
+            r = _fire(
                 client,
                 api_obj,
                 "Zoom -> 5",
@@ -1055,7 +1068,7 @@ class TestConfirmation(unittest.TestCase):
                 transport_module._log_reader, "parse_msgbox_log", return_value=snapshot
             ),
         ):
-            r = dispatch.confirm_and_fire(
+            r = _fire(
                 client,
                 api_obj,
                 "Objective -> slot 1",
@@ -1087,7 +1100,7 @@ class TestConfirmation(unittest.TestCase):
                 transport_module._log_reader, "parse_msgbox_log", return_value=snapshot
             ),
         ):
-            r = dispatch.confirm_and_fire(
+            r = _fire(
                 client,
                 api_obj,
                 "Objective -> slot 1",
@@ -1114,7 +1127,7 @@ class TestConfirmation(unittest.TestCase):
             return {"success": call_count[0] >= 2, "logs": []}
 
         with patch.object(errors, "_check_api_error", return_value=None):
-            r = dispatch.confirm_and_fire(
+            r = _fire(
                 client,
                 api_obj,
                 "Test",
@@ -1149,7 +1162,7 @@ class TestConfirmation(unittest.TestCase):
         )
 
         with patch.object(dispatch, "_fire_block", return_value=fire_result) as fire:
-            r = dispatch.confirm_and_fire(
+            r = _fire(
                 client,
                 api_obj,
                 "Set Zoom",
@@ -1182,7 +1195,7 @@ class TestConfirmation(unittest.TestCase):
         confirm_fn = MagicMock(return_value={"success": False, "logs": []})
 
         with patch.object(dispatch, "_fire_block", return_value=fire_result) as fire:
-            r = dispatch.confirm_and_fire(
+            r = _fire(
                 client,
                 api_obj,
                 "Set Zoom",
@@ -1225,7 +1238,7 @@ class TestConfirmation(unittest.TestCase):
         )
 
         with patch.object(dispatch, "_fire_block", return_value=fire_result) as fire:
-            r = dispatch.confirm_and_fire(
+            r = _fire(
                 client,
                 api_obj,
                 "Set Zoom",
@@ -1259,7 +1272,7 @@ class TestConfirmation(unittest.TestCase):
             return {"success": True, "logs": []}
 
         with patch.object(errors, "_check_api_error", return_value=None):
-            r = dispatch.confirm_and_fire(
+            r = _fire(
                 client,
                 api_obj,
                 "Test",
@@ -2543,7 +2556,7 @@ class TestDispatchCheckExceptions(unittest.TestCase):
     """pre_check_fn / error_check_fn exceptions become structured failures."""
 
     def test_raising_pre_check_returns_failure_dict(self):
-        result = send_loop.fire_block(
+        result = _fire_block(
             None,
             SimpleNamespace(Model=SimpleNamespace()),
             "TestCmd",
@@ -2564,7 +2577,7 @@ class TestDispatchCheckExceptions(unittest.TestCase):
                 Model=SimpleNamespace(Result=0, HasError=False)
             )
         )
-        result = send_loop.fire_block(
+        result = _fire_block(
             fake_client,
             api_obj,
             "TestCmd",

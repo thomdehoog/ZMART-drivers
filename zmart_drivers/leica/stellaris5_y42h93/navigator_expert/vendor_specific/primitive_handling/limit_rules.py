@@ -38,7 +38,7 @@ from dataclasses import dataclass
 from types import MappingProxyType
 from typing import Any
 
-from ..limit_errors import LimitsError, LimitsStatus, LimitViolation
+from ...dispatcher.limit_errors import LimitsError, LimitsStatus, LimitViolation
 
 # =============================================================================
 # Hardcoded physical backstop
@@ -311,6 +311,14 @@ class LeicaLimits:
                 f"{name}={value!r} not allowed; expected one of {list(allowed)!r} "
                 f"({self._origin()})"
             )
+
+    def check_command(self, command: str, values: Mapping[str, Any]) -> None:
+        """Check *values* for the command *command* by the policy key it maps to.
+
+        A command missing from ``MUTATING_COMMANDS`` is a mistake in the driver,
+        not in the values, so it raises ``KeyError``.
+        """
+        self.check(MUTATING_COMMANDS[command], values)
 
     def check(self, function: str, values: Mapping[str, Any]) -> None:
         if function == "set_xyz":

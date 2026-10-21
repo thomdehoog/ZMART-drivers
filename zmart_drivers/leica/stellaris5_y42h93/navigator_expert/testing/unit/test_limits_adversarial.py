@@ -872,7 +872,7 @@ def test_private_installed_policy_and_stage_snapshot_are_immutable(mock_client):
     )
 
 
-@pytest.mark.parametrize("wrapper", sorted(gate.MUTATING_COMMANDS))
+@pytest.mark.parametrize("wrapper", sorted(motion_limits.MUTATING_COMMANDS))
 def test_every_mutating_wrapper_refuses_fail_closed_without_state(wrapper):
     """Direct-commands bypass: no handshake -> refusal BEFORE the client is
     touched, for every declared mutating wrapper."""
@@ -977,7 +977,7 @@ def test_stale_gate_state_does_not_govern_a_new_client():
 
 
 def test_mapping_is_total_over_the_key_vocabulary():
-    assert set(_WRAPPER_CALLS) == set(gate.MUTATING_COMMANDS)
+    assert set(_WRAPPER_CALLS) == set(motion_limits.MUTATING_COMMANDS)
 
 
 def test_bundled_template_declares_exactly_the_key_vocabulary():
@@ -1001,7 +1001,7 @@ def test_generated_machine_payload_matches_the_vocabulary():
 def test_every_dispatching_wrapper_declares_and_calls_the_gate():
     """AST completeness sweep over the single-command changes and the two recipes: any public function that
     reaches the fire path (_dispatch/_dispatch_setting/the dispatcher's write)
-    must (a) be declared in gate.MUTATING_COMMANDS and
+    must (a) be declared in motion_limits.MUTATING_COMMANDS and
     (b) call the gate with ITS OWN name — a new command cannot ship ungated."""
     vendor_tree = ast.parse(
         (
@@ -1035,7 +1035,7 @@ def test_every_dispatching_wrapper_declares_and_calls_the_gate():
             and not (referenced_attrs & fire_attr_names)
         ):
             continue
-        assert node.name in gate.MUTATING_COMMANDS, (
+        assert node.name in motion_limits.MUTATING_COMMANDS, (
             f"{node.name} dispatches to the fire path but has no MUTATING_COMMANDS entry"
         )
         gate_literals = {
@@ -1074,7 +1074,7 @@ def test_every_dispatching_wrapper_declares_and_calls_the_gate():
                 assert entry.command == node.name, (
                     f"{node.name} hands the runner the entry for {entry.command}"
                 )
-                assert node.name in gate.MUTATING_COMMANDS
+                assert node.name in motion_limits.MUTATING_COMMANDS
                 checked.append(node.name)
 
     runner = next(
@@ -1095,7 +1095,7 @@ def test_every_dispatching_wrapper_declares_and_calls_the_gate():
     ), "the settings runner must show the limits gate the entry's own command name"
 
     # sanity: the sweep actually saw the whole wrapper set
-    assert set(checked) == set(gate.MUTATING_COMMANDS)
+    assert set(checked) == set(motion_limits.MUTATING_COMMANDS)
 
 
 # =============================================================================
