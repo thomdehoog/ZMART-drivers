@@ -222,7 +222,7 @@ def test_connect_session_leaves_output_root_for_driver_discovery():
     session = None
     try:
         session = validate_zmart_adapter._connect_session(args, adapter, None)
-        assert session._handle._handle.connection.get("output_root") is None
+        assert session._handle.microscope.handle.connection.get("output_root") is None
     finally:
         adapter.connect_python_client = original_connect
         profiles.STATE_READERS = original_profile

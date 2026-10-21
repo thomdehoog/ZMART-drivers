@@ -67,6 +67,10 @@ DRIVER_ROOT = Path(__file__).resolve().parents[2]
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.connection import (
     lasx_client as _connect_module,
 )
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.for_direct_use.microscope import (
+    DEFAULT_CONNECTION,
+    Microscope,
+)
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.for_zmart_controller.zmart_driver import (
     ZmartDriver,
 )
@@ -77,12 +81,12 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.absolute_
 
 def _connect_handle(connection=None):
     """Connect the way the controller does, by making the driver, and return its session handle."""
-    return ZmartDriver(connection)._handle
+    return ZmartDriver(connection).microscope.handle
 
 
 def _disconnect_handle(handle):
-    """Disconnect a session handle the way ``ZmartDriver.disconnect`` does."""
-    ZmartDriver.disconnect(SimpleNamespace(_handle=handle))
+    """Disconnect a session handle the way ``Microscope.close`` does."""
+    Microscope.close(SimpleNamespace(handle=handle))
 
 
 def _machine_root() -> Path:
@@ -915,7 +919,7 @@ def test_adapter_bypass_refuses_at_the_commands_layer(clear_stage_limits):
     _raw_snapshot(_machine_root(), limits_text=_BAD_LIMITS_TEXTS["missing_axis"])
     client = MockLasxClient(latency=0.0)
     with patch.object(_connect_module, "connect_python_client", return_value=client):
-        handle = _connect_handle(dict(ZmartDriver.DEFAULT_CONNECTION))
+        handle = _connect_handle(dict(DEFAULT_CONNECTION))
     settings = {
         "objective": {"name": "10x", "magnification": 10, "slotIndex": 1},
         "zPosition": {"z-wide": {"position": 0.0}, "z-galvo": {"position": 0.0}},

@@ -218,16 +218,10 @@ ALLOWED = {
         "procedures",
         "driver_setup",
     },
-    # Everything that faces the controller: the ZmartDriver class and, until its
-    # logic moves into the procedures, the adapter folder inside it.
+    # Everything that faces the controller: the ZmartDriver class, which only
+    # translates the controller's commands into calls of the Microscope.
     "for_zmart_controller": {
         "for_direct_use",
-        "session",
-        "vendor_specific",
-        "dispatcher",
-        "procedures",
-        "driver_setup",
-        "__version__",
     },
     "__init__": {
         "for_direct_use",

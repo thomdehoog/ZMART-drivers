@@ -98,6 +98,10 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.conn
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.session import (
     loaded_config as _session_state,
 )
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.for_direct_use.microscope import (
+    DEFAULT_CONNECTION,
+    Microscope,
+)
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.for_zmart_controller.zmart_driver import (
     ZmartDriver,
 )
@@ -108,12 +112,12 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.session.handle impor
 
 def _connect_handle(connection=None):
     """Connect the way the controller does, by making the driver, and return its session handle."""
-    return ZmartDriver(connection)._handle
+    return ZmartDriver(connection).microscope.handle
 
 
 def _disconnect_handle(handle):
-    """Disconnect a session handle the way ``ZmartDriver.disconnect`` does."""
-    ZmartDriver.disconnect(SimpleNamespace(_handle=handle))
+    """Disconnect a session handle the way ``Microscope.close`` does."""
+    Microscope.close(SimpleNamespace(handle=handle))
 
 
 def _origin(
@@ -138,7 +142,7 @@ def _handle(gate_constraints=None, gated=True, **overrides):
     The stage stands at the origin, as a get_xyz after connecting would read.
     """
     h = ZmartHandle(
-        client=object(), connection=dict(ZmartDriver.DEFAULT_CONNECTION), hash6="000abc"
+        client=object(), connection=dict(DEFAULT_CONNECTION), hash6="000abc"
     )
     h.driven_to = {"x": 0.0, "y": 0.0, "z": 0.0, "z_wide_um": 0.0, "z_galvo_um": 0.0}
     if gated:
@@ -246,7 +250,7 @@ def _acquire_and_save(handle, **given):
 
 class TestRegistration(unittest.TestCase):
     def test_connection_profile_does_not_select_operator_calibration(self):
-        self.assertNotIn("calibration_name", ZmartDriver.DEFAULT_CONNECTION)
+        self.assertNotIn("calibration_name", DEFAULT_CONNECTION)
 
     def test_the_driver_class_holds_every_command(self):
         from zmart_controller.zmart_controller import COMMANDS
@@ -270,7 +274,8 @@ class TestRegistration(unittest.TestCase):
         from zmart_controller.zmart_controller import COMMANDS
 
         self.assertNotIn("set_origin", COMMANDS)
-        self.assertTrue(callable(ZmartDriver.set_origin))
+        self.assertFalse(hasattr(ZmartDriver, "set_origin"))
+        self.assertTrue(callable(Microscope.set_origin))
 
 
 class TestCalibrationSelection(unittest.TestCase):
@@ -421,7 +426,7 @@ class TestFrame(unittest.TestCase):
                 _connect_module, "connect_python_client", return_value=object()
             ),
         ):
-            return _connect_handle(connection or dict(ZmartDriver.DEFAULT_CONNECTION))
+            return _connect_handle(connection or dict(DEFAULT_CONNECTION))
 
     def test_connect_restores_the_saved_origin(self):
         """The newest saved origin, objective included, becomes the session's frame."""
@@ -514,7 +519,7 @@ class TestFrame(unittest.TestCase):
                 ) as connect_microscope,
             ):
                 with self.assertRaisesRegex(RuntimeError, "could not be read"):
-                    _connect_handle(dict(ZmartDriver.DEFAULT_CONNECTION))
+                    _connect_handle(dict(DEFAULT_CONNECTION))
             connect_microscope.assert_not_called()
 
     def test_connect_refuses_an_incomplete_origin_file(self):
@@ -556,7 +561,7 @@ class TestFrame(unittest.TestCase):
             path = profile.write_origin({"origin": _origin(x_um=5.0)})
             path.write_text("{not json", encoding="utf-8")
             h = self._connect_with_profile(
-                profile, {**ZmartDriver.DEFAULT_CONNECTION, "load_origin": False}
+                profile, {**DEFAULT_CONNECTION, "load_origin": False}
             )
         self.assertEqual(h.origin, _origin())
 
@@ -810,7 +815,7 @@ class TestAcquire(unittest.TestCase):
 
     def test_unknown_or_invalid_option_rejected(self):
         h = _handle(
-            connection={**ZmartDriver.DEFAULT_CONNECTION, "output_root": "/tmp/out"}
+            connection={**DEFAULT_CONNECTION, "output_root": "/tmp/out"}
         )
         with (
             patch.object(_readers, "get_jobs", return_value=self._jobs()),
@@ -880,7 +885,7 @@ class TestAcquire(unittest.TestCase):
     def test_a_sessions_own_output_root_wins_over_the_set_up_one(self):
         h = _handle(
             connection={
-                **ZmartDriver.DEFAULT_CONNECTION,
+                **DEFAULT_CONNECTION,
                 "output_root": "/chosen/zmart",
             },
             data_location=Path("/elsewhere"),
@@ -1016,7 +1021,7 @@ class TestAcquire(unittest.TestCase):
         self.assertNotIn("failed", checks["limits"])
 
         h = _handle(
-            connection={**ZmartDriver.DEFAULT_CONNECTION, "output_root": "/tmp/out"}
+            connection={**DEFAULT_CONNECTION, "output_root": "/tmp/out"}
         )
         calls = {}
 
@@ -1107,7 +1112,7 @@ class TestAcquire(unittest.TestCase):
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_bytes(b"saved")
             h = _handle(
-                connection={**ZmartDriver.DEFAULT_CONNECTION, "output_root": str(out)}
+                connection={**DEFAULT_CONNECTION, "output_root": str(out)}
             )
 
             def fake_save(client, acq, output_root, naming, **kwargs):
@@ -1726,7 +1731,7 @@ class TestAcquire(unittest.TestCase):
         )
 
         h = _handle(
-            connection={**ZmartDriver.DEFAULT_CONNECTION, "output_root": "/tmp/out"}
+            connection={**DEFAULT_CONNECTION, "output_root": "/tmp/out"}
         )
         seen = {}
 
@@ -1798,7 +1803,7 @@ class TestAcquire(unittest.TestCase):
 
     def test_an_unlabelled_capture_is_named_by_the_session_counter(self):
         h = _handle(
-            connection={**ZmartDriver.DEFAULT_CONNECTION, "output_root": "/tmp/out"}
+            connection={**DEFAULT_CONNECTION, "output_root": "/tmp/out"}
         )
         calls = {}
         with ExitStack() as standing_in:
@@ -1822,7 +1827,7 @@ class TestAcquire(unittest.TestCase):
         """No capture is ever overwritten: the same label again gets ``_001``."""
         with tempfile.TemporaryDirectory() as tmp:
             h = _handle(
-                connection={**ZmartDriver.DEFAULT_CONNECTION, "output_root": tmp}
+                connection={**DEFAULT_CONNECTION, "output_root": tmp}
             )
             staged = Path(tmp).resolve() / ".staging" / h.hash6 / "data"
             staged.mkdir(parents=True)
@@ -1844,7 +1849,7 @@ class TestAcquire(unittest.TestCase):
     def test_without_a_selected_job_nothing_is_captured(self):
         """The job is state: a capture runs the selected one, and refuses when none can be read."""
         h = _handle(
-            connection={**ZmartDriver.DEFAULT_CONNECTION, "output_root": "/tmp/out"}
+            connection={**DEFAULT_CONNECTION, "output_root": "/tmp/out"}
         )
         with (
             self._capturing(),
@@ -1860,7 +1865,7 @@ class TestAcquire(unittest.TestCase):
 
     def test_explicit_label_does_not_consume_counter(self):
         h = _handle(
-            connection={**ZmartDriver.DEFAULT_CONNECTION, "output_root": "/tmp/out"}
+            connection={**DEFAULT_CONNECTION, "output_root": "/tmp/out"}
         )
         calls = {}
         env = self._fake_acquire_env(calls)
@@ -1882,7 +1887,7 @@ class TestAcquire(unittest.TestCase):
     def _acquire_and_list_the_calls(self, options=None):
         """Run acquire with every step stubbed out; returns the calls it made, in order."""
         h = _handle(
-            connection={**ZmartDriver.DEFAULT_CONNECTION, "output_root": "/tmp/out"}
+            connection={**DEFAULT_CONNECTION, "output_root": "/tmp/out"}
         )
         calls = []
         patches = _patch_position(job="Overview")
@@ -2645,7 +2650,7 @@ class TestLifecycle(unittest.TestCase):
         with patch.object(
             _connect_module, "connect_python_client", return_value=object()
         ):
-            h = _connect_handle(dict(ZmartDriver.DEFAULT_CONNECTION))
+            h = _connect_handle(dict(DEFAULT_CONNECTION))
         self.assertIsInstance(h, ZmartHandle)
         # the stage envelope was applied from the ProgramData snapshot...
         self.assertEqual(limits_checks.get_stage_limits()["x_max"], 130000.0)
@@ -2659,7 +2664,7 @@ class TestLifecycle(unittest.TestCase):
         with patch.object(
             _connect_module, "connect_python_client", return_value=object()
         ):
-            h = _connect_handle(dict(ZmartDriver.DEFAULT_CONNECTION))
+            h = _connect_handle(dict(DEFAULT_CONNECTION))
         self.assertIsInstance(h, ZmartHandle)
         self.assertFalse(h.closed)
         described = _gate.describe(h.client)
@@ -2705,8 +2710,8 @@ class TestLifecycle(unittest.TestCase):
             session = zmart_controller.ZmartController(driver)
             try:
                 # Capturing the origin is a driver setup step, not a controller
-                # command, so it is called on the adapter with the driver handle.
-                _set_origin.set_origin(session._handle._handle)
+                # command, so it is called with the driver's own session handle.
+                _set_origin.set_origin(session._handle.microscope.handle)
                 answer = session.set_xyz(10, 20, 5)
                 self.assertIs(answer["success"], True)
                 # The move answers a read-back in get_xyz's shape. The readers

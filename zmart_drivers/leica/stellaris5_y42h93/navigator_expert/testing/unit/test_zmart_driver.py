@@ -18,6 +18,7 @@ from limits_fixtures import hermetic_mock_machine_root
 from mock_lasx_api import MockLasxClient
 from zmart_controller.registry import load_driver
 
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.for_direct_use import microscope
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.for_zmart_controller import (
     zmart_driver,
 )
@@ -125,8 +126,8 @@ def test_the_class_hands_the_type_and_the_folder_to_the_capture(monkeypatch, tmp
 
     session = zmart_controller.ZmartController(zmart_driver.ZmartDriver, connection)
     try:
-        monkeypatch.setattr(zmart_driver._acquisition, "acquire", capture)
-        monkeypatch.setattr(zmart_driver._save_captures, "save_waiting", save_waiting)
+        monkeypatch.setattr(microscope.acquire_step, "acquire", capture)
+        monkeypatch.setattr(microscope.save_step, "save_waiting", save_waiting)
         answer = session.acquire(
             "A1", acquisition_type="overview", output_folder=str(tmp_path / "run")
         )
