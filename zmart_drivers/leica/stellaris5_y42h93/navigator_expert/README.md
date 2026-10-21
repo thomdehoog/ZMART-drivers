@@ -1,22 +1,34 @@
 # navigator_expert — Leica LAS X (STELLARIS) microscope driver
 
-`navigator_expert` drives a **Leica STELLARIS** confocal from Python through the **LAS X Python
-(CAM) API**. It is the Leica driver behind the ZMART controller, and every live command routes
-through a two-layer dispatch backbone that handles idle-wait, transient-error retry, readback
-confirmation, and structured timing/logging. The public API is **synchronous**, so operator
+`navigator_expert` drives a **Leica STELLARIS** confocal from Python. It talks to LAS X two ways:
+straight to LAS X's own hardware server (the **direct route**, tried first) and through the **LAS X
+Python (CAM) API** (the fallback). It is the Leica driver behind the ZMART controller, and every live
+command routes through a two-layer dispatch backbone that handles idle-wait, transient-error retry,
+readback confirmation, and structured timing/logging. The public API is **synchronous**, so operator
 notebooks keep the thin 1–3-line invocation style used across the ZMART drivers.
 
 - **Author:** Thom de Hoog (ZMB, University of Zurich) · thom.dehoog@zmb.uzh.ch · thomdehoog@gmail.com
 - **License:** see the repository root [`LICENSE`](../../../../LICENSE).
-- **Status:** **Release candidate (`7.0.0rc1`), not yet released.** Version 7 reads LAS X's state
-  first from LAS X's hardware server, and from the CAM API and the log when that fails. It has been
-  tested on the LAS X simulator and, on 15 October 2026, on the STELLARIS: the full hardware CI and
-  the checks of saving from and letting go of LAS X's cache passed
-  ([`sessions/NEXT_SESSION.md`](sessions/NEXT_SESSION.md)). The run of version 6 is recorded in
-  [`sessions/SCOPE_RUN_2026-10-10.md`](sessions/SCOPE_RUN_2026-10-10.md). Before it is released for
-  unattended use, the findings in
+- **Status:** **Beta (`7.0.0b1`).** Version 7 reads LAS X's state and sends its changes to LAS X's
+  hardware server first, and falls back to the CAM API when the hardware server cannot take a
+  command (see [Routes](#routes-direct-first-the-cam-api-behind-it)). Taking a picture, saving it and
+  letting LAS X go of its cache are three separate steps. It has been tested on the LAS X
+  simulator and on the STELLARIS: on 21 October 2026 the quick hardware acceptance passed with every
+  change sent through the direct route and no fallback
+  ([`sessions/SCOPE_RUN_2026-10-21_DIRECT_WRITERS.md`](sessions/SCOPE_RUN_2026-10-21_DIRECT_WRITERS.md)).
+  The hardware CI has since been widened to the lasers, the filter wheels, the z-stack and the
+  objective; that wider run has not yet been made on a microscope. Known limits are listed below.
+  Before it is used unattended, the findings in
   [`sessions/RELEASE_CANDIDATE_REVIEW.md`](sessions/RELEASE_CANDIDATE_REVIEW.md) need to be fixed.
   The session notes, plans and reviews are kept in [`sessions/`](sessions/).
+- **Known limits of this beta:**
+  - Scan mode is never changed by the validators, because changing it removes a job's z-stack.
+  - Detector gain cannot be tested on this hardware: LAS X gives the HyD S 2 a single value.
+  - A filter wheel's spectrum mode is applied by LAS X but the driver cannot confirm it.
+  - Windows must allow long paths, or captures must be saved to a short folder: a path of more than
+    259 characters stops a save, and the driver says so.
+  - `docs/driver-anatomy.md` and `docs/vendor-contract.md` describe the layout and what another
+    microscope must supply.
 
 ## Contents
 
@@ -637,16 +649,36 @@ The backbone is deliberately *dumb*: it owns pipeline order, retry ceilings, and
 nothing about zoom/objectives/stages. Commands supply small zero-arg callables (extra params pre-bound
 with `functools.partial`).
 
-**Ways of sending, and what answers when one cannot.** A change can be sent more than one way, and
-the order is one visible setting. `vendor_specific/primitive_handling/profiles/routes.py` lists the
-ways that exist (`ROUTES`: today only `cam`, the CAM API) and the order they are tried
-(`WRITE_ROUTES`). The dispatcher's `transport_chain.py` tries them in that order and uses the first
-that can send. It moves on to the next only when the first reports that nothing has left yet; a send
-that went out but was not acknowledged is never repeated on another route, because the command may
-already have been carried out. Reading works the same way: the direct reader first, then the family
-in `StateReaderProfile.reading_fallback` (the CAM API, `"api"`), and `waiting_fallback` for the
-readings a command waits on. Adding a direct way of sending later means writing its transport, adding
-it to `ROUTES` as `direct`, and putting it first: `WRITE_ROUTES = ("direct", "cam")`.
+### Routes: direct first, the CAM API behind it
+
+Every change the driver makes goes **first to LAS X's hardware server** (the direct route) as the same
+element LAS X itself logs for that command, and **to the CAM API only when the direct route could
+not send it**: the hardware server is not reachable, or the command has no direct form. Every
+reading likewise asks the direct reader first and then the CAM API.
+
+- **Which route carried a command** is in its result, under `route` (`"direct"` or `"cam"`), and in
+  its log as `sent through the direct route`. A fallback is a warning that names the reason.
+- **A command is never done twice.** Once an element has gone out to LAS X, the CAM API never takes it
+  over, even when LAS X refused it or did not answer: it may already have been carried out. An
+  acquisition is never sent again on either route.
+- **Every direct change goes through the same limits gate** as a CAM change, and LAS X's own
+  refusals are reported as they come.
+- **To change the order**, set the environment variable `ZMART_WRITE_ROUTES` before the driver
+  starts: `direct,cam` (the default), `cam` (the CAM API only, as in earlier versions) or `direct`
+  (no fallback). The order is read for every command.
+- **Acquire** names a Data Container project for its image. The direct route chooses one that is open
+  in LAS X: the project of the last image, else the one remembered from an earlier acquire, else
+  the newest open project, else a new `ZMART_Experiment<N>`.
+- **Save and load of an experiment file** are not offered by this driver.
+
+**Where the routes are set up.** `vendor_specific/primitive_handling/profiles/routes.py` lists the
+ways of sending that exist (`ROUTES`: `direct` and `cam`) and the order they are tried
+(`WRITE_ROUTES`, which `ZMART_WRITE_ROUTES` overrides). The dispatcher's `transport_chain.py` uses the
+first route that can send and moves on only when that route reports that nothing has left yet.
+`direct_transport.py` is the direct route and `primitives/direct/translations.py` holds what each
+command becomes at the hardware server. Reading works the same way: the direct reader first, then
+the family in `StateReaderProfile.reading_fallback` (the CAM API, `"api"`), and `waiting_fallback`
+for the readings a command waits on.
 
 **Dependency direction.** The anatomy's rule is that each part imports only from the parts below
 it: `vendor_specific` → `dispatcher` → `procedures`, with `driver_setup` beside

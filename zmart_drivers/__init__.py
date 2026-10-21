@@ -24,4 +24,4 @@ Author: Thom de Hoog, Center for Microscopy and Image Analysis (ZMB),
 University of Zurich (thom.dehoog@zmb.uzh.ch, thomdehoog@gmail.com).
 """
 
-__version__ = "0.2.0rc1"
+__version__ = "0.2.0b1"
