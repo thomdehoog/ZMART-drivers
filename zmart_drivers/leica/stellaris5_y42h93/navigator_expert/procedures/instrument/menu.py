@@ -9,17 +9,15 @@ University of Zurich (thom.dehoog@zmb.uzh.ch, thomdehoog@gmail.com).
 
 from __future__ import annotations
 
-from ..autofocus.autofocus import run_autofocus
 from ..clear_cache.clear import clear
 from ..save_data.save_captures import save_waiting
 from ..absolute_coordinate_system.frame import zero_z_galvo
-from ...session.handle import ZmartHandle, job_catalog, require_open
+from ...session.handle import ZmartHandle, require_open
 
 
 def get_procedures(handle: ZmartHandle) -> dict:
     """The named procedures this instrument offers (discover-then-apply)."""
     require_open(handle)
-    _, autofocus = job_catalog(handle)
     return {
         "zero_z_galvo": {
             "description": "park the z-galvo at 0 without changing the focus "
@@ -37,12 +35,6 @@ def get_procedures(handle: ZmartHandle) -> dict:
             "this session, freeing the disk its cache fills; acquiring and saving never do "
             "this, so run it when you choose, for example between plates"
         },
-        "autofocus": {
-            "description": "run a LAS X autofocus job (capture only, nothing saved); "
-            "restores the previously selected job and returns the focus readback",
-            "args": ["job"],
-            "jobs": [j["Name"] for j in autofocus if j.get("Name")],
-        },
     }
 
 
@@ -59,6 +51,4 @@ def run_procedure(handle: ZmartHandle, procedure: dict) -> dict:
         }
     if name == "clear_cache":
         return {"ran": dict(procedure), **clear(handle)}
-    if name == "autofocus":
-        return run_autofocus(handle, procedure)
     raise ValueError(f"unknown procedure {name!r}")

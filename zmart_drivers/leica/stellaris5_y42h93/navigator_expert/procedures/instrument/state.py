@@ -208,8 +208,8 @@ def set_state(handle: ZmartHandle, state: dict) -> dict:
         names = [j.get("Name") for j in normal if j.get("Name")]
         if job in (j.get("Name") for j in autofocus):
             raise ValueError(
-                f"{job!r} is an autofocus job — run it via the 'autofocus' "
-                "procedure (run_procedure), not as state"
+                f"{job!r} is an autofocus job of Navigator Expert; "
+                "the driver does not select autofocus jobs"
             )
         if job not in names:
             raise ValueError(

@@ -235,7 +235,7 @@ when no folder is given), `load_limits`, `load_calibration` and `load_origin` (a
 | `set_origin()` | Make the current position the origin, and save it for every later connection. |
 | `zero_z_galvo()` | Park the z-galvo at 0 without changing the focus. |
 | `jobs()` | The LAS X jobs by name: `selected`, `jobs` and `autofocus_jobs`. |
-| `select_job(name)` | Select a job. An autofocus job is run with `autofocus()` instead. |
+| `select_job(name)` | Select a job. Navigator Expert's autofocus jobs are not selected. |
 | `job_settings(job=None)` | The settings of a job, as LAS X reports them. Without a job, the selected one. |
 | `change_setting(name, job=None, **arguments)` | Change one setting of a job and read it back; see the table below. |
 | `change_objective(slot=None, name=None, magnification=None)` | Change the objective, and move the stage by the measured offset so the same spot stays in view. |
@@ -243,7 +243,6 @@ when no folder is given), `load_limits`, `load_calibration` and `load_origin` (a
 | `acquire(position_label=None, acquisition_type="acquisition", output_folder=None)` | Run the selected job. The picture stays in LAS X's cache, with a note of how it was taken. Nothing is written yet. |
 | `save(label=None)` | Write the captures that are waiting as OME-Zarr, with their projection and log. |
 | `clear_cache()` | Have LAS X let go of the pictures that were saved. Acquiring and saving never do this. |
-| `autofocus(job=None)` | Run an autofocus job, save nothing, and answer the focus it found. |
 | `state()` | The selected job, and what can only be read: the instrument, the objectives, the limits in force, the changes that were never confirmed. |
 | `info()` | The instrument in words, and what is set up on it. |
 | `procedures()` | The named procedures, with a description each. |
@@ -471,7 +470,7 @@ on the list and is reported, so a later call can try again. On the LAS X simulat
 every canvas was cleared, and the hidden copies did not grow.
 
 **Positions are never made in the Navigator Expert.** They come from the ZMART interface.
-`acquire()` and the autofocus procedure capture at the current position.
+`acquire()` captures at the current position.
 
 **Changes made in the LAS X window.** The operator can move the stage, or change the objective or the
 job, in LAS X itself, and the driver cannot see that as it happens. Every position it works out uses
@@ -533,7 +532,6 @@ zmart_drivers/leica/stellaris5_y42h93/navigator_expert/
 │   │                   objective offsets: coordinates.py · frame.py
 │   ├── objective_change_with_compensation/   changing the objective or the job without losing
 │   │                   the sample: compensated_changes.py · objective_shift.py
-│   ├── autofocus/      running a LAS X autofocus job, capture only
 │   └── instrument/     the instrument as a whole: state.py (what it is doing and what can be
 │                       changed) · info.py (its description) · menu.py (the procedures it offers)
 ├── session/            what the driver remembers about one connection: handle.py (the open

@@ -687,8 +687,8 @@ def embedded_ome_xml(path) -> bytes:
 def selectable_job_names(jobs: list[dict]) -> list[str]:
     """The jobs a workflow selects as state, whatever they are called: all but the autofocus ones.
 
-    An autofocus job is run as a procedure (``run_procedure``); the driver
-    refuses it as state, so the round trip never selects it.
+    The driver refuses an autofocus job as state, so the round trip never
+    selects it.
     """
     return [j["Name"] for j in jobs if not j.get("IsAutofocus")]
 

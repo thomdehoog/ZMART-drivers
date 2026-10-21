@@ -112,7 +112,7 @@ each part uses the parts below it, and never the parts above.
   for_zmart_controller/   the ZmartDriver class: the controller's commands, each a call below
   for_direct_use/         the driver used by itself: connect() and the Microscope
   procedures/             the recipes: take a picture, save it, clear the cache,
-                          the coordinate system, an objective change, autofocus
+                          the coordinate system, an objective change
   driver_setup/           what the operator sets up once and saves: limits, origin,
                           orientation, optical calibration, the data location
   session/                what the driver remembers about one connection
@@ -153,7 +153,6 @@ navigator_expert/
         clear_cache/           have LAS X let go of the saved pictures (clear, release)
         absolute_coordinate_system/  the one coordinate system: the arithmetic and the moves (coordinates, frame)
         objective_change_with_compensation/  change the lens and move the stage to keep the same spot
-        autofocus/             run a LAS X autofocus job
         instrument/            get_state and set_state, get_info, and the menu of named procedures
 
     session/

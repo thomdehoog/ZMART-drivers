@@ -3,8 +3,8 @@ r"""The STELLARIS driven directly, from a notebook or a script, without the ZMAR
 ``connect()`` opens LAS X, loads this microscope's configuration and hands back
 a :class:`Microscope`. Its methods are everything the driver can do: read and
 move the stage in the sample's frame, choose a job and change its settings,
-change the objective, take a picture, save it, let LAS X's cache go, run an
-autofocus job, and describe the instrument::
+change the objective, take a picture, save it, let LAS X's cache go, and
+describe the instrument::
 
     import zmart_drivers.leica.stellaris5_y42h93.navigator_expert as navigator_expert
 
@@ -44,7 +44,6 @@ from ..driver_setup.origin import set_origin as origin_step
 from ..driver_setup.store import MACHINE
 from ..procedures.absolute_coordinate_system import frame
 from ..procedures.acquisition import acquire as acquire_step
-from ..procedures.autofocus import autofocus as autofocus_step
 from ..procedures.clear_cache import clear as clear_step
 from ..procedures.instrument import info as info_step
 from ..procedures.instrument import menu
@@ -204,8 +203,8 @@ class Microscope:
     def select_job(self, name: str) -> dict:
         """Select the LAS X job *name*; answers ``{"applied", "unconfirmed"}``.
 
-        An autofocus job is run with :meth:`autofocus` instead, and a name
-        LAS X does not have is refused with ``ValueError``.
+        An autofocus job of Navigator Expert, and a name LAS X does not
+        have, are refused with ``ValueError``.
         """
         return state_step.set_state(self.handle, {"changeable": {"job": name}})
 
@@ -289,10 +288,6 @@ class Microscope:
     def clear_cache(self) -> dict:
         """Have LAS X let go of the pictures saved so far; answers ``{"cleared", "failed"}``."""
         return clear_step.clear(self.handle)
-
-    def autofocus(self, job: str | None = None) -> dict:
-        """Run the autofocus job *job* (the only one when None), save nothing, and answer the focus found."""
-        return autofocus_step.run_autofocus(self.handle, {"name": "autofocus", "job": job})
 
     # --- describing the instrument ----------------------------------------------------------
 

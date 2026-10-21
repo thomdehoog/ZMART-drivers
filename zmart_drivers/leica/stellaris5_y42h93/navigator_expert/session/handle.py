@@ -144,7 +144,7 @@ def job_catalog(handle: ZmartHandle) -> tuple[list[dict], list[dict]]:
     """The live job catalog split into (normal, autofocus) jobs.
 
     Autofocus jobs are a separate category: they never appear as acquisition
-    or state options and run only through the ``autofocus`` procedure.
+    or state options, and the driver does not select them.
     """
     jobs = _readers.get_jobs(handle.client) or []
     normal = [dict(j) for j in jobs if not j.get("IsAutofocus")]
