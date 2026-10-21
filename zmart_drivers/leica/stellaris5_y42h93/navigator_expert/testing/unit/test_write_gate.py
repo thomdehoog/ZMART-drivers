@@ -43,7 +43,7 @@ def test_every_change_hands_its_name_and_values_to_the_dispatcher():
         DRIVER_ROOT
         / "vendor_specific"
         / "primitive_handling"
-        / "settings"
+        / "commands"
         / "changes.py",
         DRIVER_ROOT
         / "procedures"

@@ -32,9 +32,7 @@ import zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.pr
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.objective_change_with_compensation import (
     objective_shift as shift,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.settings import (
-    changes as commands_mod,
-)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.commands import changes as commands_mod
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.session import (
     loaded_config as session_state,
 )
@@ -44,9 +42,7 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.orienta
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings import (
     parsing as _readers_parsing,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.settings import (
-    changes as _commands,
-)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.commands import changes as _commands
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings import named_readings as _readers
 
 # The ground-truth translation table (µm). Slot 1 is the reference lens.

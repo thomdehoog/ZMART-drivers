@@ -37,7 +37,7 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup import 
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.save_data import (
     save as _save,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.settings import run_job as _capture
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.commands import run_job as _capture
 
 
 def _run_mock(tmp_path, *extra):

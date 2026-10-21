@@ -561,8 +561,9 @@ zmart_drivers/leica/stellaris5_y42h93/navigator_expert/
 │       ├── profiles/       command_profiles.py (one CommandProfile per command) · transport.py (how a
 │       │                   request is sent and its reply awaited) · prechecks.py (is the scanner
 │       │                   idle) · error_classification.py (sorting LAS X's errors)
-│       ├── settings/       settings.py (one entry per setting of a job) · changes.py (the command
-│       │                   functions) · objectives.py · limit_rules.py (what the limits allow)
+│       ├── commands/       settings.py (one entry per setting of a job) · changes.py (the command
+│       │                   functions) · run_job.py (running the selected job) · objectives.py ·
+│       │                   limit_rules.py (what the limits allow)
 │       ├── confirmations/  confirm_changes.py · confirm_specs.py · confirm_select_job.py (how a
 │       │                   change is checked afterwards)
 │       └── readings/       reading_table.py (the table of readings) · sources.py (asking the API, the
@@ -760,7 +761,7 @@ Adding a command touches four places, following the pattern every existing comma
 1. **Confirm function** (`vendor_specific/primitive_handling/confirmations/confirm_changes.py`) — `_confirm_X(client, ...) -> {"success", "logs"}`
    (skip if no readback is possible).
 2. **CommandProfile** (`vendor_specific/primitive_handling/profiles/command_profiles.py`) — `MY_PARAM = _leica_setting_profile(_confirm_my_param)`.
-3. **Command wrapper** (`vendor_specific/primitive_handling/settings/changes.py`) — three phases (pre-checks → `dispatch_change(...)` with the
+3. **Command wrapper** (`vendor_specific/primitive_handling/commands/changes.py`) — three phases (pre-checks → `dispatch_change(...)` with the
    profile + a `setup_fn` and target-bound `confirm_fn` → post-process). `dispatch_change` handles
    client-binding, profile defaults, and the `confirm_and_fire` call. A job setting is one entry in
    `settings.py` and one named function here; listed in `settings.BY_NAME`, it is reachable with

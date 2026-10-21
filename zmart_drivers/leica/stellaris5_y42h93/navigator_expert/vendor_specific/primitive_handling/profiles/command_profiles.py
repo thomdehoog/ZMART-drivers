@@ -30,7 +30,7 @@ from dataclasses import dataclass
 
 from . import routes as _routes
 from .prechecks import check_idle
-from ..settings.limit_rules import NOTEBOOK_POINTER
+from ..commands.limit_rules import NOTEBOOK_POINTER
 from ...connection import waiting
 from ...connection.waiting import WINDOW_S
 from ...connection.waiting import WINDOWS

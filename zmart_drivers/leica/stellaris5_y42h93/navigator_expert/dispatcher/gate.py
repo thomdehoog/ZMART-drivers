@@ -9,7 +9,7 @@ The gate keeps, for each connection, the limits object that the driver
 installed when it connected (:func:`install`). It knows no microscope: it asks
 that object one question, ``check_command(command, values)``, which raises when
 the values are not allowed. What is allowed is the vendor's own rulebook (for
-LAS X, ``vendor_specific/primitive_handling/settings/limit_rules.py``), and
+LAS X, ``vendor_specific/primitive_handling/commands/limit_rules.py``), and
 finding, checking and installing the operator's limits file is the driver's
 connect-time handshake (for LAS X, ``driver_setup/limits/handshake.py``). If
 the operator's file cannot be used, the handshake installs the limits that ship

@@ -10,7 +10,7 @@ cannot be made, the command answers ``success: False`` and names the step, so
 a picture is never taken at a position that no longer points at the sample.
 
 Each one wraps the bare command of the same name in
-``vendor_specific/primitive_handling/settings/changes.py`` (``set_objective`` and
+``vendor_specific/primitive_handling/commands/changes.py`` (``set_objective`` and
 ``select_job`` there change the lens or the job and nothing else). Use those
 when the stage should not be corrected.
 
@@ -21,7 +21,7 @@ University of Zurich (thom.dehoog@zmb.uzh.ch, thomdehoog@gmail.com).
 import logging
 
 from ...dispatcher.door import make_timing as _make_timing
-from ...vendor_specific.primitive_handling.settings import changes as _changes
+from ...vendor_specific.primitive_handling.commands import changes as _changes
 from . import objective_shift as _objective_shift
 
 log = logging.getLogger(__name__)

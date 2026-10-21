@@ -357,7 +357,7 @@ GUARDED = ("dispatcher", "vendor_specific")
 GUARDED_FILES = (
     "procedures/objective_change_with_compensation/compensated_changes.py",
     "procedures/objective_change_with_compensation/objective_shift.py",
-    "vendor_specific/primitive_handling/settings/objectives.py",
+    "vendor_specific/primitive_handling/commands/objectives.py",
 )
 WAIT_NAME = re.compile(
     r"(timeout|poll_interval|max_retries|max_confirm_attempts|grace|deadline|window_s|retry_delay)",
