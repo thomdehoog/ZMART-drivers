@@ -141,19 +141,21 @@ navigator_expert/
 
     for_direct_use/            the driver used by itself, documented in the driver's README
         microscope.py          connect() and the Microscope: everything the driver can do
+        acquire.py             take a picture and keep a note of it for saving (pending_capture.py)
+        state.py               the microscope's state, saved with every picture
         running_log.py         the driver's rolling log file, for debugging
 
     for_zmart_controller/      everything that faces the controller; the folder you register
         zmart_driver.json      the driver's name and the class file beside it
         zmart_driver.py        the ZmartDriver class: each command a call of the Microscope
+        info.py                the description get_info answers
+        procedure_menu.py      the named procedures for get_procedures and run_procedure
 
     procedures/                the recipes, one folder each
-        acquisition/           take a picture and keep a note of it (acquire, run_job, pending_capture)
         save_data/             write the waiting captures as OME-Zarr, with their log (save_captures, ome_zarr, naming)
         clear_cache/           have LAS X let go of the saved pictures (clear, release)
         absolute_coordinate_system/  the one coordinate system: the arithmetic and the moves (coordinates, frame)
         objective_change_with_compensation/  change the lens and move the stage to keep the same spot
-        instrument/            get_state and set_state, get_info, and the menu of named procedures
 
     session/
         handle.py              the open connection and everything the driver remembers between commands
@@ -704,7 +706,7 @@ the Leica driver, taking a picture, saving it and letting the vendor software
 go of it are three separate steps, because each can go wrong on its own and
 each has its own moment:
 
-1. **`acquire`** (`procedures/acquisition/`) runs the selected job and leaves
+1. **`acquire`** (`for_direct_use/acquire.py`) runs the selected job and leaves
    the picture in LAS X's cache. It writes no files. It notes what only the
    moment of the capture can tell, where the stage stood, which job ran and
    the state of the microscope, and keeps that note with the session

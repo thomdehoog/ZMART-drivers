@@ -407,7 +407,7 @@ is the logger of the whole driver; the same trace also travels in each result's 
 ## 6. Pictures: taking, saving and clearing
 
 **Taking a picture, saving it and clearing LAS X's cache are three steps.** `acquire` (in
-`procedures/acquisition/`) runs the selected job, writes nothing, and keeps a note of how the
+`for_direct_use/acquire.py`) runs the selected job, writes nothing, and keeps a note of how the
 picture was taken (where the stage stood, which job ran, the state of the microscope). The
 `save_data` procedure then writes the waiting pictures, and `clear_cache` lets LAS X go of the
 pictures that were saved. Used by itself, these are `scope.acquire()`, `scope.save()` and
@@ -511,14 +511,16 @@ bottom and the class the controller calls at the top.
 zmart_drivers/leica/stellaris5_y42h93/navigator_expert/
 ├── for_direct_use/     the driver used by itself:
 │   ├── microscope.py       connect() and the Microscope: everything the driver can do (section 4)
+│   ├── acquire.py          taking a picture, and the note kept for saving it (pending_capture.py)
+│   ├── state.py            the microscope's state, saved with every picture
 │   └── running_log.py      the driver's rolling log file
 ├── for_zmart_controller/   everything that faces the controller (register this folder with it):
 │   ├── zmart_driver.json   the driver's name ("stellaris") and how to reach LAS X on this computer
-│   └── zmart_driver.py     the ZmartDriver class the controller calls, one method per command,
-│                           each a call of the Microscope
+│   ├── zmart_driver.py     the ZmartDriver class the controller calls, one method per command,
+│   │                       each a call of the Microscope
+│   ├── info.py             the description get_info answers
+│   └── procedure_menu.py   the named procedures get_procedures lists and run_procedure runs
 ├── procedures/         the recipes, one folder for each job:
-│   ├── acquisition/    taking a picture and keeping a note of how it was taken:
-│   │                   acquire.py (the step) · run_job.py (the LAS X call) · pending_capture.py
 │   ├── save_data/      writing the waiting pictures to disk, placed by the measured image
 │   │                   orientation so they line up with the stage moves: save_captures.py ·
 │   │                   save.py · saved_acquisition.py · naming.py · ome_zarr.py ·
@@ -527,10 +529,8 @@ zmart_drivers/leica/stellaris5_y42h93/navigator_expert/
 │   ├── absolute_coordinate_system/   turns the plain readings (stage, z-wide, z-galvo, the
 │   │                   objective) into the one absolute coordinate system, with the origin and the
 │   │                   objective offsets: coordinates.py · frame.py
-│   ├── objective_change_with_compensation/   changing the objective or the job without losing
-│   │                   the sample: compensated_changes.py · objective_shift.py
-│   └── instrument/     the instrument as a whole: state.py (what it is doing and what can be
-│                       changed) · info.py (its description) · menu.py (the procedures it offers)
+│   └── objective_change_with_compensation/   changing the objective or the job without losing
+│                       the sample: compensated_changes.py · objective_shift.py
 ├── session/            what the driver remembers about one connection: handle.py (the open
 │                       connection, the origin, the captures waiting to be saved, the pictures
 │                       still in LAS X's cache) · loaded_config.py (the orientation and the
@@ -644,7 +644,7 @@ workflow sees:
 - A limits refusal raises `ValueError`; today parts of the gate raise `RuntimeError`.
 - The limits gate moves inside the set dispatcher, so that no change calls it itself.
 - Done since the move: the logic of the commands left `zmart_adapter.py` for `procedures/`
-  (`session/`, `frame.py`, `acquisition/`, `instrument/`), the `output/` folder is gone, and
+  (`session/`, `frame.py`, `for_direct_use/`), the `output/` folder is gone, and
   the plain coordinate arithmetic is in `procedures/absolute_coordinate_system/coordinates.py`. The coordinate
   system is a procedure of its own (`procedures/absolute_coordinate_system/`), so the `ZmartDriver` class
   converts nothing. The full list of differences from the plan is in
