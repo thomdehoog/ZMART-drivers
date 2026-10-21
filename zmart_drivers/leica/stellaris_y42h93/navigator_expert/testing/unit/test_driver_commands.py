@@ -362,12 +362,12 @@ class TestFrame(unittest.TestCase):
         # this order, says which motor this answer used, and names every motor
         # that can move it.
         self.assertEqual(
-            list(pos["x"]), ["position", "unit", "actuator", "actuators", "canvas"]
+            list(pos["x"]), ["position", "unit", "used_actuator", "actuator_readings", "canvas"]
         )
-        self.assertEqual(pos["z"]["actuator"], "z-wide")
+        self.assertEqual(pos["z"]["used_actuator"], "z-wide")
         self.assertEqual(pos["x"]["unit"], "micrometer")
-        self.assertEqual(pos["x"]["actuators"], {"motoric": 1000.0})
-        self.assertEqual(pos["z"]["actuators"], {"z-wide": 30.0, "z-galvo": 0.0})
+        self.assertEqual(pos["x"]["actuator_readings"], {"motoric": 1000.0})
+        self.assertEqual(pos["z"]["actuator_readings"], {"z-wide": 30.0, "z-galvo": 0.0})
 
     def test_set_origin_persists_into_its_own_origin_folder(self):
         import json
@@ -563,9 +563,9 @@ class TestFrame(unittest.TestCase):
         self.assertEqual(pos["z"]["position"], 5.0)  # (32 + 3) - 30 focus sum
         # The motors' own readings are the stage's numbers, with nothing
         # subtracted: neither the origin nor an objective translation.
-        self.assertEqual(pos["x"]["actuators"], {"motoric": 1010.0})
-        self.assertEqual(pos["y"]["actuators"], {"motoric": 1990.0})
-        self.assertEqual(pos["z"]["actuators"], {"z-wide": 32.0, "z-galvo": 3.0})
+        self.assertEqual(pos["x"]["actuator_readings"], {"motoric": 1010.0})
+        self.assertEqual(pos["y"]["actuator_readings"], {"motoric": 1990.0})
+        self.assertEqual(pos["z"]["actuator_readings"], {"z-wide": 32.0, "z-galvo": 3.0})
         for axis in ("x", "y", "z"):
             self.assertEqual(pos[axis]["unit"], "micrometer")
         self.assertNotIn("hardware", pos)
@@ -585,10 +585,10 @@ class TestFrame(unittest.TestCase):
             pos = _frame.get_xyz(h)
             menu = _frame.get_actuators(h)
         for axis in ("x", "y"):
-            self.assertEqual(list(pos[axis]["actuators"]), menu[axis]["options"])
+            self.assertEqual(list(pos[axis]["actuator_readings"]), menu[axis]["options"])
         for axis in ("x", "y", "z"):
-            self.assertEqual(pos[axis]["actuator"], menu[axis]["default"])
-        self.assertEqual(list(pos["z"]["actuators"]), ["z-wide", "z-galvo"])
+            self.assertEqual(pos[axis]["used_actuator"], menu[axis]["default"])
+        self.assertEqual(list(pos["z"]["actuator_readings"]), ["z-wide", "z-galvo"])
         # the z-galvo cannot be chosen to move with
         with self.assertRaises(ValueError):
             _frame.get_xyz(h, with_actuators={"z": "z-galvo"})
@@ -667,10 +667,10 @@ class TestFrame(unittest.TestCase):
         # The answer is a fresh get_xyz: the (patched) readings, not the targets.
         self.assertEqual(list(record), ["x", "y", "z", "objective_translation_um"])
         self.assertEqual(
-            list(record["z"]), ["position", "unit", "actuator", "actuators", "canvas"]
+            list(record["z"]), ["position", "unit", "used_actuator", "actuator_readings", "canvas"]
         )
-        self.assertEqual(record["z"]["actuator"], "z-wide")
-        self.assertEqual(record["z"]["actuators"], {"z-wide": 32.0, "z-galvo": 0.0})
+        self.assertEqual(record["z"]["used_actuator"], "z-wide")
+        self.assertEqual(record["z"]["actuator_readings"], {"z-wide": 32.0, "z-galvo": 0.0})
         self.assertEqual(
             record["z"]["position"], 2.0
         )  # (32 + 0) − 30 (patched readings)
@@ -2135,8 +2135,8 @@ class TestObjectiveCompensation(unittest.TestCase):
         self.assertEqual(pos["y"]["position"], 10.0)  # 2060 − 2000 − 50
         self.assertEqual(pos["z"]["position"], 5.0)  # 45 − 30 − 10
         # The motors' readings stay untranslated: the stage's own numbers.
-        self.assertEqual(pos["x"]["actuators"], {"motoric": 1110.0})
-        self.assertEqual(pos["z"]["actuators"], {"z-wide": 45.0, "z-galvo": 0.0})
+        self.assertEqual(pos["x"]["actuator_readings"], {"motoric": 1110.0})
+        self.assertEqual(pos["z"]["actuator_readings"], {"z-wide": 45.0, "z-galvo": 0.0})
         self.assertEqual(pos["objective_translation_um"], [100.0, 50.0, 10.0])
 
     def test_cross_objective_move_targets_include_translation(self):
@@ -2167,7 +2167,7 @@ class TestObjectiveCompensation(unittest.TestCase):
         self.assertEqual(moves["z"], [(45.0, "zwide")])
         self.assertEqual(record["objective_translation_um"], [100.0, 50.0, 10.0])
         # The answer is read back from the (patched) microscope, like get_xyz.
-        self.assertEqual(record["z"]["actuators"], {"z-wide": 40.0, "z-galvo": 0.0})
+        self.assertEqual(record["z"]["actuator_readings"], {"z-wide": 40.0, "z-galvo": 0.0})
         self.assertEqual(record["z"]["position"], 0.0)  # 40 − 30 − 10
 
     def test_job_change_that_swaps_the_objective_is_compensated(self):
@@ -2615,11 +2615,11 @@ class TestLifecycle(unittest.TestCase):
                 moved = answer["output"]
                 self.assertEqual(
                     list(moved["x"]),
-                    ["position", "unit", "actuator", "actuators", "canvas"],
+                    ["position", "unit", "used_actuator", "actuator_readings", "canvas"],
                 )
                 self.assertEqual(moved["x"]["position"], 0.0)
                 self.assertEqual(
-                    moved["z"]["actuators"], {"z-wide": 30.0, "z-galvo": 0.0}
+                    moved["z"]["actuator_readings"], {"z-wide": 30.0, "z-galvo": 0.0}
                 )
                 xyz = session.get_xyz()
                 self.assertEqual(xyz["output"], moved)

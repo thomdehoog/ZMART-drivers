@@ -187,16 +187,16 @@ def _connect_session(
 def _raw_readings(xyz: dict) -> dict:
     """The four motor readings of a ``get_xyz`` answer, as the stage reports them.
 
-    ``get_xyz`` lists every motor of each axis under ``actuators`` with its
+    ``get_xyz`` lists every motor of each axis under ``actuator_readings`` with its
     own reading, untouched by the origin. The hardware checks below compare
     those readings with the targets handed to the driver's own ``move_xy``
     and ``move_z``, so this gathers them under the driver's names.
     """
     return {
-        "x_um": xyz["x"]["actuators"]["motoric"],
-        "y_um": xyz["y"]["actuators"]["motoric"],
-        "z_wide_um": xyz["z"]["actuators"]["z-wide"],
-        "z_galvo_um": xyz["z"]["actuators"]["z-galvo"],
+        "x_um": xyz["x"]["actuator_readings"]["motoric"],
+        "y_um": xyz["y"]["actuator_readings"]["motoric"],
+        "z_wide_um": xyz["z"]["actuator_readings"]["z-wide"],
+        "z_galvo_um": xyz["z"]["actuator_readings"]["z-galvo"],
     }
 
 
@@ -248,11 +248,11 @@ def phase_readonly(v: vh.Validator, sess: Any, args: argparse.Namespace) -> None
                 v.compare(
                     f"get_xyz: {axis} has position, unit, actuator, actuators and canvas",
                     list(xyz[axis]),
-                    ["position", "unit", "actuator", "actuators", "canvas"],
+                    ["position", "unit", "used_actuator", "actuator_readings", "canvas"],
                 )
                 v.compare(
                     f"get_xyz: {axis} used its default motor",
-                    xyz[axis]["actuator"],
+                    xyz[axis]["used_actuator"],
                     {"x": "motoric", "y": "motoric", "z": "z-wide"}[axis],
                 )
                 v.compare(
@@ -264,7 +264,7 @@ def phase_readonly(v: vh.Validator, sess: Any, args: argparse.Namespace) -> None
             # names get_actuators lists.
             v.compare(
                 "get_xyz: actuators name every motor",
-                {axis: list(xyz[axis]["actuators"]) for axis in ("x", "y", "z")},
+                {axis: list(xyz[axis]["actuator_readings"]) for axis in ("x", "y", "z")},
                 {"x": ["motoric"], "y": ["motoric"], "z": ["z-wide", "z-galvo"]},
             )
             v.compare(
@@ -272,7 +272,7 @@ def phase_readonly(v: vh.Validator, sess: Any, args: argparse.Namespace) -> None
                 all(
                     isinstance(reading, (int, float))
                     for axis in ("x", "y", "z")
-                    for reading in xyz[axis]["actuators"].values()
+                    for reading in xyz[axis]["actuator_readings"].values()
                 ),
                 True,
             )
@@ -588,13 +588,13 @@ def phase_move(
                     )
                     v.compare(
                         "zwide: drive moved by delta",
-                        f["z"]["actuators"]["z-wide"] - orig["z_wide_um"],
+                        f["z"]["actuator_readings"]["z-wide"] - orig["z_wide_um"],
                         dzw,
                         tolerance=Z_TOL_UM,
                     )
                     v.compare(
                         "zwide: z-galvo drive parked at 0",
-                        f["z"]["actuators"]["z-galvo"],
+                        f["z"]["actuator_readings"]["z-galvo"],
                         0.0,
                         tolerance=Z_TOL_UM,
                     )

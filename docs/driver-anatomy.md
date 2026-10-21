@@ -224,7 +224,7 @@ sits together in `zmart_controller_plugin/`, so that the controller's side is in
 one place. The operator registers the driver's own folder, the one that holds
 `zmart_controller_plugin/`; the controller finds both files there by their names and
 imports the class as part of the driver's package, so it can use the driver's code
-(controller 0.4.0rc2).
+(controller 0.4.0rc3).
 
 What changed from the first version of this layout: the `actions/` folder is
 gone, `client.py` is split into `connection/` and the `primitives/` folder,
@@ -1485,7 +1485,7 @@ how the kinds from the errors table reach the experiment:
   contents of the parts beneath it.
 - **`get_xyz` and `set_xyz` answer the same.** A move ends by reading the
   position back from the microscope, so the workflow sees where the stage
-  really is, not the numbers it asked for. Under `actuators`, every motor
+  really is, not the numbers it asked for. Under `actuator_readings`, every motor
   of each axis carries its own raw reading, in micrometres and with nothing
   subtracted, so that the workflow can see how the motors share the position.
 - **`get_info` is the description a stranger reads.** It says what the other

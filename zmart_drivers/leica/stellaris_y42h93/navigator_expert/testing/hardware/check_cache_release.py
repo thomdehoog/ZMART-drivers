@@ -202,19 +202,13 @@ def main() -> int:
                 failed += 1
                 report["errors"].append(f"capture {i}: {answer['output']}"[:300])
             else:
-                # The picture is saved; now have LAS X let go of it.
+                # The picture is saved; now have LAS X let go of it. A picture it
+                # would not let go of fails the procedure, naming it.
                 cleared = session.run_procedure({"name": "clear_cache"})
                 if not cleared["success"]:
                     failed += 1
                     report["errors"].append(
                         f"clear_cache after {i}: {cleared['output']}"[:300]
-                    )
-                elif cleared["output"]["ran"]["failed"]:
-                    failed += 1
-                    report["errors"].append(
-                        f"clear_cache after {i}: {cleared['output']['ran']['failed']}"[
-                            :300
-                        ]
                     )
             if i % 10 == 0 or i == asked.captures:
                 step = {

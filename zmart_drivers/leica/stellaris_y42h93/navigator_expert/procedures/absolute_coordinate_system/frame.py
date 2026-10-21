@@ -47,7 +47,7 @@ _ACTUATORS = {"x": ("motoric",), "y": ("motoric",), "z": ("z-wide",)}
 
 # Where each motor's own reading sits in a hardware snapshot (see
 # ``_hardware_snapshot``). ``get_xyz`` reports these readings under
-# ``actuators``. They include the z-galvo, which is read but never moved here.
+# ``actuator_readings``. They include the z-galvo, which is read but never moved here.
 _MOTOR_READINGS = {
     "x": {"motoric": "x_um"},
     "y": {"motoric": "y_um"},
@@ -140,7 +140,7 @@ def _resolve_actuators(with_actuators: dict | None) -> dict[str, str]:
 
 
 def get_xyz(handle: Session, *, with_actuators: dict | None = None) -> dict:
-    """Where the stage is, per axis: ``position``, ``unit``, ``actuators`` and ``canvas``.
+    """Where the stage is, per axis: ``position``, ``unit``, ``actuator_readings`` and ``canvas``.
 
     The answer has the keys ``x``, ``y`` and ``z``. Each axis carries the
     same four entries, and every number in them is in micrometres:
@@ -156,7 +156,7 @@ def get_xyz(handle: Session, *, with_actuators: dict | None = None) -> dict:
       reported uncompensated and a warning is logged, because a read can
       never land the stage anywhere wrong.
     - ``unit``: always ``"micrometer"``.
-    - ``actuators``: every motor of the axis with its own reading, exactly
+    - ``actuator_readings``: every motor of the axis with its own reading, exactly
       as LAS X reports it: ``{"motoric": ...}`` for x and y, ``{"z-wide":
       ..., "z-galvo": ...}`` for z. These are the stage's own numbers, with
       nothing subtracted, so they show how the two z drives share the focus.
@@ -180,8 +180,8 @@ def get_xyz(handle: Session, *, with_actuators: dict | None = None) -> dict:
         axis: {
             "position": frame[axis],
             "unit": UNIT,
-            "actuator": chosen[axis],
-            "actuators": {
+            "used_actuator": chosen[axis],
+            "actuator_readings": {
                 motor: snap[reading] for motor, reading in _MOTOR_READINGS[axis].items()
             },
             "canvas": allowed.get(f"{axis}_um") or [frame[axis], frame[axis]],

@@ -101,22 +101,22 @@ LAS X.
       "x": {
           "position": 100.0,
           "unit": "micrometer",
-          "actuator": "motoric",
-          "actuators": {"motoric": 63600.0},
+          "used_actuator": "motoric",
+          "actuator_readings": {"motoric": 63600.0},
           "canvas": [-62500.0, 66500.0],
       },
       "y": {
           "position": 50.0,
           "unit": "micrometer",
-          "actuator": "motoric",
-          "actuators": {"motoric": 41550.0},
+          "used_actuator": "motoric",
+          "actuator_readings": {"motoric": 41550.0},
           "canvas": [-40500.0, 58500.0],
       },
       "z": {
           "position": 0.0,
           "unit": "micrometer",
-          "actuator": "z-wide",
-          "actuators": {"z-wide": 2000.0, "z-galvo": 0.0},
+          "used_actuator": "z-wide",
+          "actuator_readings": {"z-wide": 2000.0, "z-galvo": 0.0},
           "canvas": [-2250.0, 6250.0],
       },
       "objective_translation_um": [0.0, 0.0, 0.0],
@@ -127,10 +127,10 @@ LAS X.
     objective is in place than the one the origin was saved under, the calibrated objective
     translation is subtracted too, so the position names the same point of the sample.
   - `unit` is always `'micrometer'`.
-  - `actuator` is the motor this answer used: `motoric` for x and y, and `z-wide` for z. The driver
+  - `used_actuator` is the motor this answer used: `motoric` for x and y, and `z-wide` for z. The driver
     always moves the focus with z-wide, because the objective offsets are measured on it; the z-galvo
     is only read, and is parked at 0 before a move if it is not there.
-  - `actuators` lists every motor of the axis, under the names `get_actuators` gives, each with
+  - `actuator_readings` lists every motor of the axis, under the names `get_actuators` gives, each with
     its own reading exactly as LAS X reports it. Nothing is subtracted from these, so they show
     how z-wide and z-galvo share the focus.
   - `canvas` is `[min, max]`, everywhere a picture can show along the axis. On x and y it is the

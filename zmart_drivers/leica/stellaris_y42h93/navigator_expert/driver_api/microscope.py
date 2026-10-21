@@ -160,7 +160,7 @@ class Microscope:
         """Where the stage is, per axis, in micrometres from the saved origin.
 
         Each of ``x``, ``y`` and ``z`` holds its ``position``, its ``unit``,
-        every motor with its own raw reading (``actuators``) and the range a
+        every motor with its own raw reading (``actuator_readings``) and the range a
         picture can show (``canvas``). ``z`` is the focus: the two z drives
         added together.
         """

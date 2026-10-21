@@ -19,6 +19,7 @@ from mock_lasx_api import MockLasxClient
 from zmart_controller.registry import load_driver
 
 from zmart_drivers.leica.stellaris_y42h93.navigator_expert.driver_api import microscope
+from zmart_drivers.leica.stellaris_y42h93.navigator_expert.zmart_controller_plugin import procedure_menu
 from zmart_drivers.leica.stellaris_y42h93.navigator_expert.zmart_controller_plugin import zmart_controller_plugin
 from zmart_drivers.leica.stellaris_y42h93.navigator_expert.primitives.log import log_settings
 
@@ -95,7 +96,7 @@ def test_the_class_describes_the_microscope_and_what_is_set_up(monkeypatch, tmp_
     }
     for item in class_info["setup"].values():
         assert isinstance(item["done"], bool) and item["says"].strip()
-    assert as_class["get_xyz"]["z"]["actuators"].keys() == {"z-wide", "z-galvo"}
+    assert as_class["get_xyz"]["z"]["actuator_readings"].keys() == {"z-wide", "z-galvo"}
 
 
 def test_the_class_says_it_saves_where_it_is_told(monkeypatch, tmp_path):
@@ -153,3 +154,31 @@ def test_a_setting_the_microscope_does_not_have_is_refused(monkeypatch, tmp_path
 
     assert answer["success"] is False
     assert "ValueError" in answer["output"] and "zoom" in answer["output"]
+
+
+def test_a_procedure_answers_the_name_of_what_ran(monkeypatch, tmp_path):
+    """The controller's contract: ``run_procedure`` returns ``True, ran``, the routine's name."""
+    connection = _offline(monkeypatch, tmp_path)
+    session = zmart_controller.ZmartController(zmart_controller_plugin.ZmartControllerPlugin, connection)
+    try:
+        answer = session.run_procedure({"name": "clear_cache"})
+    finally:
+        session.disconnect()
+
+    assert answer == {"success": True, "output": {"ran": "clear_cache"}}
+
+
+def test_a_procedure_that_did_not_finish_its_work_is_a_failure(monkeypatch, tmp_path):
+    """A picture LAS X would not let go of fails the procedure, by name, instead of hiding in a detail."""
+    connection = _offline(monkeypatch, tmp_path)
+    monkeypatch.setattr(
+        procedure_menu, "clear", lambda handle: {"cleared": [], "failed": {"HiRes007": "still in use"}}
+    )
+    session = zmart_controller.ZmartController(zmart_controller_plugin.ZmartControllerPlugin, connection)
+    try:
+        answer = session.run_procedure({"name": "clear_cache"})
+    finally:
+        session.disconnect()
+
+    assert answer["success"] is False
+    assert "HiRes007" in answer["output"] and "still in use" in answer["output"]

@@ -145,18 +145,26 @@ class ZmartControllerPlugin:
         return True, procedure_menu.get_procedures(self.microscope.handle)
 
     def run_procedure(self, procedure):
-        """Run the routine named by ``procedure["name"]``; the other keys are its arguments."""
-        return True, procedure_menu.run_procedure(self.microscope.handle, dict(procedure))
+        """Run the routine named by ``procedure["name"]`` and answer ``True, name``; the other keys are its arguments.
+
+        A routine that could not do all of its work, such as a picture LAS X
+        would not let go of, raises ``RuntimeError`` naming what was left, so
+        the workflow sees a failure.
+        """
+        done = procedure_menu.run_procedure(self.microscope.handle, dict(procedure))
+        if done.get("failed"):
+            raise RuntimeError(f"{procedure['name']} left {done['failed']}")
+        return True, procedure["name"]
 
 
 def as_controller_xyz(answer: dict) -> tuple:
-    """The per-axis answer as the controller takes it: ``(x, y, z, actuators, canvas)``.
+    """The per-axis answer as the controller takes it: ``(x, y, z, actuator_readings, canvas)``.
 
-    ``actuators`` is keyed by axis, and ``canvas`` is ``(x_min, x_max, y_min,
+    ``actuator_readings`` is keyed by axis, and ``canvas`` is ``(x_min, x_max, y_min,
     y_max, z_min, z_max)``; the controller builds the per-axis answer again for
     the workflow.
     """
     position = tuple(answer[axis]["position"] for axis in AXES)
-    actuators = {axis: dict(answer[axis]["actuators"]) for axis in AXES}
+    readings = {axis: dict(answer[axis]["actuator_readings"]) for axis in AXES}
     canvas = tuple(bound for axis in AXES for bound in answer[axis]["canvas"])
-    return (*position, actuators, canvas)
+    return (*position, readings, canvas)

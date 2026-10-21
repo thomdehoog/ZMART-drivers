@@ -187,9 +187,9 @@ def phase_commands(v: vh.Validator, sess: Any) -> dict[str, Any]:
             seen["xyz"] = xyz
             for axis in ("x", "y", "z"):
                 v.compare(
-                    f"get_xyz: {axis} has position, unit, actuator, actuators and canvas",
+                    f"get_xyz: {axis} has position, unit, used_actuator, actuator_readings and canvas",
                     sorted(xyz.get(axis, {})),
-                    ["actuator", "actuators", "canvas", "position", "unit"],
+                    ["actuator_readings", "canvas", "position", "unit", "used_actuator"],
                 )
             v.compare(
                 "get_xyz: in micrometres", xyz.get("x", {}).get("unit"), "micrometer"
