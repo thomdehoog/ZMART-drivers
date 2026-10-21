@@ -21,7 +21,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.readings import reading_table as capabilities
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.objective_change_with_compensation import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.keep_in_view import (
     objective_shift,
 )
 
@@ -356,8 +356,8 @@ def test_commands_deliver_through_the_one_helper():
 # Whole folders, plus the change definitions that moved from actions/ to procedures/.
 GUARDED = ("dispatcher", "connection", "primitives", "operations")
 GUARDED_FILES = (
-    "procedures/objective_change_with_compensation/compensated_changes.py",
-    "procedures/objective_change_with_compensation/objective_shift.py",
+    "procedures/keep_in_view/compensated_changes.py",
+    "procedures/keep_in_view/objective_shift.py",
 )
 WAIT_NAME = re.compile(
     r"(timeout|poll_interval|max_retries|max_confirm_attempts|grace|deadline|window_s|retry_delay)",

@@ -29,7 +29,7 @@ from unittest.mock import patch
 import pytest
 
 import zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.readings.named_readings as readers
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.objective_change_with_compensation import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.keep_in_view import (
     objective_shift as shift,
 )
 

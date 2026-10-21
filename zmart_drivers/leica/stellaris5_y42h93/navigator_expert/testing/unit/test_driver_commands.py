@@ -49,7 +49,7 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.clear_cac
     release as _release,
 )
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.save_data import (
-    save_captures as _save_captures,
+    save_waiting as _save_waiting,
 )
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.save_data import (
     save as _save,
@@ -57,7 +57,7 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.save_data
 
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_api import acquire as _acquisition
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.objective_change_with_compensation import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.keep_in_view import (
     compensated_changes as _commands_comp,
 )
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.absolute_coordinate_system import (
@@ -230,7 +230,7 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.changes i
 def _acquire_and_save(handle, **given):
     """Acquire, then save what was acquired, as the controller's acquire does; answer the saved record."""
     taken = _acquisition.acquire(handle, **given)
-    (record,) = _save_captures.save_waiting(handle, taken["position_label"])
+    (record,) = _save_waiting.save_waiting(handle, taken["position_label"])
     return record
 
 
@@ -1164,7 +1164,7 @@ class TestAcquire(unittest.TestCase):
         # Captures are always saved as OME-Zarr: there is no format to choose.
         self.assertNotIn("format", calls["save"])
         self.assertEqual(
-            calls["save"]["projection"], _save_captures.IMAGE_SAVE.projection
+            calls["save"]["projection"], _save_waiting.IMAGE_SAVE.projection
         )
         self.assertNotIn("cleanup_cache", calls["save"])
         self.assertEqual(record["format"], "ome-zarr")
@@ -1237,7 +1237,7 @@ class TestAcquire(unittest.TestCase):
                 output_folder=None,
                 position_label="A1",
             )
-            (record,) = _save_captures.save_waiting(h)
+            (record,) = _save_waiting.save_waiting(h)
         self.assertEqual(record["position_label"], "A1")
         self.assertEqual(h.unsaved, [])
         self.assertEqual(h.in_cache, [(7, "HiRes007")])
@@ -1255,7 +1255,7 @@ class TestAcquire(unittest.TestCase):
             )
             with patch.object(_save, "save", side_effect=RuntimeError("disk full")):
                 with self.assertRaises(RuntimeError):
-                    _save_captures.save_waiting(h)
+                    _save_waiting.save_waiting(h)
         self.assertEqual([c.label for c in h.unsaved], ["A1"])
         self.assertEqual(h.in_cache, [])
 
@@ -1280,7 +1280,7 @@ class TestAcquire(unittest.TestCase):
     def test_saving_a_label_nobody_acquired_is_refused(self):
         h = _handle()
         with self.assertRaisesRegex(ValueError, "no capture waiting"):
-            _save_captures.save_waiting(h, "nothing")
+            _save_waiting.save_waiting(h, "nothing")
 
     def test_captures_come_from_the_cache_and_clearing_is_not_a_saving_setting(self):
         """Every capture is read from LAS X's cache (AutoSave is not used, Thom, 2026-10-14);
@@ -1349,7 +1349,7 @@ class TestAcquire(unittest.TestCase):
             )
 
         self.assertEqual(
-            calls["save"]["projection"], _save_captures.IMAGE_SAVE.projection
+            calls["save"]["projection"], _save_waiting.IMAGE_SAVE.projection
         )
         self.assertEqual(record["projections"], [str(projection)])
         self.assertIn(str(projection), record["files"])

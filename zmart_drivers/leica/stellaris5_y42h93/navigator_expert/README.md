@@ -523,14 +523,14 @@ zmart_drivers/leica/stellaris5_y42h93/navigator_expert/
 │   └── procedure_menu.py   the named procedures get_procedures lists and run_procedure runs
 ├── procedures/         the recipes, one folder for each job:
 │   ├── save_data/      writing the waiting pictures to disk, placed by the measured image
-│   │                   orientation so they line up with the stage moves: save_captures.py ·
+│   │                   orientation so they line up with the stage moves: save_waiting.py ·
 │   │                   save.py · saved_acquisition.py · naming.py · ome_zarr.py ·
 │   │                   ome_canonical.py · materialize.py · command_log.py
 │   ├── clear_cache/    having LAS X let go of pictures once they are saved: clear.py · release.py
 │   ├── absolute_coordinate_system/   turns the plain readings (stage, z-wide, z-galvo, the
 │   │                   objective) into the one absolute coordinate system, with the origin and the
 │   │                   objective offsets: coordinates.py · frame.py
-│   └── objective_change_with_compensation/   changing the objective or the job without losing
+│   └── keep_in_view/   changing the objective or the job without losing
 │                       the sample: compensated_changes.py · objective_shift.py
 ├── session/            what the driver remembers about one connection: handle.py (the open
 │                       connection, the origin, the captures waiting to be saved, the pictures

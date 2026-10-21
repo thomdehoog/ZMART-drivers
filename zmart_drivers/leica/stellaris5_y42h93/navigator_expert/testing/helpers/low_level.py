@@ -21,7 +21,7 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.limits.
     connect_handshake as connect_limits_handshake,
 )
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.objective_change_with_compensation.compensated_changes import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.keep_in_view.compensated_changes import (
     select_job,
     set_objective,
 )

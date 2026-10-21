@@ -10,7 +10,7 @@ University of Zurich (thom.dehoog@zmb.uzh.ch, thomdehoog@gmail.com).
 from __future__ import annotations
 
 from ..procedures.clear_cache.clear import clear
-from ..procedures.save_data.save_captures import save_waiting
+from ..procedures.save_data.save_waiting import save_waiting
 from ..procedures.absolute_coordinate_system.frame import zero_z_galvo
 from ..session.handle import Session, require_open
 

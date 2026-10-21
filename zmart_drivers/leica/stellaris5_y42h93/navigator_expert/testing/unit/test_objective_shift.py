@@ -15,11 +15,11 @@ import pytest
 from limits_fixtures import install_permissive_limits
 
 import zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.readings.named_readings as readers
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.objective_change_with_compensation import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.keep_in_view import (
     objective_shift as shift,
 )
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.objective_change_with_compensation import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.keep_in_view import (
     compensated_changes as cmds_comp,
 )
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.session import (

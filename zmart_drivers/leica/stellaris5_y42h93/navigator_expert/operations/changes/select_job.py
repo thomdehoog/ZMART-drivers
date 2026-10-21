@@ -10,7 +10,7 @@ the confirmation for the source.
 
 This is the bare change, without moving the stage. The recipe that also keeps
 the sample in view, when the new job has another objective, is the procedure
-``procedures/objective_change_with_compensation/``.
+``procedures/keep_in_view/``.
 
 Author: Thom de Hoog, Center for Microscopy and Image Analysis (ZMB),
 University of Zurich (thom.dehoog@zmb.uzh.ch, thomdehoog@gmail.com).

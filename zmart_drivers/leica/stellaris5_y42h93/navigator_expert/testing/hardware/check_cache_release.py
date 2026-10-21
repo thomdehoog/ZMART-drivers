@@ -160,7 +160,7 @@ def main() -> int:
         lasx_data_container as container,
     )
     from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.save_data import (
-        save_captures as _saving,
+        save_waiting as _saving,
     )
 
     releases = Releases()

@@ -41,7 +41,7 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.limits 
     handshake as _handshake,
 )
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.objective_change_with_compensation import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.keep_in_view import (
     compensated_changes as commands_mod_comp,
 )
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.limits import (
@@ -1001,7 +1001,7 @@ def test_every_dispatching_wrapper_declares_and_calls_the_gate():
     files = [
         DRIVER_ROOT / "operations" / "changes" / f"{name}.py"
         for name in ("stage", "objective", "select_job", "acquire")
-    ] + [DRIVER_ROOT / "procedures" / "objective_change_with_compensation" / "compensated_changes.py"]
+    ] + [DRIVER_ROOT / "procedures" / "keep_in_view" / "compensated_changes.py"]
     fire_names = {"dispatch_change", "write"}
     fire_attrs = {"UpdateAwaitReceipt", "UpdateAsync", "dispatch_change"}
     checked = []

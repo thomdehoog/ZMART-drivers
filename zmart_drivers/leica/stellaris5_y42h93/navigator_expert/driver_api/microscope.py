@@ -45,8 +45,8 @@ from ..procedures.absolute_coordinate_system import frame
 from . import acquire as acquire_step
 from ..procedures.clear_cache import clear as clear_step
 from . import state as state_step
-from ..procedures.objective_change_with_compensation import compensated_changes
-from ..procedures.save_data import save_captures as save_step
+from ..procedures.keep_in_view import compensated_changes
+from ..procedures.save_data import save_waiting as save_step
 from ..procedures.save_data.naming import run_hash
 from ..session import loaded_config
 from ..session.handle import Session, job_catalog, note_unconfirmed, require_open, selected_job_name

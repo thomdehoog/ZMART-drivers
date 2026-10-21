@@ -20,22 +20,12 @@ University of Zurich (thom.dehoog@zmb.uzh.ch, thomdehoog@gmail.com).
 
 import logging
 
-from ...dispatcher.door import make_timing as _make_timing
 from ...operations.changes import objective as _objective
+from ...operations.changes import run_change
 from ...operations.changes import select_job as _select_job
 from . import objective_shift as _objective_shift
 
 log = logging.getLogger(__name__)
-
-
-def _refusal(message):
-    return {
-        "success": False,
-        "confirmed": None,
-        "message": message,
-        "timing": _make_timing(total_s=0.0, attempts=0),
-        "logs": [],
-    }
 
 
 def set_objective(
@@ -73,7 +63,7 @@ def set_objective(
                 client, job_name, compensate=compensate
             )
         except Exception as exc:  # noqa: BLE001 -- fail closed before the change fires
-            return _refusal(
+            return run_change.refused(
                 "refusing the objective change: could not record the "
                 f"pre-change position for objective compensation: {exc}"
             )

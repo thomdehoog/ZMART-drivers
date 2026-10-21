@@ -156,10 +156,10 @@ navigator_expert/
         procedure_menu.py      the named procedures for get_procedures and run_procedure
 
     procedures/                the recipes, one folder each
-        save_data/             write the waiting captures as OME-Zarr, with their log (save_captures, ome_zarr, naming)
+        save_data/             write the waiting captures as OME-Zarr, with their log (save_waiting, save, ome_zarr, naming)
         clear_cache/           have LAS X let go of the saved pictures (clear, release)
         absolute_coordinate_system/  the one coordinate system: the arithmetic and the moves (coordinates, frame)
-        objective_change_with_compensation/  change the lens and move the stage to keep the same spot
+        keep_in_view/  change the lens and move the stage to keep the same spot
 
     session/
         handle.py              the open connection and everything the driver remembers between commands

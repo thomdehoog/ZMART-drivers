@@ -20,7 +20,7 @@ from ..primitives.values.parsing import (
     parse_tile_geometry as _parse_tile_geometry,
 )
 from ..operations.readings import named_readings as _readers
-from ..procedures.objective_change_with_compensation import compensated_changes as _compensated
+from ..procedures.keep_in_view import compensated_changes as _compensated
 from ..session import handle as _info
 from ..session.handle import Session, job_catalog, note_unconfirmed, require_open
 

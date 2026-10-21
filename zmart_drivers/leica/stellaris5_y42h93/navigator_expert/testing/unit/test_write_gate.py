@@ -45,7 +45,7 @@ def test_every_change_hands_its_name_and_values_to_the_dispatcher():
     ] + [
         DRIVER_ROOT
         / "procedures"
-        / "objective_change_with_compensation"
+        / "keep_in_view"
         / "compensated_changes.py",
     ]
     calls = 0

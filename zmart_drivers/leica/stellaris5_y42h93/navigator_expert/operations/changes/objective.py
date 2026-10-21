@@ -2,7 +2,7 @@
 
 This is the bare change, without moving the stage. The recipe that also keeps
 the sample in view is the procedure
-``procedures/objective_change_with_compensation/``; it passes ``before_fire``
+``procedures/keep_in_view/``; it passes ``before_fire``
 to take its reading just before the change is sent.
 
 Author: Thom de Hoog, Center for Microscopy and Image Analysis (ZMB),

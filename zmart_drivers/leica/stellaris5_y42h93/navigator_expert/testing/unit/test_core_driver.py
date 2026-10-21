@@ -26,7 +26,7 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock, PropertyMock, patch
 
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher import door
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.objective_change_with_compensation import compensated_changes
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.keep_in_view import compensated_changes
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.sending import error_classification
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.primitives.values import parsing
 
@@ -36,7 +36,7 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.connection import (
 
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.connection import lasx_settings
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.objective_change_with_compensation import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.keep_in_view import (
     compensated_changes as commands_comp,
 )
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher import (

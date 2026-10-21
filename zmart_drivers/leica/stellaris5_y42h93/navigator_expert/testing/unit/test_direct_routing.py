@@ -24,7 +24,7 @@ from state_tree_stand_in import StandInNodes, answer_json_read
 
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.readings import reading_table as capabilities
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.objective_change_with_compensation import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.keep_in_view import (
     compensated_changes as commands_comp,
 )
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.sending import (
