@@ -1,6 +1,6 @@
 """Time every reading a job switch makes, to find one that waits.
 
-The full run on the STELLARIS on 2026-10-10 (``sessions/SCOPE_RUN_2026-10-10.md``,
+The full run on the STELLARIS on 2026-10-10 (``docs/leica/SCOPE_RUN_2026-10-10.md``,
 section 3.3) saw one job switch wait exactly 12 s, one full waiting budget,
 before the command went out. This probe switches jobs through the driver's
 controller-facing class, the way ``set_state`` does in a workflow, and prints

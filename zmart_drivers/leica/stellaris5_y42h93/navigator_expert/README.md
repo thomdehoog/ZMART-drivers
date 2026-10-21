@@ -15,12 +15,13 @@ notebooks keep the thin 1–3-line invocation style used across the ZMART driver
   letting LAS X go of its cache are three separate steps. It has been tested on the LAS X
   simulator and on the STELLARIS: on 21 October 2026 the quick hardware acceptance passed with every
   change sent through the direct route and no fallback
-  ([`sessions/SCOPE_RUN_2026-10-21_DIRECT_WRITERS.md`](sessions/SCOPE_RUN_2026-10-21_DIRECT_WRITERS.md)).
+  ([`docs/leica/SCOPE_RUN_2026-10-21_DIRECT_WRITERS.md`](../../../../docs/leica/SCOPE_RUN_2026-10-21_DIRECT_WRITERS.md)).
   The hardware CI has since been widened to the lasers, the filter wheels, the z-stack and the
   objective; that wider run has not yet been made on a microscope. Known limits are listed below.
   Before it is used unattended, the findings in
-  [`sessions/RELEASE_CANDIDATE_REVIEW.md`](sessions/RELEASE_CANDIDATE_REVIEW.md) need to be fixed.
-  The session notes, plans and reviews are kept in [`sessions/`](sessions/).
+  [`docs/leica/RELEASE_CANDIDATE_REVIEW.md`](../../../../docs/leica/RELEASE_CANDIDATE_REVIEW.md) need to be fixed.
+  The notes, plans and reviews written while building the driver are kept in the repository's
+  [`docs/leica/`](../../../../docs/leica/).
 - **Known limits of this beta:**
   - Scan mode is never changed by the validators, because changing it removes a job's z-stack.
   - Detector gain cannot be tested on this hardware: LAS X gives the HyD S 2 a single value.
@@ -571,7 +572,6 @@ zmart_drivers/leica/stellaris5_y42h93/navigator_expert/
 ├── testing/            unit/ (offline) · calibration/ (the calibration suites) · hardware/
 │                       (validate_*.py live scripts + mock-backed test_* gates) · helpers/ (the
 │                       LAS X mock) · data/
-├── sessions/           notes, plans and reviews written while building the driver
 └── (the driver's CI, pytest.ini, .coveragerc and requirements-dev.txt live in testing/)
 ```
 
