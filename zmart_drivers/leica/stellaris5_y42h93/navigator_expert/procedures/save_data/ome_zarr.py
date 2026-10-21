@@ -332,7 +332,7 @@ def write_store(capture: Capture, store: Path, *, state: dict | None = None) -> 
     group = image.to_zarr(zarr.storage.LocalStore(str(writing)), path="")
     group["0"][...] = volume
     if not np.array_equal(group["0"][...], volume):
-        shutil.rmtree(writing, ignore_errors=True)
+        _remove_when_free(writing)
         raise RuntimeError(
             f"{store.name}: the pixels read back from disk are not those written; not saved"
         )
@@ -391,6 +391,27 @@ def _rename_when_free(
                 waited,
             )
         return
+
+
+def _remove_when_free(writing: Path, *, wait_s: float = RENAME_WAIT_S) -> None:
+    """Remove the half-written *writing* folder, waiting out a passing lock on it.
+
+    Windows refuses to delete a file that another program holds open for a
+    moment, as it refuses a rename, so the removal is tried again every tenth
+    of a second for up to *wait_s*. A folder that still cannot be removed is
+    logged and left: the capture is refused either way, and its name shows it
+    was never finished. Seen on the LAS X simulator PC, 2026-10-21, where the
+    half-written folder stayed behind in two runs of six.
+    """
+    deadline = time.perf_counter() + wait_s
+    while writing.exists():
+        try:
+            shutil.rmtree(writing)
+        except OSError as why:
+            if time.perf_counter() >= deadline:
+                log.warning("%s could not be removed: %s", writing, why)
+                return
+            time.sleep(0.1)
 
 
 def _without_empty(value):
