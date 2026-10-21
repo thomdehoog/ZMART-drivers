@@ -94,7 +94,7 @@ include-package-data = false
     "*.json",
     "defaults/*.json",
     "notebooks/*.ipynb",
-    "notebooks/_bootstrap.py",
+    "notebooks/bootstrap.py",
     "*.example",
 ]
 

@@ -617,7 +617,7 @@ def test_failed_run_keeps_evidence_but_is_not_active(monkeypatch, sessions_root)
 
 
 def test_notebook_archive_waits_for_a_new_saved_file_version(tmp_path, monkeypatch):
-    bootstrap_path = _ORIENTATION_NOTEBOOKS / "_bootstrap.py"
+    bootstrap_path = _ORIENTATION_NOTEBOOKS / "bootstrap.py"
     spec = importlib.util.spec_from_file_location(
         "orientation_notebook_bootstrap", bootstrap_path
     )

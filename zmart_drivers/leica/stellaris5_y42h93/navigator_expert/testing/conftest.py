@@ -50,10 +50,10 @@ def pytest_report_header(config):
     CI runner or another institute's microscope PC carries the exact system
     context (OS, Python, package versions, git rev, LAS X availability) needed
     to triage it. Diagnostics must never break a run, hence the guard.
-    See testing/_diagnostics.py.
+    See testing/diagnostics.py.
     """
     try:
-        from _diagnostics import header_lines
+        from diagnostics import header_lines
 
         return header_lines()
     except Exception as exc:  # pragma: no cover - diagnostics must not fail a run

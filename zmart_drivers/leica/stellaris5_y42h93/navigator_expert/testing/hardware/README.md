@@ -79,7 +79,7 @@ release or after a change to the readers:
   rest, or when the CAM API answers differently from the direct reader (the
   CAM API's z-galvo is not compared: it keeps the job's stored height, only
   the direct reader reads the drive). The log may lack an answer by design.
-  The tables are in `_report/readers/readers.md`.
+  The tables are in `report/readers/readers.md`.
 - the passive reader probe (api / log / hybrid), the side-by-side reader
   parity check, and the end-to-end validator through the api, log and
   hybrid routes as well. Those routes stay diagnostic: they document
@@ -161,14 +161,14 @@ success+UNCONFIRMED / FAILED result, attempt counts, and timing.
 ## Where the results land
 
 - **Markdown run reports** (one per validator run, human-readable):
-  `tests/_report/hardware_run_report_<YYYYMMDD-HHMMSS>.md` — run metadata
+  `testing/report/hardware_run_report_<YYYYMMDD-HHMMSS>.md` — run metadata
   (date, host, mock-or-live, driver commit), summary table per phase, timing
   overview (per-phase and per-reader-mode latency, slowest actions,
   unconfirmed/failed changes), then the chronological detail of every
   attempted action. Paths are printed at the end of the run_ci output.
   Direct script runs write to the working directory unless `--report-dir`
   is given.
-- JSONL step records: `tests/_report/hardware_validate_{api,log,hybrid}.jsonl`,
+- JSONL step records: `testing/report/hardware_validate_{api,log,hybrid}.jsonl`,
   `zmart_adapter_validate.jsonl`; step summary in `ci_summary.json`.
 
 ## Reader modes

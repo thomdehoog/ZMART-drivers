@@ -718,7 +718,7 @@ python -m pytest -q zmart_drivers/leica/stellaris5_y42h93/navigator_expert/testi
 python zmart_drivers/leica/stellaris5_y42h93/navigator_expert/testing/hardware/validate_hardware.py --yes --allow-xy --allow-z --allow-objective --allow-acquire --state-reader-mode hybrid
 ```
 Validator JSONL outputs are runtime artifacts, ignored by default. Every validator run also
-writes a **Markdown run report** (`hardware_run_report_<timestamp>.md`, in `testing/_report/` when
+writes a **Markdown run report** (`hardware_run_report_<timestamp>.md`, in `testing/report/` when
 launched via run_ci) listing every attempted instrument change — including failures and
 restores — with confirmation status and timing. **Bench-run instructions** (prerequisites, what
 `--hardware` changes on the scope, expected duration, report locations) live in

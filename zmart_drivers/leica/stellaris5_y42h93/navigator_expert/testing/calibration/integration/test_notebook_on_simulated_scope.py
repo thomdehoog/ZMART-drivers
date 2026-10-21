@@ -274,16 +274,16 @@ def notebook_runtime(monkeypatch, tmp_path):
     machine = MachineProfile(programdata_root=tmp_path / "programdata")
     sim = _install_simulator(monkeypatch, machine)
 
-    # The notebook's first cell does `import _bootstrap` for sys.path setup and
+    # The notebook's first cell does `import bootstrap` for sys.path setup and
     # the browser-save checkpoint. Headless there is no browser, so the fake
     # checkpoint skips the save-verification step but still hands the REAL
     # notebook path to the adopt callback (archiving then copies the real file).
-    fake_bootstrap = types.ModuleType("_bootstrap")
+    fake_bootstrap = types.ModuleType("bootstrap")
     fake_bootstrap.NOTEBOOK_PATH = NOTEBOOK_PATH
     fake_bootstrap.NOTEBOOK = SimpleNamespace(
         save_and_adopt=lambda fn: fn(str(NOTEBOOK_PATH))
     )
-    monkeypatch.setitem(sys.modules, "_bootstrap", fake_bootstrap)
+    monkeypatch.setitem(sys.modules, "bootstrap", fake_bootstrap)
 
     cells = _notebook_cells()
     namespace: dict = {}
