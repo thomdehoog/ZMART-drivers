@@ -33,7 +33,7 @@ import numpy as np
 import zmart_drivers.leica.stellaris5_y42h93.navigator_expert as drv
 
 from .. import orientation as _orientation
-from ...procedures.acquisition_and_saving.naming import Naming, run_hash
+from ...procedures.save_data.naming import Naming, run_hash
 
 # matplotlib is imported lazily inside the plot helpers so test imports
 # (and headless environments) do not pull in a display backend on import.

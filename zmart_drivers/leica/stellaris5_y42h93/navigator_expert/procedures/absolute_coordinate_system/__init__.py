@@ -12,7 +12,7 @@ in view.
 
 The images are placed in the same system when they are saved: the orientation
 measured by the setup (``driver_setup/orientation``) is applied in
-``acquisition_and_saving`` so that a picture lines up with the stage moves.
+``save_data`` so that a picture lines up with the stage moves.
 
 Author: Thom de Hoog, Center for Microscopy and Image Analysis (ZMB),
 University of Zurich (thom.dehoog@zmb.uzh.ch, thomdehoog@gmail.com).

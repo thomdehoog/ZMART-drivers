@@ -30,8 +30,8 @@ for _p in (_HERE, _HELPERS, _REPO_ROOT):
 import validate_zmart_adapter
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.connection import lasx_client as adapter
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup import store as _machine
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.acquisition_and_saving import save as _save
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.acquisition_and_saving import acquire as _capture
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.save_data import save as _save
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.acquisition import acquire as _capture
 
 
 def _run_mock(tmp_path, *extra):

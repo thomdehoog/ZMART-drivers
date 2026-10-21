@@ -16,7 +16,8 @@ this repository)::
                           confirm loops and the limits gate
     - procedures/         the recipes built on the commands: the session, the frame and its
                           coordinates (absolute_coordinate_system/), changing the objective
-                          (objective_change_with_compensation/), the capture and its saving (acquisition_and_saving/)
+                          (objective_change_with_compensation/), taking a picture (acquisition/), saving it
+                          (save_data/) and letting LAS X's cache go (clear_cache/)
     - driver_setup/       what is set up once per microscope, one folder per item: limits,
                           origin, orientation, optical_calibration and
                           data_location, each with its defaults, loader, measuring code
@@ -110,10 +111,10 @@ from .driver_setup.limits.handshake import connect_handshake as connect_limits_h
 from .vendor_specific.primitive_handling.limit_rules import _stage_limits, set_stage_limits, get_stage_limits, apply_stage_limits_from_config, check_xy, check_z
 
 # -- acquisition/ - capture, file arrival, and save handling
-from .procedures.acquisition_and_saving.acquire import AcquisitionResult, acquire
+from .procedures.acquisition.acquire import AcquisitionResult, acquire
 from .vendor_specific.product import AcquisitionMetadata, ChannelMetadata, PlaneIndex, PlaneSource, PositionIndex, VendorMetadataSource
-from .procedures.acquisition_and_saving.saved_acquisition import SavedAcquisition
-from .procedures.acquisition_and_saving.save import save
+from .procedures.save_data.saved_acquisition import SavedAcquisition
+from .procedures.save_data.save import save
 
 # -- logging
 import logging
