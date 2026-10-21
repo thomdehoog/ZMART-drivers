@@ -1,13 +1,18 @@
 # The anatomy of a ZMART driver
 
-Status: design, October 2026. This document describes the parts every ZMART
-driver should have, what each part is responsible for, and the rules that
-connect them. It was written by comparing the Leica Navigator Expert driver
-with the Nikon, ZEISS and mesoSPIM drivers and with the ZMART Controller, and
-it was then simplified while we walked the Leica driver through it. The
-simplified design is in "The simplified anatomy", right after the overview.
-Where an older part further down says something different, the simplified
-anatomy is the newer decision, and the older part carries a note saying so.
+Status: October 2026. This document describes the parts every ZMART driver
+should have, what each part is responsible for, and the rules that connect
+them. It was written by comparing the Leica Navigator Expert driver with the
+Nikon, ZEISS and mesoSPIM drivers and with the ZMART Controller, and it was
+then simplified while we walked the Leica driver through it. The simplified
+design is in "The simplified anatomy", right after the overview.
+
+The Leica driver (`zmart_drivers/leica/stellaris5_y42h93/navigator_expert/`)
+now has this layout, so it is the example to read alongside the text. Where
+this document says "today", it means that driver. The Nikon, ZEISS and
+mesoSPIM drivers still have their older layouts. What a new microscope has to
+hand to the shared dispatcher is written on one page, in
+[the vendor contract](vendor-contract.md).
 
 The controller's side of the contract, the `ZmartDriver` class that every
 driver fills in, is fixed and described in the controller's
@@ -68,8 +73,13 @@ overview onward, so they are explained first.
 - **Handling notes**: the information, kept in the vendor interface, that tells
   the dispatcher how to treat each primitive: which families to try and in
   what order, how to confirm a change, how close counts as arrived, how long
-  to wait, and whether it is safe to send the command again. (Earlier drafts,
-  and the Leica code, call this a "profile".)
+  to wait, and whether it is safe to send the command again. In the Leica
+  driver the handling notes are the folder `vendor_specific/primitive_handling/`,
+  and the note for one command is called its *command profile*.
+- **Session**: what the driver remembers about one connection between two
+  commands: the open link to the vendor software, the origin, the loaded
+  calibration, the changes that could not be confirmed, and the captures that
+  are not yet saved or still sit in the vendor's cache.
 - **Route and tier**: a *route* is the list of primitives to try for one job,
   in order. Each step of that list is a *tier*.
 - **Fallback**: trying the next tier of a route because the one before it
@@ -93,112 +103,132 @@ overview onward, so they are explained first.
 
 ## The parts at a glance
 
-A driver is built from the parts below. Read the picture from bottom to top:
-each part only uses the parts below it.
+A driver is built from the parts below. Read the picture from top to bottom:
+each part uses the parts below it, and never the parts above.
 
 ```
   experiments and workflows, through the ZMART Controller
   ───────────────────────────────────────────────────────────────
-  for_zmart_controller/   the ZmartDriver class (zmart_driver.py): one method per command
-  procedures/         recipes: acquire, autofocus, the setup measurements
-  dispatcher/         the shared engines that run everything safely:
-                      one read at a time, the limits gate, fallback, confirmation, error rules
-  vendor_specific/   the only part that is rewritten for a new microscope
+  for_zmart_controller/   the ZmartDriver class: one method per command, kept thin
+  procedures/             the recipes: take a picture, save it, clear the cache,
+                          the coordinate system, an objective change, autofocus
+  driver_setup/           what the operator sets up once and saves: limits, origin,
+                          orientation, optical calibration, the data location
+  session/                what the driver remembers about one connection
+  vendor_specific/        the only part that is written again for a new microscope
+  dispatcher/             the shared machinery that runs every reading and change:
+                          the limits gate, the waiting rule, sending again, confirming
   ───────────────────────────────────────────────────────────────
   vendor software (LAS X, NIS-Elements, ZEN, mesoSPIM-control)
 
-  alongside:  driver_setup/   testing/
+  alongside:  testing/
 ```
 
-The folder layout inside a driver:
+The dispatcher sits at the bottom of the picture because it imports nothing
+from the rest of the driver. It knows no microscope. The vendor part plugs
+into it: it hands the dispatcher the way to send a request, the command
+profiles, the sources a reading can ask, and the numbers to wait by.
+[The vendor contract](vendor-contract.md) lists all of it on one page. A test,
+`testing/unit/test_architecture_guard.py`, reads every file and fails when a
+part imports a part it should not.
+
+The folder layout inside a driver, as the Leica driver has it:
 
 ```
-my_driver/
+navigator_expert/
     __init__.py                makes the folder a package, so the parts can import each other
 
     for_zmart_controller/      everything that faces the controller; the folder you register
-        zmart_driver.json      the driver's name, how to reach the microscope on this computer,
-                               and the class file beside it
-        __init__.py            needed: the controller imports the class file as part of the package, so its imports work
+        zmart_driver.json      the driver's name and the class file beside it
         zmart_driver.py        the ZmartDriver class the controller calls; kept thin
+        running_log.py         the driver's rolling log file, for debugging
 
-    vendor_specific/          the part you write for a new microscope
-        connection/            reach the vendor software, keep the link, close it (a single connection.py when it is small)
-        error_classification.py  sort this vendor's failures into the shared kinds of problem
-        primitive_handling.py  how the dispatcher treats each primitive: which to try first,
-                               how to confirm, whether it may be sent again, how long to wait
-        metadata_map.py        translate the vendor's description of a picture into the standard fields (no hardware access)
-        primitives/            the smallest single reads and writes, one folder for each way of reaching the software
-            direct/            reading (and, where possible, writing) the software's own state
-            api/               the vendor's programming interface
-            log/               reading what the software writes in its log (reading only)
-            capture/           fetching the finished picture
-            interface/         working the vendor's window: pressing buttons, answering dialogs (only where the software has no better way)
-        vendor_side/           code that runs inside the vendor software, if the vendor needs it, with its installer
-    dispatcher/                the same in every driver
-        read.py                runs a reading, with fallback
-        change.py              runs a change and confirms it
-        gate.py                the limits gate
-        error_vocabulary.py    the shared kinds of problem
-        error_rules.py         what to do for each kind of problem
-        tuning.py              the shared waiting rule and its numbers
-    procedures/                one file per recipe, for experiments and for setup alike
-        acquire.py             start, wait, fetch, map the metadata, save
-        save_zarr.py           the OME-Zarr writer, shared until the shared package takes it
-        autofocus.py
-        measure_orientation.py
-        calibrate_objectives.py
-        record_origin.py
-        focus_score.py         the pure algorithms the recipes use
-        registration.py
-    driver_setup/
-        machine_description/   each item: default.json, its check, and the notebook that sets it
-        orientation/
+    procedures/                the recipes, one folder each
+        acquisition/           take a picture and keep a note of it (acquire, run_job, pending_capture)
+        save_data/             write the waiting captures as OME-Zarr, with their log (save_captures, ome_zarr, naming)
+        clear_cache/           have LAS X let go of the saved pictures (clear, release)
+        absolute_coordinate_system/  the one coordinate system: the arithmetic and the moves (coordinates, frame)
+        objective_change_with_compensation/  change the lens and move the stage to keep the same spot
+        autofocus/             run a LAS X autofocus job
+        instrument/            get_state and set_state, get_info, and the menu of named procedures
+
+    session/
+        handle.py              the open connection and everything the driver remembers between commands
+        loaded_config.py       the orientation and calibration loaded at connect
+
+    driver_setup/              one folder for each thing the operator sets up: its defaults,
+        limits/                its check, the code that measures it, and the notebook that sets it
         origin/
-        limits/
+        orientation/
         optical_calibration/
-        coordinates.py         the only place the arithmetic between stage and user coordinates happens
-        store.py               load, check and save
+        data_location/
+        store.py               load, check and save, for every item
+
+    vendor_specific/           the part you write for a new microscope
+        connection/            reach LAS X, keep the link; tuning.py holds the waiting numbers
+        primitives/            the smallest single reads and writes, one folder for each way of reaching LAS X
+            direct/            reading LAS X's own state, through its hardware server
+            api/               the CAM API
+            log/               what LAS X writes in its log files (reading only)
+            interface/         LAS X's window: pressing buttons, answering dialogs
+            capture/           the finished picture in LAS X's cache, and LAS X's description of it
+        primitive_handling/    the handling notes: how the dispatcher treats each primitive
+            profiles/          the command profiles, the transport, the error sorting, the idle check
+            settings/          the job settings, the changes, the limits rulebook
+            confirmations/     how each change is confirmed
+            readings/          the table of readings, the sources, and the named readings
+
+    dispatcher/                the same in every driver; imports nothing of the driver
+        door.py                the one door: read and write
+        reader.py              waits for a reading, asking the sources in turn
+        send_loop.py           sends a change and checks the reply, sending again when that is safe
+        confirm_loop.py        reads the change back until it shows, sending again between windows
+        gate.py                the limits gate, asked before anything is sent
+        limit_errors.py        the shared words for trouble with limits
 
     testing/
-        mock_api/              the stand-in for the vendor software
-        unit/                  tests against the mock API, on any computer
-        hardware/              checks that only run at the microscope
-        data/                  sample vendor files, logs, example configuration
-    experimental/              ideas that are not yet trusted on hardware
+        helpers/               the stand-in for LAS X (mock_lasx_api.py) and small test helpers
+        unit/                  tests against the stand-in, on any computer
+        hardware/              checks that only run at the microscope or the LAS X simulator
+        calibration/           tests of the setup measurements on a simulated microscope
+        data/                  sample LAS X files, logs, example configuration
+        run_ci.py              the one command that runs the offline suite, or the hardware checks
     README.md
 ```
 
 Everything that faces the controller, the class file and `zmart_driver.json`,
-sits together in `for_zmart_controller/`, so that the top of a driver is as
-tidy as the inside and the controller's side is in one place. The operator
-registers that folder. The controller already allows this: it accepts a path to
-the folder or to its `zmart_driver.json`, reads the class file's name from the
-`"driver"` key (`"zmart_driver.py"` by default), and imports the class as part
-of its package. Finding the driver by the folder's name, without a path, is a
-change to the controller that is still to be decided.
+sits together in `for_zmart_controller/`, so that the controller's side is in
+one place. The operator registers that folder. The controller accepts a path
+to the folder or to its `zmart_driver.json`, reads the class file's name from
+the `"driver"` key (`"zmart_driver.py"` by default), and imports the class as
+part of its package.
 
 What changed from the first version of this layout: the `actions/` folder is
-gone, `client.py` is split into `connection.py` and the `primitives/` folder,
-the `output/` folder is gone (saving is now a procedure), and OME-TIFF is no
-longer part of the design, only OME-Zarr. "The simplified anatomy" explains why.
+gone, `client.py` is split into `connection/` and the `primitives/` folder,
+the `output/` folder is gone (saving is now a procedure), OME-TIFF is no
+longer written, only OME-Zarr, and taking, saving and clearing a picture are
+three separate steps. "The simplified anatomy" explains why.
 
 **A command travelling through the layers.** Take "move the stage to x = 500
 micrometers" as the workflow says it:
 
 1. The workflow calls `set_xyz` on the controller, which calls the
    `ZmartDriver` method of the same name.
-2. The method hands the position to the absolute coordinate system
-   procedure, which converts it from user coordinates to raw stage
-   coordinates, using the recorded origin and the objective offsets.
-3. The dispatcher checks the limits gate. A position outside the allowed
-   range is refused here, and nothing is sent.
-4. The dispatcher sends the move through the primitive named in the handling
-   notes, and retries if the problem was temporary.
-5. It reads the position back through the direct primitive, and falls back to
-   the next one only if that cannot answer, for up to four windows of three
-   seconds.
-6. The answer is "confirmed", or "unconfirmed" (the move was accepted but
+2. The method hands the position to the coordinate system procedure
+   (`procedures/absolute_coordinate_system/frame.py`), which converts it from
+   user coordinates to raw stage coordinates, using the recorded origin and
+   the objective offsets.
+3. The procedure asks for the change `move_xy`
+   (`vendor_specific/primitive_handling/settings/changes.py`), which goes to
+   the dispatcher's door, `write`.
+4. The door asks the limits gate first. A position outside the allowed range
+   is refused here, and nothing is sent.
+5. The send loop sends the move through the transport that the move's command
+   profile names, and sends it again only if the problem was temporary.
+6. The confirm loop reads the position back through the reader. The reader
+   asks the direct source first, and the next one only if that one cannot
+   answer, for up to four windows of three seconds.
+7. The answer is "confirmed", or "unconfirmed" (the move was accepted but
    never seen); either way it is recorded, and the workflow carries on. The
    controller's mock README walks through the same journey for the mock.
 
@@ -209,9 +239,9 @@ packages.
 ## The simplified anatomy
 
 This section records the decisions of October 2026. They came from walking the
-Leica driver through the anatomy, file by file. They are a design; the Leica
-driver has not been reshaped to match yet, apart from one removal (see "What
-this means for the Leica driver").
+Leica driver through the anatomy, file by file, and the Leica driver has since
+been reshaped to match them. Where it still differs, "What this means for the
+Leica driver" at the end of this section says so.
 
 ### The one rule: a new microscope means a new vendor interface
 
@@ -228,10 +258,9 @@ What a driver author writes:
   offers.
 - **The error classification**: the sorting of this vendor's failures into the
   shared kinds of problem.
-- **The handling notes** (`primitive_handling.py`): for each primitive, how the
-  dispatcher should treat it. This is the information that Leica keeps today
-  in its "profiles". The word "profile" is software shorthand, so the file is
-  called what it is about.
+- **The handling notes** (the `primitive_handling/` folder): for each
+  primitive, how the dispatcher should treat it. In the Leica driver the note
+  for one command is its command profile, in `primitive_handling/profiles/`.
 - **The metadata map**: how this vendor describes a picture, and how that
   becomes the standard metadata.
 
@@ -271,20 +300,21 @@ Primitives are grouped into **families** by the way they reach the software:
 through the window. LAS X, for example, keeps every picture in a cache until
 it is restarted, and it offers no command that empties the part of the cache
 that the Navigator canvas holds. So the Leica driver presses the canvas's
-Clear button. Such a press is an ordinary primitive. The dispatcher runs it
-like any other change, with the limits gate and the error rules. Because a
-button press often has no readback, its handling notes may declare it
-"cannot be confirmed", which is recorded as accepted and not as confirmed (see
-part 3), or confirm it indirectly, for instance by checking that the Clear
-button can be reached.
+Clear button. Such a press is an ordinary primitive. In the design, the
+dispatcher runs it like any other change, with the limits gate and the error
+rules. Because a button press often has no readback, its handling notes may
+declare it "cannot be confirmed", which is recorded as accepted and not as
+confirmed (see part 3), or confirm it indirectly, for instance by checking that
+the Clear button can be reached. Today the Leica `clear_cache` procedure still
+calls the button primitives itself, without the dispatcher; that is one of the
+differences listed at the end of this section.
 
-A recipe can combine families. Leica's "release a saved capture" is a
-procedure that shows the canvas while LAS X is idle (interface), deletes the
-saved picture from the cache after checking its name and after the saved copy
-has been read back identical (capture), and then clears the canvas
-(interface). It exists only for LAS X. Another vendor has no such procedure,
-or has one of its own, which is why procedures are the optional,
-microscope-specific layer.
+A recipe can combine families. Leica's `clear_cache` is a procedure that shows
+the canvas while LAS X is idle (interface), deletes each saved picture from
+the cache after checking its name (capture), and then clears the canvas
+(interface). It only lets go of pictures that `save_data` has written. It
+exists only for LAS X. Another vendor has no such procedure, or has one of its
+own, which is why procedures are the optional, microscope-specific layer.
 
 A microscope uses the families it has. A ZEISS may have a single one. The
 Leica driver has all of them. The direct readers are the closest to the real
@@ -488,13 +518,18 @@ all, so it does not need a turn.
 Proposal, not yet confirmed: the handling notes mark each primitive with the
 channel it uses, and primitives on the same channel take turns. A primitive
 that cannot be abandoned halfway, because the software then drops the next
-command (Leica's API is one), is marked "do not abandon", and each primitive
-in a tier gets its own slice of the window, so that one slow primitive cannot
-use up the whole window.
+command (Leica's API is one), is marked "do not abandon".
 
-This replaces a Leica habit. Today it starts the API and the log in separate
-threads during each confirmation window and takes whichever answers first. That
-is dropped on purpose. The two are now looked at one after the other.
+What the Leica driver does today. The shared reader (`dispatcher/reader.py`)
+asks the sources one after the other, and each gets its own slice of the
+window, so that one slow source cannot use up the whole window. The turns on
+LAS X's API are kept by the vendor part (`_ApiTurns` in
+`primitive_handling/readings/sources.py`): a request holds the connection's
+turn until its own wait for the answer ends, and a call that never returns is
+abandoned at the end of its slice without giving the turn back early. The old
+habit of starting the API and the log in two threads and taking whichever
+answers first is gone, with one exception: confirming a job change when the
+direct reader cannot answer (see the end of this section).
 
 ### The running log
 
@@ -502,13 +537,16 @@ The driver keeps one log file for debugging, which grows over time. It is
 separate from the log of one acquisition, which stays beside that
 acquisition's pictures and says how they were made.
 
-Proposal, not yet confirmed: the shared dispatcher writes the running log in
-the ZMART configuration folder, next to the saved settings, in a rolling file
-that starts a new one when it gets large, so that it cannot fill the disk. Each
-line has a time and records one thing: every send, every retry, how an error
-was sorted, every fallback to another primitive, every confirmation window,
-and the final answer. It also records the connect check of microscope and
-software version. It never prints a secret, such as a password or a token.
+The running log lives in the ZMART configuration folder, next to the saved
+settings, in a rolling file that starts a new one when it gets large, so that
+it cannot fill the disk. Each line has a time and records one thing: every
+send, every retry, how an error was sorted, every fallback to another
+primitive, every confirmation window, and the final answer. It never prints a
+secret, such as a password or a token. The Leica driver has it in
+`for_zmart_controller/running_log.py`: it copies every message the driver
+already writes into one file, renamed at about five megabytes, with the three
+newest old files kept. Whether the shared dispatcher should own it is still
+open.
 
 ### Pinned to one microscope and one software version
 
@@ -524,6 +562,9 @@ The check lives in one place. The vendor interface offers a primitive that
 reports the microscope's serial number and the software version (call it
 `identify`), and only the `ZmartDriver` class compares what it reports with the
 machine description. That primitive is part of what a driver author writes.
+The Leica driver does not check this yet: it reports the serial number under
+`observed` in `get_state`, but compares it with nothing, because there is no
+machine description yet.
 
 This is also why Leica's reliance on LAS X's hardware server is acceptable. The
 hardware server is part of LAS X itself, so it is always there on the
@@ -557,6 +598,13 @@ therefore decided by the primitives a driver has, and a new driver adds
 limits by writing the notes for its own primitives. Anything specific to one
 microscope belongs in the vendor interface, as far as it can.
 
+Today the gate asks one question of the limits object the vendor installs:
+`check_command(command, values)`, which raises when the values are not allowed.
+For the Leica driver that object is `LeicaLimits`, in
+`vendor_specific/primitive_handling/settings/limit_rules.py`, built from the
+operator's `limits.json` when the driver connects
+(`driver_setup/limits/handshake.py`).
+
 Proposal, not yet confirmed: a limit is a small description with a fixed shape,
 so that the gate can stay free of vendor knowledge. It names the axis or
 setting, the units, and either a range (smallest and largest value) or a list
@@ -573,38 +621,59 @@ so it will need a real rewrite and not just a rename.
 
 ### Error vocabulary, classification and rules
 
-Three words, three files, so that each one says what it does:
+Three words, so that each one says what it does:
 
-- **Error vocabulary** (`dispatcher/error_vocabulary.py`): the list of kinds of
-  problem. It is the same for every microscope.
-- **Error classification** (`vendor_specific/primitive_handling/profiles/error_classification.py`): the
-  sorting of this vendor's failures into that list. This is the part a driver
-  author writes.
-- **Error rules** (`dispatcher/error_rules.py`): what to do for each kind. It
-  is the same for every microscope.
+- **Error vocabulary**: the list of kinds of problem. It is the same for every
+  microscope.
+- **Error classification**: the sorting of this vendor's failures into that
+  list. This is the part a driver author writes.
+- **Error rules**: what to do for each kind. It is the same for every
+  microscope.
 
 The table of kinds in part 1 stays as it is.
+
+Today all three sit in one Leica file,
+`vendor_specific/primitive_handling/profiles/error_classification.py`: the
+list of kinds (`Kind`), the rule for each (`sends_again`: only a temporary
+problem is sent again), and the sorting of LAS X's messages
+(`classify_error`). The dispatcher only sees the result of a command's error
+check, a small dictionary that says whether the command failed and whether the
+failure is `transient`. That keeps the dispatcher free of LAS X, but it means
+the vocabulary and the rules are not yet shared: a second vendor would write
+its own. Moving `Kind` and `sends_again` into the dispatcher is a step for when
+the dispatcher becomes a package of its own.
 
 ### The dispatcher is fully shared
 
 Because the handling notes now live in the vendor interface, nothing in the
-`dispatcher/` folder belongs to one microscope. The waiting rule in
-`tuning.py` (Leica's is four windows of three seconds) is the shared default;
-a microscope that needs different numbers for a command puts them in its
-handling notes. The whole folder can move to the shared package once a second
-driver uses it.
+`dispatcher/` folder belongs to one microscope. Even the waiting rule's
+numbers are handed in: Leica's are four windows of three seconds, in
+`vendor_specific/connection/tuning.py`, and a microscope that needs other
+numbers hands in its own. The whole folder can move to the shared package
+once a second driver uses it.
 
-Today this is not yet true of the Leica code. Its `dispatcher/` folder
-imports Leica's dialog handling, its log reader and its message delivery, and
-its idle check is Leica-specific. The way to make the folder shared is to move
-that work inside Leica's primitives, so that every writing primitive simply
-answers success, an error, or nothing (see "The two loops and the send
-styles"). A Leica move, for example, waits until the scanner is idle before it
-sends, and looks at LAS X's dialogs and log to find out why a command failed,
-and then returns an error that says so. The dispatcher sees only the answer. No
-extra hooks are needed in the dispatcher, apart from the one primitive that
-reports the microscope's serial number and software version, described under
-"Pinned to one microscope and one software version".
+This is now true of the Leica code. Its `dispatcher/` folder imports
+nothing from the rest of the driver, and the architecture guard test keeps it
+that way. Everything that is LAS X's way of doing things is handed in by the
+vendor part:
+
+- a **transport** in each command profile, which fills in a request, clears
+  the reply, sends, waits for the reply and reports an open dialog
+  (`primitive_handling/profiles/transport.py`);
+- the **command profiles**, with their pre-check (is the scanner idle), their
+  error check and their confirmation (`primitive_handling/profiles/profiles.py`);
+- the **sources** a reading can ask, and the source tried alone first
+  (`primitive_handling/readings/sources.py`);
+- the **waiting numbers** (`vendor_specific/connection/tuning.py`), handed in as
+  `profile.waiting` for a change and `sources.waiting` for a reading;
+- the **limits object**, which answers `check_command`, and the hint that says
+  where the operator creates the limits files.
+
+[The vendor contract](vendor-contract.md) lists these on one page. The few
+fallbacks of a reading (which family answers when the direct reader cannot)
+are named fields of the reading profile, `StateReaderProfile`, and "hybrid",
+the API and the log together, is a Leica recipe that the dispatcher never
+names.
 
 **The handling notes may hold code (decided).** Most confirmations are one row of data:
 which reading, the target, how close counts. A few need code of their own, such
@@ -626,25 +695,45 @@ leaves each piece of knowledge in one place.
 
 ### Saving is a procedure, and only OME-Zarr
 
-Saving a picture is a recipe with several steps, so it is a procedure.
-`acquire` starts the capture, waits for it to finish, fetches the picture
-through the capture primitives, turns the vendor's description into the
-standard metadata through the metadata map, and calls the shared OME-Zarr
-writer. The writer, which also orients, names and saves the files so that a
+Saving a picture is a recipe with several steps, so it is a procedure. In
+the Leica driver, taking a picture, saving it and letting the vendor software
+go of it are three separate steps, because each can go wrong on its own and
+each has its own moment:
+
+1. **`acquire`** (`procedures/acquisition/`) runs the selected job and leaves
+   the picture in LAS X's cache. It writes no files. It notes what only the
+   moment of the capture can tell, where the stage stood, which job ran and
+   the state of the microscope, and keeps that note with the session
+   (a `PendingCapture` in `handle.unsaved`).
+2. **`save_data`** (`procedures/save_data/`) reads each waiting picture from
+   the cache, through the capture primitives, turns LAS X's description into
+   the standard metadata through the metadata map, and writes an OME-Zarr
+   store, with its projection and its log. It records which cache picture each
+   saved capture came from (`handle.in_cache`). A capture that cannot be saved
+   stays waiting, so a later call can try again.
+3. **`clear_cache`** (`procedures/clear_cache/`) lets LAS X go of the pictures
+   that were saved, and only those.
+
+The controller's `acquire` command runs the first two, never the third. Both
+`save_data` and `clear_cache` are also offered through `run_procedure`, so a
+workflow can take pictures quickly and save them later, and clear the cache
+when it chooses, for example between plates.
+
+The writer, which also orients, names and saves the files so that a
 half-written file is never left behind, is the same for every microscope. It
-lives in `procedures/save_zarr.py` until the shared package takes it.
+lives in `procedures/save_data/ome_zarr.py` until the shared package takes it.
 
 For this design, OME-TIFF is dropped and OME-Zarr is the only format.
 
 Saving does not need an engine of its own. The dispatcher exists to talk to
 the instrument safely: one conversation at a time, the limits check, retries
 and confirmation. Saving writes files and does not touch the instrument, so
-the only step that goes through the dispatcher is fetching the finished
-picture. The writer keeps its own safety rules: it writes each file whole,
-never overwrites an earlier picture, and checks that what it wrote reads back
-the same. The command log, the record of what was asked and what happened,
-is produced by the dispatcher (the attempts, the confirmation) and saved by
-the `acquire` procedure beside the images.
+reading the picture from the vendor's cache does not go through it either: it
+is a file read. The writer keeps its own safety rules: it writes each file
+whole, never overwrites an earlier picture, and checks that what it wrote
+reads back the same. The capture's log, the record of what was asked and what
+happened, is gathered by `acquire` (the attempts, the confirmation, the
+unconfirmed changes) and written by `save_data` beside the images.
 
 The **standard metadata** is one record that every driver fills in: the pixel
 size and the z spacing, the channels and their wavelengths, the stage position
@@ -664,7 +753,7 @@ because the metadata is more than one reading.
    description of a picture into the standard fields, for example "this
    vendor's channel entry becomes that wavelength field". It is pure
    translation and touches no hardware.
-2. **The `acquire` procedure** assembles the whole record. The pieces come
+2. **The `acquire` and `save_data` procedures** assemble the whole record. The pieces come
    from different places: the stage position, the objective and the job
    settings are read through the dispatcher, so the fallback rules and an
    honest "unknown" apply to each; the wavelengths and pixel size come from
@@ -678,99 +767,48 @@ keeps only the translation.
 
 ### What this means for the Leica driver
 
-Walking the Leica driver through the anatomy showed that most of it fits:
-`vendor_specific/`, `dispatcher/`, `driver_setup/` and `procedures/` map
-directly, and `output/` splits into the Leica-specific finding and reading of
-the picture (to the vendor interface) and the shared writer (to a procedure).
+The Leica driver has been reshaped to this anatomy in small steps, each
+checked with the offline tests, and the whole of it was run on the LAS X
+simulator on 21 October 2026 with `run_ci.py --hardware`. The picture and the
+folder tree at the top of this document are its layout. What was done, in
+short:
 
-**Done.** The Leica driver used to read and edit LAS X's scan-field template
-files (`scanfields/` and `experimental/lrp_edits/`, with the galvo pan move
-that wrote into them). Scan fields are not something this driver does, so that
-code was removed. The stacked z drive is now read only from LAS X's hardware
-server, and refused with a clear message when the server cannot be reached.
-The hardware server is always present on the STELLARIS, so this loses nothing.
-The first reshaping steps are done too: the file that sorts LAS X's errors is
-`error_classification.py`, the class the controller calls is in
-`for_zmart_controller/`, and the vendor interface is grouped into `connection/` and
-`primitives/` with one folder for each family (direct, api, log, interface,
-capture). Each step changed only names and places, and the offline tests gave the
-same result before and after.
-
-**Also done.** The adapter now sits inside `for_zmart_controller/`, with the
-class that uses it. The `actions/` folder is gone. Its handling information (the
-profiles, the confirmations, the table of readings, what a value means and the
-idle check) is in `vendor_specific/primitive_handling/`. Its command
-definitions and the capture are in `procedures/`. The dispatcher engines stay
-in `dispatcher/`. The guard test lists the few imports that still run upward.
-
-**Also done (October 2026).** The shared engines no longer name anything
-Leica-specific:
-
-- `dispatcher/read.py` only waits for an answer from whichever source gives
-  one. Asking the API, the log or the direct reader once is in
-  `vendor_specific/primitive_handling/readings/sources.py`, and the named readings
-  (`get_xy`, `get_jobs` and the others) are in `primitive_handling/readings/state.py`.
-- `dispatcher/change.py` sends a request and awaits its reply through a
-  `transport` that each command profile carries. The LAS X version of it is in
-  `primitive_handling/profiles/transport.py`.
-- The Leica limits rulebook (`LeicaLimits` and the stage checks) is in
-  `primitive_handling/settings/limit_rules.py`. `dispatcher/gate.py` keeps only the
-  moment of enforcement.
-- The settings of a job (zoom, scan speed, gain and the rest) are one table in
-  `primitive_handling/settings/settings.py`, changed by one runner in
-  `procedures/changes.py`. Only the real recipes (`set_objective`, `move_xy`,
-  `move_z`, `acquire`, `select_job`) are still written by hand.
-- A command profile can say `never_resend`. The acquisition does, and nothing a
+- **Scan fields are gone.** The driver used to read and edit LAS X's scan-field
+  template files. Scan fields are not something this driver does, so that code
+  was removed. The stacked z drive is read only from LAS X's hardware server,
+  and refused with a clear message when the server cannot be reached. The
+  hardware server is part of LAS X and always present on the STELLARIS, so this
+  loses nothing.
+- **The `actions/` and `output/` folders are gone.** What the actions held is
+  now the handling notes in `vendor_specific/primitive_handling/` (command
+  profiles, settings, confirmations, readings) and the recipes in
+  `procedures/`. What output held is now the capture primitives in
+  `vendor_specific/primitives/capture/` (LAS X's files, its description of a
+  picture, the shape of a capture) and the saving in `procedures/save_data/`.
+- **The dispatcher knows no microscope.** `dispatcher/` holds the door, the
+  reader, the send loop, the confirm loop and the limits gate, and imports
+  nothing else of the driver. The vendor part hands in everything LAS X does
+  its own way (see "The dispatcher is fully shared").
+- **One waiting rule.** Every wait on LAS X follows four windows of three
+  seconds, with the numbers in `vendor_specific/connection/tuning.py`. A
+  command profile can say `never_resend`; the acquisition does, and nothing a
   caller asks for can switch the resend back on.
-- The driver keeps a running log (`for_zmart_controller/running_log.py`): a rolling text
-  file in a `logs` folder beside the saved settings.
-
-- The logic that used to sit in `zmart_adapter.py` is now in `procedures/`:
-  `session.py` (the handle and the questions every command asks), `frame.py`
-  (`get_xyz`, `set_xyz`, `set_origin` and the allowed range), `acquisition.py`
-  (`acquire` and its log) and `instrument.py` (`get_state`, `set_state`, the
-  named procedures and `get_info`). The adapter keeps only connecting,
-  disconnecting and the table of commands.
-
-- The `output/` folder is gone, as the plan says. The shape of a capture
-  (`product.py`) stays in `vendor_specific/`, because the vendor code builds it.
-  How a capture's files are named (`naming.py`) and the manifest a save hands
-  back (`saved_acquisition.py`) are with the saving, in
-  `procedures/save_data/`, and LAS X's own file names
-  (`files.py`) are in `vendor_specific/primitives/capture/`. The writing of the files (`save.py`, `materialize.py`, `ome*.py`,
-  `command_log.py`) is in `procedures/`. What reads LAS X's own picture files
-  (`lasx_data_container.py`, `lasx_cache_release.py`) is in
-  `vendor_specific/primitives/capture/`, and LAS X's description of a picture
-  is read into the standard fields by `vendor_specific/primitives/capture/metadata_map.py`.
-- The coordinate system is a procedure, `procedures/absolute_coordinate_system/`:
-  `coordinates.py` holds the plain arithmetic, `frame.py` decides what to read
-  and what to move, and the `ZmartDriver` class converts nothing itself.
-
-**Done since (October 2026).**
-
-- Saving is OME-Zarr only. The OME-TIFF writer and its repair code are gone.
-  The calibration and orientation steps read their frames back from the saved
-  store, by the plane number the capture gave each plane
-  (`SavedAcquisition.read_plane`), because the store holds its planes lowest
-  first.
-- The shared kinds of problem and the rule for each are in
-  `dispatcher/error_vocabulary.py` and `dispatcher/error_rules.py`. The Leica
-  sorting (`error_classification.classify_error`) produces the kinds, and the
-  engines follow the rule: only a temporary problem is sent again.
-- The gate no longer builds the Leica rulebook itself. It asks the vendor
-  interface for the table of mutating commands and for the limits to install
-  (`limit_rules.MUTATING_COMMANDS`, `build_limits`). The shared types for
-  limit trouble are in `dispatcher/limit_errors.py`.
-- The dispatcher has one door (`dispatcher/door.py`, with `read` and `write`
-  and the waiting rule). Behind it are the reader, the send loop and the confirm
-  loop. The send loop sends a command and checks for an error. The confirm loop
-  reads until the change took effect and sends again if it did not, except for
-  starting an acquisition.
-- The shared reader asks the API first and then the log, one after the other,
-  each in its own share of the window. A LAS X call that never returns is
-  abandoned at the end of its share, and the connection's turn is handed back
-  only when the call finally ends, so a second request is never piled onto it.
-- `ZmartDriver` opens the connection itself, and the adapter is gone.
+- **Primitives are grouped by channel**, not by reading or writing: `api`,
+  `direct`, `log`, `interface` and `capture`.
+- **The coordinate system is a procedure**,
+  `procedures/absolute_coordinate_system/`: `coordinates.py` holds the plain
+  arithmetic, `frame.py` decides what to read and what to move, and the
+  `ZmartDriver` class converts nothing itself.
+- **The session has a folder of its own.** `session/handle.py` holds the open
+  connection and what the driver remembers between commands, and
+  `session/loaded_config.py` the orientation and calibration loaded at connect.
+- **Taking, saving and clearing are three steps** (see "Saving is a procedure,
+  and only OME-Zarr"). Only OME-Zarr is written. The OME-TIFF writer and its
+  repair code are gone, and so is the old `cleanup_cache` setting. The
+  calibration and orientation steps read their frames back from the saved
+  store, by the plane number the capture gave each plane.
+- **`ZmartDriver` opens the connection itself**, and the old adapter is gone.
+  The driver keeps a running log (`for_zmart_controller/running_log.py`).
 
 **Where the Leica tree still differs from the plan.** Each item is listed on
 purpose, so that it cannot be forgotten.
@@ -778,19 +816,31 @@ purpose, so that it cannot be forgotten.
 1. **The fallback for confirming `select_job` still races two legs.** The
    direct reader confirms a job change alone, as it is first choice for every
    read. Only when it cannot answer do the API and the log run together in two
-   threads (`vendor_specific/primitive_handling/confirmations/confirmations.py`, the dual-leg
-   race), as before. The log leg reads a file, which never reaches LAS X, so
-   the one-request-at-a-time rule still holds. The tests for the race are kept,
-   and the new default is to be checked on the simulator first.
-2. **A limit is not yet a declared description.** The gate gets its rulebook
-   and table of commands from `limit_rules.py`, so it names no Leica class, but
-   the shape of a limit (axis, unit, range or allowed values) is still the
-   Leica file format.
-3. **`vendor_side/` and a full `metadata_map.py`.** `vendor_side/` is not needed
-   for LAS X. `metadata_map.py` today reads LAS X's description of a picture
-   into the standard fields; translating every vendor field is the later
-   metadata work.
-4. **Open issue: the direction of a saved stack has not been confirmed on a
+   threads (`primitive_handling/confirmations/confirm_select_job.py` and the
+   race in `confirmations.py`). The log leg reads a file, which never reaches
+   LAS X, so the one-request-at-a-time rule still holds.
+2. **The error vocabulary and its rules are not yet shared.** They sit in the
+   Leica file `error_classification.py`, beside the sorting (see "Error
+   vocabulary, classification and rules").
+3. **The shape of a command profile is Leica's.** `CommandProfile` lives in
+   `primitive_handling/profiles/profiles.py`, and the dispatcher reads its
+   fields by name. A second vendor needs the same fields; the shape belongs to
+   the dispatcher, with only the values in the vendor part.
+4. **Some procedures still call primitives directly.** `clear_cache` presses
+   the canvas buttons and deletes cache pictures without the dispatcher, and a
+   few recipes read through the vendor's named readings rather than through
+   a small set of vendor-neutral primitives.
+5. **A limit is not yet a declared description.** The gate asks
+   `check_command` and names no Leica class, but the shape of a limit (axis,
+   unit, range or allowed values) is still the Leica file format.
+6. **No machine description and no pin check.** The serial number is reported
+   but not compared with anything (see "Pinned to one microscope and one
+   software version").
+7. **`vendor_side/` and a full metadata map.** `vendor_side/` is not needed for
+   LAS X. `primitives/capture/metadata_map.py` reads LAS X's description of a
+   picture into the standard fields; translating every vendor field is the
+   later metadata work.
+8. **Open issue: the direction of a saved stack has not been confirmed on a
    microscope.** The driver saves planes with z ascending, the same direction as
    `set_xyz`, and each plane's z is worked out from the job's stack settings, not
    measured from the picture. That is consistent in the code and in the offline
@@ -799,26 +849,22 @@ purpose, so that it cannot be forgotten.
    known depth, score the sharpness of every plane, and see that the sharpest
    plane is the one whose z matches the bead's focus. The same check with the
    stack on the other z drive would test that the two drives count the same way.
-   Whether the stage's axes are left- or right-handed in the real world is a
-   separate matter that does not affect the driver's job.
 
 **About the Leica recipes in `procedures/`.** In the plan, `procedures/` is
-written by each driver. `changes.py`, `acquire.py`, `objectives.py`,
-`objective_shift.py` and the calibration procedures know LAS X and its two z
-drives, and they belong there. A new microscope writes its own. The shared part
-is what lies below them: the dispatcher and its rules.
+written by each driver. The recipes there know LAS X and its two z drives, and
+they belong there. A new microscope writes its own. The shared part is what
+lies below them: the dispatcher and its rules.
 
-**The order, and a safety net.** The reshaping is done in small steps, each
-followed by the offline tests and the hardware tests at the STELLARIS: first
-the moves that change no behaviour (folder and file names), then the handling
-notes, then the recipes, and only then the changes in behaviour. Each step must
-pass one extra test: the limits, calibration and origin that operators have
-already saved on the LAS X computer still load, without anyone redoing a
-calibration.
+**The order, and a safety net.** The reshaping was done in small steps, each
+followed by the offline tests and the hardware tests: first the moves that
+change no behaviour (folder and file names), then the handling notes, then the
+recipes, and only then the changes in behaviour. Each step must pass one extra
+test: the limits, calibration and origin that operators have already saved on
+the LAS X computer still load, without anyone redoing a calibration.
 
 ## 1. Vendor interface
 
-> **Note, October 2026.** The vendor interface is now split into `connection.py`, `error_classification.py`, `primitive_handling.py`, `metadata_map.py` and a `primitives/` folder of families, and it holds the handling notes that used to sit with the actions. See "The simplified anatomy". The file `errors.py` named below is now `error_classification.py`, with the shared list of kinds in `dispatcher/error_vocabulary.py`.
+> **Note, October 2026.** In the Leica driver the vendor interface is the folder `vendor_specific/`: `connection/`, a `primitives/` folder of families, and `primitive_handling/`, the handling notes that used to sit with the actions. The sorting of errors is `primitive_handling/profiles/error_classification.py`, which today also holds the list of kinds and their rules (see "Error vocabulary, classification and rules"), and the metadata map is `primitives/capture/metadata_map.py`. See "The simplified anatomy".
 
 **Purpose.** This is where each microscope is allowed to be completely
 different. It opens the connection to the vendor software and does whatever
@@ -897,16 +943,17 @@ decides in two places, and only two, what happens when something goes wrong:
 - **The sorting** is written per microscope, in the vendor interface's
   `error_classification.py`. It takes whatever the vendor reported and sorts it into one
   of the shared kinds below.
-- **The rules** are the same for every microscope, in the dispatcher's
-  `error_rules.py`. For each kind, they say what the get dispatcher and the set
-  dispatcher do next.
+- **The rules** are the same for every microscope. For each kind, they say
+  what the reader and a change do next. (Today the Leica rules sit beside the
+  sorting, as `sends_again`; they move to the dispatcher when it becomes
+  shared.)
 
-The dispatchers never interpret error messages themselves. They ask the
+The dispatcher never interprets error messages itself. They ask the
 sorting what kind of problem this is, and then follow the rule.
 
 **The shared kinds and rules.**
 
-| Kind | Example | Get dispatcher | Set dispatcher | What the `ZmartDriver` method answers |
+| Kind | Example | Reader | Change | What the `ZmartDriver` method answers |
 |---|---|---|---|---|
 | Bad request | An unknown option; the vendor says "is invalid" | Raises | Does not retry | Raises `ValueError` |
 | Temporary | The software is busy; a short timeout | Reads again | Sends again, up to a set number of times | Raises `RuntimeError`, only if every retry fails |
@@ -920,7 +967,7 @@ sorting what kind of problem this is, and then follow the rule.
 
 The first four kinds are how the vendor software can fail, and the sorting
 produces them. The others are not errors the vendor raises but outcomes the
-dispatchers reach on their own; they are in the same table so that every
+dispatcher reaches on its own; they are in the same table so that every
 rule stands in one place.
 
 **Outcome unknown deserves a word.** A short timeout *before* anything was sent
@@ -929,7 +976,7 @@ sent is different: the vendor software may still carry the command out. A
 ZEN call can give up while the experiment is still acquiring, and a mesoSPIM
 script can run on after its socket drops. Sending a move again in that state
 can move the stage twice, unless the move is absolute, in which case the
-second send does no harm. So the set dispatcher never retries a send whose
+second send does no harm. So a change is never sent again after a send whose
 reply was lost, unless the handling notes declare that command safe to
 repeat. It reads back first, and only when the readback does not show the
 target does it report a failure. Today ZEISS and the mesoSPIM do retry such a
@@ -967,106 +1014,110 @@ Part 7 says more about the answers.
 
 ## 2. Dispatcher
 
-> **Note, October 2026.** The dispatcher is now fully shared. The routes and tiers, the fallback rule and the confirmation rule in "The simplified anatomy" replace the idea of racing two sources by default. The file `rules.py` is now `error_rules.py`.
+**Purpose.** To run every reading and every change safely, the same way every
+time, so that a command's handling note can stay a few lines long and never
+has to think about retries, limits or confirmation itself. The dispatcher is
+the part that is meant to be identical in every driver. It knows no
+microscope: the numbers and the ways of talking that differ for one
+microscope are handed in by its vendor part (see
+[the vendor contract](vendor-contract.md)).
 
-**Purpose.** To run every command safely, the same way every time, so that a
-command's entry in the handling notes can stay a few lines long and never has
-to think about retries, limits or confirmation itself. The dispatcher is the part that is
-meant to be identical in every driver; the numbers that differ for one
-microscope are kept in its handling notes.
+In the Leica driver it is six files in `dispatcher/`:
 
-It is two engines, and three files they share.
+| File | What it does |
+|---|---|
+| `door.py` | The one door. `read` waits for a reading; `write` asks the limits gate and then runs a change. It also builds the small timing and log records every result carries. |
+| `reader.py` | The engine behind every reading. |
+| `send_loop.py` | The first loop of a change: send it and check the reply. |
+| `confirm_loop.py` | The second loop of a change: read it back until it shows, and send again between windows when that is safe. |
+| `gate.py` | The limits gate, asked before anything is sent. |
+| `limit_errors.py` | The shared words for trouble with limits: a malformed limits file, a value outside the limits, where the limits in force came from. |
 
-**The get dispatcher** (`read.py`) is the engine behind every reading. It:
+**The reader** (`reader.py`) is the engine behind every reading. It:
 
-- lets only one read reach the vendor software at a time, so reads do not pile
-  up on a busy microscope;
-- applies a time limit and answers "unknown" instead of hanging;
-- rejects readings that are too old;
-- chooses between sources when a microscope offers more than one. Leica can
-  read from the API and from the log file; today it starts both together in
-  each window and takes whichever answers first, which the simplified design
-  replaces by looking at them in turn. Most
-  microscopes have a single source, and the dispatcher must not assume two.
+- follows the one waiting rule, four windows of three seconds in the Leica
+  driver, with the numbers the vendor hands in (`waiting`);
+- within a window, asks the sources the vendor's policy allows one after the
+  other, each in its own slice of the window, and takes the first answer that
+  counts as a success;
+- lets the vendor name one source that is tried alone first (for LAS X, the
+  direct reader), and the family that answers when that one cannot;
+- rejects an answer seen before a given moment, so that a confirmation never
+  believes a reading from before its command was sent;
+- answers "unknown" instead of hanging, when no answer counted in time.
 
-It hands back a *reading*: the value, where it came from and how old it is,
-or "unknown" with the reason when the driver cannot be sure. In the Leica
-driver this engine exists today as `readers/router.py`.
+It hands back a *reading*: the value, the source it came from, when it was
+seen and how old it was, or an empty reading with the reason when the driver
+cannot be sure. Most microscopes have a single source, and the reader does
+not assume two.
 
-**The set dispatcher** (`change.py`) runs every change through the same
-steps:
+**A change** runs through the same steps, in `door.write`, the send loop and
+the confirm loop:
 
-1. **Limits gate.** Check the request against the limits from the
-   configuration. If it is outside, refuse before anything is sent.
-2. **Pre-check.** Ask the get dispatcher whether the microscope is ready, for
-   example whether the scanner is idle.
-3. **Send** the command through a primitive.
-4. **Error check.** Sort any error into its kind and follow the rule: retry a
-   temporary error, stop on anything else.
-5. **Confirm.** Ask the get dispatcher, again and again within a time window,
-   whether the value has reached the target.
-6. **Send again** if the confirmation did not succeed, up to a set number of
-   attempts.
-7. **Give up softly** if it is still not confirmed: hand back an outcome that
-   says the change is unconfirmed and why, instead of raising. The driver
-   has done its best to confirm; what it could not confirm it writes down,
-   and the command goes on. Not confirmed is not the same as contradicted:
-   a readback that shows a *different* value is a failure, a readback that
-   never arrived is not. Part 7 says what the workflow sees.
+1. **Limits gate.** The door asks the gate whether the limits of this
+   connection allow the change. If not, nothing is sent.
+2. **Pre-check.** The command's profile may ask whether the microscope is
+   ready, for example whether the scanner is idle.
+3. **Send** the request through the profile's transport.
+4. **Error check.** The profile's error check reads the reply and says whether
+   the command failed and whether the failure is temporary. A temporary
+   failure is sent again, up to a set number of times; anything else stops.
+5. **Confirm.** The profile's confirmation reads the state, for one window,
+   until it shows the target.
+6. **Send again** if the window ended without it, up to a set number of
+   windows, but only when the profile allows it. A command marked
+   `never_resend`, such as the start of an acquisition, is sent once.
+7. **Give up softly** if it is still not confirmed: hand back a result that
+   says the change is unconfirmed and why, instead of raising. Not confirmed
+   is not the same as contradicted: a readback that shows a *different* value
+   is a failure, a readback that never arrived is not. Part 7 says what the
+   workflow sees.
 
-In the Leica driver this engine exists today as `confirm_and_fire` in
-`commands/dispatch.py`.
+Every change answers with the same small dictionary: `success`, `confirmed`,
+`message`, the timing of each step and the log entries collected on the way.
 
 **When the send already waits.** On most of our microscopes the vendor call
 only returns when the action is done: a ZEN call blocks, a mesoSPIM script
 runs `wait_until_done`, a NIS bridge call runs on the single main thread. Then
 "send, then read back until it matches" collapses to one readback after the
-call returns, and the confirmation is insurance rather than a wait. The set
-dispatcher offers this as a mode of a change: *blocking send*, one send with
-a time limit of its own, then a single readback. The time limit is set per
-action in `tuning.py` and may be long (a mesoSPIM acquisition takes minutes)
-or absent; it is never silently replaced by a short default, which is a bug
-one of our drivers has today. While such a send runs, nothing can be read,
-so a pre-check that needs the instrument's state is declared "not available"
-for that microscope rather than faked.
+call returns, and the confirmation is insurance rather than a wait. In the
+design this is a mode of a change, *blocking send*: one send with a time limit
+of its own, then a single readback. The time limit may be long (a mesoSPIM
+acquisition takes minutes) or absent; it is never silently replaced by a short
+default, which is a bug one of our drivers has today. While such a send runs,
+nothing can be read, so a pre-check that needs the instrument's state is
+declared "not available" for that microscope rather than faked. The Leica
+dispatcher does not have this mode yet, because LAS X never blocks.
 
-**A reading need not be instrument state.** The get dispatcher's sources are
-whatever can answer a question honestly: the vendor's API, a log file, or the
-size of a file on disk. The mesoSPIM cannot say whether it is idle, so the
-only proof that an acquisition finished is that its file has stopped growing.
-That is a reading like any other, with a source, an age and a possible
-"unknown".
+**A reading need not be instrument state.** The reader's sources are whatever
+can answer a question honestly: the vendor's API, a log file, or the size of a
+file on disk. The mesoSPIM cannot say whether it is idle, so the only proof
+that an acquisition finished is that its file has stopped growing. That is a
+reading like any other, with a source, an age and a possible "unknown".
 
-**The three files they share.**
-
-- `gate.py` is the limits gate, used by the set dispatcher only. It checks
-  stage positions in raw stage coordinates (part 6), and when the limits
-  could not be loaded it refuses every change. An unknown limit is never
-  treated as "no limit".
-- `error_rules.py` is the table above: for each kind of problem, what each engine
-  does next.
-- `tuning.py` holds the shared default numbers: four windows of three seconds,
-  how often to look again, and how long one read may take. A command that
-  needs different numbers sets them in its handling notes, in the vendor
-  interface. The operator never needs to change them.
+**The limits gate** (`gate.py`) keeps, for each connection, the limits
+object that the connect-time handshake installed, and asks it
+`check_command(command, values)` for every change. When no limits could be
+installed, it refuses every change and says why. An unknown limit is never
+treated as "no limit". Stage positions are checked in raw stage coordinates
+(part 6).
 
 **Rules.**
 
-- **Every change goes through the set dispatcher**, and the limits gate is
-  inside it. No command can skip the gate, because there is no other way to
-  reach the hardware. (In Leica today each wrapper calls the gate itself;
-  moving it into the dispatcher removes the chance of forgetting it.)
-- **The set dispatcher uses the get dispatcher**, for the pre-check and for the
-  confirmation. The get dispatcher never calls the set dispatcher.
-- **The get dispatcher retries the read**, never the hardware.
-- **A single read must fit inside one confirmation window.** Otherwise the set
-  dispatcher gives up before the reading arrives, or an abandoned read is
+- **Every change goes through the door**, and the limits gate is inside it. No
+  command can skip the gate, because the door is the only way to send.
+- **A change uses the reader**, for the pre-check and for the confirmation.
+  The reader never runs a change.
+- **The reader asks again, never the hardware.**
+- **A single read must fit inside one confirmation window.** Otherwise the
+  confirm loop gives up before the reading arrives, or an abandoned read is
   still running when the next attempt starts. The Leica driver learned this
   the hard way (finding CF-05 in `select_job`).
-- **One read at a time is managed per read, not per confirmation.** When Leica
-  held that rule around a whole confirmation, the confirmation's own reads
-  were blocked (finding CF-01). Only the get dispatcher manages it.
-- **One writer at a time.** The dispatchers assume a single caller. A workflow
+- **One request at a time is kept per request, not per confirmation.** When
+  Leica held that rule around a whole confirmation, the confirmation's own
+  reads were blocked (finding CF-01). In the Leica driver the turns are kept
+  by the vendor part, because only LAS X's API needs them.
+- **One writer at a time.** The dispatcher assumes a single caller. A workflow
   that sends commands from several threads at once can mix up the results.
 
 ## 3. Readings and changes (formerly "Actions")
@@ -1143,7 +1194,7 @@ or parking the z-galvo at zero while keeping the focus.
 
 ## 5. Saving a capture (formerly "Output")
 
-> **Note, October 2026.** This part is superseded. There is no `output/` folder any more. Saving is the `acquire` procedure, finding and reading the vendor's picture belongs to the vendor interface (the capture primitives and the metadata map), and the writer is shared. Only OME-Zarr is part of the design. See "The simplified anatomy".
+> **Note, October 2026.** This part is superseded. There is no `output/` folder any more. Saving is the `save_data` procedure, run after `acquire`; finding and reading the vendor's picture belongs to the vendor interface (the capture primitives and the metadata map), and the writer is shared. Only OME-Zarr is part of the design. See "Saving is a procedure, and only OME-Zarr". The responsibilities below still hold.
 
 **Purpose.** To turn what the microscope produced for one `acquire` call into
 ZMART's product of that call, and to say exactly where it was saved. The
@@ -1195,7 +1246,7 @@ several `z` values and the time series several `t`.
    state, and the pixel size.
 6. **Keep the command log**: for each acquisition, what was asked, what
    happened, how many attempts it took, and whether it was confirmed. The
-   dispatchers already produce this information; the output part saves it
+   dispatcher already produces this information; the output part saves it
    next to the images so the experiment can be traced afterwards.
 7. **Report** what was saved, in the two lists `acquire` answers with:
    `files`, the path of every file, and `planes`, one entry per image plane
@@ -1225,7 +1276,8 @@ about procedures.
 | `orientation/` | How image pixels relate to stage movement: which way each axis points, flips and 90° turns, and the pixel size. | Rarely: at installation, or after hardware changes. |
 | `limits/` | How far each axis may travel, and the allowed values for each setting. | Rarely. |
 | `optical_calibration/` | The x, y and z offsets between objectives, so that a change of objective keeps the same spot in view. | Rarely. |
-| `machine_description/` | The fixed facts about this instrument: its objectives, detectors, axes, motors and serial number, and the vendor software versions the driver was tested with. | Only when the hardware changes. |
+| `machine_description/` | The fixed facts about this instrument: its objectives, detectors, axes, motors and serial number, and the vendor software versions the driver was tested with. (The Leica driver does not have it yet.) | Only when the hardware changes. |
+| `data_location/` | Where on this computer the captures are saved, when the workflow does not say. | Once, when the driver is installed. |
 
 The origin has its own folder because recording it is a frequent, everyday
 step, while the registration is measured rarely. Someone recording a new
@@ -1278,8 +1330,11 @@ we decide how to keep one. The notebook and procedure names:
 | `limits/` | `set_limits.ipynb` | `measure_limits` |
 | `optical_calibration/` | `calibrate_objectives.ipynb` | `calibrate_objectives` |
 
-Three of these notebook names already exist in the Leica driver; the notebooks
-for the origin and the machine description are proposals.
+The Leica driver has `set_limits.ipynb`, `set_orientation.ipynb`,
+`calibrate_objective_pair.ipynb` (for the optical calibration, one pair of
+objectives at a time) and `set_data_location.ipynb`, each in the `notebooks/`
+folder of its item. It records the origin with the `set_origin` command
+rather than a notebook, and it has no machine description yet.
 
 **Order at connect.** Connecting is making the `ZmartDriver` (part 7): its
 `__init__` opens the vendor software and loads the configuration. Each item
@@ -1337,7 +1392,7 @@ to fill in. A new driver starts by copying it.
 opens the vendor software with what is in the `connection` dictionary and
 loads this microscope's configuration (part 6). `disconnect` closes the
 vendor software again. Everything the class needs between calls, such as
-the vendor connection, the two dispatchers and the command log, lives on
+the vendor connection, the session and the command log, lives on
 `self`.
 
 **The commands.** After `__init__` and `disconnect`, the class has ten
@@ -1352,7 +1407,7 @@ methods, and each one only puts the parts above to work:
 | `get_state` | The readings for the settings | `True, (changeable, observed)`: the settings `set_state` can apply, and what can only be read |
 | `set_state` | One change per setting | `True, applied`: what took |
 | `get_acquisition_settings` | How a capture can be triggered | `True, {name: {"options": ..., "default": ..., "active": ...}}`, usually only `trigger` |
-| `acquire` | The change for acquisition, then the output part | `True, (files, planes)`: where everything was saved |
+| `acquire` | The `acquire` procedure, then `save_data` (never `clear_cache`) | `True, (files, planes)`: where everything was saved |
 | `get_procedures` | The procedures' own descriptions (part 4) | `True, {name: {"description": ...}}` |
 | `run_procedure` | One procedure | `True, name` |
 
@@ -1459,7 +1514,7 @@ vendor interface. Each driver already has one, though at different depths:
 
 | Driver | Mock API |
 |---|---|
-| Leica | `mock_lasx_api.py`, an in-memory stand-in for the LAS X client that tracks jobs, stage and focus and returns realistic errors. |
+| Leica | `testing/helpers/mock_lasx_api.py`, an in-memory stand-in for the LAS X client that tracks jobs, stage and focus and returns realistic errors. |
 | mesoSPIM | `mock_mesospim_server.py`, a real socket server that speaks the real protocol and runs the driver's own scripts. |
 | ZEISS | `fake_gateway.py`, a real gRPC server built on ZEISS's own service definitions, which can also be started on its own. |
 | Nikon | `fake_nis_api.py`, an in-memory stand-in. |
@@ -1502,7 +1557,7 @@ there, and only its mock API is in `testing/`.
   touching the stage if either fails. The Leica driver already does this for
   the limits gate.
 - **The mock API can produce every kind of error on purpose**, so that one
-  shared set of tests can check that the sorting and both dispatchers follow
+  shared set of tests can check that the sorting, the reader and the change loops follow
   the rules.
 - **Every suite plugs the driver into the controller and lets the controller
   check the answers**, with `validate_driver` and `check_acquire_answer`.
@@ -1526,13 +1581,15 @@ zmart_drivers/
 **The dispatcher** is the other clear case, and the reason it has a folder
 of its own: everything in it is written once for every microscope, so the
 folder can move to the shared package as a whole. The numbers that differ for
-one microscope live in its handling notes. (The Leica dispatcher still holds
-some Leica code that has to move out first; see "The dispatcher is fully
-shared".)
+one microscope are handed in by its vendor part. The Leica dispatcher already
+imports nothing of LAS X; what still has to come with it is the shape of a
+command profile and the list of kinds of problem (see "What this means for the
+Leica driver").
 
 **The algorithms** are the clearest case today. In a driver they live in
-`procedures/` as plain modules (part 4); Leica has them in a folder of their
-own, `algorithms/registration.py` and `algorithms/focus.py`. Nothing in them
+`procedures/` as plain modules (part 4); Leica has them beside the setup items
+that use them, `driver_setup/orientation/registration.py` and
+`driver_setup/optical_calibration/focus.py`. Nothing in them
 is Leica-specific: phase correlation between two images, a vote across four
 registration methods, and the Brenner sharpness score work the same on any
 microscope. In Leica they are used by the setup procedures (the orientation
@@ -1557,7 +1614,7 @@ What is the same in every driver, and what differs:
 |---|---|---|
 | Vendor interface | The three promises; the names of the kinds of problem | Everything inside, including the sorting of errors |
 | Dispatcher | Everything: both engines, the limits gate, the error vocabulary and rules, the routes mechanism | Nothing (the numbers live in the handling notes) |
-| Handling notes (`primitive_handling.py`) | The shape of an entry | Which primitives, in which order, how to confirm, how long to wait |
+| Handling notes (`primitive_handling/`) | The shape of an entry | Which primitives, in which order, how to confirm, how long to wait |
 | Procedures | The "only through the dispatcher" rule; the algorithms | The recipes |
 | Saving | OME-Zarr writing, naming, the command log | Finding and reading the vendor's raw product, and its description of it |
 | Configuration | Load, check and save; the notebook pattern | Default values; the machine description |
@@ -1568,7 +1625,7 @@ What is the same in every driver, and what differs:
 
 Every driver may have an `experimental/` folder for ideas that are not yet
 trusted. Code there is left out of hardware validation and must not be used
-by any other part of the driver. The Leica driver already works this way.
+by any other part of the driver. The Leica driver has none at the moment.
 
 ## Settled since the first version
 
@@ -1671,7 +1728,7 @@ by any other part of the driver. The Leica driver already works this way.
 - **Stop.** No driver and no part of the controller contract offers a way to
   stop a running command. If an acquisition or a tile scan goes wrong, the
   only way out today is the vendor software itself. A defined `stop` would
-  touch the set dispatcher (a long confirmation wait has to be
+  touch the confirm loop (a long confirmation wait has to be
   interruptible), the rules (a new kind, "stopped by user") and the
   controller contract (a new command). ZEN offers a native stop primitive,
   which makes the gap concrete: using it needs a second caller while a change
@@ -1712,14 +1769,19 @@ by any other part of the driver. The Leica driver already works this way.
    lost reply after sending, and a change that cannot be read back, are now
    in parts 2 and 3 above, and the mock's dispatcher has to carry them before
    the first driver copies it.
-5. **Reshape Leica one small step at a time**, in this order: the moves that
-   change no behaviour (folder and file names), then the handling notes, then
-   the recipes, then the changes in behaviour. After every step the offline
-   tests and the tests at the STELLARIS must pass, and the limits, calibration
-   and origin that operators have already saved must still load.
-6. **Prove the abstraction with two small fake vendors**, one whose calls block
-   until done and one that answers accepted or refused at once. The shared
-   dispatcher must run against both with no change.
+5. **Reshape Leica one small step at a time.** Done in October 2026, in this
+   order: the moves that change no behaviour (folder and file names), then the
+   handling notes, then the recipes, then the changes in behaviour. After
+   every step the offline tests passed, and the whole was run on the LAS X
+   simulator. It still has to run at the STELLARIS. What still differs from
+   the plan is listed in "What this means for the Leica driver".
+6. **Prove the abstraction with small fake vendors.** Begun: a pretend vendor
+   (`navigator_expert/testing/helpers/pretend_vendor.py`) moves, reads,
+   retries and sends once through the shared dispatcher, importing nothing
+   else. Building it found two leftovers of LAS X in the dispatcher, both
+   fixed: the reader spoke of a job and the API, and the rule that a command
+   is sent only once lived in Leica's profile. Still to come: one fake whose
+   calls block until done, and one that answers accepted or refused at once.
 7. **Bring the Nikon, ZEISS and mesoSPIM drivers into the same layout**, each
    in its own pull request, so that a problem in one does not hold up the
    others.
