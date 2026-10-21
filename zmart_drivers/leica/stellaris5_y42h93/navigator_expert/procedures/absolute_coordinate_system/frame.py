@@ -36,7 +36,7 @@ from ...vendor_specific.primitive_handling.readings.derived import (
 )
 from ...vendor_specific.primitive_handling.settings import changes as _commands
 from ...session import handle as _info
-from ...session.handle import ZmartHandle, job_catalog, note_unconfirmed, require_open
+from ...session.handle import ZmartHandle, note_unconfirmed, require_open
 
 log = logging.getLogger(__name__)
 

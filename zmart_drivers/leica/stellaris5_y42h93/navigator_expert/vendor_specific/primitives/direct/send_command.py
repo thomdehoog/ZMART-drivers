@@ -88,12 +88,6 @@ senders = {"current": None}
 senders_lock = threading.Lock()
 
 
-def forget_sender():
-    """The next element goes through a new sender (a sender stays with a command LAS X holds)."""
-    with senders_lock:
-        senders["current"] = None
-
-
 def send(xml: str) -> str:
     """Send one element to the hardware server; return LAS X's answer. Never sent twice.
 

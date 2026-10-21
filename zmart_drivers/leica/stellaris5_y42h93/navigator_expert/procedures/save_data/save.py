@@ -395,16 +395,6 @@ def _physical_size_record(metadata) -> dict:
     }
 
 
-def _channel_record(metadata, c: int) -> dict:
-    channel = metadata.channel(c)
-    return {
-        "index": channel.index,
-        "name": channel.name,
-        "color": channel.color,
-        "wavelength_nm": channel.wavelength_nm,
-    }
-
-
 def _safe_component(value: str) -> str:
     out = []
     for ch in value:

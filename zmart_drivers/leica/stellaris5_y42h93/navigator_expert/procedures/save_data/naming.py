@@ -141,12 +141,6 @@ def log_dir(output_root: Path | str) -> Path:
     return Path(output_root) / "log"
 
 
-def build_projection_name(naming: Naming, method: str) -> str:
-    """The projection of one T/C of a capture, saved as OME-TIFF: the image name with the method for Z."""
-
-    return f"{naming.stem}_T{naming.t:06d}_C{naming.c:02d}_{method}.ome.tiff"
-
-
 def metadata_dir(output_root: Path | str) -> Path:
     """Return where a capture's printed metadata goes: ``data/metadata``."""
 

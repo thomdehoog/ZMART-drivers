@@ -55,58 +55,6 @@ ET.register_namespace("", OME_NS)
 ET.register_namespace("xsi", XSI_NS)
 
 
-def metadata_from_ome_xml(
-    xml: bytes | str,
-    *,
-    size_x: int | None = None,
-    size_y: int | None = None,
-    size_t: int | None = None,
-    size_z: int | None = None,
-    size_c: int | None = None,
-    pixel_type: str | None = None,
-) -> AcquisitionMetadata:
-    """Extract the minimal ZMART metadata contract from vendor OME XML."""
-    text = xml.decode("utf-8", errors="replace") if isinstance(xml, bytes) else xml
-    root = ET.fromstring(text)
-    pixels = _first_local(root, "Pixels")
-    if pixels is None:
-        raise RuntimeError("OME metadata has no Pixels element")
-
-    channels = _channels_from_pixels(pixels, size_c=size_c)
-    metadata = AcquisitionMetadata(
-        size_x=_required_int(size_x, pixels, "SizeX"),
-        size_y=_required_int(size_y, pixels, "SizeY"),
-        size_t=_required_int(size_t, pixels, "SizeT"),
-        size_z=_required_int(size_z, pixels, "SizeZ"),
-        size_c=_required_int(size_c, pixels, "SizeC"),
-        pixel_type=pixel_type or pixels.attrib.get("Type") or "uint16",
-        physical_size_x_um=_physical_um(pixels, "X"),
-        physical_size_y_um=_physical_um(pixels, "Y"),
-        physical_size_z_um=_physical_um(pixels, "Z"),
-        channels=tuple(channels),
-        significant_bits=_int_or_none(pixels.attrib.get("SignificantBits")),
-    )
-    return _ensure_channels(metadata)
-
-
-def pixels_dims(xml: bytes | str) -> tuple[int, int, int]:
-    """Return ``(SizeT, SizeZ, SizeC)`` from the first OME ``Pixels`` element.
-
-    Raises ``RuntimeError`` when no ``Pixels`` element is present or any of
-    ``SizeT``/``SizeZ``/``SizeC`` is missing or non-positive.
-    """
-    text = xml.decode("utf-8", errors="replace") if isinstance(xml, bytes) else xml
-    root = ET.fromstring(text)
-    pixels = _first_local(root, "Pixels")
-    if pixels is None:
-        raise RuntimeError("OME metadata has no Pixels element")
-    return (
-        _required_int(None, pixels, "SizeT"),
-        _required_int(None, pixels, "SizeZ"),
-        _required_int(None, pixels, "SizeC"),
-    )
-
-
 def metadata_with_shape_and_grid(
     metadata: AcquisitionMetadata,
     *,
@@ -213,24 +161,6 @@ def plane_xml(
     )
 
 
-def companion_xml(
-    metadata: AcquisitionMetadata,
-    *,
-    image_name: str,
-    plane_filenames: dict[PlaneIndex, str],
-) -> bytes:
-    """Return OME XML describing one canonical position/timepoint."""
-    entries = [
-        (0, idx.z, idx.c, filename) for idx, filename in sorted(plane_filenames.items())
-    ]
-    return _ome_xml(
-        replace(metadata, size_t=1),
-        image_name=image_name,
-        channels=metadata.channels,
-        tiff_entries=entries,
-    )
-
-
 def image_xml(
     metadata: AcquisitionMetadata, *, image_name: str, state: dict | None = None
 ) -> bytes:
@@ -276,19 +206,6 @@ def extract_embedded_ome_xml(tiff_src: Path) -> bytes:
             f"{endian_or_err}; tifffile found no OME ImageDescription"
         )
     return description.encode("utf-8")
-
-
-def pixel_type_from_dtype(dtype: str) -> str:
-    return {
-        "uint8": "uint8",
-        "uint16": "uint16",
-        "uint32": "uint32",
-        "int8": "int8",
-        "int16": "int16",
-        "int32": "int32",
-        "float32": "float",
-        "float64": "double",
-    }.get(dtype, "uint16")
 
 
 def _ome_xml(
@@ -628,37 +545,6 @@ def _channel_attrs(channel: ChannelMetadata) -> dict[str, str]:
     return attrs
 
 
-def _channels_from_pixels(
-    pixels: ET.Element,
-    *,
-    size_c: int | None,
-) -> list[ChannelMetadata]:
-    channels = []
-    for i, channel in enumerate(_children_local(pixels, "Channel")):
-        wavelength = _wavelength_nm(
-            channel.attrib.get("EmissionWavelength"),
-            channel.attrib.get("EmissionWavelengthUnit"),
-        ) or _wavelength_nm(
-            channel.attrib.get("ExcitationWavelength"),
-            channel.attrib.get("ExcitationWavelengthUnit"),
-        )
-        channels.append(
-            ChannelMetadata(
-                index=i,
-                name=channel.attrib.get("Name"),
-                color=_int_or_none(channel.attrib.get("Color")),
-                wavelength_nm=wavelength,
-            )
-        )
-    count = size_c if size_c is not None else _int_or_none(pixels.attrib.get("SizeC"))
-    if count is not None:
-        channels_by_index = {c.index: c for c in channels}
-        channels = [
-            channels_by_index.get(i, ChannelMetadata(index=i)) for i in range(count)
-        ]
-    return channels
-
-
 def _ensure_channels(metadata: AcquisitionMetadata) -> AcquisitionMetadata:
     channels = {c.index: c for c in metadata.channels}
     return replace(
@@ -708,69 +594,8 @@ def _add_physical(attrs: dict[str, str], axis: str, value_um: float | None) -> N
     # requires to be 7-bit ASCII — a literal 'µm' would fail the write.
 
 
-def _physical_um(pixels: ET.Element, axis: str) -> float | None:
-    value = _float_or_none(pixels.attrib.get(f"PhysicalSize{axis}"))
-    if value is None:
-        return None
-    unit = pixels.attrib.get(f"PhysicalSize{axis}Unit")
-    return _to_um(value, unit)
-
-
-def _wavelength_nm(value: str | None, unit: str | None) -> float | None:
-    parsed = _float_or_none(value)
-    if parsed is None:
-        return None
-    unit_key = (unit or "nm").strip().lower()
-    if unit_key in {"nm", "nanometer", "nanometers", "nanometre", "nanometres"}:
-        return parsed
-    if unit_key in {"um", MICROMETER, "micrometer", "micrometers"}:
-        return parsed * 1000.0
-    if unit_key == "m":
-        return parsed * 1000000000.0
-    return parsed
-
-
-def _to_um(value: float, unit: str | None) -> float:
-    unit_key = (unit or "um").strip().lower()
-    if unit_key in {"um", MICROMETER, "micrometer", "micrometers"}:
-        return value
-    if unit_key in {"nm", "nanometer", "nanometers"}:
-        return value * 0.001
-    if unit_key == "m":
-        return value * 1000000.0
-    if unit_key == "mm":
-        return value * 1000.0
-    return value
-
-
-def _required_int(override: int | None, pixels: ET.Element, name: str) -> int:
-    if override is not None:
-        return override
-    value = _int_or_none(pixels.attrib.get(name))
-    if value is None or value <= 0:
-        raise RuntimeError(f"OME metadata missing positive {name}")
-    return value
-
-
-def _first_local(root: ET.Element, name: str) -> ET.Element | None:
-    for element in root.iter():
-        if _local(element.tag) == name:
-            return element
-    return None
-
-
-def _children_local(root: ET.Element, name: str):
-    for element in list(root):
-        if _local(element.tag) == name:
-            yield element
-
-
 def _tag(name: str, ns: str = OME_NS) -> str:
     return f"{{{ns}}}{name}"
-
-
-def _local(tag: str) -> str:
-    return tag.rsplit("}", 1)[-1]
 
 
 def _int_or_none(value: Any) -> int | None:

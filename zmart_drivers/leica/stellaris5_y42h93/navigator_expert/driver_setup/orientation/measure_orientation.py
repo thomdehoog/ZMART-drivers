@@ -274,10 +274,6 @@ def _candidate_alignment_overlay(
     return reorient_array(overlay, orientation)
 
 
-def _reflection_label(orientation: Orientation) -> str:
-    return "Reflection" if orientation.mirrored else "No reflection"
-
-
 def write_orientation_diagnostic(
     session: OrientationSession,
     vote_x: dict,

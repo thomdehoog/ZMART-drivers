@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from .product import AcquisitionResult
+    pass
 
 log = logging.getLogger(__name__)
 
@@ -57,18 +57,6 @@ def read_relative_path(client):
 # before the acquire — is bounded by this constant and by
 # _detect_from_mtime's refusal of ambiguous multi-candidate matches.
 MTIME_SKEW_ALLOWANCE_S = 2.0
-
-
-def _is_from_acquisition(path: Path, acq: AcquisitionResult) -> bool:
-    """Return True when *path* was written at or after *acq* started.
-
-    The comparison allows MTIME_SKEW_ALLOWANCE_S of skew: host wall-clock
-    (acq.started_at) and file-server mtime are different clocks.
-    """
-    try:
-        return path.stat().st_mtime >= acq.started_at - MTIME_SKEW_ALLOWANCE_S
-    except OSError:
-        return False
 
 
 def _relative_posix(path: Path, base: Path, *, fallback_to_str: bool) -> str | None:
