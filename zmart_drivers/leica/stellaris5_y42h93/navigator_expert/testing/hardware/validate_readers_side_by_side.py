@@ -55,13 +55,14 @@ from run_report import RunReport, attempts_of, confirmation_of, replay_envelope_
 
 import low_level as drv
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings import reading_table as capabilities
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitives.log import log_settings
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.profiles import command_profiles as profiles
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings import named_readings as readers
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.connection import waiting
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitives.log import (
     log_reader as L,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings.parsing import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitives.values.parsing import (
     make_changeable_copy,
     parse_tile_geometry,
 )
@@ -833,7 +834,7 @@ def main(argv=None):
     args = p.parse_args(argv)
 
     if args.log_path:
-        profiles.LOG_READER = profiles.LogReaderProfile(lcs_log_path=args.log_path)
+        log_settings.LOG_READER = log_settings.LogReaderProfile(lcs_log_path=args.log_path)
     if args.mock:
         # The mock backend has no LAS X log stream, so the default hybrid
         # select-job confirmation race would only ever time out on the log leg

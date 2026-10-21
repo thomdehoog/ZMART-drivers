@@ -903,7 +903,7 @@ def test_adapter_bypass_refuses_at_the_commands_layer(clear_stage_limits):
     not a missing handshake."""
     from unittest.mock import patch
 
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings import (
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitives.values import (
         parsing as _cmd_settings,
     )
     from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings import named_readings as _readers
@@ -940,7 +940,7 @@ def test_controller_session_bypass_refuses_at_the_commands_layer(clear_stage_lim
     import zmart_controller
 
     from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.zmart_controller_plugin.zmart_controller_plugin import ZmartControllerPlugin as driver
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings import (
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitives.values import (
         parsing as _cmd_settings,
     )
     from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings import named_readings as _readers

@@ -29,7 +29,7 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.prim
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.connection import (
     hardware_server,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings.parsing import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitives.values.parsing import (
     make_changeable_copy,
 )
 

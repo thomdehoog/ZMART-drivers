@@ -170,18 +170,25 @@ navigator_expert/
         store.py               load, check and save, for every item
 
     vendor_specific/           the part you write for a new microscope
-        connection/            reach LAS X, keep the link; waiting.py holds the waiting numbers
+        connection/            reach LAS X, keep the link; waiting.py holds the waiting numbers,
+                               lasx_settings.py how the CAM API is opened
         primitives/            the smallest single reads and writes, one folder for each way of reaching LAS X
             direct/            reading LAS X's own state, through its hardware server
             api/               the CAM API
-            log/               what LAS X writes in its log files (reading only)
+            log/               what LAS X writes in its log files (reading only); log_settings.py says where
             interface/         LAS X's window: pressing buttons, answering dialogs
             capture/           the finished picture in LAS X's cache, and LAS X's description of it
+            values/            the values in what LAS X hands back: parsing.py (its text), derived.py
+                               (what a job's settings mean: its field of view, its z-stack)
         primitive_handling/    the handling notes: how the dispatcher treats each primitive
             profiles/          the command profiles, the transport, the error sorting, the idle check
             commands/          the changes, running a job, the job settings, the limits rulebook
             confirmations/     how each change is confirmed
             readings/          the table of readings, the sources, and the named readings
+
+        connection/ and primitives/ import nothing above them: the connection only
+        itself, the primitives only themselves and the connection. Their settings
+        live with them, and a test keeps it so.
 
     dispatcher/                the same in every driver; imports nothing of the driver
         door.py                the one door: read and write

@@ -425,7 +425,7 @@ class TestApiModeCappedWorker(unittest.TestCase):
 
 class TestDerivedZoom(unittest.TestCase):
     def test_sub_unity_zoom_is_not_clamped(self):
-        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings import (
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitives.values import (
             derived,
         )
 

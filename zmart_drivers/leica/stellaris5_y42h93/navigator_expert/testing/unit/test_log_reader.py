@@ -18,7 +18,7 @@ import tempfile
 import unittest
 from datetime import datetime, timedelta
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.profiles import command_profiles as profiles
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitives.log import log_settings
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitives.log import (
     log_reader as L,
 )
@@ -301,9 +301,9 @@ class TestLogReader(unittest.TestCase):
         self.assertGreater(L.ages(s)["xy"], 500)
         self.assertGreater(L.ages(s)["jobs"]["AF Job"], 500)
         self.assertIsNotNone(L.get_xy(s))  # default: exposed, not refused
-        old = profiles.LOG_READER
+        old = log_settings.LOG_READER
         try:
-            profiles.LOG_READER = profiles.LogReaderProfile(max_age_s=60.0)
+            log_settings.LOG_READER = log_settings.LogReaderProfile(max_age_s=60.0)
             self.assertIsNone(L.get_xy(s))
             self.assertIsNone(L.get_job_settings("AF Job", s))
             self.assertEqual(
@@ -317,7 +317,7 @@ class TestLogReader(unittest.TestCase):
                 "Unknown",
             )
         finally:
-            profiles.LOG_READER = old
+            log_settings.LOG_READER = old
 
     def test_max_age_gates_get_jobs_and_selection(self):
         s = parse(
@@ -325,13 +325,13 @@ class TestLogReader(unittest.TestCase):
             now=(BASE + timedelta(seconds=600)).timestamp(),
         )
         self.assertIsNotNone(L.get_jobs(s))  # default: exposed
-        old = profiles.LOG_READER
+        old = log_settings.LOG_READER
         try:
-            profiles.LOG_READER = profiles.LogReaderProfile(max_age_s=60.0)
+            log_settings.LOG_READER = log_settings.LogReaderProfile(max_age_s=60.0)
             self.assertIsNone(L.get_jobs(s))  # stale blocks dropped
             self.assertIsNone(L.get_selected_job(s))
         finally:
-            profiles.LOG_READER = old
+            log_settings.LOG_READER = old
 
     def test_missing_timestamp_is_stale_under_policy(self):
         bad = (
@@ -341,14 +341,14 @@ class TestLogReader(unittest.TestCase):
         )
         s = parse([bad])
         self.assertIsNotNone(L.get_job_settings("A", s))  # max_age None -> exposed
-        old = profiles.LOG_READER
+        old = log_settings.LOG_READER
         try:
-            profiles.LOG_READER = profiles.LogReaderProfile(max_age_s=60.0)
+            log_settings.LOG_READER = log_settings.LogReaderProfile(max_age_s=60.0)
             self.assertIsNone(
                 L.get_job_settings("A", s)
             )  # no timestamp -> refused under policy
         finally:
-            profiles.LOG_READER = old
+            log_settings.LOG_READER = old
 
     def test_missing_log_returns_none(self):
         s = L.parse_log(lcs_path=NONE_PATH, msgbox_path=NONE_PATH, now=NOWE)

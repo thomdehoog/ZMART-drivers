@@ -22,7 +22,7 @@ from z_readback_settings import raw_settings
 
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.confirmations import confirm_changes as confirmations
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.commands import changes as commands
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings.derived import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitives.values.derived import (
     z_um_from_settings,
 )
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.connection import (
@@ -32,7 +32,7 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.conn
     HardwareServerUnavailable,
     read_hardware_z_um,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings.parsing import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitives.values.parsing import (
     make_changeable_copy,
 )
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.absolute_coordinate_system import (

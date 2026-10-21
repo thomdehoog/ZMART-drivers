@@ -112,6 +112,8 @@ class Microscope:
         client = lasx_client.connect_python_client(
             client_name=connection["client"], api_delay_ms=connection["api_delay_ms"]
         )
+        if not readings.ping(client):
+            raise RuntimeError("LAS X does not answer: the ping after connecting failed.")
 
         # The limits are loaded first, so nothing can move before they govern.
         handshake.connect_handshake(client, load=connection["load_limits"])

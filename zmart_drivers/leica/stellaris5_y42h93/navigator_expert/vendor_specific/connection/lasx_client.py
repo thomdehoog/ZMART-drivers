@@ -13,16 +13,9 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from ..primitive_handling.readings import named_readings as _readers
+from . import lasx_settings
 
 _log = logging.getLogger(__name__)
-
-
-def _profile_api_delay_ms() -> int | None:
-    """Return the configured Leica API delay from the active profile."""
-    from ..primitive_handling.profiles import command_profiles as profiles
-
-    return profiles.LASX_API.delay_ms
 
 
 def configure_lasx_api_delay(
@@ -36,7 +29,7 @@ def configure_lasx_api_delay(
     Returns the applied value, or ``None`` when disabled.
     """
     if delay_ms is None:
-        delay_ms = _profile_api_delay_ms()
+        delay_ms = lasx_settings.LASX_API.delay_ms
     if delay_ms is None:
         return None
 
@@ -61,15 +54,16 @@ def configure_lasx_api_delay(
 def connect_python_client(
     client_name: str = "PythonClient", api_delay_ms: int | None = None
 ) -> Any:
-    """Open the LAS X API client and verify it responds to ``ping``.
+    """Open the LAS X API client.
 
     The runtime loader is imported at the call site so this module
     stays import-safe on machines without LAS X. Pass a custom ``client_name`` if
     multiple python clients need to coexist. ``api_delay_ms`` overrides the
-    profile's ``LASX_API.delay_ms`` for this connection attempt.
+    ``lasx_settings.LASX_API.delay_ms`` for this connection attempt.
+    Whether LAS X then answers is the caller's check (``ping``), a reading
+    the connection does not make.
 
-    Raises ``ConnectionError`` if the connect call returns False, or
-    ``RuntimeError`` if the subsequent ping fails.
+    Raises ``ConnectionError`` if the connect call returns False.
     """
     from .lasx_runtime import load_lasx_api_runtime
 
@@ -84,7 +78,4 @@ def connect_python_client(
         getattr(_lasx_api, "__version__", "unknown"),
         "profile-disabled" if applied_delay is None else applied_delay,
     )
-
-    if not _readers.ping(client):
-        raise RuntimeError("LAS X ping failed.")
     return client

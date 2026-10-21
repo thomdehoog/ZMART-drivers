@@ -384,7 +384,7 @@ EXCEPTIONS = {
         "ECHO_SETTLE_TIMEOUT_S",
     ),
     # How old a log entry may be to count as current: freshness, not a wait.
-    ("vendor_specific/primitive_handling/profiles/command_profiles.py", "current_window_s"),
+    ("vendor_specific/primitives/log/log_settings.py", "current_window_s"),
     # Waiting for a finished picture's files to stop growing on disk. This is
     # about files, not about LAS X's state, and has its own decided numbers.
     ("vendor_specific/primitives/capture/files.py", "DEFAULT_FILE_STABILITY_TIMEOUT_S"),

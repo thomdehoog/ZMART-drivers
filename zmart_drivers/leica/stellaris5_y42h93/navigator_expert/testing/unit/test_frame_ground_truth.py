@@ -39,7 +39,7 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.session import (
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.orientation import (
     Orientation,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitives.values import (
     parsing as _readers_parsing,
 )
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.commands import changes as _commands

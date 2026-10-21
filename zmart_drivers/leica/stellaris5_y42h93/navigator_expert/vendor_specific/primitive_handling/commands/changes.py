@@ -54,7 +54,7 @@ from ....dispatcher.door import (
     make_log_entry as _make_log_entry,
     make_timing as _make_timing,
 )
-from ..readings.parsing import _hw_get
+from ...primitives.values.parsing import _hw_get
 from . import settings
 from ..confirmations.confirm_select_job import (
     prepare_select_job,

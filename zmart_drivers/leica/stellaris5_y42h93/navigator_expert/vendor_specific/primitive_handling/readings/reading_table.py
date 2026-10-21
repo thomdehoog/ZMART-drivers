@@ -21,7 +21,7 @@ from dataclasses import dataclass
 from ...primitives.api import api_reader
 from ...primitives.direct import direct_reader
 from ...primitives.log import log_reader
-from . import derived
+from ...primitives.values import derived
 
 
 class UnsupportedSource(RuntimeError):

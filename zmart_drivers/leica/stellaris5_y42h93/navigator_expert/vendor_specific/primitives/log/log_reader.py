@@ -45,7 +45,7 @@ The routed public reader layer may use this module for passive ``log`` or
 ``hybrid`` reads, and dispatch uses it as a dialog diagnostic when the CAM API is
 blocked. Command-control reads should pin the API backend instead.
 
-Parameters live in ``config.profiles.LOG_READER`` - no hardcoded values in the
+Parameters live in ``log_settings.LOG_READER`` - no hardcoded values in the
 read paths.
 
 Dependency direction:
@@ -63,7 +63,8 @@ import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
 from datetime import datetime
 
-from ...primitive_handling.readings import derived
+from ..values import derived
+from . import log_settings
 
 log = logging.getLogger(__name__)
 
@@ -73,11 +74,6 @@ log = logging.getLogger(__name__)
 # =============================================================================
 
 
-def _profile():
-    """Return the active low-level log-reader profile."""
-    from ...primitive_handling.profiles import command_profiles as profiles
-
-    return profiles.LOG_READER
 
 
 # =============================================================================
@@ -284,7 +280,7 @@ class SharedParse:
     def snapshot(self):
         """The live logs as a :class:`Snapshot`, from a parse begun after this call."""
         asked = time.monotonic()
-        profile = _profile()
+        profile = log_settings.LOG_READER
         files = (profile.lcs_log_path, profile.msgbox_log_path)
         with self._changed:
             while True:
@@ -334,7 +330,7 @@ def parse_files(lcs_path=None, msgbox_path=None, now=None, lines=None):
     "Latest valid wins" per datum. Tolerant of partial/malformed final
     lines. ``lines``/``now`` are injectable for tests.
     """
-    profile = _profile()
+    profile = log_settings.LOG_READER
     lcs_path = lcs_path or profile.lcs_log_path
     msgbox_path = msgbox_path or profile.msgbox_log_path
     snap = Snapshot(now=now if now is not None else time.time())
@@ -391,7 +387,7 @@ def parse_files(lcs_path=None, msgbox_path=None, now=None, lines=None):
 
 def parse_msgbox_log(msgbox_path=None, now=None):
     """Parse only the NavigatorExpert log entries used for scan/dialog state."""
-    profile = _profile()
+    profile = log_settings.LOG_READER
     snap = Snapshot(now=now if now is not None else time.time())
     _read_msgbox_state(snap, msgbox_path or profile.msgbox_log_path)
     return snap
@@ -457,7 +453,7 @@ def _current_blocks(s, apply_max_age=True, *, max_age_s=None):
         if apply_max_age and _too_old(ts, s.now, max_age_s=max_age_s):
             continue
         if newest is None or (
-            ts is not None and ts >= newest - _profile().current_window_s
+            ts is not None and ts >= newest - log_settings.LOG_READER.current_window_s
         ):
             current.append((bid, j, ts))
 
@@ -477,7 +473,7 @@ def _current_blocks(s, apply_max_age=True, *, max_age_s=None):
 
 def _too_old(ts, now, *, max_age_s=None):
     if max_age_s is None:
-        max_age_s = _profile().max_age_s
+        max_age_s = log_settings.LOG_READER.max_age_s
     if max_age_s is None:
         return False  # no policy -> expose age, never refuse
     if ts is None:

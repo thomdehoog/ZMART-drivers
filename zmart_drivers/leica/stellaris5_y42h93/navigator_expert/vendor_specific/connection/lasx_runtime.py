@@ -21,9 +21,9 @@ REQUIRED_DLLS = (
 
 def _runtime_root() -> Path:
     """Return the configured LAS X CAM API runtime root."""
-    from ..primitive_handling.profiles import command_profiles as profiles
+    from . import lasx_settings
 
-    return Path(profiles.LASX_API.runtime_root)
+    return Path(lasx_settings.LASX_API.runtime_root)
 
 
 def _missing_dlls(root: Path) -> list[str]:

@@ -33,7 +33,7 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.prim
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher import (
     gate as _gate,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitives.values import (
     parsing as _readers_parsing,
 )
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup import (
@@ -87,6 +87,11 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.zmart_controller_plu
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.session.handle import (
     Session,
 )
+
+
+def answering_client():
+    """A stand-in LAS X client that answers the ping after connecting, and nothing else."""
+    return SimpleNamespace(PyApiPing=SimpleNamespace(UpdateAwaitReceipt=lambda window_s: True))
 
 
 def _connect_handle(connection=None):
@@ -402,7 +407,7 @@ class TestFrame(unittest.TestCase):
         with (
             patch.object(_machine, "MACHINE", profile),
             patch.object(
-                _connect_module, "connect_python_client", return_value=object()
+                _connect_module, "connect_python_client", return_value=answering_client()
             ),
         ):
             return _connect_handle(connection or dict(DEFAULT_CONNECTION))
@@ -2539,7 +2544,7 @@ class TestLifecycle(unittest.TestCase):
         self.addCleanup(_clear_limits)
         provision_machine_limits(os.environ["ZMART_MICROSCOPY_ROOT"])
         with patch.object(
-            _connect_module, "connect_python_client", return_value=object()
+            _connect_module, "connect_python_client", return_value=answering_client()
         ):
             h = _connect_handle(dict(DEFAULT_CONNECTION))
         self.assertIsInstance(h, Session)
@@ -2553,7 +2558,7 @@ class TestLifecycle(unittest.TestCase):
     def test_connect_uses_packaged_fallback_when_programdata_is_empty(self):
         """Empty ProgramData uses defaults without creating a limits snapshot."""
         with patch.object(
-            _connect_module, "connect_python_client", return_value=object()
+            _connect_module, "connect_python_client", return_value=answering_client()
         ):
             h = _connect_handle(dict(DEFAULT_CONNECTION))
         self.assertIsInstance(h, Session)
@@ -2579,7 +2584,7 @@ class TestLifecycle(unittest.TestCase):
         patches = _patch_position(x_um=1000.0, y_um=2000.0, z_wide_um=30.0)
         with (
             patch.object(
-                _connect_module, "connect_python_client", return_value=object()
+                _connect_module, "connect_python_client", return_value=answering_client()
             ),
             patches[0],
             patches[1],

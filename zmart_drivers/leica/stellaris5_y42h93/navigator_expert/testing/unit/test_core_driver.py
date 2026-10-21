@@ -28,7 +28,7 @@ from unittest.mock import MagicMock, PropertyMock, patch
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher import door
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.objective_change_with_compensation import compensated_changes
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.profiles import error_classification
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings import parsing
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitives.values import parsing
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.commands import changes
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.commands import limit_rules
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.connection import (
@@ -38,6 +38,7 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.prim
     confirm_select_job,
 )
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.confirmations import confirm_changes as confirmations
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.connection import lasx_settings
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.profiles import command_profiles as profiles
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.commands import changes as commands
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.objective_change_with_compensation import (
@@ -115,8 +116,8 @@ class TestLasxApiSessionProfile(unittest.TestCase):
             class PyApiClient:
                 DelayInMilliseconds = 0
 
-        profile = profiles.LasxApiProfile(delay_ms=123)
-        with patch.object(profiles, "LASX_API", profile):
+        profile = lasx_settings.LasxApiProfile(delay_ms=123)
+        with patch.object(lasx_settings, "LASX_API", profile):
             applied = session.configure_lasx_api_delay(FakeLasxApi)
 
         self.assertEqual(applied, 123)

@@ -20,6 +20,7 @@ from zmart_controller.registry import load_driver
 
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.for_direct_use import microscope
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.zmart_controller_plugin import zmart_controller_plugin
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitives.log import log_settings
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.profiles import command_profiles as profiles
 
 # The folder to register is the driver's: the one that holds zmart_controller_plugin/.
@@ -35,7 +36,7 @@ def _offline(monkeypatch, tmp_path):
     """Stand the LAS X mock in for the real CAM API, with a throwaway machine root."""
     monkeypatch.setenv("ZMART_MICROSCOPY_ROOT", os.environ["ZMART_MICROSCOPY_ROOT"])
     monkeypatch.setenv("APPDATA", os.environ.get("APPDATA", str(tmp_path)))
-    monkeypatch.setattr(profiles, "LOG_READER", profiles.LOG_READER)
+    monkeypatch.setattr(log_settings, "LOG_READER", log_settings.LOG_READER)
     monkeypatch.setattr(
         profiles,
         "STATE_READERS",

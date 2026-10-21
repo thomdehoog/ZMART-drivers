@@ -33,7 +33,7 @@ from ..profiles.error_classification import (
     classify_error,
     sends_again,
 )
-from ..readings.parsing import parse_format
+from ...primitives.values.parsing import parse_format
 from ..confirmations import confirm_changes as _check
 from ..profiles import command_profiles as _profiles
 from ..profiles.command_profiles import CommandProfile

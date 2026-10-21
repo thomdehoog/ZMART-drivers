@@ -28,12 +28,6 @@ class LogPollResult:
     diagnostics: dict
 
 
-def _profile():
-    from ...primitive_handling.profiles import command_profiles as profiles
-
-    return profiles.STATE_READERS
-
-
 def wait_for_selected_job_log(
     job_name: str,
     command_started_at: float,
@@ -55,12 +49,8 @@ def wait_for_selected_job_log(
     log timestamp is newer than the command start time.
     """
 
-    profile = _profile()
     timeout_s = waiting.WINDOW_S if timeout_s is None else timeout_s
     poll_interval_s = waiting.POLL_S if poll_interval_s is None else poll_interval_s
-    max_age_s = (
-        profile.selected_job_log_cluster_max_age_s if max_age_s is None else max_age_s
-    )
     parse_fn = log_reader.parse_log if parse_fn is None else parse_fn
     sleep_fn = time.sleep if sleep_fn is None else sleep_fn
     monotonic_fn = time.monotonic if monotonic_fn is None else monotonic_fn

@@ -25,10 +25,10 @@ from ...connection.hardware_server import HardwareServerUnavailable
 from ...primitives.api import api_reader
 from ...primitives.direct import direct_reader
 from ...primitives.log import log_reader
-from . import derived
+from ...primitives.values import derived
 from . import reading_table as capabilities
 from . import sources
-from .derived import stack_drive, stack_slices_um  # noqa: F401  re-exported, as the readers package did
+from ...primitives.values.derived import stack_drive, stack_slices_um  # noqa: F401  re-exported, as the readers package did
 
 log = logging.getLogger(__name__)
 

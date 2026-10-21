@@ -276,6 +276,39 @@ def test_each_part_only_imports_what_the_anatomy_allows():
             )
 
 
+#: The bottom of the vendor part, bottom first: how the driver reaches LAS X, and
+#: one read or write each. Neither imports from anything above it.
+BOTTOM = ("connection", "primitives")
+
+
+def _vendor_layers_imported(path: Path) -> set[str]:
+    """The folders of ``vendor_specific`` that ``path`` imports from."""
+    tree = ast.parse(path.read_text(encoding="utf-8"))
+    here = list(path.relative_to(DRIVER_ROOT).parent.parts)
+    found = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ImportFrom) and node.level:
+            base = here[: len(here) - (node.level - 1)]
+            target = [*base, *(node.module or "").split(".")]
+            if target[0] == "vendor_specific" and len(target) > 1:
+                found.add(target[1])
+        elif isinstance(node, ast.ImportFrom) and "navigator_expert.vendor_specific." in (node.module or ""):
+            found.add(node.module.split("navigator_expert.vendor_specific.")[1].split(".")[0])
+    return found
+
+
+def test_the_connection_and_the_primitives_import_nothing_above_them():
+    """The connection imports only itself; the primitives only themselves and the connection."""
+    for depth, layer in enumerate(BOTTOM):
+        allowed = set(BOTTOM[: depth + 1])
+        for path in (DRIVER_ROOT / "vendor_specific" / layer).rglob("*.py"):
+            used = _vendor_layers_imported(path) | _imported_parts(path, "vendor_specific")
+            assert used <= allowed, (
+                f"{path.relative_to(DRIVER_ROOT)} imports {sorted(used - allowed)}; "
+                f"{layer}/ may import only {sorted(allowed)}"
+            )
+
+
 def test_a_reading_never_uses_a_change():
     """A get never calls a set: vendor_specific/primitive_handling/readings/reading_table.py must not import vendor_specific/primitive_handling/commands/changes.py."""
     readings = (

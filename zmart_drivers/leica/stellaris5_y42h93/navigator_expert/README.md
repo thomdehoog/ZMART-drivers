@@ -150,14 +150,14 @@ LAS X.
 | LAS X dialog / MessageBox log | `C:\ProgramData\Leica Microsystems\LAS X\MatrixScreener.log` |
 | CAM API assemblies (runtime) | `C:\Program Files\Leica Microsystems CMS GmbH\LAS X\AddIns\NavigatorExpert` |
 
-Defaults live in `vendor_specific/primitive_handling/profiles/command_profiles.py` (`LogReaderProfile`, `LasxApiProfile`) and are discovered at
-runtime where possible. Override via the profile, not at call sites.
+Defaults live beside the code that uses them: `LasxApiProfile` in `vendor_specific/connection/lasx_settings.py`
+and `LogReaderProfile` in `vendor_specific/primitives/log/log_settings.py`. Override them there, not at call sites.
 
 ## 3. Configuration
 
-- **Connection** — `LasxApiProfile` (`vendor_specific/primitive_handling/profiles/command_profiles.py`): `runtime_root` (the add-in dir) and
+- **Connection** — `LasxApiProfile` (`vendor_specific/connection/lasx_settings.py`): `runtime_root` (the add-in dir) and
   `delay_ms` (Leica's client-side pacing knob `DelayInMilliseconds`, default 250 ms).
-- **Log reader** — `LogReaderProfile`: the `lcsCommand.log` / `MatrixScreener.log` paths + freshness windows.
+- **Log reader** — `LogReaderProfile` (`vendor_specific/primitives/log/log_settings.py`): the `lcsCommand.log` / `MatrixScreener.log` paths + freshness windows.
 - **Machine-local calibration & limits** — `driver_setup/store.py` resolves the instrument's calibration
   (image↔stage matrix, per-objective translation), limits, orientation, and origin from a
   machine-local ProgramData. Directly below `navigator_expert`, each subsystem owns an independent
@@ -550,13 +550,16 @@ zmart_drivers/leica/stellaris5_y42h93/navigator_expert/
 │                       did not; never for an acquisition) · gate.py (when the limits are enforced)
 │                       · limit_errors.py
 ├── vendor_specific/    the only part that knows LAS X:
-│   ├── connection/     lasx_client.py (open the client and check it answers) · lasx_runtime.py (the
-│   │                   .NET CAM assemblies) · hardware_server.py · waiting.py (the waiting numbers)
+│   ├── connection/     lasx_client.py (open the client) · lasx_runtime.py (the .NET CAM assemblies)
+│   │                   · lasx_settings.py (its pacing and install folder) · hardware_server.py ·
+│   │                   waiting.py (the waiting numbers)
 │   ├── primitives/     the smallest reads and writes, one folder for each way of reaching LAS X:
 │   │                   direct/ (direct_reader.py, state_tree.py), api/ (api_reader.py, delivery.py),
-│   │                   log/ (log_reader.py, log_wait.py), interface/ (lasx_navigator.py,
-│   │                   lasx_dialogs.py: its buttons and dialogs), capture/ (data_container.py,
-│   │                   files.py, lasx_data_container.py, product.py, metadata_map.py)
+│   │                   log/ (log_reader.py, log_wait.py, log_settings.py), interface/
+│   │                   (lasx_navigator.py, lasx_dialogs.py: its buttons and dialogs), capture/
+│   │                   (data_container.py, files.py, lasx_data_container.py, product.py,
+│   │                   metadata_map.py), values/ (derived.py: what a value means · parsing.py:
+│   │                   the strings LAS X hands back). Imports nothing above it.
 │   └── primitive_handling/   how the dispatcher treats each command, for this microscope:
 │       ├── profiles/       command_profiles.py (one CommandProfile per command) · transport.py (how a
 │       │                   request is sent and its reply awaited) · prechecks.py (is the scanner
@@ -568,8 +571,7 @@ zmart_drivers/leica/stellaris5_y42h93/navigator_expert/
 │       │                   change is checked afterwards)
 │       └── readings/       reading_table.py (the table of readings) · sources.py (asking the API, the
 │                           log or the direct reader once) · named_readings.py (get_xy and the other named
-│                           readings) · derived.py (what a value means) · parsing.py (the strings
-│                           LAS X hands back)
+│                           readings)
 ├── testing/            unit/ (offline) · calibration/ (the calibration suites) · hardware/
 │                       (validate_*.py live scripts + mock-backed test_* gates) · helpers/ (the
 │                       LAS X mock) · data/

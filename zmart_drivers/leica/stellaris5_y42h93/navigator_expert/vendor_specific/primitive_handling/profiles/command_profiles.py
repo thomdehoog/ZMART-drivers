@@ -62,16 +62,6 @@ from ..confirmations.confirm_changes import confirm_objective
 
 
 @dataclass(frozen=True)
-class LogReaderProfile:
-    """Low-level LAS X log-reader paths and freshness defaults."""
-
-    lcs_log_path: str = r"C:\ProgramData\Leica Microsystems\LAS X\lcsCommand.log"
-    msgbox_log_path: str = r"C:\ProgramData\Leica Microsystems\LAS X\MatrixScreener.log"
-    current_window_s: float = 180.0
-    max_age_s: float | None = None
-
-
-@dataclass(frozen=True)
 class StateReaderProfile:
     """Profile-controlled backend selection for passive state reads.
 
@@ -171,27 +161,7 @@ class StateReaderProfile:
                 )
 
 
-LOG_READER = LogReaderProfile()
 STATE_READERS = StateReaderProfile()
-
-
-@dataclass(frozen=True)
-class LasxApiProfile:
-    """Connection-level LAS X API settings.
-
-    ``DelayInMilliseconds`` is Leica's client-side pacing knob. Keeping it in
-    the profile makes the default explicit and keeps hardware-specific API
-    timing out of scripts and workflows. ``runtime_root`` is the LAS X-installed
-    NavigatorExpert add-in directory that contains the CAM API assemblies.
-    """
-
-    delay_ms: int | None = 250
-    runtime_root: str = (
-        r"C:\Program Files\Leica Microsystems CMS GmbH\LAS X\AddIns\NavigatorExpert"
-    )
-
-
-LASX_API = LasxApiProfile()
 
 
 @dataclass(frozen=True)

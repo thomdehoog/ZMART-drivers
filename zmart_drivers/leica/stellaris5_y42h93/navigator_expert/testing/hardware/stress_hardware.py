@@ -1028,7 +1028,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--api-delay-ms",
         type=int,
-        help="override profiles.LASX_API.delay_ms for LasxApi",
+        help="override lasx_settings.LASX_API.delay_ms for LasxApi",
     )
     parser.add_argument(
         "--limits-config",

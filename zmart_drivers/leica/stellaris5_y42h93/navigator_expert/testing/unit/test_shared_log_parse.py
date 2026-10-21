@@ -172,20 +172,19 @@ def test_a_snapshot_counts_only_for_the_log_files_it_was_parsed_from(
     monkeypatch, tmp_path
 ):
     """Pointing the reader at other files (the --mock validators do) never serves the old ones."""
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.profiles import command_profiles as profiles
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitives.log import log_settings
 
     seen = []
 
     def parse(*args, **kwargs):
-        seen.append(profiles.LOG_READER.lcs_log_path)
+        seen.append(log_settings.LOG_READER.lcs_log_path)
         return log_reader.Snapshot(now=time.time())
 
     with patch.object(log_reader, "parse_files", side_effect=parse):
         real = log_reader.parse_log()
-        monkeypatch.setattr(
-            profiles,
+        monkeypatch.setattr(log_settings,
             "LOG_READER",
-            profiles.LogReaderProfile(
+            log_settings.LogReaderProfile(
                 lcs_log_path=str(tmp_path / "none.log"),
                 msgbox_log_path=str(tmp_path / "none2.log"),
             ),

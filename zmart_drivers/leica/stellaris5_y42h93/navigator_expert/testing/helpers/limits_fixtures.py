@@ -17,7 +17,7 @@ import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.profiles import command_profiles as profiles
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitives.log import log_settings
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.limits import (
     config as _limits_config,
 )
@@ -82,14 +82,14 @@ def hermetic_mock_machine_root() -> Path:
     publishes fixture limits and a named two-objective calibration. The
     connect-time configuration handshake then runs against machine-local files.
 
-    Also redirects ``profiles.LOG_READER`` to nonexistent paths under the
+    Also redirects ``log_settings.LOG_READER`` to nonexistent paths under the
     same throwaway root. The mock CAM client has no log stream (by design —
     see every validator's own "no LAS X log stream" framing), but
     ``LogReaderProfile``'s defaults are the *real* LAS X log paths
     (``config/profiles.py``); left alone, a machine with genuine LAS X log
     history (e.g. the actual bench PC, right after a live session) makes log
     reads succeed with real, stale data instead of correctly reading absent.
-    Callers running under pytest must restore ``profiles.LOG_READER``
+    Callers running under pytest must restore ``log_settings.LOG_READER``
     afterwards (see ``testing/hardware/conftest.py``'s autouse fixture); this
     function only sets it.
     """
@@ -115,7 +115,7 @@ def hermetic_mock_machine_root() -> Path:
             },
         },
     )
-    profiles.LOG_READER = profiles.LogReaderProfile(
+    log_settings.LOG_READER = log_settings.LogReaderProfile(
         lcs_log_path=str(root / "no_such_lcsCommand.log"),
         msgbox_log_path=str(root / "no_such_MatrixScreener.log"),
     )

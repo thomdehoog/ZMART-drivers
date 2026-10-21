@@ -45,7 +45,7 @@ import os
 import time
 import xml.etree.ElementTree as ET
 
-from ...primitive_handling.readings import derived
+from ..values import derived
 from .delivery import deliver
 from ...connection import waiting
 

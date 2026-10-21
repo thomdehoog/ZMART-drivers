@@ -16,7 +16,7 @@ import math
 from typing import Any
 from ..session import loaded_config as _session_state
 from ..dispatcher import gate as _gate
-from ..vendor_specific.primitive_handling.readings.parsing import (
+from ..vendor_specific.primitives.values.parsing import (
     parse_tile_geometry as _parse_tile_geometry,
 )
 from ..vendor_specific.primitive_handling.readings import named_readings as _readers

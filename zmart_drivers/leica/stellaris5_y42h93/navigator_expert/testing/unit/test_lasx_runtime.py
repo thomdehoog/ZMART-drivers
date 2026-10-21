@@ -4,7 +4,7 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.profiles import command_profiles as profiles
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.connection import lasx_settings
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.connection import (
     lasx_runtime,
 )
@@ -27,9 +27,9 @@ class TestLasxRuntime(unittest.TestCase):
 
     def test_missing_runtime_fails_before_importing_clr(self):
         root = Path(self._tmpdir.name)
-        profile = profiles.LasxApiProfile(runtime_root=str(root))
+        profile = lasx_settings.LasxApiProfile(runtime_root=str(root))
 
-        with mock.patch.object(profiles, "LASX_API", profile):
+        with mock.patch.object(lasx_settings, "LASX_API", profile):
             with self.assertRaisesRegex(RuntimeError, "Is LAS X installed"):
                 lasx_runtime.load_lasx_api_runtime()
 
