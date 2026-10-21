@@ -408,20 +408,20 @@ def phase_ci_default_position(v: vh.Validator, sess: Any, drv: Any) -> bool:
         commands = (
             v.command(
                 "ci default: move XY",
-                lambda: drv.move_xy(sess._handle.client, x_um, y_um, unit="um"),
+                lambda: drv.move_xy(sess._handle.microscope.client, x_um, y_um, unit="um"),
                 context={"target_x_um": x_um, "target_y_um": y_um},
             ),
             v.command(
                 "ci default: move Z-wide",
                 lambda: drv.move_z(
-                    sess._handle.client, job, z_wide_um, unit="um", z_mode="zwide"
+                    sess._handle.microscope.client, job, z_wide_um, unit="um", z_mode="zwide"
                 ),
                 context={"target_z_wide_um": z_wide_um, "non_negative": True},
             ),
             v.command(
                 "ci default: move Z-galvo",
                 lambda: drv.move_z(
-                    sess._handle.client, job, z_galvo_um, unit="um", z_mode="galvo"
+                    sess._handle.microscope.client, job, z_galvo_um, unit="um", z_mode="galvo"
                 ),
                 context={"target_z_galvo_um": z_galvo_um},
             ),
@@ -467,7 +467,7 @@ def _restore(
     only if this run actually moved it (its baseline may sit outside the
     envelope on the simulator, so we never touch it there).
     """
-    client = sess._handle.client
+    client = sess._handle.microscope.client
     if restore_zwide:
 
         def do_zwide() -> bool:
@@ -501,7 +501,7 @@ def _forget_validator_origin(
     it wrote makes the operator's previous origin the newest again, and the
     session goes back to the origin it was connected with.
     """
-    handle = sess._handle._handle
+    handle = sess._handle.microscope.handle
     if record is not None and record.get("origin_file"):
         folder = Path(record["origin_file"]).parent
 
@@ -538,13 +538,13 @@ def phase_move(
     dzw = args.z_wide_delta_um
     dzg = args.z_galvo_delta_um
     restore_zwide = False
-    saved_origin = dict(sess._handle._handle.origin)
+    saved_origin = dict(sess._handle.microscope.handle.origin)
     record = None
 
     with v.phase("move (set_origin + set_xyz)"):
         try:
             record = v.callable(
-                "set_origin", lambda: sess._handle.set_origin(), mutating=True
+                "set_origin", lambda: sess._handle.microscope.set_origin(), mutating=True
             )
             f = v.callable("get_xyz after set_origin", sess.get_xyz)
             if f is not None:

@@ -23,8 +23,8 @@ def set_origin(handle: ZmartHandle) -> dict:
     This is a setup step for the driver, not a controller command. The
     operator runs it once, working with the driver directly, for example::
 
-        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.for_zmart_controller.zmart_driver import ZmartDriver
-        ZmartDriver().set_origin()
+        import zmart_drivers.leica.stellaris5_y42h93.navigator_expert as navigator_expert
+        navigator_expert.connect().set_origin()
 
     It reads stage XY, both z drives (z-wide and z-galvo), their sum (the
     focus) and the current objective, and records them as the zero point.
