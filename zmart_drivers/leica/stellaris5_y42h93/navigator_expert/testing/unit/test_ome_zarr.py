@@ -165,6 +165,36 @@ class TestOneCopy:
             or [p.name for p in data.iterdir() if p.name != "metadata"] == []
         )
 
+    def test_a_copy_that_does_not_read_back_is_removed_even_while_held_for_a_moment(
+        self, hires, tmp_path, monkeypatch
+    ):
+        """Windows may hold a fresh file open for a moment; the half-written copy still goes.
+
+        Seen on the LAS X simulator PC, 2026-10-21: in two runs of six the
+        half-written store stayed behind, because removing it failed while a
+        file in it was held open, and the failure was ignored.
+        """
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.save_data import ome_zarr
+
+        root, _ = hires
+        monkeypatch.setattr(np, "array_equal", lambda *_, **__: False)
+        real_rmtree, refusals = ome_zarr.shutil.rmtree, []
+
+        def held_twice(path, *args, **kwargs):
+            if str(path).endswith(".writing") and len(refusals) < 2:
+                refusals.append(path)
+                raise PermissionError(5, "Access is denied", str(path))
+            return real_rmtree(path, *args, **kwargs)
+
+        monkeypatch.setattr(ome_zarr.shutil, "rmtree", held_twice)
+
+        with pytest.raises(RuntimeError, match="read back"):
+            save_as_zarr(root, tmp_path, "HiRes", placement=at(0.0, 0.0, {0: 0.0}))
+
+        data = tmp_path / "out" / "data"
+        assert [p.name for p in data.iterdir() if p.name != "metadata"] == []
+        assert len(refusals) == 2
+
     def test_a_store_held_open_for_a_moment_is_still_renamed_into_place(
         self, hires, tmp_path, monkeypatch, caplog
     ):
