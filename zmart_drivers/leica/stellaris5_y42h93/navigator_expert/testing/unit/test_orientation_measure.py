@@ -33,13 +33,15 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.orienta
     measure_orientation as wf,
 )
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.limits import handshake
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.changes import run_job
+
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.save_data import save as saving
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.connection import lasx_client
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.primitives.values import parsing
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.readings import named_readings as readers
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.changes import changes
+
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.primitives.capture import product
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.changes import acquire as acquire_change
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.changes import stage
 
 
 @pytest.fixture
@@ -131,7 +133,7 @@ def _patch(
 
     monkeypatch.setattr(readers, "get_xy", _get_xy)
     monkeypatch.setattr(readers, "get_xy", _get_xy)
-    monkeypatch.setattr(changes, "move_xy", _move_xy)
+    monkeypatch.setattr(stage, "move_xy", _move_xy)
     monkeypatch.setattr(
         readers,
         "get_job_settings",
@@ -168,7 +170,7 @@ def _patch(
             image = _translate_without_wrap(image, dx_px, dy_px)
         return _saved_manifest(output_root, naming, image)
 
-    monkeypatch.setattr(run_job, "acquire", _acquire)
+    monkeypatch.setattr(acquire_change, "take_picture", _acquire)
     monkeypatch.setattr(saving, "save", _save)
     return pos
 
@@ -706,7 +708,7 @@ def test_validation_stays_in_run_and_reloads_saved_image(tmp_path, monkeypatch):
     acquired = object()
     expected_image = np.arange(12, dtype=np.uint16).reshape(3, 4)
 
-    monkeypatch.setattr(run_job, "acquire", lambda client, job: acquired)
+    monkeypatch.setattr(acquire_change, "take_picture", lambda client, job: acquired)
 
     def _save(client, acquisition, output_root, naming, *, orientation):
         assert client is session.client

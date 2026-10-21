@@ -20,8 +20,7 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher.door impo
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.limits.handshake import (
     connect_handshake as connect_limits_handshake,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.changes.run_job import AcquisitionResult
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.changes.run_job import acquire
+
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.objective_change_with_compensation.compensated_changes import (
     select_job,
     set_objective,
@@ -33,7 +32,7 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.save_data
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.connection.lasx_client import (
     connect_python_client,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.changes.confirm_changes import _readback
+
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.sending.error_classification import (
     _check_api_error,
     _default_error_check,
@@ -59,34 +58,21 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.readings.
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.readings.named_readings import get_xy
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.readings.named_readings import ping
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.readings.named_readings import read_zwide_um
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.changes.changes import move_xy
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.changes.changes import move_z
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.changes.changes import set_detector_gain
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.changes.changes import set_filter_wheel_slot
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.changes.changes import set_filter_wheel_spectrum
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.changes.changes import set_frame_accumulation
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.changes.changes import set_frame_average
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.changes.changes import set_image_format
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.changes.changes import set_laser_intensity
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.changes.changes import set_laser_shutter
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.changes.changes import set_line_accumulation
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.changes.changes import set_line_average
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.changes.changes import set_pinhole_airy
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.changes.changes import set_scan_field_rotation
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.changes.changes import set_scan_mode
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.changes.changes import set_scan_resonant
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.changes.changes import set_scan_speed
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.changes.changes import set_sequential_mode
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.changes.changes import set_z_stack_definition
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.changes.changes import set_z_stack_size
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.changes.changes import set_z_stack_step_size
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.changes.changes import set_zoom
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.changes.limit_rules import _stage_limits
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.changes.limit_rules import apply_stage_limits_from_config
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.changes.limit_rules import check_xy
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.changes.limit_rules import check_z
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.changes.limit_rules import get_stage_limits
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.changes.limit_rules import set_stage_limits
+
+
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.changes.acquire import take_picture
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.changes.confirming import readback
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.changes.job_settings import change as change_setting
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.changes.stage import move_xy, move_z
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.sending.limit_rules import (
+    _stage_limits,
+    apply_stage_limits_from_config,
+    check_xy,
+    check_z,
+    get_stage_limits,
+    set_stage_limits,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.primitives.capture.product import AcquisitionResult
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.primitives.capture.product import (
     AcquisitionMetadata,
     ChannelMetadata,

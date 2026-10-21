@@ -23,7 +23,7 @@ from mock_lasx_api import MockLasxClient
 from state_tree_stand_in import StandInNodes, answer_json_read
 
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.readings import reading_table as capabilities
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.changes import changes as commands
+
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.objective_change_with_compensation import (
     compensated_changes as commands_comp,
 )
@@ -38,6 +38,9 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.primitives.direct im
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.connection import (
     hardware_server,
 )
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.changes import acquire as acquire_change
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.changes import select_job as select_job_change
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.changes import stage
 
 #: The jobs' block and element ids as on the simulator (2026-10-13).
 JOBS = {"AF Job": (156, 1), "Overview": (154, 2), "HiRes": (152, 3)}
@@ -155,7 +158,7 @@ class TestSuccessChecks:
     """move_xy, move_z and select_job confirm from the direct reader."""
 
     def test_move_xy(self, client, tree):
-        result = commands.move_xy(client, 50025.0, 30000.0)
+        result = stage.move_xy(client, 50025.0, 30000.0)
         assert (result["success"], result["confirmed"]) == (True, True)
         assert readers.get_xy(client)["x_um"] == pytest.approx(50025.0)
 
@@ -166,7 +169,7 @@ class TestSuccessChecks:
             "sections": 21,
             "mode": "z-galvo",
         }
-        result = commands.move_z(client, "HiRes", 12.0, z_mode="galvo")
+        result = stage.move_z(client, "HiRes", 12.0, z_mode="galvo")
         assert (
             result["success"],
             result["confirmed"],
@@ -285,7 +288,6 @@ class TestDirectByDefault:
         self, client, tree, monkeypatch
     ):
         # The scan runs for three readings, then LAS X is idle again.
-        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.changes import confirm_changes as confirmations
 
         real, asked = readers.get_scan_status, []
 
@@ -299,7 +301,7 @@ class TestDirectByDefault:
             return reading
 
         monkeypatch.setattr(readers, "get_scan_status", watched)
-        result = confirmations.confirm_acquire(
+        result = acquire_change.confirm_acquire(
             client, start_timeout=5.0, timeout=10.0, poll_interval=0.001
         )
         assert result["success"] is True
@@ -311,9 +313,6 @@ class TestDirectByDefault:
         # The direct reader says HiRes is selected; a stale log line claims the
         # target, Overview, already is. The switch must still be made, and the
         # CAM API's job list is never read for it.
-        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.changes import (
-            confirm_select_job,
-        )
 
         real_jobs, api_job_lists = readers.get_jobs, []
 
@@ -324,8 +323,8 @@ class TestDirectByDefault:
 
         monkeypatch.setattr(readers, "get_jobs", jobs)
         monkeypatch.setattr(
-            confirm_select_job,
-            "_selected_job_name_from_log",
+            select_job_change,
+            "selected_job_from_log",
             lambda _profile: "Overview",
         )
         result = commands_comp.select_job(client, "Overview")

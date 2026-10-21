@@ -19,7 +19,7 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.zmart_controller_plu
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.connection import (
     lasx_client,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.sending.command_profiles import IMAGE_SAVE
+
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.session import (
     loaded_config as session_state,
 )
@@ -34,6 +34,7 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.store i
     MachineProfile,
 )
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher import gate
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.save_data import save_settings
 
 
 def _connect(**kwargs) -> MockLasxClient:
@@ -44,7 +45,7 @@ def _connect(**kwargs) -> MockLasxClient:
 
 
 def test_connect_loads_limits_orientation_and_calibration_by_default():
-    assert IMAGE_SAVE.apply_orientation is True
+    assert save_settings.IMAGE_SAVE.apply_orientation is True
     client = _connect()
     cfg = session_state.get(client)
     assert cfg is not None

@@ -24,13 +24,12 @@ import time
 import unittest
 from unittest.mock import patch
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.changes import confirm_changes as confirmations
-
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.sending import command_profiles as profiles
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.readings import named_readings as readers
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.readings import (
     sources as engine,
 )
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.changes import confirming
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.readings import reading_settings
 
 
 def _ok(msg="ok"):
@@ -46,22 +45,22 @@ class TestSingleLegIdentity(unittest.TestCase):
         def leg():
             return _ok()
 
-        self.assertIs(confirmations.race_confirmations(api_leg=leg), leg)
+        self.assertIs(confirming.race_confirmations(api_leg=leg), leg)
 
     def test_log_only_returns_the_leg_unchanged(self):
         def leg():
             return _ok()
 
-        self.assertIs(confirmations.race_confirmations(log_leg=leg), leg)
+        self.assertIs(confirming.race_confirmations(log_leg=leg), leg)
 
     def test_no_legs_returns_none(self):
-        self.assertIsNone(confirmations.race_confirmations())
+        self.assertIsNone(confirming.race_confirmations())
 
 
 class TestDualLegRace(unittest.TestCase):
     def test_dual_leg_requires_budget(self):
         with self.assertRaises(ValueError):
-            confirmations.race_confirmations(
+            confirming.race_confirmations(
                 api_leg=lambda: _ok(), log_leg=lambda: _ok()
             )
 
@@ -73,7 +72,7 @@ class TestDualLegRace(unittest.TestCase):
             release.wait(5.0)
             return _ok("api late")
 
-        race = confirmations.race_confirmations(
+        race = confirming.race_confirmations(
             api_leg=hung_api,
             log_leg=lambda: _ok("log confirmed"),
             label="TestCmd",
@@ -98,7 +97,7 @@ class TestDualLegRace(unittest.TestCase):
             finally:
                 log_done.set()
 
-        race = confirmations.race_confirmations(
+        race = confirming.race_confirmations(
             api_leg=lambda: (log_done.wait(2.0), _ok("api readback"))[1],
             log_leg=failing_log,
             label="TestCmd",
@@ -112,7 +111,7 @@ class TestDualLegRace(unittest.TestCase):
         self.assertTrue(any("log leg had not confirmed" in m for m in warnings))
 
     def test_both_fail_is_fail_closed_with_both_logs(self):
-        race = confirmations.race_confirmations(
+        race = confirming.race_confirmations(
             api_leg=lambda: _fail("api no match"),
             log_leg=lambda: _fail("log no event"),
             label="TestCmd",
@@ -133,7 +132,7 @@ class TestDualLegRace(unittest.TestCase):
             release.wait(10.0)
             return _ok()
 
-        race = confirmations.race_confirmations(
+        race = confirming.race_confirmations(
             api_leg=hung,
             log_leg=hung,
             label="TestCmd",
@@ -153,7 +152,7 @@ class TestDualLegRace(unittest.TestCase):
         def broken_api():
             raise RuntimeError("CAM exploded")
 
-        race = confirmations.race_confirmations(
+        race = confirming.race_confirmations(
             api_leg=broken_api,
             log_leg=lambda: _ok("log confirmed"),
             label="TestCmd",
@@ -170,12 +169,12 @@ class TestApiLegRoutedReads(unittest.TestCase):
     expired race leaves no claim residue blocking the next attempt."""
 
     def setUp(self):
-        self._profile = profiles.STATE_READERS
-        profiles.STATE_READERS = profiles.StateReaderProfile()
+        self._profile = reading_settings.STATE_READERS
+        reading_settings.STATE_READERS = reading_settings.StateReaderProfile()
         self.addCleanup(self._restore)
 
     def _restore(self):
-        profiles.STATE_READERS = self._profile
+        reading_settings.STATE_READERS = self._profile
 
     @staticmethod
     def _make_api_leg(client, poll_window_s=1.5):
@@ -214,7 +213,7 @@ class TestApiLegRoutedReads(unittest.TestCase):
             return [{"Name": "HiRes", "IsSelected": True}]
 
         with patch.object(readers.api_reader, "get_jobs", side_effect=raw_get_jobs):
-            race = confirmations.race_confirmations(
+            race = confirming.race_confirmations(
                 api_leg=self._make_api_leg(client),
                 log_leg=lambda: _fail("log no event"),
                 label="TestCmd",
@@ -259,7 +258,7 @@ class TestApiLegRoutedReads(unittest.TestCase):
 
         with patch.object(readers.api_reader, "get_jobs", side_effect=raw_get_jobs):
             threading.Thread(target=release_later, daemon=True).start()
-            race = confirmations.race_confirmations(
+            race = confirming.race_confirmations(
                 api_leg=self._make_api_leg(client),
                 log_leg=lambda: _fail("log no event"),
                 label="TestCmd",
@@ -288,7 +287,7 @@ class TestApiLegRoutedReads(unittest.TestCase):
             return [{"Name": "HiRes", "IsSelected": True}]
 
         with patch.object(readers.api_reader, "get_jobs", side_effect=raw_get_jobs):
-            first = confirmations.race_confirmations(
+            first = confirming.race_confirmations(
                 api_leg=self._make_api_leg(client),
                 log_leg=lambda: _fail("log no event"),
                 label="TestCmd",
@@ -300,7 +299,7 @@ class TestApiLegRoutedReads(unittest.TestCase):
             self._wait_claim_clear(api_key)
             self.assertNotIn(api_key, engine._API_TURNS._busy)
 
-            second = confirmations.race_confirmations(
+            second = confirming.race_confirmations(
                 api_leg=self._make_api_leg(client),
                 log_leg=lambda: _fail("log no event"),
                 label="TestCmd",

@@ -4,8 +4,9 @@ import sys
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.readings import reading_settings
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.sending import command_profiles as profiles
+
 
 
 def _load_validator():
@@ -19,14 +20,14 @@ def _load_validator():
 
 class TestValidateHardwareCli(unittest.TestCase):
     def setUp(self):
-        self._profile = profiles.STATE_READERS
+        self._profile = reading_settings.STATE_READERS
         self.addCleanup(self._restore)
 
     def _restore(self):
-        profiles.STATE_READERS = self._profile
+        reading_settings.STATE_READERS = self._profile
 
     def test_log_tuning_flags_preserve_current_confirm_source(self):
-        profiles.STATE_READERS = profiles.StateReaderProfile(
+        reading_settings.STATE_READERS = reading_settings.StateReaderProfile(
             selected_job_confirm_source="hybrid",
         )
         validator = _load_validator()
@@ -43,8 +44,8 @@ class TestValidateHardwareCli(unittest.TestCase):
             args, logging.getLogger("validate-hardware-test")
         )
 
-        self.assertEqual(profiles.STATE_READERS.selected_job_confirm_source, "hybrid")
-        self.assertEqual(profiles.STATE_READERS.selected_job_log_cluster_max_age_s, 4.0)
+        self.assertEqual(reading_settings.STATE_READERS.selected_job_confirm_source, "hybrid")
+        self.assertEqual(reading_settings.STATE_READERS.selected_job_log_cluster_max_age_s, 4.0)
 
 
 if __name__ == "__main__":

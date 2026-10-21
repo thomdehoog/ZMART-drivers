@@ -11,15 +11,14 @@ University of Zurich (thom.dehoog@zmb.uzh.ch, thomdehoog@gmail.com).
 
 import pytest
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.changes import (
-    confirm_select_job,
-)
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.sending import prechecks
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.sending import command_profiles as profiles
+
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.readings import (
     sources,
 )
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.readings import named_readings as readers
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.readings import reading_settings
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.changes import select_job as select_job_change
 
 
 @pytest.fixture
@@ -28,14 +27,14 @@ def use_profile(monkeypatch):
 
     def install(**settings):
         monkeypatch.setattr(
-            profiles, "STATE_READERS", profiles.StateReaderProfile(**settings)
+            reading_settings, "STATE_READERS", reading_settings.StateReaderProfile(**settings)
         )
 
     return install
 
 
 def test_the_shipped_fallbacks():
-    shipped = profiles.StateReaderProfile()
+    shipped = reading_settings.StateReaderProfile()
     assert shipped.reading_fallback == "api"
     assert shipped.waiting_fallback == "api"
     assert shipped.selected_job_confirm_fallback == "hybrid"
@@ -46,7 +45,7 @@ def test_the_shipped_fallbacks():
 )
 def test_a_fallback_that_names_no_family_is_refused(field):
     with pytest.raises(ValueError, match=field):
-        profiles.StateReaderProfile(**{field: "direct"})
+        reading_settings.StateReaderProfile(**{field: "direct"})
 
 
 def test_a_plain_reading_falls_back_to_the_profiles_family(use_profile, monkeypatch):
@@ -104,7 +103,7 @@ def test_job_confirmation_falls_back_as_the_profile_says(use_profile):
         selected_job_confirm_fallback="api",
     )
 
-    api_confirm, log_leg, budget_s = confirm_select_job.select_job_confirm_legs(
+    api_confirm, log_leg, budget_s = select_job_change.select_job_confirm_legs(
         "Overview", command_started_at=0.0
     )
 

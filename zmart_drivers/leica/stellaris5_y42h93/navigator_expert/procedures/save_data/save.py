@@ -99,7 +99,7 @@ def save(
     a single plane is its own projection and gets none, so nothing is
     written twice.
     """
-    from ...operations.sending.command_profiles import IMAGE_SAVE
+    from .save_settings import IMAGE_SAVE
 
     projection = IMAGE_SAVE.projection if projection is None else projection
     if projection not in PROJECTIONS:

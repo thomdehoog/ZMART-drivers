@@ -30,7 +30,7 @@ DRIVER_ROOT = Path(__file__).resolve().parents[2]
 # The parts that may fire native stage motion or call the limit-check functions.
 DISPATCHER = "dispatcher"
 # The Leica rulebook defines the check functions; the gate in the dispatcher enforces them.
-RULEBOOK = Path("operations/changes/limit_rules.py")
+RULEBOOK = Path("operations/sending/limit_rules.py")
 
 # Source selection is policy, not caller behaviour. The read engine implements
 # the profile-controlled modes; the confirmation modules construct explicit
@@ -43,8 +43,8 @@ READER_SOURCE_POLICY_MODULES = {
     Path("dispatcher/send_loop.py"),
     Path("dispatcher/confirm_loop.py"),
     Path("operations/readings/reading_table.py"),
-    Path("operations/changes/confirm_changes.py"),
-    Path("operations/changes/confirm_select_job.py"),
+    Path("operations/changes/confirming.py"),
+    Path("operations/changes/select_job.py"),
     # Calibration geometry is saved for good, so it is read from the API
     # and never from a log entry that may be stale (review finding M4).
     Path("driver_setup/optical_calibration/calibration_common.py"),
@@ -69,7 +69,7 @@ def _driver_sources():
 def test_native_stage_motion_fires_only_from_the_actions():
     """The native CAM motion functions are the stage's real door.
 
-    Only the change definitions in ``operations/changes/changes.py`` may touch them: that
+    Only the stage moves in ``operations/changes/stage.py`` may touch them: that
     is where the limit checks run, immediately before the native call. A
     native-motion reference anywhere else would be a second, unchecked door.
     """
@@ -79,7 +79,7 @@ def test_native_stage_motion_fires_only_from_the_actions():
         if "PyApiMoveHardware" in text
         and rel
         not in (
-            Path("operations/changes/changes.py"),
+            Path("operations/changes/stage.py"),
             # The direct route's table of how each CAM command is written for the hardware
             # server. It sends nothing itself: only the direct transport does, and that is
             # reached through the same change definitions and the same limits gate.
@@ -87,20 +87,18 @@ def test_native_stage_motion_fires_only_from_the_actions():
         )
     ]
     assert offenders == [], (
-        f"native stage motion referenced outside operations/changes/changes.py: {offenders}; "
+        f"native stage motion referenced outside operations/changes/stage.py: {offenders}; "
         f"route the move through the move_xy / move_z actions instead"
     )
 
 
 def test_limit_checks_are_called_only_from_the_changes_and_the_dispatcher():
     """``check_xy`` / ``check_z`` are *defined* in the dispatcher's rulebook and
-    *called* only from the change definitions in ``operations/changes/changes.py``. A call anywhere else
+    *called* only from the stage moves in ``operations/changes/stage.py``. A call anywhere else
     is a second whistle: a copy of enforcement that can drift out of sync with
     the real one."""
     allowed = {
-        Path(
-            "operations/changes/changes.py"
-        ),  # the change definitions: where the checks run
+        Path("operations/changes/stage.py"),  # the stage moves: where the checks run
     }
     offenders = []
     for rel, text in _driver_sources():
@@ -109,19 +107,19 @@ def test_limit_checks_are_called_only_from_the_changes_and_the_dispatcher():
         if "check_xy(" in text or "check_z(" in text:
             offenders.append(str(rel))
     assert offenders == [], (
-        f"limit checks called outside operations/changes/changes.py and dispatcher/: {offenders}; "
+        f"limit checks called outside operations/changes/stage.py and dispatcher/: {offenders}; "
         f"the changes already check every move; delete the duplicate call"
     )
 
 
 def test_the_rulebook_lives_in_the_dispatcher():
     """``LeicaLimits`` (the compiled limits document) is defined in
-    operations/changes/limit_rules.py; the gate only imports it. If the class definition
+    operations/sending/limit_rules.py; the gate only imports it. If the class definition
     moves back into the gate, rulebook and whistle have merged again."""
     checks_text = (
         DRIVER_ROOT
         / "operations"
-        / "changes"
+        / "sending"
         / "limit_rules.py"
     ).read_text(encoding="utf-8")
     gate_text = (DRIVER_ROOT / "dispatcher" / "gate.py").read_text(encoding="utf-8")
@@ -257,7 +255,7 @@ def test_each_part_only_imports_what_the_anatomy_allows():
 #: The bottom of the vendor part, bottom first: how the driver reaches LAS X, and
 #: one read or write each. Neither imports from anything above it.
 def test_a_reading_never_uses_a_change():
-    """A get never calls a set: operations/readings/reading_table.py must not import operations/changes/changes.py."""
+    """A get never calls a set: operations/readings/reading_table.py must not import a change."""
     readings = (
         DRIVER_ROOT
         / "operations"
@@ -269,7 +267,7 @@ def test_a_reading_never_uses_a_change():
         if isinstance(node, ast.ImportFrom):
             names = [node.module or "", *(a.name for a in node.names)]
             assert "changes" not in names, (
-                "operations/readings/reading_table.py imports operations/changes/changes.py"
+                "operations/readings/reading_table.py imports a change"
             )
 
 

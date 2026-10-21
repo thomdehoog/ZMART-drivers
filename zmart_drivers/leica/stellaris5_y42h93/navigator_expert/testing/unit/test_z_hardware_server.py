@@ -20,8 +20,6 @@ from unittest.mock import patch
 import pytest
 from z_readback_settings import raw_settings
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.changes import confirm_changes as confirmations
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.changes import changes as commands
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.primitives.values.derived import (
     z_um_from_settings,
 )
@@ -39,6 +37,8 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.absolute_
     frame as _frame,
 )
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.readings import named_readings as _readers
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.changes import confirming
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.changes import stage
 
 
 #: What the simulator's hardware server answered on 2026-10-12, at rest.
@@ -184,8 +184,8 @@ class TestCallers:
     def test_confirm_move_z_confirms_where_the_drive_is(self, server, monkeypatch):
         server.Hardware.ZPosZGalvo = 50e-6
         ch = make_changeable_copy(raw_settings(galvo_um=-0.01, stack_on="z-galvo"))
-        with patch.object(confirmations, "_readback", return_value=ch):
-            result = confirmations.confirm_move_z(
+        with patch.object(confirming, "readback", return_value=ch):
+            result = stage.confirm_move_z(
                 object(), job_name="J", z_mode="galvo", target_um=50.0, poll_window=1.0
             )
         assert result["success"] is True
@@ -195,8 +195,8 @@ class TestCallers:
     ):
         server.Hardware.ZPosZGalvo = 0.0
         ch = make_changeable_copy(raw_settings(galvo_um=-0.01, stack_on="z-galvo"))
-        with patch.object(confirmations, "_readback", return_value=ch):
-            result = confirmations.confirm_move_z(
+        with patch.object(confirming, "readback", return_value=ch):
+            result = stage.confirm_move_z(
                 object(), job_name="J", z_mode="galvo", target_um=50.0, poll_window=0.3
             )
         assert result["success"] is False
@@ -234,7 +234,7 @@ class TestMoveZEndToEnd:
         install_permissive_limits(client, wide_stage=True)
         server.Hardware.ZPosZGalvo = 12e-6
         t0 = time.perf_counter()
-        result = commands.move_z(client, "HiRes", 12.0, z_mode="galvo")
+        result = stage.move_z(client, "HiRes", 12.0, z_mode="galvo")
         assert (
             result["success"],
             result["confirmed"],

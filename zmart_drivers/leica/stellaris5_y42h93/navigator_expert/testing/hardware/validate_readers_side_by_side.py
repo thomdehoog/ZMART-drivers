@@ -56,7 +56,7 @@ from run_report import RunReport, attempts_of, confirmation_of, replay_envelope_
 import low_level as drv
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.readings import reading_table as capabilities
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.primitives.log import log_settings
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.sending import command_profiles as profiles
+
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.readings import named_readings as readers
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.connection import waiting
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.primitives.log import (
@@ -66,6 +66,7 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.primitives.values.pa
     make_changeable_copy,
     parse_tile_geometry,
 )
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.readings import reading_settings
 
 API_HANG_MS = 1500.0  # an API read slower than this is treated as a dialog-hang
 
@@ -633,28 +634,28 @@ def phase_changes(client, job, rec):
             "zoom",
             [5.0, 2.0, 1.0],
             0.1,
-            lambda j, x: drv.set_zoom(client, j, x),
+            lambda j, x: drv.change_setting(client, "zoom", j, value=x),
             lambda ch: (ch["zoom"] or {}).get("current"),
         ),
         (
             "scan_speed",
             [400, 600, 800],
             1.0,
-            lambda j, x: drv.set_scan_speed(client, j, x),
+            lambda j, x: drv.change_setting(client, "scan_speed", j, value=x),
             lambda ch: (ch["scanSpeed"] or {}).get("value"),
         ),
         (
             "image_format",
             ["512 x 512", "1024 x 1024"],
             None,
-            lambda j, x: drv.set_image_format(client, j, x),
+            lambda j, x: drv.change_setting(client, "image_format", j, format_str=x),
             lambda ch: ch.get("format"),
         ),
         (
             "pinhole_airy",
             [1.0, 1.2, 0.8],
             0.05,
-            lambda j, x: drv.set_pinhole_airy(client, j, 0, x),
+            lambda j, x: drv.change_setting(client, "pinhole_airy", j, setting_index=0, value=x),
             lambda ch: (
                 (ch.get("activeSettings") or [{}])[0].get("pinholeAiry") or {}
             ).get("value"),
@@ -841,8 +842,8 @@ def main(argv=None):
         # (same pinning as validate_hardware --mock).
         from dataclasses import replace  # noqa: PLC0415
 
-        profiles.STATE_READERS = replace(
-            profiles.STATE_READERS, selected_job_confirm_source="api"
+        reading_settings.STATE_READERS = replace(
+            reading_settings.STATE_READERS, selected_job_confirm_source="api"
         )
 
     report = RunReport(

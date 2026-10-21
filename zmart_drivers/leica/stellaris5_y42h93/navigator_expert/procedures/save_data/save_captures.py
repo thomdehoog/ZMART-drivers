@@ -23,7 +23,7 @@ from pathlib import Path
 from typing import Any
 
 from ...driver_setup import orientation as _orientation
-from ...operations.sending.command_profiles import IMAGE_SAVE
+from .save_settings import IMAGE_SAVE
 from ...operations.readings import named_readings as _readers
 from ...session import loaded_config as _session_state
 from ...session.handle import Session, require_open

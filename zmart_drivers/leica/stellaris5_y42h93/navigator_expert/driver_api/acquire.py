@@ -35,7 +35,7 @@ except Exception:  # noqa: BLE001 -- best-effort provenance
 from ..procedures.save_data.naming import Naming, free_stem
 from .pending_capture import PendingCapture
 from ..operations.readings import named_readings as _readers
-from ..operations.changes import run_job as _capture
+from ..operations.changes import acquire as acquire_change
 from ..session import handle as _info
 from ..procedures.absolute_coordinate_system.frame import get_xyz
 from .state import get_state
@@ -194,7 +194,7 @@ def acquire(
             "last reported (changed in LAS X?); the capture is placed from the "
             "fresh reading",
         )
-    acq = _capture.acquire(handle.client, job)
+    acq = acquire_change.take_picture(handle.client, job)
 
     label = (
         position_label if position_label is not None else _next_position_label(handle)

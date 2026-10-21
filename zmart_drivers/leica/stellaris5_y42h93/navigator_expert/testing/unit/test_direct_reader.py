@@ -18,7 +18,7 @@ from mock_lasx_api import MockLasxClient
 from state_tree_stand_in import StandInNodes, answer_json_read
 
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.readings import reading_table as capabilities
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.changes.objectives import objective_by_slot
+
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.primitives.api import (
     api_reader,
 )
@@ -32,6 +32,7 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.connection import (
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.primitives.values.parsing import (
     make_changeable_copy,
 )
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.changes import objective as objective_change
 
 #: The jobs' block and element ids as on the simulator (2026-10-13).
 JOBS = {"AF Job": (156, 1), "Overview": (154, 2), "HiRes": (152, 3)}
@@ -604,8 +605,8 @@ class TestTheHardwareInfo:
         assert direct_reader.get_hardware_info() == api_reader.get_hardware_info(client)
 
     def test_the_turret_as_the_driver_reads_it(self, client, tree):
-        assert sorted(objective_by_slot(direct_reader.get_hardware_info())) == sorted(
-            objective_by_slot(api_reader.get_hardware_info(client))
+        assert sorted(objective_change.objective_by_slot(direct_reader.get_hardware_info())) == sorted(
+            objective_change.objective_by_slot(api_reader.get_hardware_info(client))
         )
 
 

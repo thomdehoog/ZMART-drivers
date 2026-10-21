@@ -550,17 +550,18 @@ zmart_drivers/leica/stellaris5_y42h93/navigator_expert/
 │                       did not; never for an acquisition) · gate.py (when the limits are enforced)
 │                       · limit_errors.py
 ├── operations/         what the STELLARIS does, each change and reading in one place:
-│   ├── changes/        the changes, each with its confirmation: settings.py (one entry per setting
-│   │                   of a job) · changes.py (the command functions) · confirm_changes.py ·
-│   │                   confirm_select_job.py · run_job.py (running the selected job) ·
-│   │                   objectives.py · limit_rules.py (what the limits allow)
+│   ├── changes/        each change with its profile and its confirmation: job_settings.py (the
+│   │                   settings of a job: one table, one runner, one confirmation) · stage.py
+│   │                   (move_xy, move_z) · objective.py · select_job.py · acquire.py; and what
+│   │                   they share: run_change.py (the limits, then the dispatcher) · confirming.py
+│   │                   (reading back, racing two confirmations)
 │   ├── readings/       reading_table.py (the table of readings) · sources.py (asking the API, the
 │   │                   log or the direct reader once) · named_readings.py (get_xy and the other
-│   │                   named readings)
-│   └── sending/        how a command reaches LAS X: command_profiles.py (one CommandProfile per
-│                       command) · routes.py, direct_transport.py, transport.py (the direct route
-│                       and the CAM API) · prechecks.py (is the scanner idle) ·
-│                       error_classification.py (sorting LAS X's errors)
+│   │                   named readings) · reading_settings.py (which source each reading asks)
+│   └── sending/        how a command reaches LAS X: command_profile.py (the CommandProfile) ·
+│                       routes.py, direct_transport.py, transport.py (the direct route and the
+│                       CAM API) · prechecks.py (is the scanner idle) · error_classification.py
+│                       (sorting LAS X's errors) · limit_rules.py (what the limits allow)
 ├── primitives/         the smallest reads and writes, one folder for each way of reaching LAS X:
 │                       direct/ (direct_reader.py, state_tree.py, send_command.py), api/
 │                       (api_reader.py, delivery.py), log/ (log_reader.py, log_wait.py,
@@ -653,8 +654,9 @@ workflow sees:
 
 ## 8. Configuration & tuning (profiles)
 
-Every command has a frozen `CommandProfile` in `operations/sending/command_profiles.py` — its complete recipe (pluggable
-callables + retry/confirm tuning). Tuning a command = editing its profile; nothing else changes.
+Every change has a frozen `CommandProfile` (`operations/sending/command_profile.py`), defined beside the
+change in `operations/changes/`: its complete recipe (pluggable callables + retry/confirm tuning). Every
+setting of a job shares one, `job_settings.PROFILE`. Tuning a change = editing its profile; nothing else changes.
 
 ```python
 @dataclass(frozen=True)
@@ -755,20 +757,21 @@ These **silently misbehave** instead of failing loudly — respect them or resul
 
 ## 11. Extending the driver
 
-Adding a command touches four places, following the pattern every existing command uses:
+**A new setting of a job** is one entry in the table in `operations/changes/job_settings.py`: its
+name, its arguments, the LAS X request and how it is filled in, which argument holds the value,
+where the value stands in the job's settings read back, and its tolerance. `change_setting` then
+changes it, and the limits know it as `set_<name>` (`operations/sending/limit_rules.py`); add a row
+to the table of settings in section 4.
 
-1. **Confirm function** (`operations/changes/confirm_changes.py`) — `_confirm_X(client, ...) -> {"success", "logs"}`
-   (skip if no readback is possible).
-2. **CommandProfile** (`operations/sending/command_profiles.py`) — `MY_PARAM = _leica_setting_profile(_confirm_my_param)`.
-3. **Command wrapper** (`operations/changes/changes.py`) — three phases (pre-checks → `dispatch_change(...)` with the
-   profile + a `setup_fn` and target-bound `confirm_fn` → post-process). `dispatch_change` handles
-   client-binding, profile defaults, and the `confirm_and_fire` call. A job setting is one entry in
-   `settings.py` and one named function here; listed in `settings.BY_NAME`, it is reachable with
-   `change_setting`.
-4. **The Microscope** (`driver_api/microscope.py`) — a new kind of command gets a method there,
-   and a row in section 4. A test checks that every method of the `Microscope` is in this README.
+**A new kind of change** is one file in `operations/changes/`, holding the change, its
+`CommandProfile` and its confirmation (`confirm_X(client, ...) -> {"success", "logs"}`, one
+window long). The change runs in three phases: the checks and the limits
+(`run_change.limits_refusal`), then `run_change.dispatch_change(...)` with the profile, a
+`setup_fn` and the confirmation, then what the caller needs added. The `Microscope`
+(`driver_api/microscope.py`) gets a method for it and a row in section 4; a test checks that every
+method of the `Microscope` is in this README.
 
-Copy the closest existing command of a similar shape.
+Copy the closest existing change of a similar shape.
 
 ## 12. References
 - ZMART Controller (the microscope-independent layer this driver plugs into). It lives in its own

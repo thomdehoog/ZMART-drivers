@@ -50,7 +50,7 @@ profile can name it directly.
 
 How the dispatcher treats one command. A frozen dataclass (the dispatcher
 changes a field with `dataclasses.replace`), with these fields. Leica:
-`CommandProfile` in `operations/sending/command_profiles.py`.
+`CommandProfile` in `operations/sending/command_profile.py`, one beside each change in `operations/changes/`.
 
 | Field | Meaning |
 |---|---|

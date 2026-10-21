@@ -58,6 +58,7 @@ import validate_hardware as vh
 import zmart_controller
 from validate_zmart_adapter import _ReportingSession
 from zmart_controller.registry import registry_file
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.readings import reading_settings
 
 #: The driver's name in zmart_controller_plugin.json, and what get_instruments lists it under.
 DRIVER_NAME = "stellaris"
@@ -91,7 +92,6 @@ def _go_offline(args: argparse.Namespace) -> None:
     from limits_fixtures import hermetic_mock_machine_root
     from mock_lasx_api import MockLasxClient
 
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.sending import command_profiles as profiles
 
     hermetic_mock_machine_root()
     _adapter().connect_python_client = lambda **_kw: MockLasxClient(
@@ -99,8 +99,8 @@ def _go_offline(args: argparse.Namespace) -> None:
     )
     # The mock has no LAS X log stream, so a job selection can only be
     # confirmed through the API.
-    profiles.STATE_READERS = replace(
-        profiles.STATE_READERS, selected_job_confirm_source="api"
+    reading_settings.STATE_READERS = replace(
+        reading_settings.STATE_READERS, selected_job_confirm_source="api"
     )
 
 

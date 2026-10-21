@@ -22,17 +22,18 @@ for _p in (_HERE, _HELPERS, _REPO_ROOT):
 
 import validate_readers_side_by_side as sxs
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.primitives.log import log_settings
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.sending import command_profiles as profiles
+
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.connection import waiting
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.readings import reading_settings
 
 
 def _run_mock(tmp_path, *extra):
     """Run the validator against the mock, restoring global profile state."""
-    original_profile = profiles.STATE_READERS
+    original_profile = reading_settings.STATE_READERS
     try:
         return sxs.main(["--mock", "--report-dir", str(tmp_path), *extra])
     finally:
-        profiles.STATE_READERS = original_profile
+        reading_settings.STATE_READERS = original_profile
 
 
 def test_poll_params_come_from_the_rule():

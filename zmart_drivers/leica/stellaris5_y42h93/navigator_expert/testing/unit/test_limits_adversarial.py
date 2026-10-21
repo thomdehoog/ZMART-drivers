@@ -40,7 +40,7 @@ from mock_lasx_api import MockLasxClient
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.limits import (
     handshake as _handshake,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.changes import changes as commands_mod
+
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.objective_change_with_compensation import (
     compensated_changes as commands_mod_comp,
 )
@@ -50,7 +50,7 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.limits 
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.store import (
     MachineProfile,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.changes import limit_rules as motion_limits
+
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher import gate
 
 DRIVER_ROOT = Path(__file__).resolve().parents[2]
@@ -58,7 +58,6 @@ DRIVER_ROOT = Path(__file__).resolve().parents[2]
 # =============================================================================
 # Helpers
 # =============================================================================
-
 
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.connection import (
     lasx_client as _connect_module,
@@ -71,6 +70,10 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.zmart_controller_plu
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.absolute_coordinate_system import (
     frame as _frame,
 )
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.changes import acquire as acquire_change
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.changes import job_settings
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.sending import limit_rules
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.changes import stage
 
 
 def _connect_handle(connection=None):
@@ -124,10 +127,10 @@ def _with_payload(mutate) -> str:
 
 @pytest.fixture()
 def clear_stage_limits():
-    saved = dict(motion_limits._stage_limits)
-    motion_limits._stage_limits.update(dict.fromkeys(motion_limits._stage_limits, None))
+    saved = dict(limit_rules._stage_limits)
+    limit_rules._stage_limits.update(dict.fromkeys(limit_rules._stage_limits, None))
     yield
-    motion_limits._stage_limits.update(saved)
+    limit_rules._stage_limits.update(saved)
 
 
 @pytest.fixture()
@@ -187,12 +190,12 @@ def test_malformed_limits_json_falls_back_to_defaults(attack, mock_client):
     assert state.ok, attack
     assert state.limits.describe()["is_fallback"] is True
     # the DEFAULT envelope is applied — NOT the malformed file's values
-    assert motion_limits.get_stage_limits()["x_min"] == DEFAULT_STAGE_UM["x"][0]
+    assert limit_rules.get_stage_limits()["x_min"] == DEFAULT_STAGE_UM["x"][0]
     # an in-envelope move works; an out-of-envelope one still refuses, so a
     # widened/garbage file can never authorize a move the defaults forbid
-    assert commands_mod.move_xy(mock_client, 50000, 50000, unit="um")["success"] is True
+    assert stage.move_xy(mock_client, 50000, 50000, unit="um")["success"] is True
     _assert_refused(
-        commands_mod.move_xy(mock_client, 999999, 50000, unit="um"), needle="outside"
+        stage.move_xy(mock_client, 999999, 50000, unit="um"), needle="outside"
     )
     # reads still work
     assert mock_client.PyApiPing is not None
@@ -256,7 +259,7 @@ def test_malformed_function_limits_falls_back_to_defaults(attack, mock_client):
     assert state.limits.describe()["is_fallback"] is True
     # the default policy governs: an out-of-envelope move still refuses
     _assert_refused(
-        commands_mod.move_xy(mock_client, 999999, 50000, unit="um"), needle="outside"
+        stage.move_xy(mock_client, 999999, 50000, unit="um"), needle="outside"
     )
 
 
@@ -387,7 +390,7 @@ def test_default_objective_slot_is_unrestricted(mock_client):
 )
 def test_poisoned_move_xy_targets_refuse(governed_client, x, y):
     before = _mock_stage_position(governed_client)
-    result = commands_mod.move_xy(governed_client, x, y, unit="um")
+    result = stage.move_xy(governed_client, x, y, unit="um")
     assert result["success"] is False, (x, y)
     assert result["message"]
     assert _mock_stage_position(governed_client) == before  # nothing fired
@@ -398,7 +401,7 @@ def test_poisoned_move_xy_targets_refuse(governed_client, x, y):
 )
 @pytest.mark.parametrize("z_mode", ["galvo", "zwide"])
 def test_poisoned_move_z_targets_refuse(governed_client, z, z_mode):
-    result = commands_mod.move_z(governed_client, "HiRes", z, unit="um", z_mode=z_mode)
+    result = stage.move_z(governed_client, "HiRes", z, unit="um", z_mode=z_mode)
     assert result["success"] is False, (z, z_mode)
     assert result["message"]
 
@@ -418,9 +421,9 @@ def test_degenerate_envelope_min_equals_max_pins_the_stage(mock_client):
     )
     state = _handshake.connect_handshake(mock_client)
     assert state.ok, state.error
-    ok = commands_mod.move_xy(mock_client, 50000, 30000, unit="um")
+    ok = stage.move_xy(mock_client, 50000, 30000, unit="um")
     assert ok["success"] is True
-    refused = commands_mod.move_xy(mock_client, 50001, 30000, unit="um")
+    refused = stage.move_xy(mock_client, 50001, 30000, unit="um")
     assert refused["success"] is False
 
 
@@ -431,7 +434,7 @@ def test_degenerate_envelope_min_equals_max_pins_the_stage(mock_client):
 
 def test_moves_refuse_before_any_handshake(mock_client):
     before = _mock_stage_position(mock_client)
-    result = commands_mod.move_xy(mock_client, 50000, 50000, unit="um")
+    result = stage.move_xy(mock_client, 50000, 50000, unit="um")
     _assert_refused(result)
     assert "set_limits.ipynb" in result["message"]
     assert _mock_stage_position(mock_client) == before
@@ -445,7 +448,7 @@ def test_manual_set_stage_limits_allows_silent_widening_but_backstop_holds(
     changed here). The hardcoded backstop still refuses the move the widened
     envelope would have allowed.
     """
-    motion_limits.set_stage_limits(
+    limit_rules.set_stage_limits(
         x_min=0.0,
         x_max=500000.0,  # far beyond the physical travel; accepted silently today
         y_min=0.0,
@@ -455,11 +458,11 @@ def test_manual_set_stage_limits_allows_silent_widening_but_backstop_holds(
         z_wide_min=0.0,
         z_wide_max=8000.0,
     )
-    assert motion_limits.get_stage_limits()["x_max"] == 500000.0  # the pin
+    assert limit_rules.get_stage_limits()["x_max"] == 500000.0  # the pin
     # a target beyond the physical travel, inside the widened in-memory
     # envelope: the machine file's set_xyz constraint and the backstop both
     # stand in the way — the move must refuse, not fire
-    result = commands_mod.move_xy(governed_client, 200000, 50000, unit="um")
+    result = stage.move_xy(governed_client, 200000, 50000, unit="um")
     assert result["success"] is False
     assert "outside" in result["message"]
 
@@ -469,7 +472,7 @@ def test_backstop_refuses_even_with_a_widened_in_memory_envelope(mock_client):
     from limits_fixtures import install_permissive_limits
 
     install_permissive_limits(mock_client)  # function gate wide open
-    motion_limits.set_stage_limits(
+    limit_rules.set_stage_limits(
         x_min=0.0,
         x_max=1_000_000.0,
         y_min=0.0,
@@ -480,11 +483,11 @@ def test_backstop_refuses_even_with_a_widened_in_memory_envelope(mock_client):
         z_wide_max=100_000.0,
     )
     before = _mock_stage_position(mock_client)
-    result = commands_mod.move_xy(mock_client, 200000, 50000, unit="um")
+    result = stage.move_xy(mock_client, 200000, 50000, unit="um")
     assert result["success"] is False
     assert "backstop" in result["message"]
     assert _mock_stage_position(mock_client) == before
-    z = commands_mod.move_z(mock_client, "HiRes", 5000, unit="um", z_mode="galvo")
+    z = stage.move_z(mock_client, "HiRes", 5000, unit="um", z_mode="galvo")
     assert z["success"] is False
     assert "backstop" in z["message"]
 
@@ -502,7 +505,7 @@ def test_hand_widened_limits_file_does_not_govern(mock_client):
     # a target the WIDENED file would have allowed (y within [0, 400000]) but the
     # defaults forbid must still refuse — the wide value is not in force
     _assert_refused(
-        commands_mod.move_xy(mock_client, 50000, 300000, unit="um"), needle="outside"
+        stage.move_xy(mock_client, 50000, 300000, unit="um"), needle="outside"
     )
 
 
@@ -524,7 +527,7 @@ def test_broken_setter_entry_widens_a_narrow_envelope_to_the_defaults(mock_clien
     # inside the defaults: the fallback allows it. This is the sanctioned
     # trade-off — bounded by the defaults and the backstop, not left dead.
     assert (
-        commands_mod.move_xy(mock_client, 100000, 50000, unit="um")["success"] is True
+        stage.move_xy(mock_client, 100000, 50000, unit="um")["success"] is True
     )
 
 
@@ -548,11 +551,11 @@ def test_rehandshake_after_fixing_the_file_replaces_the_fallback(mock_client):
     state2 = _handshake.connect_handshake(mock_client)
     assert state2.ok
     assert state2.limits.describe()["is_fallback"] is False
-    assert motion_limits.get_stage_limits()["x_min"] == 40000.0
+    assert limit_rules.get_stage_limits()["x_min"] == 40000.0
     _assert_refused(
-        commands_mod.move_xy(mock_client, 100000, 50000, unit="um"), needle="outside"
+        stage.move_xy(mock_client, 100000, 50000, unit="um"), needle="outside"
     )
-    assert commands_mod.move_xy(mock_client, 50000, 50000, unit="um")["success"] is True
+    assert stage.move_xy(mock_client, 50000, 50000, unit="um")["success"] is True
 
 
 def test_second_handshake_rebinds_without_leaking_between_clients(tmp_path):
@@ -565,7 +568,7 @@ def test_second_handshake_rebinds_without_leaking_between_clients(tmp_path):
     state_a = _handshake.connect_handshake(client_a)
     assert state_a.ok
     # b never handshook: it must refuse even though a's state exists
-    _assert_refused(commands_mod.move_xy(client_b, 50000, 50000, unit="um"))
+    _assert_refused(stage.move_xy(client_b, 50000, 50000, unit="um"))
     # a re-handshakes against a NARROWER machine file: the new envelope governs
     root_b = tmp_path / "narrow_root"
     profile = provision_machine_limits(
@@ -573,7 +576,7 @@ def test_second_handshake_rebinds_without_leaking_between_clients(tmp_path):
     )
     state_a2 = _handshake.connect_handshake(client_a, machine=profile)
     assert state_a2.ok
-    refused = commands_mod.move_xy(client_a, 70000, 50000, unit="um")
+    refused = stage.move_xy(client_a, 70000, 50000, unit="um")
     assert refused["success"] is False
 
 
@@ -603,7 +606,7 @@ def test_absent_setter_falls_back_but_explicit_empty_list_is_unlimited(mock_clie
     provision_machine_limits(_machine_root())
     state = _handshake.connect_handshake(mock_client)
     assert state.ok
-    ok = commands_mod.set_zoom(mock_client, "Overview", 1.0)
+    ok = job_settings.change(mock_client, "zoom", "Overview", value=1.0)
     assert ok["success"] is True
     # Missing-key fallback is covered above.
 
@@ -618,7 +621,7 @@ def test_reads_work_without_a_handshake_while_mutations_refuse(mock_client):
     assert readers.ping(mock_client)
     jobs = readers.get_jobs(mock_client, mode="api")
     assert jobs
-    _assert_refused(commands_mod.acquire(mock_client, jobs[0]["Name"]))
+    _assert_refused(acquire_change.acquire(mock_client, jobs[0]["Name"]))
 
 
 # =============================================================================
@@ -644,56 +647,32 @@ _HW_INFO = {
 # wrapper name -> zero-state invocation (client is a poisoned _Untouchable):
 # the gate must refuse BEFORE any client attribute is touched.
 _WRAPPER_CALLS = {
-    "set_zoom": lambda c: commands_mod.set_zoom(c, "Overview", 5.0),
-    "set_scan_speed": lambda c: commands_mod.set_scan_speed(c, "Overview", 400),
-    "set_scan_resonant": lambda c: commands_mod.set_scan_resonant(c, "Overview", True),
-    "set_scan_mode": lambda c: commands_mod.set_scan_mode(c, "Overview", "xyz"),
-    "set_sequential_mode": lambda c: commands_mod.set_sequential_mode(
-        c, "Overview", "Frame"
-    ),
-    "set_scan_field_rotation": lambda c: commands_mod.set_scan_field_rotation(
-        c, "Overview", 0.0
-    ),
-    "set_image_format": lambda c: commands_mod.set_image_format(
-        c, "Overview", "512 x 512"
-    ),
+    "set_zoom": lambda c: job_settings.change(c, "zoom", "Overview", value=5.0),
+    "set_scan_speed": lambda c: job_settings.change(c, "scan_speed", "Overview", value=400),
+    "set_scan_resonant": lambda c: job_settings.change(c, "scan_resonant", "Overview", enable=True),
+    "set_scan_mode": lambda c: job_settings.change(c, "scan_mode", "Overview", mode="xyz"),
+    "set_sequential_mode": lambda c: job_settings.change(c, "sequential_mode", "Overview", mode="Frame"),
+    "set_scan_field_rotation": lambda c: job_settings.change(c, "scan_field_rotation", "Overview", angle=0.0),
+    "set_image_format": lambda c: job_settings.change(c, "image_format", "Overview", format_str="512 x 512"),
     "set_objective": lambda c: commands_mod_comp.set_objective(
         c, "J", _HW_INFO, slot_index=1
     ),
-    "set_z_stack_definition": lambda c: commands_mod.set_z_stack_definition(
-        c, "Overview", begin_um=0.0, end_um=1.0
-    ),
-    "set_z_stack_step_size": lambda c: commands_mod.set_z_stack_step_size(
-        c, "Overview", 1.0
-    ),
-    "set_z_stack_size": lambda c: commands_mod.set_z_stack_size(c, "Overview", 10.0),
-    "set_frame_accumulation": lambda c: commands_mod.set_frame_accumulation(
-        c, "Overview", 0, 2
-    ),
-    "set_frame_average": lambda c: commands_mod.set_frame_average(c, "Overview", 0, 2),
-    "set_line_accumulation": lambda c: commands_mod.set_line_accumulation(
-        c, "Overview", 0, 2
-    ),
-    "set_line_average": lambda c: commands_mod.set_line_average(c, "Overview", 0, 2),
-    "set_pinhole_airy": lambda c: commands_mod.set_pinhole_airy(c, "Overview", 0, 1.0),
-    "set_detector_gain": lambda c: commands_mod.set_detector_gain(
-        c, "Overview", 0, "40;3", 100.0
-    ),
-    "set_laser_intensity": lambda c: commands_mod.set_laser_intensity(
-        c, "Overview", 0, "30", 0, 0.1
-    ),
-    "set_laser_shutter": lambda c: commands_mod.set_laser_shutter(
-        c, "Overview", 0, "30", True
-    ),
-    "set_filter_wheel_slot": lambda c: commands_mod.set_filter_wheel_slot(
-        c, "Overview", 0, "40;3", 1, 2
-    ),
-    "set_filter_wheel_spectrum": lambda c: commands_mod.set_filter_wheel_spectrum(
-        c, "Overview", 0, "40;3", 1, 500.0
-    ),
-    "move_xy": lambda c: commands_mod.move_xy(c, 50000, 50000, unit="um"),
-    "move_z": lambda c: commands_mod.move_z(c, "J", 0.0, unit="um", z_mode="galvo"),
-    "acquire": lambda c: commands_mod.acquire(c, "J"),
+    "set_z_stack_definition": lambda c: job_settings.change(c, "z_stack_definition", "Overview", begin_um=0.0, end_um=1.0),
+    "set_z_stack_step_size": lambda c: job_settings.change(c, "z_stack_step_size", "Overview", step_size_um=1.0),
+    "set_z_stack_size": lambda c: job_settings.change(c, "z_stack_size", "Overview", size_um=10.0),
+    "set_frame_accumulation": lambda c: job_settings.change(c, "frame_accumulation", "Overview", setting_index=0, value=2),
+    "set_frame_average": lambda c: job_settings.change(c, "frame_average", "Overview", setting_index=0, value=2),
+    "set_line_accumulation": lambda c: job_settings.change(c, "line_accumulation", "Overview", setting_index=0, value=2),
+    "set_line_average": lambda c: job_settings.change(c, "line_average", "Overview", setting_index=0, value=2),
+    "set_pinhole_airy": lambda c: job_settings.change(c, "pinhole_airy", "Overview", setting_index=0, value=1.0),
+    "set_detector_gain": lambda c: job_settings.change(c, "detector_gain", "Overview", setting_index=0, beam_route="40;3", value=100.0),
+    "set_laser_intensity": lambda c: job_settings.change(c, "laser_intensity", "Overview", setting_index=0, beam_route="30", line_index=0, value=0.1),
+    "set_laser_shutter": lambda c: job_settings.change(c, "laser_shutter", "Overview", setting_index=0, beam_route="30", activate=True),
+    "set_filter_wheel_slot": lambda c: job_settings.change(c, "filter_wheel_slot", "Overview", setting_index=0, beam_route="40;3", filter_wheel_type=1, slot_index=2),
+    "set_filter_wheel_spectrum": lambda c: job_settings.change(c, "filter_wheel_spectrum", "Overview", setting_index=0, beam_route="40;3", filter_wheel_type=1, position=500.0),
+    "move_xy": lambda c: stage.move_xy(c, 50000, 50000, unit="um"),
+    "move_z": lambda c: stage.move_z(c, "J", 0.0, unit="um", z_mode="galvo"),
+    "acquire": lambda c: acquire_change.acquire(c, "J"),
     "select_job": lambda c: commands_mod_comp.select_job(c, "Overview"),
 }
 
@@ -731,7 +710,7 @@ def test_every_configurable_setter_enforces_before_touching_native_api(setter):
     gate.install(
         client,
         gate.GateState(
-            limits=motion_limits.LeicaLimits(
+            limits=limit_rules.LeicaLimits(
                 policy, source="test", path="limits.json", is_fallback=False
             ),
             stage_cfg=None,
@@ -763,9 +742,9 @@ def test_setter_range_accepts_boundaries_and_refuses_outside(mock_client):
     _raw_snapshot(_machine_root(), limits_text=json.dumps(payload))
     assert _handshake.connect_handshake(mock_client).ok
 
-    assert commands_mod.set_zoom(mock_client, "Overview", 1.0)["success"] is True
-    assert commands_mod.set_zoom(mock_client, "Overview", 5.0)["success"] is True
-    refused = commands_mod.set_zoom(mock_client, "Overview", 5.01)
+    assert job_settings.change(mock_client, "zoom", "Overview", value=1.0)["success"] is True
+    assert job_settings.change(mock_client, "zoom", "Overview", value=5.0)["success"] is True
+    refused = job_settings.change(mock_client, "zoom", "Overview", value=5.01)
     assert refused["success"] is False
     assert "outside range [1.0, 5.0]" in refused["message"]
 
@@ -776,8 +755,8 @@ def test_setter_allowed_accepts_member_and_refuses_other(mock_client):
     _raw_snapshot(_machine_root(), limits_text=json.dumps(payload))
     assert _handshake.connect_handshake(mock_client).ok
 
-    assert commands_mod.set_scan_mode(mock_client, "Overview", "xyz")["success"] is True
-    refused = commands_mod.set_scan_mode(mock_client, "Overview", "xyzt")
+    assert job_settings.change(mock_client, "scan_mode", "Overview", mode="xyz")["success"] is True
+    refused = job_settings.change(mock_client, "scan_mode", "Overview", mode="xyzt")
     assert refused["success"] is False
     assert "expected one of ['xyz']" in refused["message"]
 
@@ -790,7 +769,7 @@ def test_z_stack_definition_checks_both_endpoints_before_native_api():
     gate.install(
         client,
         gate.GateState(
-            limits=motion_limits.LeicaLimits(
+            limits=limit_rules.LeicaLimits(
                 policy, source="test", path="limits.json", is_fallback=False
             ),
             stage_cfg=None,
@@ -798,9 +777,7 @@ def test_z_stack_definition_checks_both_endpoints_before_native_api():
         ),
     )
 
-    refused = commands_mod.set_z_stack_definition(
-        client, "J", begin_um=5.0, end_um=11.0
-    )
+    refused = job_settings.change(client, "z_stack_definition", "J", begin_um=5.0, end_um=11.0)
     assert refused["success"] is False
     assert "11.0 outside range [0.0, 10.0]" in refused["message"]
 
@@ -813,7 +790,7 @@ def test_z_stack_definition_configured_limit_refuses_value_unknown_reset():
     gate.install(
         client,
         gate.GateState(
-            limits=motion_limits.LeicaLimits(
+            limits=limit_rules.LeicaLimits(
                 policy, source="test", path="limits.json", is_fallback=False
             ),
             stage_cfg=None,
@@ -821,7 +798,7 @@ def test_z_stack_definition_configured_limit_refuses_value_unknown_reset():
         ),
     )
 
-    refused = commands_mod.set_z_stack_definition(client, "J", old_begin_um=0.0)
+    refused = job_settings.change(client, "z_stack_definition", "J", old_begin_um=0.0)
     assert refused["success"] is False
     assert "configured limit but the wrapper supplied no value" in refused["message"]
 
@@ -831,7 +808,7 @@ def test_installed_policy_is_independent_of_input_payload_mutation():
     payload = _valid_payload()
     payload["set_zoom"] = {"allowed": [1.0]}
     policy = limits_config.validate_payload(payload)
-    installed = motion_limits.LeicaLimits(
+    installed = limit_rules.LeicaLimits(
         policy, source="test", path="limits.json", is_fallback=False
     )
     gate.install(
@@ -840,12 +817,12 @@ def test_installed_policy_is_independent_of_input_payload_mutation():
     )
 
     _assert_refused(
-        commands_mod.set_zoom(client, "Overview", 5.0), needle="not allowed"
+        job_settings.change(client, "zoom", "Overview", value=5.0), needle="not allowed"
     )
     payload["set_zoom"]["allowed"].append(5.0)
     policy["set_zoom"]["allowed"].append(5.0)
     _assert_refused(
-        commands_mod.set_zoom(client, "Overview", 5.0), needle="not allowed"
+        job_settings.change(client, "zoom", "Overview", value=5.0), needle="not allowed"
     )
 
 
@@ -855,7 +832,7 @@ def test_public_gate_status_is_detached_from_installed_policy(mock_client):
     _raw_snapshot(_machine_root(), limits_text=json.dumps(payload))
     status = _handshake.connect_handshake(mock_client)
     _assert_refused(
-        commands_mod.set_zoom(mock_client, "Overview", 5.0), needle="not allowed"
+        job_settings.change(mock_client, "zoom", "Overview", value=5.0), needle="not allowed"
     )
 
     assert not hasattr(status.limits, "payload")
@@ -864,7 +841,7 @@ def test_public_gate_status_is_detached_from_installed_policy(mock_client):
     second_status = gate.state_for(mock_client)
     assert second_status.stage_cfg["policy"]["set_zoom"] == {"allowed": [1.0]}
     _assert_refused(
-        commands_mod.set_zoom(mock_client, "Overview", 5.0), needle="not allowed"
+        job_settings.change(mock_client, "zoom", "Overview", value=5.0), needle="not allowed"
     )
 
 
@@ -882,11 +859,11 @@ def test_private_installed_policy_and_stage_snapshot_are_immutable(mock_client):
     with pytest.raises(TypeError):
         installed.stage_cfg["policy"]["set_zoom"] = {"allowed": [1.0, 5.0]}
     _assert_refused(
-        commands_mod.set_zoom(mock_client, "Overview", 5.0), needle="not allowed"
+        job_settings.change(mock_client, "zoom", "Overview", value=5.0), needle="not allowed"
     )
 
 
-@pytest.mark.parametrize("wrapper", sorted(motion_limits.MUTATING_COMMANDS))
+@pytest.mark.parametrize("wrapper", sorted(limit_rules.MUTATING_COMMANDS))
 def test_every_mutating_wrapper_refuses_fail_closed_without_state(wrapper):
     """Direct-commands bypass: no handshake -> refusal BEFORE the client is
     touched, for every declared mutating wrapper."""
@@ -984,7 +961,7 @@ def test_stale_gate_state_does_not_govern_a_new_client():
     assert _handshake.connect_handshake(governed).ok
     fresh = MockLasxClient(latency=0.0)
     assert gate.state_for(fresh) is None
-    _assert_refused(commands_mod.move_xy(fresh, 50000, 50000, unit="um"))
+    _assert_refused(stage.move_xy(fresh, 50000, 50000, unit="um"))
 
 
 # =============================================================================
@@ -993,7 +970,7 @@ def test_stale_gate_state_does_not_govern_a_new_client():
 
 
 def test_mapping_is_total_over_the_key_vocabulary():
-    assert set(_WRAPPER_CALLS) == set(motion_limits.MUTATING_COMMANDS)
+    assert set(_WRAPPER_CALLS) == set(limit_rules.MUTATING_COMMANDS)
 
 
 def test_bundled_template_declares_exactly_the_key_vocabulary():
@@ -1015,117 +992,61 @@ def test_generated_machine_payload_matches_the_vocabulary():
 
 
 def test_every_dispatching_wrapper_declares_and_calls_the_gate():
-    """AST completeness sweep over the single-command changes and the two recipes: any public function that
-    reaches the fire path (_dispatch/_dispatch_setting/the dispatcher's write)
-    must (a) be declared in motion_limits.MUTATING_COMMANDS and
-    (b) call the gate with ITS OWN name — a new command cannot ship ungated."""
-    vendor_tree = ast.parse(
-        (
-            DRIVER_ROOT
-            / "operations"
-            / "changes"
-            / "changes.py"
-        ).read_text(encoding="utf-8")
-    )
-    recipe_tree = ast.parse(
-        (
-            DRIVER_ROOT
-            / "procedures"
-            / "objective_change_with_compensation"
-            / "compensated_changes.py"
-        ).read_text(encoding="utf-8")
-    )
-    tree = vendor_tree
-    fire_names = {"dispatch_change", "_dispatch_setting", "write"}
-    fire_attr_names = {"dispatch_change"}
-    # Raw-receipt fires must not escape the
-    # sweep either: a wrapper that skips the dispatch helpers and calls
-    # api_obj.UpdateAwaitReceipt()/UpdateAsync() directly still reaches
-    # hardware.
-    fire_attrs = {"UpdateAwaitReceipt", "UpdateAsync"}
+    """AST sweep over the changes and the two recipes: a public function that
+    reaches the fire path (``dispatch_change``, the dispatcher's ``write`` or a
+    raw ``UpdateAwaitReceipt``/``UpdateAsync``) must (a) be declared in
+    ``MUTATING_COMMANDS`` and (b) call the gate with ITS OWN name, so a new
+    change cannot ship ungated. The job settings go through one runner, which
+    shows the gate each entry's own command name."""
+    files = [
+        DRIVER_ROOT / "operations" / "changes" / f"{name}.py"
+        for name in ("stage", "objective", "select_job", "acquire")
+    ] + [DRIVER_ROOT / "procedures" / "objective_change_with_compensation" / "compensated_changes.py"]
+    fire_names = {"dispatch_change", "write"}
+    fire_attrs = {"UpdateAwaitReceipt", "UpdateAsync", "dispatch_change"}
     checked = []
-    for node in [*vendor_tree.body, *recipe_tree.body]:
-        if not isinstance(node, ast.FunctionDef) or node.name.startswith("_"):
-            continue
-        if node.name == "change_setting":
-            continue  # the shared runner of the settings table, checked below by its entries
-        referenced = {n.id for n in ast.walk(node) if isinstance(n, ast.Name)}
-        referenced_attrs = {
-            n.attr for n in ast.walk(node) if isinstance(n, ast.Attribute)
-        }
-        if (
-            not (referenced & fire_names)
-            and not (referenced_attrs & fire_attrs)
-            and not (referenced_attrs & fire_attr_names)
-        ):
-            continue
-        assert node.name in motion_limits.MUTATING_COMMANDS, (
-            f"{node.name} dispatches to the fire path but has no MUTATING_COMMANDS entry"
-        )
-        gate_literals = {
-            call.args[1].value
-            for call in ast.walk(node)
-            if isinstance(call, ast.Call)
-            and (
-                (isinstance(call.func, ast.Name) and call.func.id == "limits_refusal")
-                or (
-                    isinstance(call.func, ast.Attribute)
-                    and call.func.attr in ("check_refusal", "limits_refusal")
-                )
+    for path in files:
+        for node in ast.parse(path.read_text(encoding="utf-8")).body:
+            if not isinstance(node, ast.FunctionDef) or node.name.startswith("_"):
+                continue
+            referenced = {n.id for n in ast.walk(node) if isinstance(n, ast.Name)}
+            referenced_attrs = {n.attr for n in ast.walk(node) if isinstance(n, ast.Attribute)}
+            if not (referenced & fire_names) and not (referenced_attrs & fire_attrs):
+                continue
+            assert node.name in limit_rules.MUTATING_COMMANDS, (
+                f"{node.name} dispatches to the fire path but has no MUTATING_COMMANDS entry"
             )
-            and len(call.args) >= 2
-            and isinstance(call.args[1], ast.Constant)
-        }
-        assert node.name in gate_literals, (
-            f"{node.name} never calls the limits gate with its own name"
-        )
-        checked.append(node.name)
-    # The settings of a job go through one runner, so their functions do not
-    # call the gate themselves. Each must hand the runner the table entry that
-    # carries its own name, and the runner must show the gate that name.
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.changes import settings as settings_table
+            gate_literals = {
+                call.args[1].value
+                for call in ast.walk(node)
+                if isinstance(call, ast.Call)
+                and isinstance(call.func, (ast.Name, ast.Attribute))
+                and getattr(call.func, "id", getattr(call.func, "attr", None)) in ("check_refusal", "limits_refusal")
+                and len(call.args) >= 2
+                and isinstance(call.args[1], ast.Constant)
+            }
+            assert node.name in gate_literals, f"{node.name} never calls the limits gate with its own name"
+            checked.append(node.name)
 
-    for node in tree.body:
-        if not isinstance(node, ast.FunctionDef) or node.name.startswith("_"):
-            continue
-        for call in ast.walk(node):
-            if (
-                isinstance(call, ast.Call)
-                and isinstance(call.func, ast.Name)
-                and call.func.id == "change_setting"
-            ):
-                entry = getattr(settings_table, call.args[0].attr)
-                assert entry.command == node.name, (
-                    f"{node.name} hands the runner the entry for {entry.command}"
-                )
-                assert node.name in motion_limits.MUTATING_COMMANDS
-                checked.append(node.name)
-
-    # A setting changed by its name (the Microscope's change_setting) reaches the
-    # same runner; every name in the table carries a command the gate knows.
-    for name, entry in settings_table.BY_NAME.items():
+    # Every setting of a job carries a command the gate knows ...
+    for name, entry in job_settings.SETTINGS.items():
         assert entry.command == f"set_{name}"
-        assert entry.command in motion_limits.MUTATING_COMMANDS, entry.command
-
-    runner = next(
-        n
-        for n in tree.body
-        if isinstance(n, ast.FunctionDef) and n.name == "change_setting"
-    )
+        assert entry.command in limit_rules.MUTATING_COMMANDS, entry.command
+        checked.append(entry.command)
+    # ... and the one runner shows the gate that entry's own command name.
+    tree = ast.parse((DRIVER_ROOT / "operations" / "changes" / "job_settings.py").read_text(encoding="utf-8"))
+    runner = next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == "change")
     shown_to_gate = [
         call.args[1]
         for call in ast.walk(runner)
-        if isinstance(call, ast.Call)
-        and isinstance(call.func, ast.Name)
-        and call.func.id == "limits_refusal"
+        if isinstance(call, ast.Call) and getattr(call.func, "attr", None) == "limits_refusal"
     ]
     assert shown_to_gate and all(
-        isinstance(arg, ast.Attribute) and arg.attr == "command"
-        for arg in shown_to_gate
+        isinstance(arg, ast.Attribute) and arg.attr == "command" for arg in shown_to_gate
     ), "the settings runner must show the limits gate the entry's own command name"
 
-    # sanity: the sweep actually saw the whole wrapper set
-    assert set(checked) == set(motion_limits.MUTATING_COMMANDS)
+    # the sweep saw every change the limits know
+    assert set(checked) == set(limit_rules.MUTATING_COMMANDS)
 
 
 # =============================================================================
@@ -1141,32 +1062,32 @@ def test_backstop_allows_measured_xy_below_the_default_margin():
     )
 
     for axis in ("x", "y"):
-        lo, hi = motion_limits.STAGE_BACKSTOP_UM[axis]
+        lo, hi = limit_rules.STAGE_BACKSTOP_UM[axis]
         default_lo, default_hi = template[f"{axis}_um"]["range"]
         assert lo == 0.0 < default_lo
         assert hi == default_hi
         assert math.isfinite(lo) and math.isfinite(hi)
 
     for axis in ("z_galvo", "z_wide"):
-        lo, hi = motion_limits.STAGE_BACKSTOP_UM[axis]
+        lo, hi = limit_rules.STAGE_BACKSTOP_UM[axis]
         assert template[f"{axis}_um"] == {"range": [lo, hi]}
         assert math.isfinite(lo) and math.isfinite(hi)
 
 
 def test_containment_checker_accepts_the_template_and_narrower():
-    motion_limits.check_envelope_within_backstop(DEFAULT_STAGE_UM)
-    motion_limits.check_envelope_within_backstop(
+    limit_rules.check_envelope_within_backstop(DEFAULT_STAGE_UM)
+    limit_rules.check_envelope_within_backstop(
         dict(DEFAULT_STAGE_UM, x=[20000.0, 40000.0])
     )
-    motion_limits.check_envelope_within_backstop(
+    limit_rules.check_envelope_within_backstop(
         dict(DEFAULT_STAGE_UM, y=[964.8553, 90000.0])
     )
     with pytest.raises(RuntimeError, match="backstop"):
-        motion_limits.check_envelope_within_backstop(
+        limit_rules.check_envelope_within_backstop(
             dict(DEFAULT_STAGE_UM, y=[-1.0, 90000.0])
         )
     with pytest.raises(RuntimeError, match="backstop"):
-        motion_limits.check_envelope_within_backstop(
+        limit_rules.check_envelope_within_backstop(
             dict(DEFAULT_STAGE_UM, z_galvo=[-251.0, 250.0])
         )
 
@@ -1291,7 +1212,7 @@ def test_flat_limits_round_trip_adopt_handshake_gated_move(mock_client):
 
     state = _handshake.connect_handshake(mock_client, machine=profile)
     assert state.ok, state.error
-    assert commands_mod.move_xy(mock_client, 50000, 50000, unit="um")["success"] is True
-    refused = commands_mod.move_xy(mock_client, 200000, 50000, unit="um")
+    assert stage.move_xy(mock_client, 50000, 50000, unit="um")["success"] is True
+    refused = stage.move_xy(mock_client, 200000, 50000, unit="um")
     assert refused["success"] is False
     assert "outside" in refused["message"] or "backstop" in refused["message"]

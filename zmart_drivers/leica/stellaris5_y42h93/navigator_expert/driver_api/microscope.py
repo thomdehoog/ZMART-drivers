@@ -31,7 +31,6 @@ University of Zurich (thom.dehoog@zmb.uzh.ch, thomdehoog@gmail.com).
 
 from __future__ import annotations
 
-import inspect
 from typing import Any
 
 from ..dispatcher import gate
@@ -53,8 +52,7 @@ from ..session import loaded_config
 from ..session.handle import Session, job_catalog, note_unconfirmed, require_open, selected_job_name
 from ..connection import lasx_client
 from ..operations.readings import named_readings as readings
-from ..operations.changes import changes
-from ..operations.changes.settings import BY_NAME as SETTINGS
+from ..operations.changes import job_settings
 from ..primitives.interface import lasx_dialogs
 from . import running_log
 
@@ -216,23 +214,16 @@ class Microscope:
     def change_setting(self, name: str, job: str | None = None, **arguments: Any) -> dict:
         """Change the setting *name* of *job* (the selected job when None), and read it back.
 
-        *name* is one of :data:`SETTINGS`, such as ``"zoom"`` or
+        *name* is one of the job's settings (``job_settings.SETTINGS``), such as ``"zoom"`` or
         ``"laser_intensity"``; the keywords are what that setting takes, such
         as ``value=2.0``. The limits are asked first. Answers the change's
         result, with ``confirmed`` True when the readback showed the new
         value; a change that was never seen is recorded and does not raise.
         """
         require_open(self.handle)
-        if name not in SETTINGS:
-            raise ValueError(f"no setting {name!r}; the settings are {sorted(SETTINGS)}")
-        # The named change holds which of its arguments may be left out.
-        change = getattr(changes, SETTINGS[name].command)
-        takes = [p for p in inspect.signature(change).parameters if p not in ("client", "job_name", "max_retries", "tolerance")]
-        unknown = sorted(set(arguments) - set(takes))
-        if unknown:
-            raise ValueError(f"{name} takes {takes}, not {unknown}")
+        job_settings.arguments_of(name, job or "", arguments)  # a wrong name or argument raises here
         job = job or selected_job_name(self.handle)
-        result = change(self.handle.client, job, **arguments)
+        result = job_settings.change(self.handle.client, name, job, **arguments)
         return checked(self.handle, result, f"change_setting({name!r}, job={job!r})")
 
     def change_objective(self, slot: int | None = None, name: str | None = None, magnification: float | None = None) -> dict:

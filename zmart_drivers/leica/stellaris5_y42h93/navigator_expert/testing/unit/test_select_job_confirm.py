@@ -16,17 +16,13 @@ import time
 import unittest
 from unittest.mock import patch
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.changes import (
-    confirm_select_job,
-)
-
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.changes import confirm_changes as confirmations
-
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.sending import command_profiles as profiles
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.readings import named_readings as readers
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.primitives.log import (
     log_wait,
 )
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.changes import confirming
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.readings import reading_settings
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.changes import select_job as select_job_change
 
 
 def _poll_result(success, value=None, reason="matched"):
@@ -43,14 +39,14 @@ def _poll_result(success, value=None, reason="matched"):
 
 class SelectJobCase(unittest.TestCase):
     def setUp(self):
-        self._profile = profiles.STATE_READERS
+        self._profile = reading_settings.STATE_READERS
         self.addCleanup(self._restore)
 
     def _restore(self):
-        profiles.STATE_READERS = self._profile
+        reading_settings.STATE_READERS = self._profile
 
     def _use(self, **kwargs):
-        profiles.STATE_READERS = profiles.StateReaderProfile(**kwargs)
+        reading_settings.STATE_READERS = reading_settings.StateReaderProfile(**kwargs)
 
 
 class TestHybridAdmissibility(SelectJobCase):
@@ -60,7 +56,7 @@ class TestHybridAdmissibility(SelectJobCase):
         self._use(
             selected_job_confirm_source="hybrid",
         )
-        api_leg, log_leg, budget = confirm_select_job.select_job_confirm_legs(
+        api_leg, log_leg, budget = select_job_change.select_job_confirm_legs(
             "AF Job",
             command_started_at=100.0,
             timeout=0.5,
@@ -70,13 +66,13 @@ class TestHybridAdmissibility(SelectJobCase):
         with (
             patch.object(readers, "get_jobs", return_value=stale_jobs) as api_jobs,
             patch.object(
-                confirm_select_job.log_wait,
+                select_job_change.log_wait,
                 "wait_for_selected_job_log",
                 return_value=_poll_result(False, reason="timeout"),
             ),
         ):
             api_outcome = api_leg(None)
-            race = confirmations.race_confirmations(
+            race = confirming.race_confirmations(
                 api_leg=lambda: api_leg(None),
                 log_leg=log_leg,
                 label="SelectJob 'AF Job'",
@@ -96,7 +92,7 @@ class TestHybridAdmissibility(SelectJobCase):
         self._use(
             selected_job_confirm_source="hybrid",
         )
-        api_leg, log_leg, budget = confirm_select_job.select_job_confirm_legs(
+        api_leg, log_leg, budget = select_job_change.select_job_confirm_legs(
             "AF Job",
             command_started_at=100.0,
             timeout=0.5,
@@ -106,13 +102,13 @@ class TestHybridAdmissibility(SelectJobCase):
         with (
             patch.object(readers, "get_jobs", return_value=stale_jobs) as api_jobs,
             patch.object(
-                confirm_select_job.log_wait,
+                select_job_change.log_wait,
                 "wait_for_selected_job_log",
                 return_value=_poll_result(False, reason="timeout"),
             ),
         ):
             api_outcome = api_leg(None)
-            race = confirmations.race_confirmations(
+            race = confirming.race_confirmations(
                 api_leg=lambda: api_leg(None),
                 log_leg=log_leg,
                 label="SelectJob 'AF Job'",
@@ -129,7 +125,7 @@ class TestHybridAdmissibility(SelectJobCase):
         self._use(
             selected_job_confirm_source="hybrid",
         )
-        api_leg, log_leg, budget = confirm_select_job.select_job_confirm_legs(
+        api_leg, log_leg, budget = select_job_change.select_job_confirm_legs(
             "HiRes",
             command_started_at=100.0,
             timeout=0.3,
@@ -139,12 +135,12 @@ class TestHybridAdmissibility(SelectJobCase):
         with (
             patch.object(readers, "get_jobs", return_value=stale_jobs),
             patch.object(
-                confirm_select_job.log_wait,
+                select_job_change.log_wait,
                 "wait_for_selected_job_log",
                 return_value=_poll_result(True, value="HiRes"),
             ),
         ):
-            race = confirmations.race_confirmations(
+            race = confirming.race_confirmations(
                 api_leg=lambda: api_leg(None),
                 log_leg=log_leg,
                 label="SelectJob 'HiRes'",
@@ -163,7 +159,7 @@ class TestHybridAdmissibility(SelectJobCase):
         self._use(
             selected_job_confirm_source="hybrid",
         )
-        api_leg, log_leg, budget = confirm_select_job.select_job_confirm_legs(
+        api_leg, log_leg, budget = select_job_change.select_job_confirm_legs(
             "HiRes",
             command_started_at=100.0,
             timeout=1.0,
@@ -173,12 +169,12 @@ class TestHybridAdmissibility(SelectJobCase):
         with (
             patch.object(readers, "get_jobs", return_value=switched),
             patch.object(
-                confirm_select_job.log_wait,
+                select_job_change.log_wait,
                 "wait_for_selected_job_log",
                 return_value=_poll_result(False, reason="timeout"),
             ),
         ):
-            race = confirmations.race_confirmations(
+            race = confirming.race_confirmations(
                 api_leg=lambda: api_leg(None),
                 log_leg=log_leg,
                 label="SelectJob 'HiRes'",
@@ -197,7 +193,7 @@ class TestDefaultPolicy(unittest.TestCase):
         confirms a job change. The hybrid race (api and log) is only its
         fallback: the api confirm alone is measured-wrong on the real scope
         and log-only is insufficient on the simulator (validated 2026-06-11)."""
-        profile = profiles.StateReaderProfile()
+        profile = reading_settings.StateReaderProfile()
         self.assertEqual(profile.selected_job_confirm_source, "direct")
 
 
@@ -207,7 +203,7 @@ class TestLegsBuilder(SelectJobCase):
         only evidence, even when the pre-command baseline equals the target
         (re-assert / write-current shape)."""
         self._use(selected_job_confirm_source="api")
-        api_leg, log_leg, budget = confirm_select_job.select_job_confirm_legs(
+        api_leg, log_leg, budget = select_job_change.select_job_confirm_legs(
             "AF Job",
             command_started_at=100.0,
             timeout=0.5,
@@ -224,14 +220,14 @@ class TestLegsBuilder(SelectJobCase):
         self._use(
             selected_job_confirm_source="log",
         )
-        api_leg, log_leg, budget = confirm_select_job.select_job_confirm_legs(
+        api_leg, log_leg, budget = select_job_change.select_job_confirm_legs(
             "HiRes", command_started_at=100.0
         )
         self.assertIsNone(api_leg)
         self.assertIsNone(budget)
         with (
             patch.object(
-                confirm_select_job.log_wait,
+                select_job_change.log_wait,
                 "wait_for_selected_job_log",
                 return_value=_poll_result(True, value="HiRes"),
             ),
@@ -246,11 +242,11 @@ class TestLegsBuilder(SelectJobCase):
         self._use(
             selected_job_confirm_source="log",
         )
-        _, log_leg, _ = confirm_select_job.select_job_confirm_legs(
+        _, log_leg, _ = select_job_change.select_job_confirm_legs(
             "HiRes", command_started_at=100.0
         )
         with patch.object(
-            confirm_select_job.log_wait,
+            select_job_change.log_wait,
             "wait_for_selected_job_log",
             return_value=_poll_result(False, reason="timeout"),
         ):
@@ -263,7 +259,7 @@ class TestLegsBuilder(SelectJobCase):
         poll window are both just the confirm window -- one window, no
         separate budget and no fractional sizing."""
         self._use(selected_job_confirm_source="hybrid")
-        api_leg, log_leg, budget = confirm_select_job.select_job_confirm_legs(
+        api_leg, log_leg, budget = select_job_change.select_job_confirm_legs(
             "HiRes", command_started_at=100.0, api_baseline_name="Overview", timeout=5.0
         )
         self.assertIsNotNone(api_leg)
@@ -275,12 +271,12 @@ class TestLegsBuilder(SelectJobCase):
         """With no explicit timeout the window is the shared ``WINDOW_S`` --
         the same 4x3 window every command uses."""
         self._use(selected_job_confirm_source="hybrid")
-        api_leg, _, budget = confirm_select_job.select_job_confirm_legs(
+        api_leg, _, budget = select_job_change.select_job_confirm_legs(
             "HiRes", command_started_at=100.0, api_baseline_name="Overview"
         )
         # Read the live module constant the code reads (a conftest patches it
         # down for suite speed), not the import-time value.
-        expected = confirm_select_job.waiting.WINDOW_S
+        expected = select_job_change.waiting.WINDOW_S
         self.assertEqual(budget, expected)
         self.assertEqual(api_leg.keywords["timeout"], expected)
 
@@ -288,7 +284,7 @@ class TestLegsBuilder(SelectJobCase):
         """Pure api mode has no race to fit inside: the leg keeps the
         caller's window unchanged."""
         self._use(selected_job_confirm_source="api")
-        api_leg, _, budget = confirm_select_job.select_job_confirm_legs(
+        api_leg, _, budget = select_job_change.select_job_confirm_legs(
             "HiRes",
             command_started_at=100.0,
             timeout=5.0,
@@ -298,12 +294,12 @@ class TestLegsBuilder(SelectJobCase):
 
     def test_direct_source_confirms_alone_and_has_no_race(self):
         self._use(selected_job_confirm_source="direct")
-        leg, log_leg, budget = confirm_select_job.select_job_confirm_legs(
+        leg, log_leg, budget = select_job_change.select_job_confirm_legs(
             "HiRes", command_started_at=100.0, api_baseline_name="Overview", timeout=5.0
         )
         self.assertIsNone(log_leg)
         self.assertIsNone(budget)
-        self.assertEqual(leg.func, confirm_select_job.confirm_select_job_direct)
+        self.assertEqual(leg.func, select_job_change.confirm_select_job_direct)
 
     def test_direct_source_uses_the_hybrid_race_when_the_direct_reader_cannot_answer(
         self,
@@ -311,22 +307,22 @@ class TestLegsBuilder(SelectJobCase):
         self._use(selected_job_confirm_source="direct")
         with (
             patch.object(
-                confirm_select_job.direct_reader,
+                select_job_change.direct_reader,
                 "get_selected_job",
                 side_effect=RuntimeError("hardware server not reachable"),
             ),
             patch.object(
-                confirm_select_job,
+                select_job_change,
                 "confirm_select_job",
                 return_value={"success": True, "logs": []},
             ) as api_leg,
             patch.object(
-                confirm_select_job,
-                "_confirm_select_job_log",
+                select_job_change,
+                "confirm_select_job_log",
                 return_value={"success": False, "logs": []},
             ),
         ):
-            leg, _, _ = confirm_select_job.select_job_confirm_legs(
+            leg, _, _ = select_job_change.select_job_confirm_legs(
                 "HiRes",
                 command_started_at=100.0,
                 api_baseline_name="Overview",
@@ -339,7 +335,7 @@ class TestLegsBuilder(SelectJobCase):
     def test_unknown_source_raises_before_firing(self):
         self._use(selected_job_confirm_source="nonsense")
         with self.assertRaises(ValueError):
-            confirm_select_job.select_job_confirm_legs(
+            select_job_change.select_job_confirm_legs(
                 "HiRes", command_started_at=100.0
             )
 
@@ -347,11 +343,11 @@ class TestLegsBuilder(SelectJobCase):
         self._use(
             selected_job_confirm_source="log",
         )
-        _, log_leg, _ = confirm_select_job.select_job_confirm_legs(
+        _, log_leg, _ = select_job_change.select_job_confirm_legs(
             "HiRes", command_started_at=123.456
         )
         with patch.object(
-            confirm_select_job.log_wait,
+            select_job_change.log_wait,
             "wait_for_selected_job_log",
             return_value=_poll_result(False, reason="timeout"),
         ) as poll:
@@ -366,7 +362,7 @@ class TestPrepareSelectJob(SelectJobCase):
         self._use(selected_job_confirm_source="api")
         jobs = [{"Name": "AF Job", "IsSelected": True}]
         with patch.object(readers, "get_jobs", return_value=jobs):
-            noop, context = confirm_select_job.prepare_select_job(None, "AF Job")
+            noop, context = select_job_change.prepare_select_job(None, "AF Job")
         self.assertIsNotNone(noop)
         self.assertTrue(noop["success"])
         self.assertTrue(noop["confirmed"])
@@ -380,15 +376,15 @@ class TestPrepareSelectJob(SelectJobCase):
         jobs = [{"Name": "AF Job", "IsSelected": True}]
         with (
             patch.object(
-                confirm_select_job, "_selected_job_name_from_log", return_value=None
+                select_job_change, "selected_job_from_log", return_value=None
             ),
             patch.object(
-                confirm_select_job,
-                "_selected_job_api_baseline",
+                select_job_change,
+                "api_baseline",
                 return_value=("AF Job", jobs, "ok"),
             ),
         ):
-            noop, context = confirm_select_job.prepare_select_job(None, "AF Job")
+            noop, context = select_job_change.prepare_select_job(None, "AF Job")
         self.assertIsNone(noop)  # fires despite api==target
         self.assertEqual(context["api_baseline_name"], "AF Job")
 
@@ -398,10 +394,10 @@ class TestPrepareSelectJob(SelectJobCase):
         with (
             patch.object(readers, "get_jobs", return_value=jobs),
             patch.object(
-                confirm_select_job, "_selected_job_name_from_log", return_value="AF Job"
+                select_job_change, "selected_job_from_log", return_value="AF Job"
             ),
         ):
-            noop, _ = confirm_select_job.prepare_select_job(None, "AF Job")
+            noop, _ = select_job_change.prepare_select_job(None, "AF Job")
         self.assertIsNotNone(noop)
         self.assertTrue(noop["confirmed"])
 
@@ -411,22 +407,22 @@ class TestPrepareSelectJob(SelectJobCase):
         with (
             patch.object(readers, "get_jobs", return_value=jobs),
             patch.object(
-                confirm_select_job, "_selected_job_name_from_log", return_value="AF Job"
+                select_job_change, "selected_job_from_log", return_value="AF Job"
             ),
         ):
-            noop, _ = confirm_select_job.prepare_select_job(None, "AF Job")
+            noop, _ = select_job_change.prepare_select_job(None, "AF Job")
         self.assertIsNotNone(noop)
 
     def test_log_source_does_not_touch_api_when_log_has_no_noop(self):
         self._use(selected_job_confirm_source="log")
         with (
             patch.object(
-                confirm_select_job, "_selected_job_name_from_log", return_value=None
+                select_job_change, "selected_job_from_log", return_value=None
             ),
             patch.object(readers, "get_jobs") as api_jobs,
             patch.object(readers, "get_job_settings") as api_settings,
         ):
-            noop, context = confirm_select_job.prepare_select_job(None, "AF Job")
+            noop, context = select_job_change.prepare_select_job(None, "AF Job")
 
         self.assertIsNone(noop)
         self.assertEqual(context["api_baseline_reason"], "not_attempted")

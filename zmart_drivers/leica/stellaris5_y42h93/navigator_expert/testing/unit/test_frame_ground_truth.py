@@ -32,7 +32,7 @@ import zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.reading
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.objective_change_with_compensation import (
     objective_shift as shift,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.changes import changes as commands_mod
+
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.session import (
     loaded_config as session_state,
 )
@@ -42,12 +42,11 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.orienta
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.primitives.values import (
     parsing as _readers_parsing,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.changes import changes as _commands
+
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.readings import named_readings as _readers
 
 # The ground-truth translation table (µm). Slot 1 is the reference lens.
 TRUE_T = {1: (0.0, 0.0, 0.0), 2: (50.0, -30.0, 7.0), 3: (-12.5, 4.0, -3.25)}
-
 
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.absolute_coordinate_system import (
     frame as _frame,
@@ -57,6 +56,7 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.zmart_controller_plu
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.session.handle import (
     Session,
 )
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.changes import stage
 
 
 class SimScope:
@@ -124,8 +124,8 @@ def _running(sim: SimScope):
         }
 
     with (
-        patch.object(_commands, "move_xy", fake_arrive),
-        patch.object(_commands, "move_z", fake_move_z),
+        patch.object(stage, "move_xy", fake_arrive),
+        patch.object(stage, "move_z", fake_move_z),
         patch.object(
             _readers,
             "get_xy",
@@ -318,8 +318,8 @@ def test_swap_compensation_keeps_the_viewed_point():
             patch.object(
                 readers, "read_zwide_um", side_effect=lambda c, j, **k: sim.z_wide
             ),
-            patch.object(commands_mod, "move_xy", fake_move_xy),
-            patch.object(commands_mod, "move_z", fake_move_z),
+            patch.object(stage, "move_xy", fake_move_xy),
+            patch.object(stage, "move_z", fake_move_z),
         ):
             viewed_before = sim.viewed_point()
             before = shift.record_before_change(client)
@@ -374,7 +374,7 @@ def test_zero_z_galvo_refused_first_leg_moves_nothing():
     def refusing_move_z(client, job, z, unit="um", z_mode="galvo", **_k):
         return {"success": False, "message": "z_wide_um outside range"}
 
-    with _running(sim), patch.object(_commands, "move_z", refusing_move_z):
+    with _running(sim), patch.object(stage, "move_z", refusing_move_z):
         with pytest.raises(RuntimeError, match="zero_z_galvo"):
             _procedure_menu.run_procedure(h, {"name": "zero_z_galvo"})
     assert sim.state() == before

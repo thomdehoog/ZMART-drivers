@@ -24,7 +24,7 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.readings 
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.objective_change_with_compensation import (
     objective_shift,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.sending import command_profiles as profiles
+
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.sending import (
     prechecks,
 )
@@ -33,6 +33,7 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.readings 
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.primitives.api import (
     delivery,
 )
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.readings import reading_settings
 
 WINDOW_S = 0.5
 
@@ -43,7 +44,7 @@ def short_windows(monkeypatch):
     monkeypatch.setattr(waiting, "WINDOW_S", WINDOW_S)
     monkeypatch.setattr(waiting, "POLL_S", 0.01)
     monkeypatch.setattr(waiting, "ANSWER_POLL_S", 0.001)
-    monkeypatch.setattr(profiles, "STATE_READERS", profiles.StateReaderProfile())
+    monkeypatch.setattr(reading_settings, "STATE_READERS", reading_settings.StateReaderProfile())
 
 
 _CLIENTS = []
@@ -248,7 +249,7 @@ def test_the_scanner_status_races_the_api_against_the_log():
     fallback when it fails.
     """
     assert capabilities.spec("scan_status").log_fn is not None
-    assert profiles.StateReaderProfile().scan_status_mode == "direct"
+    assert reading_settings.StateReaderProfile().scan_status_mode == "direct"
 
 
 def test_the_idle_check_asks_the_api_even_in_a_log_only_run():
@@ -259,7 +260,7 @@ def test_the_idle_check_asks_the_api_even_in_a_log_only_run():
     Whether a command may fire is decided by the API alone, which answers on
     demand (the README's rule for command-gating reads).
     """
-    profiles.STATE_READERS = profiles.StateReaderProfile(
+    reading_settings.STATE_READERS = reading_settings.StateReaderProfile(
         **{
             field: "log"
             for field in (
@@ -357,7 +358,6 @@ GUARDED = ("dispatcher", "connection", "primitives", "operations")
 GUARDED_FILES = (
     "procedures/objective_change_with_compensation/compensated_changes.py",
     "procedures/objective_change_with_compensation/objective_shift.py",
-    "operations/changes/objectives.py",
 )
 WAIT_NAME = re.compile(
     r"(timeout|poll_interval|max_retries|max_confirm_attempts|grace|deadline|window_s|retry_delay)",
@@ -366,18 +366,14 @@ WAIT_NAME = re.compile(
 #: The waits that stay outside the rule, by decision, as (file, name).
 EXCEPTIONS = {
     # Acquisition is never sent again and watches one acquisition (ACQUIRE).
-    (
-        "operations/changes/confirm_changes.py",
-        "start_timeout",
-    ),
-    (
-        "operations/changes/confirm_changes.py",
-        "poll_interval",
-    ),
-    ("operations/sending/command_profiles.py", "max_retries"),
-    ("operations/sending/command_profiles.py", "max_confirm_attempts"),
-    ("operations/sending/command_profiles.py", "poll_interval"),
-    ("operations/sending/command_profiles.py", "start_timeout"),
+    ("operations/changes/acquire.py", "start_timeout"),
+    ("operations/changes/acquire.py", "poll_interval"),
+    ("operations/changes/acquire.py", "max_retries"),
+    ("operations/changes/acquire.py", "max_confirm_attempts"),
+    ("operations/sending/command_profile.py", "max_retries"),
+    ("operations/sending/command_profile.py", "max_confirm_attempts"),
+    ("operations/sending/command_profile.py", "poll_interval"),
+    ("operations/sending/command_profile.py", "start_timeout"),
     # LAS X filling in the error report after a command stays at 1 s.
     (
         "operations/sending/transport.py",

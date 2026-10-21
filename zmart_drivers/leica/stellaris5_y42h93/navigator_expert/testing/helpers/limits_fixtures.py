@@ -24,10 +24,11 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.limits 
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.store import (
     MachineProfile,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.changes import limit_rules as _motion_limits
+
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher import (
     gate as _gate,
 )
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.sending import limit_rules
 
 # The bundled conservative default envelope. The absolute X/Y backstop
 # (operations/changes/limit_rules.py) extends down to coordinate zero, so measured limits may
@@ -138,7 +139,7 @@ def permissive_function_limits(**set_xyz_constraints) -> object:
     )
     for param, bounds in set_xyz_constraints.items():
         payload[param] = {"range": [bounds["min"], bounds["max"]]}
-    return _motion_limits.LeicaLimits(
+    return limit_rules.LeicaLimits(
         payload, source="test", path=None, is_fallback=False
     )
 
@@ -161,7 +162,7 @@ def install_permissive_limits(client, *, wide_stage=False, **set_xyz_constraints
         ),
     )
     if wide_stage:
-        _motion_limits.set_stage_limits(
+        limit_rules.set_stage_limits(
             x_min=0.0,
             x_max=1_000_000.0,
             y_min=0.0,

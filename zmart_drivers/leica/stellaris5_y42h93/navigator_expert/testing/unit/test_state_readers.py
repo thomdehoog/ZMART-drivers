@@ -9,22 +9,19 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.changes import (
-    confirm_select_job,
-)
-
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.sending import command_profiles as profiles
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.readings import reading_table as capabilities
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.readings import named_readings as readers
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.readings import named_readings as router
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.readings import reading_settings
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.changes import select_job as select_job_change
 
 
 class TestStateReaders(unittest.TestCase):
     def setUp(self):
-        self._state_profile = profiles.STATE_READERS
+        self._state_profile = reading_settings.STATE_READERS
 
     def tearDown(self):
-        profiles.STATE_READERS = self._state_profile
+        reading_settings.STATE_READERS = self._state_profile
 
     def test_default_profile_reads_directly_first(self):
         # Maintainer decision (docs/reviews/MAINTAINER_DECISIONS.md §1):
@@ -33,7 +30,7 @@ class TestStateReaders(unittest.TestCase):
         # the active job, so its list is incomplete (bench 2026-07-06).
         # Since 2026-10-13 every reading asks the direct reader first (Thom's
         # decision), and the API and the log when it fails.
-        profile = profiles.STATE_READERS
+        profile = reading_settings.STATE_READERS
         self.assertEqual(profile.xy_mode, "direct")
         self.assertEqual(profile.job_settings_mode, "direct")
         self.assertEqual(profile.jobs_mode, "direct")
@@ -82,7 +79,7 @@ class TestStateReaders(unittest.TestCase):
         self.assertIsNotNone(reading.observed_at)
 
     def test_log_mode_returns_fresh_log_value(self):
-        profiles.STATE_READERS = profiles.StateReaderProfile(
+        reading_settings.STATE_READERS = reading_settings.StateReaderProfile(
             xy_mode="log",
             xy_log_max_age_s=1.0,
         )
@@ -97,7 +94,7 @@ class TestStateReaders(unittest.TestCase):
         log_xy.assert_called_once_with(snapshot, max_age_s=1.0)
 
     def test_log_mode_rejects_stale_log_value(self):
-        profiles.STATE_READERS = profiles.StateReaderProfile(
+        reading_settings.STATE_READERS = reading_settings.StateReaderProfile(
             xy_mode="log",
             xy_log_max_age_s=1.0,
         )
@@ -110,7 +107,7 @@ class TestStateReaders(unittest.TestCase):
             self.assertIsNone(readers.get_xy(object()))
 
     def test_hybrid_returns_log_when_api_hangs(self):
-        profiles.STATE_READERS = profiles.StateReaderProfile(
+        reading_settings.STATE_READERS = reading_settings.StateReaderProfile(
             xy_mode="hybrid",
             xy_log_max_age_s=1.0,
         )
@@ -134,7 +131,7 @@ class TestStateReaders(unittest.TestCase):
     def test_hybrid_takes_the_first_success_not_the_log(self):
         # No source is preferred: the faster API answer wins over a fresh log
         # answer that arrives later (the old 0.25 s log head start is gone).
-        profiles.STATE_READERS = profiles.StateReaderProfile(
+        reading_settings.STATE_READERS = reading_settings.StateReaderProfile(
             xy_mode="hybrid",
             xy_log_max_age_s=1.0,
         )
@@ -157,7 +154,7 @@ class TestStateReaders(unittest.TestCase):
         self.assertEqual(reading.value, api_value)
 
     def test_hybrid_ignores_untrustworthy_log_and_returns_api(self):
-        profiles.STATE_READERS = profiles.StateReaderProfile(
+        reading_settings.STATE_READERS = reading_settings.StateReaderProfile(
             xy_mode="hybrid",
             xy_log_max_age_s=1.0,
         )
@@ -174,7 +171,7 @@ class TestStateReaders(unittest.TestCase):
         self.assertEqual(reading.value, expected)
 
     def test_hybrid_does_not_start_second_api_read_while_one_is_pending(self):
-        profiles.STATE_READERS = profiles.StateReaderProfile(
+        reading_settings.STATE_READERS = reading_settings.StateReaderProfile(
             xy_mode="hybrid",
             xy_log_max_age_s=1.0,
         )
@@ -225,14 +222,14 @@ class TestStateReaders(unittest.TestCase):
         # Bench 2026-07-06: the log stream only reports the ACTIVE job, so the
         # job LIST has no log source. jobs is API-only — mode="log" fails
         # closed (UnsupportedSource), and mode="hybrid" degrades to api.
-        profiles.STATE_READERS = profiles.StateReaderProfile(jobs_mode="log")
+        reading_settings.STATE_READERS = reading_settings.StateReaderProfile(jobs_mode="log")
         reading = readers.get_jobs(object(), diagnostics=True)
         self.assertIsNone(reading.value)
         self.assertIsInstance(reading.error, capabilities.UnsupportedSource)
 
         full = [{"Name": "A"}, {"Name": "B"}, {"Name": "C"}]
         for mode in ("api", "hybrid"):
-            profiles.STATE_READERS = profiles.StateReaderProfile(jobs_mode=mode)
+            reading_settings.STATE_READERS = reading_settings.StateReaderProfile(jobs_mode=mode)
             with (
                 patch.object(router.api_reader, "get_jobs", return_value=full) as api,
                 patch.object(router.log_reader, "parse_log"),
@@ -243,7 +240,7 @@ class TestStateReaders(unittest.TestCase):
             log_jobs.assert_not_called()
 
     def test_selected_job_log_route_is_independent_from_job_list_route(self):
-        profiles.STATE_READERS = profiles.StateReaderProfile(
+        reading_settings.STATE_READERS = reading_settings.StateReaderProfile(
             jobs_mode="log",
             jobs_log_max_age_s=2.0,
             selected_job_mode="log",
@@ -279,13 +276,13 @@ class TestStateReaders(unittest.TestCase):
         )
         with (
             patch.object(
-                confirm_select_job._readers,
+                select_job_change.readers,
                 "get_jobs",
                 side_effect=[old, fresh],
             ),
             patch("time.sleep"),
         ):
-            result = confirm_select_job.confirm_select_job(
+            result = select_job_change.confirm_select_job(
                 object(),
                 job_name="Overview",
                 timeout=1.0,
@@ -293,7 +290,7 @@ class TestStateReaders(unittest.TestCase):
         self.assertTrue(result["success"])
 
     def test_confirm_select_job_pins_api_mode(self):
-        profiles.STATE_READERS = profiles.StateReaderProfile(jobs_mode="hybrid")
+        reading_settings.STATE_READERS = reading_settings.StateReaderProfile(jobs_mode="hybrid")
         calls = []
 
         def fake_get_jobs(client, **kwargs):
@@ -307,11 +304,11 @@ class TestStateReaders(unittest.TestCase):
 
         with (
             patch.object(
-                confirm_select_job._readers, "get_jobs", side_effect=fake_get_jobs
+                select_job_change.readers, "get_jobs", side_effect=fake_get_jobs
             ),
             patch("time.sleep"),
         ):
-            result = confirm_select_job.confirm_select_job(
+            result = select_job_change.confirm_select_job(
                 object(),
                 job_name="Overview",
                 timeout=1.0,
@@ -369,13 +366,13 @@ class TestApiModeCappedWorker(unittest.TestCase):
     """mode="api" must run in the capped worker with the profile timeout."""
 
     def setUp(self):
-        self._state_profile = profiles.STATE_READERS
+        self._state_profile = reading_settings.STATE_READERS
 
     def tearDown(self):
-        profiles.STATE_READERS = self._state_profile
+        reading_settings.STATE_READERS = self._state_profile
 
     def test_api_mode_hung_read_returns_none_after_timeout(self):
-        profiles.STATE_READERS = profiles.StateReaderProfile()
+        reading_settings.STATE_READERS = reading_settings.StateReaderProfile()
         release = threading.Event()
 
         def hung_api(*_args, **_kwargs):
@@ -393,7 +390,7 @@ class TestApiModeCappedWorker(unittest.TestCase):
             release.set()
 
     def test_api_mode_respects_in_flight_cap(self):
-        profiles.STATE_READERS = profiles.StateReaderProfile()
+        reading_settings.STATE_READERS = reading_settings.StateReaderProfile()
         release = threading.Event()
         client = object()
 
@@ -535,10 +532,10 @@ class TestRoutedErrorAndDiagnosticShapes(unittest.TestCase):
     fail closed to None (plain), never leak values or raise."""
 
     def setUp(self):
-        self._state_profile = profiles.STATE_READERS
+        self._state_profile = reading_settings.STATE_READERS
 
     def tearDown(self):
-        profiles.STATE_READERS = self._state_profile
+        reading_settings.STATE_READERS = self._state_profile
 
     def test_unknown_mode_raises_value_error(self):
         with self.assertRaises(ValueError):
@@ -561,7 +558,7 @@ class TestRoutedErrorAndDiagnosticShapes(unittest.TestCase):
         self.assertIs(reading._replace_value_none(), reading)
 
     def test_log_mode_reader_exception_carries_error_in_diagnostics(self):
-        profiles.STATE_READERS = profiles.StateReaderProfile(xy_mode="log")
+        reading_settings.STATE_READERS = reading_settings.StateReaderProfile(xy_mode="log")
         with patch.object(
             router.log_reader, "parse_log", side_effect=RuntimeError("log unreadable")
         ):
@@ -590,7 +587,7 @@ class TestRoutedErrorAndDiagnosticShapes(unittest.TestCase):
         self.assertIn("no hybrid leg", str(reading.error))
 
     def test_hybrid_api_only_hung_read_returns_none_after_timeout(self):
-        profiles.STATE_READERS = profiles.StateReaderProfile()
+        reading_settings.STATE_READERS = reading_settings.StateReaderProfile()
         api_only = dataclasses.replace(capabilities.spec("xy"), log_fn=None)
         release = threading.Event()
 

@@ -1,38 +1,99 @@
-"""select_job confirmation source-policy engine (api / log / hybrid).
+"""Selecting a job: ``select_job``, its profile, and how the switch is confirmed.
 
-The self-contained subsystem that decides, builds, and runs the
-confirmation evidence for the ``select_job`` command: the api poll leg,
-the log ``CurrentBlock`` leg, their hybrid admissibility gate, and the
-pre-fire no-op / api-baseline preparation. The trivial per-setting
-readback confirmations stay in ``confirmations``; the dual-leg
-``race_confirmations`` arbiter also lives there.
+The confirmation can come from three places, and the reading settings
+(``selected_job_confirm_source``) say which: the direct reader (LAS X's live
+selection, the default), the CAM API's job list, or the log's ``CurrentBlock``
+event; ``hybrid`` races the API and the log. ``prepare_select_job`` decides
+before anything is sent whether the job is already selected, and what was
+selected before (the API leg's baseline); ``select_job_confirm_legs`` builds
+the confirmation for the source.
 
-Import restrictions: only ``readers``, runtime utilities/profiles, the
-shared ``confirmations._reading_value_after`` helper, and stdlib.
-Nothing from command wrappers.
+This is the bare change, without moving the stage. The recipe that also keeps
+the sample in view, when the new job has another objective, is the procedure
+``procedures/objective_change_with_compensation/``.
+
+Author: Thom de Hoog, Center for Microscopy and Image Analysis (ZMB),
+University of Zurich (thom.dehoog@zmb.uzh.ch, thomdehoog@gmail.com).
 """
 
 import logging
 import time
 from functools import partial
 
-from ..readings import named_readings as _readers
-from ...dispatcher.door import make_log_entry as _make_log_entry
+from ...connection import waiting
+from ...connection.hardware_server import HardwareServerUnavailable
+from ...dispatcher.door import make_log_entry, make_timing
+from ...primitives.api.request import request_of
 from ...primitives.direct import direct_reader
 from ...primitives.log import log_wait
-from ...connection.hardware_server import HardwareServerUnavailable
-from .confirm_changes import _reading_value_after
-from .confirm_changes import race_confirmations
-from ...connection import waiting
+from ..readings import named_readings as readers
+from ..readings import reading_settings
+from ..sending.command_profile import CommandProfile
+from ..sending.prechecks import check_idle
+from . import confirming, run_change
 
 log = logging.getLogger(__name__)
 
+#: Four confirmation windows of ``WINDOW_S``, sent again between them, like
+#: every change. The confirmation is built for each call
+#: (``select_job_confirm_legs``), not held by the profile.
+SELECT_JOB = CommandProfile(pre_check_fn=check_idle)
 
-def _state_reader_profile():
-    """Return the current state-reader profile without importing at module load."""
-    from ..sending import command_profiles as profiles
 
-    return profiles.STATE_READERS
+def select_job(client, job_name, *, before_fire=None):
+    """Select the job ``job_name``, without moving the stage.
+
+    Nothing is sent when the job is already selected. ``before_fire`` is called
+    with the prepared context (``api_baseline_name`` is the job selected
+    before) once the limits allow the change, just before it is sent; it may
+    return a refusal, and then nothing is sent.
+    """
+    gated_values = {"job_name": job_name}
+    refusal = run_change.limits_refusal(client, "select_job", gated_values)
+    if refusal:
+        return refusal
+
+    t0 = time.perf_counter()
+    noop, context = prepare_select_job(client, job_name)
+    if noop is not None:
+        noop["timing"] = make_timing(total_s=time.perf_counter() - t0, attempts=0)
+        return noop
+    if before_fire is not None:
+        refusal = before_fire(context)
+        if refusal:
+            refusal.setdefault("timing", make_timing(total_s=time.perf_counter() - t0, attempts=0))
+            return refusal
+
+    def setup(m):
+        m.JobName = job_name
+
+    api_confirm, log_leg, budget_s = select_job_confirm_legs(
+        job_name,
+        command_started_at=time.time(),
+        api_baseline_name=context["api_baseline_name"],
+        timeout=SELECT_JOB.confirm_poll_s,
+    )
+    result = run_change.dispatch_change(
+        client,
+        request_of(client, "PyApiSelectJobByName"),
+        f"SelectJob '{job_name}'",
+        SELECT_JOB,
+        command="select_job",
+        values=gated_values,
+        setup_fn=setup,
+        confirm_fn=api_confirm,
+        log_confirm_fn=log_leg,
+        confirm_race_budget_s=budget_s,
+    )
+    if context["api_said_selected"]:
+        result.setdefault("logs", []).append(
+            make_log_entry(
+                "info",
+                "API reported target already selected before SelectJob, "
+                "but the log-participating confirmation still fired the command",
+            )
+        )
+    return result
 
 
 def selected_job_direct():
@@ -42,7 +103,7 @@ def selected_job_direct():
     It reads LAS X's live selection, so unlike the CAM API's job list it
     cannot be stale, and unlike the log it answers without a new event.
     """
-    if _state_reader_profile().selected_job_mode != "direct":
+    if reading_settings.STATE_READERS.selected_job_mode != "direct":
         return None
     try:
         selected = direct_reader.get_selected_job()
@@ -92,7 +153,7 @@ def confirm_select_job_direct(client, *, job_name, timeout=None, otherwise=None)
         time.sleep(waiting.POLL_S)
     msg = f"Job selection timeout after {timeout:.1f}s for '{job_name}' (direct reader)"
     log.warning(msg)
-    logs.append(_make_log_entry("warning", msg))
+    logs.append(make_log_entry("warning", msg))
     return {"success": False, "logs": logs, "source": "direct"}
 
 
@@ -136,7 +197,7 @@ def confirm_select_job(
             "pre-command API baseline (no transition witness)"
         )
         log.info(msg)
-        logs.append(_make_log_entry("info", msg))
+        logs.append(make_log_entry("info", msg))
         return {
             "success": False,
             "logs": logs,
@@ -149,7 +210,7 @@ def confirm_select_job(
             "read the target before the command (no transition witness)"
         )
         log.info(msg)
-        logs.append(_make_log_entry("info", msg))
+        logs.append(make_log_entry("info", msg))
         return {
             "success": False,
             "logs": logs,
@@ -162,8 +223,8 @@ def confirm_select_job(
     deadline = time.monotonic() + timeout
 
     while time.monotonic() < deadline:
-        jobs = _reading_value_after(
-            _readers.get_jobs(client, mode="api", diagnostics=True, deadline=deadline),
+        jobs = confirming.reading_value_after(
+            readers.get_jobs(client, mode="api", diagnostics=True, deadline=deadline),
             observed_after,
         )
         if jobs:
@@ -175,19 +236,19 @@ def confirm_select_job(
 
     msg = f"Job selection timeout after {timeout:.1f}s for '{job_name}'"
     log.warning(msg)
-    logs.append(_make_log_entry("warning", msg))
+    logs.append(make_log_entry("warning", msg))
     return {"success": False, "logs": logs, "source": "api"}
 
 
-def _confirm_select_job_log(job_name, command_started_at, *, timeout=None):
+def confirm_select_job_log(job_name, command_started_at, *, timeout=None):
     """Log confirmation leg: a fresh post-command ``CurrentBlock`` event
     naming *job_name* (see ``log_wait``). Applied state, never intent."""
-    profile = _state_reader_profile()
+    profile = reading_settings.STATE_READERS
     logs = []
     if command_started_at is None:
         msg = "Log-backed job confirmation requires command_started_at"
         log.warning(msg)
-        logs.append(_make_log_entry("warning", msg))
+        logs.append(make_log_entry("warning", msg))
         return {"success": False, "logs": logs, "source": "log"}
     log_timeout = waiting.WINDOW_S if timeout is None else max(0.0, timeout)
     log_result = log_wait.wait_for_selected_job_log(
@@ -203,7 +264,7 @@ def _confirm_select_job_log(job_name, command_started_at, *, timeout=None):
             f"attempts={log_result.attempts})"
         )
         log.info(msg)
-        logs.append(_make_log_entry("info", msg))
+        logs.append(make_log_entry("info", msg))
         return {
             "success": True,
             "logs": logs,
@@ -213,7 +274,7 @@ def _confirm_select_job_log(job_name, command_started_at, *, timeout=None):
         }
     msg = f"Log-backed job selection timeout after {log_timeout:.1f}s for '{job_name}'"
     log.warning(msg)
-    logs.append(_make_log_entry("warning", msg))
+    logs.append(make_log_entry("warning", msg))
     return {
         "success": False,
         "logs": logs,
@@ -254,7 +315,7 @@ def select_job_confirm_legs(
     either may be None. ``budget_s`` (the race window) is just the confirm
     window. Raises ``ValueError`` on an unknown source BEFORE anything fires.
     """
-    profile = _state_reader_profile()
+    profile = reading_settings.STATE_READERS
     source = profile.selected_job_confirm_source
     if source not in ("direct", "api", "log", "hybrid"):
         raise ValueError(
@@ -276,7 +337,7 @@ def select_job_confirm_legs(
         )
     if fallback in ("log", "hybrid"):
         log_leg = partial(
-            _confirm_select_job_log, job_name, command_started_at, timeout=window_s
+            confirm_select_job_log, job_name, command_started_at, timeout=window_s
         )
     if source == "direct":
         # The direct reader confirms alone. Only when it cannot answer does the
@@ -284,7 +345,7 @@ def select_job_confirm_legs(
         api_leg, log_fallback = api_confirm, log_leg
 
         def hybrid_instead(client):
-            race = race_confirmations(
+            race = confirming.race_confirmations(
                 api_leg=lambda: api_leg(client),
                 log_leg=log_fallback,
                 label=f"SelectJob '{job_name}'",
@@ -309,9 +370,9 @@ def select_job_confirm_legs(
     return api_confirm, log_leg, budget_s
 
 
-def _selected_job_api_jobs(client, profile):
+def api_jobs(client, profile):
     """The pre-command job list from the API, by the one rule; ``(jobs, reason)``."""
-    reading = _readers.get_jobs(client, mode="api", diagnostics=True)
+    reading = readers.get_jobs(client, mode="api", diagnostics=True)
     if reading is None:
         return None, "api_timeout"
     if reading.error is not None:
@@ -321,8 +382,8 @@ def _selected_job_api_jobs(client, profile):
     return reading.value, "ok"
 
 
-def _selected_job_api_baseline(client, profile):
-    jobs, reason = _selected_job_api_jobs(client, profile)
+def api_baseline(client, profile):
+    jobs, reason = api_jobs(client, profile)
     if not jobs:
         return None, None, reason
     selected = None
@@ -333,14 +394,14 @@ def _selected_job_api_baseline(client, profile):
     return selected, jobs, "ok" if selected else "api_no_selected_job"
 
 
-def _prime_selected_job_log_cluster(client, jobs):
+def prime_log_cluster(client, jobs):
     """Best-effort ATL job-cluster priming for log-backed confirmation.
 
     LAS X writes complete ATL job blocks when each job's settings are queried.
     This is explicit API-assisted log priming: it generates log evidence, but
     the confirmation decision still gates only on post-command log content.
     """
-    profile = _state_reader_profile()
+    profile = reading_settings.STATE_READERS
     if (
         profile.selected_job_confirm_source not in ("log", "hybrid", "direct")
         or not profile.selected_job_log_prime_cluster
@@ -351,20 +412,20 @@ def _prime_selected_job_log_cluster(client, jobs):
         if not name:
             continue
         try:
-            _readers.get_job_settings(client, name, mode="api")
+            readers.get_job_settings(client, name, mode="api")
         except Exception:
             log.debug("Could not prime log job cluster for %r", name, exc_info=True)
 
 
-def _selected_job_name_from_log(profile):
+def selected_job_from_log(profile):
     """Fresh selected-job name from LAS X logs, or None when unavailable."""
     try:
-        from ...primitives.log import log_reader as _log_reader
+        from ...primitives.log import log_reader
 
         max_age_s = profile.selected_job_log_cluster_max_age_s
         if max_age_s is None:
             max_age_s = profile.selected_job_log_max_age_s
-        selected = _log_reader.get_selected_job(max_age_s=max_age_s)
+        selected = log_reader.get_selected_job(max_age_s=max_age_s)
     except Exception:
         log.debug("Could not read selected job from LAS X log", exc_info=True)
         return None
@@ -390,7 +451,7 @@ def prepare_select_job(client, job_name):
     fires and may time out unconfirmed: that is correct fail-closed
     behavior, not a bug.
     """
-    profile = _state_reader_profile()
+    profile = reading_settings.STATE_READERS
     source = profile.selected_job_confirm_source
     if source == "direct":
         source = (
@@ -414,7 +475,7 @@ def prepare_select_job(client, job_name):
             "confirmed": True,
             "message": f"'{job_name}' already selected",
             "logs": [
-                _make_log_entry(
+                make_log_entry(
                     "info", "selected job already confirmed by the direct reader"
                 )
             ],
@@ -426,7 +487,7 @@ def prepare_select_job(client, job_name):
 
     if source == "api":
         try:
-            jobs = _readers.get_jobs(client, mode="api")
+            jobs = readers.get_jobs(client, mode="api")
         except Exception:
             log.debug(
                 "Could not check current job selection before select_job", exc_info=True
@@ -447,21 +508,21 @@ def prepare_select_job(client, job_name):
 
     # Log participates ("log" / "hybrid"): applied log state owns the no-op
     # decision.
-    if _selected_job_name_from_log(profile) == job_name:
+    if selected_job_from_log(profile) == job_name:
         return {
             "success": True,
             "confirmed": True,
             "message": f"'{job_name}' already selected",
             "logs": [
-                _make_log_entry("info", "selected job already confirmed from LAS X log")
+                make_log_entry("info", "selected job already confirmed from LAS X log")
             ],
         }, context
     if source == "log":
         try:
             if profile.selected_job_log_prime_cluster:
-                jobs, reason = _selected_job_api_jobs(client, profile)
+                jobs, reason = api_jobs(client, profile)
                 if jobs is not None:
-                    _prime_selected_job_log_cluster(client, jobs)
+                    prime_log_cluster(client, jobs)
                 else:
                     log.debug("Could not enumerate jobs before log priming: %s", reason)
         except Exception:
@@ -470,11 +531,11 @@ def prepare_select_job(client, job_name):
             )
         return None, context
     try:
-        name, jobs, reason = _selected_job_api_baseline(client, profile)
+        name, jobs, reason = api_baseline(client, profile)
         context["api_baseline_name"] = name
         context["api_baseline_reason"] = reason
         if jobs is not None:
-            _prime_selected_job_log_cluster(client, jobs)
+            prime_log_cluster(client, jobs)
     except Exception:
         log.debug("Could not enumerate/prime jobs before select_job", exc_info=True)
     if context["api_baseline_name"] == job_name:

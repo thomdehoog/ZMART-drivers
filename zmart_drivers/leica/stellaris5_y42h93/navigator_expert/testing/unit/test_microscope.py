@@ -16,13 +16,16 @@ import os
 from dataclasses import replace
 
 import pytest
+
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.changes import job_settings
 from limits_fixtures import hermetic_mock_machine_root
 from mock_lasx_api import MockLasxClient
 
 import zmart_drivers.leica.stellaris5_y42h93.navigator_expert as navigator_expert
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_api import microscope
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.connection import lasx_client
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.sending import command_profiles as profiles
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.readings import reading_settings
+
 
 
 @pytest.fixture
@@ -30,9 +33,9 @@ def scope(monkeypatch, tmp_path):
     """A Microscope connected to the LAS X stand-in, with a throwaway machine folder."""
     monkeypatch.setenv("ZMART_MICROSCOPY_ROOT", os.environ["ZMART_MICROSCOPY_ROOT"])
     monkeypatch.setattr(
-        profiles,
+        reading_settings,
         "STATE_READERS",
-        replace(profiles.STATE_READERS, selected_job_confirm_source="api"),
+        replace(reading_settings.STATE_READERS, selected_job_confirm_source="api"),
     )
     hermetic_mock_machine_root()
     monkeypatch.setattr(lasx_client, "connect_python_client", lambda **_kw: MockLasxClient(latency=0.0))
@@ -197,4 +200,4 @@ def test_every_call_of_the_microscope_and_every_setting_is_in_the_readme():
     calls = [name for name, _ in inspect.getmembers(navigator_expert.Microscope) if not name.startswith("_")]
 
     assert [name for name in calls if not re.search(rf"`{name}[`(]", section)] == []
-    assert [name for name in microscope.SETTINGS if f"| `{name}` |" not in section] == []
+    assert [name for name in job_settings.SETTINGS if f"| `{name}` |" not in section] == []

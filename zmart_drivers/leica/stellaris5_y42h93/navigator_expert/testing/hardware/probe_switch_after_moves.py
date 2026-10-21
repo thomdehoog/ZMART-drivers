@@ -39,7 +39,7 @@ if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.changes import (
-    confirm_select_job as _confirm_select_job,
+    select_job as _confirm_select_job,
 )
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.objective_change_with_compensation import (
     objective_shift as _objective_shift,
@@ -111,7 +111,7 @@ def _time_slow_calls() -> None:
     watch(_log_reader, "parse_log")
     watch(_gate, "check_refusal")
     watch(_confirm_select_job, "prepare_select_job")
-    watch(_confirm_select_job, "_selected_job_name_from_log")
+    watch(_confirm_select_job, "selected_job_from_log")
     watch(_objective_shift, "record_before_change")
 
 

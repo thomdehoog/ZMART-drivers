@@ -40,10 +40,9 @@ def test_write_refuses_a_client_with_no_limits_and_sends_nothing():
 def test_every_change_hands_its_name_and_values_to_the_dispatcher():
     """Each call to ``dispatch_change`` says which command it is and what it sets."""
     sources = [
-        DRIVER_ROOT
-        / "operations"
-        / "changes"
-        / "changes.py",
+        DRIVER_ROOT / "operations" / "changes" / f"{name}.py"
+        for name in ("stage", "objective", "select_job", "acquire", "job_settings")
+    ] + [
         DRIVER_ROOT
         / "procedures"
         / "objective_change_with_compensation"

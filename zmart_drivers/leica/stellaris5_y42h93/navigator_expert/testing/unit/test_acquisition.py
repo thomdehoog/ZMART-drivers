@@ -24,7 +24,6 @@ import pytest
 import tifffile
 import zarr
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.changes import run_job
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.save_data import save as saving
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.save_data import saved_acquisition
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.primitives.capture import product
@@ -40,7 +39,7 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.primitives.capture.p
     ExportedAcquisition,
     ExportedPosition,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.changes import run_job as capture
+
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.save_data import (
     save as acquisition,
 )
@@ -48,6 +47,7 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.save_data
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.clear_cache import (
     release,
 )
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.changes import acquire as acquire_change
 
 
 @pytest.fixture(autouse=True)
@@ -182,8 +182,8 @@ def fake_export(tmp_path: Path) -> dict:
 
 
 @pytest.fixture
-def successful_acq() -> capture.AcquisitionResult:
-    return capture.AcquisitionResult(
+def successful_acq() -> product.AcquisitionResult:
+    return product.AcquisitionResult(
         job="HiRes",
         started_at=time.time() - 1,
         finished_at=time.time(),
@@ -217,21 +217,14 @@ def _store_xml(store: Path) -> str:
 class TestAcquire:
     def test_acquire_returns_save_agnostic_token(self):
         with patch.object(
-            capture._commands,
+            acquire_change,
             "acquire",
             return_value={"success": True, "receipt": "ok"},
         ) as command:
-            result = run_job.acquire("client", "HiRes")
+            result = acquire_change.take_picture("client", "HiRes")
 
-        command.assert_called_once_with(
-            "client",
-            "HiRes",
-            poll_interval=None,
-            poll_timeout=None,
-            heartbeat_interval=None,
-            start_timeout=None,
-        )
-        assert isinstance(result, run_job.AcquisitionResult)
+        command.assert_called_once_with("client", "HiRes")
+        assert isinstance(result, product.AcquisitionResult)
         assert result.job == "HiRes"
         assert result.command_result == {"success": True, "receipt": "ok"}
         assert result.started_at <= result.finished_at
@@ -239,18 +232,18 @@ class TestAcquire:
     def test_acquire_raises_on_command_failure(self):
         with (
             patch.object(
-                capture._commands,
+                acquire_change,
                 "acquire",
                 return_value={"success": False, "error": "blocked"},
             ),
             pytest.raises(RuntimeError, match="acquire failed"),
         ):
-            run_job.acquire("client", "HiRes")
+            acquire_change.take_picture("client", "HiRes")
 
     def test_acquire_has_no_file_or_save_side_effects(self):
         with (
             patch.object(
-                capture._commands,
+                acquire_change,
                 "acquire",
                 return_value={"success": True},
             ),
@@ -259,7 +252,7 @@ class TestAcquire:
                 "_persist_store",
             ) as persist,
         ):
-            run_job.acquire("client", "HiRes")
+            acquire_change.take_picture("client", "HiRes")
 
         persist.assert_not_called()
 
@@ -378,7 +371,7 @@ class TestSave:
         tmp_path,
         naming,
     ):
-        with patch.object(capture._commands, "acquire") as command:
+        with patch.object(acquire_change, "acquire") as command:
             _save(successful_acq, tmp_path / "run_000001", naming)
         command.assert_not_called()
 

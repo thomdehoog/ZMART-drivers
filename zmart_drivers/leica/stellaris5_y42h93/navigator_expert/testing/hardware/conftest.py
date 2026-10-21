@@ -7,7 +7,8 @@ import os
 import pytest
 
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.primitives.log import log_settings
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.sending import command_profiles as profiles
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.readings import reading_settings
+
 
 
 @pytest.fixture(autouse=True)
@@ -24,7 +25,7 @@ def _restore_mock_globals():
     ProgramData/AppData path into whichever test runs next.
     """
     original_log_reader = log_settings.LOG_READER
-    original_state_readers = profiles.STATE_READERS
+    original_state_readers = reading_settings.STATE_READERS
     original_env = {
         name: os.environ.get(name) for name in ("ZMART_MICROSCOPY_ROOT", "APPDATA")
     }
@@ -32,7 +33,7 @@ def _restore_mock_globals():
         yield
     finally:
         log_settings.LOG_READER = original_log_reader
-        profiles.STATE_READERS = original_state_readers
+        reading_settings.STATE_READERS = original_state_readers
         for name, value in original_env.items():
             if value is None:
                 os.environ.pop(name, None)

@@ -9,9 +9,9 @@ The correction is made only when the change was accepted. When the correction
 cannot be made, the command answers ``success: False`` and names the step, so
 a picture is never taken at a position that no longer points at the sample.
 
-Each one wraps the bare command of the same name in
-``operations/changes/changes.py`` (``set_objective`` and
-``select_job`` there change the lens or the job and nothing else). Use those
+Each one wraps the bare change of the same name, ``operations/changes/objective.py``'s
+``set_objective`` and ``operations/changes/select_job.py``'s ``select_job``, which
+change the lens or the job and nothing else. Use those
 when the stage should not be corrected.
 
 Author: Thom de Hoog, Center for Microscopy and Image Analysis (ZMB),
@@ -21,7 +21,8 @@ University of Zurich (thom.dehoog@zmb.uzh.ch, thomdehoog@gmail.com).
 import logging
 
 from ...dispatcher.door import make_timing as _make_timing
-from ...operations.changes import changes as _changes
+from ...operations.changes import objective as _objective
+from ...operations.changes import select_job as _select_job
 from . import objective_shift as _objective_shift
 
 log = logging.getLogger(__name__)
@@ -78,7 +79,7 @@ def set_objective(
             )
         return None
 
-    result = _changes.set_objective(
+    result = _objective.set_objective(
         client,
         job_name,
         hw_info,
@@ -133,7 +134,7 @@ def select_job(client, job_name, *, compensate=None):
             }
         return None
 
-    result = _changes.select_job(client, job_name, before_fire=record_position)
+    result = _select_job.select_job(client, job_name, before_fire=record_position)
     before = recorded.get("before")
     if before is not None and result.get("success"):
         result = _objective_shift.merge_into_result(

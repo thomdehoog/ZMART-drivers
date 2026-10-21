@@ -22,7 +22,7 @@ from functools import partial
 from ...dispatcher.reader import Reading, counts
 from ...connection.hardware_server import HardwareServerUnavailable
 from ...primitives.log import log_reader
-from ..sending import command_profiles as profiles
+from . import reading_settings
 from . import reading_table as capabilities
 from ...connection import waiting  # how long the shared reader waits: this microscope's numbers
 
@@ -40,7 +40,7 @@ UnsupportedSource = capabilities.UnsupportedSource
 
 def profile():
     """The reading policy of this driver: which source each datum prefers."""
-    return profiles.STATE_READERS
+    return reading_settings.STATE_READERS
 
 
 def mode_for(datum):

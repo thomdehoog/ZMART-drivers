@@ -34,7 +34,7 @@ from ...primitives.values.derived import (
     stack_drive as _stack_drive,
     z_um_from_settings as _z_um_from_settings,
 )
-from ...operations.changes import changes as _commands
+from ...operations.changes import stage as _commands
 from ...session import handle as _info
 from ...session.handle import Session, note_unconfirmed, require_open
 

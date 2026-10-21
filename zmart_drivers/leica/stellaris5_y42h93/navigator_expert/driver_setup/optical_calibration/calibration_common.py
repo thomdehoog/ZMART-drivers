@@ -30,11 +30,11 @@ from typing import Any
 
 import numpy as np
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.changes import run_job
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.changes import acquire as acquire_change
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.save_data import save as saving
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.primitives.values import parsing
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.readings import named_readings as readers
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.changes import changes
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.changes import stage
 
 from .. import orientation as _orientation
 from ...procedures.save_data.naming import Naming, run_hash
@@ -181,7 +181,7 @@ def move_xy_and_verify(
     settle_s: float = 0.5,
     tolerance_um: float = 0.5,
 ) -> None:
-    result = changes.move_xy(client, x_um, y_um, unit="um", tolerance=tolerance_um)
+    result = stage.move_xy(client, x_um, y_um, unit="um", tolerance=tolerance_um)
     if not result or not result.get("success"):
         raise RuntimeError(f"move_xy failed: {result}")
     if settle_s > 0:
@@ -203,7 +203,7 @@ def move_zwide_and_verify(
     *,
     tolerance_um: float = 1.0,
 ) -> None:
-    result = changes.move_z(
+    result = stage.move_z(
         client, job_name, z_um, unit="um", z_mode="zwide", tolerance=tolerance_um
     )
     if not result or not result.get("success"):
@@ -346,7 +346,7 @@ def _capture_for_calibration(
         orientation = _orientation.rig_orientation()
     position_label = f"{len(session.exported_files):06d}"
     naming = Naming(stem=f"{folder}_{run_hash()}_{position_label}")
-    acq = run_job.acquire(session.client, session.job_name)
+    acq = acquire_change.take_picture(session.client, session.job_name)
     return saving.save(
         session.client,
         acq,

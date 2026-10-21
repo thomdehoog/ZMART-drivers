@@ -37,23 +37,24 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup import 
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.save_data import (
     save as _save,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.changes import run_job as _capture
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.changes import acquire as acquire_change
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.readings import reading_settings
+
 
 
 def _run_mock(tmp_path, *extra):
     """Run the validator against the mock, restoring global state afterwards."""
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.sending import command_profiles as profiles
 
     output = tmp_path / "adapter_mock.jsonl"
     original_connect = adapter.connect_python_client
-    original_profile = profiles.STATE_READERS
+    original_profile = reading_settings.STATE_READERS
     try:
         exit_code = validate_zmart_adapter.main(
             ["--mock", "--output", str(output), "--report-dir", str(tmp_path), *extra]
         )
     finally:
         adapter.connect_python_client = original_connect
-        profiles.STATE_READERS = original_profile
+        reading_settings.STATE_READERS = original_profile
     records = [
         json.loads(line)
         for line in output.read_text(encoding="utf-8").splitlines()
@@ -206,10 +207,9 @@ def test_state_phase_does_not_switch_away_from_autofocus_job():
 
 
 def test_connect_session_leaves_output_root_for_driver_discovery():
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.sending import command_profiles as profiles
 
     original_connect = adapter.connect_python_client
-    original_profile = profiles.STATE_READERS
+    original_profile = reading_settings.STATE_READERS
     args = argparse.Namespace(
         mock=True, mock_latency=0.0, client_name="PythonClient", api_delay_ms=None
     )
@@ -219,7 +219,7 @@ def test_connect_session_leaves_output_root_for_driver_discovery():
         assert session.plugin.microscope.handle.connection.get("output_root") is None
     finally:
         adapter.connect_python_client = original_connect
-        profiles.STATE_READERS = original_profile
+        reading_settings.STATE_READERS = original_profile
         if session is not None:
             session.disconnect()
 
@@ -234,10 +234,9 @@ def test_acquire_through_the_controller_seam(tmp_path):
     mock CAM cannot satisfy -- so the seam decision #3 cares about (Session ->
     ops table -> adapter) is what is actually exercised.
     """
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.sending import command_profiles as profiles
 
     original_connect = adapter.connect_python_client
-    original_profile = profiles.STATE_READERS
+    original_profile = reading_settings.STATE_READERS
     args = argparse.Namespace(
         mock=True, mock_latency=0.0, client_name="PythonClient", api_delay_ms=None
     )
@@ -256,13 +255,13 @@ def test_acquire_through_the_controller_seam(tmp_path):
             return SimpleNamespace(image_paths={}, xml_paths={}, naming=naming)
 
         with (
-            patch.object(_capture, "acquire", fake_capture),
+            patch.object(acquire_change, "take_picture", fake_capture),
             patch.object(_save, "save", fake_save),
         ):
             record = session.acquire(position_label="1")
     finally:
         adapter.connect_python_client = original_connect
-        profiles.STATE_READERS = original_profile
+        reading_settings.STATE_READERS = original_profile
         if session is not None:
             session.disconnect()
 

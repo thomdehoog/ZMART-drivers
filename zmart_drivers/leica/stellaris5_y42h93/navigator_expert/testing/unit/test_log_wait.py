@@ -2,7 +2,6 @@
 
 import unittest
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.sending import command_profiles as profiles
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.connection import waiting
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.primitives.log import (
     log_reader,
@@ -10,6 +9,7 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.primitives.log impor
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.primitives.log.log_wait import (
     wait_for_selected_job_log,
 )
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.readings import reading_settings
 
 
 def _job(block_id, name):
@@ -43,10 +43,10 @@ def _snapshot(
 
 class TestLogWait(unittest.TestCase):
     def setUp(self):
-        self._state_profile = profiles.STATE_READERS
+        self._state_profile = reading_settings.STATE_READERS
 
     def tearDown(self):
-        profiles.STATE_READERS = self._state_profile
+        reading_settings.STATE_READERS = self._state_profile
 
     def test_selected_job_poll_succeeds_immediately(self):
         snap = _snapshot(

@@ -11,38 +11,40 @@ against Unknown status (Unknown is not idle).
 import unittest
 from unittest.mock import patch
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.sending import command_profiles as profiles
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.sending import (
     prechecks,
 )
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.readings import reading_settings
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.changes import stage
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.changes import objective as objective_change
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.changes import select_job as select_job_change
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.changes import acquire as acquire_change
 
-IDLE_GUARDED = [
-    "MOVE_XY",
-    "MOVE_Z",
-    "OBJECTIVE",
-    "SELECT_JOB",
-    "ACQUIRE",
-]
+IDLE_GUARDED = {
+    "MOVE_XY": stage.MOVE_XY,
+    "MOVE_Z": stage.MOVE_Z,
+    "OBJECTIVE": objective_change.OBJECTIVE,
+    "SELECT_JOB": select_job_change.SELECT_JOB,
+    "ACQUIRE": acquire_change.ACQUIRE,
+}
 
 
 class TestIdlePrecheckPolicy(unittest.TestCase):
     def setUp(self):
-        self._prior = profiles.STATE_READERS
-        profiles.STATE_READERS = profiles.StateReaderProfile(scan_status_mode="api")
+        self._prior = reading_settings.STATE_READERS
+        reading_settings.STATE_READERS = reading_settings.StateReaderProfile(scan_status_mode="api")
 
     def tearDown(self):
-        profiles.STATE_READERS = self._prior
+        reading_settings.STATE_READERS = self._prior
 
     def _statuses(self, values):
         remaining = list(values)
         return lambda client: remaining.pop(0) if len(remaining) > 1 else remaining[0]
 
     def test_physical_commands_see_idle_before_firing(self):
-        for name in IDLE_GUARDED:
+        for name, profile in IDLE_GUARDED.items():
             with self.subTest(profile=name):
-                self.assertIs(
-                    getattr(profiles, name).pre_check_fn, prechecks.check_idle
-                )
+                self.assertIs(profile.pre_check_fn, prechecks.check_idle)
 
     def test_check_idle_waits_through_a_busy_phase_within_the_windows(self):
         statuses = self._statuses(["eScanRunning"] * 10 + ["eScanIdle"])

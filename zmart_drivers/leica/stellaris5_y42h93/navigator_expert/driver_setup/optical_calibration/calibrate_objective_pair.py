@@ -232,7 +232,7 @@ def start_session(
     # the adopted calibration so a named set never carries stale objective names.
     # Slots whose hardware record has no usable name are left out: an empty
     # name must never overwrite the human-set name already in the config.
-    from ...operations.changes import objectives as _objectives
+    from ...operations.changes import objective as _objectives
 
     hardware_objectives = {
         slot: name

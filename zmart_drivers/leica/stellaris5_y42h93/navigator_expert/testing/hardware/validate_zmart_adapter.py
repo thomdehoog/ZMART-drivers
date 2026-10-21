@@ -63,6 +63,7 @@ for _p in (str(_HERE.parent), str(_REPO_ROOT), str(_HELPERS)):
 
 import validate_hardware as vh  # reuse Record/Validator/sink/logging
 import zmart_controller
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.readings import reading_settings
 
 # Readback tolerances: match the driver's own confirmation gates
 # (confirm_move_xy default 20 um, confirm_move_z default 1.0 um).
@@ -166,7 +167,6 @@ def _connect_session(
         from limits_fixtures import hermetic_mock_machine_root  # noqa: PLC0415
         from mock_lasx_api import MockLasxClient  # noqa: PLC0415
 
-        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.sending import command_profiles as profiles
 
         # Use a hermetic ProgramData fixture so the adapter connect's REAL
         # limits handshake succeeds without touching this developer machine.
@@ -177,8 +177,8 @@ def _connect_session(
         # The mock has no LAS X log stream, so the default select-job
         # confirmation race would only ever time out waiting on log evidence
         # (same pinning as validate_hardware --mock).
-        profiles.STATE_READERS = replace(
-            profiles.STATE_READERS, selected_job_confirm_source="api"
+        reading_settings.STATE_READERS = replace(
+            reading_settings.STATE_READERS, selected_job_confirm_source="api"
         )
 
     return _ReportingSession(zmart_controller.ZmartController(driver, inst))

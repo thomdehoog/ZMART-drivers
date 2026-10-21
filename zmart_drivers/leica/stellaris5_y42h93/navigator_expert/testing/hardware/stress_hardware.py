@@ -48,6 +48,7 @@ from pathlib import Path
 from typing import Any
 
 import validate_hardware as vh
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.readings import reading_settings
 
 
 @dataclass
@@ -577,9 +578,7 @@ def op_detector_gain(
         read=lambda: _active_setting(drv, client, job_name)["activeDetectors"][0][
             "gain"
         ]["value"],
-        write=lambda value: drv.set_detector_gain(
-            client, job_name, 0, beam_route, value
-        ),
+        write=lambda value: drv.change_setting(client, "detector_gain", job_name, setting_index=0, beam_route=beam_route, value=value),
         candidates=[target, current],
         tolerance=0.1,
     )
@@ -783,7 +782,7 @@ def op_acquire_once(
     _args: argparse.Namespace,
 ) -> tuple[str, str, dict[str, Any] | None, str | None, dict[str, Any]]:
     status, message, timing, driver_message = _driver_call(
-        lambda: drv.acquire(client, job_name).command_result
+        lambda: drv.take_picture(client, job_name).command_result
     )
     return (
         status,
@@ -812,7 +811,7 @@ def _operation_pool(args: argparse.Namespace) -> dict[str, Operation]:
             rng,
             setting_name="zoom",
             read=lambda: _setting(drv, client, job, ["zoom", "current"]),
-            write=lambda value: drv.set_zoom(client, job, value),
+            write=lambda value: drv.change_setting(client, "zoom", job, value=value),
             candidates=[1.0, 2.0, 5.0, 10.0],
             tolerance=0.1,
             strict_readback=args.strict_readback,
@@ -824,7 +823,7 @@ def _operation_pool(args: argparse.Namespace) -> dict[str, Operation]:
             rng,
             setting_name="scan_speed",
             read=lambda: _setting(drv, client, job, ["scanSpeed", "value"]),
-            write=lambda value: drv.set_scan_speed(client, job, value),
+            write=lambda value: drv.change_setting(client, "scan_speed", job, value=value),
             candidates=[400, 600, 800, 1000],
             strict_readback=args.strict_readback,
         ),
@@ -835,7 +834,7 @@ def _operation_pool(args: argparse.Namespace) -> dict[str, Operation]:
             rng,
             setting_name="scan_resonant",
             read=lambda: _setting(drv, client, job, ["scanSpeed", "isResonant"]),
-            write=lambda value: drv.set_scan_resonant(client, job, value),
+            write=lambda value: drv.change_setting(client, "scan_resonant", job, enable=value),
             candidates=[False, True],
             strict_readback=args.strict_readback,
         ),
@@ -847,7 +846,7 @@ def _operation_pool(args: argparse.Namespace) -> dict[str, Operation]:
             rng,
             setting_name="sequential_mode",
             read=lambda: _setting(drv, client, job, ["sequentialMode"]),
-            write=lambda value: drv.set_sequential_mode(client, job, value),
+            write=lambda value: drv.change_setting(client, "sequential_mode", job, mode=value),
             candidates=["Frame", "Line"],
             strict_readback=args.strict_readback,
         ),
@@ -858,7 +857,7 @@ def _operation_pool(args: argparse.Namespace) -> dict[str, Operation]:
             rng,
             setting_name="scan_field_rotation",
             read=lambda: _setting(drv, client, job, ["scanFieldRotation", "value"]),
-            write=lambda value: drv.set_scan_field_rotation(client, job, value),
+            write=lambda value: drv.change_setting(client, "scan_field_rotation", job, angle=value),
             candidates=[-5.0, 0.0, 5.0],
             tolerance=0.5,
             strict_readback=args.strict_readback,
@@ -870,7 +869,7 @@ def _operation_pool(args: argparse.Namespace) -> dict[str, Operation]:
             rng,
             setting_name="image_format",
             read=lambda: _setting(drv, client, job, ["format"]),
-            write=lambda value: drv.set_image_format(client, job, value),
+            write=lambda value: drv.change_setting(client, "image_format", job, format_str=value),
             candidates=["512 x 512", "1024 x 1024"],
             strict_readback=args.strict_readback,
         ),
@@ -881,7 +880,7 @@ def _operation_pool(args: argparse.Namespace) -> dict[str, Operation]:
             rng,
             setting_name="frame_accumulation",
             read=lambda: _active_setting(drv, client, job)["frameAccumulation"],
-            write=lambda value: drv.set_frame_accumulation(client, job, 0, value),
+            write=lambda value: drv.change_setting(client, "frame_accumulation", job, setting_index=0, value=value),
             candidates=[1, 2, 4],
             strict_readback=args.strict_readback,
         ),
@@ -892,7 +891,7 @@ def _operation_pool(args: argparse.Namespace) -> dict[str, Operation]:
             rng,
             setting_name="frame_average",
             read=lambda: _active_setting(drv, client, job)["frameAverage"],
-            write=lambda value: drv.set_frame_average(client, job, 0, value),
+            write=lambda value: drv.change_setting(client, "frame_average", job, setting_index=0, value=value),
             candidates=[1, 2, 4],
             strict_readback=args.strict_readback,
         ),
@@ -903,7 +902,7 @@ def _operation_pool(args: argparse.Namespace) -> dict[str, Operation]:
             rng,
             setting_name="line_accumulation",
             read=lambda: _active_setting(drv, client, job)["lineAccumulation"],
-            write=lambda value: drv.set_line_accumulation(client, job, 0, value),
+            write=lambda value: drv.change_setting(client, "line_accumulation", job, setting_index=0, value=value),
             candidates=[1, 2, 4],
             strict_readback=args.strict_readback,
         ),
@@ -914,7 +913,7 @@ def _operation_pool(args: argparse.Namespace) -> dict[str, Operation]:
             rng,
             setting_name="line_average",
             read=lambda: _active_setting(drv, client, job)["lineAverage"],
-            write=lambda value: drv.set_line_average(client, job, 0, value),
+            write=lambda value: drv.change_setting(client, "line_average", job, setting_index=0, value=value),
             candidates=[1, 2, 4],
             strict_readback=args.strict_readback,
         ),
@@ -925,7 +924,7 @@ def _operation_pool(args: argparse.Namespace) -> dict[str, Operation]:
             rng,
             setting_name="pinhole_airy",
             read=lambda: _active_setting(drv, client, job)["pinholeAiry"]["value"],
-            write=lambda value: drv.set_pinhole_airy(client, job, 0, value),
+            write=lambda value: drv.change_setting(client, "pinhole_airy", job, setting_index=0, value=value),
             candidates=[0.8, 1.0, 1.2],
             tolerance=0.05,
             strict_readback=args.strict_readback,
@@ -1131,10 +1130,9 @@ def main(argv: list[str] | None = None) -> int:
         # exist; pin selected-job confirmation to the api leg.
         from dataclasses import replace  # noqa: PLC0415
 
-        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.sending import command_profiles as profiles
 
-        profiles.STATE_READERS = replace(
-            profiles.STATE_READERS, selected_job_confirm_source="api"
+        reading_settings.STATE_READERS = replace(
+            reading_settings.STATE_READERS, selected_job_confirm_source="api"
         )
         log.info(
             "mock backend: selected-job confirmation pinned to api (no log stream exists)"

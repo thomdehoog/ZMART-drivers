@@ -25,11 +25,11 @@ from limits_fixtures import (
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.limits import (
     handshake as _handshake,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.sending.command_profiles import ImageSaveProfile
+
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.primitives.capture.product import (
     PlaneIndex,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.changes import limit_rules as limits_checks
+
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher import (
     gate as _gate,
 )
@@ -54,9 +54,9 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.save_data
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.save_data import (
     save as _save,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.changes import run_job as _capture
+
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_api import acquire as _acquisition
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.changes import changes as _commands
+
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.objective_change_with_compensation import (
     compensated_changes as _commands_comp,
 )
@@ -71,7 +71,6 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.session import (
     handle as _info,
 )
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.readings import named_readings as _readers
-
 
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.connection import (
     lasx_client as _connect_module,
@@ -175,7 +174,7 @@ def _patch_position(
 
 def _wide_limits():
     """Configure a permissive stage envelope for tests that exercise set_xyz."""
-    limits_checks.set_stage_limits(
+    limit_rules.set_stage_limits(
         x_min=0.0,
         x_max=1_000_000.0,
         y_min=0.0,
@@ -188,7 +187,7 @@ def _wide_limits():
 
 
 def _clear_limits():
-    limits_checks._stage_limits.update(dict.fromkeys(limits_checks._stage_limits, None))
+    limit_rules._stage_limits.update(dict.fromkeys(limit_rules._stage_limits, None))
 
 
 def _a_capture(job: str) -> SimpleNamespace:
@@ -219,10 +218,13 @@ def setUpModule():
 def tearDownModule():
     _NO_LOG_ON_DISK.stop()
 
-
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.origin import (
     set_origin as _set_origin,
 )
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.changes import acquire as acquire_change
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.sending import limit_rules
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.save_data import save_settings
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.changes import stage
 
 
 def _acquire_and_save(handle, **given):
@@ -597,10 +599,10 @@ class TestFrame(unittest.TestCase):
         stack_on_galvo = {**_settings(z_wide_um=32.0), "stack": {"mode": "z-galvo"}}
         with (
             patch.object(
-                _commands, "move_xy", return_value={"success": True, "confirmed": True}
+                stage, "move_xy", return_value={"success": True, "confirmed": True}
             ),
             patch.object(
-                _commands, "move_z", return_value={"success": True, "confirmed": True}
+                stage, "move_z", return_value={"success": True, "confirmed": True}
             ),
             patches[0],
             patch.object(_readers, "get_job_settings", return_value=stack_on_galvo),
@@ -625,9 +627,9 @@ class TestFrame(unittest.TestCase):
         patches = _patch_position(z_wide_um=32.0, z_galvo_um=3.0)
         with (
             patch.object(
-                _commands, "move_xy", return_value={"success": True, "confirmed": True}
+                stage, "move_xy", return_value={"success": True, "confirmed": True}
             ),
-            patch.object(_commands, "move_z", fake_move_z),
+            patch.object(stage, "move_z", fake_move_z),
             patches[0],
             patches[1],
             patches[2],
@@ -651,8 +653,8 @@ class TestFrame(unittest.TestCase):
         # current hardware: z-wide at 32, z-galvo parked at 0
         patches = _patch_position(z_wide_um=32.0, z_galvo_um=0.0)
         with (
-            patch.object(_commands, "move_xy", fake_move_xy),
-            patch.object(_commands, "move_z", fake_move_z),
+            patch.object(stage, "move_xy", fake_move_xy),
+            patch.object(stage, "move_z", fake_move_z),
             patches[0],
             patches[1],
             patches[2],
@@ -688,11 +690,11 @@ class TestFrame(unittest.TestCase):
         patches = _patch_position(z_wide_um=25.0, z_galvo_um=4.0)
         with (
             patch.object(
-                _commands,
+                stage,
                 "move_xy",
                 return_value={"success": True, "confirmed": True},
             ),
-            patch.object(_commands, "move_z", fake_move_z),
+            patch.object(stage, "move_z", fake_move_z),
             patches[0],
             patches[1],
             patches[2],
@@ -709,12 +711,12 @@ class TestFrame(unittest.TestCase):
         patches = _patch_position()
         with (
             patch.object(
-                _commands,
+                stage,
                 "move_xy",
                 return_value={"success": True, "confirmed": True},
             ),
             patch.object(
-                _commands,
+                stage,
                 "move_z",
                 return_value={
                     "success": True,
@@ -739,12 +741,12 @@ class TestFrame(unittest.TestCase):
         patches = _patch_position()
         with (
             patch.object(
-                _commands,
+                stage,
                 "move_xy",
                 return_value={"success": True, "confirmed": True},
             ),
             patch.object(
-                _commands,
+                stage,
                 "move_z",
                 return_value={
                     "success": False,
@@ -920,7 +922,7 @@ class TestAcquire(unittest.TestCase):
                 patch.object(
                     _commands_comp, "select_job", lambda c, j, **k: {"success": True}
                 ),
-                patch.object(_capture, "acquire", lambda c, j, **k: _a_capture(j)),
+                patch.object(acquire_change, "take_picture", lambda c, j, **k: _a_capture(j)),
                 patch.object(_save, "save", fake_save),
                 patch.object(_log, "write", fake_log),
                 *patches,
@@ -1026,7 +1028,7 @@ class TestAcquire(unittest.TestCase):
         with (
             patch.object(_readers, "get_jobs", return_value=self._jobs()),
             patch.object(_readers, "get_hardware_info", return_value={}),
-            patch.object(_capture, "acquire", fake_capture),
+            patch.object(acquire_change, "take_picture", fake_capture),
             patch.object(_save, "save", fake_save),
             patches[0],
             patches[1],
@@ -1115,8 +1117,8 @@ class TestAcquire(unittest.TestCase):
                     _commands_comp, "select_job", lambda *a, **k: {"success": True}
                 ),
                 patch.object(
-                    _capture,
-                    "acquire",
+                    acquire_change,
+                    "take_picture",
                     lambda client, job, **k: _a_capture(job),
                 ),
                 patch.object(_save, "save", fake_save),
@@ -1283,8 +1285,8 @@ class TestAcquire(unittest.TestCase):
     def test_captures_come_from_the_cache_and_clearing_is_not_a_saving_setting(self):
         """Every capture is read from LAS X's cache (AutoSave is not used, Thom, 2026-10-14);
         whether LAS X lets go of it is the clear_cache procedure, never a setting of the save."""
-        self.assertFalse(hasattr(ImageSaveProfile(), "source"))
-        self.assertFalse(hasattr(ImageSaveProfile(), "cleanup_cache"))
+        self.assertFalse(hasattr(save_settings.ImageSaveProfile(), "source"))
+        self.assertFalse(hasattr(save_settings.ImageSaveProfile(), "cleanup_cache"))
 
     def test_the_capture_is_placed_where_the_answer_says_its_planes_are(self):
         """The store is placed where the answer says its planes are."""
@@ -1742,8 +1744,8 @@ class TestAcquire(unittest.TestCase):
                     lambda client, job, **k: {"success": True},
                 ),
                 patch.object(
-                    _capture,
-                    "acquire",
+                    acquire_change,
+                    "take_picture",
                     lambda client, job, **k: _a_capture(job),
                 ),
                 patch.object(_save, "save", fake_save),
@@ -1777,7 +1779,7 @@ class TestAcquire(unittest.TestCase):
             patch.object(_readers, "get_jobs", return_value=self._jobs()),
             patch.object(_readers, "get_hardware_info", return_value={}),
             patch.object(_commands_comp, "select_job", return_value={"success": True}),
-            patch.object(_capture, "acquire", lambda client, job, **k: _a_capture(job)),
+            patch.object(acquire_change, "take_picture", lambda client, job, **k: _a_capture(job)),
             patch.object(_save, "save", fake_save),
             patches[0],
             patches[1],
@@ -1879,8 +1881,8 @@ class TestAcquire(unittest.TestCase):
             patch.object(_readers, "get_jobs", return_value=self._jobs()),
             patch.object(_commands_comp, "select_job", return_value={"success": True}),
             patch.object(
-                _capture,
-                "acquire",
+                acquire_change,
+                "take_picture",
                 side_effect=lambda client, job, **k: (
                     calls.append("capture") or _a_capture(job)
                 ),
@@ -2151,8 +2153,8 @@ class TestObjectiveCompensation(unittest.TestCase):
 
         patches = _patch_position(z_wide_um=40.0, z_galvo_um=0.0, slot=2)
         with (
-            patch.object(_commands, "move_xy", fake_xy),
-            patch.object(_commands, "move_z", fake_z),
+            patch.object(stage, "move_xy", fake_xy),
+            patch.object(stage, "move_z", fake_z),
             patches[0],
             patches[1],
             patches[2],
@@ -2199,8 +2201,8 @@ class TestObjectiveCompensation(unittest.TestCase):
             slot=2,
         )
         with (
-            patch.object(_commands, "move_xy", fake_xy),
-            patch.object(_commands, "move_z", fake_z),
+            patch.object(stage, "move_xy", fake_xy),
+            patch.object(stage, "move_z", fake_z),
             patches[0],
             patches[1],
             patches[2],
@@ -2229,11 +2231,11 @@ class TestObjectiveCompensation(unittest.TestCase):
         patches = _patch_position(z_wide_um=40.0, z_galvo_um=0.0, slot=2)
         with (
             patch.object(
-                _commands,
+                stage,
                 "move_xy",
                 return_value={"success": True, "confirmed": True},
             ),
-            patch.object(_commands, "move_z", fake_z),
+            patch.object(stage, "move_z", fake_z),
             patches[0],
             patches[1],
             patches[2],
@@ -2256,7 +2258,7 @@ class TestObjectiveCompensation(unittest.TestCase):
         )
         patches = _patch_position(z_wide_um=40.0, z_galvo_um=0.0, slot=2)
         with (
-            patch.object(_commands, "move_xy") as xy,
+            patch.object(stage, "move_xy") as xy,
             patches[0],
             patches[1],
             patches[2],
@@ -2281,8 +2283,8 @@ class TestObjectiveCompensation(unittest.TestCase):
             return {"success": True, "confirmed": True}
 
         with (
-            patch.object(_commands, "move_xy", fake_xy),
-            patch.object(_commands, "move_z", fake_z),
+            patch.object(stage, "move_xy", fake_xy),
+            patch.object(stage, "move_z", fake_z),
             patch.object(
                 _readers,
                 "get_xy",
@@ -2320,7 +2322,7 @@ class TestObjectiveCompensation(unittest.TestCase):
         h = _handle(origin=_origin(objective={"name": "10x", "slotIndex": 1}))
         patches = _patch_position(slot=2)
         with (
-            patch.object(_commands, "move_xy") as xy,
+            patch.object(stage, "move_xy") as xy,
             patches[0],
             patches[1],
             patches[2],
@@ -2363,7 +2365,7 @@ class TestObjectiveCompensation(unittest.TestCase):
         )
         patches = _patch_position(z_wide_um=0.0, z_galvo_um=0.0, slot=3)
         with (
-            patch.object(_commands, "move_xy") as xy,
+            patch.object(stage, "move_xy") as xy,
             patches[0],
             patches[1],
             patches[2],
@@ -2549,7 +2551,7 @@ class TestLifecycle(unittest.TestCase):
             h = _connect_handle(dict(DEFAULT_CONNECTION))
         self.assertIsInstance(h, Session)
         # the stage envelope was applied from the ProgramData snapshot...
-        self.assertEqual(limits_checks.get_stage_limits()["x_max"], 130000.0)
+        self.assertEqual(limit_rules.get_stage_limits()["x_max"], 130000.0)
         # ...and the commands-layer gate governs this client (with provenance)
         described = _gate.describe(h.client)
         self.assertEqual(described["source"], "machine")
@@ -2591,12 +2593,12 @@ class TestLifecycle(unittest.TestCase):
             patches[2],
             patches[3],
             patch.object(
-                _commands,
+                stage,
                 "move_xy",
                 return_value={"success": True, "confirmed": True},
             ),
             patch.object(
-                _commands,
+                stage,
                 "move_z",
                 return_value={"success": True, "confirmed": True},
             ),
@@ -2656,7 +2658,7 @@ class TestFunctionLimits(unittest.TestCase):
         h = _handle(gate_constraints={"x_um": {"min": 0, "max": 500}})
         patches = _patch_position(x_um=0.0, y_um=0.0)
         with (
-            patch.object(_commands, "move_z") as mz,
+            patch.object(stage, "move_z") as mz,
             patches[0],
             patches[1],
             patches[2],
@@ -2677,7 +2679,7 @@ class TestFunctionLimits(unittest.TestCase):
         )
         patches = _patch_position(z_wide_um=0.0, z_galvo_um=0.0)
         with (
-            patch.object(_commands, "move_xy") as xy,
+            patch.object(stage, "move_xy") as xy,
             patches[0],
             patches[1],
             patches[2],

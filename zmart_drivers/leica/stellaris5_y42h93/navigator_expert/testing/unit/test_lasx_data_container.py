@@ -26,13 +26,14 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.primitives.capture.p
     PlaneIndex,
     RawPlaneSource,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.changes import run_job as capture
+
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.save_data import (
     save as acquisition,
 )
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.primitives.capture import (
     lasx_data_container as container,
 )
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.primitives.capture import product
 
 PID = "669c"
 
@@ -125,9 +126,9 @@ def cache(tmp_path: Path) -> Path:
 
 def acquisition_of(
     job: str, *, started: float | None = None
-) -> capture.AcquisitionResult:
+) -> product.AcquisitionResult:
     started = time.time() - 1 if started is None else started
-    return capture.AcquisitionResult(
+    return product.AcquisitionResult(
         job=job,
         started_at=started,
         finished_at=time.time(),

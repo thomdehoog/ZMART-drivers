@@ -44,13 +44,15 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.optical
     calibration_common as cm,
 )
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.limits import handshake
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.changes import run_job
+
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.save_data import save as saving
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.connection import lasx_client
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.primitives.values import parsing
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.readings import named_readings as readers
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.changes import changes
+
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.primitives.capture import product
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.changes import acquire as acquire_change
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.changes import stage
 
 # ---------------------------------------------------------------------
 # Explicit runtime roots
@@ -93,7 +95,7 @@ def test_calibration_capture_explicitly_passes_active_orientation(
     received = {}
 
     monkeypatch.setattr(cm._orientation, "rig_orientation", lambda: expected)
-    monkeypatch.setattr(run_job, "acquire", lambda client, job: acquisition)
+    monkeypatch.setattr(acquire_change, "take_picture", lambda client, job: acquisition)
 
     def _save(client, result, output_root, naming, *, orientation, **_settings):
         received["orientation"] = orientation
@@ -1028,8 +1030,8 @@ def _patch_objective_driver(
 
     monkeypatch.setattr(readers, "get_xy", _get_xy)
     monkeypatch.setattr(readers, "get_xy", _get_xy)
-    monkeypatch.setattr(changes, "move_xy", _move_xy)
-    monkeypatch.setattr(changes, "move_z", _move_z)
+    monkeypatch.setattr(stage, "move_xy", _move_xy)
+    monkeypatch.setattr(stage, "move_z", _move_z)
     monkeypatch.setattr(readers, "read_zwide_um", _read_zwide_um)
     monkeypatch.setattr(readers, "read_zwide_um", _read_zwide_um)
 
@@ -1107,7 +1109,7 @@ def _patch_objective_driver(
                 image = img_template.copy()
         return _saved_manifest(output_root, naming, image)
 
-    monkeypatch.setattr(run_job, "acquire", _acquire)
+    monkeypatch.setattr(acquire_change, "take_picture", _acquire)
     monkeypatch.setattr(saving, "save", _save)
 
     def _acquire_frame(client, job, **kw):

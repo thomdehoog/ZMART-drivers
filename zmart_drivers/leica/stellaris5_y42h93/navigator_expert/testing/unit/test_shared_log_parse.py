@@ -20,6 +20,7 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.connection import wa
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.primitives.log import (
     log_reader,
 )
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.readings import reading_settings
 
 PARSE_S = 0.05
 
@@ -145,12 +146,11 @@ def test_sixty_readings_at_once_never_overlap_two_parses(monkeypatch):
     The shipped policy falls back to the API alone, so this run asks for the
     fallback that lets the log answer too, which is what puts it under load.
     """
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.sending import command_profiles as profiles
 
     monkeypatch.setattr(
-        profiles,
+        reading_settings,
         "STATE_READERS",
-        profiles.StateReaderProfile(reading_fallback="hybrid"),
+        reading_settings.StateReaderProfile(reading_fallback="hybrid"),
     )
     slow = SlowParse()
     with (

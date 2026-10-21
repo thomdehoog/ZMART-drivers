@@ -25,10 +25,11 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.save_data
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.primitives.capture.product import (
     PlaneIndex,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.changes import run_job as capture
+
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.save_data import (
     save as saving,
 )
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.primitives.capture import product
 
 DATA = Path(__file__).resolve().parents[1] / "data" / "lasx_description"
 PID = "669c"
@@ -87,8 +88,8 @@ def stack(tmp_path):
     return root, pixels
 
 
-def acquisition_of(job: str) -> capture.AcquisitionResult:
-    return capture.AcquisitionResult(
+def acquisition_of(job: str) -> product.AcquisitionResult:
+    return product.AcquisitionResult(
         job=job,
         started_at=time.time() - 1,
         finished_at=time.time(),

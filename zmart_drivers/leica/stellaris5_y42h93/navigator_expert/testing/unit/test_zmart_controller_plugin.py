@@ -21,15 +21,15 @@ from zmart_controller.registry import load_driver
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_api import microscope
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.zmart_controller_plugin import zmart_controller_plugin
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.primitives.log import log_settings
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.sending import command_profiles as profiles
+
 
 # The folder to register is the driver's: the one that holds zmart_controller_plugin/.
 DRIVER_FOLDER = Path(zmart_controller_plugin.__file__).resolve().parents[1]
 
-
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.connection import (
     lasx_client as _connect_module,
 )
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.readings import reading_settings
 
 
 def _offline(monkeypatch, tmp_path):
@@ -38,9 +38,9 @@ def _offline(monkeypatch, tmp_path):
     monkeypatch.setenv("APPDATA", os.environ.get("APPDATA", str(tmp_path)))
     monkeypatch.setattr(log_settings, "LOG_READER", log_settings.LOG_READER)
     monkeypatch.setattr(
-        profiles,
+        reading_settings,
         "STATE_READERS",
-        replace(profiles.STATE_READERS, selected_job_confirm_source="api"),
+        replace(reading_settings.STATE_READERS, selected_job_confirm_source="api"),
     )
     hermetic_mock_machine_root()
     monkeypatch.setattr(

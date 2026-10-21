@@ -12,7 +12,9 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher.transport
     TransportUnavailable,
 )
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.sending import routes
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.sending import command_profiles as profiles
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.changes import acquire as acquire_change
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.sending import command_profile
+
 
 
 class FakeRoute:
@@ -134,7 +136,7 @@ def test_the_send_loop_works_through_a_chain_and_reports_the_fallback():
     from dataclasses import replace
 
     profile = replace(
-        profiles.COMMAND_DEFAULT,
+        command_profile.CommandProfile(),
         transport=chain_of(direct, cam),
         error_check_fn=None,
         skip_reply_check=True,
@@ -179,5 +181,5 @@ def test_a_route_name_that_does_not_exist_is_refused_with_the_names_that_do(
 
 
 def test_every_command_profile_sends_through_the_vendor_routes():
-    assert profiles.COMMAND_DEFAULT.transport is routes.ROUTED
-    assert profiles.ACQUIRE.transport is routes.ROUTED
+    assert command_profile.CommandProfile().transport is routes.ROUTED
+    assert acquire_change.ACQUIRE.transport is routes.ROUTED

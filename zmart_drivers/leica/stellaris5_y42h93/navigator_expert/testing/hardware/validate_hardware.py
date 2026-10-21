@@ -73,6 +73,7 @@ from run_report import (  # noqa: E402
     confirmation_of,
     replay_envelope_logs,
 )
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.readings import reading_settings
 
 # --- Record + classification ------------------------------------------------
 
@@ -1064,7 +1065,7 @@ def phase_settings(drv: Any, v: Validator, client: Any, job_name: str) -> None:
             "zoom",
             job_name,
             read=lambda: api_settings()["zoom"]["current"],
-            write=lambda x: drv.set_zoom(client, job_name, x),
+            write=lambda x: drv.change_setting(client, "zoom", job_name, value=x),
             candidates=zoom_values,
             tolerance=0.1,
         )
@@ -1073,7 +1074,7 @@ def phase_settings(drv: Any, v: Validator, client: Any, job_name: str) -> None:
             "scan_speed",
             job_name,
             read=lambda: api_settings()["scanSpeed"]["value"],
-            write=lambda x: drv.set_scan_speed(client, job_name, x),
+            write=lambda x: drv.change_setting(client, "scan_speed", job_name, value=x),
             candidates=[400, 600, 800, 1000],
         )
         _round_trip(
@@ -1081,7 +1082,7 @@ def phase_settings(drv: Any, v: Validator, client: Any, job_name: str) -> None:
             "scan_resonant",
             job_name,
             read=lambda: api_settings()["scanSpeed"]["isResonant"],
-            write=lambda x: drv.set_scan_resonant(client, job_name, x),
+            write=lambda x: drv.change_setting(client, "scan_resonant", job_name, enable=x),
             candidates=[False, True],
         )
         scan_mode = v.callable(
@@ -1096,7 +1097,7 @@ def phase_settings(drv: Any, v: Validator, client: Any, job_name: str) -> None:
             "sequential_mode",
             job_name,
             read=lambda: api_settings()["sequentialMode"],
-            write=lambda x: drv.set_sequential_mode(client, job_name, x),
+            write=lambda x: drv.change_setting(client, "sequential_mode", job_name, mode=x),
             candidates=["Line", "Frame"],
         )
         _round_trip(
@@ -1104,7 +1105,7 @@ def phase_settings(drv: Any, v: Validator, client: Any, job_name: str) -> None:
             "scan_field_rotation",
             job_name,
             read=lambda: api_settings()["scanFieldRotation"]["value"],
-            write=lambda x: drv.set_scan_field_rotation(client, job_name, x),
+            write=lambda x: drv.change_setting(client, "scan_field_rotation", job_name, angle=x),
             candidates=[0.0, 5.0, -5.0],
             tolerance=0.5,
         )
@@ -1113,7 +1114,7 @@ def phase_settings(drv: Any, v: Validator, client: Any, job_name: str) -> None:
             "image_format",
             job_name,
             read=lambda: api_settings()["format"],
-            write=lambda x: drv.set_image_format(client, job_name, x),
+            write=lambda x: drv.change_setting(client, "image_format", job_name, format_str=x),
             candidates=["512 x 512", "1024 x 1024"],
         )
         _round_trip(
@@ -1121,7 +1122,7 @@ def phase_settings(drv: Any, v: Validator, client: Any, job_name: str) -> None:
             "frame_accumulation",
             job_name,
             read=lambda: api_settings()["activeSettings"][0]["frameAccumulation"],
-            write=lambda x: drv.set_frame_accumulation(client, job_name, 0, x),
+            write=lambda x: drv.change_setting(client, "frame_accumulation", job_name, setting_index=0, value=x),
             candidates=[1, 2, 4],
         )
         _round_trip(
@@ -1129,7 +1130,7 @@ def phase_settings(drv: Any, v: Validator, client: Any, job_name: str) -> None:
             "frame_average",
             job_name,
             read=lambda: _active_setting(api_settings())["frameAverage"],
-            write=lambda x: drv.set_frame_average(client, job_name, 0, x),
+            write=lambda x: drv.change_setting(client, "frame_average", job_name, setting_index=0, value=x),
             candidates=[1, 2, 4],
         )
         _round_trip(
@@ -1137,7 +1138,7 @@ def phase_settings(drv: Any, v: Validator, client: Any, job_name: str) -> None:
             "line_accumulation",
             job_name,
             read=lambda: _active_setting(api_settings())["lineAccumulation"],
-            write=lambda x: drv.set_line_accumulation(client, job_name, 0, x),
+            write=lambda x: drv.change_setting(client, "line_accumulation", job_name, setting_index=0, value=x),
             candidates=[1, 2, 4],
         )
         _round_trip(
@@ -1145,7 +1146,7 @@ def phase_settings(drv: Any, v: Validator, client: Any, job_name: str) -> None:
             "line_average",
             job_name,
             read=lambda: _active_setting(api_settings())["lineAverage"],
-            write=lambda x: drv.set_line_average(client, job_name, 0, x),
+            write=lambda x: drv.change_setting(client, "line_average", job_name, setting_index=0, value=x),
             candidates=[1, 2, 4],
         )
         _round_trip(
@@ -1153,7 +1154,7 @@ def phase_settings(drv: Any, v: Validator, client: Any, job_name: str) -> None:
             "pinhole_airy",
             job_name,
             read=lambda: _active_setting(api_settings())["pinholeAiry"]["value"],
-            write=lambda x: drv.set_pinhole_airy(client, job_name, 0, x),
+            write=lambda x: drv.change_setting(client, "pinhole_airy", job_name, setting_index=0, value=x),
             candidates=[1.0, 1.2, 0.8],
             tolerance=0.05,
         )
@@ -1206,7 +1207,7 @@ def phase_detector_gain(drv: Any, v: Validator, client: Any, job_name: str) -> N
         read=lambda: _active_setting(_settings(drv, client, job_name, mode="direct"))[
             "activeDetectors"
         ][0]["gain"]["value"],
-        write=lambda x: drv.set_detector_gain(client, job_name, 0, beam_route, x),
+        write=lambda x: drv.change_setting(client, "detector_gain", job_name, setting_index=0, beam_route=beam_route, value=x),
         candidates=[target, current],
         tolerance=0.1,
     )
@@ -1478,9 +1479,7 @@ def phase_lasers(drv: Any, v: Validator, client: Any, job_name: str) -> None:
             "laser_intensity",
             job_name,
             read=lambda: line()["intensity"]["value"],
-            write=lambda x: drv.set_laser_intensity(
-                client, job_name, 0, route, index, x
-            ),
+            write=lambda x: drv.change_setting(client, "laser_intensity", job_name, setting_index=0, beam_route=route, line_index=index, value=x),
             candidates=[min(level + 0.01, top), max(level - 0.01, 0.0)],
             tolerance=0.005,
         )
@@ -1489,7 +1488,7 @@ def phase_lasers(drv: Any, v: Validator, client: Any, job_name: str) -> None:
             "laser_shutter",
             job_name,
             read=lambda: line()["shutterOpen"],
-            write=lambda x: drv.set_laser_shutter(client, job_name, 0, route, x),
+            write=lambda x: drv.change_setting(client, "laser_shutter", job_name, setting_index=0, beam_route=route, activate=x),
             candidates=[True, False],
         )
 
@@ -1534,7 +1533,7 @@ def phase_filter_wheels(drv: Any, v: Validator, client: Any, job_name: str) -> N
                 )["filterIndex"]
 
             def write(x, route=route, kind=kind):
-                return drv.set_filter_wheel_slot(client, job_name, 0, route, kind, x)
+                return drv.change_setting(client, "filter_wheel_slot", job_name, setting_index=0, beam_route=route, filter_wheel_type=kind, slot_index=x)
 
             own = write(slot)
             if not own or not own.get("success"):
@@ -1587,17 +1586,17 @@ def phase_z_stack(drv: Any, v: Validator, client: Any, job_name: str) -> None:
         def put_back() -> None:
             v.command(
                 "z_stack: restore begin and end",
-                lambda: drv.set_z_stack_definition(client, job_name, begin, end),
+                lambda: drv.change_setting(client, "z_stack_definition", job_name, begin_um=begin, end_um=end),
             )
             v.command(
                 "z_stack: restore step size",
-                lambda: drv.set_z_stack_step_size(client, job_name, step),
+                lambda: drv.change_setting(client, "z_stack_step_size", job_name, step_size_um=step),
             )
 
         try:
             v.command(
                 "z_stack: step size +0.5 um",
-                lambda: drv.set_z_stack_step_size(client, job_name, step + 0.5),
+                lambda: drv.change_setting(client, "z_stack_step_size", job_name, step_size_um=step + 0.5),
             )
             now = stack()
             if now:
@@ -1611,11 +1610,11 @@ def phase_z_stack(drv: Any, v: Validator, client: Any, job_name: str) -> None:
             # answer is the check; the begin and end are read back after the next step.
             v.command(
                 "z_stack: size +2 um",
-                lambda: drv.set_z_stack_size(client, job_name, round(size + 2, 6)),
+                lambda: drv.change_setting(client, "z_stack_size", job_name, size_um=round(size + 2, 6)),
             )
             v.command(
                 "z_stack: definition 1 um wider",
-                lambda: drv.set_z_stack_definition(client, job_name, *widened),
+                lambda: drv.change_setting(client, "z_stack_definition", job_name, begin_um=widened[0], end_um=widened[1]),
             )
             now = stack()
             if now:
@@ -1640,7 +1639,7 @@ def phase_acquire(drv: Any, v: Validator, client: Any, job_name: str) -> None:
     with v.phase("acquire"):
         v.command(
             "acquire: job",
-            lambda: drv.acquire(client, job_name).command_result,
+            lambda: drv.take_picture(client, job_name).command_result,
             context={"job": job_name},
         )
 
@@ -1852,9 +1851,8 @@ def _apply_state_reader_mode(mode: str | None, log: logging.Logger) -> None:
     """Override all profile-routed passive state readers for this run."""
     if mode is None:
         return
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.sending import command_profiles as profiles
 
-    profiles.STATE_READERS = profiles.StateReaderProfile(
+    reading_settings.STATE_READERS = reading_settings.StateReaderProfile(
         xy_mode=mode,
         job_settings_mode=mode,
         jobs_mode=mode,
@@ -1895,13 +1893,12 @@ def _apply_log_select_confirmation(
         or args.prime_log_select_cluster
     ):
         return
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.sending import command_profiles as profiles
 
     updates = {
         "selected_job_confirm_source": (
             source
             if source is not None
-            else profiles.STATE_READERS.selected_job_confirm_source
+            else reading_settings.STATE_READERS.selected_job_confirm_source
         ),
         "selected_job_log_prime_cluster": args.prime_log_select_cluster,
     }
@@ -1909,12 +1906,12 @@ def _apply_log_select_confirmation(
         updates["selected_job_log_cluster_max_age_s"] = (
             args.log_select_cluster_max_age_s
         )
-    profiles.STATE_READERS = replace(profiles.STATE_READERS, **updates)
+    reading_settings.STATE_READERS = replace(reading_settings.STATE_READERS, **updates)
     log.info(
         "select-job confirmation source=%s prime_cluster=%s cluster_max_age=%s",
-        profiles.STATE_READERS.selected_job_confirm_source,
-        profiles.STATE_READERS.selected_job_log_prime_cluster,
-        profiles.STATE_READERS.selected_job_log_cluster_max_age_s,
+        reading_settings.STATE_READERS.selected_job_confirm_source,
+        reading_settings.STATE_READERS.selected_job_log_prime_cluster,
+        reading_settings.STATE_READERS.selected_job_log_cluster_max_age_s,
     )
 
 
@@ -2026,9 +2023,7 @@ def main(argv: list[str] | None = None) -> int:
             if kept:
                 v.command(
                     "objective: define the stack again",
-                    lambda: drv.set_z_stack_definition(
-                        client, job_name, float(kept["begin"]), float(kept["end"])
-                    ),
+                    lambda: drv.change_setting(client, "z_stack_definition", job_name, begin_um=float(kept["begin"]), end_um=float(kept["end"])),
                 )
         else:
             v.skip("phase: objective", "use --allow-objective to enable")

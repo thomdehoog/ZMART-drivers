@@ -116,9 +116,13 @@ each part uses the parts below it, and never the parts above.
   driver_setup/           what the operator sets up once and saves: limits, origin,
                           orientation, optical calibration, the data location
   session/                what the driver remembers about one connection
-  vendor_specific/        the only part that is written again for a new microscope
+  operations/             what the microscope does: each change and reading in one place,
+                          with its profile and its confirmation, and how a command is sent
   dispatcher/             the shared machinery that runs every reading and change:
                           the limits gate, the waiting rule, sending again, confirming
+  primitives/             one read or write each, one folder for each way of reaching
+                          the vendor software
+  connection/             opening the vendor software, and the waiting numbers
   ───────────────────────────────────────────────────────────────
   vendor software (LAS X, NIS-Elements, ZEN, mesoSPIM-control)
 
@@ -169,26 +173,33 @@ navigator_expert/
         data_location/
         store.py               load, check and save, for every item
 
-    vendor_specific/           the part you write for a new microscope
-        connection/            reach LAS X, keep the link; waiting.py holds the waiting numbers,
-                               lasx_settings.py how the CAM API is opened
-        primitives/            the smallest single reads and writes, one folder for each way of reaching LAS X
-            direct/            reading LAS X's own state, through its hardware server
-            api/               the CAM API
-            log/               what LAS X writes in its log files (reading only); log_settings.py says where
-            interface/         LAS X's window: pressing buttons, answering dialogs
-            capture/           the finished picture in LAS X's cache, and LAS X's description of it
-            values/            the values in what LAS X hands back: parsing.py (its text), derived.py
-                               (what a job's settings mean: its field of view, its z-stack)
-        primitive_handling/    the handling notes: how the dispatcher treats each primitive
-            profiles/          the command profiles, the transport, the error sorting, the idle check
-            commands/          the changes, running a job, the job settings, the limits rulebook
-            confirmations/     how each change is confirmed
-            readings/          the table of readings, the sources, and the named readings
+    operations/                what the microscope does; written for each microscope
+        changes/               one file per change, with its profile and its confirmation:
+                               job_settings.py (the settings of a job: one table, one runner),
+                               stage.py, objective.py, select_job.py, acquire.py; run_change.py
+                               and confirming.py are what they share
+        readings/              the table of readings, the sources, the named readings, and
+                               reading_settings.py (which source each reading asks)
+        sending/               how a command reaches LAS X: the command profile, the routes
+                               (direct first, the CAM API behind it), the error sorting, the
+                               idle check, and the limits rulebook
 
-        connection/ and primitives/ import nothing above them: the connection only
-        itself, the primitives only themselves and the connection. Their settings
-        live with them, and a test keeps it so.
+    primitives/                the smallest single reads and writes, one folder for each way of reaching LAS X
+        direct/                reading LAS X's own state, and sending, through its hardware server
+        api/                   the CAM API
+        log/                   what LAS X writes in its log files (reading only); log_settings.py says where
+        interface/             LAS X's window: pressing buttons, answering dialogs
+        capture/               the finished picture in LAS X's cache, and LAS X's description of it
+        values/                the values in what LAS X hands back: parsing.py (its text), derived.py
+                               (what a job's settings mean: its field of view, its z-stack)
+
+    connection/                reach LAS X, keep the link; waiting.py holds the waiting numbers,
+                               lasx_settings.py how the CAM API is opened
+
+    Each layer imports only the layers below it, bottom to top: connection,
+    primitives, dispatcher, operations, session, procedures and driver_setup,
+    driver_api, zmart_controller_plugin. The settings of each layer live in it,
+    and testing/unit/test_architecture_guard.py keeps the order.
 
     dispatcher/                the same in every driver; imports nothing of the driver
         door.py                the one door: read and write
@@ -232,7 +243,7 @@ micrometers" as the workflow says it:
    user coordinates to raw stage coordinates, using the recorded origin and
    the objective offsets.
 3. The procedure asks for the change `move_xy`
-   (`operations/changes/changes.py`), which goes to
+   (`operations/changes/stage.py`), which goes to
    the dispatcher's door, `write`.
 4. The door asks the limits gate first. A position outside the allowed range
    is refused here, and nothing is sent.
@@ -260,8 +271,9 @@ Leica driver" at the end of this section says so.
 
 The point of the whole anatomy is that when someone writes a driver for a new
 microscope, such as a ZEISS, an Evident or a Nikon, the work is in one place:
-the `vendor_specific/` folder. Everything above it, the dispatcher, the
-procedures and the `ZmartControllerPlugin` class, should already work.
+`connection/`, `primitives/` and `operations/`. Everything else, the dispatcher,
+the procedures, the `Microscope` and the `ZmartControllerPlugin` class, should
+already work.
 
 What a driver author writes:
 
@@ -271,9 +283,10 @@ What a driver author writes:
   offers.
 - **The error classification**: the sorting of this vendor's failures into the
   shared kinds of problem.
-- **The handling notes** (the `primitive_handling/` folder): for each
-  primitive, how the dispatcher should treat it. In the Leica driver the note
-  for one command is its command profile, in `operations/sending/`.
+- **The operations** (the `operations/` folder): each change and reading,
+  with how the dispatcher should treat it. In the Leica driver each change is
+  one file in `operations/changes/`, holding its command profile and its
+  confirmation; the settings of a job are one table there.
 - **The metadata map**: how this vendor describes a picture, and how that
   becomes the standard metadata.
 
@@ -589,7 +602,7 @@ new version.
 ### Who converts the coordinates
 
 The conversion is a procedure of its own, `procedures/absolute_coordinate_system/`.
-Below it, in `vendor_specific/`, the driver only reports clear readings from
+Below it, in `operations/readings/`, the driver only reports clear readings from
 the microscope: the stage position, each z drive and the selected objective.
 The procedure turns those readings into the driver's one absolute coordinate
 system, and turns a requested position back into moves. It takes into account
@@ -674,7 +687,7 @@ vendor part:
   the reply, sends, waits for the reply and reports an open dialog
   (`operations/sending/transport.py`);
 - the **command profiles**, with their pre-check (is the scanner idle), their
-  error check and their confirmation (`operations/sending/command_profiles.py`);
+  error check and their confirmation (each beside its change in `operations/changes/`);
 - the **sources** a reading can ask, and the source tried alone first
   (`operations/readings/sources.py`);
 - the **waiting numbers** (`connection/waiting.py`), handed in as
@@ -835,14 +848,14 @@ purpose, so that it cannot be forgotten.
 1. **The fallback for confirming `select_job` still races two legs.** The
    direct reader confirms a job change alone, as it is first choice for every
    read. Only when it cannot answer do the API and the log run together in two
-   threads (`operations/changes/confirm_select_job.py` and the
-   race in `confirm_changes.py`). The log leg reads a file, which never reaches
+   threads (`operations/changes/select_job.py` and the
+   race in `confirming.py`). The log leg reads a file, which never reaches
    LAS X, so the one-request-at-a-time rule still holds.
 2. **The error vocabulary and its rules are not yet shared.** They sit in the
    Leica file `error_classification.py`, beside the sorting (see "Error
    vocabulary, classification and rules").
 3. **The shape of a command profile is Leica's.** `CommandProfile` lives in
-   `operations/sending/command_profiles.py`, and the dispatcher reads its
+   `operations/sending/command_profile.py`, and the dispatcher reads its
    fields by name. A second vendor needs the same fields; the shape belongs to
    the dispatcher, with only the values in the vendor part.
 4. **Some procedures still call primitives directly.** `clear_cache` presses
@@ -883,7 +896,7 @@ the LAS X computer still load, without anyone redoing a calibration.
 
 ## 1. Vendor interface
 
-> **Note, October 2026.** In the Leica driver the vendor interface is the folder `vendor_specific/`: `connection/`, a `primitives/` folder of families, and `primitive_handling/`, the handling notes that used to sit with the actions. The sorting of errors is `operations/sending/error_classification.py`, which today also holds the list of kinds and their rules (see "Error vocabulary, classification and rules"), and the metadata map is `primitives/capture/metadata_map.py`. See "The simplified anatomy".
+> **Note, October 2026.** In the Leica driver the vendor interface is three folders at the driver's top level: `connection/`, `primitives/` (a folder for each way of reaching LAS X) and `operations/` (each change and reading, and how a command is sent). The sorting of errors is `operations/sending/error_classification.py`, which today also holds the list of kinds and their rules (see "Error vocabulary, classification and rules"), and the metadata map is `primitives/capture/metadata_map.py`. See "The simplified anatomy".
 
 **Purpose.** This is where each microscope is allowed to be completely
 different. It opens the connection to the vendor software and does whatever
@@ -1635,7 +1648,7 @@ What is the same in every driver, and what differs:
 |---|---|---|
 | Vendor interface | The three promises; the names of the kinds of problem | Everything inside, including the sorting of errors |
 | Dispatcher | Everything: both engines, the limits gate, the error vocabulary and rules, the routes mechanism | Nothing (the numbers live in the handling notes) |
-| Handling notes (`primitive_handling/`) | The shape of an entry | Which primitives, in which order, how to confirm, how long to wait |
+| Operations (`operations/`) | The shape of an entry | Which primitives, in which order, how to confirm, how long to wait |
 | Procedures | The "only through the dispatcher" rule; the algorithms | The recipes |
 | Saving | OME-Zarr writing, naming, the command log | Finding and reading the vendor's raw product, and its description of it |
 | Configuration | Load, check and save; the notebook pattern | Default values; the machine description |
@@ -1671,7 +1684,7 @@ by any other part of the driver. The Leica driver has none at the moment.
   dispatcher is the only thing that follows them. The kinds table above is
   the seam between the two.
 - **The vendor side.** Code that runs inside the vendor software lives in
-  `vendor_specific/vendor_side/`, standard library only, importing nothing
+  `primitives/vendor_side/`, standard library only, importing nothing
   of the driver but the shared message format.
 - **Actions and the dispatcher are separate folders.** The dispatcher is the
   same for every microscope and will move to the shared package; the actions

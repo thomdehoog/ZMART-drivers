@@ -7,8 +7,11 @@ checked, and which values the limits gate is shown. These tests call each
 definition with sample values and compare that whole description with the one
 saved in ``data/change_definitions.json``.
 
-The saved description was recorded from the code before the definitions were
-moved into a table, so a change in any entry shows up here as a plain difference.
+The saved description was first recorded from the code before the definitions
+were moved into a table, and recorded again when the settings became one table
+(2026-10-21): the requests, their fields, the gate's values and the log text
+stayed the same, only the description of each confirmation changed. A change in
+any entry shows up here as a plain difference.
 Run this file as a script to record the description again after a change that is
 meant to alter one.
 
@@ -23,11 +26,9 @@ from pathlib import Path
 
 import pytest
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.objective_change_with_compensation import (
-    compensated_changes,
-)
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.changes import changes
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.sending import command_profiles as profiles
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.changes import job_settings
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.changes import run_change
+
 
 SAVED = Path(__file__).resolve().parents[1] / "data" / "change_definitions.json"
 
@@ -65,31 +66,23 @@ class RecordingClient:
 
 
 def _profile_name(profile):
-    for name in dir(profiles):
-        if getattr(profiles, name) is profile:
-            return name
-    return repr(profile)
+    return "job_settings.PROFILE" if profile is job_settings.PROFILE else repr(profile)
 
 
 def _describe_callable(fn):
     if fn is None:
         return None
     if isinstance(fn, partial):
-        return {"function": fn.func.__name__, "keywords": dict(fn.keywords or {})}
+        keywords = {
+            key: value.name if isinstance(value, job_settings.Setting) else value
+            for key, value in (fn.keywords or {}).items()
+        }
+        return {"function": fn.func.__name__, "keywords": keywords}
     return {"function": getattr(fn, "__name__", repr(fn))}
 
 
-class _AllChanges:
-    """Every named change: the single commands, and the two that correct the stage."""
-
-    def __getattr__(self, name):
-        if name in ("set_objective", "select_job"):
-            return getattr(compensated_changes, name)
-        return getattr(changes, name)
-
-
 def record(call):
-    """Run ``call(changes, client)`` and describe everything it asked of the dispatcher."""
+    """Run ``call(client)`` and describe everything it asked of the dispatcher."""
     asked = {"gate": [], "dispatch": None, "result": None}
     client = RecordingClient()
 
@@ -113,12 +106,12 @@ def record(call):
         }
         return {"success": True, "confirmed": True, "message": description, "logs": []}
 
-    original = (changes._gate.check_refusal, changes.dispatch_change)
-    changes._gate.check_refusal, changes.dispatch_change = gate, dispatch
+    original = (run_change.gate.check_refusal, run_change.dispatch_change)
+    run_change.gate.check_refusal, run_change.dispatch_change = gate, dispatch
     try:
-        result = call(_AllChanges(), client)
+        result = call(client)
     finally:
-        changes._gate.check_refusal, changes.dispatch_change = original
+        run_change.gate.check_refusal, run_change.dispatch_change = original
     asked["result"] = (
         {"success": result.get("success"), "message": result.get("message")}
         if asked["dispatch"] is None
@@ -128,43 +121,33 @@ def record(call):
 
 
 CASES = {
-    "zoom": lambda c, k: c.set_zoom(k, "J", 1.5),
-    "zoom_with_overrides": lambda c, k: c.set_zoom(
-        k, "J", 1.5, max_retries=2, tolerance=0.01
-    ),
-    "scan_speed": lambda c, k: c.set_scan_speed(k, "J", 400),
-    "scan_resonant_on": lambda c, k: c.set_scan_resonant(k, "J", True),
-    "scan_mode": lambda c, k: c.set_scan_mode(k, "J", "xyz"),
-    "sequential_frame": lambda c, k: c.set_sequential_mode(k, "J", "Frame"),
-    "sequential_unknown": lambda c, k: c.set_sequential_mode(k, "J", "Bogus"),
-    "sequential_empty": lambda c, k: c.set_sequential_mode(k, "J", " "),
-    "scan_field_rotation": lambda c, k: c.set_scan_field_rotation(
-        k, "J", 12.5, tolerance=0.2
-    ),
-    "image_format_text": lambda c, k: c.set_image_format(k, "J", "512 x 512"),
-    "image_format_tuple": lambda c, k: c.set_image_format(k, "J", (256, 128)),
-    "z_stack_definition_both": lambda c, k: c.set_z_stack_definition(k, "J", -5.0, 5.0),
-    "z_stack_definition_zero_begin": lambda c, k: c.set_z_stack_definition(
-        k, "J", begin_um=0.0
-    ),
-    "z_stack_definition_reset": lambda c, k: c.set_z_stack_definition(
-        k, "J", None, None, old_begin_um=1, old_end_um=1
-    ),
-    "z_stack_step_size": lambda c, k: c.set_z_stack_step_size(k, "J", 0.5),
-    "z_stack_size": lambda c, k: c.set_z_stack_size(k, "J", 20.0),
-    "frame_accumulation": lambda c, k: c.set_frame_accumulation(k, "J", 1, 3),
-    "frame_average": lambda c, k: c.set_frame_average(k, "J", 1, 2),
-    "line_accumulation": lambda c, k: c.set_line_accumulation(k, "J", 0, 4),
-    "line_average": lambda c, k: c.set_line_average(k, "J", 0, 2),
-    "pinhole_airy": lambda c, k: c.set_pinhole_airy(k, "J", 0, 1.0, tolerance=0.05),
-    "detector_gain": lambda c, k: c.set_detector_gain(k, "J", 0, "HyD1", 55.0),
-    "laser_intensity": lambda c, k: c.set_laser_intensity(k, "J", 0, "R1", 2, 0.25),
-    "laser_shutter_open": lambda c, k: c.set_laser_shutter(k, "J", 0, "R1", True),
-    "laser_shutter_closed": lambda c, k: c.set_laser_shutter(k, "J", 0, "R1", False),
-    "filter_wheel_slot": lambda c, k: c.set_filter_wheel_slot(k, "J", 0, "R1", 2, 3),
-    "filter_wheel_spectrum": lambda c, k: c.set_filter_wheel_spectrum(
-        k, "J", 0, "R1", 2, 520.0, tolerance=1.0
-    ),
+    "zoom": lambda k: job_settings.change(k, "zoom", "J", value=1.5),
+    "zoom_with_overrides": lambda k: job_settings.change(k, "zoom", "J", value=1.5, max_retries=2, tolerance=0.01),
+    "scan_speed": lambda k: job_settings.change(k, "scan_speed", "J", value=400),
+    "scan_resonant_on": lambda k: job_settings.change(k, "scan_resonant", "J", enable=True),
+    "scan_mode": lambda k: job_settings.change(k, "scan_mode", "J", mode="xyz"),
+    "sequential_frame": lambda k: job_settings.change(k, "sequential_mode", "J", mode="Frame"),
+    "sequential_unknown": lambda k: job_settings.change(k, "sequential_mode", "J", mode="Bogus"),
+    "sequential_empty": lambda k: job_settings.change(k, "sequential_mode", "J", mode=" "),
+    "scan_field_rotation": lambda k: job_settings.change(k, "scan_field_rotation", "J", angle=12.5, tolerance=0.2),
+    "image_format_text": lambda k: job_settings.change(k, "image_format", "J", format_str="512 x 512"),
+    "image_format_tuple": lambda k: job_settings.change(k, "image_format", "J", format_str=(256, 128)),
+    "z_stack_definition_both": lambda k: job_settings.change(k, "z_stack_definition", "J", begin_um=-5.0, end_um=5.0),
+    "z_stack_definition_zero_begin": lambda k: job_settings.change(k, "z_stack_definition", "J", begin_um=0.0),
+    "z_stack_definition_reset": lambda k: job_settings.change(k, "z_stack_definition", "J", begin_um=None, end_um=None, old_begin_um=1, old_end_um=1),
+    "z_stack_step_size": lambda k: job_settings.change(k, "z_stack_step_size", "J", step_size_um=0.5),
+    "z_stack_size": lambda k: job_settings.change(k, "z_stack_size", "J", size_um=20.0),
+    "frame_accumulation": lambda k: job_settings.change(k, "frame_accumulation", "J", setting_index=1, value=3),
+    "frame_average": lambda k: job_settings.change(k, "frame_average", "J", setting_index=1, value=2),
+    "line_accumulation": lambda k: job_settings.change(k, "line_accumulation", "J", setting_index=0, value=4),
+    "line_average": lambda k: job_settings.change(k, "line_average", "J", setting_index=0, value=2),
+    "pinhole_airy": lambda k: job_settings.change(k, "pinhole_airy", "J", setting_index=0, value=1.0, tolerance=0.05),
+    "detector_gain": lambda k: job_settings.change(k, "detector_gain", "J", setting_index=0, beam_route="HyD1", value=55.0),
+    "laser_intensity": lambda k: job_settings.change(k, "laser_intensity", "J", setting_index=0, beam_route="R1", line_index=2, value=0.25),
+    "laser_shutter_open": lambda k: job_settings.change(k, "laser_shutter", "J", setting_index=0, beam_route="R1", activate=True),
+    "laser_shutter_closed": lambda k: job_settings.change(k, "laser_shutter", "J", setting_index=0, beam_route="R1", activate=False),
+    "filter_wheel_slot": lambda k: job_settings.change(k, "filter_wheel_slot", "J", setting_index=0, beam_route="R1", filter_wheel_type=2, slot_index=3),
+    "filter_wheel_spectrum": lambda k: job_settings.change(k, "filter_wheel_spectrum", "J", setting_index=0, beam_route="R1", filter_wheel_type=2, position=520.0, tolerance=1.0),
 }
 
 

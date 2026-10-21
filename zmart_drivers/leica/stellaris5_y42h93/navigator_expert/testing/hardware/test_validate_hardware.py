@@ -26,7 +26,8 @@ if str(_REPO_ROOT) not in sys.path:
 
 import validate_hardware
 from mock_lasx_api import MockLasxClient, _SET_DISPATCH
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.sending import command_profiles as profiles
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.readings import reading_settings
+
 
 
 def test_classify_result_statuses():
@@ -220,7 +221,7 @@ def test_validate_hardware_full_mock_run(tmp_path):
 
 def test_state_reader_mode_argument_overrides_profile(tmp_path):
     output = tmp_path / "reader_mode.jsonl"
-    prior = profiles.STATE_READERS
+    prior = reading_settings.STATE_READERS
     try:
         exit_code = validate_hardware.main(
             [
@@ -235,40 +236,40 @@ def test_state_reader_mode_argument_overrides_profile(tmp_path):
             ]
         )
         assert exit_code == 0
-        assert profiles.STATE_READERS.xy_mode == "api"
-        assert profiles.STATE_READERS.job_settings_mode == "api"
-        assert profiles.STATE_READERS.selected_job_mode == "api"
+        assert reading_settings.STATE_READERS.xy_mode == "api"
+        assert reading_settings.STATE_READERS.job_settings_mode == "api"
+        assert reading_settings.STATE_READERS.selected_job_mode == "api"
     finally:
-        profiles.STATE_READERS = prior
+        reading_settings.STATE_READERS = prior
 
 
 def test_the_direct_reader_route_can_be_chosen(caplog):
     """The direct reader is the driver's default route, so the validator runs on it too."""
-    prior = profiles.STATE_READERS
+    prior = reading_settings.STATE_READERS
     try:
         args = validate_hardware.parse_args(["--state-reader-mode", "direct"])
         validate_hardware._apply_state_reader_mode(
             args.state_reader_mode, validate_hardware.logging.getLogger("t")
         )
-        assert profiles.STATE_READERS.xy_mode == "direct"
-        assert profiles.STATE_READERS.job_settings_mode == "direct"
-        assert profiles.STATE_READERS.scan_status_mode == "direct"
+        assert reading_settings.STATE_READERS.xy_mode == "direct"
+        assert reading_settings.STATE_READERS.job_settings_mode == "direct"
+        assert reading_settings.STATE_READERS.scan_status_mode == "direct"
     finally:
-        profiles.STATE_READERS = prior
+        reading_settings.STATE_READERS = prior
 
 
 def test_the_direct_route_keeps_the_drivers_own_job_confirmation():
     """Job selection is confirmed by api, log or hybrid; on the direct route the driver's default stays."""
-    prior = profiles.STATE_READERS
+    prior = reading_settings.STATE_READERS
     try:
         args = validate_hardware.parse_args(["--state-reader-mode", "direct"])
         log = validate_hardware.logging.getLogger("t")
         validate_hardware._apply_state_reader_mode(args.state_reader_mode, log)
         validate_hardware._apply_log_select_confirmation(args, log)
-        assert profiles.STATE_READERS.selected_job_confirm_source == "direct"
-        assert profiles.STATE_READERS.xy_mode == "direct"
+        assert reading_settings.STATE_READERS.selected_job_confirm_source == "direct"
+        assert reading_settings.STATE_READERS.xy_mode == "direct"
     finally:
-        profiles.STATE_READERS = prior
+        reading_settings.STATE_READERS = prior
 
 
 def test_the_zoom_test_values_lie_in_the_jobs_own_range():

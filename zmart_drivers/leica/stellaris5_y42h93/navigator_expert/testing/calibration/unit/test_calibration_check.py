@@ -38,13 +38,15 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.optical
     check_calibration as chk,
 )
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.limits import handshake
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.changes import run_job
+
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.save_data import save as saving
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.connection import lasx_client
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.primitives.values import parsing
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.readings import named_readings as readers
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.changes import changes
+
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.primitives.capture import product
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.changes import acquire as acquire_change
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.changes import stage
 
 PIXEL_UM = 0.5
 JOB = "Overview"
@@ -52,7 +54,7 @@ JOB = "Overview"
 
 def test_zwide_move_uses_command_confirmation(monkeypatch):
     monkeypatch.setattr(
-        changes,
+        stage,
         "move_z",
         lambda *args, **kwargs: {"success": True, "confirmed": True},
     )
@@ -168,8 +170,8 @@ def _patch(
 
     monkeypatch.setattr(readers, "get_xy", get_xy)
     monkeypatch.setattr(readers, "get_xy", get_xy)
-    monkeypatch.setattr(changes, "move_xy", move_xy)
-    monkeypatch.setattr(changes, "move_z", move_z)
+    monkeypatch.setattr(stage, "move_xy", move_xy)
+    monkeypatch.setattr(stage, "move_z", move_z)
     monkeypatch.setattr(readers, "read_zwide_um", lambda c, job, **k: rig["z"])
     monkeypatch.setattr(readers, "get_selected_job", lambda c, **k: {"Name": JOB})
     monkeypatch.setattr(readers, "get_job_settings", job_settings)
@@ -184,8 +186,8 @@ def _patch(
         },
     )
     monkeypatch.setattr(
-        run_job,
-        "acquire",
+        acquire_change,
+        "take_picture",
         lambda c, job, **k: SimpleNamespace(job=job, command_result={"ok": True}),
     )
     seq = iter(frames)
