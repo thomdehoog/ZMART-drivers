@@ -67,9 +67,7 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.for_direct_use.micro
     DEFAULT_CONNECTION,
     Microscope,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.for_zmart_controller.zmart_driver import (
-    ZmartDriver,
-)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.zmart_controller_plugin.zmart_controller_plugin import ZmartControllerPlugin
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.absolute_coordinate_system import (
     frame as _frame,
 )
@@ -77,7 +75,7 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.absolute_
 
 def _connect_handle(connection=None):
     """Connect the way the controller does, by making the driver, and return its session handle."""
-    return ZmartDriver(connection).microscope.handle
+    return ZmartControllerPlugin(connection).microscope.handle
 
 
 def _disconnect_handle(handle):
@@ -941,9 +939,7 @@ def test_controller_session_bypass_refuses_at_the_commands_layer(clear_stage_lim
 
     import zmart_controller
 
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.for_zmart_controller.zmart_driver import (
-        ZmartDriver as driver,
-    )
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.zmart_controller_plugin.zmart_controller_plugin import ZmartControllerPlugin as driver
     from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings import (
         parsing as _cmd_settings,
     )
@@ -973,7 +969,7 @@ def test_controller_session_bypass_refuses_at_the_commands_layer(clear_stage_lim
             answer = session.set_xyz(0.0, 0.0, 0.0)
             assert answer["success"] is False
             assert (
-                "RuntimeError" in answer["content"] and "outside" in answer["content"]
+                "RuntimeError" in answer["output"] and "outside" in answer["output"]
             )
         finally:
             session.disconnect()

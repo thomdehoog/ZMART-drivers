@@ -35,8 +35,7 @@ follow the reason.
    what it is for, so the reader can find their way.
 7. **Name things after their job, not after jargon.** A reader should be able to
    guess what a file or a function does from its name. We chose
-   `primitive_handling` over `profiles`, and `for_zmart_controller` over
-   `adapter`, for this reason.
+   `primitive_handling` over `profiles` for this reason.
 8. **Comments say why, and what was seen.** A comment that only repeats the
    code adds nothing. A comment that gives the reason, or a measurement with
    its date and place ("measured on the LAS X simulator, 2026-10-12"), earns

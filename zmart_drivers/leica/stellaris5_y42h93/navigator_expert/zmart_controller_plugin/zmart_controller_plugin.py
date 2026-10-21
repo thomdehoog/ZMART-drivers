@@ -2,13 +2,13 @@ r"""The Leica STELLARIS 5 driver, as the ZMART Controller plugs it in.
 
 This is the class the controller makes when it connects, with one method per
 command (see the controller's "How do I plug in a ZMART-driver"). Together
-with ``zmart_driver.json`` beside it in this folder, which names this
+with ``zmart_controller_plugin.json`` beside it in this folder, which names this
 file, it is all the controller needs. Install
 the driver once on the LAS X computer, then connect by name in every session::
 
     from zmart_controller import mic
 
-    mic.register_driver(r"C:\ZMART-drivers\zmart_drivers\leica\stellaris5_y42h93\navigator_expert\for_zmart_controller")
+    mic.register_driver(r"C:\ZMART-drivers\zmart_drivers\leica\stellaris5_y42h93\navigator_expert")
     mic.connect("stellaris")
     mic.get_xyz()
 
@@ -25,11 +25,11 @@ was asked. When it did not, the ``Microscope`` raises: ``ValueError`` for a
 request that is wrong (an unknown motor, setting or job) and
 ``RuntimeError`` for a change that was refused or failed. The controller
 reports a raised error with its text, so a workflow always sees
-``{"success": False, "content": "..."}`` and never has to catch anything
+``{"success": False, "output": "..."}`` and never has to catch anything
 itself.
 
 Positions are micrometres from the saved origin, in the sample's coordinate
-system. The ``connection`` dictionary comes from ``zmart_driver.json``; every
+system. The ``connection`` dictionary comes from ``zmart_controller_plugin.json``; every
 key may be left out and then takes the driver's default
 (``for_direct_use/microscope.DEFAULT_CONNECTION``).
 
@@ -42,13 +42,17 @@ from __future__ import annotations
 from typing import Any
 
 from ..for_direct_use.microscope import Microscope
-from . import info, procedure_menu
+from . import info
+from . import procedure_menu
 
 #: The three axes, in the order the controller's canvas lists them.
 AXES = ("x", "y", "z")
 
+#: What set_state can change: the selected LAS X job, and nothing else.
+CHANGEABLE = frozenset({"job"})
 
-class ZmartDriver:
+
+class ZmartControllerPlugin:
     """One connected STELLARIS, with the controller's commands."""
 
     def __init__(self, connection: dict[str, Any] | None = None) -> None:
@@ -97,7 +101,16 @@ class ZmartDriver:
         return True, (state["changeable"], state["observed"])
 
     def set_state(self, changeable):
-        """Apply the changeable settings (today the job) and answer ``True, applied``."""
+        """Apply the changeable settings and answer ``True, applied``.
+
+        The one changeable setting is ``job``, the selected LAS X job. Any other
+        is a setting this microscope does not have, and is refused with
+        ``ValueError``; the job's own settings, such as the zoom, are changed
+        with the ``Microscope``'s ``change_setting``.
+        """
+        unknown = sorted(set(changeable) - CHANGEABLE)
+        if unknown:
+            raise ValueError(f"no changeable setting {unknown}; the changeable settings are {sorted(CHANGEABLE)}")
         job = dict(changeable).get("job")
         if job is None:
             return True, {}

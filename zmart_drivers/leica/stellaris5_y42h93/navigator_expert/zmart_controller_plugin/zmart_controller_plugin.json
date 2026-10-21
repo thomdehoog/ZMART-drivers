@@ -1,6 +1,5 @@
 {
   "name": "stellaris",
-  "driver": "zmart_driver.py",
   "connection": {
     "microscope": "stellaris5-y42h93",
     "client": "PythonClient",

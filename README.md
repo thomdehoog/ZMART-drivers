@@ -79,7 +79,7 @@ Or register it once with the ZMART Controller, and connect by name in every sess
 ```python
 from zmart_controller import mic
 
-mic.register_driver("C:/ZMART-drivers/zmart_drivers/leica/stellaris5_y42h93/navigator_expert/for_zmart_controller")
+mic.register_driver("C:/ZMART-drivers/zmart_drivers/leica/stellaris5_y42h93/navigator_expert")
 mic.connect("stellaris")
 print(mic.get_info()["content"]["description"])
 ```

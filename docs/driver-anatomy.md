@@ -14,10 +14,10 @@ mesoSPIM drivers are not in this beta. What a new microscope has to
 hand to the shared dispatcher is written on one page, in
 [the vendor contract](vendor-contract.md).
 
-The controller's side of the contract, the `ZmartDriver` class that every
+The controller's side of the contract, the `ZmartControllerPlugin` class that every
 driver fills in, is fixed and described in the controller's
 [How do I plug in a ZMART-driver](https://github.com/ZMB-UZH/ZMART-controller/blob/main/docs/plug_in_a_driver/README.md);
-"The `ZmartDriver` class" below follows it. The controller's mock driver,
+"The `ZmartControllerPlugin` class" below follows it. The controller's mock driver,
 `zmart_controller.mock`, is a complete, small driver to read alongside this
 text. It was built in the first version of the layout (it has `get_actions/`
 and `set_actions/` folders, for example), so it still has to be brought into
@@ -26,7 +26,7 @@ order we plan to get there.
 
 A note on the numbering. The numbered sections further down are the parts in
 more detail: 1 Vendor interface, 2 Dispatcher, 3 Readings and changes,
-4 Procedures, 5 Saving a capture, 6 Configuration, 7 The `ZmartDriver` class,
+4 Procedures, 5 Saving a capture, 6 Configuration, 7 The `ZmartControllerPlugin` class,
 and 8 Testing. When the text says "part 7", it means section 7.
 
 ## Why a common anatomy
@@ -109,7 +109,7 @@ each part uses the parts below it, and never the parts above.
 ```
   experiments and workflows, through the ZMART Controller   ·   a notebook or a script
   ───────────────────────────────────────────────────────────────
-  for_zmart_controller/   the ZmartDriver class: the controller's commands, each a call below
+  zmart_controller_plugin/   the ZmartControllerPlugin class: the controller's commands, each a call below
   for_direct_use/         the driver used by itself: connect() and the Microscope
   procedures/             the recipes: take a picture, save it, clear the cache,
                           the coordinate system, an objective change
@@ -145,9 +145,9 @@ navigator_expert/
         state.py               the microscope's state, saved with every picture
         running_log.py         the driver's rolling log file, for debugging
 
-    for_zmart_controller/      everything that faces the controller; the folder you register
-        zmart_driver.json      the driver's name and the class file beside it
-        zmart_driver.py        the ZmartDriver class: each command a call of the Microscope
+    zmart_controller_plugin/   everything that faces the controller, as the controller names it
+        zmart_controller_plugin.json   the driver's name and its connection, nothing else
+        zmart_controller_plugin.py     the ZmartControllerPlugin class: each command a call of the Microscope
         info.py                the description get_info answers
         procedure_menu.py      the named procedures for get_procedures and run_procedure
 
@@ -201,12 +201,12 @@ navigator_expert/
     README.md
 ```
 
-Everything that faces the controller, the class file and `zmart_driver.json`,
-sits together in `for_zmart_controller/`, so that the controller's side is in
-one place. The operator registers that folder. The controller accepts a path
-to the folder or to its `zmart_driver.json`, reads the class file's name from
-the `"driver"` key (`"zmart_driver.py"` by default), and imports the class as
-part of its package.
+Everything that faces the controller, the class file and `zmart_controller_plugin.json`,
+sits together in `zmart_controller_plugin/`, so that the controller's side is in
+one place. The operator registers the driver's own folder, the one that holds
+`zmart_controller_plugin/`; the controller finds both files there by their names and
+imports the class as part of the driver's package, so it can use the driver's code
+(controller 0.4.0rc2).
 
 What changed from the first version of this layout: the `actions/` folder is
 gone, `client.py` is split into `connection/` and the `primitives/` folder,
@@ -218,7 +218,7 @@ three separate steps. "The simplified anatomy" explains why.
 micrometers" as the workflow says it:
 
 1. The workflow calls `set_xyz` on the controller, which calls the
-   `ZmartDriver` method of the same name. That method calls the
+   `ZmartControllerPlugin` method of the same name. That method calls the
    `Microscope`'s `move_to`, as a notebook using the driver by itself would.
 2. `move_to` hands the position to the coordinate system procedure
    (`procedures/absolute_coordinate_system/frame.py`), which converts it from
@@ -254,7 +254,7 @@ Leica driver" at the end of this section says so.
 The point of the whole anatomy is that when someone writes a driver for a new
 microscope, such as a ZEISS, an Evident or a Nikon, the work is in one place:
 the `vendor_specific/` folder. Everything above it, the dispatcher, the
-procedures and the `ZmartDriver` class, should already work.
+procedures and the `ZmartControllerPlugin` class, should already work.
 
 What a driver author writes:
 
@@ -478,7 +478,7 @@ happen?" are different questions.
 |---|---|---|---|
 | Yes | Yes | The microscope did it, and we saw it. | `success: True` with the values. |
 | Yes | No ("unconfirmed") | The microscope accepted the command, but the state was never seen. | `success: True` with the values. The change is recorded in the result and in the logs, and `get_state` lists it as unconfirmed. The workflow carries on. |
-| No | – | The microscope refused it, a readback showed something different, or the link was lost. All retries are used up. | `success: False` with a message in `content`. |
+| No | – | The microscope refused it, a readback showed something different, or the link was lost. All retries are used up. | `success: False` with a message in `output`. |
 
 **How long the driver waits.** The shared rule is four windows of three
 seconds, so twelve seconds at most. Between the windows the command is sent
@@ -549,7 +549,7 @@ it cannot fill the disk. Each line has a time and records one thing: every
 send, every retry, how an error was sorted, every fallback to another
 primitive, every confirmation window, and the final answer. It never prints a
 secret, such as a password or a token. The Leica driver has it in
-`for_zmart_controller/running_log.py`: it copies every message the driver
+`for_direct_use/running_log.py`: it copies every message the driver
 already writes into one file, renamed at about five megabytes, with the three
 newest old files kept. Whether the shared dispatcher should own it is still
 open.
@@ -566,7 +566,7 @@ against each other on the new version and the pin has been moved on purpose.
 
 The check lives in one place. The vendor interface offers a primitive that
 reports the microscope's serial number and the software version (call it
-`identify`), and only the `ZmartDriver` class compares what it reports with the
+`identify`), and only the `ZmartControllerPlugin` class compares what it reports with the
 machine description. That primitive is part of what a driver author writes.
 The Leica driver does not check this yet: it reports the serial number under
 `observed` in `get_state`, but compares it with nothing, because there is no
@@ -591,7 +591,7 @@ measured offsets between objectives (the centring and focus offsets). The
 limits are checked on the raw stage coordinates, so no origin can move the safe
 travel range. The saving procedure then applies the measured image orientation,
 so that how the stage moves in x, y and z is also how the images come out. The
-`ZmartDriver` class does no arithmetic of its own: it calls the procedure.
+`ZmartControllerPlugin` class does no arithmetic of its own: it calls the procedure.
 
 ### Limits do not know the microscope
 
@@ -804,7 +804,7 @@ short:
 - **The coordinate system is a procedure**,
   `procedures/absolute_coordinate_system/`: `coordinates.py` holds the plain
   arithmetic, `frame.py` decides what to read and what to move, and the
-  `ZmartDriver` class converts nothing itself.
+  `ZmartControllerPlugin` class converts nothing itself.
 - **The session has a folder of its own.** `session/handle.py` holds the open
   connection and what the driver remembers between commands, and
   `session/loaded_config.py` the orientation and calibration loaded at connect.
@@ -815,7 +815,7 @@ short:
   store, by the plane number the capture gave each plane.
 - **The driver can be used by itself.** `connect()` hands back a `Microscope`
   (`for_direct_use/microscope.py`) with everything the driver can do, under
-  plain names, and the driver's README documents it. `ZmartDriver` only gives
+  plain names, and the driver's README documents it. `ZmartControllerPlugin` only gives
   each controller command its name and answer, by calling the `Microscope`,
   and the guard test lets it import nothing else. The package offers
   `connect()` and the `Microscope` only; the low-level reads and commands on a
@@ -919,7 +919,7 @@ The list of primitives is not the same for every microscope. Leica thinks in
 *jobs*, ZEISS in *experiments*, Nikon in *optical configurations*, and
 mesoSPIM has none of these. Forcing one fixed list on all of them would either
 be too small to be useful or push the awkward fit up into the layers above. The
-list that must be the same everywhere lives higher up, in the `ZmartDriver`
+list that must be the same everywhere lives higher up, in the `ZmartControllerPlugin`
 class (part 7).
 
 **The vendor side.** Some vendor software cannot be driven from outside at
@@ -965,7 +965,7 @@ sorting what kind of problem this is, and then follow the rule.
 
 **The shared kinds and rules.**
 
-| Kind | Example | Reader | Change | What the `ZmartDriver` method answers |
+| Kind | Example | Reader | Change | What the `ZmartControllerPlugin` method answers |
 |---|---|---|---|---|
 | Bad request | An unknown option; the vendor says "is invalid" | Raises | Does not retry | Raises `ValueError` |
 | Temporary | The software is busy; a short timeout | Reads again | Sends again, up to a set number of times | Raises `RuntimeError`, only if every retry fails |
@@ -1348,7 +1348,7 @@ objectives at a time) and `set_data_location.ipynb`, each in the `notebooks/`
 folder of its item. It records the origin with the `set_origin` command
 rather than a notebook, and it has no machine description yet.
 
-**Order at connect.** Connecting is making the `ZmartDriver` (part 7): its
+**Order at connect.** Connecting is making the `ZmartControllerPlugin` (part 7): its
 `__init__` opens the vendor software and loads the configuration. Each item
 depends on the one before it, so it loads them in this order: machine
 description, image-to-stage registration and origin, limits, optical
@@ -1370,11 +1370,11 @@ way:
   coordinates only;
 - the limits gate checks raw stage coordinates, so recording a new origin can
   never move the safe travel range;
-- the `ZmartDriver` class does no arithmetic.
+- the `ZmartControllerPlugin` class does no arithmetic.
 
-## 7. The `ZmartDriver` class
+## 7. The `ZmartControllerPlugin` class
 
-> **Note, October 2026.** The class file now lives in `for_zmart_controller/`, not at the top of the driver folder; see the layout at the start of this document. The older `zmart_controller_plugin.py` goes away once the class has driven the real microscope.
+> **Note, October 2026.** The class file now lives in `zmart_controller_plugin/`, not at the top of the driver folder; see the layout at the start of this document. The older `zmart_controller_plugin.py` goes away once the class has driven the real microscope.
 
 **Purpose.** To present the driver to the ZMART Controller in the shape every
 microscope shares.
@@ -1386,15 +1386,15 @@ This section says how that shape sits on top of the parts above, and which
 rules the class follows. When the two disagree, the controller's document
 wins, and this one needs updating.
 
-**Two files.** A driver is, to the controller, a folder with two files:
+**Two files.** To the controller, a driver is a folder holding
+`zmart_controller_plugin/`, with two files:
 
-- `zmart_driver.json` holds the driver's name (what `get_instruments` lists
-  it under, such as `stellaris`), the name of the class file, and the
-  `connection`: how to reach the microscope on this computer. The keys the
+- `zmart_controller_plugin.json` holds the driver's name (what `get_instruments` lists
+  it under, such as `stellaris`) and the `connection`, and nothing else: how to reach the microscope on this computer. The keys the
   controller knows are `microscope`, `api_type`, `host`, `password` and
   `config`; a driver may add its own, such as where images go. Every key is
   optional, and the driver fills in what is left out.
-- `zmart_driver.py` holds the `ZmartDriver` class. The controller makes one
+- `zmart_controller_plugin.py` holds the `ZmartControllerPlugin` class. The controller makes one
   when it connects, and calls the method of the same name for every command.
 
 The controller's `template/` folder holds both files, with every method left
@@ -1430,7 +1430,7 @@ means the microscope did what was asked. `False` and a message means it did
 not, and the message says what happened. A method that raises is the third
 outcome, and the controller reports it with the error's text. The controller
 turns all three into the one answer a workflow sees, `{"success": ...,
-"content": ...}`, so a workflow never has to catch an error itself. This is
+"output": ...}`, so a workflow never has to catch an error itself. This is
 how the kinds from the errors table reach the experiment:
 
 - **A request that is wrong raises `ValueError`.** A position outside the
@@ -1458,7 +1458,7 @@ how the kinds from the errors table reach the experiment:
 
 **Rules.**
 
-- `zmart_driver.py` **only maps** the driver's readings, changes, procedures and data
+- `zmart_controller_plugin.py` **only maps** the driver's readings, changes, procedures and data
   handling onto the commands. It does no coordinate
   arithmetic and no safety checks of its own; those already happened further
   down. Reading the mock's class file should feel like reading a table of
@@ -1479,30 +1479,30 @@ how the kinds from the errors table reach the experiment:
   was given, and never overwrites an earlier picture with the same name.
 - **The connection dictionary is handed to `__init__` as it is.** The driver
   fills in every key that is left out from its own defaults, so a nearly
-  empty `zmart_driver.json` still connects on the microscope computer.
+  empty `zmart_controller_plugin.json` still connects on the microscope computer.
 
 **Checking and installing.** The controller checks and installs a driver by
-its `zmart_driver.json`:
+its `zmart_controller_plugin.json`:
 
 ```python
 from zmart_controller import mic
 
-mic.validate_driver("C:/drivers/my-scope/zmart_driver.json")   # [] when every answer fits
-mic.register_driver("C:/drivers/my-scope/zmart_driver.json")   # once, on the microscope computer
+mic.validate_driver("C:/drivers/my-scope")   # [] when every answer fits
+mic.register_driver("C:/drivers/my-scope")   # once, on the microscope computer
 mic.connect("my-scope")                                        # in every session
 ```
 
 `validate_driver` connects, calls every `get_*` command and checks each
 answer against the contract; it moves nothing and acquires nothing. The
 driver's own tests check `acquire` with `check_acquire_answer`, since
-checking it means taking a picture. `register_driver` writes the JSON's path
+checking it means taking a picture. `register_driver` writes the driver's folder
 into this computer's list of drivers, `drivers.json` under `config_root()`,
 and from then on `get_instruments` lists the driver and `connect` finds it by
 name.
 
 **The older shape.** Before the class, a driver was a module with one
 function per command, `connect` first, each function taking the handle that
-`connect` returned and answering `{"success": ..., "content": ...}` itself.
+`connect` returned and answering `{"success": ..., "output": ...}` itself.
 The controller still accepts this shape, and the four drivers in this
 repository and the mock still use it, through their `zmart_controller_plugin.py`.
 It is the shape to move away from, not to copy: the class keeps the
@@ -1632,7 +1632,7 @@ What is the same in every driver, and what differs:
 | Procedures | The "only through the dispatcher" rule; the algorithms | The recipes |
 | Saving | OME-Zarr writing, naming, the command log | Finding and reading the vendor's raw product, and its description of it |
 | Configuration | Load, check and save; the notebook pattern | Default values; the machine description |
-| `ZmartDriver` | The contract: the methods, their answers and the three outcomes; `validate_driver` | Mapping the dispatcher and the procedures onto those methods; the `connection` keys |
+| `ZmartControllerPlugin` | The contract: the methods, their answers and the three outcomes; `validate_driver` | Mapping the dispatcher and the procedures onto those methods; the `connection` keys |
 | Testing | The dispatcher and error-rule tests; offline before hardware | The mock API; the hardware checks |
 
 ## Experimental code
@@ -1655,9 +1655,9 @@ by any other part of the driver. The Leica driver has none at the moment.
   physical backstop already did. How Leica's `limits.json` is interpreted
   today still needs to be confirmed before its gate is moved into the
   dispatcher.
-- **How a driver plugs in.** By its `zmart_driver.json`, through
-  `register_driver` and `connect` by name, with a `ZmartDriver` class in
-  `zmart_driver.py` (part 7).
+- **How a driver plugs in.** By its `zmart_controller_plugin.json`, through
+  `register_driver` and `connect` by name, with a `ZmartControllerPlugin` class in
+  `zmart_controller_plugin.py` (part 7).
 - **Where error handling lives.** It is not a part of its own. The sorting of
   errors sits in the vendor interface, since only vendor code knows what the
   vendor's messages mean, and the rules sit in the dispatcher, since the
@@ -1687,8 +1687,8 @@ by any other part of the driver. The Leica driver has none at the moment.
   are looked at in turn.
 - **Pinned.** A driver is pinned to one microscope and one software version.
   The Leica driver may rely on LAS X's hardware server, which is part of LAS X.
-- **The answer key is `content`.** The controller wraps every answer as
-  `success` and `content`. Whether to rename it is not decided.
+- **The answer key is `output`.** The controller wraps every answer as
+  `success` and `output`; it was `content` before controller 0.4.0rc2.
 - **Simplified anatomy (October 2026).** No `actions/` folder, no `output/`
   folder, OME-Zarr only, handling notes in the vendor interface, and a
   fully shared dispatcher with routes, tiers and fallback only on error. See
@@ -1759,7 +1759,7 @@ by any other part of the driver. The Leica driver has none at the moment.
    simplified layout (it has `get_actions/`, `set_actions/` and
    `error_handling/` folders and no `dispatcher/`), and it still plugs in
    through the older module shape (`zmart_controller_plugin.py`). It should
-   become a `ZmartDriver` in `zmart_driver.py` like every other driver.
+   become a `ZmartControllerPlugin` in `zmart_controller_plugin.py` like every other driver.
 2. **The contract.** Done: the controller's
    [How do I plug in a ZMART-driver](https://github.com/ZMB-UZH/ZMART-controller/blob/main/docs/plug_in_a_driver/README.md)
    fixes the class, every method's input and output, the three outcomes,
@@ -1768,10 +1768,10 @@ by any other part of the driver. The Leica driver has none at the moment.
 3. **Give every driver its two files.** Each of the four drivers here still
    offers the older module shape through its `zmart_controller_plugin.py`,
    and the install steps in their READMEs still point the controller at that
-   file, which it no longer accepts. The next step is a `zmart_driver.json`
+   file, which it no longer accepts. The next step is a `zmart_controller_plugin.json`
    beside each plug-in file, naming it as the class file, so that
-   `register_driver` and `connect` by name work again; then a `ZmartDriver`
-   in `zmart_driver.py` that replaces the plug-in file, driver by driver.
+   `register_driver` and `connect` by name work again; then a `ZmartControllerPlugin`
+   in `zmart_controller_plugin.py` that replaces the plug-in file, driver by driver.
 4. **What a review of the four drivers found**, in October 2026, which the
    dispatcher fixes once for all of them. Each driver copied Leica's adapter
    and each drifted the same way: a limits refusal is raised as

@@ -95,7 +95,7 @@ def _register_adapter() -> Any:
 class _ReportingSession:
     """A controller Session that checks each answer, then hands back its content.
 
-    Every command answers ``{"success": ..., "content": ...}`` through the
+    Every command answers ``{"success": ..., "output": ...}`` through the
     controller. This wrapper reads each answer the way the controller
     documents it, so the validator exercises that exact shape: a missing
     key, or ``success`` that is not ``True``, fails the step with a clear
@@ -130,17 +130,17 @@ class _ReportingSession:
             answer = attribute(*args, **kwargs)
             if (
                 not isinstance(answer, dict)
-                or not {"success", "content"} <= answer.keys()
+                or not {"success", "output"} <= answer.keys()
             ):
                 raise RuntimeError(
                     f"{name} did not answer in the controller's shape "
-                    f"{{'success': ..., 'content': ...}}; it returned {answer!r}"
+                    f"{{'success': ..., 'output': ...}}; it returned {answer!r}"
                 )
             if answer["success"] is not True:
                 raise RuntimeError(
                     f"{name} reported success={answer['success']!r}: {answer!r}"
                 )
-            return answer["content"]
+            return answer["output"]
 
         return command
 
@@ -153,9 +153,7 @@ def _connect_session(
     In --mock mode the adapter's CAM connect is swapped for the in-process
     Python mock, so the whole controller -> adapter -> driver path runs offline.
     """
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.for_zmart_controller.zmart_driver import (
-        ZmartDriver as driver,
-    )
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.zmart_controller_plugin.zmart_controller_plugin import ZmartControllerPlugin as driver
 
     inst = {"client": args.client_name}
     inst["api_delay_ms"] = args.api_delay_ms
@@ -404,20 +402,20 @@ def phase_ci_default_position(v: vh.Validator, sess: Any, drv: Any) -> bool:
         commands = (
             v.command(
                 "ci default: move XY",
-                lambda: drv.move_xy(sess._handle.microscope.client, x_um, y_um, unit="um"),
+                lambda: drv.move_xy(sess.plugin.microscope.client, x_um, y_um, unit="um"),
                 context={"target_x_um": x_um, "target_y_um": y_um},
             ),
             v.command(
                 "ci default: move Z-wide",
                 lambda: drv.move_z(
-                    sess._handle.microscope.client, job, z_wide_um, unit="um", z_mode="zwide"
+                    sess.plugin.microscope.client, job, z_wide_um, unit="um", z_mode="zwide"
                 ),
                 context={"target_z_wide_um": z_wide_um, "non_negative": True},
             ),
             v.command(
                 "ci default: move Z-galvo",
                 lambda: drv.move_z(
-                    sess._handle.microscope.client, job, z_galvo_um, unit="um", z_mode="galvo"
+                    sess.plugin.microscope.client, job, z_galvo_um, unit="um", z_mode="galvo"
                 ),
                 context={"target_z_galvo_um": z_galvo_um},
             ),
@@ -463,7 +461,7 @@ def _restore(
     only if this run actually moved it (its baseline may sit outside the
     envelope on the simulator, so we never touch it there).
     """
-    client = sess._handle.microscope.client
+    client = sess.plugin.microscope.client
     if restore_zwide:
 
         def do_zwide() -> bool:
@@ -497,7 +495,7 @@ def _forget_validator_origin(
     it wrote makes the operator's previous origin the newest again, and the
     session goes back to the origin it was connected with.
     """
-    handle = sess._handle.microscope.handle
+    handle = sess.plugin.microscope.handle
     if record is not None and record.get("origin_file"):
         folder = Path(record["origin_file"]).parent
 
@@ -534,13 +532,13 @@ def phase_move(
     dzw = args.z_wide_delta_um
     dzg = args.z_galvo_delta_um
     restore_zwide = False
-    saved_origin = dict(sess._handle.microscope.handle.origin)
+    saved_origin = dict(sess.plugin.microscope.handle.origin)
     record = None
 
     with v.phase("move (set_origin + set_xyz)"):
         try:
             record = v.callable(
-                "set_origin", lambda: sess._handle.microscope.set_origin(), mutating=True
+                "set_origin", lambda: sess.plugin.microscope.set_origin(), mutating=True
             )
             f = v.callable("get_xyz after set_origin", sess.get_xyz)
             if f is not None:

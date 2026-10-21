@@ -32,9 +32,7 @@ if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings import named_readings as readers  # noqa: E402
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.for_zmart_controller.zmart_driver import (  # noqa: E402
-    ZmartDriver,
-)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.zmart_controller_plugin.zmart_controller_plugin import # noqa: E402     ZmartControllerPlugin
 
 
 def _timed_readings(t0: float):
@@ -74,11 +72,11 @@ def main(argv: list[str] | None = None) -> int:
     t0 = time.monotonic()
     _timed_readings(t0)
     connection = json.loads(
-        (_DRIVER_ROOT / "for_zmart_controller" / "zmart_driver.json").read_text(
+        (_DRIVER_ROOT / "zmart_controller_plugin" / "zmart_controller_plugin.json").read_text(
             encoding="utf-8"
         )
     )
-    driver = ZmartDriver(connection["connection"])
+    driver = ZmartControllerPlugin(connection["connection"])
     try:
         _, (changeable, _) = driver.get_state()
         start = changeable["job"]

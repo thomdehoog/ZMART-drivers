@@ -1,8 +1,8 @@
-"""The driver plugs into the ZMART Controller as a ``ZmartDriver`` class.
+"""The driver plugs into the ZMART Controller as a ``ZmartControllerPlugin`` class.
 
 These tests do what an operator does on the LAS X computer: point the
-controller at the driver's ``for_zmart_controller`` folder, which holds ``zmart_driver.json`` and
-``zmart_driver.py``, and let the controller's own ``validate_driver`` check
+controller at the driver's ``zmart_controller_plugin`` folder, which holds ``zmart_controller_plugin.json`` and
+``zmart_controller_plugin.py``, and let the controller's own ``validate_driver`` check
 every answer against its contract. The driver connects to the offline LAS X
 mock, so the tests run on any computer.
 """
@@ -19,13 +19,11 @@ from mock_lasx_api import MockLasxClient
 from zmart_controller.registry import load_driver
 
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.for_direct_use import microscope
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.for_zmart_controller import (
-    zmart_driver,
-)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.zmart_controller_plugin import zmart_controller_plugin
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.profiles import command_profiles as profiles
 
-# The class file and zmart_driver.json sit together in for_zmart_controller/; that is the folder to register.
-DRIVER_FOLDER = Path(zmart_driver.__file__).resolve().parent
+# The folder to register is the driver's: the one that holds zmart_controller_plugin/.
+DRIVER_FOLDER = Path(zmart_controller_plugin.__file__).resolve().parents[1]
 
 
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.connection import (
@@ -56,7 +54,7 @@ def test_the_folder_holds_the_two_files_the_controller_reads():
     driver = load_driver(DRIVER_FOLDER)
 
     assert driver.NAME == "stellaris"
-    assert driver.ZmartDriver is zmart_driver.ZmartDriver
+    assert driver.ZmartControllerPlugin is zmart_controller_plugin.ZmartControllerPlugin
     assert driver.CONNECTION["microscope"] == "stellaris5-y42h93"
 
 
@@ -73,14 +71,14 @@ def test_the_class_describes_the_microscope_and_what_is_set_up(monkeypatch, tmp_
     """The class answers the controller's questions, including what is set up once."""
     connection = _offline(monkeypatch, tmp_path)
     through_class = zmart_controller.ZmartController(
-        zmart_driver.ZmartDriver, connection
+        zmart_controller_plugin.ZmartControllerPlugin, connection
     )
     try:
         as_class = {
-            name: getattr(through_class, name)()["content"]
+            name: getattr(through_class, name)()["output"]
             for name in ("get_actuators", "get_xyz", "get_state", "get_procedures")
         }
-        class_info = through_class.get_info()["content"]
+        class_info = through_class.get_info()["output"]
     finally:
         through_class.disconnect()
 
@@ -102,9 +100,9 @@ def test_the_class_describes_the_microscope_and_what_is_set_up(monkeypatch, tmp_
 def test_the_class_says_it_saves_where_it_is_told(monkeypatch, tmp_path):
     """The driver writes every file itself, from LAS X's cache, so it can choose the folder."""
     connection = _offline(monkeypatch, tmp_path)
-    session = zmart_controller.ZmartController(zmart_driver.ZmartDriver, connection)
+    session = zmart_controller.ZmartController(zmart_controller_plugin.ZmartControllerPlugin, connection)
     try:
-        info = session.get_info()["content"]
+        info = session.get_info()["output"]
     finally:
         session.disconnect()
 
@@ -122,7 +120,7 @@ def test_the_class_hands_the_type_and_the_folder_to_the_capture(monkeypatch, tmp
     def save_waiting(handle, label):
         return [{"files": [], "planes": []}]
 
-    session = zmart_controller.ZmartController(zmart_driver.ZmartDriver, connection)
+    session = zmart_controller.ZmartController(zmart_controller_plugin.ZmartControllerPlugin, connection)
     try:
         monkeypatch.setattr(microscope.acquire_step, "acquire", capture)
         monkeypatch.setattr(microscope.save_step, "save_waiting", save_waiting)
@@ -138,4 +136,19 @@ def test_the_class_hands_the_type_and_the_folder_to_the_capture(monkeypatch, tmp
         "acquisition_type": "overview",
         "output_folder": str(tmp_path / "run"),
     }
-    assert answer["content"]["acquisition_type"] == "overview"
+    assert answer["output"]["acquisition_type"] == "overview"
+
+
+def test_a_setting_the_microscope_does_not_have_is_refused(monkeypatch, tmp_path):
+    """Only the job can be set through the controller; anything else is a wrong request, not ignored."""
+    connection = _offline(monkeypatch, tmp_path)
+    session = zmart_controller.ZmartController(
+        zmart_controller_plugin.ZmartControllerPlugin, connection
+    )
+    try:
+        answer = session.set_state({"changeable": {"zoom": 2.0}})
+    finally:
+        session.disconnect()
+
+    assert answer["success"] is False
+    assert "ValueError" in answer["output"] and "zoom" in answer["output"]

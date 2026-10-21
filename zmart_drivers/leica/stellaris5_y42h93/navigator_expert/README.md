@@ -76,15 +76,15 @@ LAS X.
   scope = navigator_expert.connect()
   ```
   The package offers `connect()` and the `Microscope`, and nothing else.
-- **Plug it into the ZMART Controller** on the LAS X computer. Register the `for_zmart_controller` folder (its `zmart_driver.json` names the class
-  beside it) with the controller once; from then on every session plugs the driver in by name.
+- **Plug it into the ZMART Controller** on the LAS X computer. Register the driver's folder, `navigator_expert/`, which holds
+  `zmart_controller_plugin/`, with the controller once; from then on every session plugs the driver in by name.
   Its settings, `CONNECTION` in that file, are all optional; the file explains each one:
   ```python
   import zmart_controller
 
   # Once, on the LAS X computer:
   zmart_controller.register_driver(
-      "C:/ZMART-drivers/zmart_drivers/leica/stellaris5_y42h93/navigator_expert/for_zmart_controller"
+      "C:/ZMART-drivers/zmart_drivers/leica/stellaris5_y42h93/navigator_expert"
   )
 
   # In every session:
@@ -164,12 +164,12 @@ runtime where possible. Override via the profile, not at call sites.
   timestamp tree: `limits/<datetime>/`, `calibration/<datetime>/`,
   `orientation/<datetime>/`, and `origin/<datetime>/`. The newest timestamp in each tree wins.
   Limits, calibration, and orientation seed their own repo defaults when empty. The origin has no
-  repo default: it exists only once an operator saves one, and the `ZmartDriver` loads the newest one at
+  repo default: it exists only once an operator saves one, and the `ZmartControllerPlugin` loads the newest one at
   connect. Setup notebooks append only to their owning tree,
   so publishing one subsystem never duplicates another. The single `limits.json` is
   flat: four typed stage-axis `range` entries, `objective_slot` with `allowed` values,
   and either a typed constraint or explicit `[]` for each setter.
-- **The driver loads the configs at connect** — making a `ZmartDriver` is the connection. Its
+- **The driver loads the configs at connect** — making a `ZmartControllerPlugin` is the connection. Its
   constructor opens the CAM client (`vendor_specific/connection/lasx_client.py`) and then loads this
   microscope's three machine-local configs — the **instrument limits**, the **orientation**, and the
   **calibration** — so the whole session works from one consistent picture. Normal image orientation is enabled by `IMAGE_SAVE` in `vendor_specific/primitive_handling/profiles/command_profiles.py`; only the
@@ -177,7 +177,7 @@ runtime where possible. Override via the profile, not at call sites.
   This is a deliberate ladder: the limits notebook
   is bounded only by the physical backstop, `set_orientation` is bounded by limits, and
   `calibrate_objective_pair` is bounded by limits and expects a measured orientation.
-- **Limits handshake** — `connect_limits_handshake(client)` (run by the `ZmartDriver` constructor;
+- **Limits handshake** — `connect_limits_handshake(client)` (run by the `ZmartControllerPlugin` constructor;
   workflows/validators/notebooks call it directly). It resolves an operator-published ProgramData
   `limits.json`, or uses the bundled defaults directly when none exists. It validates exact flat keys, finite ranges, allowed
   objective slots, and envelope **within the hardcoded physical backstop**
@@ -193,7 +193,7 @@ runtime where possible. Override via the profile, not at call sites.
   completed its limits handshake before the native call fires. Stage commands use the four flat
   axis ranges, objective changes use `objective_slot.allowed`, and every listed setter with `[]` is
   explicitly unrestricted. Setter constraints use `range` or `allowed`. Missing or unknown entries invalidate the file and
-  trigger the defaults fallback above. Nothing built on top—the `ZmartDriver` class, controller, workflow, or
+  trigger the defaults fallback above. Nothing built on top—the `ZmartControllerPlugin` class, controller, workflow, or
   notebook—can bypass this command-layer check.
 
 ## 4. Using the driver by itself
@@ -279,7 +279,7 @@ A per-setting entry targets one sequential setting of the job, by its `setting_i
 
 ### Through the ZMART controller
 
-The controller uses the same `Microscope`. Its `ZmartDriver` class in `for_zmart_controller/`
+The controller uses the same `Microscope`. Its `ZmartControllerPlugin` class in `zmart_controller_plugin/`
 only gives each command the controller's name and answer: `get_xyz` is `position()`, `set_xyz` is
 `move_to()`, `set_state` is `select_job()`, and `acquire` is `acquire()` then `save()`. Register
 the folder once and connect by name:
@@ -287,7 +287,7 @@ the folder once and connect by name:
 ```python
 from zmart_controller import mic
 
-mic.register_driver(r"C:\ZMART-drivers\zmart_drivers\leica\stellaris5_y42h93\navigator_expert\for_zmart_controller")
+mic.register_driver(r"C:\ZMART-drivers\zmart_drivers\leica\stellaris5_y42h93\navigator_expert")
 mic.connect("stellaris")
 ```
 
@@ -515,9 +515,9 @@ zmart_drivers/leica/stellaris5_y42h93/navigator_expert/
 │   ├── acquire.py          taking a picture, and the note kept for saving it (pending_capture.py)
 │   ├── state.py            the microscope's state, saved with every picture
 │   └── running_log.py      the driver's rolling log file
-├── for_zmart_controller/   everything that faces the controller (register this folder with it):
-│   ├── zmart_driver.json   the driver's name ("stellaris") and how to reach LAS X on this computer
-│   ├── zmart_driver.py     the ZmartDriver class the controller calls, one method per command,
+├── zmart_controller_plugin/   everything that faces the controller, which finds it here by name:
+│   ├── zmart_controller_plugin.json   the driver's name ("stellaris") and how to reach LAS X on this computer
+│   ├── zmart_controller_plugin.py     the ZmartControllerPlugin class the controller calls, one method per command,
 │   │                       each a call of the Microscope
 │   ├── info.py             the description get_info answers
 │   └── procedure_menu.py   the named procedures get_procedures lists and run_procedure runs
@@ -626,7 +626,7 @@ upward today: the readers and the handling notes in `vendor_specific` use the di
 envelope and read engine. The dispatcher no longer imports anything from `driver_setup`: the
 limits handshake lives in `driver_setup/limits/handshake.py` and installs the limits in the gate. `testing/unit/test_architecture_guard.py` lists each
 of them and fails when a new one appears; removing them is follow-up work, one at a time.
-The connect-time flow lives in `ZmartDriver.__init__`: it opens the client, installs the limits
+The connect-time flow lives in `ZmartControllerPlugin.__init__`: it opens the client, installs the limits
 gate, and loads the orientation and the calibration (the loaders are in
 `session/loaded_config.py`).
 
@@ -647,7 +647,7 @@ workflow sees:
 - Done since the move: the logic of the commands left `zmart_adapter.py` for `procedures/`
   (`session/`, `frame.py`, `for_direct_use/`), the `output/` folder is gone, and
   the plain coordinate arithmetic is in `procedures/absolute_coordinate_system/coordinates.py`. The coordinate
-  system is a procedure of its own (`procedures/absolute_coordinate_system/`), so the `ZmartDriver` class
+  system is a procedure of its own (`procedures/absolute_coordinate_system/`), so the `ZmartControllerPlugin` class
   converts nothing. The full list of differences from the plan is in
   `docs/driver-anatomy.md` ("Where the Leica tree still differs from the plan").
 - The setup notebooks become thin: the measuring is a procedure, the notebook only calls it.
@@ -729,7 +729,7 @@ restores — with confirmation status and timing. **Bench-run instructions** (pr
 These **silently misbehave** instead of failing loudly — respect them or results are wrong without an error:
 
 1. **Movement needs a limits handshake** — a client that never handshook refuses every move
-   fail-closed. Through `connect()` (and so the `ZmartDriver` class) the handshake always runs, falling back
+   fail-closed. Through `connect()` (and so the `ZmartControllerPlugin` class) the handshake always runs, falling back
    to the bundled default envelope if the machine file is invalid, so a connected session can always
    move within the defaults; the physical backstop bounds every move regardless.
 2. **`acquire()` writes nothing** — it raises when the capture fails, and otherwise keeps the
@@ -748,7 +748,7 @@ These **silently misbehave** instead of failing loudly — respect them or resul
 9. **Adapter mutating ops are gated by the flat `limits.json` at the commands layer** — if the machine file
     fails to load/validate at connect, the session falls back to the bundled **default** envelope
     (loudly warned) rather than refusing everything; the connect-time warning names what happened
-    (see §3). Out-of-envelope moves still refuse at the commands layer, below the `ZmartDriver` class.
+    (see §3). Out-of-envelope moves still refuse at the commands layer, below the `ZmartControllerPlugin` class.
 10. **The origin is loaded at connect** — `connect` loads the newest origin saved by the driver's
     `set_origin` setup step, so the controller never sets it. With none saved, positions are plain
     stage coordinates (with a warning); a damaged origin file stops connect with a clear error

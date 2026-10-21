@@ -1,4 +1,4 @@
-"""Making a ``ZmartDriver`` loads the three machine-local configs, with per-file load switches.
+"""Making a ``ZmartControllerPlugin`` loads the three machine-local configs, with per-file load switches.
 
 These exercise the driver's connection against a mock CAM
 client and the hermetic ProgramData root the autouse conftest fixture points
@@ -15,9 +15,7 @@ from unittest.mock import patch
 import pytest
 from mock_lasx_api import MockLasxClient
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.for_zmart_controller.zmart_driver import (
-    ZmartDriver,
-)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.zmart_controller_plugin.zmart_controller_plugin import ZmartControllerPlugin
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.connection import (
     lasx_client,
 )
@@ -41,7 +39,7 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher import ga
 def _connect(**kwargs) -> MockLasxClient:
     client = MockLasxClient(latency=0.0)
     with patch.object(lasx_client, "connect_python_client", return_value=client):
-        ZmartDriver(kwargs)
+        ZmartControllerPlugin(kwargs)
     return client
 
 

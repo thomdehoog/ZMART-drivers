@@ -2,8 +2,8 @@
 
 The other validators hand the controller the driver's module. This one takes
 the path an experiment takes after the driver is installed on the microscope
-computer: it registers the driver's folder (``zmart_driver.json`` and the
-``ZmartDriver`` class in ``zmart_driver.py``), connects by name, and then
+computer: it registers the driver's folder (``zmart_controller_plugin.json`` and the
+``ZmartControllerPlugin`` class in ``zmart_controller_plugin.py``), connects by name, and then
 asks every command the controller offers, the way ``mic.connect("stellaris")``
 followed by ``mic.get_xyz()`` would.
 
@@ -59,10 +59,10 @@ import zmart_controller
 from validate_zmart_adapter import _ReportingSession
 from zmart_controller.registry import registry_file
 
-#: The driver's name in zmart_driver.json, and what get_instruments lists it under.
+#: The driver's name in zmart_controller_plugin.json, and what get_instruments lists it under.
 DRIVER_NAME = "stellaris"
-#: The folder register_driver is pointed at: it holds zmart_driver.json.
-DRIVER_FOLDER = _NAV_ROOT / "for_zmart_controller"
+#: The folder register_driver is pointed at: the driver's, which holds zmart_controller_plugin/.
+DRIVER_FOLDER = _NAV_ROOT
 #: Readback tolerance for a move, matching the driver's own confirmation gate.
 XY_TOL_UM = 20.0
 #: A step far beyond any stage, so the gate refuses it whatever the limits are.
@@ -105,7 +105,7 @@ def _go_offline(args: argparse.Namespace) -> None:
 
 
 def _connection(args: argparse.Namespace, output_root: str | None) -> dict[str, Any]:
-    """The connection the session uses, on top of what zmart_driver.json saved."""
+    """The connection the session uses, on top of what zmart_controller_plugin.json saved."""
     connection: dict[str, Any] = {
         "client": args.client_name,
         "api_delay_ms": args.api_delay_ms,
@@ -269,7 +269,7 @@ def phase_limits(v: vh.Validator, sess: Any, before: dict[str, Any] | None) -> N
         raw = sess._session.set_xyz(x + FAR_UM, y, z)  # the raw answer, not unwrapped
         refused = isinstance(raw, dict) and raw.get("success") is False
         v.compare("limits: a far move is answered as a failure", refused, True)
-        text = str(raw.get("content", "")) if isinstance(raw, dict) else ""
+        text = str(raw.get("output", "")) if isinstance(raw, dict) else ""
         v.compare(
             "limits: the answer says the move was refused",
             any(
@@ -357,7 +357,7 @@ def phase_acquire(v: vh.Validator, sess: Any, args: argparse.Namespace) -> None:
             return
         problems = zmart_controller.check_acquire_answer(answer)
         v.compare("acquire: the controller accepts the answer", problems, [])
-        content = answer.get("content") if isinstance(answer, dict) else None
+        content = answer.get("output") if isinstance(answer, dict) else None
         files = (content.get("files") or []) if isinstance(content, dict) else []
         v.compare("acquire: at least one file", len(files) >= 1, True)
         present = all(vh.capture_saved(f) for f in files)

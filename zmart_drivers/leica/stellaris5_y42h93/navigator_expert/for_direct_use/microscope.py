@@ -22,7 +22,7 @@ change that was sent but never seen is recorded (``state()`` lists it) while
 the work goes on. A request that is wrong raises ``ValueError``; a change LAS
 X refused or that failed raises ``RuntimeError`` with the reason.
 
-The ZMART Controller's ``ZmartDriver`` class (``for_zmart_controller/``) is
+The ZMART Controller's ``ZmartControllerPlugin`` class (``zmart_controller_plugin/``) is
 this class with the controller's names and answers.
 
 Author: Thom de Hoog, Center for Microscopy and Image Analysis (ZMB),

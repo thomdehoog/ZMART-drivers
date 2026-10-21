@@ -51,9 +51,7 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.prim
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitives.log import (
     log_reader as _log_reader,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.for_zmart_controller.zmart_driver import (  # noqa: E402
-    ZmartDriver,
-)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.zmart_controller_plugin.zmart_controller_plugin import # noqa: E402     ZmartControllerPlugin
 
 #: A call slower than this is printed by name.
 SLOW_S = 0.3
@@ -134,11 +132,11 @@ def main(argv: list[str] | None = None) -> int:
     _time_readings()
     _time_slow_calls()
     connection = json.loads(
-        (_DRIVER_ROOT / "for_zmart_controller" / "zmart_driver.json").read_text(
+        (_DRIVER_ROOT / "zmart_controller_plugin" / "zmart_controller_plugin.json").read_text(
             encoding="utf-8"
         )
     )
-    driver = ZmartDriver(connection["connection"])
+    driver = ZmartControllerPlugin(connection["connection"])
     try:
         _, (changeable, _) = driver.get_state()
         start = changeable["job"]

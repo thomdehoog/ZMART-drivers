@@ -52,7 +52,7 @@ TRUE_T = {1: (0.0, 0.0, 0.0), 2: (50.0, -30.0, 7.0), 3: (-12.5, 4.0, -3.25)}
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.absolute_coordinate_system import (
     frame as _frame,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.for_zmart_controller import procedure_menu as _procedure_menu
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.zmart_controller_plugin import procedure_menu as _procedure_menu
 
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.session.handle import (
     Session,

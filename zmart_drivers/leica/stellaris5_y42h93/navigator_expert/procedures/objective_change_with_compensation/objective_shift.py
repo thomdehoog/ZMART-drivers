@@ -51,7 +51,7 @@ def _translations_for(client: Any) -> dict | None:
     ``None`` means compensation is off for this client: either the driver
     never loaded per-connection config for it (bare command-level use,
     tests, the setup notebooks), or the connection explicitly declined
-    calibration (``ZmartDriver({"load_calibration": False})``) — the
+    calibration (``ZmartControllerPlugin({"load_calibration": False})``) — the
     session declared itself uncalibrated, so lens swaps proceed bare.
     An empty dict means the connection *wanted* calibration but none is
     usable (unreadable file, or no pairs measured); an objective swap then

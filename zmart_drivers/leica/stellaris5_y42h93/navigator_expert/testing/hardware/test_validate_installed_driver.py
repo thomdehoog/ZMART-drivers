@@ -97,7 +97,7 @@ def test_a_capture_that_failed_is_reported_not_a_crash():
     """A failed capture answers with words, not a record: the checks say it failed, nothing breaks."""
     failed = {
         "success": False,
-        "content": "RuntimeError: this microscope does not know where to save its data",
+        "output": "RuntimeError: this microscope does not know where to save its data",
     }
     session = SimpleNamespace(_session=SimpleNamespace(acquire=lambda **kwargs: failed))
     v = RecordingValidator()

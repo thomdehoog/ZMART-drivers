@@ -63,8 +63,8 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.objective
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.absolute_coordinate_system import (
     frame as _frame,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.for_zmart_controller import info as _controller_info
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.for_zmart_controller import procedure_menu as _procedure_menu
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.zmart_controller_plugin import info as _controller_info
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.zmart_controller_plugin import procedure_menu as _procedure_menu
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.for_direct_use import state as _state_record
 
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.session import (
@@ -83,9 +83,7 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.for_direct_use.micro
     DEFAULT_CONNECTION,
     Microscope,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.for_zmart_controller.zmart_driver import (
-    ZmartDriver,
-)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.zmart_controller_plugin.zmart_controller_plugin import ZmartControllerPlugin
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.session.handle import (
     Session,
 )
@@ -93,7 +91,7 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.session.handle impor
 
 def _connect_handle(connection=None):
     """Connect the way the controller does, by making the driver, and return its session handle."""
-    return ZmartDriver(connection).microscope.handle
+    return ZmartControllerPlugin(connection).microscope.handle
 
 
 def _disconnect_handle(handle):
@@ -240,10 +238,10 @@ class TestRegistration(unittest.TestCase):
             if command == "connect":
                 continue
             with self.subTest(command=command):
-                self.assertTrue(callable(getattr(ZmartDriver, command)))
+                self.assertTrue(callable(getattr(ZmartControllerPlugin, command)))
 
     def test_importing_the_driver_registers_nothing(self):
-        import zmart_drivers.leica.stellaris5_y42h93.navigator_expert.for_zmart_controller.zmart_driver as module
+        import zmart_drivers.leica.stellaris5_y42h93.navigator_expert.zmart_controller_plugin.zmart_controller_plugin as module
 
         source = Path(module.__file__).read_text(encoding="utf-8")
         self.assertIsNone(
@@ -255,7 +253,7 @@ class TestRegistration(unittest.TestCase):
         from zmart_controller.zmart_controller import COMMANDS
 
         self.assertNotIn("set_origin", COMMANDS)
-        self.assertFalse(hasattr(ZmartDriver, "set_origin"))
+        self.assertFalse(hasattr(ZmartControllerPlugin, "set_origin"))
         self.assertTrue(callable(Microscope.set_origin))
 
 
@@ -1135,7 +1133,7 @@ class TestAcquire(unittest.TestCase):
                 record["files"], [str(image), str(vendor), str(state), *record["log"]]
             )
             self.assertEqual(
-                check_acquire_answer({"success": True, "content": record}), []
+                check_acquire_answer({"success": True, "output": record}), []
             )
 
     def test_saving_follows_this_microscopes_profile(self):
@@ -2573,9 +2571,7 @@ class TestLifecycle(unittest.TestCase):
 
         import zmart_controller
 
-        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.for_zmart_controller.zmart_driver import (
-            ZmartDriver as driver,
-        )
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.zmart_controller_plugin.zmart_controller_plugin import ZmartControllerPlugin as driver
 
         _clear_limits()
         self.addCleanup(_clear_limits)
@@ -2604,12 +2600,12 @@ class TestLifecycle(unittest.TestCase):
             try:
                 # Capturing the origin is a driver setup step, not a controller
                 # command, so it is called with the driver's own session handle.
-                _set_origin.set_origin(session._handle.microscope.handle)
+                _set_origin.set_origin(session.plugin.microscope.handle)
                 answer = session.set_xyz(10, 20, 5)
                 self.assertIs(answer["success"], True)
                 # The move answers a read-back in get_xyz's shape. The readers
                 # are mocked and never move, so it reads the origin itself.
-                moved = answer["content"]
+                moved = answer["output"]
                 self.assertEqual(
                     list(moved["x"]),
                     ["position", "unit", "actuator", "actuators", "canvas"],
@@ -2619,7 +2615,7 @@ class TestLifecycle(unittest.TestCase):
                     moved["z"]["actuators"], {"z-wide": 30.0, "z-galvo": 0.0}
                 )
                 xyz = session.get_xyz()
-                self.assertEqual(xyz["content"], moved)
+                self.assertEqual(xyz["output"], moved)
             finally:
                 session.disconnect()
 

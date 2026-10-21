@@ -50,7 +50,7 @@ def test_the_package_offers_only_the_microscope():
     offered = {name for name in vars(navigator_expert) if not name.startswith("__")} - {"for_direct_use"}
 
     assert sorted(navigator_expert.__all__) == ["Microscope", "__version__", "connect"]
-    assert offered <= {"Microscope", "connect"} | {"dispatcher", "driver_setup", "procedures", "session", "vendor_specific", "for_zmart_controller", "testing"}
+    assert offered <= {"Microscope", "connect"} | {"dispatcher", "driver_setup", "procedures", "session", "vendor_specific", "zmart_controller_plugin", "testing"}
 
 
 def test_the_running_log_gets_the_messages_of_every_part_of_the_driver(scope):
@@ -174,7 +174,7 @@ def test_the_state_names_the_selected_job(scope):
 
 
 def test_what_only_the_controller_asks_for_is_not_on_the_microscope():
-    """The description for get_info and the procedure menu are the controller's, in for_zmart_controller/."""
+    """The description for get_info and the procedure menu are the controller's, in zmart_controller_plugin/."""
     for name in ("info", "procedures", "run_procedure", "autofocus"):
         assert not hasattr(navigator_expert.Microscope, name), name
 

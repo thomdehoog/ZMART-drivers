@@ -62,9 +62,7 @@ def main() -> int:
     import zarr
     from zmart_controller import ZmartController
 
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.for_zmart_controller.zmart_driver import (
-        ZmartDriver as driver,
-    )
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.zmart_controller_plugin.zmart_controller_plugin import ZmartControllerPlugin as driver
 
     report: dict = {
         "job": asked.job,
@@ -82,17 +80,17 @@ def main() -> int:
             if asked.job
             else {"success": True}
         )
-        report["job"] = session.get_state()["content"]["changeable"].get("job")
+        report["job"] = session.get_state()["output"]["changeable"].get("job")
         if not chosen["success"]:
-            report["error"] = f"the job was not selected: {chosen['content']}"
+            report["error"] = f"the job was not selected: {chosen['output']}"
             return _finish(report, Path(asked.report_dir))
-        state = session.get_state()["content"]
+        state = session.get_state()["output"]
         report["system"] = {
             k: v
             for k, v in (state.get("observed") or {}).items()
             if k in ("serial_number", "system_type", "stand")
         }
-        here = session.get_xyz()["content"]
+        here = session.get_xyz()["output"]
         session.set_xyz(*(float(here[axis]["position"]) for axis in "xyz"))
 
         started = time.perf_counter()
@@ -102,9 +100,9 @@ def main() -> int:
         report["acquire_s"] = round(time.perf_counter() - started, 2)
         checks["captured and saved"] = bool(answer["success"])
         if not answer["success"]:
-            report["error"] = str(answer["content"])
+            report["error"] = str(answer["output"])
             return _finish(report, Path(asked.report_dir))
-        record = answer["content"]
+        record = answer["output"]
         stores = sorted({plane["path"] for plane in record["planes"]})
         checks["one store for the capture"] = len(stores) == 1 and stores[0].endswith(
             ".ome.zarr"

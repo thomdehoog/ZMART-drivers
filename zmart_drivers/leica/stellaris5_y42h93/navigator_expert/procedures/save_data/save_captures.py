@@ -189,7 +189,7 @@ def _loaded_orientation(handle: Session):
     loaded = _session_state.get(handle.client)
     if loaded is not None:
         return loaded.orientation
-    # No per-connection state for this handle (built without a ZmartDriver,
+    # No per-connection state for this handle (built without a ZmartControllerPlugin,
     # or its registry entry was uninstalled). Fall back to reading the file
     # fresh — loudly, because this re-read can differ from what the connection
     # loaded and can differ from what the connection loaded.

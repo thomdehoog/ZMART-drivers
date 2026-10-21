@@ -152,9 +152,7 @@ def main() -> int:
 
     from zmart_controller import ZmartController
 
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.for_zmart_controller.zmart_driver import (
-        ZmartDriver as driver,
-    )
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.zmart_controller_plugin.zmart_controller_plugin import ZmartControllerPlugin as driver
     from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.clear_cache import (
         release as lasx_cache_release,
     )
@@ -187,10 +185,10 @@ def main() -> int:
             if asked.job
             else {"success": True}
         )
-        report["job"] = session.get_state()["content"]["changeable"].get("job")
+        report["job"] = session.get_state()["output"]["changeable"].get("job")
         if not chosen["success"]:
-            raise SystemExit(f"the job was not selected: {chosen['content']}")
-        here = session.get_xyz()["content"]
+            raise SystemExit(f"the job was not selected: {chosen['output']}")
+        here = session.get_xyz()["output"]
         session.set_xyz(*(float(here[axis]["position"]) for axis in "xyz"))
         start = report["cache before, MB"] = cache.measure()
         print(
@@ -202,19 +200,19 @@ def main() -> int:
             answer = session.acquire(position_label=f"t{i:04d}")
             if not answer["success"]:
                 failed += 1
-                report["errors"].append(f"capture {i}: {answer['content']}"[:300])
+                report["errors"].append(f"capture {i}: {answer['output']}"[:300])
             else:
                 # The picture is saved; now have LAS X let go of it.
                 cleared = session.run_procedure({"name": "clear_cache"})
                 if not cleared["success"]:
                     failed += 1
                     report["errors"].append(
-                        f"clear_cache after {i}: {cleared['content']}"[:300]
+                        f"clear_cache after {i}: {cleared['output']}"[:300]
                     )
-                elif cleared["content"]["ran"]["failed"]:
+                elif cleared["output"]["ran"]["failed"]:
                     failed += 1
                     report["errors"].append(
-                        f"clear_cache after {i}: {cleared['content']['ran']['failed']}"[
+                        f"clear_cache after {i}: {cleared['output']['ran']['failed']}"[
                             :300
                         ]
                     )

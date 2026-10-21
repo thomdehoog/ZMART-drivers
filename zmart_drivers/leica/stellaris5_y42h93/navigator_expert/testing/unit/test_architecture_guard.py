@@ -218,10 +218,10 @@ ALLOWED = {
         "driver_setup",
         "__version__",  # acquire.py records the driver version in the saved state
     },
-    # Everything that faces the controller: the ZmartDriver class, which
+    # Everything that faces the controller: the ZmartControllerPlugin class, which
     # translates the controller's commands into calls of the Microscope, and
     # what only the controller asks for: the description and the procedure menu.
-    "for_zmart_controller": {
+    "zmart_controller_plugin": {
         "for_direct_use",
         "session",
         "dispatcher",

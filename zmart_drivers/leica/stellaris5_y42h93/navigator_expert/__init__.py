@@ -2,7 +2,7 @@
 
 Use the driver by itself with ``connect()``, which opens LAS X and hands back
 a ``Microscope``; the README says what it can do. The ZMART Controller plugs
-the driver in through ``for_zmart_controller/``, which is built on the same
+the driver in through ``zmart_controller_plugin/``, which is built on the same
 ``Microscope``.
 
 Package layout, the anatomy of a ZMART driver (``docs/driver-anatomy.md`` in
@@ -11,7 +11,7 @@ this repository)::
     navigator_expert/
     - for_direct_use/     the driver used by itself: connect() and the Microscope, taking a
                           picture, the state saved with it, and the driver's rolling log
-    - for_zmart_controller/  what the controller sees: the ZmartDriver class (zmart_driver.py),
+    - zmart_controller_plugin/  what the controller sees: the ZmartControllerPlugin class (zmart_controller_plugin.py),
                           one method per controller command, each a call of the Microscope,
                           and what only the controller asks for (info.py, procedure_menu.py)
     - procedures/         the recipes, one folder each: saving the captures (save_data/),
