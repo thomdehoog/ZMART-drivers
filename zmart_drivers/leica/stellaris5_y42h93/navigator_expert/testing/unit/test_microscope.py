@@ -187,3 +187,17 @@ def test_a_closed_microscope_refuses(scope):
 
     with pytest.raises(RuntimeError, match="disconnected"):
         scope.position()
+
+
+def test_every_call_of_the_microscope_and_every_setting_is_in_the_readme():
+    """The README is the manual of the driver used by itself; nothing it can do is left out."""
+    import inspect
+    import re
+    from pathlib import Path
+
+    readme = (Path(microscope.__file__).resolve().parents[1] / "README.md").read_text(encoding="utf-8")
+    section = readme[readme.index("## 4. Using the driver by itself") : readme.index("## 5.")]
+    calls = [name for name, _ in inspect.getmembers(navigator_expert.Microscope) if not name.startswith("_")]
+
+    assert [name for name in calls if not re.search(rf"`{name}[`(]", section)] == []
+    assert [name for name in microscope.SETTINGS if f"| `{name}` |" not in section] == []

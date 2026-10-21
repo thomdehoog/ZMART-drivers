@@ -35,9 +35,9 @@ notebooks keep the thin 1–3-line invocation style used across the ZMART driver
 1. [About the LAS X CAM API](#1-about-the-las-x-cam-api)
 2. [Requirements & installation](#2-requirements--installation)
 3. [Configuration](#3-configuration)
-4. [Quick start](#4-quick-start)
+4. [Using the driver by itself](#4-using-the-driver-by-itself)
 5. [Core concepts](#5-core-concepts)
-6. [API reference](#6-api-reference)
+6. [Pictures: taking, saving and clearing](#6-pictures-taking-saving-and-clearing)
 7. [Architecture](#7-architecture)
 8. [Configuration & tuning (profiles)](#8-configuration--tuning-profiles)
 9. [Testing](#9-testing)
@@ -68,18 +68,13 @@ LAS X.
   CAM assemblies. Install the repository with the Leica extra from its root folder; this also
   installs the ZMART Controller and `pythonnet` (on Windows):
   `pip install -e ".[leica]"`. Add `test` for the offline suite: `pip install -e ".[leica,test]"`.
-- **Import the package** by its full name:
+- **Import the package** by its full name, and connect (section 4):
   ```python
-  import zmart_drivers.leica.stellaris5_y42h93.navigator_expert as lasx
-  from zmart_drivers.leica.stellaris5_y42h93.navigator_expert import (
-      connect_python_client,
-      set_zoom,
-      acquire,
-      save,
-  )
+  import zmart_drivers.leica.stellaris5_y42h93.navigator_expert as navigator_expert
+
+  scope = navigator_expert.connect()
   ```
-  The Leica package is self-contained; its filename helper lives under
-  `navigator_expert.procedures.save_data.naming`.
+  The package offers `connect()` and the `Microscope`, and nothing else.
 - **Plug it into the ZMART Controller** on the LAS X computer. Register the `for_zmart_controller` folder (its `zmart_driver.json` names the class
   beside it) with the controller once; from then on every session plugs the driver in by name.
   Its settings, `CONNECTION` in that file, are all optional; the file explains each one:
@@ -200,97 +195,139 @@ runtime where possible. Override via the profile, not at call sites.
   trigger the defaults fallback above. Nothing built on top—the `ZmartDriver` class, controller, workflow, or
   notebook—can bypass this command-layer check.
 
-## 4. Quick start
+## 4. Using the driver by itself
+
+The driver works on its own, from a notebook or a script, without the ZMART controller.
+`connect()` opens LAS X, loads this microscope's limits, origin, orientation and calibration, and
+hands back a `Microscope`:
 
 ```python
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert import (
-    connect_python_client,
-    ping,
-    connect_limits_handshake,
-    select_job,
-    set_zoom,
-    set_scan_speed,
-    move_xy,
-    acquire,
-    save,
-)
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.save_data.naming import (
-    Naming,
-    run_hash,
-)
+import zmart_drivers.leica.stellaris5_y42h93.navigator_expert as navigator_expert
 
-# 1. Connect and validate the scope
-client = connect_python_client()
-assert ping(client)
+scope = navigator_expert.connect()
 
-# 2. Limits handshake (REQUIRED before any mutating command; run automatically
-#    by the `ZmartDriver` class — shown here for the low-level
-#    API): resolves and validates an operator-published ProgramData limits.json
-#    and installs the limits gate for this client. A MISSING or INVALID file
-#    uses the bundled defaults directly (loudly), so
-#    state.ok stays True — check state.limits.describe()["is_fallback"] if you
-#    need to know whether your measured envelope is really in force.
-state = connect_limits_handshake(client)
-assert state.ok, state.error  # False only if even the bundled defaults are unusable
+scope.move_to(100.0, 250.0, 0.0)          # micrometres from the saved origin
+scope.select_job("HiRes")
+scope.change_setting("zoom", value=2.0)   # the selected job, read back
+scope.acquire("A1")                       # the picture stays in LAS X's cache
+scope.save()                              # written as OME-Zarr
+scope.clear_cache()                       # LAS X lets go of the saved pictures
 
-# 3. Select and configure a job (live commands return a result dict)
-select_job(client, "MyExperiment")
-r = set_zoom(client, "MyExperiment", 2.0)
-assert r["success"] and r["confirmed"], r["message"]  # check BOTH — see §5
-set_scan_speed(client, "MyExperiment", 600)
-
-# 4. Move and acquire
-move_xy(client, 65_000, 65_000, unit="um")
-acq = acquire(client, "MyExperiment")  # -> AcquisitionResult (RAISES on failure)
-
-# 5. Persist with Leica's private naming helper (a separate step from acquire)
-naming = Naming(stem=f"overview_{run_hash()}_K00_M000001_G000001_P000000_V00")
-saved = save(client, acq, output_root="D:/runs/demo", naming=naming)
-print(saved.image_paths)  # {PlaneIndex(t,z,c): Path, ...}
+scope.close()
 ```
 
-> `acquire()` returns an `AcquisitionResult` dataclass and **raises** on failure — it is *not* a
-> `{"success": ...}` dict. Saving is a deliberate second step (see §6).
+Every call goes through the same checks as the controller's commands. The limits are asked
+before anything moves. Every change is read back. A change that was sent but never seen is
+recorded, and `state()` lists it; the work goes on. A request that is wrong raises `ValueError`.
+A change that LAS X refused, or that failed, raises `RuntimeError` with the reason.
 
-> The explicit `output_root` above is for the low-level driver API. Through
-> `zmart_controller`, the Leica driver saves under this microscope's data location, set up once
-> and reported in `get_info()["setup"]["data_location"]` (or under the connection's
-> `output_root`, when a session gives one); the workflow files each capture into its own run.
+`connect()` takes the keys of the connection, all optional: `output_root` (where captures go
+when no folder is given), `load_limits`, `load_calibration` and `load_origin` (all `True`),
+`calibration_name`, `client` and `api_delay_ms`.
 
-> No machine config yet? The first connect seeds ProgramData from the repo defaults so CI and local
-> mock runs work. On the rig, run `driver_setup/limits/notebooks/set_limits.ipynb`,
-> `driver_setup/orientation/notebooks/set_orientation.ipynb`, and the calibration notebook to replace those defaults
-> with measured values. If a machine file is invalid, the session falls back to the bundled default
-> envelope (loudly) rather than refusing — fix the file the warning names and reconnect.
+### What the microscope can do
+
+| Call | What it does |
+|---|---|
+| `position()` | Where the stage is: `x`, `y` and `z` in micrometres from the origin, each with its motors' own readings and the range a picture can show. `z` is the focus, the two z drives added together. |
+| `move_to(x, y, z)` | Move there, and answer as `position()`, read back once the stage has arrived. The focus moves with z-wide. |
+| `motors()` | The motors of each axis, and the one used to move it. |
+| `set_origin()` | Make the current position the origin, and save it for every later connection. |
+| `zero_z_galvo()` | Park the z-galvo at 0 without changing the focus. |
+| `jobs()` | The LAS X jobs by name: `selected`, `jobs` and `autofocus_jobs`. |
+| `select_job(name)` | Select a job. An autofocus job is run with `autofocus()` instead. |
+| `job_settings(job=None)` | The settings of a job, as LAS X reports them. Without a job, the selected one. |
+| `change_setting(name, job=None, **arguments)` | Change one setting of a job and read it back; see the table below. |
+| `change_objective(slot=None, name=None, magnification=None)` | Change the objective, and move the stage by the measured offset so the same spot stays in view. |
+| `acquisition_settings()` | How a capture is triggered: `full`, the whole selected job. |
+| `acquire(position_label=None, acquisition_type="acquisition", output_folder=None)` | Run the selected job. The picture stays in LAS X's cache, with a note of how it was taken. Nothing is written yet. |
+| `save(label=None)` | Write the captures that are waiting as OME-Zarr, with their projection and log. |
+| `clear_cache()` | Have LAS X let go of the pictures that were saved. Acquiring and saving never do this. |
+| `autofocus(job=None)` | Run an autofocus job, save nothing, and answer the focus it found. |
+| `state()` | The selected job, and what can only be read: the instrument, the objectives, the limits in force, the changes that were never confirmed. |
+| `info()` | The instrument in words, and what is set up on it. |
+| `procedures()` | The named procedures, with a description each. |
+| `run_procedure(name, **arguments)` | Run one of them by name. |
+| `close()` | Close the session. Every later call is refused. |
+| `client` | The LAS X client itself, for the setup notebooks. |
+
+### The settings `change_setting` can change
+
+The name is the first column. The arguments are given by name, for example
+`change_setting("laser_intensity", setting_index=0, beam_route="...", line_index=0, value=0.05)`.
+A per-setting entry targets one sequential setting of the job, by its `setting_index`.
+
+| Name | Arguments | Read back within |
+|---|---|---|
+| `zoom` | `value` | 0.1 |
+| `scan_speed` | `value` | exact |
+| `scan_resonant` | `enable` | exact |
+| `scan_mode` | `mode`, such as `"xyz"` | exact |
+| `sequential_mode` | `mode`: `"Line"`, `"Frame"` or `"Stack"` | exact |
+| `scan_field_rotation` | `angle` | 0.5° |
+| `image_format` | `format_str`, such as `"512 x 512"` | exact |
+| `z_stack_definition` | `begin_um`, `end_um`; `old_begin_um` or `old_end_um` set to anything resets that end | 1.0 µm |
+| `z_stack_step_size` | `step_size_um` | 0.5 µm |
+| `z_stack_size` | `size_um` | 1.5 µm |
+| `frame_accumulation` | `setting_index`, `value` | exact |
+| `frame_average` | `setting_index`, `value` | exact |
+| `line_accumulation` | `setting_index`, `value` | exact |
+| `line_average` | `setting_index`, `value` | exact |
+| `pinhole_airy` | `setting_index`, `value` | 0.05 AU |
+| `detector_gain` | `setting_index`, `beam_route`, `value` | 1.0 |
+| `laser_intensity` | `setting_index`, `beam_route`, `line_index`, `value` | 0.005 (0 to 1) |
+| `laser_shutter` | `setting_index`, `beam_route`, `activate` | exact |
+| `filter_wheel_slot` | `setting_index`, `beam_route`, `filter_wheel_type`, `slot_index` | exact |
+| `filter_wheel_spectrum` | `setting_index`, `beam_route`, `filter_wheel_type`, `position` | 1 nm |
+
+### Through the ZMART controller
+
+The controller uses the same `Microscope`. Its `ZmartDriver` class in `for_zmart_controller/`
+only gives each command the controller's name and answer: `get_xyz` is `position()`, `set_xyz` is
+`move_to()`, `set_state` is `select_job()`, and `acquire` is `acquire()` then `save()`. Register
+the folder once and connect by name:
+
+```python
+from zmart_controller import mic
+
+mic.register_driver(r"C:\ZMART-drivers\zmart_drivers\leica\stellaris5_y42h93\navigator_expert\for_zmart_controller")
+mic.connect("stellaris")
+```
+
+Through the controller, captures are saved under this microscope's data location, set up once
+with `driver_setup/data_location/notebooks/set_data_location.ipynb`, unless the workflow gives a
+folder.
+
+> No machine settings yet? The first connect seeds them from the driver's defaults, so offline
+> runs work. At the microscope, run `driver_setup/limits/notebooks/set_limits.ipynb`,
+> `driver_setup/orientation/notebooks/set_orientation.ipynb` and the calibration notebook to
+> replace those defaults with measured values. If a machine file is invalid, the session uses the
+> bundled default limits and says so loudly; fix the file the warning names and connect again.
 
 ## 5. Core concepts
 
-**The client.** Making a `ZmartDriver` is the normal entry point: it opens the CAM client and
-loads this microscope's three machine-local configs (limits, orientation, calibration), so the whole
-session works from one consistent picture (`driver.client` is the CAM client); `connect_python_client()` is the lower-level primitive that
-only opens and pings the client (the setup notebooks use it, since they load just the one config they
-need). Every command/reader takes the returned `client` as its first argument. The CAM client has no
-disconnect counterpart — it lives for the process; there is nothing to close when a session ends.
+**Connecting.** `connect()` opens the CAM client and loads this microscope's three
+machine-local configs (limits, orientation, calibration), so the whole session works from one
+consistent picture. The CAM client has no disconnect of its own; it lives for the process.
+`close()` forgets what was loaded for the session, and every later call is refused.
 
-**Which configs to load.** `ZmartDriver({"load_limits": …, "load_calibration": …})` chooses whether
-limits and calibration are loaded. `load_limits=False` governs the session with the bundled **default**
-envelope (never ungated; the physical backstop still holds); `load_calibration=False` refuses
-cross-objective moves rather than computing uncompensated ones. Normal image saves always use the
-`IMAGE_SAVE.apply_orientation=True` profile default. Only orientation measurement passes an explicit
-identity orientation to obtain raw camera pixels.
+**Which configs to load.** `connect(load_limits=..., load_calibration=...)` chooses whether
+limits and calibration are loaded. `load_limits=False` governs the session with the bundled
+**default** envelope (never ungated; the physical backstop still holds); `load_calibration=False`
+refuses cross-objective moves rather than computing uncompensated ones. Normal image saves always
+use the `IMAGE_SAVE.apply_orientation=True` profile default. Only orientation measurement passes
+an explicit identity orientation to obtain raw camera pixels.
 
 **The origin is part of the microscope's configuration.** The frame origin is the stage position
 that the ZMART controller calls (0, 0, 0). Like the limits, orientation, and calibration, it is set
 once in a setup step and then reused by every session. During that step the operator works with
-the driver directly and calls its `set_origin`:
+the driver directly:
 
 ```python
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.for_zmart_controller.zmart_driver import (
-    ZmartDriver,
-)
+import zmart_drivers.leica.stellaris5_y42h93.navigator_expert as navigator_expert
 
-driver = ZmartDriver()  # making the driver connects it
-driver.set_origin()  # the current position becomes (0, 0, 0)
+scope = navigator_expert.connect()
+scope.set_origin()  # the current position becomes (0, 0, 0)
 ```
 
 `set_origin` saves stage XY, both z drives, and the current objective to a new
@@ -302,14 +339,14 @@ compensated with the calibration, or refused when no calibration covers it.
 If no origin has been saved yet, positions are plain stage coordinates and connect logs a warning.
 If an origin file exists but is damaged or incomplete, connect stops with a clear error rather than
 quietly using a zero origin, which would shift every position in the experiment. To recover, fix or
-remove that file, or connect with `load_origin=False` in the connection dict and run `set_origin`
+remove that file, or connect with `load_origin=False` and run `set_origin`
 again. (Earlier versions treated the origin as belonging to one session only and did not load it at
 connect; that is no longer the case.)
 
 **Command vs. read.** Commands *change* state through the dispatch backbone; reads *observe* state
 through `readers`. Reads that gate control flow or become persisted truth have a stricter rule (below).
 
-**The result dictionary.** Every live command returns a stable envelope:
+**The result dictionary.** Every change, such as `change_setting` and `change_objective`, answers with a stable envelope:
 
 | Key | Meaning |
 |---|---|
@@ -364,120 +401,25 @@ written. **Freshness rule:** a fresh-by-age
 or what metadata/calibration is persisted — those must use the API leg. The CAM API can hang; the log
 mirror is the hang-proof fallback.
 
-**Units.** Public API *inputs* are micrometers (`unit="um"`/`"mm"`/`"m"` where accepted). Returned
-positions are mixed: `get_xy` and `move_xy`'s `position` carry raw meters under bare `x`/`y` —
-use the `*_um` keys.
+**Units.** Positions are micrometres from the saved origin, in `position()`, `move_to()` and every
+plane of a saved capture.
 
-**Common per-call overrides** (`None` = use the profile): `max_retries` (transient-retry ceiling),
-`tolerance` (readback tolerance, numeric commands). How long to wait is never a per-call choice.
+**Logging:** every message of the driver also goes to its running log, `running_log.txt` in the
+`logs` folder beside the saved settings. `logging.getLogger("zmart_drivers.leica.stellaris5_y42h93.navigator_expert")`
+is the logger of the whole driver; the same trace also travels in each result's `logs`.
 
-**Logging:** `logging.getLogger("navigator_expert").setLevel(logging.DEBUG)` — the same trace also
-travels in each result's `logs`.
+## 6. Pictures: taking, saving and clearing
 
-## 6. API reference
-
-All setting commands take `(client, job_name, ...)` and return the result dict of §5.
-
-### Connection
-```python
-connect_python_client(client_name="PythonClient", api_delay_ms=None) -> client
-ping(client) -> bool
-```
-
-### State readers
-
-The routed readers return a value or `None` (never raise) and accept `diagnostics=True` for a
-source-tagged `Reading` (value + `source` + `observed_at`) plus `mode="api"|"log"|"hybrid"` to
-override the profile backend. Exceptions: `ping` and `get_lasx_settings` take exactly the calls
-shown; `read_zwide_um` takes only `(client, job_name, *, mode=None)` — no `diagnostics` — and
-**can raise** (`RuntimeError`/`ValueError`) when job settings are readable but incomplete or
-schema-mismatched (it returns `None` only when the settings cannot be read at all).
-
-Z has no hardware readback through CAM. The settings' `zPosition` is the job's stored setpoint
-and it stops refreshing for the drive that carries the job's z-stack; for that drive the Z
-extractor (`vendor_specific/primitive_handling/readings/derived.py::z_um_from_settings`) asks LAS X's hardware server where the drive
-really is, transparently to every caller — reader, `confirm_move_z`, the `ZmartDriver` class. If the hardware
-server cannot be reached, the stacked drive is refused with a clear message instead of answered
-with the stale number. The free drive is read from the settings at no extra cost.
-`docs/design/z-readback-stacked-drive.md` has the measurements and the open items.
-
-| Function | Call | Returns |
-|---|---|---|
-| `ping` | `(client)` | `bool` |
-| `get_scan_status` | `(client, mode=None)` | status string (e.g. `"eIdle"`) |
-| `get_xy` | `(client, mode=None)` | `{"x","y","x_um","y_um"}` |
-| `read_zwide_um` | `(client, job_name, mode=None)` | `float` (µm); can raise — see above |
-| `get_jobs` | `(client, ...)` | list of job dicts |
-| `get_job_by_name` | `(client, job_name, ...)` | job dict |
-| `get_selected_job` | `(client, ...)` | selected job dict |
-| `get_job_settings` | `(client, job_name, ...)` | raw settings dict |
-| `get_hardware_info` | `(client, ...)` | hardware dict |
-| `get_fov` / `get_base_fov` | `(client, ...)` | field-of-view info |
-| `get_lasx_settings` | `()` | LAS X advanced settings (orientation, …) |
-| `get_pending_dialog` | `(*, diagnostics=False)` — no client; log-only | open LAS X dialog text, if any |
-
-### Setting commands — reference
-
-All take `(client, job_name, …)` and return the result dict of §5; `tolerance` overrides the default.
-Per-setting commands (below the rule) also take a `setting_index` targeting a specific sequential setting.
-
-| Function | Key parameters | Tolerance / notes |
-|---|---|---|
-| `set_zoom` | `value` | 0.1 (factor) |
-| `set_scan_speed` | `value` | integer speed |
-| `set_scan_resonant` | `enable` | `True`/`False` |
-| `set_scan_mode` | `mode` | e.g. `"xyz"`, `"xzy"` |
-| `set_sequential_mode` | `mode` | `"Line"`/`"Frame"`/`"Stack"` |
-| `set_scan_field_rotation` | `angle` | 0.5° |
-| `set_image_format` | `format_str` | `"512 x 512"` or `(512, 512)` |
-| `set_objective` | `hw_info`, one of `slot_index=`/`name=`/`magnification=` | needs `get_hardware_info()` |
-| `set_z_stack_definition` | `begin_um=`, `end_um=` (`old_begin_um=`, `old_end_um=`) | 1.0 µm |
-| `set_z_stack_step_size` | `step_size_um` | 0.5 µm |
-| `set_z_stack_size` | `size_um` | 1.5 µm |
-| — *per-setting (take `setting_index`)* — | | |
-| `set_frame_accumulation` | `setting_index, value` | exact match |
-| `set_frame_average` | `setting_index, value` | exact match |
-| `set_line_accumulation` | `setting_index, value` | exact match |
-| `set_line_average` | `setting_index, value` | exact match |
-| `set_pinhole_airy` | `setting_index, value` | 0.05 AU |
-| `set_detector_gain` | `setting_index, beam_route, value` | 1.0 |
-| `set_laser_intensity` | `setting_index, beam_route, line_index, value` | 0.005 (0–1) |
-| `set_laser_shutter` | `setting_index, beam_route, activate` | `True` = open |
-| `set_filter_wheel_slot` | `setting_index, beam_route, filter_wheel_type, slot_index` | exact match |
-| `set_filter_wheel_spectrum` | `setting_index, beam_route, filter_wheel_type, position` | 1 nm |
-
-### Settings model
-`make_changeable_copy(get_job_settings(client, job))` (`vendor_specific/primitive_handling/readings/parsing.py`) normalizes raw job
-settings into the flat, stable dict the `_confirm_*` functions read back against: `zoom`, `scanSpeed`,
-`scanMode`, `stack`, `zPosition`, and `activeSettings[...]` (with `activeDetectors`, `activeLaserLines`,
-`filterWheels`). Underscore-prefixed keys (`_beamRoute`, `_lineIndex`, `_index`, `_name`) are
-driver-added aliases for stable access.
-
-### Stage & motion
-```python
-move_xy(client, x, y, unit="um", *, max_retries=None, tolerance=None) -> dict                           # tol 20 µm; result has "position"
-move_z(client, job_name, z, unit="um", z_mode="galvo", ...) -> dict                                     # z_mode "galvo"|"zwide"; tol 1 µm
-set_stage_limits(*, x_min, x_max, y_min, y_max, z_galvo_min, z_galvo_max, z_wide_min, z_wide_max) -> None
-get_stage_limits() -> dict ; apply_stage_limits_from_config(stage_cfg) -> None
-```
-
-### Acquisition & job selection
-```python
-select_job(client, job_name, *, compensate=None) -> dict                         # confirm defaults to hybrid
-acquire(client, job, *, poll_interval=None, poll_timeout=None, heartbeat_interval=None,
-        start_timeout=None) -> AcquisitionResult                                  # RAISES on failure
-save(client, acq, output_root, naming, *, lineage=None, state=None,
-     orientation=None, projection=None) -> SavedAcquisition                      # image_paths / naming / release_target
-```
 **Taking a picture, saving it and clearing LAS X's cache are three steps.** `acquire` (in
 `procedures/acquisition/`) runs the selected job, writes nothing, and keeps a note of how the
 picture was taken (where the stage stood, which job ran, the state of the microscope). The
 `save_data` procedure then writes the waiting pictures, and `clear_cache` lets LAS X go of the
-pictures that were saved. The controller's `acquire` runs the first two in order and never the
-third. Run `save_data` or `clear_cache` by hand with `run_procedure({"name": "save_data"})` and
-`run_procedure({"name": "clear_cache"})`.
+pictures that were saved. Used by itself, these are `scope.acquire()`, `scope.save()` and
+`scope.clear_cache()`. The controller's `acquire` runs the first two in order and never the
+third; through the controller, run `save_data` or `clear_cache` with
+`run_procedure({"name": "save_data"})` and `run_procedure({"name": "clear_cache"})`.
 
-`save()` collects the capture from LAS X's cache as LAS X writes it (LAS X's AutoSave is not used)
+Saving collects the capture from LAS X's cache as LAS X writes it (LAS X's AutoSave is not used)
 and writes it as one OME-Zarr store. They land in `<output_root>/data/`, so what is made from
 them later (a stitched view, an analysis) becomes a folder beside `data` and is
 never confused with it. Everything describing the capture is under
@@ -485,7 +427,7 @@ never confused with it. Everything describing the capture is under
 
 ```
 data/
-  overview_K00_M000001_G000001_P000000_V00_T000000_C00_Z00000.ome.tiff
+  overview_K00_M000001_G000001_P000000_V00.ome.zarr
   metadata/
     ZMART_state/  overview_K00_..._T000000_ZMART_state.json
     vendor/       lasx_data_container/<picture>.lasx-description.xml
@@ -502,7 +444,7 @@ translation is the field centre minus `(n - 1) / 2` pixels, half a pixel in from
 corner; z is the lowest plane's own height. The plane entries of the answer and the OME-TIFF
 `PositionX`/`PositionY` are the field centre.
 
-The `state` passed to `save()` is embedded in every plane's OME-XML **and**
+The microscope's state at the capture is embedded in every plane's OME-XML **and**
 printed once per acquisition — the image name without the channel and the
 z-slice, which one state spans. Embedded, reading it costs opening a picture;
 printed, it can simply be read. `SavedAcquisition.state_paths` names what was
@@ -524,10 +466,9 @@ delete of LAS X's own window, so the cache's files go and the project stays whol
 (`procedures/clear_cache/release.py` says how). Only pictures whose copy was written and read back
 identical are on its list, and the Navigator canvas is then cleared, which lets go of each
 capture's hidden copy. The driver never deletes a file itself. A picture it cannot let go of stays
-on the list and is reported, so a later call can try again. The 15 October 2026 STELLARIS check
-(fifty and then ten captures let go of, the cache staying flat) was made with the earlier
-release-after-every-save; `testing/hardware/check_cache_release.py` now runs `clear_cache` after
-each capture and should be run again on the simulator.
+on the list and is reported, so a later call can try again. On the LAS X simulator (21 October
+2026), `testing/hardware/check_cache_release.py` ran `clear_cache` after each of ten captures:
+every canvas was cleared, and the hidden copies did not grow.
 
 **Positions are never made in the Navigator Expert.** They come from the ZMART interface.
 `acquire()` and the autofocus procedure capture at the current position.
@@ -572,11 +513,13 @@ bottom and the class the controller calls at the top.
 
 ```
 zmart_drivers/leica/stellaris5_y42h93/navigator_expert/
+├── for_direct_use/     the driver used by itself:
+│   ├── microscope.py       connect() and the Microscope: everything the driver can do (section 4)
+│   └── running_log.py      the driver's rolling log file
 ├── for_zmart_controller/   everything that faces the controller (register this folder with it):
 │   ├── zmart_driver.json   the driver's name ("stellaris") and how to reach LAS X on this computer
-│   ├── zmart_driver.py     the ZmartDriver class the controller calls, one method per command;
-│   │                       the work behind each method is in procedures/
-│   └── running_log.py      the driver's rolling log file
+│   └── zmart_driver.py     the ZmartDriver class the controller calls, one method per command,
+│                           each a call of the Microscope
 ├── procedures/         the recipes, one folder for each job:
 │   ├── acquisition/    taking a picture and keeping a note of how it was taken:
 │   │                   acquire.py (the step) · run_job.py (the LAS X call) · pending_capture.py
@@ -789,14 +732,14 @@ restores — with confirmation status and timing. **Bench-run instructions** (pr
 
 These **silently misbehave** instead of failing loudly — respect them or results are wrong without an error:
 
-1. **Movement needs a limits handshake** — a client that never handshook refuses `move_xy`/`move_z`
-   fail-closed. Through `connect_microscope` (and so the `ZmartDriver` class) the handshake always runs, falling back
+1. **Movement needs a limits handshake** — a client that never handshook refuses every move
+   fail-closed. Through `connect()` (and so the `ZmartDriver` class) the handshake always runs, falling back
    to the bundled default envelope if the machine file is invalid, so a connected session can always
    move within the defaults; the physical backstop bounds every move regardless.
-2. **`acquire()` returns an `AcquisitionResult` and raises on failure** — not a dict; read timing via
-   `acq.command_result["timing"]`. Persisting is a separate `save()` call.
-3. **For setting commands, check `confirmed`, not just `success`** — most `set_*` return
-   `success=True, confirmed=False` when readback never matched (mismatch is in `logs`).
+2. **`acquire()` writes nothing** — it raises when the capture fails, and otherwise keeps the
+   picture in LAS X's cache. Writing the files is the separate `save()`.
+3. **For a change, check `confirmed`** — `change_setting` answers `confirmed=False` when the
+   readback never matched; the change is recorded in `state()` and the mismatch is in `logs`.
 4. **Reads that gate control flow or get persisted must use the API leg** — never let a fresh-by-age
    log value decide whether a command fires or what metadata/calibration is written.
 5. **The CAM API can hang** — that's why `readers` has a log mirror and an in-flight API-read cap.
@@ -822,10 +765,13 @@ Adding a command touches four places, following the pattern every existing comma
 1. **Confirm function** (`vendor_specific/primitive_handling/confirmations/confirmations.py`) — `_confirm_X(client, ...) -> {"success", "logs"}`
    (skip if no readback is possible).
 2. **CommandProfile** (`vendor_specific/primitive_handling/profiles/profiles.py`) — `MY_PARAM = _leica_setting_profile(_confirm_my_param)`.
-3. **Command wrapper** (`vendor_specific/primitive_handling/settings/changes.py`) — three phases (pre-checks → `_dispatch(...)` with the
-   profile + a `setup_fn` and target-bound `confirm_fn` → post-process). `_dispatch` handles
-   client-binding, profile defaults, and the `confirm_and_fire` call.
-4. **Export** (`__init__.py`) — add to `__all__` and import it.
+3. **Command wrapper** (`vendor_specific/primitive_handling/settings/changes.py`) — three phases (pre-checks → `dispatch_change(...)` with the
+   profile + a `setup_fn` and target-bound `confirm_fn` → post-process). `dispatch_change` handles
+   client-binding, profile defaults, and the `confirm_and_fire` call. A job setting is one entry in
+   `settings.py` and one named function here; listed in `settings.BY_NAME`, it is reachable with
+   `change_setting`.
+4. **The Microscope** (`for_direct_use/microscope.py`) — a new kind of command gets a method there,
+   and a row in section 4. A test checks that every method of the `Microscope` is in this README.
 
 Copy the closest existing command of a similar shape.
 
