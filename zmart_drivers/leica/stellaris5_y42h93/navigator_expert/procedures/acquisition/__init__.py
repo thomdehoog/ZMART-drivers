@@ -4,7 +4,7 @@ Acquiring and saving belong together, so the metadata of a picture is not a
 separate step. It is gathered in three places, each doing one job:
 
 - **What LAS X says about the picture** is read and translated into the
-  standard fields in ``vendor_specific/metadata_map.py``. Only LAS X knows how
+  standard fields in ``vendor_specific/primitives/capture/metadata_map.py``. Only LAS X knows how
   it describes a picture, so that part stays with the vendor code and moves no
   hardware.
 - **The state of the microscope at the moment of the capture** (the job, the

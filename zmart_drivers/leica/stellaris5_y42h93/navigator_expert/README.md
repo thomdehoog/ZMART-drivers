@@ -314,7 +314,7 @@ command but readback didn't confirm the value within the windows (most `set_*` u
 `success` alone as "applied"** for setting commands. `success=False` means it failed to fire (transport,
 permanent error, failed pre-check) and `confirmed` is `None`.
 
-**Error classification** (`vendor_specific/error_classification.py`): messages are matched **permanent-first**
+**Error classification** (`vendor_specific/primitive_handling/profiles/error_classification.py`): messages are matched **permanent-first**
 (`out of range`, `is invalid`, `not implemented`, …) then **transient** (`being scanned`, `busy`,
 `timeout`, …); unknown → permanent (conservative). Transient errors retry up to `max_retries`.
 
@@ -435,7 +435,7 @@ Per-setting commands (below the rule) also take a `setting_index` targeting a sp
 | `set_filter_wheel_spectrum` | `setting_index, beam_route, filter_wheel_type, position` | 1 nm |
 
 ### Settings model
-`make_changeable_copy(get_job_settings(client, job))` (`vendor_specific/parsing.py`) normalizes raw job
+`make_changeable_copy(get_job_settings(client, job))` (`vendor_specific/primitive_handling/readings/parsing.py`) normalizes raw job
 settings into the flat, stable dict the `_confirm_*` functions read back against: `zoom`, `scanSpeed`,
 `scanMode`, `stack`, `zPosition`, and `activeSettings[...]` (with `activeDetectors`, `activeLaserLines`,
 `filterWheels`). Underscore-prefixed keys (`_beamRoute`, `_lineIndex`, `_index`, `_name`) are
@@ -551,72 +551,72 @@ bottom and the class the controller calls at the top.
 
 ```
 zmart_drivers/leica/stellaris5_y42h93/navigator_expert/
-├── for_zmart_controller/   everything that faces the controller:
-│   ├── zmart_driver.json   the driver's name ("stellaris") and how to reach LAS X on this computer;
-│   │                       this is the folder you register with the controller
-│   └── zmart_driver.py     the ZmartDriver class the controller calls, one method per command;
-│                           the work behind each method is in procedures/ (session, frame,
-│                           acquisition, instrument)
-├── vendor_specific/   the only part that knows LAS X:
-│   ├── connection/     lasx_client.py (open the client and check it answers) · lasx_runtime.py (the .NET CAM
-│   │                   assemblies) · hardware_server.py
-│   ├── error_classification.py   the kinds of problem, the rule that only a temporary one is
-│   │                   sent again, and the sorting of LAS X's messages into the kinds
-│   ├── product.py      the shape of a capture, built by the vendor code and used by the saving
-│   ├── primitives/     the smallest reads and writes, one folder for each way of reaching LAS X:
-│   │                   direct/ (direct_reader.py, state_tree.py), api/ (api_reader.py, delivery.py),
-│   │                   log/ (log_reader.py, log_wait.py), interface/ (lasx_navigator.py,
-│   │                   lasx_dialogs.py: its buttons and dialogs), capture/ (data_container.py, files.py,
-│   │                   lasx_data_container.py, lasx_cache_release.py)
-│   ├── primitive_handling/   how the dispatcher treats each command, for this microscope:
-│   │                   profiles.py (one CommandProfile per command), settings.py (one table
-│   │                   entry per setting of a job) · transport.py (how a request is sent and
-│   │                   its reply awaited) · confirmations.py ·
-│   │                   confirm_specs.py · confirm_select_job.py (how a change is checked),
-│   │                   readings.py (the table of readings) · sources.py (asking the API, the log
-│   │                   or the direct reader once) · state.py (get_xy and the other named
-│   │                   readings) · derived.py (what a value means) · prechecks.py (is the
-│   │                   scanner idle) · limit_rules.py (what the limits allow)
-│   ├── parsing.py      the strings LAS X hands back
-│   ├── metadata_map.py LAS X's description of a picture, read into the standard fields
-│   └── error_classification.py   sorting LAS X's errors
-├── dispatcher/         the machinery that runs a command safely, and nothing else. It names no LAS X
-│                       object: dispatcher.py (the one door: read() and write(); the waiting rule of
-│                       four windows of three seconds; the shape of a command's result) ·
-│                       reader.py (asks the microscope's sources one after the other until an answer
-│                       counts; holds the Reading record) · send_loop.py (sends a command, checks for
-│                       an error, sends again if the problem is temporary) · confirm_loop.py (reads
-│                       until the change took effect, and sends again if it did not; never for an
-│                       acquisition) · gate.py (when the limits are enforced)
-├── procedures/         the recipes built on the machinery, grouped by job:
-│   ├── session.py · session_state.py · instrument.py   what the ZmartDriver class calls: the
-│   │                   session handle and what one connection loaded, the state and the named
-│   │                   procedures
+├── for_zmart_controller/   everything that faces the controller (register this folder with it):
+│   ├── zmart_driver.json   the driver's name ("stellaris") and how to reach LAS X on this computer
+│   ├── zmart_driver.py     the ZmartDriver class the controller calls, one method per command;
+│   │                       the work behind each method is in procedures/
+│   └── running_log.py      the driver's rolling log file
+├── procedures/         the recipes, one folder for each job:
+│   ├── acquisition/    taking a picture and keeping a note of how it was taken:
+│   │                   acquire.py (the step) · run_job.py (the LAS X call) · pending_capture.py
+│   ├── save_data/      writing the waiting pictures to disk, placed by the measured image
+│   │                   orientation so they line up with the stage moves: save_captures.py ·
+│   │                   save.py · saved_acquisition.py · naming.py · ome_zarr.py ·
+│   │                   ome_canonical.py · materialize.py · command_log.py
+│   ├── clear_cache/    having LAS X let go of pictures once they are saved: clear.py · release.py
 │   ├── absolute_coordinate_system/   turns the plain readings (stage, z-wide, z-galvo, the
 │   │                   objective) into the one absolute coordinate system, with the origin and the
-│   │                   objective offsets: coordinates.py · frame.py (where the stage is and moving
-│   │                   it)
-│   ├── objective_change_with_compensation/   changing the objective or the job without losing the sample:
-│   │                   compensated_changes.py (set_objective and select_job) · objective_shift.py ·
-│   │                   objectives.py
-│   ├── acquisition/      taking a picture: acquisition.py · acquire.py (the capture)
-│   ├── save_data/        keeping it, placed by the measured image orientation so it lines up with the
-│   │                   stage moves: save.py · saved_acquisition.py · naming.py · ome_zarr.py ·
-│   │                   ome_canonical.py · materialize.py · command_log.py
-│   └── clear_cache/      release.py: having LAS X let go of a picture once it is saved
+│   │                   objective offsets: coordinates.py · frame.py
+│   ├── objective_change_with_compensation/   changing the objective or the job without losing
+│   │                   the sample: compensated_changes.py · objective_shift.py
+│   ├── autofocus/      running a LAS X autofocus job, capture only
+│   └── instrument/     the instrument as a whole: state.py (what it is doing and what can be
+│                       changed) · info.py (its description) · menu.py (the procedures it offers)
+├── session/            what the driver remembers about one connection: handle.py (the open
+│                       connection, the origin, the captures waiting to be saved, the pictures
+│                       still in LAS X's cache) · loaded_config.py (the orientation and the
+│                       objective offsets, loaded once at connect)
 ├── driver_setup/       everything for setting up this driver on one microscope, one folder per item:
 │                       limits/, origin/, orientation/ (the picture's orientation),
 │                       optical_calibration/ and data_location/. Each holds its bundled defaults,
 │                       its loader, the code that measures it and its notebook. store.py finds
 │                       the saved values under ProgramData; notebook_support.py helps the notebooks
-├── running_log.py      the driver's rolling log file
+├── dispatcher/         the machinery that runs a command safely, and nothing else. It names no LAS X
+│                       object: door.py (the one door: read() and write(); the shape of a command's
+│                       result) · reader.py (asks the microscope's sources one after the other until
+│                       an answer counts; holds the Reading record) · send_loop.py (sends a command,
+│                       checks for an error, sends again if the problem is temporary) ·
+│                       confirm_loop.py (reads until the change took effect, and sends again if it
+│                       did not; never for an acquisition) · gate.py (when the limits are enforced)
+│                       · limit_errors.py
+├── vendor_specific/    the only part that knows LAS X:
+│   ├── connection/     lasx_client.py (open the client and check it answers) · lasx_runtime.py (the
+│   │                   .NET CAM assemblies) · hardware_server.py · tuning.py (the waiting numbers)
+│   ├── primitives/     the smallest reads and writes, one folder for each way of reaching LAS X:
+│   │                   direct/ (direct_reader.py, state_tree.py), api/ (api_reader.py, delivery.py),
+│   │                   log/ (log_reader.py, log_wait.py), interface/ (lasx_navigator.py,
+│   │                   lasx_dialogs.py: its buttons and dialogs), capture/ (data_container.py,
+│   │                   files.py, lasx_data_container.py, product.py, metadata_map.py)
+│   └── primitive_handling/   how the dispatcher treats each command, for this microscope:
+│       ├── profiles/       profiles.py (one CommandProfile per command) · transport.py (how a
+│       │                   request is sent and its reply awaited) · prechecks.py (is the scanner
+│       │                   idle) · error_classification.py (sorting LAS X's errors)
+│       ├── settings/       settings.py (one entry per setting of a job) · changes.py (the command
+│       │                   functions) · objectives.py · limit_rules.py (what the limits allow)
+│       ├── confirmations/  confirmations.py · confirm_specs.py · confirm_select_job.py (how a
+│       │                   change is checked afterwards)
+│       └── readings/       readings.py (the table of readings) · sources.py (asking the API, the
+│                           log or the direct reader once) · state.py (get_xy and the other named
+│                           readings) · derived.py (what a value means) · parsing.py (the strings
+│                           LAS X hands back)
 ├── testing/            unit/ (offline) · calibration/ (the calibration suites) · hardware/
 │                       (validate_*.py live scripts + mock-backed test_* gates) · helpers/ (the
 │                       LAS X mock) · data/
+├── sessions/           notes, plans and reviews written while building the driver
 └── (the driver's CI, pytest.ini, .coveragerc and requirements-dev.txt live in testing/)
 ```
 
-**Two-layer dispatch backbone** (`dispatcher/writer.py` → `confirm_and_fire`):
+**Two-layer dispatch backbone** (`dispatcher/confirm_loop.py` → `confirm_and_fire`):
 
 ```
 confirm_and_fire (outer)
@@ -637,7 +637,7 @@ limits handshake lives in `driver_setup/limits/handshake.py` and installs the li
 of them and fails when a new one appears; removing them is follow-up work, one at a time.
 The connect-time flow lives in `ZmartDriver.__init__`: it opens the client, installs the limits
 gate, and loads the orientation and the calibration (the loaders are in
-`procedures/session_state.py`).
+`session/loaded_config.py`).
 
 **What the move did not change.** The layout follows the anatomy; the behaviour is the release
 candidate's, so that the move can be reviewed and tested on hardware on its own. These are the
@@ -654,7 +654,7 @@ workflow sees:
 - A limits refusal raises `ValueError`; today parts of the gate raise `RuntimeError`.
 - The limits gate moves inside the set dispatcher, so that no change calls it itself.
 - Done since the move: the logic of the commands left `zmart_adapter.py` for `procedures/`
-  (`session.py`, `frame.py`, `acquisition.py`, `instrument.py`), the `output/` folder is gone, and
+  (`session/`, `frame.py`, `acquisition/`, `instrument/`), the `output/` folder is gone, and
   the plain coordinate arithmetic is in `procedures/absolute_coordinate_system/coordinates.py`. The coordinate
   system is a procedure of its own (`procedures/absolute_coordinate_system/`), so the `ZmartDriver` class
   converts nothing. The full list of differences from the plan is in

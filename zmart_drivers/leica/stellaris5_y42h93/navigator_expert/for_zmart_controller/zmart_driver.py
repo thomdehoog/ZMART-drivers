@@ -55,7 +55,9 @@ from ..procedures.save_data.naming import run_hash
 from ..procedures.acquisition import acquire as _acquisition
 from ..procedures.save_data import save_captures as _save_captures
 from ..procedures.absolute_coordinate_system import frame as _frame
-from ..procedures import instrument as _instrument
+from ..procedures.instrument import info as _instrument_info
+from ..procedures.instrument import menu as _instrument_menu
+from ..procedures.instrument import state as _instrument_state
 from ..session.handle import ZmartHandle
 from ..vendor_specific.connection import lasx_client
 from ..vendor_specific.primitives.interface import lasx_dialogs
@@ -177,7 +179,7 @@ class ZmartDriver:
         ``chooses_its_own_folder`` is False: the driver writes every file
         itself, from LAS X's cache, so it saves where ``acquire`` is told.
         """
-        info = _instrument.get_info(self._handle)
+        info = _instrument_info.get_info(self._handle)
         return True, (
             info["description"],
             info["setup"],
@@ -243,7 +245,7 @@ class ZmartDriver:
         serial number, objectives, pixel size, the jobs on offer, and which
         limits file governs.
         """
-        state = _instrument.get_state(self._handle)
+        state = _instrument_state.get_state(self._handle)
         return True, (state["changeable"], state["observed"])
 
     def set_state(self, changeable):
@@ -251,7 +253,7 @@ class ZmartDriver:
 
         An unknown setting or job is refused with ``ValueError``.
         """
-        return True, _instrument.set_state(
+        return True, _instrument_state.set_state(
             self._handle, {"changeable": dict(changeable)}
         )["applied"]
 
@@ -287,7 +289,7 @@ class ZmartDriver:
 
     def get_procedures(self):
         """``True, procedures``: parking the z-galvo, saving captures, clearing LAS X's cache, autofocus."""
-        return True, _instrument.get_procedures(self._handle)
+        return True, _instrument_menu.get_procedures(self._handle)
 
     def run_procedure(self, procedure):
         """Run the routine named by ``procedure["name"]``; the other keys are its arguments.
@@ -296,7 +298,7 @@ class ZmartDriver:
         ran, and for autofocus the focus read back afterwards. A name that
         ``get_procedures`` does not list is refused with ``ValueError``.
         """
-        return True, _instrument.run_procedure(self._handle, dict(procedure))
+        return True, _instrument_menu.run_procedure(self._handle, dict(procedure))
 
 
 def _load_data_location():

@@ -59,7 +59,7 @@ class StateReaderProfile:
     capability table and source preference belongs here.
 
     Nothing here says how long to wait or how often to look: that is the one
-    rule in ``vendor_specific/tuning.py``. A mode says which sources take part; a
+    rule in ``vendor_specific/connection/tuning.py``. A mode says which sources take part; a
     ``*_log_max_age_s`` says how old a log answer may be and still count,
     because each kind of state goes stale at its own pace.
 
@@ -275,7 +275,7 @@ class CommandProfile:
     # ``transport.py``. Another microscope supplies its own.
     transport: object = _transport.LASX
     # The waiting rule (windows, window length, poll times) the engines follow
-    # for this command; see ``vendor_specific/tuning.py``.
+    # for this command; see ``vendor_specific/connection/tuning.py``.
     waiting: object = tuning
     # Where the operator creates the limits files, said when a command is refused
     # because no limits are installed.

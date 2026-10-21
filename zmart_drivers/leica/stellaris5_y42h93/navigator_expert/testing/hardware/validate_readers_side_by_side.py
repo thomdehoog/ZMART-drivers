@@ -283,7 +283,7 @@ def _settings_diffs(af, lf):
     ]
 
 
-# --- polling: the one rule in vendor_specific/tuning.py ------------------------------
+# --- polling: the one rule in vendor_specific/connection/tuning.py ------------------------------
 #
 # A post-change readback waits for the expected value by the same rule as the
 # driver: at most WINDOWS windows of WINDOW_S, looking again every POLL_S.

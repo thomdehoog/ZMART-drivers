@@ -38,7 +38,7 @@ from ...vendor_specific.primitive_handling.readings import state as _readers
 from . import run_job as _capture
 from ...session import handle as _info
 from ..absolute_coordinate_system.frame import get_xyz
-from ..instrument import get_state
+from ..instrument.state import get_state
 from ...session.handle import ZmartHandle, note_unconfirmed, require_open, try_
 
 log = logging.getLogger(__name__)

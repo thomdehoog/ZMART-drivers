@@ -577,7 +577,7 @@ Three words, three files, so that each one says what it does:
 
 - **Error vocabulary** (`dispatcher/error_vocabulary.py`): the list of kinds of
   problem. It is the same for every microscope.
-- **Error classification** (`vendor_specific/error_classification.py`): the
+- **Error classification** (`vendor_specific/primitive_handling/profiles/error_classification.py`): the
   sorting of this vendor's failures into that list. This is the part a driver
   author writes.
 - **Error rules** (`dispatcher/error_rules.py`): what to do for each kind. It
@@ -722,7 +722,7 @@ Leica-specific:
   `move_z`, `acquire`, `select_job`) are still written by hand.
 - A command profile can say `never_resend`. The acquisition does, and nothing a
   caller asks for can switch the resend back on.
-- The driver keeps a running log (`dispatcher/running_log.py`): a rolling text
+- The driver keeps a running log (`for_zmart_controller/running_log.py`): a rolling text
   file in a `logs` folder beside the saved settings.
 
 - The logic that used to sit in `zmart_adapter.py` is now in `procedures/`:
@@ -741,7 +741,7 @@ Leica-specific:
   `command_log.py`) is in `procedures/`. What reads LAS X's own picture files
   (`lasx_data_container.py`, `lasx_cache_release.py`) is in
   `vendor_specific/primitives/capture/`, and LAS X's description of a picture
-  is read into the standard fields by `vendor_specific/metadata_map.py`.
+  is read into the standard fields by `vendor_specific/primitives/capture/metadata_map.py`.
 - The coordinate system is a procedure, `procedures/absolute_coordinate_system/`:
   `coordinates.py` holds the plain arithmetic, `frame.py` decides what to read
   and what to move, and the `ZmartDriver` class converts nothing itself.
@@ -761,7 +761,7 @@ Leica-specific:
   interface for the table of mutating commands and for the limits to install
   (`limit_rules.MUTATING_COMMANDS`, `build_limits`). The shared types for
   limit trouble are in `dispatcher/limit_errors.py`.
-- The dispatcher has one door (`dispatcher/dispatcher.py`, with `read` and `write`
+- The dispatcher has one door (`dispatcher/door.py`, with `read` and `write`
   and the waiting rule). Behind it are the reader, the send loop and the confirm
   loop. The send loop sends a command and checks for an error. The confirm loop
   reads until the change took effect and sends again if it did not, except for

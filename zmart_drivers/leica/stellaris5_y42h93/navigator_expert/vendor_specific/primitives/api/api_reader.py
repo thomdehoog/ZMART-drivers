@@ -17,7 +17,7 @@ Each query makes ONE **request** (``_request``):
        deadline, or until the caller stops watching.
 
 Asking again is not done here. The routed readers in ``dispatcher.read``
-follow the one rule in ``vendor_specific/tuning.py``: they request the read again
+follow the one rule in ``vendor_specific/connection/tuning.py``: they request the read again
 every ``POLL_S`` while an answer does not count, and at the next window when
 a request got no answer.
 

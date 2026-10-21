@@ -42,9 +42,10 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.acquisiti
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.settings import changes as _commands
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.objective_change_with_compensation import compensated_changes as _commands_comp
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.absolute_coordinate_system import frame as _frame
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures import (
-    instrument as _instrument,
-)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.instrument import info as _instrument_info
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.instrument import menu as _instrument_menu
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.instrument import state as _instrument_state
+
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.session import handle as _info
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings import state as _readers
 
@@ -789,7 +790,7 @@ class TestAcquire(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             h = _handle(data_location=Path(tmp))
             with patch.object(_info, "selected_job_name", return_value="Overview"):
-                info = _instrument.get_info(h)
+                info = _instrument_info.get_info(h)
             self.assertNotIn("output_root", info)
             self.assertTrue(info["setup"]["data_location"]["done"])
             self.assertIn(str(Path(tmp)), info["setup"]["data_location"]["says"])
@@ -922,7 +923,7 @@ class TestAcquire(unittest.TestCase):
             patches[2],
             patches[3],
         ):
-            info = _instrument.get_info(h)
+            info = _instrument_info.get_info(h)
 
         # In the frame: the envelope shifted by the origin.
         self.assertEqual(info["canvas"]["x_um"], [-1_000.0, 119_000.0])
@@ -1850,7 +1851,7 @@ class TestStateAndProcedures(unittest.TestCase):
             p[2] as jobs,
             patch.object(_readers, "get_job_settings", return_value={}) as settings,
         ):
-            state = _instrument.get_state(h)
+            state = _instrument_state.get_state(h)
         self.assertEqual(list(state), ["changeable", "observed"])  # changeable first
         self.assertEqual(state["changeable"], {"job": "Overview"})
         self.assertNotIn("mode", hardware.call_args.kwargs)
@@ -1884,7 +1885,7 @@ class TestStateAndProcedures(unittest.TestCase):
             p[2],
             patch.object(_readers, "get_job_settings", return_value=settings),
         ):
-            observed = _instrument.get_state(h)["observed"]
+            observed = _instrument_state.get_state(h)["observed"]
         self.assertEqual(
             observed["pixel_size"],
             {"x": 0.1, "y": 0.2, "unit": "um"},
@@ -1895,7 +1896,7 @@ class TestStateAndProcedures(unittest.TestCase):
         p = self._state_patches()
         with p[0], p[1], p[2], patch.object(_commands_comp, "select_job") as select:
             with self.assertRaisesRegex(ValueError, "autofocus"):
-                _instrument.set_state(h, {"changeable": {"job": "AF Job"}})
+                _instrument_state.set_state(h, {"changeable": {"job": "AF Job"}})
         select.assert_not_called()
 
     def test_set_state_applies_changeable_ignoring_observed(self):
@@ -1909,12 +1910,12 @@ class TestStateAndProcedures(unittest.TestCase):
                 _commands_comp, "select_job", return_value={"success": True}
             ) as select,
         ):
-            captured = _instrument.get_state(h)
+            captured = _instrument_state.get_state(h)
             captured["changeable"]["job"] = "HiRes"
             # observed is a report, never an instruction: even a wildly
             # mismatching observed part does not block the apply.
             captured["observed"]["serial_number"] = "SOMETHING-ELSE"
-            result = _instrument.set_state(h, captured)
+            result = _instrument_state.set_state(h, captured)
             self.assertEqual(result["applied"], {"job": "HiRes"})
             select.assert_called_once()
 
@@ -1923,21 +1924,21 @@ class TestStateAndProcedures(unittest.TestCase):
         p = self._state_patches(jobs=("Overview",))
         with p[0], p[1], p[2], patch.object(_commands_comp, "select_job") as select:
             with self.assertRaisesRegex(ValueError, "no longer exists"):
-                _instrument.set_state(h, {"changeable": {"job": "Gone"}})
+                _instrument_state.set_state(h, {"changeable": {"job": "Gone"}})
         select.assert_not_called()
 
     def test_procedures(self):
         h = _handle()
         p = self._state_patches()
         with p[2]:
-            procedures = _instrument.get_procedures(h)
+            procedures = _instrument_menu.get_procedures(h)
         self.assertIn("zero_z_galvo", procedures)
         self.assertNotIn("get_root", procedures)
         self.assertNotIn("get_positions", procedures)
         self.assertNotIn("get_focus_points", procedures)
         self.assertEqual(procedures["autofocus"]["jobs"], ["AF Job"])
         with self.assertRaises(ValueError):
-            _instrument.run_procedure(h, {"name": "nope"})
+            _instrument_menu.run_procedure(h, {"name": "nope"})
 
     def test_autofocus_runs_capture_only_and_restores_the_selection(self):
         from types import SimpleNamespace
@@ -1968,7 +1969,7 @@ class TestStateAndProcedures(unittest.TestCase):
                 ),
             ),
         ):
-            result = _instrument.run_procedure(
+            result = _instrument_menu.run_procedure(
                 h, {"name": "autofocus"}
             )  # single AF job: no arg
         # select AF -> capture -> restore the original selection, in order
@@ -2000,7 +2001,7 @@ class TestStateAndProcedures(unittest.TestCase):
                 ),
             ),
         ):
-            result = _instrument.run_procedure(h, {"name": "autofocus"})
+            result = _instrument_menu.run_procedure(h, {"name": "autofocus"})
         self.assertEqual(result["ran"], "autofocus")
 
     def test_autofocus_rejects_a_normal_job(self):
@@ -2008,21 +2009,21 @@ class TestStateAndProcedures(unittest.TestCase):
         p = self._state_patches()
         with p[2]:
             with self.assertRaisesRegex(ValueError, "not an autofocus job"):
-                _instrument.run_procedure(h, {"name": "autofocus", "job": "Overview"})
+                _instrument_menu.run_procedure(h, {"name": "autofocus", "job": "Overview"})
 
     def test_autofocus_requires_a_choice_when_several_exist(self):
         h = _handle()
         p = self._state_patches(af_jobs=("AF Job", "AF Fine"))
         with p[2]:
             with self.assertRaisesRegex(ValueError, "multiple autofocus jobs"):
-                _instrument.run_procedure(h, {"name": "autofocus"})
+                _instrument_menu.run_procedure(h, {"name": "autofocus"})
 
     def test_autofocus_without_af_jobs_is_a_clear_error(self):
         h = _handle()
         p = self._state_patches(af_jobs=())
         with p[2]:
             with self.assertRaisesRegex(RuntimeError, "no autofocus job"):
-                _instrument.run_procedure(h, {"name": "autofocus"})
+                _instrument_menu.run_procedure(h, {"name": "autofocus"})
 
 
 class TestConnectCardCalibrationLine(unittest.TestCase):
@@ -2036,17 +2037,17 @@ class TestConnectCardCalibrationLine(unittest.TestCase):
     def test_a_loaded_calibration_shows_its_name(self):
         record = {"enabled": True, "loaded": True, "name": "water_lens_setup"}
 
-        self.assertEqual(_instrument._calibration_status(record), "water_lens_setup")
+        self.assertEqual(_instrument_info._calibration_status(record), "water_lens_setup")
 
     def test_a_loaded_calibration_without_a_name_says_found(self):
         record = {"enabled": True, "loaded": True, "name": None}
 
-        self.assertEqual(_instrument._calibration_status(record), "found")
+        self.assertEqual(_instrument_info._calibration_status(record), "found")
 
     def test_a_calibration_that_failed_to_load_says_so_even_when_it_has_a_name(self):
         record = {"enabled": True, "loaded": False, "name": "water_lens_setup"}
 
-        line = _instrument._calibration_status(record)
+        line = _instrument_info._calibration_status(record)
 
         self.assertTrue(line.startswith("failed"))
         self.assertIn("objective changes are refused", line)
@@ -2054,10 +2055,10 @@ class TestConnectCardCalibrationLine(unittest.TestCase):
     def test_a_calibration_that_was_switched_off_says_so(self):
         record = {"enabled": False, "loaded": False, "name": None}
 
-        self.assertEqual(_instrument._calibration_status(record), "switched off")
+        self.assertEqual(_instrument_info._calibration_status(record), "switched off")
 
     def test_no_record_at_all_says_none_found(self):
-        self.assertEqual(_instrument._calibration_status(None), "failed — none found")
+        self.assertEqual(_instrument_info._calibration_status(None), "failed — none found")
 
 
 class TestGetInfoReportsNoPositions(unittest.TestCase):
@@ -2072,7 +2073,7 @@ class TestGetInfoReportsNoPositions(unittest.TestCase):
         with (
             patch.object(_info, "selected_job_name", return_value="Overview"),
         ):
-            info = _instrument.get_info(h)
+            info = _instrument_info.get_info(h)
         self.assertNotIn("tile_positions", info)
         self.assertNotIn("focus_positions", info)
         self.assertEqual(info["selected_job"], "Overview")
@@ -2381,20 +2382,20 @@ class TestDriverSetupReadiness(unittest.TestCase):
         )
         self.addCleanup(_session_state.uninstall, h.client)
 
-        ready = _instrument.setup_readiness(
+        ready = _instrument_state.setup_readiness(
             h, {"slotIndex": 2, "name": "20x"}, self.measured_limits
         )
         self.assertTrue(ready["ready"])
         self.assertEqual(ready["issues"], [])
 
-        missing = _instrument.setup_readiness(
+        missing = _instrument_state.setup_readiness(
             h, {"slotIndex": 3, "name": "40x"}, self.measured_limits
         )
         self.assertFalse(missing["ready"])
         self.assertIn("slot 3", missing["issues"][0])
 
         h.origin["objective"] = {"slotIndex": 4, "name": "uncalibrated"}
-        bad_origin = _instrument.setup_readiness(
+        bad_origin = _instrument_state.setup_readiness(
             h, {"slotIndex": 2, "name": "20x"}, self.measured_limits
         )
         self.assertFalse(bad_origin["ready"])
@@ -2425,7 +2426,7 @@ class TestDriverSetupReadiness(unittest.TestCase):
         )
         self.addCleanup(_session_state.uninstall, h.client)
 
-        setup = _instrument.setup_readiness(
+        setup = _instrument_state.setup_readiness(
             h, {"slotIndex": 2, "name": "20x"}, self.measured_limits
         )
 
@@ -2449,7 +2450,7 @@ class TestDriverSetupReadiness(unittest.TestCase):
         )
         self.addCleanup(_session_state.uninstall, h.client)
 
-        setup = _instrument.setup_readiness(
+        setup = _instrument_state.setup_readiness(
             h, {"slotIndex": 1, "name": "10x"}, self.measured_limits
         )
 
@@ -2469,7 +2470,7 @@ class TestDriverSetupReadiness(unittest.TestCase):
         )
         self.addCleanup(_session_state.uninstall, h.client)
 
-        setup = _instrument.setup_readiness(h, {"slotIndex": 1}, self.measured_limits)
+        setup = _instrument_state.setup_readiness(h, {"slotIndex": 1}, self.measured_limits)
 
         self.assertFalse(setup["ready"])
         self.assertIn("orientation", setup["issues"][0])
@@ -2487,7 +2488,7 @@ class TestDriverSetupReadiness(unittest.TestCase):
         )
         self.addCleanup(_session_state.uninstall, h.client)
 
-        setup = _instrument.setup_readiness(
+        setup = _instrument_state.setup_readiness(
             h,
             {"slotIndex": 1},
             {"source": "defaults", "path": "limits.json", "is_fallback": True},
@@ -2694,9 +2695,9 @@ class TestFunctionLimits(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "refused"):
                 _frame.set_xyz(h, 0.0, 0.0, 0.0)
             with self.assertRaisesRegex(RuntimeError, "refused"):
-                _instrument.set_state(h, {"changeable": {"job": "HiRes"}})
+                _instrument_state.set_state(h, {"changeable": {"job": "HiRes"}})
             self.assertIn(
-                "zero_z_galvo", _instrument.get_procedures(h)
+                "zero_z_galvo", _instrument_menu.get_procedures(h)
             )  # reads fine
 
     def test_get_state_reports_limits_provenance(self):
@@ -2714,7 +2715,7 @@ class TestFunctionLimits(unittest.TestCase):
             ),
             patch.object(_readers, "get_jobs", return_value=[]),
         ):
-            observed = _instrument.get_state(h)["observed"]
+            observed = _instrument_state.get_state(h)["observed"]
         self.assertEqual(
             observed["limits"],
             {"source": "test", "path": None, "is_fallback": False},
