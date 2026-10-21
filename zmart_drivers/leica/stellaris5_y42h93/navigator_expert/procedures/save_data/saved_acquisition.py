@@ -35,3 +35,6 @@ class SavedAcquisition:
     #: when it was captured. The saved store holds its planes in another order
     #: (lowest first), so the number the capture gave is the reliable key.
     read_plane: Callable[[PlaneIndex], Any] | None = None
+    #: The picture in LAS X's cache this capture was read from (its element
+    #: number and name), so the ``clear_cache`` procedure can let go of it.
+    release_target: tuple[int, str] | None = None

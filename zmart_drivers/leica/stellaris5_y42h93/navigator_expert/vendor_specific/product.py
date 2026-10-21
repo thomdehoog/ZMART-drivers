@@ -235,7 +235,7 @@ class ExportedAcquisition:
     relative_path: str | None = None
     source_exporter: str = "lasx_data_container"
     vendor_metadata_sources: tuple[VendorMetadataSource, ...] = ()
-    #: Which capture LAS X lets go of once it is saved (``cleanup_cache``): its
+    #: Which capture LAS X may let go of once it is saved (``clear_cache``): its
     #: element number and its name. None when there is none, and then letting go
     #: is refused. How it is done is the business of ``procedures/clear_cache/release.py``.
     release_target: tuple[int, str] | None = None

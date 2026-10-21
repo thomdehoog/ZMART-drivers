@@ -1,10 +1,12 @@
-"""Taking a picture and saving it: the ``acquire`` command and what it records.
+"""Taking a picture: the ``acquire`` step, and the notes it keeps for saving.
 
-``acquire`` runs the selected LAS X job and saves what LAS X captured, in one
-step. Every file name starts with the acquisition type and the position label
-the workflow gave, so the files of one place stay together. Along with the
-pictures the driver saves a small log of what it did, and it embeds the
-state of the machine in each saved plane.
+``acquire`` runs the selected LAS X job and leaves the picture in LAS X's
+cache. It writes no files and clears nothing. Instead it notes what only the
+moment of the capture can tell (where the stage stood, which job ran, the
+state of the microscope) and keeps the note with the session, as a
+:class:`~.pending_capture.PendingCapture`. Saving the files is the
+``save_data`` procedure, and letting LAS X go of the picture is the
+``clear_cache`` procedure.
 
 A change that was sent but could not be confirmed is recorded and the capture
 carries on, so the workflow is told rather than stopped.
@@ -30,14 +32,9 @@ try:  # driver version for embedded export state; never fail acquire over it
 except Exception:  # noqa: BLE001 -- best-effort provenance
     _DRIVER_VERSION = None
 
-from ...driver_setup import orientation as _orientation
-from .. import session_state as _session_state
-from ..save_data import command_log as _log
-from ..clear_cache import release as _release
-from ..save_data import save as _save
 from ..save_data.naming import Naming, free_stem
+from .pending_capture import PendingCapture
 from ...vendor_specific.primitive_handling.readings import state as _readers
-from ...vendor_specific.primitive_handling.profiles.profiles import IMAGE_SAVE
 from . import acquire as _capture
 from .. import session as _info
 from ..absolute_coordinate_system.frame import get_xyz
@@ -45,27 +42,6 @@ from ..instrument import get_state
 from ..session import ZmartHandle, note_unconfirmed, require_open, try_
 
 log = logging.getLogger(__name__)
-
-
-def _loaded_orientation(handle: ZmartHandle):
-    """The camera-to-stage turn loaded for this connection (identity if none).
-
-    Read from the per-connection session registry the driver populated at
-    connect, so every saved image in a session uses the same orientation the
-    connection loaded — rather than each save re-reading the file.
-    """
-    loaded = _session_state.get(handle.client)
-    if loaded is not None:
-        return loaded.orientation
-    # No per-connection state for this handle (built without a ZmartDriver,
-    # or its registry entry was uninstalled). Fall back to reading the file
-    # fresh — loudly, because this re-read can differ from what the connection
-    # loaded and can differ from what the connection loaded.
-    log.warning(
-        "no per-connection orientation is installed for this handle; reading "
-        "orientation.json fresh for this save"
-    )
-    return _orientation.rig_orientation()
 
 
 def get_acquisition_settings(handle: ZmartHandle) -> dict:
@@ -148,7 +124,7 @@ def acquire(
     acquisition_type: str,
     output_folder: str | None,
 ) -> dict:
-    """Run the job, wait for the export, and persist the OME-TIFF product.
+    """Run the selected job and keep a note of the capture, for ``save_data``.
 
     Args:
         position_label: What the workflow calls this place. Every file name
@@ -166,21 +142,18 @@ def acquire(
             controller fills in (``"acquisition"`` when the workflow gave
             none). It names the files and is kept in the lineage, the log
             and the answer.
-        output_folder: Where the capture is saved, as text. The driver
-            writes every file itself, from LAS X's cache, so it saves
-            exactly there. When None, it saves in this session's staging
-            folder under the microscope's data location.
+        output_folder: Where the capture will be saved, as text. When None,
+            it is this session's staging folder under the microscope's data
+            location. Nothing is written until ``save_data`` runs.
 
     The selected LAS X job is what runs; choose it with :func:`set_state`.
     The session hash (``handle.hash6``) rides along only in lineage and
-    provenance. The machine/software state is captured and embedded in each
-    saved plane's OME-XML (no sidecar).
+    provenance. The machine/software state is noted now and embedded in each
+    plane's OME-XML when the capture is saved.
 
-    Returns a record with the resolved job and settings, ``files`` (every file
-    saved) and ``planes`` (which file holds which channel, z and t, and where
-    on the sample it was taken).
-    Raises on any unrecoverable step — job selection, capture, export
-    detection, or persistence.
+    Returns ``{"position_label", "acquisition_type", "job"}``. Raises when the
+    job cannot be read, the stage is unknown, the label is still waiting to be
+    saved, or the capture itself fails.
     """
     require_open(handle)
     resolved = _with_defaults(handle, acquisition_settings)
@@ -221,144 +194,39 @@ def acquire(
             "last reported (changed in LAS X?); the capture is placed from the "
             "fresh reading",
         )
-    if IMAGE_SAVE.cleanup_cache:
-        _release.prepare()
-
     acq = _capture.acquire(handle.client, job)
 
     label = (
         position_label if position_label is not None else _next_position_label(handle)
     )
+    if any(waiting.label == label for waiting in handle.unsaved):
+        raise ValueError(
+            f"a capture labelled {label!r} is still waiting to be saved; run save_data first, "
+            "or choose another label, so that no capture overwrites another"
+        )
     naming = Naming(
         stem=free_stem(output_root, Naming(stem=f"{acquisition_type}_{label}").stem)
     )
     state = _export_state(handle, stem=naming.stem, job=job)
-    saved = _save.save(
-        handle.client,
-        acq,
-        output_root,
-        naming,
-        lineage={
-            "position_label": label,
-            "acquisition_type": acquisition_type,
-            "stem": naming.stem,
-            "job": job,
-            "session_hash6": handle.hash6,
-        },
-        state=state,
-        # Rig image->stage orientation, applied to the saved planes behind the
-        # scenes so the workflow only ever sees stage-aligned images. Loaded once
-        # at connect (from the set_orientation setup notebook's file); a separate
-        # concern from pixel-scale calibration and limits.
-        orientation=_loaded_orientation(handle),
-        cleanup_cache=IMAGE_SAVE.cleanup_cache,
-        projection=IMAGE_SAVE.projection,
-        # Where on the sample each plane was taken, the same answer the
-        # acquisition gives below, so a store lies where its planes say.
-        placement=lambda plane_z: _where_the_planes_are(handle, at, job, plane_z),
-    )
 
-    written = sorted(saved.image_paths.items())
-    depths = [
-        int(getattr(index, "z", ordinal))
-        for ordinal, (index, _path) in enumerate(written)
-    ]
-    taken_at = _where_the_planes_are(handle, at, job, depths)
-    # Depth 0 is the lowest slice, as in a store, whichever way LAS X swept.
-    upward = sorted(set(depths), key=lambda z: taken_at(z)["z_um"])
-    planes = [
-        {
-            "t": int(getattr(index, "t", 0)),
-            "z": upward.index(depths[ordinal]),
-            "c": int(getattr(index, "c", ordinal)),
-            # Where the pixels are, and where inside them. A flat OME-TIFF
-            # holds exactly the one plane t/c/z name; were this a store, the
-            # same three would index into it and only the path would change.
-            "path": str(path),
-            **taken_at(depths[ordinal]),
-        }
-        for ordinal, (index, path) in enumerate(written)
-    ]
-    vendor_metadata = [
-        str(path) for path in getattr(saved, "vendor_metadata_paths", ())
-    ]
-    printed = [str(path) for path in getattr(saved, "state_paths", ())]
-    projections = [str(path) for path in getattr(saved, "projection_paths", ())]
-    files = list(
-        dict.fromkeys(
-            [
-                *(plane["path"] for plane in planes),
-                *projections,
-                *vendor_metadata,
-                *printed,
-            ]
+    # Everything the files will need that only the moment of the capture can tell.
+    handle.unsaved.append(
+        PendingCapture(
+            acq=acq,
+            label=label,
+            acquisition_type=acquisition_type,
+            naming=naming,
+            state=state,
+            job=job,
+            at=at,
+            output_root=output_root,
+            session_hash6=handle.hash6,
+            asked=dict(acquisition_settings or {}),
+            settings=resolved,
+            unconfirmed=list(handle.unconfirmed[noted_before:]),
         )
     )
-    unconfirmed = list(handle.unconfirmed[noted_before:])
-    log = _log.write(
-        output_root,
-        naming,
-        {
-            "position_label": label,
-            "acquisition_type": acquisition_type,
-            "stem": naming.stem,
-            "asked": dict(acquisition_settings or {}),
-            "settings": resolved,
-            "capture": {
-                "started": _when(acq.started_at),
-                "finished": _when(acq.finished_at),
-                "answered": getattr(acq, "command_result", None),
-            },
-            "unconfirmed": unconfirmed,
-            # Paths from where the run starts, so they stay true when the
-            # capture is moved into a run folder of the same shape.
-            "planes": [
-                {**plane, "path": _from(output_root, plane["path"])} for plane in planes
-            ],
-            "files": [_from(output_root, path) for path in files],
-        },
-    )
-    return {
-        "position_label": label,
-        "acquisition_type": acquisition_type,
-        "trigger": resolved["trigger"],
-        "job": job,
-        "format": "ome-zarr",
-        # Every file this acquisition saved, under the name the ZMART
-        # Controller's contract fixes, so a workflow finds them on any
-        # microscope: the images, then the vendor's metadata, then the state.
-        "files": [*files, str(log)],
-        # The manifest a workflow needs to tell channels from z and t, and
-        # where on the sample each plane was taken.
-        "planes": planes,
-        "vendor_metadata": vendor_metadata,
-        # What the driver printed about this capture: the state, beside the
-        # images in ``data/metadata``. A client moving a record moves this too.
-        "metadata": printed,
-        # The changes made for this capture that were sent but never
-        # confirmed by a readback.
-        # Empty when everything confirmed. The capture itself went ahead.
-        "unconfirmed": unconfirmed,
-        # The driver's log of this capture: what it was asked, and what it did.
-        "log": [str(log)],
-        # Projected from a capture with more than one plane, beside its data.
-        "projections": projections,
-    }
-
-
-def _from(root: Path, path: str) -> str:
-    """*path* from *root*, with forward slashes; as it is when it lies elsewhere."""
-    try:
-        return Path(path).relative_to(root).as_posix()
-    except ValueError:
-        return str(path)
-
-
-def _when(seconds: float | None) -> str | None:
-    """A time from the clock as an ISO 8601 moment in UTC; None when there is none."""
-    if not isinstance(seconds, (int, float)):
-        return None
-    return datetime.fromtimestamp(seconds, tz=timezone.utc).isoformat()
+    return {"position_label": label, "acquisition_type": acquisition_type, "job": job}
 
 
 #: How far the stage may differ from the last reported position before the
@@ -373,39 +241,3 @@ def _moved(before: dict, after: dict) -> bool:
     )
 
 
-def _where_the_planes_are(handle: ZmartHandle, at: dict, job: str, plane_z: list[int]):
-    """Answer, per plane number in z, where on the sample it was captured.
-
-    In the frame :func:`set_xyz` takes, so a position handed back can be
-    handed straight back in. A saved file cannot say this and neither can the
-    drive alone: each slice is the frame the drive was sent to, displaced by
-    how far the slice sits from where the stack's own drive stood when the
-    drive arrived -- z-wide for a z-wide stack, the galvo for a z-galvo one.
-    The channels of a plane share its height, so the stack is matched against
-    the planes in z, not against the files. Nothing is assumed about where in
-    its stack the drive stands. A stack whose settings do not place its
-    slices is refused: every plane says where it is, and a guessed height is
-    worse than none. *at* is where the stage stood, as :func:`get_xyz` read it.
-    """
-    settings = _readers.get_job_settings(handle.client, job) or {}
-    numbers = sorted(set(plane_z))
-    slices = _readers.stack_slices_um(settings, len(numbers))
-    standing = {"z-wide": at.get("z_wide_um"), "z-galvo": at.get("z_galvo_um")}.get(
-        _readers.stack_drive(settings)
-    )
-    if slices is None or standing is None:
-        if len(numbers) > 1:
-            raise RuntimeError(
-                f"the {len(numbers)} slices of job {job!r} cannot be placed: its stack settings "
-                "do not say where they are or which drive made them"
-            )
-        slices, standing = [0.0], 0.0
-
-    def where(z: int) -> dict:
-        return {
-            "x_um": at["x"],
-            "y_um": at["y"],
-            "z_um": at["z"] + slices[numbers.index(z)] - standing,
-        }
-
-    return where

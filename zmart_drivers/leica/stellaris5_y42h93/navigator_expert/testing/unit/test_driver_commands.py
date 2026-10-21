@@ -35,6 +35,7 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup import 
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup import store as _machine
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.save_data import command_log as _log
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.clear_cache import release as _release
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.save_data import save_captures as _save_captures
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.save_data import save as _save
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.acquisition import acquire as _capture
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.acquisition import acquisition as _acquisition
@@ -189,6 +190,14 @@ def tearDownModule():
 
 
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.origin import set_origin as _set_origin
+
+
+
+def _acquire_and_save(handle, **given):
+    """Acquire, then save what was acquired, as the controller's acquire does; answer the saved record."""
+    taken = _acquisition.acquire(handle, **given)
+    (record,) = _save_captures.save_waiting(handle, taken["position_label"])
+    return record
 
 
 class TestRegistration(unittest.TestCase):
@@ -743,7 +752,7 @@ class TestAcquire(unittest.TestCase):
             ),
         ):
             with self.assertRaisesRegex(ValueError, "unknown acquisition setting"):
-                _acquisition.acquire(
+                _acquire_and_save(
                     h,
                     acquisition_type="acquisition",
                     output_folder=None,
@@ -751,7 +760,7 @@ class TestAcquire(unittest.TestCase):
                     acquisition_settings={"fromat": "x"},
                 )
             with self.assertRaisesRegex(ValueError, "invalid value"):
-                _acquisition.acquire(
+                _acquire_and_save(
                     h,
                     acquisition_type="acquisition",
                     output_folder=None,
@@ -763,7 +772,7 @@ class TestAcquire(unittest.TestCase):
                     self.subTest(gone=gone),
                     self.assertRaisesRegex(ValueError, "unknown acquisition setting"),
                 ):
-                    _acquisition.acquire(
+                    _acquire_and_save(
                         h,
                         acquisition_type="acquisition",
                         output_folder=None,
@@ -774,7 +783,7 @@ class TestAcquire(unittest.TestCase):
     def test_without_a_data_location_nothing_is_saved_and_the_notebook_is_named(self):
         h = _handle()
         with self.assertRaisesRegex(RuntimeError, "set_data_location"):
-            _acquisition.acquire(
+            _acquire_and_save(
                 h,
                 acquisition_type="acquisition",
                 output_folder=None,
@@ -791,7 +800,7 @@ class TestAcquire(unittest.TestCase):
             self.assertTrue(info["setup"]["data_location"]["done"])
             self.assertIn(str(Path(tmp)), info["setup"]["data_location"]["says"])
             with self._capturing(output_root=None) as calls:
-                _acquisition.acquire(
+                _acquire_and_save(
                     h,
                     acquisition_type="acquisition",
                     output_folder=None,
@@ -808,7 +817,7 @@ class TestAcquire(unittest.TestCase):
             data_location=Path("/elsewhere"),
         )
         with self._capturing(output_root=None) as calls:
-            _acquisition.acquire(
+            _acquire_and_save(
                 h,
                 acquisition_type="acquisition",
                 output_folder=None,
@@ -820,7 +829,12 @@ class TestAcquire(unittest.TestCase):
 
     @contextmanager
     def _capturing(
-        self, *, image_paths=None, projections=None, output_root=Path("/tmp/out")
+        self,
+        *,
+        image_paths=None,
+        projections=None,
+        output_root=Path("/tmp/out"),
+        release_target=None,
     ):
         """Everything an ``acquire`` needs stood in for, so a test says one thing."""
         written = image_paths or {0: Path("/tmp/out/img.ome.tif")}
@@ -833,6 +847,7 @@ class TestAcquire(unittest.TestCase):
                 image_paths=dict(written),
                 naming=naming,
                 projection_paths=tuple(projections or ()),
+                release_target=release_target,
             )
 
         def fake_log(output_root, naming, entry):
@@ -960,7 +975,7 @@ class TestAcquire(unittest.TestCase):
             patches[2],
             patches[3],
         ):
-            record = _acquisition.acquire(
+            record = _acquire_and_save(
                 h,
                 acquisition_type="acquisition",
                 output_folder=None,
@@ -1054,7 +1069,7 @@ class TestAcquire(unittest.TestCase):
                 patches[2],
                 patches[3],
             ):
-                record = _acquisition.acquire(
+                record = _acquire_and_save(
                     h,
                     acquisition_type="acquisition",
                     output_folder=None,
@@ -1069,7 +1084,7 @@ class TestAcquire(unittest.TestCase):
             )
 
     def test_saving_follows_this_microscopes_profile(self):
-        """The projection and letting go of the cache are set up once.
+        """The projection is set up once.
 
         They are this microscope's ``IMAGE_SAVE`` profile, the same for every
         capture, never a choice made per capture.
@@ -1077,7 +1092,7 @@ class TestAcquire(unittest.TestCase):
         h = _handle()
         h.driven_to = {"x": 0.0, "y": 0.0, "z": 0.0, "z_wide_um": 0.0}
         with self._capturing() as calls:
-            record = _acquisition.acquire(
+            record = _acquire_and_save(
                 h,
                 acquisition_type="acquisition",
                 output_folder=None,
@@ -1089,11 +1104,9 @@ class TestAcquire(unittest.TestCase):
         # Captures are always saved as OME-Zarr: there is no format to choose.
         self.assertNotIn("format", calls["save"])
         self.assertEqual(
-            calls["save"]["projection"], _acquisition.IMAGE_SAVE.projection
+            calls["save"]["projection"], _save_captures.IMAGE_SAVE.projection
         )
-        self.assertIs(
-            calls["save"]["cleanup_cache"], _acquisition.IMAGE_SAVE.cleanup_cache
-        )
+        self.assertNotIn("cleanup_cache", calls["save"])
         self.assertEqual(record["format"], "ome-zarr")
 
     def test_the_capture_is_saved_in_the_output_folder_it_is_given(self):
@@ -1105,7 +1118,7 @@ class TestAcquire(unittest.TestCase):
         h = _handle()
         h.driven_to = {"x": 0.0, "y": 0.0, "z": 0.0, "z_wide_um": 0.0}
         with self._capturing(output_root=None) as calls:
-            _acquisition.acquire(
+            _acquire_and_save(
                 h,
                 position_label="A1",
                 acquisition_type="acquisition",
@@ -1118,7 +1131,7 @@ class TestAcquire(unittest.TestCase):
         h = _handle()
         h.driven_to = {"x": 0.0, "y": 0.0, "z": 0.0, "z_wide_um": 0.0}
         with self._capturing() as calls:
-            record = _acquisition.acquire(
+            record = _acquire_and_save(
                 h,
                 position_label="well-7",
                 acquisition_type="overview",
@@ -1130,71 +1143,65 @@ class TestAcquire(unittest.TestCase):
         self.assertEqual(record["acquisition_type"], "overview")
         self.assertEqual(record["position_label"], "well-7")
 
-    def test_letting_go_of_the_cache_follows_the_profile(self):
-        """A capture read from LAS X's cache is let go of when the profile says so, never per capture."""
-        h = _handle()
-        h.driven_to = {"x": 0.0, "y": 0.0, "z": 0.0, "z_wide_um": 0.0}
-        releasing = replace(_acquisition.IMAGE_SAVE, cleanup_cache=True)
-        with (
-            patch.object(_acquisition, "IMAGE_SAVE", releasing),
-            self._capturing() as calls,
-        ):
-            _acquisition.acquire(
-                h,
-                acquisition_type="acquisition",
-                output_folder=None,
-                position_label="A1",
-            )
-        self.assertIs(calls["save"]["cleanup_cache"], True)
-
-    def test_a_capture_that_will_be_released_has_the_canvas_shown_first(self):
-        """The canvas is shown while LAS X is idle, before the capture, so the release can clear it after."""
-        h = _handle()
-        h.driven_to = {"x": 0.0, "y": 0.0, "z": 0.0, "z_wide_um": 0.0}
-        order = []
-        releasing = replace(_acquisition.IMAGE_SAVE, cleanup_cache=True)
-        with (
-            patch.object(_acquisition, "IMAGE_SAVE", releasing),
-            self._capturing(),
-            patch.object(_release, "prepare", lambda: order.append("canvas shown")),
-            patch.object(
-                _capture,
-                "acquire",
-                lambda c, j, **k: order.append("captured") or _a_capture(j),
-            ),
-        ):
-            _acquisition.acquire(
-                h,
-                acquisition_type="acquisition",
-                output_folder=None,
-                position_label="A1",
-            )
-        self.assertEqual(order, ["canvas shown", "captured"])
-
-    def test_a_capture_that_is_kept_leaves_the_screen_alone(self):
+    def test_acquiring_writes_nothing_and_leaves_the_cache_alone(self):
+        """Taking a picture only keeps a note of it; saving and clearing are steps of their own."""
         h = _handle()
         h.driven_to = {"x": 0.0, "y": 0.0, "z": 0.0, "z_wide_um": 0.0}
         prepared = []
-        keeping = replace(_acquisition.IMAGE_SAVE, cleanup_cache=False)
-        with (
-            patch.object(_acquisition, "IMAGE_SAVE", keeping),
-            self._capturing(),
-            patch.object(_release, "prepare", lambda: prepared.append(1)),
-        ):
-            _acquisition.acquire(
-                h,
-                acquisition_type="acquisition",
-                output_folder=None,
-                position_label="A1",
+        with self._capturing() as calls, patch.object(_release, "prepare", lambda: prepared.append(1)):
+            taken = _acquisition.acquire(
+                h, acquisition_type="acquisition", output_folder=None, position_label="A1"
             )
+        self.assertEqual(taken["position_label"], "A1")
+        self.assertNotIn("save", calls)
+        self.assertEqual([c.label for c in h.unsaved], ["A1"])
         self.assertEqual(prepared, [])
 
-    def test_captures_come_from_the_cache_and_are_let_go_of_by_default(self):
-        """Every capture is read from LAS X's cache (AutoSave is not used, Thom, 2026-10-14),
-        and LAS X lets go of it once saved (on since the STELLARIS, 2026-10-15)."""
+    def test_saving_empties_the_waiting_list_and_notes_what_the_cache_holds(self):
+        h = _handle()
+        h.driven_to = {"x": 0.0, "y": 0.0, "z": 0.0, "z_wide_um": 0.0}
+        prepared = []
+        with self._capturing(release_target=(7, "HiRes007")), patch.object(
+            _release, "prepare", lambda: prepared.append(1)
+        ):
+            _acquisition.acquire(h, acquisition_type="acquisition", output_folder=None, position_label="A1")
+            (record,) = _save_captures.save_waiting(h)
+        self.assertEqual(record["position_label"], "A1")
+        self.assertEqual(h.unsaved, [])
+        self.assertEqual(h.in_cache, [(7, "HiRes007")])
+        self.assertEqual(prepared, [])  # saving never touches the cache
+
+    def test_a_capture_that_fails_to_save_stays_waiting(self):
+        h = _handle()
+        h.driven_to = {"x": 0.0, "y": 0.0, "z": 0.0, "z_wide_um": 0.0}
+        with self._capturing():
+            _acquisition.acquire(h, acquisition_type="acquisition", output_folder=None, position_label="A1")
+            with patch.object(_save, "save", side_effect=RuntimeError("disk full")):
+                with self.assertRaises(RuntimeError):
+                    _save_captures.save_waiting(h)
+        self.assertEqual([c.label for c in h.unsaved], ["A1"])
+        self.assertEqual(h.in_cache, [])
+
+    def test_a_label_still_waiting_to_be_saved_is_not_taken_twice(self):
+        h = _handle()
+        h.driven_to = {"x": 0.0, "y": 0.0, "z": 0.0, "z_wide_um": 0.0}
+        with self._capturing():
+            _acquisition.acquire(h, acquisition_type="acquisition", output_folder=None, position_label="A1")
+            with self.assertRaisesRegex(ValueError, "still waiting to be saved"):
+                _acquisition.acquire(
+                    h, acquisition_type="acquisition", output_folder=None, position_label="A1"
+                )
+
+    def test_saving_a_label_nobody_acquired_is_refused(self):
+        h = _handle()
+        with self.assertRaisesRegex(ValueError, "no capture waiting"):
+            _save_captures.save_waiting(h, "nothing")
+
+    def test_captures_come_from_the_cache_and_clearing_is_not_a_saving_setting(self):
+        """Every capture is read from LAS X's cache (AutoSave is not used, Thom, 2026-10-14);
+        whether LAS X lets go of it is the clear_cache procedure, never a setting of the save."""
         self.assertFalse(hasattr(ImageSaveProfile(), "source"))
-        self.assertIs(ImageSaveProfile().cleanup_cache, True)
-        self.assertIs(ImageSaveProfile(cleanup_cache=False).cleanup_cache, False)
+        self.assertFalse(hasattr(ImageSaveProfile(), "cleanup_cache"))
 
     def test_the_capture_is_placed_where_the_answer_says_its_planes_are(self):
         """The store is placed where the answer says its planes are."""
@@ -1221,7 +1228,7 @@ class TestAcquire(unittest.TestCase):
                 },
             ),
         ):
-            _acquisition.acquire(
+            _acquire_and_save(
                 h,
                 acquisition_type="acquisition",
                 output_folder=None,
@@ -1249,7 +1256,7 @@ class TestAcquire(unittest.TestCase):
         }
         projection = Path("/tmp/out/projections/A1.ome.zarr")
         with self._capturing(projections=[projection]) as calls:
-            record = _acquisition.acquire(
+            record = _acquire_and_save(
                 h,
                 acquisition_type="acquisition",
                 output_folder=None,
@@ -1257,7 +1264,7 @@ class TestAcquire(unittest.TestCase):
             )
 
         self.assertEqual(
-            calls["save"]["projection"], _acquisition.IMAGE_SAVE.projection
+            calls["save"]["projection"], _save_captures.IMAGE_SAVE.projection
         )
         self.assertEqual(record["projections"], [str(projection)])
         self.assertIn(str(projection), record["files"])
@@ -1273,7 +1280,7 @@ class TestAcquire(unittest.TestCase):
         }
         image = Path("/tmp/out/.staging") / h.hash6 / "data" / "img.ome.tif"
         with self._capturing(image_paths={0: image}) as calls:
-            record = _acquisition.acquire(
+            record = _acquire_and_save(
                 h,
                 acquisition_type="acquisition",
                 output_folder=None,
@@ -1327,7 +1334,7 @@ class TestAcquire(unittest.TestCase):
             self._capturing() as calls,
             patch.object(_acquisition, "get_xyz", read_the_stage),
         ):
-            record = _acquisition.acquire(
+            record = _acquire_and_save(
                 h,
                 acquisition_type="acquisition",
                 output_folder=None,
@@ -1366,7 +1373,7 @@ class TestAcquire(unittest.TestCase):
                 },
             ),
         ):
-            record = _acquisition.acquire(
+            record = _acquire_and_save(
                 h,
                 acquisition_type="acquisition",
                 output_folder=None,
@@ -1405,7 +1412,7 @@ class TestAcquire(unittest.TestCase):
                 },
             ),
         ):
-            record = _acquisition.acquire(
+            record = _acquire_and_save(
                 h,
                 acquisition_type="acquisition",
                 output_folder=None,
@@ -1423,7 +1430,7 @@ class TestAcquire(unittest.TestCase):
                 return_value={"stack": stack},
             ),
         ):
-            record = _acquisition.acquire(
+            record = _acquire_and_save(
                 h,
                 acquisition_type="acquisition",
                 output_folder=None,
@@ -1561,7 +1568,7 @@ class TestAcquire(unittest.TestCase):
         h = _handle()
         h.driven_to = {"x": 0.0, "y": 0.0, "z": 0.0, "z_wide_um": 50.0}
         with self._capturing():
-            record = _acquisition.acquire(
+            record = _acquire_and_save(
                 h, acquisition_type="acquisition", output_folder=None, position_label="A1"
             )
         self.assertEqual(
@@ -1576,7 +1583,7 @@ class TestAcquire(unittest.TestCase):
         h = _handle()
         h.driven_to = {"x": 100.0, "y": 200.0, "z": 50.0, "z_wide_um": 50.0}
         with self._capturing():
-            record = _acquisition.acquire(
+            record = _acquire_and_save(
                 h, acquisition_type="acquisition", output_folder=None, position_label="A1"
             )
         self.assertEqual(record["unconfirmed"], [])
@@ -1589,7 +1596,7 @@ class TestAcquire(unittest.TestCase):
             patch.object(_acquisition, "get_xyz", side_effect=RuntimeError("no answer")),
             self.assertRaisesRegex(RuntimeError, "where the stage is"),
         ):
-            _acquisition.acquire(
+            _acquire_and_save(
                 h,
                 acquisition_type="acquisition",
                 output_folder=None,
@@ -1652,7 +1659,7 @@ class TestAcquire(unittest.TestCase):
                 patches[2],
                 patches[3],
             ):
-                _acquisition.acquire(
+                _acquire_and_save(
                     h,
                     acquisition_type="acquisition",
                     output_folder=None,
@@ -1693,10 +1700,10 @@ class TestAcquire(unittest.TestCase):
         with ExitStack() as standing_in:
             for stand_in in self._fake_acquire_env(calls):
                 standing_in.enter_context(stand_in)
-            record0 = _acquisition.acquire(
+            record0 = _acquire_and_save(
                 h, acquisition_type="acquisition", output_folder=None
             )
-            record1 = _acquisition.acquire(
+            record1 = _acquire_and_save(
                 h, acquisition_type="acquisition", output_folder=None
             )
         # unlabeled acquires consume the per-session counter, zero-padded
@@ -1722,7 +1729,7 @@ class TestAcquire(unittest.TestCase):
             with ExitStack() as standing_in:
                 for stand_in in self._fake_acquire_env(calls):
                     standing_in.enter_context(stand_in)
-                _acquisition.acquire(
+                _acquire_and_save(
                     h,
                     acquisition_type="acquisition",
                     output_folder=None,
@@ -1740,7 +1747,7 @@ class TestAcquire(unittest.TestCase):
             patch.object(_readers, "get_selected_job", return_value=None),
             self.assertRaisesRegex(RuntimeError, "set_state"),
         ):
-            _acquisition.acquire(
+            _acquire_and_save(
                 h,
                 acquisition_type="acquisition",
                 output_folder=None,
@@ -1756,13 +1763,13 @@ class TestAcquire(unittest.TestCase):
         with ExitStack() as standing_in:
             for stand_in in env:
                 standing_in.enter_context(stand_in)
-            _acquisition.acquire(
+            _acquire_and_save(
                 h,
                 acquisition_type="acquisition",
                 output_folder=None,
                 position_label="named",
             )  # must not bump the counter
-            record = _acquisition.acquire(
+            record = _acquire_and_save(
                 h, acquisition_type="acquisition", output_folder=None
             )  # still gets 000000
         self.assertEqual(calls["namings"][0].stem, "acquisition_named")
@@ -1792,7 +1799,7 @@ class TestAcquire(unittest.TestCase):
             ),
             patches[2],
         ):
-            _acquisition.acquire(
+            _acquire_and_save(
                 h,
                 acquisition_type="acquisition",
                 output_folder=None,

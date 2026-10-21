@@ -28,6 +28,8 @@ from ..dispatcher import gate as _gate
 from ..vendor_specific.parsing import parse_tile_geometry as _parse_tile_geometry
 from ..vendor_specific.primitive_handling.readings import state as _readers
 from .acquisition import acquire as _capture
+from .clear_cache.clear import clear
+from .save_data.save_captures import save_waiting
 from ..vendor_specific.primitive_handling.settings import changes as _commands
 from .objective_change_with_compensation import compensated_changes as _compensated
 from . import session as _info
@@ -246,6 +248,17 @@ def get_procedures(handle: ZmartHandle) -> dict:
             "(its offset is transferred onto z-wide), freeing the galvo's "
             "full travel for a following z-stack"
         },
+        "save_data": {
+            "description": "write the captures taken and not yet saved to disk, with their "
+            "planes, projections and logs; the controller's acquire does this for its own "
+            "capture, so run it after an acquisition taken without saving",
+            "args": ["label"],
+        },
+        "clear_cache": {
+            "description": "have LAS X let go of the pictures of the captures saved so far in "
+            "this session, freeing the disk its cache fills; acquiring and saving never do "
+            "this, so run it when you choose, for example between plates"
+        },
         "autofocus": {
             "description": "run a LAS X autofocus job (capture only, nothing saved); "
             "restores the previously selected job and returns the focus readback",
@@ -261,6 +274,10 @@ def run_procedure(handle: ZmartHandle, procedure: dict) -> dict:
     name = procedure.get("name")
     if name == "zero_z_galvo":
         return {"ran": dict(procedure), **zero_z_galvo(handle)}
+    if name == "save_data":
+        return {"ran": dict(procedure), "saved": save_waiting(handle, procedure.get("label"))}
+    if name == "clear_cache":
+        return {"ran": dict(procedure), **clear(handle)}
     if name == "autofocus":
         return _run_autofocus(handle, procedure)
     raise ValueError(f"unknown procedure {name!r}")

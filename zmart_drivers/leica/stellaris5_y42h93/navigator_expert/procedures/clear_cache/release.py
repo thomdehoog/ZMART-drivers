@@ -22,7 +22,8 @@ What it takes:
 - the picture's name, checked before deleting, so that nothing else is ever
   deleted.
 
-The save calls it last (``cleanup_cache``), only once its copy is written and
+The ``clear_cache`` procedure calls it, never the save: a picture is let go of
+only when the operator asks, and only for a capture whose copy was written and
 read back identical. Seen on the LAS X simulator: the picture's pixels leave
 the cache, the project file is rewritten without it, and LAS X captures on.
 About 0.2 MB of descriptions per picture stays while LAS X's window holds it.
@@ -32,8 +33,8 @@ a zoom pyramid and a histogram: about twice a 512 x 512 capture's pixels),
 which the Navigator canvas holds while it shows the capture's tile. So the
 release also clears the canvas (``vendor_specific.primitives.interface.lasx_navigator``), which
 lets go of the hidden copies too (simulator, 2026-10-14). The canvas can be
-cleared only while LAS X shows it, so :func:`prepare` shows it before the
-capture, while LAS X is idle. A canvas that cannot be shown or cleared is
+cleared only while LAS X shows it, so :func:`prepare` shows it just before the
+release, while LAS X is idle. A canvas that cannot be shown or cleared is
 logged; the capture is taken and released all the same.
 """
 

@@ -180,13 +180,6 @@ class ImageSaveProfile:
     #: ``<acquisition>/projections`` (``output.save.PROJECTIONS``): its
     #: ``"max"`` projection over z, or ``"none"``.
     projection: str = "max"
-    #: Whether LAS X lets go of a capture in its cache once the copy is saved
-    #: and read back identical (``output.lasx_cache_release``): the capture
-    #: leaves the cache, and the Navigator canvas is cleared of the hidden
-    #: copies it holds. Without it, a long run fills the cache's disk. On since
-    #: it passed on the STELLARIS (2026-10-15): fifty and then ten captures let
-    #: go of, the cache staying flat.
-    cleanup_cache: bool = True
 
 
 IMAGE_SAVE = ImageSaveProfile()
