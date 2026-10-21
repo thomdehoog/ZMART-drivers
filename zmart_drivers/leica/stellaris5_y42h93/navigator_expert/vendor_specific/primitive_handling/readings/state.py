@@ -67,10 +67,10 @@ def _routed(
         datum,
         client,
         accept=accept,
-        job_name=job_name,
+        about=job_name,
         mode=mode,
         deadline=deadline,
-        api_kwargs=api_kwargs,
+        source_kwargs=api_kwargs,
         fallback=fallback,
     )
     return _plain_or_diagnostic(reading, diagnostics)
