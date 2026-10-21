@@ -62,6 +62,9 @@ def build_env() -> dict:
     # holds folders with common names, such as config and connection, which a
     # run started there would otherwise import in place of other packages.
     env["PYTHONSAFEPATH"] = "1"
+    # Coverage keeps its data file in the folder a run starts in; keep it with
+    # the reports, so a run started in the driver leaves no file there.
+    env["COVERAGE_FILE"] = str(REPORT_DIR / ".coverage")
     return env
 
 

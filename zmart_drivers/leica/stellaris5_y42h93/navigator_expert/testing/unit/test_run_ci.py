@@ -32,6 +32,13 @@ def test_run_ci_exposes_only_mock_and_hardware_modes():
         run_ci.parse_args(["--no-cov"])
 
 
+def test_coverage_keeps_its_data_file_with_the_reports():
+    """A run started in the driver folder must leave no .coverage there; the folder guard refuses loose files."""
+    run_ci = _load_run_ci()
+
+    assert run_ci.build_env()["COVERAGE_FILE"] == str(run_ci.REPORT_DIR / ".coverage")
+
+
 def _capture_steps(run_ci, monkeypatch, tmp_path, argv, folders=None):
     """Run run_ci with every step replaced; return (name, command, fatal) per step.
 
