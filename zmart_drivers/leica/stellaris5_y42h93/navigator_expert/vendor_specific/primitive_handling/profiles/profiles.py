@@ -28,6 +28,7 @@ and stdlib. Nothing from dispatch or command wrappers.
 from collections.abc import Callable
 from dataclasses import dataclass
 
+from . import routes as _routes
 from . import transport as _transport
 from .prechecks import check_idle
 from ..settings.limit_rules import NOTEBOOK_POINTER
@@ -79,8 +80,10 @@ class StateReaderProfile:
     # reading names the source it came from. Each is "api", "log" or "hybrid"
     # (the API and the log asked together).
     #
-    # An ordinary reading falls back to both, so that either can answer.
-    reading_fallback: str = "hybrid"
+    # An ordinary reading falls back to the CAM API alone: the direct reader
+    # first, then the API (Thom, 2026-10-21). "hybrid" would let the log answer
+    # too, which can still show the state from before.
+    reading_fallback: str = "api"
     # A reading a command waits on (is the scanner idle, did the stage arrive)
     # falls back to the API alone. The log writes a value only when it changes,
     # so it can still show the state from before the command.
@@ -273,7 +276,7 @@ class CommandProfile:
     success_on_unconfirmed: bool = True
     # How a request reaches the microscope and how its reply is waited for; see
     # ``transport.py``. Another microscope supplies its own.
-    transport: object = _transport.LASX
+    transport: object = _routes.ROUTED
     # The waiting rule (windows, window length, poll times) the engines follow
     # for this command; see ``vendor_specific/connection/tuning.py``.
     waiting: object = tuning

@@ -637,6 +637,17 @@ The backbone is deliberately *dumb*: it owns pipeline order, retry ceilings, and
 nothing about zoom/objectives/stages. Commands supply small zero-arg callables (extra params pre-bound
 with `functools.partial`).
 
+**Ways of sending, and what answers when one cannot.** A change can be sent more than one way, and
+the order is one visible setting. `vendor_specific/primitive_handling/profiles/routes.py` lists the
+ways that exist (`ROUTES`: today only `cam`, the CAM API) and the order they are tried
+(`WRITE_ROUTES`). The dispatcher's `transport_chain.py` tries them in that order and uses the first
+that can send. It moves on to the next only when the first reports that nothing has left yet; a send
+that went out but was not acknowledged is never repeated on another route, because the command may
+already have been carried out. Reading works the same way: the direct reader first, then the family
+in `StateReaderProfile.reading_fallback` (the CAM API, `"api"`), and `waiting_fallback` for the
+readings a command waits on. Adding a direct way of sending later means writing its transport, adding
+it to `ROUTES` as `direct`, and putting it first: `WRITE_ROUTES = ("direct", "cam")`.
+
 **Dependency direction.** The anatomy's rule is that each part imports only from the parts below
 it: `vendor_specific` → `dispatcher` → `procedures`, with `driver_setup` beside
 them. The move that put every file in its part kept the imports as they were, so a few still run

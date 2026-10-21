@@ -137,8 +137,17 @@ def test_the_log_is_not_parsed_when_the_api_answers():
     parse.assert_not_called()
 
 
-def test_sixty_readings_at_once_never_overlap_two_parses():
-    """The scope's burst: many readings at once, the API giving no answer so the log is read."""
+def test_sixty_readings_at_once_never_overlap_two_parses(monkeypatch):
+    """The scope's burst: many readings at once, the API giving no answer so the log is read.
+
+    The shipped policy falls back to the API alone, so this run asks for the
+    fallback that lets the log answer too, which is what puts it under load.
+    """
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.profiles import profiles
+
+    monkeypatch.setattr(
+        profiles, "STATE_READERS", profiles.StateReaderProfile(reading_fallback="hybrid")
+    )
     slow = SlowParse()
     with (
         patch.object(log_reader, "parse_files", side_effect=slow),
