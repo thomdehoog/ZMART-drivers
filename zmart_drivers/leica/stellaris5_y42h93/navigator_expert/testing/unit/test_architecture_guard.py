@@ -209,9 +209,19 @@ ALLOWED = {
         # (see the test below): they read the saved values only.
         "procedures",
     },
+    # The driver used by itself: connect() and the Microscope, built on every
+    # part below it.
+    "for_direct_use": {
+        "session",
+        "vendor_specific",
+        "dispatcher",
+        "procedures",
+        "driver_setup",
+    },
     # Everything that faces the controller: the ZmartDriver class and, until its
     # logic moves into the procedures, the adapter folder inside it.
     "for_zmart_controller": {
+        "for_direct_use",
         "session",
         "vendor_specific",
         "dispatcher",
@@ -220,6 +230,7 @@ ALLOWED = {
         "__version__",
     },
     "__init__": {
+        "for_direct_use",
         "vendor_specific",
         "dispatcher",
         "procedures",
