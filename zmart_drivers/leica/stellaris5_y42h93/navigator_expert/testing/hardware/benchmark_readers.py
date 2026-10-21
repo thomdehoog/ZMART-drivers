@@ -97,7 +97,7 @@ def poll(reader, out: Path, until: Path):
     """Read as fast as possible until *until* exists; one JSON line per reading."""
     client = None
     if reader == "api":
-        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.connect import (
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.connection.lasx_client import (
             connect_python_client,
         )
 

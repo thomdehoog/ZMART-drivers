@@ -462,7 +462,7 @@ def _connect(
         )
         return None
     try:
-        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.connect import (
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.connection.lasx_client import (
             configure_lasx_api_delay,
         )
 
@@ -961,7 +961,7 @@ def phase_job_selection(
             v.skip("job selection: round-trip", "no jobs returned")
             return
 
-        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher import door as tuning
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.connection import tuning
 
         names = selectable_job_names(jobs)
         # The job to come back to is read the way the driver reads it, not

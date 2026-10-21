@@ -38,7 +38,6 @@ import json
 import re
 import sys
 import time
-from dataclasses import replace
 from pathlib import Path
 
 
@@ -66,7 +65,6 @@ def main() -> int:
     from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.for_zmart_controller.zmart_driver import (
         ZmartDriver as driver,
     )
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.acquisition import acquire as _acquisition
 
     report: dict = {
         "job": asked.job,
@@ -75,9 +73,6 @@ def main() -> int:
         "metadata": {},
     }
     checks = report["checks"]
-    _acquisition.IMAGE_SAVE = replace(
-        _acquisition.IMAGE_SAVE, format="ome-zarr", cleanup_cache=False
-    )
     session = ZmartController(
         driver, {"output_root": asked.save_to} if asked.save_to else {}
     )
