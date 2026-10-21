@@ -2,7 +2,7 @@
 
 ``Exported*`` types are collector -> save inputs and are writer-agnostic.
 The manifest of what was saved, ``SavedAcquisition``, is in
-``procedures/acquisition_and_saving/saved_acquisition.py``.
+``procedures/save_data/saved_acquisition.py``.
 """
 
 from __future__ import annotations
@@ -237,7 +237,7 @@ class ExportedAcquisition:
     vendor_metadata_sources: tuple[VendorMetadataSource, ...] = ()
     #: Which capture LAS X lets go of once it is saved (``cleanup_cache``): its
     #: element number and its name. None when there is none, and then letting go
-    #: is refused. How it is done is the business of ``procedures/acquisition_and_saving/clear_cache.py``.
+    #: is refused. How it is done is the business of ``procedures/clear_cache/release.py``.
     release_target: tuple[int, str] | None = None
 
     @property

@@ -736,7 +736,7 @@ Leica-specific:
   (`product.py`) stays in `vendor_specific/`, because the vendor code builds it.
   How a capture's files are named (`naming.py`) and the manifest a save hands
   back (`saved_acquisition.py`) are with the saving, in
-  `procedures/acquisition_and_saving/`, and LAS X's own file names
+  `procedures/save_data/`, and LAS X's own file names
   (`files.py`) are in `vendor_specific/primitives/capture/`. The writing of the files (`save.py`, `materialize.py`, `ome*.py`,
   `command_log.py`) is in `procedures/`. What reads LAS X's own picture files
   (`lasx_data_container.py`, `lasx_cache_release.py`) is in

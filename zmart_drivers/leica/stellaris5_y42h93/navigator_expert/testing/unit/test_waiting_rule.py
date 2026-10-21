@@ -346,7 +346,7 @@ def test_commands_deliver_through_the_one_helper():
 GUARDED = ("dispatcher", "vendor_specific")
 GUARDED_FILES = (
     "procedures/objective_change_with_compensation/compensated_changes.py",
-    "procedures/acquisition_and_saving/acquire.py",
+    "procedures/acquisition/acquire.py",
     "procedures/objective_change_with_compensation/objective_shift.py",
     "vendor_specific/primitive_handling/objectives.py",
 )

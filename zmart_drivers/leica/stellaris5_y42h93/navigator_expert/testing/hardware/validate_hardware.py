@@ -675,7 +675,7 @@ def embedded_ome_xml(path) -> bytes:
     path = Path(path)
     if path.is_dir():
         return (path / "OME" / "METADATA.ome.xml").read_bytes()
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.acquisition_and_saving import materialize
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.save_data import materialize
 
     return materialize.extract_embedded_ome_xml(path)
 

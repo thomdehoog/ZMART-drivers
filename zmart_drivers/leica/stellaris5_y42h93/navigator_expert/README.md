@@ -67,7 +67,7 @@ LAS X.
   )
   ```
   The Leica package is self-contained; its filename helper lives under
-  `navigator_expert.procedures.acquisition_and_saving.naming`.
+  `navigator_expert.procedures.save_data.naming`.
 - **Plug it into the ZMART Controller** on the LAS X computer. Register the `for_zmart_controller` folder (its `zmart_driver.json` names the class
   beside it) with the controller once; from then on every session plugs the driver in by name.
   Its settings, `CONNECTION` in that file, are all optional; the file explains each one:
@@ -202,7 +202,7 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert import (
     acquire,
     save,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.acquisition_and_saving.naming import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.save_data.naming import (
     Naming,
     run_hash,
 )
@@ -492,7 +492,7 @@ written, and the acquire record carries it as `metadata`.
 `vendor/` is LAS X's own account of the same capture, kept verbatim as
 provenance and sha256'd in `summary.json` — never read in the normal path, and
 there only in case the two accounts disagree.
-**OME metadata:** `procedures/acquisition_and_saving/ome_canonical.py` writes the clean canonical ZMART OME-XML
+**OME metadata:** `procedures/save_data/ome_canonical.py` writes the clean canonical ZMART OME-XML
 that is stored inside each OME-Zarr image (`OME/METADATA.ome.xml`). Captures are saved as OME-Zarr
 only.
 
@@ -503,7 +503,7 @@ Container V2`): `D:\Temp2` on the STELLARIS Y42H93.
 With `cleanup_cache=True`, the profile's default since it passed on the STELLARIS (15 October
 2026), the save's last step asks LAS X itself to delete the picture it was read from: the delete of
 LAS X's own window, so the cache's files go and the project stays whole
-(`procedures/acquisition_and_saving/clear_cache.py` says how). It runs only once the copy is written and read back
+(`procedures/clear_cache/release.py` says how). It runs only once the copy is written and read back
 identical, and the Navigator canvas is then cleared, which lets go of each capture's hidden copy.
 The driver never deletes a file itself: a capture LAS X gives no way to let go of is refused before
 anything is saved.
@@ -599,10 +599,11 @@ zmart_drivers/leica/stellaris5_y42h93/navigator_expert/
 │   ├── objective_change_with_compensation/   changing the objective or the job without losing the sample:
 │   │                   compensated_changes.py (set_objective and select_job) · objective_shift.py ·
 │   │                   objectives.py
-│   └── acquisition_and_saving/   taking a picture and keeping it, placed by the measured image
-│                       orientation so it lines up with the stage moves: acquisition.py · acquire.py
-│                       (the capture) · save.py · ome_zarr.py · ome_canonical.py · materialize.py ·
-│                       command_log.py · clear_cache.py
+│   ├── acquisition/      taking a picture: acquisition.py · acquire.py (the capture)
+│   ├── save_data/        keeping it, placed by the measured image orientation so it lines up with the
+│   │                   stage moves: save.py · saved_acquisition.py · naming.py · ome_zarr.py ·
+│   │                   ome_canonical.py · materialize.py · command_log.py
+│   └── clear_cache/      release.py: having LAS X let go of a picture once it is saved
 ├── driver_setup/       everything for setting up this driver on one microscope, one folder per item:
 │                       limits/, origin/, orientation/ (the picture's orientation),
 │                       optical_calibration/ and data_location/. Each holds its bundled defaults,
@@ -784,4 +785,4 @@ Copy the closest existing command of a similar shape.
 - Sibling drivers, still under construction in the main ZMART-microscopy repository:
   [ZEISS ZEN API](https://github.com/ZMB-UZH/ZMART-microscopy/tree/main/zmart_drivers/zeiss/zenapi) (gRPC) and
   [Nikon NIS-Elements](https://github.com/ZMB-UZH/ZMART-microscopy/tree/main/zmart_drivers/nikon) (socket macro).
-- Leica filename implementation: [`procedures/acquisition_and_saving/naming.py`](procedures/acquisition_and_saving/naming.py)
+- Leica filename implementation: [`procedures/save_data/naming.py`](procedures/save_data/naming.py)

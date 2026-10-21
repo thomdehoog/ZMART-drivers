@@ -27,7 +27,7 @@ from ..driver_setup import store as _machine
 from ..dispatcher import gate as _gate
 from ..vendor_specific.parsing import parse_tile_geometry as _parse_tile_geometry
 from ..vendor_specific.primitive_handling import state as _readers
-from .acquisition_and_saving import acquire as _capture
+from .acquisition import acquire as _capture
 from ..vendor_specific.primitive_handling import changes as _commands
 from .objective_change_with_compensation import compensated_changes as _compensated
 from . import session as _info

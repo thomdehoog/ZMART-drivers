@@ -23,7 +23,7 @@ from typing import Any
 
 from ...driver_setup.orientation import Orientation
 from ...vendor_specific.primitives.capture import files as _files
-from . import clear_cache
+from ..clear_cache import release as clear_cache
 from . import materialize as _materialize
 from . import ome_zarr
 from ...vendor_specific.primitives.capture.files import DEFAULT_EXPORT_COMPLETION_POLL_INTERVAL_S, DEFAULT_EXPORT_COMPLETION_TIMEOUT_S

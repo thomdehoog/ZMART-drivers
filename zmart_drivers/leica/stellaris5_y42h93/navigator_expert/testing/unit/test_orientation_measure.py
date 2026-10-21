@@ -22,7 +22,7 @@ pytest.importorskip("cv2")  # calibration.core.common (reused by measure) import
 
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.orientation import Orientation
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.notebook_support import NotebookCheckpoint
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.acquisition_and_saving.naming import build_image_name
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.save_data.naming import build_image_name
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.optical_calibration import calibration_common as cm
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.orientation import measure_orientation as wf
 
