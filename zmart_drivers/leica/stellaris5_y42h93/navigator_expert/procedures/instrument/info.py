@@ -77,8 +77,8 @@ def _described(handle: ZmartHandle) -> str:
     jobs = f"The jobs on this microscope now: {', '.join(names) or 'none'}."
     if af_names:
         jobs += (
-            f" The autofocus jobs ({', '.join(af_names)}) are not settings; run them "
-            "with the autofocus procedure."
+            f" The autofocus jobs ({', '.join(af_names)}) are Navigator Expert's own; "
+            "the driver does not select them."
         )
     hardware = _readers.get_hardware_info(handle.client) or {}
     turret = (hardware.get("Microscope") or {}).get("objectives") or []

@@ -2050,97 +2050,9 @@ class TestStateAndProcedures(unittest.TestCase):
         self.assertNotIn("get_root", procedures)
         self.assertNotIn("get_positions", procedures)
         self.assertNotIn("get_focus_points", procedures)
-        self.assertEqual(procedures["autofocus"]["jobs"], ["AF Job"])
+        self.assertNotIn("autofocus", procedures)
         with self.assertRaises(ValueError):
             _instrument_menu.run_procedure(h, {"name": "nope"})
-
-    def test_autofocus_runs_capture_only_and_restores_the_selection(self):
-        from types import SimpleNamespace
-
-        h = _handle()
-        calls = []
-        p = self._state_patches()
-        position = _patch_position(z_wide_um=42.0, z_galvo_um=1.5)
-        with (
-            p[2],  # job catalog (AF Job flagged)
-            position[0],
-            position[1],
-            position[2],
-            position[3],
-            patch.object(
-                _commands_comp,
-                "select_job",
-                side_effect=lambda client, job, **k: (
-                    calls.append(("select", job)) or {"success": True}
-                ),
-            ),
-            patch.object(
-                _capture,
-                "acquire",
-                side_effect=lambda client, job, **k: (
-                    calls.append(("acquire", job))
-                    or SimpleNamespace(job=job, started_at=1.0, finished_at=3.5)
-                ),
-            ),
-        ):
-            result = _instrument_menu.run_procedure(
-                h, {"name": "autofocus"}
-            )  # single AF job: no arg
-        # select AF -> capture -> restore the original selection, in order
-        self.assertEqual(
-            calls, [("select", "AF Job"), ("acquire", "AF Job"), ("select", "Overview")]
-        )
-        self.assertEqual(result["ran"], "autofocus")
-        self.assertEqual(result["job"], "AF Job")
-        self.assertEqual(result["focus_um"], 43.5)  # 42.0 + 1.5, read before restore
-        self.assertEqual(result["frame_z_um"], 43.5)  # all-zero origin
-        self.assertEqual(result["duration_s"], 2.5)
-
-    def test_autofocus_runs_on_its_autofocus_job(self):
-        h = _handle()
-        p = self._state_patches()
-        position = _patch_position()
-        with (
-            p[2],
-            position[0],
-            position[1],
-            position[2],
-            position[3],
-            patch.object(_commands_comp, "select_job", return_value={"success": True}),
-            patch.object(
-                _capture,
-                "acquire",
-                return_value=SimpleNamespace(
-                    job="AF Job", started_at=0.0, finished_at=1.0
-                ),
-            ),
-        ):
-            result = _instrument_menu.run_procedure(h, {"name": "autofocus"})
-        self.assertEqual(result["ran"], "autofocus")
-
-    def test_autofocus_rejects_a_normal_job(self):
-        h = _handle()
-        p = self._state_patches()
-        with p[2]:
-            with self.assertRaisesRegex(ValueError, "not an autofocus job"):
-                _instrument_menu.run_procedure(
-                    h, {"name": "autofocus", "job": "Overview"}
-                )
-
-    def test_autofocus_requires_a_choice_when_several_exist(self):
-        h = _handle()
-        p = self._state_patches(af_jobs=("AF Job", "AF Fine"))
-        with p[2]:
-            with self.assertRaisesRegex(ValueError, "multiple autofocus jobs"):
-                _instrument_menu.run_procedure(h, {"name": "autofocus"})
-
-    def test_autofocus_without_af_jobs_is_a_clear_error(self):
-        h = _handle()
-        p = self._state_patches(af_jobs=())
-        with p[2]:
-            with self.assertRaisesRegex(RuntimeError, "no autofocus job"):
-                _instrument_menu.run_procedure(h, {"name": "autofocus"})
-
 
 class TestConnectCardCalibrationLine(unittest.TestCase):
     """The Connect card says whether the objective calibration is usable.

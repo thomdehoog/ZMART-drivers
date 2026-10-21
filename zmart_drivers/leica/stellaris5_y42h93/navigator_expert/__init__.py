@@ -16,7 +16,7 @@ this repository)::
     - procedures/         the recipes, one folder each: taking a picture (acquisition/), saving
                           it (save_data/), letting LAS X's cache go (clear_cache/), the stage
                           frame (absolute_coordinate_system/), changing the objective
-                          (objective_change_with_compensation/), autofocus and the instrument's
+                          (objective_change_with_compensation/) and the instrument's
                           state and description (instrument/)
     - session/            what the driver remembers about one connection
     - driver_setup/       what is set up once per microscope, one folder per item: limits,

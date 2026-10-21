@@ -169,14 +169,6 @@ def test_capture_save_and_clear_call_their_procedures(scope, monkeypatch):
     ]
 
 
-def test_autofocus_runs_the_job_named(scope, monkeypatch):
-    asked = []
-    monkeypatch.setattr(microscope.autofocus_step, "run_autofocus", lambda handle, procedure: asked.append(procedure) or {"focus_um": 1.0})
-
-    assert scope.autofocus("AF Job") == {"focus_um": 1.0}
-    assert asked == [{"name": "autofocus", "job": "AF Job"}]
-
-
 def test_the_state_and_the_description_are_answered(scope):
     assert scope.state()["changeable"]["job"] in scope.jobs()["jobs"]
     assert "chooses_its_own_folder" in scope.info()

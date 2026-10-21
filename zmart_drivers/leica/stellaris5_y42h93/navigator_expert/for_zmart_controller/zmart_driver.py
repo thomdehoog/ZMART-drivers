@@ -125,7 +125,7 @@ class ZmartDriver:
     # --- procedures ---------------------------------------------------------------------
 
     def get_procedures(self):
-        """``True, procedures``: parking the z-galvo, saving captures, clearing LAS X's cache, autofocus."""
+        """``True, procedures``: parking the z-galvo, saving captures, clearing LAS X's cache."""
         return True, self.microscope.procedures()
 
     def run_procedure(self, procedure):

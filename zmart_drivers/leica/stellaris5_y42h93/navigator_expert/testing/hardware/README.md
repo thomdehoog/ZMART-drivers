@@ -99,7 +99,7 @@ commands a negative Z-wide target and restores it to 0 um.
   no modal dialog open (a dialog blocks the whole CAM API).
 - A template/experiment loaded with **at least two jobs that are not
   autofocus jobs**, whatever they are called, so job-selection round-trips
-  have a target (an autofocus job runs as a procedure and is never selected).
+  have a target (the driver never selects an autofocus job).
 - Stage clear (no sample you care about): `--hardware` first moves to the
   fixed four-axis baseline above, then moves XY in a
   10-position pattern (±25 µm around the current position) and does a ±2 µm
