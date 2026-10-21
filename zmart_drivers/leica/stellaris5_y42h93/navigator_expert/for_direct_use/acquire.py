@@ -39,12 +39,12 @@ from ..vendor_specific.primitive_handling.commands import run_job as _capture
 from ..session import handle as _info
 from ..procedures.absolute_coordinate_system.frame import get_xyz
 from .state import get_state
-from ..session.handle import ZmartHandle, note_unconfirmed, require_open, try_
+from ..session.handle import Session, note_unconfirmed, require_open, try_
 
 log = logging.getLogger(__name__)
 
 
-def get_acquisition_settings(handle: ZmartHandle) -> dict:
+def get_acquisition_settings(handle: Session) -> dict:
     """How a capture is triggered: ``full``, the whole of the selected LAS X job.
 
     That is the only way this driver captures, so it is the only option and
@@ -58,7 +58,7 @@ def get_acquisition_settings(handle: ZmartHandle) -> dict:
     return {"trigger": {"options": ["full"], "default": "full", "active": "full"}}
 
 
-def _with_defaults(handle: ZmartHandle, settings: dict | None) -> dict:
+def _with_defaults(handle: Session, settings: dict | None) -> dict:
     """Validate settings against the menu, filling omissions from the active values."""
     menu = get_acquisition_settings(handle)
     resolved = {name: spec["active"] for name, spec in menu.items()}
@@ -74,7 +74,7 @@ def _with_defaults(handle: ZmartHandle, settings: dict | None) -> dict:
     return resolved
 
 
-def _next_position_label(handle: ZmartHandle) -> str:
+def _next_position_label(handle: Session) -> str:
     """The next per-session position label ("000000", "000001", ...).
 
     Consumes one counter value. Only used when :func:`acquire` gets no
@@ -86,7 +86,7 @@ def _next_position_label(handle: ZmartHandle) -> str:
 
 
 def _export_state(
-    handle: ZmartHandle,
+    handle: Session,
     *,
     stem: str,
     job: str,
@@ -117,7 +117,7 @@ def _export_state(
 
 
 def acquire(
-    handle: ZmartHandle,
+    handle: Session,
     *,
     position_label: str | None = None,
     acquisition_settings: dict | None = None,

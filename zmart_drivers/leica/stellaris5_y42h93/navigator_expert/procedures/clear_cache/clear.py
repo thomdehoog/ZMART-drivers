@@ -13,13 +13,13 @@ from __future__ import annotations
 
 import logging
 
-from ...session.handle import ZmartHandle, require_open
+from ...session.handle import Session, require_open
 from . import release
 
 log = logging.getLogger(__name__)
 
 
-def clear(handle: ZmartHandle) -> dict:
+def clear(handle: Session) -> dict:
     """Have LAS X let go of the pictures of the captures saved so far; say what happened.
 
     Each picture is checked by name just before it is let go of, so nothing

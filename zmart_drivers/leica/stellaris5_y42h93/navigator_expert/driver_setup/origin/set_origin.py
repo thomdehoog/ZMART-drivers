@@ -14,10 +14,10 @@ import time
 
 from .. import store as _machine
 from ...procedures.absolute_coordinate_system.frame import hardware_snapshot
-from ...session.handle import ZmartHandle, require_open
+from ...session.handle import Session, require_open
 
 
-def set_origin(handle: ZmartHandle) -> dict:
+def set_origin(handle: Session) -> dict:
     """Make the current stage position the (0, 0, 0) of the frame and save it.
 
     This is a setup step for the driver, not a controller command. The
