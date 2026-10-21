@@ -26,9 +26,7 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.prim
     PlaneIndex,
     RawPlaneSource,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.acquisition import (
-    run_job as capture,
-)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.settings import run_job as capture
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.save_data import (
     save as acquisition,
 )

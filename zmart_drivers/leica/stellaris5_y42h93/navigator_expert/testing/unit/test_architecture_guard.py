@@ -198,7 +198,6 @@ ALLOWED = {
         "vendor_specific",
         "dispatcher",
         "driver_setup",
-        "__version__",  # acquisition.py records the driver version in the saved state
     },
     "driver_setup": {
         "session",
@@ -217,11 +216,18 @@ ALLOWED = {
         "dispatcher",
         "procedures",
         "driver_setup",
+        "__version__",  # acquire.py records the driver version in the saved state
     },
-    # Everything that faces the controller: the ZmartDriver class, which only
-    # translates the controller's commands into calls of the Microscope.
+    # Everything that faces the controller: the ZmartDriver class, which
+    # translates the controller's commands into calls of the Microscope, and
+    # what only the controller asks for: the description and the procedure menu.
     "for_zmart_controller": {
         "for_direct_use",
+        "session",
+        "dispatcher",
+        "vendor_specific",
+        "procedures",
+        "driver_setup",
     },
     # The package offers the driver used by itself, and nothing else.
     "__init__": {

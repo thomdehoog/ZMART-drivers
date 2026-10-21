@@ -9,10 +9,10 @@ University of Zurich (thom.dehoog@zmb.uzh.ch, thomdehoog@gmail.com).
 
 from __future__ import annotations
 
-from ..clear_cache.clear import clear
-from ..save_data.save_captures import save_waiting
-from ..absolute_coordinate_system.frame import zero_z_galvo
-from ...session.handle import ZmartHandle, require_open
+from ..procedures.clear_cache.clear import clear
+from ..procedures.save_data.save_captures import save_waiting
+from ..procedures.absolute_coordinate_system.frame import zero_z_galvo
+from ..session.handle import ZmartHandle, require_open
 
 
 def get_procedures(handle: ZmartHandle) -> dict:

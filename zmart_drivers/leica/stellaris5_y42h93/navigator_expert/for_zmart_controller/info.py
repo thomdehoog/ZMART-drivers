@@ -10,13 +10,13 @@ University of Zurich (thom.dehoog@zmb.uzh.ch, thomdehoog@gmail.com).
 from __future__ import annotations
 
 from pathlib import Path
-from ...session import loaded_config as _session_state
-from ...driver_setup import store as _machine
-from ...dispatcher import gate as _gate
-from ...vendor_specific.primitive_handling.readings import state as _readers
-from ...session import handle as _info
-from ..absolute_coordinate_system.frame import canvas, get_xyz
-from ...session.handle import ZmartHandle, job_catalog, require_open, try_
+from ..session import loaded_config as _session_state
+from ..driver_setup import store as _machine
+from ..dispatcher import gate as _gate
+from ..vendor_specific.primitive_handling.readings import state as _readers
+from ..session import handle as _info
+from ..procedures.absolute_coordinate_system.frame import canvas, get_xyz
+from ..session.handle import ZmartHandle, job_catalog, require_open, try_
 
 
 def get_info(handle: ZmartHandle) -> dict:

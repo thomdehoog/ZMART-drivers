@@ -169,9 +169,14 @@ def test_capture_save_and_clear_call_their_procedures(scope, monkeypatch):
     ]
 
 
-def test_the_state_and_the_description_are_answered(scope):
+def test_the_state_names_the_selected_job(scope):
     assert scope.state()["changeable"]["job"] in scope.jobs()["jobs"]
-    assert "chooses_its_own_folder" in scope.info()
+
+
+def test_what_only_the_controller_asks_for_is_not_on_the_microscope():
+    """The description for get_info and the procedure menu are the controller's, in for_zmart_controller/."""
+    for name in ("info", "procedures", "run_procedure", "autofocus"):
+        assert not hasattr(navigator_expert.Microscope, name), name
 
 
 def test_a_closed_microscope_refuses(scope):

@@ -15,7 +15,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from ..save_data.naming import Naming
+from ..procedures.save_data.naming import Naming
 
 
 @dataclass
