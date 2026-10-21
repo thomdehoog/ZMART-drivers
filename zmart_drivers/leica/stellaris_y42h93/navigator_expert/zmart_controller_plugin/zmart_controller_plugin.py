@@ -66,7 +66,7 @@ class ZmartControllerPlugin:
     # --- describing the setup ---------------------------------------------------------
 
     def get_info(self):
-        """``True, (description, setup, chooses_its_own_folder)``.
+        """``True, (description, setup, chooses_its_own_folder, connection_status)``.
 
         The description says what the other commands cannot: what each
         setting means, in which unit and within which bounds, which
@@ -74,9 +74,16 @@ class ZmartControllerPlugin:
         each thing set up once on this microscope, done or not, in words.
         ``chooses_its_own_folder`` is False: the driver writes every file
         itself, from LAS X's cache, so it saves where ``acquire`` is told.
+        ``connection_status`` is what the session stands on, each check in
+        words, for the operator's Connect step.
         """
         answer = info.get_info(self.microscope.handle)
-        return True, (answer["description"], answer["setup"], answer["chooses_its_own_folder"])
+        return True, (
+            answer["description"],
+            answer["setup"],
+            answer["chooses_its_own_folder"],
+            answer["connection_status"],
+        )
 
     def get_actuators(self):
         """``True, (x, y, z)``: per axis the motors and the default, ``{"options": [...], "default": ...}``."""

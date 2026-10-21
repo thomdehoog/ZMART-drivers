@@ -96,6 +96,9 @@ def test_the_class_describes_the_microscope_and_what_is_set_up(monkeypatch, tmp_
     }
     for item in class_info["setup"].values():
         assert isinstance(item["done"], bool) and item["says"].strip()
+    # What the session stands on, each check in words: the operator's Connect step lists them.
+    assert class_info["connection_status"]
+    assert all(isinstance(said, str) and said for said in class_info["connection_status"].values())
     assert as_class["get_xyz"]["z"]["actuator_readings"].keys() == {"z-wide", "z-galvo"}
 
 

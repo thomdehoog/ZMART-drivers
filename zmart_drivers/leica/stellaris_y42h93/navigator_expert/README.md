@@ -9,7 +9,7 @@ notebooks keep the thin 1–3-line invocation style used across the ZMART driver
 
 - **Author:** Thom de Hoog (ZMB, University of Zurich) · thom.dehoog@zmb.uzh.ch · thomdehoog@gmail.com
 - **License:** see the repository root [`LICENSE`](../../../../LICENSE).
-- **Status:** **Beta (`7.0.0b1`).** Version 7 reads LAS X's state and sends its changes to LAS X's
+- **Status:** **Beta (`0.7.0b1`).** Version 0.7 reads LAS X's state and sends its changes to LAS X's
   hardware server first, and falls back to the CAM API when the hardware server cannot take a
   command (see [Routes](#routes-direct-first-the-cam-api-behind-it)). Taking a picture, saving it and
   letting LAS X go of its cache are three separate steps. It has been tested on the LAS X
@@ -162,7 +162,7 @@ and `LogReaderProfile` in `primitives/log/log_settings.py`. Override them there,
   (image↔stage matrix, per-objective translation), limits, orientation, and origin from a
   machine-local ProgramData (`C:\ProgramData\zmart-microscopy\leica\stellaris_y42h93
 avigator_expert`;
-  on a PC set up with a version before 7.0.0b1 the folder is still called `stellaris5_y42h93`: rename
+  on a PC set up with a version before 0.7.0b1 the folder is still called `stellaris5_y42h93`: rename
   it once to `stellaris_y42h93`, or the driver finds no limits and refuses every move).
   Directly below `navigator_expert`, each subsystem owns an independent
   timestamp tree: `limits/<datetime>/`, `calibration/<datetime>/`,

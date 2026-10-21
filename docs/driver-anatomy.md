@@ -224,7 +224,7 @@ sits together in `zmart_controller_plugin/`, so that the controller's side is in
 one place. The operator registers the driver's own folder, the one that holds
 `zmart_controller_plugin/`; the controller finds both files there by their names and
 imports the class as part of the driver's package, so it can use the driver's code
-(controller 0.4.0rc3).
+(controller 0.4.0rc4).
 
 What changed from the first version of this layout: the `actions/` folder is
 gone, `client.py` is split into `connection/` and the `primitives/` folder,
@@ -1434,7 +1434,7 @@ methods, and each one only puts the parts above to work:
 
 | Method | Built from | Hands back |
 |---|---|---|
-| `get_info` | The machine description and the limits (part 6) | `True, (description, setup, chooses_its_own_folder)`: the microscope in plain words, for whoever drives it, a person or a program, what is set up once on it, and whether its software always saves in its own place |
+| `get_info` | The machine description and the limits (part 6) | `True, (description, setup, chooses_its_own_folder, connection_status)`: the microscope in plain words, for whoever drives it, a person or a program, what is set up once on it, whether its software always saves in its own place, and what the session stands on, each check in words |
 | `get_actuators` | The machine description | `True, (x, y, z)`: per axis `{"options": [...], "default": ...}`, the motors and the one the driver chooses when a command does not |
 | `get_xyz` | The reading for position (part 3) | `True, (x, y, z, actuators, canvas)`: the position in user coordinates, every motor's raw reading, and everywhere a picture can show |
 | `set_xyz` | The change for position (part 3), then `get_xyz` | The same as `get_xyz`, read from the microscope once the stage has arrived |
