@@ -1,12 +1,18 @@
-# ruff: noqa: E402,I001,F401
 """Navigator Expert driver for Leica LAS X.
+
+Use the driver by itself with ``connect()``, which opens LAS X and hands back
+a ``Microscope``; the README says what it can do. The ZMART Controller plugs
+the driver in through ``for_zmart_controller/``, which is built on the same
+``Microscope``.
 
 Package layout, the anatomy of a ZMART driver (``docs/driver-anatomy.md`` in
 this repository)::
 
     navigator_expert/
-    - for_zmart_controller/  what the controller sees: the ZmartDriver class (zmart_driver.py), one
-                          method per controller command, and the driver's rolling log
+    - for_direct_use/     the driver used by itself: connect() and the Microscope, and the
+                          driver's rolling log
+    - for_zmart_controller/  what the controller sees: the ZmartDriver class (zmart_driver.py),
+                          one method per controller command, each a call of the Microscope
     - procedures/         the recipes, one folder each: taking a picture (acquisition/), saving
                           it (save_data/), letting LAS X's cache go (clear_cache/), the stage
                           frame (absolute_coordinate_system/), changing the objective
@@ -24,168 +30,13 @@ this repository)::
                           numbers, the primitives (the smallest reads and writes) and
                           primitive_handling/, which says how each command is treated
     - testing/            the mock LAS X API, the offline suite, the hardware validators
+
+Author: Thom de Hoog, Center for Microscopy and Image Analysis (ZMB),
+University of Zurich (thom.dehoog@zmb.uzh.ch, thomdehoog@gmail.com).
 """
 
 __version__ = "7.0.0b1"
 
-__all__ = [
-    # the driver used by itself
-    "connect",
-    "Microscope",
-    # logging
-    "log",
-    # parsing
-    "parse_tile_geometry",
-    # limits
-    "set_stage_limits",
-    "get_stage_limits",
-    "apply_stage_limits_from_config",
-    # limits handshake and command safety gate
-    "connect_limits_handshake",
-    # readers
-    "Reading",
-    "get_scan_status",
-    "ping",
-    "get_job_settings",
-    "get_hardware_info",
-    "get_xy",
-    "read_zwide_um",
-    "get_jobs",
-    "get_job_by_name",
-    "get_selected_job",
-    "get_fov",
-    "get_base_fov",
-    "get_lasx_settings",
-    "get_pending_dialog",
-    # settings
-    "make_changeable_copy",
-    # commands
-    "set_zoom",
-    "set_scan_speed",
-    "set_scan_resonant",
-    "set_scan_mode",
-    "set_sequential_mode",
-    "set_scan_field_rotation",
-    "set_image_format",
-    "set_objective",
-    "set_z_stack_definition",
-    "set_z_stack_step_size",
-    "set_z_stack_size",
-    "set_frame_accumulation",
-    "set_frame_average",
-    "set_line_accumulation",
-    "set_line_average",
-    "set_pinhole_airy",
-    "set_detector_gain",
-    "set_laser_intensity",
-    "set_laser_shutter",
-    "set_filter_wheel_slot",
-    "set_filter_wheel_spectrum",
-    "move_xy",
-    "move_z",
-    # acquisition, not a command: acquire RAISES on failure and returns an
-    # AcquisitionResult, never a result dict (see acquisition.capture)
-    "acquire",
-    "select_job",
-    # session helpers
-    "connect_python_client",
-    # acquisition workflow
-    "AcquisitionResult",
-    "PlaneIndex",
-    "PositionIndex",
-    "SavedAcquisition",
-    "save",
-]
+__all__ = ["__version__", "connect", "Microscope"]
 
-# -- parsing + command mechanics
-from .vendor_specific.primitive_handling.readings.parsing import (
-    _safe_float,
-    make_changeable_copy,
-    parse_format,
-    parse_tile_geometry,
-)
-from .dispatcher.door import make_log_entry as _make_log_entry
-from .vendor_specific.primitive_handling.profiles.error_classification import (
-    _is_transient_error,
-    _check_api_error,
-    _default_error_check,
-)
-from .vendor_specific.primitive_handling.readings.state import (
-    Reading,
-    get_scan_status,
-    ping,
-    get_job_settings,
-    get_hardware_info,
-    get_xy,
-    read_zwide_um,
-    get_jobs,
-    get_job_by_name,
-    get_selected_job,
-    get_fov,
-    get_base_fov,
-    get_lasx_settings,
-    get_pending_dialog,
-)
-from .vendor_specific.primitive_handling.confirmations.confirmations import _readback
-from .vendor_specific.primitive_handling.settings.changes import (
-    set_zoom,
-    set_scan_speed,
-    set_scan_resonant,
-    set_scan_mode,
-    set_sequential_mode,
-    set_scan_field_rotation,
-    set_image_format,
-    set_z_stack_definition,
-    set_z_stack_step_size,
-    set_z_stack_size,
-    set_frame_accumulation,
-    set_frame_average,
-    set_line_accumulation,
-    set_line_average,
-    set_pinhole_airy,
-    set_detector_gain,
-    set_laser_intensity,
-    set_laser_shutter,
-    set_filter_wheel_slot,
-    set_filter_wheel_spectrum,
-    move_xy,
-    move_z,
-)
-from .procedures.objective_change_with_compensation.compensated_changes import (
-    set_objective,
-    select_job,
-)
-from .vendor_specific.connection.lasx_client import connect_python_client
-
-# -- driver_setup/limits/handshake.py - the connect-time limits handshake
-from .driver_setup.limits.handshake import connect_handshake as connect_limits_handshake
-
-# -- vendor_specific/primitive_handling/settings/limit_rules.py - the rulebook: stage checks + the compiled limits document
-from .vendor_specific.primitive_handling.settings.limit_rules import (
-    _stage_limits,
-    set_stage_limits,
-    get_stage_limits,
-    apply_stage_limits_from_config,
-    check_xy,
-    check_z,
-)
-
-# -- acquisition/ - capture, file arrival, and save handling
-from .procedures.acquisition.run_job import AcquisitionResult, acquire
-from .vendor_specific.primitives.capture.product import (
-    AcquisitionMetadata,
-    ChannelMetadata,
-    PlaneIndex,
-    PlaneSource,
-    PositionIndex,
-    VendorMetadataSource,
-)
-from .procedures.save_data.saved_acquisition import SavedAcquisition
-from .procedures.save_data.save import save
-
-# -- logging
-import logging
-
-log = logging.getLogger(__name__)
-
-from .for_direct_use.microscope import Microscope, connect  # noqa: E402
+from .for_direct_use.microscope import Microscope, connect
