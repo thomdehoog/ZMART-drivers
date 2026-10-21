@@ -20,7 +20,7 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher.door impo
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.limits.handshake import (
     connect_handshake as connect_limits_handshake,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.acquisition.run_job import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.settings.run_job import (
     AcquisitionResult,
     acquire,
 )

@@ -45,7 +45,7 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.optical
     calibration_common as cm,
 )
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.limits import handshake
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.acquisition import run_job
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.settings import run_job
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.save_data import save as saving
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.connection import lasx_client
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings import parsing

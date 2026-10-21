@@ -14,8 +14,8 @@ from __future__ import annotations
 import time
 from typing import Any
 
-from ...vendor_specific.primitives.capture.product import AcquisitionResult
-from ...vendor_specific.primitive_handling.settings import changes as _commands
+from ...primitives.capture.product import AcquisitionResult
+from . import changes as _commands
 
 __all__ = ["AcquisitionResult", "acquire"]
 

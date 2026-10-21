@@ -12,10 +12,12 @@ the driver once on the LAS X computer, then connect by name in every session::
     mic.connect("stellaris")
     mic.get_xyz()
 
-The class only translates. The driver itself is the ``Microscope`` in
+The class translates. The driver itself is the ``Microscope`` in
 ``for_direct_use/microscope.py``, which can also be used without the
 controller; each method here calls it and gives the answer the shape the
-controller takes. ``acquire`` takes the picture and saves it, and never
+controller takes. What only the controller asks for lives beside this file:
+the description of ``get_info`` (``info.py``) and the menu of named
+procedures (``procedure_menu.py``). ``acquire`` takes the picture and saves it, and never
 clears LAS X's cache: that is the ``clear_cache`` procedure.
 
 Each method hands back ``True`` and the values when the microscope did what
@@ -40,6 +42,7 @@ from __future__ import annotations
 from typing import Any
 
 from ..for_direct_use.microscope import Microscope
+from . import info, procedure_menu
 
 #: The three axes, in the order the controller's canvas lists them.
 AXES = ("x", "y", "z")
@@ -68,8 +71,8 @@ class ZmartDriver:
         ``chooses_its_own_folder`` is False: the driver writes every file
         itself, from LAS X's cache, so it saves where ``acquire`` is told.
         """
-        info = self.microscope.info()
-        return True, (info["description"], info["setup"], info["chooses_its_own_folder"])
+        answer = info.get_info(self.microscope.handle)
+        return True, (answer["description"], answer["setup"], answer["chooses_its_own_folder"])
 
     def get_actuators(self):
         """``True, (x, y, z)``: per axis the motors and the default, ``{"options": [...], "default": ...}``."""
@@ -126,12 +129,11 @@ class ZmartDriver:
 
     def get_procedures(self):
         """``True, procedures``: parking the z-galvo, saving captures, clearing LAS X's cache."""
-        return True, self.microscope.procedures()
+        return True, procedure_menu.get_procedures(self.microscope.handle)
 
     def run_procedure(self, procedure):
         """Run the routine named by ``procedure["name"]``; the other keys are its arguments."""
-        arguments = dict(procedure)
-        return True, self.microscope.run_procedure(arguments.pop("name", None), **arguments)
+        return True, procedure_menu.run_procedure(self.microscope.handle, dict(procedure))
 
 
 def as_controller_xyz(answer: dict) -> tuple:

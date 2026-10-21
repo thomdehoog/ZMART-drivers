@@ -18,7 +18,7 @@ CHILD_SCRIPT = """
 import sys
 # Mimic an example-script entry point: only the repository root on sys.path.
 sys.path.insert(0, r"{repo}")
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.acquisition import run_job
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.settings import run_job
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.save_data import save as saving
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.save_data import saved_acquisition
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.connection import lasx_runtime

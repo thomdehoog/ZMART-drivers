@@ -14,15 +14,15 @@ from __future__ import annotations
 import logging
 import math
 from typing import Any
-from ...session import loaded_config as _session_state
-from ...dispatcher import gate as _gate
-from ...vendor_specific.primitive_handling.readings.parsing import (
+from ..session import loaded_config as _session_state
+from ..dispatcher import gate as _gate
+from ..vendor_specific.primitive_handling.readings.parsing import (
     parse_tile_geometry as _parse_tile_geometry,
 )
-from ...vendor_specific.primitive_handling.readings import state as _readers
-from ..objective_change_with_compensation import compensated_changes as _compensated
-from ...session import handle as _info
-from ...session.handle import ZmartHandle, job_catalog, note_unconfirmed, require_open
+from ..vendor_specific.primitive_handling.readings import state as _readers
+from ..procedures.objective_change_with_compensation import compensated_changes as _compensated
+from ..session import handle as _info
+from ..session.handle import ZmartHandle, job_catalog, note_unconfirmed, require_open
 
 log = logging.getLogger(__name__)
 

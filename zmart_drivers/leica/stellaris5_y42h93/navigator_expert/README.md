@@ -244,9 +244,6 @@ when no folder is given), `load_limits`, `load_calibration` and `load_origin` (a
 | `save(label=None)` | Write the captures that are waiting as OME-Zarr, with their projection and log. |
 | `clear_cache()` | Have LAS X let go of the pictures that were saved. Acquiring and saving never do this. |
 | `state()` | The selected job, and what can only be read: the instrument, the objectives, the limits in force, the changes that were never confirmed. |
-| `info()` | The instrument in words, and what is set up on it. |
-| `procedures()` | The named procedures, with a description each. |
-| `run_procedure(name, **arguments)` | Run one of them by name. |
 | `close()` | Close the session. Every later call is refused. |
 | `client` | The LAS X client itself, for the setup notebooks. |
 

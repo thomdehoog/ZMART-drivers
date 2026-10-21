@@ -58,15 +58,9 @@ TRUE_T = {1: (0.0, 0.0, 0.0), 2: (50.0, -30.0, 7.0), 3: (-12.5, 4.0, -3.25)}
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.absolute_coordinate_system import (
     frame as _frame,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.instrument import (
-    info as _instrument_info,
-)
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.instrument import (
-    menu as _instrument_menu,
-)
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.instrument import (
-    state as _instrument_state,
-)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.for_zmart_controller import info as _controller_info
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.for_zmart_controller import procedure_menu as _procedure_menu
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.for_direct_use import state as _state_record
 
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.session.handle import (
     ZmartHandle,
@@ -357,7 +351,7 @@ def test_zero_z_galvo_procedure_preserves_frame_z():
 
     with _running(sim):
         z_before = _frame.get_xyz(h)["z"]["position"]
-        result = _instrument_menu.run_procedure(h, {"name": "zero_z_galvo"})
+        result = _procedure_menu.run_procedure(h, {"name": "zero_z_galvo"})
         z_after = _frame.get_xyz(h)["z"]["position"]
 
     assert sim.z_galvo == 0.0
@@ -371,7 +365,7 @@ def test_zero_z_galvo_is_a_noop_when_already_zero():
     h = _handle_at(sim)
     before = sim.state()
     with _running(sim):
-        result = _instrument_menu.run_procedure(h, {"name": "zero_z_galvo"})
+        result = _procedure_menu.run_procedure(h, {"name": "zero_z_galvo"})
     assert sim.state() == before
     assert result["transferred_um"] == 0.0
 
@@ -390,5 +384,5 @@ def test_zero_z_galvo_refused_first_leg_moves_nothing():
 
     with _running(sim), patch.object(_commands, "move_z", refusing_move_z):
         with pytest.raises(RuntimeError, match="zero_z_galvo"):
-            _instrument_menu.run_procedure(h, {"name": "zero_z_galvo"})
+            _procedure_menu.run_procedure(h, {"name": "zero_z_galvo"})
     assert sim.state() == before

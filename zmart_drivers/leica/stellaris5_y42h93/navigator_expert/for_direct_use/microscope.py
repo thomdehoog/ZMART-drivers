@@ -43,11 +43,9 @@ from ..driver_setup.origin import saved_origin
 from ..driver_setup.origin import set_origin as origin_step
 from ..driver_setup.store import MACHINE
 from ..procedures.absolute_coordinate_system import frame
-from ..procedures.acquisition import acquire as acquire_step
+from . import acquire as acquire_step
 from ..procedures.clear_cache import clear as clear_step
-from ..procedures.instrument import info as info_step
-from ..procedures.instrument import menu
-from ..procedures.instrument import state as state_step
+from . import state as state_step
 from ..procedures.objective_change_with_compensation import compensated_changes
 from ..procedures.save_data import save_captures as save_step
 from ..procedures.save_data.naming import run_hash
@@ -289,23 +287,11 @@ class Microscope:
         """Have LAS X let go of the pictures saved so far; answers ``{"cleared", "failed"}``."""
         return clear_step.clear(self.handle)
 
-    # --- describing the instrument ----------------------------------------------------------
+    # --- the state ------------------------------------------------------------------------
 
     def state(self) -> dict:
         """``{"changeable", "observed"}``: the selected job, and what can only be read, with the unconfirmed changes."""
         return state_step.get_state(self.handle)
-
-    def info(self) -> dict:
-        """``{"description", "setup", "chooses_its_own_folder"}``: the instrument in words, and what is set up on it."""
-        return info_step.get_info(self.handle)
-
-    def procedures(self) -> dict:
-        """The named procedures, with a plain description each, as the controller lists them."""
-        return menu.get_procedures(self.handle)
-
-    def run_procedure(self, name: str, **arguments: Any) -> dict:
-        """Run the procedure *name* from :meth:`procedures`, with its arguments."""
-        return menu.run_procedure(self.handle, {"name": name, **arguments})
 
 
 def checked(handle: ZmartHandle, result: dict, what: str) -> dict:
