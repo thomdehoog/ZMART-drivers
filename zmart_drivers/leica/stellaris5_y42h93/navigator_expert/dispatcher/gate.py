@@ -1,7 +1,7 @@
 """Limits gate for the commands layer.
 
 Maintainer decision (MAINTAINER_DECISIONS.md §7): limits are enforced as low
-as possible — at the command wrapper that populates the native CAM function's
+as possible — at the command wrapper that populates the native function's
 model — so nothing built on top (adapter, controller, workflows, notebooks)
 can interfere with or bypass them. The rules themselves (what is allowed:
 ``LeicaLimits`` and the stage checks) live in ``vendor_specific/primitive_handling/limit_rules.py``; this
@@ -43,7 +43,7 @@ shook hands at all still refuses fail-closed.
 Single-writer invariant: like command dispatch (``confirm_loop.py``) and the
 stage-envelope module global (``vendor_specific/primitive_handling/limit_rules.py``), this registry assumes
 ONE instrument per process. The registry is keyed by ``id(client)`` and holds
-a strong reference to the client (CAM clients are process-lifetime), so an id
+a strong reference to the client (microscope clients are process-lifetime), so an id
 can never be recycled onto a different client. A second ``connect_handshake``
 for the same client rebinds its state; the module-global stage envelope is
 rebound by whichever handshake ran last.
@@ -102,7 +102,7 @@ class GateStatus:
 # id(client) -> (client, GateState). The client reference is deliberately
 # strong: it pins the id so a garbage-collected client's id can never be
 # recycled onto a new, never-handshaken client that would then inherit stale
-# limits. CAM clients are process-lifetime, so this is not a leak in practice.
+# limits. microscope clients are process-lifetime, so this is not a leak in practice.
 _GATE_STATE: dict[int, tuple[Any, GateState]] = {}
 
 

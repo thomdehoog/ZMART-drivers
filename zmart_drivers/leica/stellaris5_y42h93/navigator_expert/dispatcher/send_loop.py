@@ -3,11 +3,12 @@
 This is the first of the two loops of a change. It runs four steps:
 
 1. **Pre-check**: ask the microscope whether it is ready (for example, idle).
-2. **Setup**: write the command's values into the request.
+2. **Setup**: have the transport write the command's values into the request.
 3. **Fire**: send the request. How a request is sent and its reply awaited is
    the business of the command's ``profile.transport`` (for LAS X,
    ``vendor_specific/primitive_handling/transport.py``); this file only asks
-   it to clear the reply, send, wait for the reply and report an open dialog.
+   it to fill in the request, clear the reply, send, wait for the reply and
+   report an open dialog.
 4. **Error check**: read what the microscope answered. A temporary problem is
    sent again, up to ``max_retries`` times, with an optional pause that can
    grow. A permanent problem stops the loop at once.
@@ -21,9 +22,9 @@ calls functions it is handed and acts on the dictionaries they return. It does
 not poll for the microscope's state: that is the second loop, in
 ``confirm_loop.py``.
 
-Commands are sent one at a time. The shared reply field of the LAS X API is
-cleared, fired and read without a lock, so two threads sending on one client
-would trample each other's reply.
+Commands are sent one at a time. A microscope may answer every request in one
+shared reply, which is cleared, sent and read without a lock, so two threads
+sending on one client would trample each other's reply.
 
 Author: Thom de Hoog, Center for Microscopy and Image Analysis (ZMB),
 University of Zurich (thom.dehoog@zmb.uzh.ch, thomdehoog@gmail.com).
@@ -70,7 +71,7 @@ def resolve_profile(profile, **overrides):
 
 def fire_block(
     client,
-    api_obj,
+    request,
     description,
     *,
     profile=None,
@@ -80,26 +81,28 @@ def fire_block(
     max_retries=None,
     retry_backoff=None,
     retry_escalate=None,
-    skip_echo=None,
-    fire_async=None,
+    skip_reply_check=None,
+    send_without_receipt=None,
 ):
     """Execute the four-step fire pipeline with transient retry.
 
     Steps:
         1. Pre-check - call ``pre_check_fn()`` (zero-arg, returns result dict).
-        2. Setup - call ``setup_fn(api_obj.Model)`` to write parameters.
-        3. Fire - clear echo, ``deliver(api_obj)``.
+        2. Setup - the transport calls ``setup_fn`` on the request to write parameters.
+        3. Fire - clear the reply, send the request through the transport.
         4. Error check - call ``error_check_fn()`` (zero-arg, returns result dict).
 
-    Steps 1-4 repeat on transient API errors, up to ``max_retries`` + 1
+    Steps 1-4 repeat on transient errors, up to ``max_retries`` + 1
     total attempts. Pre-check functions own their own polling internally.
     The fire block never knows what it is checking.
 
     Args:
-        client: LAS X API client.
-        api_obj: Resolved API object (e.g. client.PyApiSetZoomByJobName).
+        client: The connected microscope client.
+        request: The request to send, in whatever form the transport expects
+            (the dispatcher never looks inside it).
         description: Human-readable label for logging.
-        setup_fn: Callable(model) that writes parameters to api_obj.Model.
+        setup_fn: Callable that writes the parameters; the transport decides
+            what it is called with. None to skip setup.
             None to skip setup.
         pre_check_fn: Zero-arg callable -> result dict with "success" and
             "logs". None to skip step 1.
@@ -114,10 +117,10 @@ def fire_block(
         retry_escalate: If True, double the delay after each retry
             (exponential backoff: 0s, base, 2×base, 4×base, ...).
             If False, use a fixed delay. Ignored when retry_backoff is None.
-        skip_echo: If True, skip the echo error check step entirely (the
+        skip_reply_check: If True, skip the check of the microscope's reply entirely (the
             confirm_fn is then the authoritative completion signal).
-        fire_async: If True, fire via UpdateAsync (blanking the echo) instead
-            of UpdateAwaitReceipt.
+        send_without_receipt: If True, send without waiting for the microscope to
+            confirm receipt.
 
     Returns:
         {
@@ -133,8 +136,8 @@ def fire_block(
         max_retries=max_retries,
         retry_backoff=retry_backoff,
         retry_escalate=retry_escalate,
-        skip_echo=skip_echo,
-        fire_async=fire_async,
+        skip_reply_check=skip_reply_check,
+        send_without_receipt=send_without_receipt,
     )
     transport = profile.transport
     t_pre_check = 0.0
@@ -179,7 +182,7 @@ def fire_block(
         t0 = time.perf_counter()
         try:
             if setup_fn is not None:
-                setup_fn(api_obj.Model)
+                transport.fill(request, setup_fn)
         except Exception as e:
             t_setup += time.perf_counter() - t0
             msg = f"{description} | Setup exception: {e}"
@@ -199,22 +202,22 @@ def fire_block(
             }
         t_setup += time.perf_counter() - t0
 
-        # --- Step 3: Fire + await echo ---
+        # --- Step 3: Fire + await the reply ---
         t0 = time.perf_counter()
         try:
             transport.clear_reply(client)
             delivered, answered = transport.send(
-                client, api_obj, description, asynchronous=profile.fire_async
+                client, request, description, asynchronous=profile.send_without_receipt
             )
             for message in answered:
                 all_logs.append(_make_log_entry("warning", message))
-            if delivered and not profile.skip_echo and not profile.fire_async:
+            if delivered and not profile.skip_reply_check and not profile.send_without_receipt:
                 if not transport.await_reply(client):
-                    # The echo never settled: a LAS X rejection arriving
-                    # after this window is invisible to the error check
-                    # below (it reads a still-cleared echo). Only the
-                    # readback confirmation can catch it — leave a trace.
-                    msg = f"{description} | Command echo did not settle; error check may miss a late rejection"
+                    # The reply never settled: a rejection arriving after this
+                    # window is invisible to the error check below (it reads a
+                    # still-cleared reply). Only the readback confirmation can
+                    # catch it — leave a trace.
+                    msg = f"{description} | The reply did not settle; the error check may miss a late rejection"
                     log.warning(msg)
                     all_logs.append(_make_log_entry("warning", msg))
         except Exception as e:
@@ -262,7 +265,7 @@ def fire_block(
             try:
                 err_result = error_check_fn()
             except Exception as e:
-                # A raising check (transient COM fault reading the echo) must
+                # A raising check (a transient fault reading the reply) must
                 # not escape as an exception; classify it transient so the
                 # normal retry path decides.
                 msg = f"{description} | Error check raised: {type(e).__name__}: {e}"
@@ -279,7 +282,7 @@ def fire_block(
         all_logs.extend(err_result.get("logs", []))
 
         if err_result["success"]:
-            # No API error - fire block succeeded
+            # No error - the send succeeded
             break
 
         error_msg = err_result.get("error", "")
@@ -323,7 +326,7 @@ def fire_block(
 
         return {
             "success": False,
-            "message": f"{description} | API Error: {error_msg}",
+            "message": f"{description} | Error: {error_msg}",
             "timing": {
                 "pre_check_s": t_pre_check,
                 "setup_s": t_setup,

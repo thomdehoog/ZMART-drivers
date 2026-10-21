@@ -961,11 +961,11 @@ class TestCommandProfileGuard(unittest.TestCase):
         # Async fire blanks the echo, so a live echo-based error check would
         # report a meaningless success.
         with self.assertRaises(ValueError):
-            profiles.CommandProfile(fire_async=True)  # error_check_fn defaults live
+            profiles.CommandProfile(send_without_receipt=True)  # error_check_fn defaults live
 
     def test_async_with_null_error_check_is_allowed(self):
-        p = profiles.CommandProfile(fire_async=True, error_check_fn=None)
-        self.assertTrue(p.fire_async)
+        p = profiles.CommandProfile(send_without_receipt=True, error_check_fn=None)
+        self.assertTrue(p.send_without_receipt)
         self.assertIsNone(p.error_check_fn)
 
     def test_single_confirm_attempt_forbids_refire(self):
@@ -2583,7 +2583,7 @@ class TestDispatchCheckExceptions(unittest.TestCase):
             "TestCmd",
             profile=profiles.CommandProfile(
                 error_check_fn=None,
-                fire_async=True,
+                send_without_receipt=True,
                 max_retries=0,
             ),
             setup_fn=None,
