@@ -55,7 +55,7 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.absolute_
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.for_zmart_controller import procedure_menu as _procedure_menu
 
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.session.handle import (
-    ZmartHandle,
+    Session,
 )
 
 
@@ -80,9 +80,9 @@ class SimScope:
         return (self.x, self.y, self.z_wide, self.z_galvo, self.slot)
 
 
-def _handle_at(sim: SimScope) -> ZmartHandle:
+def _handle_at(sim: SimScope) -> Session:
     """A handle whose origin is the sim's current state (like set_origin)."""
-    h = ZmartHandle(client=SimpleNamespace(), connection={}, hash6="ground1")
+    h = Session(client=SimpleNamespace(), connection={}, hash6="ground1")
     h.origin = {
         "x_um": sim.x,
         "y_um": sim.y,

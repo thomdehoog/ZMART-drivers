@@ -22,13 +22,13 @@ from ..vendor_specific.primitive_handling.readings.parsing import (
 from ..vendor_specific.primitive_handling.readings import named_readings as _readers
 from ..procedures.objective_change_with_compensation import compensated_changes as _compensated
 from ..session import handle as _info
-from ..session.handle import ZmartHandle, job_catalog, note_unconfirmed, require_open
+from ..session.handle import Session, job_catalog, note_unconfirmed, require_open
 
 log = logging.getLogger(__name__)
 
 
 def setup_readiness(
-    handle: ZmartHandle,
+    handle: Session,
     active_objective: dict | None,
     limits: dict | None,
 ) -> dict:
@@ -103,7 +103,7 @@ def setup_readiness(
     }
 
 
-def get_state(handle: ZmartHandle) -> dict:
+def get_state(handle: Session) -> dict:
     """The instrument state: the changeable part first, then the observed report.
 
     ``changeable`` is the promise — exactly what :func:`set_state` reapplies.
@@ -187,7 +187,7 @@ def get_state(handle: ZmartHandle) -> dict:
     }
 
 
-def set_state(handle: ZmartHandle, state: dict) -> dict:
+def set_state(handle: Session, state: dict) -> dict:
     """Apply the changeable part; report what stuck.
 
     ``observed`` is a report, never an instruction — it is not read here

@@ -16,10 +16,10 @@ from ..dispatcher import gate as _gate
 from ..vendor_specific.primitive_handling.readings import named_readings as _readers
 from ..session import handle as _info
 from ..procedures.absolute_coordinate_system.frame import canvas, get_xyz
-from ..session.handle import ZmartHandle, job_catalog, require_open, try_
+from ..session.handle import Session, job_catalog, require_open, try_
 
 
-def get_info(handle: ZmartHandle) -> dict:
+def get_info(handle: Session) -> dict:
     """Read the session's setup and resolved output root live.
 
     The LAS X scanning template is never read: positions are never made in
@@ -59,7 +59,7 @@ Objectives on the turret, as slot: LAS X objective number: {objectives}.
 Acquiring has one trigger, full: it runs the selected LAS X job and saves what LAS X captured in the output folder acquire is given, or else under this microscope's data location, each file named by the acquisition type and the position label it was given, then the time point, the channel and the plane."""
 
 
-def _described(handle: ZmartHandle) -> str:
+def _described(handle: Session) -> str:
     """The description, filled in from the loaded limits and what LAS X reports now."""
     state = _gate.state_for(handle.client)
     galvo_range = None
@@ -89,7 +89,7 @@ def _described(handle: ZmartHandle) -> str:
     return DESCRIPTION.format(galvo=galvo, jobs=jobs, objectives=objectives)
 
 
-def _setup(handle: ZmartHandle) -> dict:
+def _setup(handle: Session) -> dict:
     """Each thing set up once on this microscope, whether it is done, and in words what it holds or what to do."""
     limits = _gate.describe(handle.client) or {}
     loaded = _session_state.get(handle.client)
@@ -145,7 +145,7 @@ def _setup(handle: ZmartHandle) -> dict:
     }
 
 
-def _where_it_saves(handle: ZmartHandle) -> Path | None:
+def _where_it_saves(handle: Session) -> Path | None:
     """The folder this session saves under, or None when there is none yet."""
     try:
         return _info.output_root(handle)
@@ -172,7 +172,7 @@ def _calibration_status(calibration: dict | None) -> str:
     return "failed — no usable calibration, so objective changes are refused"
 
 
-def _connection_status(handle: ZmartHandle, root: Path | None) -> dict:
+def _connection_status(handle: Session, root: Path | None) -> dict:
     """What a session stands on, from what the driver already holds; a
     failure names itself."""
     limits = _gate.describe(handle.client)

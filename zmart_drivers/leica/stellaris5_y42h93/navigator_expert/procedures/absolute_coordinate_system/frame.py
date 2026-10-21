@@ -36,7 +36,7 @@ from ...vendor_specific.primitive_handling.readings.derived import (
 )
 from ...vendor_specific.primitive_handling.commands import changes as _commands
 from ...session import handle as _info
-from ...session.handle import ZmartHandle, note_unconfirmed, require_open
+from ...session.handle import Session, note_unconfirmed, require_open
 
 log = logging.getLogger(__name__)
 
@@ -66,14 +66,14 @@ _DEFAULT_ACTUATORS = {"x": "motoric", "y": "motoric", "z": "z-wide"}
 UNIT = "micrometer"
 
 
-def objective_delta_um(handle: ZmartHandle, current_objective: dict | None) -> tuple:
+def objective_delta_um(handle: Session, current_objective: dict | None) -> tuple:
     """ΔT for this session's origin and calibration; see :func:`coordinates.objective_delta_um`."""
     return coordinates.objective_delta_um(
         handle.origin, handle.translations, current_objective
     )
 
 
-def hardware_snapshot(handle: ZmartHandle) -> dict:
+def hardware_snapshot(handle: Session) -> dict:
     """One consistent read of everything the frame math needs.
 
     Stage XY, both z drives, and the current objective use the configured
@@ -106,7 +106,7 @@ def hardware_snapshot(handle: ZmartHandle) -> dict:
     }
 
 
-def delta_or_warn(handle: ZmartHandle, snapshot: dict) -> tuple:
+def delta_or_warn(handle: Session, snapshot: dict) -> tuple:
     """ΔT for a READ: uncompensated-but-loud when translations are missing.
 
     Reads must stay available (a read cannot land the stage anywhere wrong),
@@ -120,7 +120,7 @@ def delta_or_warn(handle: ZmartHandle, snapshot: dict) -> tuple:
         return (0.0, 0.0, 0.0)
 
 
-def get_actuators(handle: ZmartHandle) -> dict:
+def get_actuators(handle: Session) -> dict:
     """The motors that can move each axis, and the one used when none is chosen.
 
     ``{"x": {"options": ["motoric"], "default": "motoric"}, ...,
@@ -146,7 +146,7 @@ def _resolve_actuators(with_actuators: dict | None) -> dict[str, str]:
     return chosen
 
 
-def get_xyz(handle: ZmartHandle, *, with_actuators: dict | None = None) -> dict:
+def get_xyz(handle: Session, *, with_actuators: dict | None = None) -> dict:
     """Where the stage is, per axis: ``position``, ``unit``, ``actuators`` and ``canvas``.
 
     The answer has the keys ``x``, ``y`` and ``z``. Each axis carries the
@@ -209,7 +209,7 @@ def get_xyz(handle: ZmartHandle, *, with_actuators: dict | None = None) -> dict:
 Z_GALVO_PARKED_TOLERANCE_UM = 0.5
 
 
-def zero_z_galvo(handle: ZmartHandle) -> dict:
+def zero_z_galvo(handle: Session) -> dict:
     """Park the z-galvo at 0 while keeping the focus.
 
     The driver moves the focus with z-wide alone, so the fast z-galvo is kept
@@ -240,7 +240,7 @@ def zero_z_galvo(handle: ZmartHandle) -> dict:
 
 
 def set_xyz(
-    handle: ZmartHandle,
+    handle: Session,
     x: float,
     y: float,
     z: float,
@@ -321,7 +321,7 @@ def set_xyz(
     return get_xyz(handle, with_actuators=with_actuators)
 
 
-def canvas(handle: ZmartHandle) -> dict | None:
+def canvas(handle: Session) -> dict | None:
     """Everywhere a picture can show, per axis, in the frame. None when no limits govern the session.
 
     On z the frame follows the focus, the sum of the two z drives, so the

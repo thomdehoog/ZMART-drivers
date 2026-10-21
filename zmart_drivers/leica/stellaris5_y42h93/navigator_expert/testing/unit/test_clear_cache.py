@@ -11,7 +11,7 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.clear_cac
     release as release,
 )
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.session.handle import (
-    ZmartHandle,
+    Session,
 )
 
 
@@ -104,7 +104,7 @@ class TestDeleting:
 
 
 def _session(*in_cache):
-    return ZmartHandle(
+    return Session(
         client=object(), connection={}, hash6="abc123", in_cache=list(in_cache)
     )
 

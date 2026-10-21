@@ -26,14 +26,14 @@ from ...driver_setup import orientation as _orientation
 from ...vendor_specific.primitive_handling.profiles.command_profiles import IMAGE_SAVE
 from ...vendor_specific.primitive_handling.readings import named_readings as _readers
 from ...session import loaded_config as _session_state
-from ...session.handle import ZmartHandle, require_open
+from ...session.handle import Session, require_open
 from . import command_log as _log
 from . import save as _save
 
 log = logging.getLogger(__name__)
 
 
-def save_waiting(handle: ZmartHandle, label: str | None = None) -> list[dict]:
+def save_waiting(handle: Session, label: str | None = None) -> list[dict]:
     """Save the captures taken and not yet saved; answer one record for each.
 
     With *label*, only the capture of that name is saved. Each record lists the
@@ -179,7 +179,7 @@ def save_pending(
     return record, saved
 
 
-def _loaded_orientation(handle: ZmartHandle):
+def _loaded_orientation(handle: Session):
     """The camera-to-stage turn loaded for this connection (identity if none).
 
     Read from the per-connection session registry the driver populated at
@@ -200,7 +200,7 @@ def _loaded_orientation(handle: ZmartHandle):
     return _orientation.rig_orientation()
 
 
-def _where_the_planes_are(handle: ZmartHandle, at: dict, job: str, plane_z: list[int]):
+def _where_the_planes_are(handle: Session, at: dict, job: str, plane_z: list[int]):
     """Answer, per plane number in z, where on the sample it was captured.
 
     In the frame :func:`set_xyz` takes, so a position handed back can be

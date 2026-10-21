@@ -50,7 +50,7 @@ from ..procedures.objective_change_with_compensation import compensated_changes
 from ..procedures.save_data import save_captures as save_step
 from ..procedures.save_data.naming import run_hash
 from ..session import loaded_config
-from ..session.handle import ZmartHandle, job_catalog, note_unconfirmed, require_open, selected_job_name
+from ..session.handle import Session, job_catalog, note_unconfirmed, require_open, selected_job_name
 from ..vendor_specific.connection import lasx_client
 from ..vendor_specific.primitive_handling.readings import named_readings as readings
 from ..vendor_specific.primitive_handling.commands import changes
@@ -131,7 +131,7 @@ class Microscope:
             ),
         )
 
-        handle = ZmartHandle(client=client, connection=dict(connection), hash6=run_hash())
+        handle = Session(client=client, connection=dict(connection), hash6=run_hash())
         handle.translations = translations
         if origin is not None:
             handle.origin = origin
@@ -294,7 +294,7 @@ class Microscope:
         return state_step.get_state(self.handle)
 
 
-def checked(handle: ZmartHandle, result: dict, what: str) -> dict:
+def checked(handle: Session, result: dict, what: str) -> dict:
     """A change's result, raising when it failed and recording it when it was never seen."""
     if not result.get("success"):
         raise RuntimeError(f"{what} failed: {result.get('message')}")

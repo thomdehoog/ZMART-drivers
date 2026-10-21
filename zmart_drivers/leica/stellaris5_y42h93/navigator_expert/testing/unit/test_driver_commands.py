@@ -87,7 +87,7 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.for_zmart_controller
     ZmartDriver,
 )
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.session.handle import (
-    ZmartHandle,
+    Session,
 )
 
 
@@ -122,7 +122,7 @@ def _handle(gate_constraints=None, gated=True, **overrides):
     without any gate state (the fail-closed posture of a failed handshake).
     The stage stands at the origin, as a get_xyz after connecting would read.
     """
-    h = ZmartHandle(
+    h = Session(
         client=object(), connection=dict(DEFAULT_CONNECTION), hash6="000abc"
     )
     h.driven_to = {"x": 0.0, "y": 0.0, "z": 0.0, "z_wide_um": 0.0, "z_galvo_um": 0.0}
@@ -2544,7 +2544,7 @@ class TestLifecycle(unittest.TestCase):
             _connect_module, "connect_python_client", return_value=object()
         ):
             h = _connect_handle(dict(DEFAULT_CONNECTION))
-        self.assertIsInstance(h, ZmartHandle)
+        self.assertIsInstance(h, Session)
         # the stage envelope was applied from the ProgramData snapshot...
         self.assertEqual(limits_checks.get_stage_limits()["x_max"], 130000.0)
         # ...and the commands-layer gate governs this client (with provenance)
@@ -2558,7 +2558,7 @@ class TestLifecycle(unittest.TestCase):
             _connect_module, "connect_python_client", return_value=object()
         ):
             h = _connect_handle(dict(DEFAULT_CONNECTION))
-        self.assertIsInstance(h, ZmartHandle)
+        self.assertIsInstance(h, Session)
         self.assertFalse(h.closed)
         described = _gate.describe(h.client)
         self.assertEqual(described["source"], "defaults")

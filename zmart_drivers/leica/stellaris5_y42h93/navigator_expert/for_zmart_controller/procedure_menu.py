@@ -12,10 +12,10 @@ from __future__ import annotations
 from ..procedures.clear_cache.clear import clear
 from ..procedures.save_data.save_captures import save_waiting
 from ..procedures.absolute_coordinate_system.frame import zero_z_galvo
-from ..session.handle import ZmartHandle, require_open
+from ..session.handle import Session, require_open
 
 
-def get_procedures(handle: ZmartHandle) -> dict:
+def get_procedures(handle: Session) -> dict:
     """The named procedures this instrument offers (discover-then-apply)."""
     require_open(handle)
     return {
@@ -38,7 +38,7 @@ def get_procedures(handle: ZmartHandle) -> dict:
     }
 
 
-def run_procedure(handle: ZmartHandle, procedure: dict) -> dict:
+def run_procedure(handle: Session, procedure: dict) -> dict:
     """Run a procedure from :func:`get_procedures`; report what ran."""
     require_open(handle)
     name = procedure.get("name")

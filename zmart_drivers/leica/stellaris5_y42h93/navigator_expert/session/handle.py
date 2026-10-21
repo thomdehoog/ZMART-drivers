@@ -1,7 +1,7 @@
-"""The session a controller command works in: the handle, and the questions every command asks.
+"""The session every call works in, and the questions nearly every call asks.
 
-A :class:`ZmartHandle` is what ``connect`` hands back to the controller. It
-holds the open connection to LAS X and everything the driver remembers about
+A :class:`Session` is made when the driver connects, and the ``Microscope``
+keeps it. It holds the open connection to LAS X and everything the driver remembers about
 this session: the zero point of the frame, the objective calibration, the
 data location, and the changes that were sent but could not be confirmed.
 The small functions here are the ones nearly every command needs: refuse a
@@ -33,8 +33,8 @@ SET_UP = (
 
 
 @dataclass
-class ZmartHandle:
-    """Opaque controller handle: the CAM client plus all adapter state.
+class Session:
+    """One connection's session: the LAS X client and everything the driver remembers about it.
 
     Attributes:
         client: Connected LAS X CAM client (process-lifetime, no close).
@@ -100,7 +100,7 @@ class ZmartHandle:
     in_cache: list[tuple[int, str]] = field(default_factory=list)
 
 
-def note_unconfirmed(handle: ZmartHandle, what: str, result: Any) -> None:
+def note_unconfirmed(handle: Session, what: str, result: Any) -> None:
     """Record a change that was sent and accepted but never confirmed, and carry on.
 
     The driver confirms what it can. When a readback never matched in
@@ -119,13 +119,13 @@ def note_unconfirmed(handle: ZmartHandle, what: str, result: Any) -> None:
     log.warning("unconfirmed, carrying on: %s: %s", what, note["message"])
 
 
-def require_open(handle: ZmartHandle) -> None:
+def require_open(handle: Session) -> None:
     """Refuse to drive a disconnected handle."""
     if handle.closed:
         raise RuntimeError("session is disconnected")
 
 
-def selected_job_name(handle: ZmartHandle) -> str | None:
+def selected_job_name(handle: Session) -> str | None:
     """Name of the currently selected LAS X job, or ``None`` when it cannot be read.
 
     A reading that fails is unknown, not a stop. The commands that only
@@ -140,7 +140,7 @@ def selected_job_name(handle: ZmartHandle) -> str | None:
     return name
 
 
-def job_catalog(handle: ZmartHandle) -> tuple[list[dict], list[dict]]:
+def job_catalog(handle: Session) -> tuple[list[dict], list[dict]]:
     """The live job catalog split into (normal, autofocus) jobs.
 
     Autofocus jobs are a separate category: they never appear as acquisition
