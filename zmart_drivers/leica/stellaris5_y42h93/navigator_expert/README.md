@@ -455,6 +455,14 @@ there only in case the two accounts disagree.
 in place, preserving byte formatting; `output/ome_canonical.py` writes clean canonical ZMART OME;
 `save(..., fix_ome=True)` validates/repairs each written file.
 
+**Capturing, saving and clearing the cache are three separate steps.** The adapter's `capture` runs
+the selected job and leaves the picture in LAS X's cache, with a note of where the stage stood and
+the microscope's state at that moment. The `save_data` procedure
+(`procedures/save_data/`) then writes the pending captures to disk. `clear_cache` (below) lets go of
+the pictures that were saved. `acquire`, the one step the ZMART Controller calls, is `capture`
+followed by `save_data`; it never clears the cache. A capture that cannot be saved stays pending, so
+`save_data` can be run again.
+
 **LAS X's cache is cleared by its own procedure, `clear_cache`.** Every picture LAS X takes stays in
 its Data Container cache until LAS X restarts, so a long time course fills the disk twice. The cache
 folder is the one the registry names under `Data Port` (`HKLM\SOFTWARE\Leica Microsystems\Data
@@ -538,7 +546,8 @@ zmart_drivers/leica/stellaris5_y42h93/navigator_expert/
 │                       objectives.py · objective_shift.py · galvo.py · acquire.py (the capture)
 ├── procedures/         backlash.py · measure_orientation.py · measure_limits.py ·
 │                       calibrate_objective_pair.py · check_calibration.py · adopt_calibration.py ·
-│                       calibration_common.py · clear_cache/ (let go of LAS X's cache) ·
+│                       calibration_common.py · save_data/ (write a capture to disk) ·
+│                       clear_cache/ (let go of LAS X's cache) ·
 │                       algorithms/ (registration and focus scoring)
 ├── output/             what comes out of one acquisition: lasx_data_container.py (collect) ·
 │                       files.py · materialize.py · ome.py · ome_canonical.py ·

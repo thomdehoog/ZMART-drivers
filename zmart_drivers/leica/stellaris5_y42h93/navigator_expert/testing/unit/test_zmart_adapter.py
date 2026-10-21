@@ -699,8 +699,8 @@ class TestAcquire(unittest.TestCase):
                 patch.object(adapter._commands, "select_job", lambda c, j, **k: {"success": True}),
                 patch.object(adapter._motion, "correct_backlash", lambda client, **k: {"success": True, "confirmed": True}),
                 patch.object(adapter._capture, "acquire", lambda c, j, **k: _a_capture(j)),
-                patch.object(adapter._save, "save", fake_save),
-                patch.object(adapter._log, "write", fake_log),
+                patch.object(adapter._save_data._save, "save", fake_save),
+                patch.object(adapter._save_data._log, "write", fake_log),
                 *patches,
             ):
                 standing_in.enter_context(stand_in)
@@ -781,7 +781,7 @@ class TestAcquire(unittest.TestCase):
             patch.object(adapter._readers, "get_hardware_info", return_value={}),
             patch.object(adapter._motion, "correct_backlash", lambda client, **k: {"success": True, "confirmed": True}),
             patch.object(adapter._capture, "acquire", fake_capture),
-            patch.object(adapter._save, "save", fake_save),
+            patch.object(adapter._save_data._save, "save", fake_save),
             patches[0],
             patches[1],
             patches[2],
@@ -856,7 +856,7 @@ class TestAcquire(unittest.TestCase):
                 patch.object(adapter._commands, "select_job", lambda *a, **k: {"success": True}),
                 patch.object(adapter._motion, "correct_backlash", lambda client, **k: {"success": True, "confirmed": True}),
                 patch.object(adapter._capture, "acquire", lambda client, job, **k: _a_capture(job)),
-                patch.object(adapter._save, "save", fake_save),
+                patch.object(adapter._save_data._save, "save", fake_save),
                 # This answer is checked for files that exist: the log is written.
                 patch.object(adapter._log, "write", _WRITE_THE_LOG),
                 patches[0], patches[1], patches[2], patches[3],
@@ -890,6 +890,42 @@ class TestAcquire(unittest.TestCase):
         self.assertNotIn("cleanup_cache", calls["save"])
         self.assertFalse(hasattr(ImageSaveProfile(), "cleanup_cache"))
         self.assertEqual(h.in_cache, [])  # the stubbed save names no picture
+
+    def test_a_capture_writes_nothing_until_save_data_is_run(self):
+        """Taking the picture and writing its files are separate steps; the capture waits, with its notes."""
+        h = _handle()
+        h.driven_to = {"x": 0.0, "y": 0.0, "z": 0.0, "z_wide_um": 0.0}
+        with self._capturing() as calls:
+            taken = adapter.capture(h, position_label="A1")
+            self.assertNotIn("save", calls)
+            self.assertEqual([c.label for c in h.unsaved], ["A1"])
+            records = adapter.save_data(h)
+        self.assertEqual(taken["position_label"], "A1")
+        self.assertEqual(len(records), 1)
+        self.assertEqual(records[0]["position_label"], "A1")
+        self.assertEqual(h.unsaved, [])
+
+    def test_a_capture_that_fails_to_save_stays_pending_for_another_try(self):
+        h = _handle()
+        h.driven_to = {"x": 0.0, "y": 0.0, "z": 0.0, "z_wide_um": 0.0}
+        with self._capturing():
+            adapter.capture(h, position_label="A1")
+            with patch.object(adapter._save_data._save, "save", side_effect=RuntimeError("disk full")):
+                with self.assertRaises(RuntimeError):
+                    adapter.save_data(h)
+            self.assertEqual([c.label for c in h.unsaved], ["A1"])
+
+    def test_a_label_still_waiting_to_be_saved_is_not_taken_twice(self):
+        h = _handle()
+        h.driven_to = {"x": 0.0, "y": 0.0, "z": 0.0, "z_wide_um": 0.0}
+        with self._capturing():
+            adapter.capture(h, position_label="A1")
+            with self.assertRaisesRegex(ValueError, "still waiting to be saved"):
+                adapter.capture(h, position_label="A1")
+
+    def test_the_save_data_procedure_is_offered(self):
+        h = _handle()
+        self.assertIn("save_data", adapter.get_procedures(h))
 
     def test_the_clear_cache_procedure_is_offered_and_clears_what_was_saved(self):
         h = _handle()
@@ -1136,7 +1172,7 @@ class TestAcquire(unittest.TestCase):
                 patch.object(
                     adapter._capture, "acquire", lambda client, job, **k: _a_capture(job)
                 ),
-                patch.object(adapter._save, "save", fake_save),
+                patch.object(adapter._save_data._save, "save", fake_save),
                 patches[0],
                 patches[1],
                 patches[2],
@@ -1171,7 +1207,7 @@ class TestAcquire(unittest.TestCase):
             patch.object(
                 adapter._capture, "acquire", lambda client, job, **k: _a_capture(job)
             ),
-            patch.object(adapter._save, "save", fake_save),
+            patch.object(adapter._save_data._save, "save", fake_save),
             patches[0],
             patches[1],
             patches[2],
@@ -1256,7 +1292,7 @@ class TestAcquire(unittest.TestCase):
             patch.object(adapter._readers, "get_jobs", return_value=self._jobs()),
             patch.object(adapter._motion, "correct_backlash", fake_correct_backlash),
             patch.object(adapter._capture, "acquire", fake_capture),
-            patch.object(adapter._save, "save", fake_save),
+            patch.object(adapter._save_data._save, "save", fake_save),
             patches[2],
         ):
             record = adapter.acquire(h, position_label="7")

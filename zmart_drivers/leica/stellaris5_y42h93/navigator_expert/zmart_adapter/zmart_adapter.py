@@ -48,9 +48,11 @@ Scope of v1 (grow as needed):
       restores the whole setup).
     - ``get_procedures`` offers backlash takeup, zero-z-galvo (park the
       galvo at 0 with the focus kept), autofocus (with job
-      discovery) and clear_cache (have LAS X let go of the pictures of the
+      discovery), save_data (write the captures not yet saved) and clear_cache (have LAS X let go of the pictures of the
       captures saved so far); ``run_procedure`` runs them.
-    - ``acquire`` runs the selected job and saves in one step, and leaves
+    - ``capture`` runs the selected job and keeps the picture in LAS X's
+      cache; ``save_data`` writes it to disk afterwards.
+    - ``acquire`` does both in one step, and leaves
       LAS X's cache alone (clearing it is the ``clear_cache`` procedure); every file
       name starts with ``position_label``, which travels verbatim in the
       save lineage.
@@ -100,6 +102,7 @@ from ..output import save as _save
 from ..output.naming import Naming, free_stem, run_hash
 from ..procedures import backlash as _motion
 from ..procedures import clear_cache as _clear_cache
+from ..procedures import save_data as _save_data
 from ..vendor_interface.parsing import parse_tile_geometry as _parse_tile_geometry
 from ..configuration import data_location as _data_location
 from . import info as _info
@@ -220,6 +223,10 @@ class ZmartHandle:
     #: whose cache copy is still there, as ``(element number, name)`` pairs.
     #: Saving adds to it; the ``clear_cache`` procedure empties it.
     in_cache: list[tuple[int, str]] = field(default_factory=list)
+    #: The captures taken whose files are not yet written, each with the notes
+    #: made as it was taken. :func:`capture` adds to it; :func:`save_data`
+    #: empties it.
+    unsaved: list[Any] = field(default_factory=list)
 
 
 def _note_unconfirmed(handle: ZmartHandle, what: str, result: Any) -> None:
@@ -973,13 +980,19 @@ def _export_state(
     }
 
 
-def acquire(
+def capture(
     handle: ZmartHandle,
     *,
     position_label: str | None = None,
     acquisition_settings: dict | None = None,
 ) -> dict:
-    """Run the job, wait for the export, and persist the OME-TIFF product.
+    """Run the selected job and leave the picture in LAS X's cache, to be saved later.
+
+    Nothing is written to disk and nothing is cleared. The moment of the
+    capture is noted (where the stage stood, the microscope's state, what was
+    asked) and kept with the session, so that :func:`save_data` can write
+    the files whenever it is run, as the capture was and not as things
+    stand then.
 
     Args:
         position_label: What the workflow calls this capture; every file
@@ -996,15 +1009,8 @@ def acquire(
             raise.
 
     The selected LAS X job is what runs; choose it with :func:`set_state`.
-    The session hash (``handle.hash6``) rides along only in lineage and
-    provenance. The machine/software state is captured and embedded in each
-    saved plane's OME-XML (no sidecar).
-
-    Returns a record with the resolved job and settings, ``files`` (every file
-    saved) and ``planes`` (which file holds which channel, z and t, and where
-    on the sample it was taken).
-    Raises on any unrecoverable step — job selection, capture, export
-    detection, or persistence.
+    Returns ``{"position_label", "job"}``. Raises on any unrecoverable step:
+    job selection or the capture itself.
     """
     _require_open(handle)
     resolved = _with_defaults(handle, acquisition_settings)
@@ -1043,123 +1049,84 @@ def acquire(
     acq = _capture.acquire(handle.client, job)
 
     label = position_label if position_label is not None else _next_position_label(handle)
+    if any(waiting.label == label for waiting in handle.unsaved):
+        raise ValueError(
+            f"a capture labelled {label!r} is still waiting to be saved; run save_data first, "
+            "or choose another label, so that no capture overwrites another"
+        )
     naming = Naming(stem=free_stem(output_root, Naming(stem=label).stem))
     state = _export_state(handle, stem=naming.stem, job=job)
-    saved = _save.save(
-        handle.client,
-        acq,
-        output_root,
-        naming,
-        lineage={
-            "position_label": label,
-            "stem": naming.stem,
-            "job": job,
-            "session_hash6": handle.hash6,
-        },
-        state=state,
-        # Rig image->stage orientation, applied to the saved planes behind the
-        # scenes so the workflow only ever sees stage-aligned images. Loaded once
-        # at connect (from the set_orientation setup notebook's file); a separate
-        # concern from pixel-scale calibration and limits.
-        orientation=_loaded_orientation(handle),
-        format=IMAGE_SAVE.format,
-        projection=IMAGE_SAVE.projection,
-        # Where on the sample each plane was taken, the same answer the
-        # acquisition gives below, so a store lies where its planes say.
-        placement=lambda plane_z: _where_the_planes_are(handle, at, job, plane_z),
+    handle.unsaved.append(
+        _save_data.PendingCapture(
+            acq=acq,
+            label=label,
+            naming=naming,
+            state=state,
+            job=job,
+            at=at,
+            output_root=output_root,
+            session_hash6=handle.hash6,
+            asked=dict(acquisition_settings or {}),
+            settings=resolved,
+            steps=steps,
+            backlash_rounds=backlash_rounds,
+            apply_backlash=apply_backlash,
+            unconfirmed=list(handle.unconfirmed[noted_before:]),
+        )
     )
-
-    cache_element = getattr(saved, "cache_element", None)
-    if cache_element is not None:
-        handle.in_cache.append(cache_element)
-
-    written = sorted(saved.image_paths.items())
-    depths = [int(getattr(index, "z", ordinal)) for ordinal, (index, _path) in enumerate(written)]
-    taken_at = _where_the_planes_are(handle, at, job, depths)
-    # Depth 0 is the lowest slice, as in a store, whichever way LAS X swept.
-    upward = sorted(set(depths), key=lambda z: taken_at(z)["z_um"])
-    planes = [
-        {
-            "t": int(getattr(index, "t", 0)),
-            "z": upward.index(depths[ordinal]),
-            "c": int(getattr(index, "c", ordinal)),
-            # Where the pixels are, and where inside them. A flat OME-TIFF
-            # holds exactly the one plane t/c/z name; were this a store, the
-            # same three would index into it and only the path would change.
-            "path": str(path),
-            **taken_at(depths[ordinal]),
-        }
-        for ordinal, (index, path) in enumerate(written)
-    ]
-    vendor_metadata = [str(path) for path in getattr(saved, "vendor_metadata_paths", ())]
-    printed = [str(path) for path in getattr(saved, "state_paths", ())]
-    projections = [str(path) for path in getattr(saved, "projection_paths", ())]
-    files = list(dict.fromkeys([*(plane["path"] for plane in planes), *projections, *vendor_metadata, *printed]))
-    unconfirmed = list(handle.unconfirmed[noted_before:])
-    log = _log.write(output_root, naming, {
-        "position_label": label,
-        "stem": naming.stem,
-        "asked": dict(acquisition_settings or {}),
-        "settings": resolved,
-        "steps": steps,
-        "capture": {
-            "started": _when(acq.started_at),
-            "finished": _when(acq.finished_at),
-            "answered": getattr(acq, "command_result", None),
-        },
-        "unconfirmed": unconfirmed,
-        # Paths from where the run starts, so they stay true when the
-        # capture is moved into a run folder of the same shape.
-        "planes": [{**plane, "path": _from(output_root, plane["path"])} for plane in planes],
-        "files": [_from(output_root, path) for path in files],
-    })
-    return {
-        "position_label": label,
-        "trigger": resolved["trigger"],
-        "job": job,
-        "format": IMAGE_SAVE.format,
-        "settle": "backlash-corrected" if apply_backlash else "direct",
-        "backlash_rounds": backlash_rounds if apply_backlash else 0,
-        # Every file this acquisition saved, under the name the ZMART
-        # Controller's contract fixes, so a workflow finds them on any
-        # microscope: the images, then the vendor's metadata, then the state.
-        "files": [*files, str(log)],
-        # The manifest a workflow needs to tell channels from z and t, and
-        # where on the sample each plane was taken.
-        "planes": planes,
-        "vendor_metadata": vendor_metadata,
-        # What the driver printed about this capture: the state, beside the
-        # images in ``data/metadata``. A client moving a record moves this too.
-        "metadata": printed,
-        # The changes made for this capture that were sent but never
-        # confirmed by a readback (the backlash takeup).
-        # Empty when everything confirmed. The capture itself went ahead.
-        "unconfirmed": unconfirmed,
-        # The driver's log of this capture: what it was asked, and what it did.
-        "log": [str(log)],
-        # Projected from a capture with more than one plane, beside its data.
-        "projections": projections,
-    }
+    return {"position_label": label, "job": job}
 
 
-def _from(root: Path, path: str) -> str:
-    """*path* from *root*, with forward slashes; as it is when it lies elsewhere."""
-    try:
-        return Path(path).relative_to(root).as_posix()
-    except ValueError:
-        return str(path)
+def save_data(handle: ZmartHandle, label: str | None = None) -> list[dict]:
+    """Save the captures taken and not yet saved; answer one record for each.
+
+    With *label*, only the capture of that name is saved. Each record lists
+    the files written, which plane is in which file and where on the sample
+    it was taken (see :func:`acquire`). Saving never clears LAS X's cache; it
+    only notes, for :func:`clear_cache`, which pictures are now safely
+    written. A capture that cannot be saved stays pending, so that a later
+    call can try again, and the error is raised.
+    """
+    _require_open(handle)
+    chosen = [c for c in handle.unsaved if label is None or c.label == label]
+    if label is not None and not chosen:
+        raise ValueError(f"no capture waiting to be saved is labelled {label!r}")
+    records = []
+    for pending in chosen:
+        record, saved = _save_data.save_pending(
+            handle.client,
+            pending,
+            orientation=_loaded_orientation(handle),
+            where_the_planes_are=lambda plane_z, p=pending: _where_the_planes_are(handle, p.at, p.job, plane_z),
+        )
+        handle.unsaved.remove(pending)
+        cache_element = getattr(saved, "cache_element", None)
+        if cache_element is not None:
+            handle.in_cache.append(cache_element)
+        records.append(record)
+    return records
 
 
-def _when(seconds: float | None) -> str | None:
-    """A time from the clock as an ISO 8601 moment in UTC; None when there is none."""
-    if not isinstance(seconds, (int, float)):
-        return None
-    return datetime.fromtimestamp(seconds, tz=timezone.utc).isoformat()
+def acquire(
+    handle: ZmartHandle,
+    *,
+    position_label: str | None = None,
+    acquisition_settings: dict | None = None,
+) -> dict:
+    """Capture and then save, in one step, as the ZMART Controller's acquisition asks.
 
+    This is :func:`capture` followed by :func:`save_data` for that capture;
+    it leaves LAS X's cache alone (see :func:`clear_cache`). The arguments are
+    those of :func:`capture`. If saving fails, the capture stays pending and
+    the error is raised, so :func:`save_data` can be run again.
 
-# =============================================================================
-# State and procedures
-# =============================================================================
+    Returns a record with the resolved job and settings, ``files`` (every file
+    saved) and ``planes`` (which file holds which channel, z and t, and where
+    on the sample it was taken).
+    """
+    taken = capture(handle, position_label=position_label, acquisition_settings=acquisition_settings)
+    (record,) = save_data(handle, taken["position_label"])
+    return record
 
 
 def _where_the_planes_are(handle: ZmartHandle, at: dict, job: str, plane_z: list[int]):
@@ -1330,6 +1297,12 @@ def get_procedures(handle: ZmartHandle) -> dict:
             "(its offset is transferred onto z-wide), freeing the galvo's "
             "full travel for a following z-stack"
         },
+        "save_data": {
+            "description": "write the captures taken and not yet saved to disk, with their "
+            "planes, projections and logs; acquire does this for its own capture, so run it "
+            "after a capture you took without saving",
+            "args": ["label"],
+        },
         "clear_cache": {
             "description": "have LAS X let go of the pictures of the captures saved so far "
             "in this session, freeing the disk its cache fills; acquiring and saving never "
@@ -1353,6 +1326,8 @@ def run_procedure(handle: ZmartHandle, procedure: dict) -> dict:
         return {"ran": dict(procedure)}
     if name == "zero_z_galvo":
         return {"ran": dict(procedure), **_zero_z_galvo(handle)}
+    if name == "save_data":
+        return {"ran": dict(procedure), "saved": save_data(handle, procedure.get("label"))}
     if name == "clear_cache":
         return {"ran": dict(procedure), **_clear_cache.clear(handle.in_cache)}
     if name == "autofocus":
