@@ -34,7 +34,10 @@ This file knows nothing of any one microscope. What the reader asks of the
   ``ANSWER_POLL_S``);
 - ``spec(datum)``, ``mode_for(datum)`` and ``legs(spec, datum, mode)``: the
   table of readings and which sources take part;
-- ``ask(leg, spec, client, until=, answer_counts=, job_name=, api_kwargs=)``:
+- ``success(spec, value, about)``: whether *value* counts as an answer to
+  the reading; *about* is what a reading of one item is about (for LAS X, the
+  name of a job), or None;
+- ``ask(leg, spec, client, until=, answer_counts=, about=, source_kwargs=)``:
   ask one source, and again until an answer counts or *until*, and return a
   Reading;
 - ``first_stage(spec, mode, fallback)``: the source tried alone first, if any,
@@ -127,9 +130,9 @@ def _watch(
     mode,
     succeeded,
     deadline,
-    job_name,
+    about,
     observed_after,
-    api_kwargs,
+    source_kwargs,
 ):
     """Watch one window: ask each allowed source in turn, and return the first answer that counts.
 
@@ -158,8 +161,8 @@ def _watch(
             client,
             until=until,
             answer_counts=answer_counts,
-            job_name=job_name,
-            api_kwargs=api_kwargs,
+            about=about,
+            source_kwargs=source_kwargs,
         )
         if answer_counts(reading):
             return reading
@@ -168,11 +171,11 @@ def _watch(
     return failed
 
 
-def _success_for(vendor, datum, job_name, accept):
+def _success_for(vendor, datum, about, accept):
     spec = vendor.spec(datum)
 
     def succeeded(value):
-        if not spec.success(value, job_name=job_name):
+        if not vendor.success(spec, value, about):
             return False
         return accept is None or bool(accept(value))
 
@@ -185,11 +188,11 @@ def wait_for(
     client,
     *,
     accept=None,
-    job_name=None,
+    about=None,
     observed_after=None,
     mode=None,
     deadline=None,
-    api_kwargs=None,
+    source_kwargs=None,
     fallback=None,
 ):
     """Wait for a reading by the one rule; return the winning Reading, or a failure.
@@ -204,7 +207,8 @@ def wait_for(
         accept: Optional ``accept(value) -> bool`` that narrows the datum's
             own success rule for this caller (a target value, a field the
             caller needs). Applied on top of the rule, never instead of it.
-        job_name: The job a per-job datum is about.
+        about: What a reading of one item is about (for LAS X, the name of
+            a job), handed to the vendor's sources and its success rule.
         observed_after: Reject answers observed at or before this wall-clock
             time; a confirmation passes the moment its command was sent.
         mode: The source family the microscope's policy names; None takes the
@@ -213,7 +217,7 @@ def wait_for(
             that runs its own window (a command confirmation). None means
             the rule: ``WINDOWS`` windows of ``WINDOW_S``, requesting an
             unanswered read again at each new window.
-        api_kwargs: Extra keyword arguments handed to the sources.
+        source_kwargs: Extra keyword arguments handed to the sources.
         fallback: The family that answers when the source tried first cannot;
             None lets the microscope's policy choose.
 
@@ -223,7 +227,7 @@ def wait_for(
     """
     spec = vendor.spec(datum)
     mode = mode if mode is not None else vendor.mode_for(datum)
-    succeeded = _success_for(vendor, datum, job_name, accept)
+    succeeded = _success_for(vendor, datum, about, accept)
     # Some microscopes have a source that is tried alone before the others
     # (for LAS X, the direct reader); the vendor says which, and which family
     # answers if that source cannot.
@@ -238,7 +242,7 @@ def wait_for(
             succeeded=succeeded,
             deadline=until,
             observed_after=observed_after,
-            kwargs=api_kwargs or {},
+            kwargs=source_kwargs or {},
             waiting=accept is not None or observed_after is not None,
         )
         if reading is None or reading.error is None:
@@ -248,9 +252,9 @@ def wait_for(
     kwargs = dict(
         mode=mode,
         succeeded=succeeded,
-        job_name=job_name,
+        about=about,
         observed_after=observed_after,
-        api_kwargs=api_kwargs or {},
+        source_kwargs=source_kwargs or {},
     )
     if deadline is not None:
         return _watch(vendor, datum, client, deadline=deadline, **kwargs)
@@ -275,7 +279,7 @@ def wait_for(
     log.warning(
         "%s%s: no answer counted as a success in %d windows of %ss",
         datum,
-        f" for '{job_name}'" if job_name else "",
+        f" for '{about}'" if about else "",
         vendor.waiting.WINDOWS,
         vendor.waiting.WINDOW_S,
     )
