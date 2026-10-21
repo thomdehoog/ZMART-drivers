@@ -32,8 +32,13 @@ def test_run_ci_exposes_only_mock_and_hardware_modes():
         run_ci.parse_args(["--no-cov"])
 
 
-def _capture_steps(run_ci, monkeypatch, tmp_path, argv):
+def _capture_steps(run_ci, monkeypatch, tmp_path, argv, folders=None):
+    """Run run_ci with every step replaced; return (name, command, fatal) per step.
+
+    *folders*, when given, is filled with the folder each step runs in.
+    """
     captured: list[tuple[str, list[str], bool]] = []
+    folders = {} if folders is None else folders
 
     monkeypatch.setattr(run_ci, "REPORT_DIR", tmp_path)
     monkeypatch.setattr(run_ci, "build_env", lambda: {})
@@ -43,8 +48,9 @@ def _capture_steps(run_ci, monkeypatch, tmp_path, argv):
         lambda *args, **kwargs: SimpleNamespace(returncode=0, stdout=""),
     )
 
-    def fake_run_step(name, cmd, env, *, fatal):
+    def fake_run_step(name, cmd, env, *, fatal, cwd=None):
         captured.append((name, cmd, fatal))
+        folders[name] = cwd
         return {
             "name": name,
             "ok": True,
@@ -58,6 +64,17 @@ def _capture_steps(run_ci, monkeypatch, tmp_path, argv):
     monkeypatch.setattr(run_ci, "run_step", fake_run_step)
     assert run_ci.main(argv) == 0
     return captured
+
+
+def test_the_hardware_steps_run_in_the_reports_folder(monkeypatch, tmp_path):
+    """LAS X writes DCLogFile.log where a script starts; it must land with the reports, not in the driver."""
+    run_ci = _load_run_ci()
+    folders = {}
+    _capture_steps(run_ci, monkeypatch, tmp_path, ["--hardware"], folders)
+
+    hardware = {name: cwd for name, cwd in folders.items() if name.startswith("hardware:")}
+    assert hardware
+    assert set(hardware.values()) == {tmp_path}
 
 
 def test_the_quick_hardware_run_is_the_acceptance(monkeypatch, tmp_path):
