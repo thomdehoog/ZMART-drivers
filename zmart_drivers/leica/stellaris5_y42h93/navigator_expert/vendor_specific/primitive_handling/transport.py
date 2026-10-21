@@ -88,6 +88,10 @@ class LasxTransport:
         except Exception:
             pass  # Some API versions may not allow Result assignment
 
+    def fill(self, request, setup_fn):
+        """Write the command's values into the request: a LAS X request keeps them in its ``Model``."""
+        setup_fn(request.Model)
+
     def send(self, client, api_obj, label, *, asynchronous):
         """Send the request. Returns ``(arrived, answered)``.
 

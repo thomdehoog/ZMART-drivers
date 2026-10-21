@@ -440,7 +440,7 @@ These were looked at deliberately and no problem was found. They are listed so t
 
 - **Safety gate for stage moves:** every native call in `commands/` checks the gate first. `move_xy` and `move_z` also run the envelope and physical-backstop checks. NaN, infinite and numeric-string targets are refused.
 - **Unit handling in moves:** the gate and backstop check the µm value, and the native command receives the raw value with the matching Units enum.
-- **No double acquisition:** ACQUIRE uses `fire_async` with `max_retries=0` and no re-fire.
+- **No double acquisition:** ACQUIRE uses `send_without_receipt` with `max_retries=0` and no re-fire.
 - **Retries** only re-send absolute moves or setters, so sending one again is harmless.
 - **Limits validation:** NaN, Infinity and min > max are rejected. The backstop is enforced at connect (`commands/gate.py:263`) and in `adopt_limits`. `limits/adaptive.py` rejects non-finite points and zero-area rectangles.
 - **Log reader robustness:** decimal commas, `Âµm`, scientific notation and negative numbers make parsing fail cleanly rather than produce a wrong value. Log rotation and truncation are safe, because each read parses the file tail afresh. Router timeouts are bounded.

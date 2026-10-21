@@ -37,7 +37,7 @@ log = logging.getLogger(__name__)
 
 def confirm_and_fire(
     client,
-    api_obj,
+    request,
     description,
     *,
     profile=None,
@@ -50,8 +50,8 @@ def confirm_and_fire(
     refire_on_unconfirmed=None,
     retry_backoff=None,
     retry_escalate=None,
-    skip_echo=None,
-    fire_async=None,
+    skip_reply_check=None,
+    send_without_receipt=None,
     success_on_unconfirmed=None,
 ):
     """Fire a command and optionally confirm the result, with correction.
@@ -70,10 +70,10 @@ def confirm_and_fire(
            against ``max_confirm_attempts``.
 
     Args:
-        client: LAS X API client.
-        api_obj: Resolved API object.
+        client: The connected microscope client.
+        request: The request to send, in the form the transport expects.
         description: Human-readable label for logging.
-        setup_fn: Callable(model) that writes parameters to api_obj.Model.
+        setup_fn: Callable that writes the parameters into the request.
         pre_check_fn: Zero-arg callable -> result dict. None to skip.
         error_check_fn: Zero-arg callable -> error result dict. None
             skips the check (the default check is applied at profile
@@ -116,8 +116,8 @@ def confirm_and_fire(
         refire_on_unconfirmed=refire_on_unconfirmed,
         retry_backoff=retry_backoff,
         retry_escalate=retry_escalate,
-        skip_echo=skip_echo,
-        fire_async=fire_async,
+        skip_reply_check=skip_reply_check,
+        send_without_receipt=send_without_receipt,
         success_on_unconfirmed=success_on_unconfirmed,
     )
     command_started_at = time.time()
@@ -130,7 +130,7 @@ def confirm_and_fire(
     # --- Fire block (first attempt) ---
     fb = _fire_block(
         client,
-        api_obj,
+        request,
         description,
         profile=profile,
         setup_fn=setup_fn,
@@ -265,7 +265,7 @@ def confirm_and_fire(
             )
             fb = _fire_block(
                 client,
-                api_obj,
+                request,
                 description,
                 profile=profile,
                 setup_fn=setup_fn,
@@ -304,8 +304,8 @@ def confirm_and_fire(
     # All confirm attempts exhausted.
     msg = (
         f"{description} | UNCONFIRMED after {confirm_attempts} "
-        f"readback attempt(s); command was sent successfully, but LAS X "
-        f"state readback did not confirm the requested value"
+        f"readback attempt(s); command was sent successfully, but the "
+        f"microscope's state readback did not confirm the requested value"
         f"{_confirmation_detail(last_confirm_result)}"
     )
     dialog_detail = _append_dialog_warning(

@@ -62,8 +62,8 @@ def make_timing(
     Args:
         pre_check_s: Time spent in pre-fire check (e.g. idle wait).
         setup_s: Time writing parameters to the model.
-        fire_s: Time for UpdateAwaitReceipt transport.
-        check_s: Time for API error check.
+        fire_s: Time for sending the request through the transport.
+        check_s: Time for the error check.
         confirm_s: Time spent in confirm_fn.
         total_s: Wall-clock time for the entire operation.
         attempts: Number of fire-block attempts (1 + retries).
@@ -93,7 +93,7 @@ def read(vendor, datum, client, **keywords):
     return reader.wait_for(vendor, datum, client, **keywords)
 
 
-def write(client, api_obj, description, *, command, values, **keywords):
+def write(client, request, description, *, command, values, **keywords):
     """Send a change, check it, and confirm it; see :func:`confirm_loop.confirm_and_fire`.
 
     ``command`` is the name of the change and ``values`` is what it would set.
@@ -114,4 +114,4 @@ def write(client, api_obj, description, *, command, values, **keywords):
             "timing": make_timing(total_s=0.0, attempts=0),
             "logs": [make_log_entry("error", message)],
         }
-    return confirm_loop.confirm_and_fire(client, api_obj, description, **keywords)
+    return confirm_loop.confirm_and_fire(client, request, description, **keywords)

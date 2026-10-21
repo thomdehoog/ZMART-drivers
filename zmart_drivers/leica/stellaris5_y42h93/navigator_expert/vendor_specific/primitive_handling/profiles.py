@@ -217,11 +217,11 @@ class CommandProfile:
         retry_escalate: If True, double the delay after each retry
             (exponential backoff: 0s, base, 2×base, 4×base, ...).
             If False, use a fixed delay. Ignored when retry_backoff is None.
-        skip_echo: If True, skip echo settlement polling after fire.
+        skip_reply_check: If True, skip echo settlement polling after fire.
             Use for commands where a dedicated confirm_fn (e.g. scan
             status polling) is the authoritative completion signal and
             echo waiting is redundant overhead.
-        fire_async: If True, use UpdateAsync instead of UpdateAwaitReceipt.
+        send_without_receipt: If True, use UpdateAsync instead of UpdateAwaitReceipt.
             Use for hardware commands (e.g. stage moves, acquisitions)
             where confirm_fn is the authoritative completion signal.
         success_on_unconfirmed: If True (the default), return success=True with
@@ -251,8 +251,8 @@ class CommandProfile:
     heartbeat_interval: float | None = None
     retry_backoff: float | None = None
     retry_escalate: bool = False
-    skip_echo: bool = False
-    fire_async: bool = False
+    skip_reply_check: bool = False
+    send_without_receipt: bool = False
     success_on_unconfirmed: bool = True
     # How a request reaches the microscope and how its reply is waited for; see
     # ``transport.py``. Another microscope supplies its own.
@@ -276,8 +276,8 @@ class CommandProfile:
             object.__setattr__(self, "refire_on_unconfirmed", False)
         # Async fire blanks the echo, so an echo-based error check would read a
         # cleared echo and report a meaningless success. Couple the two fields.
-        if self.fire_async and self.error_check_fn is not None:
-            raise ValueError("fire_async=True requires error_check_fn=None")
+        if self.send_without_receipt and self.error_check_fn is not None:
+            raise ValueError("send_without_receipt=True requires error_check_fn=None")
         # A single confirm window has no 'next attempt' to re-fire before, so a
         # requested re-fire could never run. Forbid the incoherent combination.
         if self.max_confirm_attempts == 1 and self.refire_on_unconfirmed:
@@ -442,7 +442,7 @@ MOVE_XY = CommandProfile(
     confirm_fn=confirm_move_xy,
     error_check_fn=None,  # async fire blanks the echo; nothing to error-check
     confirm_tolerance=20.0,
-    fire_async=True,
+    send_without_receipt=True,
     # Uniform posture: re-fires an unconfirmed absolute move (idempotent) after
     # waiting for idle; unconfirmed-not-fail like every other command.
 )
@@ -474,8 +474,8 @@ ACQUIRE = CommandProfile(
     poll_timeout=None,
     start_timeout=15.0,
     heartbeat_interval=30.0,
-    skip_echo=True,
-    fire_async=True,
+    skip_reply_check=True,
+    send_without_receipt=True,
 )
 
 SELECT_JOB = CommandProfile(
