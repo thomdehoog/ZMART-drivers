@@ -9,15 +9,15 @@ Package layout, the anatomy of a ZMART driver (``docs/driver-anatomy.md`` in
 this repository)::
 
     navigator_expert/
-    - for_direct_use/     the driver used by itself: connect() and the Microscope, and the
-                          driver's rolling log
+    - for_direct_use/     the driver used by itself: connect() and the Microscope, taking a
+                          picture, the state saved with it, and the driver's rolling log
     - for_zmart_controller/  what the controller sees: the ZmartDriver class (zmart_driver.py),
-                          one method per controller command, each a call of the Microscope
-    - procedures/         the recipes, one folder each: taking a picture (acquisition/), saving
-                          it (save_data/), letting LAS X's cache go (clear_cache/), the stage
-                          frame (absolute_coordinate_system/), changing the objective
-                          (objective_change_with_compensation/) and the instrument's
-                          state and description (instrument/)
+                          one method per controller command, each a call of the Microscope,
+                          and what only the controller asks for (info.py, procedure_menu.py)
+    - procedures/         the recipes, one folder each: saving the captures (save_data/),
+                          letting LAS X's cache go (clear_cache/), the stage frame
+                          (absolute_coordinate_system/) and changing the objective
+                          (objective_change_with_compensation/)
     - session/            what the driver remembers about one connection
     - driver_setup/       what is set up once per microscope, one folder per item: limits,
                           origin, orientation, optical_calibration and
