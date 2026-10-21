@@ -617,12 +617,12 @@ def test_absent_setter_falls_back_but_explicit_empty_list_is_unlimited(mock_clie
 def test_reads_work_without_a_handshake_while_mutations_refuse(mock_client):
     """No handshake == read-only session, not a dead session. Reads never touch
     the gate; mutations refuse fail-closed until a handshake runs."""
-    import zmart_drivers.leica.stellaris5_y42h93.navigator_expert as drv
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings import state as readers
 
     # This client never handshook — the one path that stays fail-closed.
     assert gate.state_for(mock_client) is None
-    assert drv.ping(mock_client)
-    jobs = drv.get_jobs(mock_client, mode="api")
+    assert readers.ping(mock_client)
+    jobs = readers.get_jobs(mock_client, mode="api")
     assert jobs
     _assert_refused(commands_mod.acquire(mock_client, jobs[0]["Name"]))
 

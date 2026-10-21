@@ -18,12 +18,14 @@ CHILD_SCRIPT = """
 import sys
 # Mimic an example-script entry point: only the repository root on sys.path.
 sys.path.insert(0, r"{repo}")
-import zmart_drivers.leica.stellaris5_y42h93.navigator_expert as drv
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.acquisition import run_job
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.save_data import save as saving
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.save_data import saved_acquisition
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.connection import lasx_runtime
-assert drv.acquire is not None
-assert drv.save is not None
-assert drv.AcquisitionResult is not None
-assert drv.SavedAcquisition is not None
+assert run_job.acquire is not None
+assert saving.save is not None
+assert run_job.AcquisitionResult is not None
+assert saved_acquisition.SavedAcquisition is not None
 assert lasx_runtime.REQUIRED_DLLS
 print("bootstrap-ok")
 """

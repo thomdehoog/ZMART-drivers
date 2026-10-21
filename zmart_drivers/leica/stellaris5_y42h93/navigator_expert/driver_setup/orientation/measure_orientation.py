@@ -34,7 +34,11 @@ from typing import Any
 
 import numpy as np
 
-import zmart_drivers.leica.stellaris5_y42h93.navigator_expert as drv
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.limits import handshake
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.acquisition import run_job
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.save_data import save as saving
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.connection import lasx_client
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings import state as readers
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.save_data.naming import (
     Naming,
     run_hash,
@@ -136,14 +140,14 @@ def start_session(
     for directory in (paths.data_dir, paths.reports_dir, run_dir / "validation"):
         directory.mkdir(parents=True, exist_ok=False)
 
-    client = drv.connect_python_client()
+    client = lasx_client.connect_python_client()
     # Connect-time limits handshake: the measurement moves the stage through
-    # the gated drv.move_* wrappers, so it needs validated machine-local
+    # the gated move_xy and move_z changes, so it needs validated machine-local
     # limits exactly like any other session.
-    limits_state = drv.connect_limits_handshake(client)
+    limits_state = handshake.connect_handshake(client)
     if not limits_state.ok:
         raise RuntimeError(limits_state.error)
-    hw = drv.get_hardware_info(client)
+    hw = readers.get_hardware_info(client)
     if hw is None:
         raise RuntimeError("get_hardware_info returned None; LAS X unreachable")
     if job_name is None:
@@ -596,7 +600,7 @@ def measure(session: OrientationSession) -> OrientationSession:
     # leave this session looking valid.
     _invalidate_orientation_config(session)
 
-    xy = drv.get_xy(session.client) or {}
+    xy = readers.get_xy(session.client) or {}
     if "x_um" not in xy or "y_um" not in xy:
         raise RuntimeError(f"get_xy returned no readback: {xy}")
     home_x, home_y = float(xy["x_um"]), float(xy["y_um"])
@@ -816,8 +820,8 @@ def acquire_validation_image(
         shutil.rmtree(output_root)
     output_root.mkdir()
 
-    acquisition = drv.acquire(session.client, session.job_name)
-    saved = drv.save(
+    acquisition = run_job.acquire(session.client, session.job_name)
+    saved = saving.save(
         session.client,
         acquisition,
         output_root,

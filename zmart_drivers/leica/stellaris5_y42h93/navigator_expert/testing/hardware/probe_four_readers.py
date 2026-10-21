@@ -34,8 +34,9 @@ from pathlib import Path
 from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[6]))  # the repository root
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "helpers"))  # low_level
 
-import zmart_drivers.leica.stellaris5_y42h93.navigator_expert as drv
+import low_level as drv
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings import (
     readings as capabilities,
 )

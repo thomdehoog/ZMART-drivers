@@ -425,7 +425,7 @@ def _bootstrap() -> tuple[Any, type]:
             sys.path.insert(0, p)
     from mock_lasx_api import MockLasxClient  # noqa: PLC0415
 
-    import zmart_drivers.leica.stellaris5_y42h93.navigator_expert as drv  # noqa: PLC0415
+    import low_level as drv  # noqa: PLC0415
 
     return drv, MockLasxClient
 
