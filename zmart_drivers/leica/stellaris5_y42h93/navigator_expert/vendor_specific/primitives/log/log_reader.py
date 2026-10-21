@@ -75,7 +75,7 @@ log = logging.getLogger(__name__)
 
 def _profile():
     """Return the active low-level log-reader profile."""
-    from ...primitive_handling.profiles import profiles
+    from ...primitive_handling.profiles import command_profiles as profiles
 
     return profiles.LOG_READER
 

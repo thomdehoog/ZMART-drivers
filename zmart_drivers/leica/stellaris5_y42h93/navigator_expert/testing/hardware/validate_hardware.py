@@ -888,9 +888,7 @@ def phase_readonly(
         v.callable("get_hardware_info", lambda: drv.get_hardware_info(client))
         v.callable("get_xy", lambda: drv.get_xy(client))
 
-        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings import (
-            readings as capabilities,
-        )
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings import reading_table as capabilities
 
         jobs_has_log_leg = capabilities.DATUMS["jobs"].log_fn is not None
         if not jobs:
@@ -969,9 +967,7 @@ def phase_job_selection(
             v.skip("job selection: round-trip", "no jobs returned")
             return
 
-        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.connection import (
-            tuning,
-        )
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.connection import waiting
 
         names = selectable_job_names(jobs)
         # The job to come back to is read the way the driver reads it, not
@@ -1026,8 +1022,8 @@ def phase_job_selection(
                         drv,
                         client,
                         name,
-                        window_s=tuning.WINDOW_S,
-                        poll_s=tuning.POLL_S,
+                        window_s=waiting.WINDOW_S,
+                        poll_s=waiting.POLL_S,
                     ),
                     context=ctx,
                 )
@@ -1856,9 +1852,7 @@ def _apply_state_reader_mode(mode: str | None, log: logging.Logger) -> None:
     """Override all profile-routed passive state readers for this run."""
     if mode is None:
         return
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.profiles import (
-        profiles,
-    )
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.profiles import command_profiles as profiles
 
     profiles.STATE_READERS = profiles.StateReaderProfile(
         xy_mode=mode,
@@ -1901,9 +1895,7 @@ def _apply_log_select_confirmation(
         or args.prime_log_select_cluster
     ):
         return
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.profiles import (
-        profiles,
-    )
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.profiles import command_profiles as profiles
 
     updates = {
         "selected_job_confirm_source": (

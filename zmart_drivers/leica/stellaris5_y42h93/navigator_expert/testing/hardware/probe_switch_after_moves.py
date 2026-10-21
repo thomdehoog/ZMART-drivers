@@ -47,9 +47,7 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.objective
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher import (  # noqa: E402
     gate as _gate,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings import (
-    state as _readers,
-)  # noqa: E402
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings import named_readings as _readers  # noqa: E402
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitives.log import (
     log_reader as _log_reader,
 )

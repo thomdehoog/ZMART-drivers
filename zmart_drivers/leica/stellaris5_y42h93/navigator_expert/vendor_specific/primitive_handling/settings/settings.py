@@ -34,9 +34,9 @@ from ..profiles.error_classification import (
     sends_again,
 )
 from ..readings.parsing import parse_format
-from ..confirmations import confirmations as _check
-from ..profiles import profiles as _profiles
-from ..profiles.profiles import CommandProfile
+from ..confirmations import confirm_changes as _check
+from ..profiles import command_profiles as _profiles
+from ..profiles.command_profiles import CommandProfile
 
 
 @dataclass(frozen=True)

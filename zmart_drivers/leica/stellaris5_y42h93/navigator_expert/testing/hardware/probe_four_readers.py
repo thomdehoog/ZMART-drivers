@@ -37,12 +37,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[6]))  # the repository r
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "helpers"))  # low_level
 
 import low_level as drv
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings import (
-    readings as capabilities,
-)
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings import (
-    state as readers,
-)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings import reading_table as capabilities
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings import named_readings as readers
 
 HERE = Path(__file__).resolve().parent
 PASSIVE_MODES = ("api", "log", "hybrid")

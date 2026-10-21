@@ -20,9 +20,7 @@ from unittest.mock import patch
 import pytest
 from z_readback_settings import raw_settings
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.confirmations import (
-    confirmations,
-)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.confirmations import confirm_changes as confirmations
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.settings import (
     changes as commands,
 )
@@ -42,9 +40,7 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.prim
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.absolute_coordinate_system import (
     frame as _frame,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings import (
-    state as _readers,
-)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings import named_readings as _readers
 
 
 #: What the simulator's hardware server answered on 2026-10-12, at rest.

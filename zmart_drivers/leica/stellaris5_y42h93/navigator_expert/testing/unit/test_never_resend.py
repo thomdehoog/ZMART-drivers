@@ -14,11 +14,9 @@ from dataclasses import replace
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher.send_loop import (
     resolve_profile as _resolve_profile,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.profiles.profiles import (
-    ACQUIRE,
-    COMMAND_DEFAULT,
-    SELECT_JOB,
-)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.profiles.command_profiles import ACQUIRE
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.profiles.command_profiles import COMMAND_DEFAULT
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.profiles.command_profiles import SELECT_JOB
 
 
 def _is_sent_once(profile):

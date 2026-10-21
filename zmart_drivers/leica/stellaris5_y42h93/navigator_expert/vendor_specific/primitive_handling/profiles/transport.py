@@ -20,13 +20,13 @@ import time
 from ...primitives.api.delivery import deliver
 from ...primitives.interface import lasx_dialogs
 from ...primitives.log import log_reader as _log_reader
-from ...connection import tuning
+from ...connection import waiting
 
 log = logging.getLogger(__name__)
 
 #: How long ``_await_echo_result`` checks the echo after delivery before giving
 #: up: LAS X filling in whether the command raised an error. It stays outside
-#: the window rule in ``tuning`` by decision; read at call time so tests can
+#: the window rule in ``waiting`` by decision; read at call time so tests can
 #: shrink it.
 ECHO_SETTLE_TIMEOUT_S = 1.0
 
@@ -73,7 +73,7 @@ def _await_echo_result(client, timeout=None):
         if time.perf_counter() >= deadline:
             return False
 
-        time.sleep(tuning.ANSWER_POLL_S)
+        time.sleep(waiting.ANSWER_POLL_S)
 
 
 class LasxTransport:

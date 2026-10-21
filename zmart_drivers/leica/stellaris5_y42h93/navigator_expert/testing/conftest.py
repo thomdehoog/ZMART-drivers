@@ -152,23 +152,21 @@ def _clean_limits_gate():
 def fast_timing_windows(monkeypatch):
     """Shrink the rule's real-time windows for the offline suite.
 
-    The shipped values (``tuning.WINDOW_S = 3`` s per window, ``POLL_S`` and
+    The shipped values (``waiting.WINDOW_S = 3`` s per window, ``POLL_S`` and
     ``ANSWER_POLL_S`` between looks, ``transport.ECHO_SETTLE_TIMEOUT_S = 1`` s
     per fire) are real hardware timing; against mocks they are pure sleep.
     The consumers read them at call time, so patching here reaches every
     wait. Shipped values are unchanged; a test that needs a specific window
     patches it itself (``test_waiting_rule``).
     """
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.connection import (
-        tuning,
-    )
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.connection import waiting
     from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.profiles import (
         transport,
     )
 
-    monkeypatch.setattr(tuning, "WINDOW_S", 0.25)
-    monkeypatch.setattr(tuning, "POLL_S", 0.005)
-    monkeypatch.setattr(tuning, "ANSWER_POLL_S", 0.001)
+    monkeypatch.setattr(waiting, "WINDOW_S", 0.25)
+    monkeypatch.setattr(waiting, "POLL_S", 0.005)
+    monkeypatch.setattr(waiting, "ANSWER_POLL_S", 0.001)
     monkeypatch.setattr(transport, "ECHO_SETTLE_TIMEOUT_S", 0.05)
 
 

@@ -38,12 +38,12 @@ RULEBOOK = Path("vendor_specific/primitive_handling/settings/limit_rules.py")
 # ``mode`` unset and consume the configured reader abstraction.
 READER_SOURCE_POLICY_MODULES = {
     Path("dispatcher/reader.py"),
-    Path("vendor_specific/primitive_handling/readings/state.py"),
+    Path("vendor_specific/primitive_handling/readings/named_readings.py"),
     Path("vendor_specific/primitive_handling/readings/sources.py"),
     Path("dispatcher/send_loop.py"),
     Path("dispatcher/confirm_loop.py"),
-    Path("vendor_specific/primitive_handling/readings/readings.py"),
-    Path("vendor_specific/primitive_handling/confirmations/confirmations.py"),
+    Path("vendor_specific/primitive_handling/readings/reading_table.py"),
+    Path("vendor_specific/primitive_handling/confirmations/confirm_changes.py"),
     Path("vendor_specific/primitive_handling/confirmations/confirm_select_job.py"),
     # Calibration geometry is saved for good, so it is read from the API
     # and never from a log entry that may be stale (review finding M4).
@@ -277,20 +277,20 @@ def test_each_part_only_imports_what_the_anatomy_allows():
 
 
 def test_a_reading_never_uses_a_change():
-    """A get never calls a set: vendor_specific/primitive_handling/readings/readings.py must not import vendor_specific/primitive_handling/settings/changes.py."""
+    """A get never calls a set: vendor_specific/primitive_handling/readings/reading_table.py must not import vendor_specific/primitive_handling/settings/changes.py."""
     readings = (
         DRIVER_ROOT
         / "vendor_specific"
         / "primitive_handling"
         / "readings"
-        / "readings.py"
+        / "reading_table.py"
     )
     tree = ast.parse(readings.read_text(encoding="utf-8"))
     for node in ast.walk(tree):
         if isinstance(node, ast.ImportFrom):
             names = [node.module or "", *(a.name for a in node.names)]
             assert "changes" not in names, (
-                "vendor_specific/primitive_handling/readings/readings.py imports vendor_specific/primitive_handling/settings/changes.py"
+                "vendor_specific/primitive_handling/readings/reading_table.py imports vendor_specific/primitive_handling/settings/changes.py"
             )
 
 

@@ -6,7 +6,7 @@ Each function owns its own polling loop internally — the backbone never
 sleeps or polls. It calls the function once and gets back a result dict.
 
 Currently contains only ``check_idle`` (wait for scanner idle, by the one
-rule in ``tuning``). Future
+rule in ``waiting``). Future
 pre-flight checks (e.g. wait for temperature stability, wait for stage
 settled) follow the same contract: ``callable(client) → result dict``.
 Extra parameters are pre-bound with ``partial`` at profile definition
@@ -19,9 +19,9 @@ from command wrappers, profiles, or confirmations.
 import logging
 import time
 
-from ..readings import state as _readers
+from ..readings import named_readings as _readers
 from ....dispatcher.door import make_log_entry as _make_log_entry
-from ...connection import tuning
+from ...connection import waiting
 
 log = logging.getLogger(__name__)
 
@@ -57,7 +57,7 @@ def check_idle(client):
     status = None if reading is None else reading.value
     msg = (
         f"Scanner not idle after {time.perf_counter() - t0:.1f}s "
-        f"({tuning.WINDOWS} windows of {tuning.WINDOW_S}s, last status: {status or 'unknown'})"
+        f"({waiting.WINDOWS} windows of {waiting.WINDOW_S}s, last status: {status or 'unknown'})"
     )
     log.warning(msg)
     return {"success": False, "logs": [_make_log_entry("warning", msg)]}

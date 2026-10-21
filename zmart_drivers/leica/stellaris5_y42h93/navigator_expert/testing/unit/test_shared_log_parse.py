@@ -15,12 +15,8 @@ from unittest.mock import patch
 
 import pytest
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings import (
-    state as readers,
-)
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.connection import (
-    tuning,
-)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings import named_readings as readers
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.connection import waiting
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitives.log import (
     log_reader,
 )
@@ -31,7 +27,7 @@ PARSE_S = 0.05
 @pytest.fixture(autouse=True)
 def fresh_shared_parse(monkeypatch):
     monkeypatch.setattr(log_reader, "LIVE_LOG", log_reader.SharedParse())
-    monkeypatch.setattr(tuning, "POLL_S", 0.02)
+    monkeypatch.setattr(waiting, "POLL_S", 0.02)
 
 
 class SlowParse:
@@ -149,9 +145,7 @@ def test_sixty_readings_at_once_never_overlap_two_parses(monkeypatch):
     The shipped policy falls back to the API alone, so this run asks for the
     fallback that lets the log answer too, which is what puts it under load.
     """
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.profiles import (
-        profiles,
-    )
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.profiles import command_profiles as profiles
 
     monkeypatch.setattr(
         profiles,
@@ -178,9 +172,7 @@ def test_a_snapshot_counts_only_for_the_log_files_it_was_parsed_from(
     monkeypatch, tmp_path
 ):
     """Pointing the reader at other files (the --mock validators do) never serves the old ones."""
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.profiles import (
-        profiles,
-    )
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.profiles import command_profiles as profiles
 
     seen = []
 

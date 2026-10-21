@@ -46,7 +46,7 @@ This file knows nothing of any one microscope. What the reader asks of the
 
 For LAS X these are in ``vendor_specific/primitive_handling/readings/sources.py``, and the
 named readings the rest of the driver asks for (``get_xy`` and the others) are
-in ``vendor_specific/primitive_handling/readings/state.py``, which call :func:`wait_for`.
+in ``vendor_specific/primitive_handling/readings/named_readings.py``, which call :func:`wait_for`.
 
 Author: Thom de Hoog, Center for Microscopy and Image Analysis (ZMB),
 University of Zurich (thom.dehoog@zmb.uzh.ch, thomdehoog@gmail.com).

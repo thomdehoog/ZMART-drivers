@@ -35,9 +35,7 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.save_data
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.connection.lasx_client import (
     connect_python_client,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.confirmations.confirmations import (
-    _readback,
-)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.confirmations.confirm_changes import _readback
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.profiles.error_classification import (
     _check_api_error,
     _default_error_check,
@@ -49,22 +47,20 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.prim
     parse_format,
     parse_tile_geometry,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings.state import (
-    Reading,
-    get_base_fov,
-    get_fov,
-    get_hardware_info,
-    get_job_by_name,
-    get_job_settings,
-    get_jobs,
-    get_lasx_settings,
-    get_pending_dialog,
-    get_scan_status,
-    get_selected_job,
-    get_xy,
-    ping,
-    read_zwide_um,
-)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings.named_readings import Reading
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings.named_readings import get_base_fov
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings.named_readings import get_fov
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings.named_readings import get_hardware_info
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings.named_readings import get_job_by_name
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings.named_readings import get_job_settings
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings.named_readings import get_jobs
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings.named_readings import get_lasx_settings
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings.named_readings import get_pending_dialog
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings.named_readings import get_scan_status
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings.named_readings import get_selected_job
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings.named_readings import get_xy
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings.named_readings import ping
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings.named_readings import read_zwide_um
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.settings.changes import (
     move_xy,
     move_z,

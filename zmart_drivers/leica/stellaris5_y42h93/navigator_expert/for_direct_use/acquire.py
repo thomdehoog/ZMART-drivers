@@ -34,7 +34,7 @@ except Exception:  # noqa: BLE001 -- best-effort provenance
 
 from ..procedures.save_data.naming import Naming, free_stem
 from .pending_capture import PendingCapture
-from ..vendor_specific.primitive_handling.readings import state as _readers
+from ..vendor_specific.primitive_handling.readings import named_readings as _readers
 from ..vendor_specific.primitive_handling.settings import run_job as _capture
 from ..session import handle as _info
 from ..procedures.absolute_coordinate_system.frame import get_xyz

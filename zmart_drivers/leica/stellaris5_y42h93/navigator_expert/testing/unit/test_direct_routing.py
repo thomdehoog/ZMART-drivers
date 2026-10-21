@@ -22,9 +22,7 @@ from limits_fixtures import install_permissive_limits
 from mock_lasx_api import MockLasxClient
 from state_tree_stand_in import StandInNodes, answer_json_read
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings import (
-    readings as capabilities,
-)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings import reading_table as capabilities
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.settings import (
     changes as commands,
 )
@@ -34,9 +32,7 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.objective
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.profiles import (
     prechecks,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings import (
-    state as readers,
-)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings import named_readings as readers
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitives.direct import (
     direct_reader,
     state_tree,
@@ -291,9 +287,7 @@ class TestDirectByDefault:
         self, client, tree, monkeypatch
     ):
         # The scan runs for three readings, then LAS X is idle again.
-        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.confirmations import (
-            confirmations,
-        )
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.confirmations import confirm_changes as confirmations
 
         real, asked = readers.get_scan_status, []
 

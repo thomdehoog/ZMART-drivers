@@ -20,16 +20,10 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.prim
     confirm_select_job,
 )
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.confirmations import (
-    confirmations,
-)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.confirmations import confirm_changes as confirmations
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.profiles import (
-    profiles,
-)
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings import (
-    state as readers,
-)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.profiles import command_profiles as profiles
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings import named_readings as readers
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitives.log import (
     log_wait,
 )
@@ -286,7 +280,7 @@ class TestLegsBuilder(SelectJobCase):
         )
         # Read the live module constant the code reads (a conftest patches it
         # down for suite speed), not the import-time value.
-        expected = confirm_select_job.tuning.WINDOW_S
+        expected = confirm_select_job.waiting.WINDOW_S
         self.assertEqual(budget, expected)
         self.assertEqual(api_leg.keywords["timeout"], expected)
 

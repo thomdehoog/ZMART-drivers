@@ -17,7 +17,7 @@ Each query makes ONE **request** (``_request``):
        deadline, or until the caller stops watching.
 
 Asking again is not done here. The routed readers in ``dispatcher.read``
-follow the one rule in ``vendor_specific/connection/tuning.py``: they request the read again
+follow the one rule in ``vendor_specific/connection/waiting.py``: they request the read again
 every ``POLL_S`` while an answer does not count, and at the next window when
 a request got no answer.
 
@@ -47,7 +47,7 @@ import xml.etree.ElementTree as ET
 
 from ...primitive_handling.readings import derived
 from .delivery import deliver
-from ...connection import tuning
+from ...connection import waiting
 
 log = logging.getLogger(__name__)
 
@@ -131,7 +131,7 @@ def _request(
         The answered value, or None when there was no answer.
     """
     label = label or command
-    deadline = time.monotonic() + tuning.WINDOW_S if deadline is None else deadline
+    deadline = time.monotonic() + waiting.WINDOW_S if deadline is None else deadline
     should_stop = should_stop or _never_stop
     try:
         flush(client)
@@ -148,7 +148,7 @@ def _request(
                     return value
             if time.monotonic() >= deadline:
                 break
-            time.sleep(tuning.ANSWER_POLL_S)
+            time.sleep(waiting.ANSWER_POLL_S)
         log.debug("%s: no answer%s", label, context)
     except Exception as e:
         log.debug("%s failed: %s", label, e)
@@ -198,7 +198,7 @@ def get_job_settings(client, job_name, *, deadline=None, should_stop=None):
             return _STALE
         return _ACCEPT
 
-    deadline_at = time.monotonic() + tuning.WINDOW_S if deadline is None else deadline
+    deadline_at = time.monotonic() + waiting.WINDOW_S if deadline is None else deadline
     return _request(
         client,
         command="GetJobSettingsByName",

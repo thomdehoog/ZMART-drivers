@@ -25,9 +25,7 @@ from limits_fixtures import (
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.limits import (
     handshake as _handshake,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.profiles.profiles import (
-    ImageSaveProfile,
-)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.profiles.command_profiles import ImageSaveProfile
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitives.capture.product import (
     PlaneIndex,
 )
@@ -76,9 +74,7 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.for_direct_use impor
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.session import (
     handle as _info,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings import (
-    state as _readers,
-)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings import named_readings as _readers
 
 
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.connection import (
