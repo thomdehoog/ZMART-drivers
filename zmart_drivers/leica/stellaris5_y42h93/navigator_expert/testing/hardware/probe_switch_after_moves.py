@@ -15,7 +15,7 @@ then a switch, and prints three things:
 
 On the microscope this showed about 60 threads alive after the burst, 65 log
 parses of 10 s each where one alone takes 0.1 s, and the switch's own log
-read stuck behind them for 7 to 10 s (see ``sessions/SCOPE_CHECK_JOB_SWITCH.md``).
+read stuck behind them for 7 to 10 s (see ``docs/leica/SCOPE_CHECK_JOB_SWITCH.md``).
 
 The moves are 25 um around the current position, with the z-galvo, and end
 where they started. Nothing is acquired. The stage must be clear.
