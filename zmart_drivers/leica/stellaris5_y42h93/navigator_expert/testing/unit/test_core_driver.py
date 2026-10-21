@@ -26,21 +26,43 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock, PropertyMock, patch
 
 import zmart_drivers.leica.stellaris5_y42h93.navigator_expert as drv
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.connection import lasx_client as session
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.confirmations import confirm_select_job
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.confirmations import confirmations
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.profiles import profiles
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.settings import changes as commands
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.objective_change_with_compensation import compensated_changes as commands_comp
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.connection import (
+    lasx_client as session,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.confirmations import (
+    confirm_select_job,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.confirmations import (
+    confirmations,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.profiles import (
+    profiles,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.settings import (
+    changes as commands,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.objective_change_with_compensation import (
+    compensated_changes as commands_comp,
+)
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher import (
     confirm_loop as dispatch,
     send_loop,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.profiles import prechecks
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings import state as readers
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.profiles import error_classification as errors
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.settings import settings as settings_table
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.profiles import transport as transport_module
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.profiles import (
+    prechecks,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings import (
+    state as readers,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.profiles import (
+    error_classification as errors,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.settings import (
+    settings as settings_table,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.profiles import (
+    transport as transport_module,
+)
 
 # =============================================================================
 # Helpers - mock factory
@@ -272,7 +294,6 @@ class TestDefaultErrorCheck(unittest.TestCase):
         result = drv._default_error_check(client)
         self.assertFalse(result["success"])
         self.assertTrue(result["transient"])
-
 
 
 def _fire_block(*args, **keywords):
@@ -770,7 +791,9 @@ class TestRetryBackoff(unittest.TestCase):
         client = make_client()
         api_obj = make_api_obj()
 
-        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.profiles.profiles import CommandProfile
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.profiles.profiles import (
+            CommandProfile,
+        )
 
         profile = CommandProfile(
             retry_backoff=2.0,
@@ -790,7 +813,13 @@ class TestRetryBackoff(unittest.TestCase):
             },
         ) as mock_caf:
             commands.dispatch_change(
-                client, api_obj, "Test", profile, command="set_zoom", values={}, setup_fn=lambda m: None
+                client,
+                api_obj,
+                "Test",
+                profile,
+                command="set_zoom",
+                values={},
+                setup_fn=lambda m: None,
             )
 
         mock_caf.assert_called_once()
@@ -803,7 +832,9 @@ class TestRetryBackoff(unittest.TestCase):
         client = make_client()
         api_obj = make_api_obj()
 
-        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.profiles.profiles import CommandProfile
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.profiles.profiles import (
+            CommandProfile,
+        )
 
         profile = CommandProfile(
             refire_on_unconfirmed=False,
@@ -821,7 +852,13 @@ class TestRetryBackoff(unittest.TestCase):
             },
         ) as mock_caf:
             commands.dispatch_change(
-                client, api_obj, "Test", profile, command="set_zoom", values={}, setup_fn=lambda m: None
+                client,
+                api_obj,
+                "Test",
+                profile,
+                command="set_zoom",
+                values={},
+                setup_fn=lambda m: None,
             )
 
         _, kwargs = mock_caf.call_args
@@ -963,7 +1000,9 @@ class TestCommandProfileGuard(unittest.TestCase):
         # Async fire blanks the echo, so a live echo-based error check would
         # report a meaningless success.
         with self.assertRaises(ValueError):
-            profiles.CommandProfile(send_without_receipt=True)  # error_check_fn defaults live
+            profiles.CommandProfile(
+                send_without_receipt=True
+            )  # error_check_fn defaults live
 
     def test_async_with_null_error_check_is_allowed(self):
         p = profiles.CommandProfile(send_without_receipt=True, error_check_fn=None)
@@ -1817,7 +1856,9 @@ class TestSetFunctionWiring(unittest.TestCase):
 
         def mock_fire(client, api_obj, description, **kw):
             captured["description"] = description
-            captured["api_obj"] = getattr(api_obj, "cam_object", api_obj)  # the request, without its name
+            captured["api_obj"] = getattr(
+                api_obj, "cam_object", api_obj
+            )  # the request, without its name
             captured["kwargs"] = kw
             model = MagicMock()
             if kw.get("setup_fn"):
@@ -2885,7 +2926,9 @@ class TestHybridSelectJobApiLegEndToEnd(unittest.TestCase):
     """
 
     def test_api_leg_confirms_when_log_has_no_evidence(self):
-        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitives.log import log_wait
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitives.log import (
+            log_wait,
+        )
 
         client = make_client()
         api_obj = make_api_obj()

@@ -21,9 +21,13 @@ class FakeRoute:
     """A way of sending that records what it was asked, and can refuse before anything leaves."""
 
     def __init__(self, name, *, unavailable=None, arrived=True, dialog=None):
-        self.name, self.unavailable, self.arrived, self.dialog = name, unavailable, arrived, dialog
+        self.name, self.unavailable, self.arrived, self.dialog = (
+            name,
+            unavailable,
+            arrived,
+            dialog,
+        )
         self.sent, self.cleared, self.waited = [], 0, 0
-
 
     def fill(self, request, setup_fn):
         self.filled = setup_fn(request)
@@ -61,7 +65,10 @@ def test_the_first_route_that_can_send_does():
 
 
 def test_a_route_that_cannot_send_is_followed_by_the_next_and_the_answer_says_so():
-    direct, cam = FakeRoute("direct", unavailable="the hardware server is not running"), FakeRoute("cam")
+    direct, cam = (
+        FakeRoute("direct", unavailable="the hardware server is not running"),
+        FakeRoute("cam"),
+    )
     chain = chain_of(direct, cam)
 
     arrived, answered = chain.send(object(), object(), "SetZoom", asynchronous=False)
@@ -69,7 +76,10 @@ def test_a_route_that_cannot_send_is_followed_by_the_next_and_the_answer_says_so
     assert arrived is True
     assert cam.sent == ["SetZoom"]
     assert chain.carried_by == "cam"
-    assert "the direct route could not send (the hardware server is not running)" in answered[0]
+    assert (
+        "the direct route could not send (the hardware server is not running)"
+        in answered[0]
+    )
     assert "sent through the cam route instead" in answered[0]
 
 
@@ -84,9 +94,15 @@ def test_a_send_that_went_out_but_was_not_acknowledged_is_not_tried_on_another_r
 
 
 def test_when_no_route_can_send_the_error_says_why_for_each():
-    chain = chain_of(FakeRoute("direct", unavailable="no server"), FakeRoute("cam", unavailable="no client"))
+    chain = chain_of(
+        FakeRoute("direct", unavailable="no server"),
+        FakeRoute("cam", unavailable="no client"),
+    )
 
-    with pytest.raises(TransportUnavailable, match="direct route could not send \\(no server\\).*cam route could not send \\(no client\\)"):
+    with pytest.raises(
+        TransportUnavailable,
+        match="direct route could not send \\(no server\\).*cam route could not send \\(no client\\)",
+    ):
         chain.send(object(), object(), "SetZoom", asynchronous=False)
 
 
@@ -96,7 +112,10 @@ def test_a_chain_with_no_route_says_so():
 
 
 def test_the_reply_and_the_dialog_are_asked_of_the_route_that_carried_the_command():
-    direct, cam = FakeRoute("direct", unavailable="down"), FakeRoute("cam", dialog="a dialog is open")
+    direct, cam = (
+        FakeRoute("direct", unavailable="down"),
+        FakeRoute("cam", dialog="a dialog is open"),
+    )
     chain = chain_of(direct, cam)
     chain.send(object(), object(), "SetZoom", asynchronous=False)
 
@@ -116,7 +135,12 @@ def test_the_send_loop_works_through_a_chain_and_reports_the_fallback():
     direct, cam = FakeRoute("direct", unavailable="down"), FakeRoute("cam")
     from dataclasses import replace
 
-    profile = replace(profiles.COMMAND_DEFAULT, transport=chain_of(direct, cam), error_check_fn=None, skip_reply_check=True)
+    profile = replace(
+        profiles.COMMAND_DEFAULT,
+        transport=chain_of(direct, cam),
+        error_check_fn=None,
+        skip_reply_check=True,
+    )
     request = type("Request", (), {"Model": object()})()
 
     result = send_loop.fire_block(
@@ -126,7 +150,9 @@ def test_the_send_loop_works_through_a_chain_and_reports_the_fallback():
     assert result["success"] is True
     assert direct.filled == "zoom written"  # filled once, by the preferred route
     assert cam.sent == ["SetZoom"]
-    assert any("sent through the cam route instead" in entry["msg"] for entry in result["logs"])
+    assert any(
+        "sent through the cam route instead" in entry["msg"] for entry in result["logs"]
+    )
 
 
 def test_the_vendor_policy_is_read_for_every_command(monkeypatch):
@@ -143,10 +169,14 @@ def test_the_vendor_policy_is_read_for_every_command(monkeypatch):
     assert cam.sent == ["first"] and other.sent == ["second"]
 
 
-def test_a_route_name_that_does_not_exist_is_refused_with_the_names_that_do(monkeypatch):
+def test_a_route_name_that_does_not_exist_is_refused_with_the_names_that_do(
+    monkeypatch,
+):
     monkeypatch.setattr(routes, "WRITE_ROUTES", ("sideways", "cam"))
 
-    with pytest.raises(ValueError, match="'sideways'.*routes that exist are \\['cam', 'direct'\\]"):
+    with pytest.raises(
+        ValueError, match="'sideways'.*routes that exist are \\['cam', 'direct'\\]"
+    ):
         routes.write_routes()
 
 

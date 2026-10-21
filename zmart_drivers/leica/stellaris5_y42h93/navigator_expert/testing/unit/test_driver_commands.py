@@ -23,39 +23,87 @@ from limits_fixtures import (
     provision_machine_limits,
 )
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.limits import handshake as _handshake
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.profiles.profiles import ImageSaveProfile
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitives.capture.product import PlaneIndex
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.settings import limit_rules as limits_checks
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.limits import (
+    handshake as _handshake,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.profiles.profiles import (
+    ImageSaveProfile,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitives.capture.product import (
+    PlaneIndex,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.settings import (
+    limit_rules as limits_checks,
+)
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher import (
     gate as _gate,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings import parsing as _readers_parsing
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup import orientation as _orientation
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup import store as _machine
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.save_data import command_log as _log
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.clear_cache import release as _release
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.save_data import save_captures as _save_captures
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.save_data import save as _save
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.acquisition import run_job as _capture
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.acquisition import acquire as _acquisition
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.settings import changes as _commands
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.objective_change_with_compensation import compensated_changes as _commands_comp
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.absolute_coordinate_system import frame as _frame
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.instrument import info as _instrument_info
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.instrument import menu as _instrument_menu
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.instrument import state as _instrument_state
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings import (
+    parsing as _readers_parsing,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup import (
+    orientation as _orientation,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup import (
+    store as _machine,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.save_data import (
+    command_log as _log,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.clear_cache import (
+    release as _release,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.save_data import (
+    save_captures as _save_captures,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.save_data import (
+    save as _save,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.acquisition import (
+    run_job as _capture,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.acquisition import (
+    acquire as _acquisition,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.settings import (
+    changes as _commands,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.objective_change_with_compensation import (
+    compensated_changes as _commands_comp,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.absolute_coordinate_system import (
+    frame as _frame,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.instrument import (
+    info as _instrument_info,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.instrument import (
+    menu as _instrument_menu,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.instrument import (
+    state as _instrument_state,
+)
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.session import handle as _info
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings import state as _readers
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.session import (
+    handle as _info,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings import (
+    state as _readers,
+)
 
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.connection import lasx_client as _connect_module
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.session import loaded_config as _session_state
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.connection import (
+    lasx_client as _connect_module,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.session import (
+    loaded_config as _session_state,
+)
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.for_zmart_controller.zmart_driver import (
     ZmartDriver,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.session.handle import ZmartHandle
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.session.handle import (
+    ZmartHandle,
+)
 
 
 def _connect_handle(connection=None):
@@ -184,8 +232,9 @@ def tearDownModule():
     _NO_LOG_ON_DISK.stop()
 
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.origin import set_origin as _set_origin
-
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.origin import (
+    set_origin as _set_origin,
+)
 
 
 def _acquire_and_save(handle, **given):
@@ -229,8 +278,12 @@ class TestCalibrationSelection(unittest.TestCase):
         # The driver now owns loading: the named calibration flows through
         # the driver's connection -> model.load_objective_calibration, where one
         # exact document supplies both translations and readiness provenance.
-        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup import optical_calibration as drv_session
-        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.optical_calibration import model as cal_model
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup import (
+            optical_calibration as drv_session,
+        )
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.optical_calibration import (
+            model as cal_model,
+        )
 
         cfg = {
             "schema_version": 13,
@@ -259,8 +312,12 @@ class TestCalibrationSelection(unittest.TestCase):
 
     def test_translations_and_provenance_come_from_one_calibration_read(self):
         """A snapshot adoption during connect cannot mix old math with new proof."""
-        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup import optical_calibration as drv_session
-        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.optical_calibration import model as cal_model
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup import (
+            optical_calibration as drv_session,
+        )
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.optical_calibration import (
+            model as cal_model,
+        )
 
         old = {
             "schema_version": 13,
@@ -325,7 +382,10 @@ class TestFrame(unittest.TestCase):
         import json
         import tempfile
 
-        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.store import MachineProfile, is_snapshot_name
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.store import (
+            MachineProfile,
+            is_snapshot_name,
+        )
 
         with tempfile.TemporaryDirectory() as tmp:
             profile = MachineProfile(programdata_root=Path(tmp))
@@ -367,7 +427,9 @@ class TestFrame(unittest.TestCase):
         """The newest saved origin, objective included, becomes the session's frame."""
         import tempfile
 
-        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.store import MachineProfile
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.store import (
+            MachineProfile,
+        )
 
         objective = {"slotIndex": 2, "magnification": 63, "name": "HC PL APO 63x"}
         with tempfile.TemporaryDirectory() as tmp:
@@ -394,7 +456,9 @@ class TestFrame(unittest.TestCase):
         """What set_origin captures is exactly what the next connect loads."""
         import tempfile
 
-        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.store import MachineProfile
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.store import (
+            MachineProfile,
+        )
 
         with tempfile.TemporaryDirectory() as tmp:
             profile = MachineProfile(programdata_root=Path(tmp))
@@ -417,7 +481,9 @@ class TestFrame(unittest.TestCase):
         """No origin saved yet: the frame is the absolute stage, with a warning."""
         import tempfile
 
-        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.store import MachineProfile
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.store import (
+            MachineProfile,
+        )
 
         with tempfile.TemporaryDirectory() as tmp:
             profile = MachineProfile(programdata_root=Path(tmp))
@@ -433,7 +499,9 @@ class TestFrame(unittest.TestCase):
         """A damaged origin file stops connect before LAS X is contacted."""
         import tempfile
 
-        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.store import MachineProfile
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.store import (
+            MachineProfile,
+        )
 
         with tempfile.TemporaryDirectory() as tmp:
             profile = MachineProfile(programdata_root=Path(tmp))
@@ -453,7 +521,9 @@ class TestFrame(unittest.TestCase):
         """An origin missing a value or its objective is refused, not zero-filled."""
         import tempfile
 
-        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.store import MachineProfile
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.store import (
+            MachineProfile,
+        )
 
         broken = [
             ({"origin": {"x_um": 5}}, "'y_um'"),
@@ -477,7 +547,9 @@ class TestFrame(unittest.TestCase):
         """load_origin=False starts in stage coordinates, even over a damaged file."""
         import tempfile
 
-        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.store import MachineProfile
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.store import (
+            MachineProfile,
+        )
 
         with tempfile.TemporaryDirectory() as tmp:
             profile = MachineProfile(programdata_root=Path(tmp))
@@ -608,7 +680,9 @@ class TestFrame(unittest.TestCase):
         )
         self.assertEqual(record["z"]["actuator"], "z-wide")
         self.assertEqual(record["z"]["actuators"], {"z-wide": 32.0, "z-galvo": 0.0})
-        self.assertEqual(record["z"]["position"], 2.0)  # (32 + 0) − 30 (patched readings)
+        self.assertEqual(
+            record["z"]["position"], 2.0
+        )  # (32 + 0) − 30 (patched readings)
         # the selection does NOT persist: defaults are fixed, never sticky
         self.assertEqual(_frame._resolve_actuators(None)["z"], "z-wide")
         self.assertEqual(_frame._resolve_actuators(None)["x"], "motoric")
@@ -1143,9 +1217,15 @@ class TestAcquire(unittest.TestCase):
         h = _handle()
         h.driven_to = {"x": 0.0, "y": 0.0, "z": 0.0, "z_wide_um": 0.0}
         prepared = []
-        with self._capturing() as calls, patch.object(_release, "prepare", lambda: prepared.append(1)):
+        with (
+            self._capturing() as calls,
+            patch.object(_release, "prepare", lambda: prepared.append(1)),
+        ):
             taken = _acquisition.acquire(
-                h, acquisition_type="acquisition", output_folder=None, position_label="A1"
+                h,
+                acquisition_type="acquisition",
+                output_folder=None,
+                position_label="A1",
             )
         self.assertEqual(taken["position_label"], "A1")
         self.assertNotIn("save", calls)
@@ -1156,10 +1236,16 @@ class TestAcquire(unittest.TestCase):
         h = _handle()
         h.driven_to = {"x": 0.0, "y": 0.0, "z": 0.0, "z_wide_um": 0.0}
         prepared = []
-        with self._capturing(release_target=(7, "HiRes007")), patch.object(
-            _release, "prepare", lambda: prepared.append(1)
+        with (
+            self._capturing(release_target=(7, "HiRes007")),
+            patch.object(_release, "prepare", lambda: prepared.append(1)),
         ):
-            _acquisition.acquire(h, acquisition_type="acquisition", output_folder=None, position_label="A1")
+            _acquisition.acquire(
+                h,
+                acquisition_type="acquisition",
+                output_folder=None,
+                position_label="A1",
+            )
             (record,) = _save_captures.save_waiting(h)
         self.assertEqual(record["position_label"], "A1")
         self.assertEqual(h.unsaved, [])
@@ -1170,7 +1256,12 @@ class TestAcquire(unittest.TestCase):
         h = _handle()
         h.driven_to = {"x": 0.0, "y": 0.0, "z": 0.0, "z_wide_um": 0.0}
         with self._capturing():
-            _acquisition.acquire(h, acquisition_type="acquisition", output_folder=None, position_label="A1")
+            _acquisition.acquire(
+                h,
+                acquisition_type="acquisition",
+                output_folder=None,
+                position_label="A1",
+            )
             with patch.object(_save, "save", side_effect=RuntimeError("disk full")):
                 with self.assertRaises(RuntimeError):
                     _save_captures.save_waiting(h)
@@ -1181,10 +1272,18 @@ class TestAcquire(unittest.TestCase):
         h = _handle()
         h.driven_to = {"x": 0.0, "y": 0.0, "z": 0.0, "z_wide_um": 0.0}
         with self._capturing():
-            _acquisition.acquire(h, acquisition_type="acquisition", output_folder=None, position_label="A1")
+            _acquisition.acquire(
+                h,
+                acquisition_type="acquisition",
+                output_folder=None,
+                position_label="A1",
+            )
             with self.assertRaisesRegex(ValueError, "still waiting to be saved"):
                 _acquisition.acquire(
-                    h, acquisition_type="acquisition", output_folder=None, position_label="A1"
+                    h,
+                    acquisition_type="acquisition",
+                    output_folder=None,
+                    position_label="A1",
                 )
 
     def test_saving_a_label_nobody_acquired_is_refused(self):
@@ -1564,7 +1663,10 @@ class TestAcquire(unittest.TestCase):
         h.driven_to = {"x": 0.0, "y": 0.0, "z": 0.0, "z_wide_um": 50.0}
         with self._capturing():
             record = _acquire_and_save(
-                h, acquisition_type="acquisition", output_folder=None, position_label="A1"
+                h,
+                acquisition_type="acquisition",
+                output_folder=None,
+                position_label="A1",
             )
         self.assertEqual(
             [(p["x_um"], p["y_um"]) for p in record["planes"]], [(100.0, 200.0)]
@@ -1579,7 +1681,10 @@ class TestAcquire(unittest.TestCase):
         h.driven_to = {"x": 100.0, "y": 200.0, "z": 50.0, "z_wide_um": 50.0}
         with self._capturing():
             record = _acquire_and_save(
-                h, acquisition_type="acquisition", output_folder=None, position_label="A1"
+                h,
+                acquisition_type="acquisition",
+                output_folder=None,
+                position_label="A1",
             )
         self.assertEqual(record["unconfirmed"], [])
 
@@ -1588,7 +1693,9 @@ class TestAcquire(unittest.TestCase):
         h = _handle(driven_to=None)
         with (
             self._capturing(),
-            patch.object(_acquisition, "get_xyz", side_effect=RuntimeError("no answer")),
+            patch.object(
+                _acquisition, "get_xyz", side_effect=RuntimeError("no answer")
+            ),
             self.assertRaisesRegex(RuntimeError, "where the stage is"),
         ):
             _acquire_and_save(
@@ -1614,7 +1721,9 @@ class TestAcquire(unittest.TestCase):
         """
         from datetime import datetime, timezone
 
-        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.store import MachineProfile
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.store import (
+            MachineProfile,
+        )
 
         h = _handle(
             connection={**ZmartDriver.DEFAULT_CONNECTION, "output_root": "/tmp/out"}
@@ -2009,7 +2118,9 @@ class TestStateAndProcedures(unittest.TestCase):
         p = self._state_patches()
         with p[2]:
             with self.assertRaisesRegex(ValueError, "not an autofocus job"):
-                _instrument_menu.run_procedure(h, {"name": "autofocus", "job": "Overview"})
+                _instrument_menu.run_procedure(
+                    h, {"name": "autofocus", "job": "Overview"}
+                )
 
     def test_autofocus_requires_a_choice_when_several_exist(self):
         h = _handle()
@@ -2037,7 +2148,9 @@ class TestConnectCardCalibrationLine(unittest.TestCase):
     def test_a_loaded_calibration_shows_its_name(self):
         record = {"enabled": True, "loaded": True, "name": "water_lens_setup"}
 
-        self.assertEqual(_instrument_info._calibration_status(record), "water_lens_setup")
+        self.assertEqual(
+            _instrument_info._calibration_status(record), "water_lens_setup"
+        )
 
     def test_a_loaded_calibration_without_a_name_says_found(self):
         record = {"enabled": True, "loaded": True, "name": None}
@@ -2058,7 +2171,9 @@ class TestConnectCardCalibrationLine(unittest.TestCase):
         self.assertEqual(_instrument_info._calibration_status(record), "switched off")
 
     def test_no_record_at_all_says_none_found(self):
-        self.assertEqual(_instrument_info._calibration_status(None), "failed — none found")
+        self.assertEqual(
+            _instrument_info._calibration_status(None), "failed — none found"
+        )
 
 
 class TestGetInfoReportsNoPositions(unittest.TestCase):
@@ -2470,7 +2585,9 @@ class TestDriverSetupReadiness(unittest.TestCase):
         )
         self.addCleanup(_session_state.uninstall, h.client)
 
-        setup = _instrument_state.setup_readiness(h, {"slotIndex": 1}, self.measured_limits)
+        setup = _instrument_state.setup_readiness(
+            h, {"slotIndex": 1}, self.measured_limits
+        )
 
         self.assertFalse(setup["ready"])
         self.assertIn("orientation", setup["issues"][0])
@@ -2620,7 +2737,9 @@ class TestFunctionLimits(unittest.TestCase):
 
     def test_bundled_template_covers_every_declared_key(self):
         """THE completeness guard on the template: a new key cannot ship absent."""
-        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.limits import config as limits_config
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.limits import (
+            config as limits_config,
+        )
 
         path = _machine.MACHINE.bundled_default_path(_machine.LIMITS_FILENAME)
         payload = limits_config.validate_payload(

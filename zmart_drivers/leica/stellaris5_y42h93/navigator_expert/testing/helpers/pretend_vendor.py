@@ -35,7 +35,9 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher.limit_err
     LimitsStatus,
     LimitViolation,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher.reader import Reading
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher.reader import (
+    Reading,
+)
 
 # =============================================================================
 # The pretend microscope
@@ -199,7 +201,9 @@ class PretendLimits:
         if command == "move_x":
             low, high = self.X_RANGE_UM
             if not low <= values["x_um"] <= high:
-                raise LimitViolation(f"x={values['x_um']} um is outside {low}-{high} um")
+                raise LimitViolation(
+                    f"x={values['x_um']} um is outside {low}-{high} um"
+                )
 
     def status(self):
         return LimitsStatus(source="pretend", path=None, is_fallback=False)

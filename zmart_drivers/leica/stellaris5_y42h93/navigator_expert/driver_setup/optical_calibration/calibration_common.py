@@ -337,9 +337,7 @@ def _capture_for_calibration(
     folder: str,
     orientation=None,
 ):
-    """Use the public driver acquire/save workflow for calibration captures.
-
-    """
+    """Use the public driver acquire/save workflow for calibration captures."""
     if orientation is None:
         orientation = _orientation.rig_orientation()
     position_label = f"{len(session.exported_files):06d}"

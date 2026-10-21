@@ -145,7 +145,9 @@ def test_adopt_seeds_first_used_objective_at_origin():
     # Fresh config (FROM objective has no translation yet): the first objective
     # used becomes the [0,0,0] origin; the pair's translation lands on TO.
     sys.path.insert(0, str(_repo_root()))
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.optical_calibration import adopt_calibration as adopt
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.optical_calibration import (
+        adopt_calibration as adopt,
+    )
 
     config = {
         "schema_version": 13,
@@ -275,7 +277,9 @@ def test_save_without_path_seeds_programdata_not_bundled_defaults(
     tmp_path, monkeypatch
 ):
     cal = _load_calibration_module()
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup import store as machine_config
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup import (
+        store as machine_config,
+    )
 
     profile = machine_config.MachineProfile(programdata_root=tmp_path / "programdata")
     monkeypatch.setattr(machine_config, "MACHINE", profile)
@@ -298,7 +302,9 @@ def test_save_named_calibration_writes_existing_machine_local_path(
     tmp_path, monkeypatch
 ):
     cal = _load_calibration_module()
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup import store as machine_config
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup import (
+        store as machine_config,
+    )
 
     profile = machine_config.MachineProfile(programdata_root=tmp_path / "programdata")
     monkeypatch.setattr(machine_config, "MACHINE", profile)

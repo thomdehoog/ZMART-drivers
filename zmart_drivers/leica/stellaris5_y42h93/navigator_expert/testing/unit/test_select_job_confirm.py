@@ -16,13 +16,23 @@ import time
 import unittest
 from unittest.mock import patch
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.confirmations import confirm_select_job
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.confirmations import (
+    confirm_select_job,
+)
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.confirmations import confirmations
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.confirmations import (
+    confirmations,
+)
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.profiles import profiles
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings import state as readers
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitives.log import log_wait
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.profiles import (
+    profiles,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings import (
+    state as readers,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitives.log import (
+    log_wait,
+)
 
 
 def _poll_result(success, value=None, reason="matched"):
@@ -301,7 +311,9 @@ class TestLegsBuilder(SelectJobCase):
         self.assertIsNone(budget)
         self.assertEqual(leg.func, confirm_select_job.confirm_select_job_direct)
 
-    def test_direct_source_uses_the_hybrid_race_when_the_direct_reader_cannot_answer(self):
+    def test_direct_source_uses_the_hybrid_race_when_the_direct_reader_cannot_answer(
+        self,
+    ):
         self._use(selected_job_confirm_source="direct")
         with (
             patch.object(

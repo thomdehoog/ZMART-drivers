@@ -444,7 +444,9 @@ def _connect(
         log.info("limits | hermetic machine root provisioned at %s", root)
         return MockClient(latency=args.mock_latency)
     try:
-        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.connection.lasx_runtime import load_lasx_api_runtime
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.connection.lasx_runtime import (
+            load_lasx_api_runtime,
+        )
 
         lasx_api = load_lasx_api_runtime()
     except (ImportError, ModuleNotFoundError, RuntimeError) as exc:
@@ -675,7 +677,9 @@ def embedded_ome_xml(path) -> bytes:
     path = Path(path)
     if path.is_dir():
         return (path / "OME" / "METADATA.ome.xml").read_bytes()
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.save_data import materialize
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.save_data import (
+        materialize,
+    )
 
     return materialize.extract_embedded_ome_xml(path)
 
@@ -732,7 +736,9 @@ def _record_log_selected_job_poll(
     context: dict,
 ) -> None:
     """Record the experimental log-only selected-job wait."""
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitives.log.log_wait import wait_for_selected_job_log
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitives.log.log_wait import (
+        wait_for_selected_job_log,
+    )
 
     started_at = _now_iso()
     result = wait_for_selected_job_log(
@@ -882,7 +888,9 @@ def phase_readonly(
         v.callable("get_hardware_info", lambda: drv.get_hardware_info(client))
         v.callable("get_xy", lambda: drv.get_xy(client))
 
-        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings import readings as capabilities
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings import (
+            readings as capabilities,
+        )
 
         jobs_has_log_leg = capabilities.DATUMS["jobs"].log_fn is not None
         if not jobs:
@@ -961,7 +969,9 @@ def phase_job_selection(
             v.skip("job selection: round-trip", "no jobs returned")
             return
 
-        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.connection import tuning
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.connection import (
+            tuning,
+        )
 
         names = selectable_job_names(jobs)
         # The job to come back to is read the way the driver reads it, not
@@ -1453,7 +1463,9 @@ def phase_lasers(drv: Any, v: Validator, client: Any, job_name: str) -> None:
     """The first laser line's intensity and shutter: write another value, check it, put it back."""
 
     def line() -> dict:
-        return _settings(drv, client, job_name, mode="direct")["activeSettings"][0]["activeLaserLines"][0]
+        return _settings(drv, client, job_name, mode="direct")["activeSettings"][0][
+            "activeLaserLines"
+        ][0]
 
     with v.phase("laser round-trip"):
         try:
@@ -1470,7 +1482,9 @@ def phase_lasers(drv: Any, v: Validator, client: Any, job_name: str) -> None:
             "laser_intensity",
             job_name,
             read=lambda: line()["intensity"]["value"],
-            write=lambda x: drv.set_laser_intensity(client, job_name, 0, route, index, x),
+            write=lambda x: drv.set_laser_intensity(
+                client, job_name, 0, route, index, x
+            ),
             candidates=[min(level + 0.01, top), max(level - 0.01, 0.0)],
             tolerance=0.005,
         )
@@ -1492,7 +1506,9 @@ def phase_filter_wheels(drv: Any, v: Validator, client: Any, job_name: str) -> N
     """
 
     def wheels() -> list:
-        return _settings(drv, client, job_name, mode="direct")["activeSettings"][0].get("filterWheels", [])
+        return _settings(drv, client, job_name, mode="direct")["activeSettings"][0].get(
+            "filterWheels", []
+        )
 
     with v.phase("filter wheel round-trip"):
         try:
@@ -1504,21 +1520,32 @@ def phase_filter_wheels(drv: Any, v: Validator, client: Any, job_name: str) -> N
             v.skip("filter_wheel: round-trip", "the job has no filter wheel")
             return
         for number, wheel in enumerate(found):
-            route, kind, slot = wheel["_beamRoute"], wheel.get("type"), wheel.get("filterIndex")
+            route, kind, slot = (
+                wheel["_beamRoute"],
+                wheel.get("type"),
+                wheel.get("filterIndex"),
+            )
             name = f"filter_wheel[{number}]"
             if kind is None or slot is None:
                 v.skip(f"{name}: round-trip", "the wheel reports no type or slot")
                 continue
 
             def read(route=route, kind=kind):
-                return next(w for w in wheels() if w["_beamRoute"] == route and w.get("type") == kind)["filterIndex"]
+                return next(
+                    w
+                    for w in wheels()
+                    if w["_beamRoute"] == route and w.get("type") == kind
+                )["filterIndex"]
 
             def write(x, route=route, kind=kind):
                 return drv.set_filter_wheel_slot(client, job_name, 0, route, kind, x)
 
             own = write(slot)
             if not own or not own.get("success"):
-                v.skip(f"{name}: round-trip", f"LAS X did not take the wheel's own slot: {(own or {}).get('message')}")
+                v.skip(
+                    f"{name}: round-trip",
+                    f"LAS X did not take the wheel's own slot: {(own or {}).get('message')}",
+                )
                 continue
             for target in (slot + 1, slot - 1):
                 if target < 0:
@@ -1528,7 +1555,11 @@ def phase_filter_wheels(drv: Any, v: Validator, client: Any, job_name: str) -> N
                     try:
                         v.compare(f"{name}: readback", read(), target)
                     finally:
-                        v.command(f"{name}: restore", lambda: write(slot), context={"restore_to": slot})
+                        v.command(
+                            f"{name}: restore",
+                            lambda: write(slot),
+                            context={"restore_to": slot},
+                        )
                     break
             else:
                 v.skip(f"{name}: round-trip", "LAS X took no neighbouring slot")
@@ -1549,27 +1580,61 @@ def phase_z_stack(drv: Any, v: Validator, client: Any, job_name: str) -> None:
         if not before:
             v.skip("z_stack: round-trip", "the job has no z-stack")
             return
-        begin, end, step = float(before["begin"]), float(before["end"]), float(before["stepSize"])
+        begin, end, step = (
+            float(before["begin"]),
+            float(before["end"]),
+            float(before["stepSize"]),
+        )
         size = round(abs(end - begin), 6)
         widened = (begin - 1.0, end + 1.0) if begin <= end else (begin + 1.0, end - 1.0)
 
         def put_back() -> None:
-            v.command("z_stack: restore begin and end", lambda: drv.set_z_stack_definition(client, job_name, begin, end))
-            v.command("z_stack: restore step size", lambda: drv.set_z_stack_step_size(client, job_name, step))
+            v.command(
+                "z_stack: restore begin and end",
+                lambda: drv.set_z_stack_definition(client, job_name, begin, end),
+            )
+            v.command(
+                "z_stack: restore step size",
+                lambda: drv.set_z_stack_step_size(client, job_name, step),
+            )
 
         try:
-            v.command("z_stack: step size +0.5 um", lambda: drv.set_z_stack_step_size(client, job_name, step + 0.5))
+            v.command(
+                "z_stack: step size +0.5 um",
+                lambda: drv.set_z_stack_step_size(client, job_name, step + 0.5),
+            )
             now = stack()
             if now:
-                v.compare("z_stack: step size readback", float(now["stepSize"]), step + 0.5, tolerance=0.05)
+                v.compare(
+                    "z_stack: step size readback",
+                    float(now["stepSize"]),
+                    step + 0.5,
+                    tolerance=0.05,
+                )
             # The driver confirms the new size against LAS X itself, so the command's own
             # answer is the check; the begin and end are read back after the next step.
-            v.command("z_stack: size +2 um", lambda: drv.set_z_stack_size(client, job_name, round(size + 2, 6)))
-            v.command("z_stack: definition 1 um wider", lambda: drv.set_z_stack_definition(client, job_name, *widened))
+            v.command(
+                "z_stack: size +2 um",
+                lambda: drv.set_z_stack_size(client, job_name, round(size + 2, 6)),
+            )
+            v.command(
+                "z_stack: definition 1 um wider",
+                lambda: drv.set_z_stack_definition(client, job_name, *widened),
+            )
             now = stack()
             if now:
-                v.compare("z_stack: begin readback", float(now["begin"]), widened[0], tolerance=0.1)
-                v.compare("z_stack: end readback", float(now["end"]), widened[1], tolerance=0.1)
+                v.compare(
+                    "z_stack: begin readback",
+                    float(now["begin"]),
+                    widened[0],
+                    tolerance=0.1,
+                )
+                v.compare(
+                    "z_stack: end readback",
+                    float(now["end"]),
+                    widened[1],
+                    tolerance=0.1,
+                )
         finally:
             put_back()
 
@@ -1791,7 +1856,9 @@ def _apply_state_reader_mode(mode: str | None, log: logging.Logger) -> None:
     """Override all profile-routed passive state readers for this run."""
     if mode is None:
         return
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.profiles import profiles
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.profiles import (
+        profiles,
+    )
 
     profiles.STATE_READERS = profiles.StateReaderProfile(
         xy_mode=mode,
@@ -1834,7 +1901,9 @@ def _apply_log_select_confirmation(
         or args.prime_log_select_cluster
     ):
         return
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.profiles import profiles
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.profiles import (
+        profiles,
+    )
 
     updates = {
         "selected_job_confirm_source": (
@@ -1956,12 +2025,18 @@ def main(argv: list[str] | None = None) -> int:
             # A new objective makes LAS X recalculate a System Optimized stack's steps and keep
             # them when the first objective is back; sending the stack's own begin and end
             # again puts it right (STELLARIS, 2026-10-15).
-            kept = (_settings(drv, client, job_name).get("stack") or None) if args.allow_stack else None
+            kept = (
+                (_settings(drv, client, job_name).get("stack") or None)
+                if args.allow_stack
+                else None
+            )
             phase_objective(drv, v, client, job_name)
             if kept:
                 v.command(
                     "objective: define the stack again",
-                    lambda: drv.set_z_stack_definition(client, job_name, float(kept["begin"]), float(kept["end"])),
+                    lambda: drv.set_z_stack_definition(
+                        client, job_name, float(kept["begin"]), float(kept["end"])
+                    ),
                 )
         else:
             v.skip("phase: objective", "use --allow-objective to enable")

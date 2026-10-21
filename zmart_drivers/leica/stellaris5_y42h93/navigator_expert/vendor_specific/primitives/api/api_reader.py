@@ -198,9 +198,7 @@ def get_job_settings(client, job_name, *, deadline=None, should_stop=None):
             return _STALE
         return _ACCEPT
 
-    deadline_at = (
-        time.monotonic() + tuning.WINDOW_S if deadline is None else deadline
-    )
+    deadline_at = time.monotonic() + tuning.WINDOW_S if deadline is None else deadline
     return _request(
         client,
         command="GetJobSettingsByName",

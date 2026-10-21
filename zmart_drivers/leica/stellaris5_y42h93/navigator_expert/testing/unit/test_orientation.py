@@ -14,8 +14,12 @@ import pytest
 import tifffile
 import zarr
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup import orientation as orient
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.save_data import ome_zarr
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup import (
+    orientation as orient,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.save_data import (
+    ome_zarr,
+)
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitives.capture.product import (
     AcquisitionMetadata,
     ChannelMetadata,
@@ -166,7 +170,9 @@ def test_rig_orientation_defaults_to_identity_template(monkeypatch, tmp_path):
     # template -- "no turn." The real value is measured by the set_orientation
     # notebook, never hard-coded. A hermetic ProgramData root (no snapshot)
     # exercises that fallback without touching the machine's real config.
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.store import MachineProfile
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.store import (
+        MachineProfile,
+    )
 
     monkeypatch.setattr(
         "zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.store.MACHINE",
@@ -180,7 +186,9 @@ def test_rig_orientation_reads_the_measured_snapshot(monkeypatch, tmp_path):
     # reads the measured turn from it -- not the identity template.
     from datetime import datetime, timezone
 
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.store import MachineProfile
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.store import (
+        MachineProfile,
+    )
 
     machine = MachineProfile(programdata_root=tmp_path / "programdata")
     machine.publish_snapshot(

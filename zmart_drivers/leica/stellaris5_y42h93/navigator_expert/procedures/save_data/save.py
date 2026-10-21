@@ -25,10 +25,25 @@ from ...driver_setup.orientation import Orientation
 from ...vendor_specific.primitives.capture import files as _files
 from . import materialize as _materialize
 from . import ome_zarr
-from ...vendor_specific.primitives.capture.files import DEFAULT_EXPORT_COMPLETION_POLL_INTERVAL_S, DEFAULT_EXPORT_COMPLETION_TIMEOUT_S
-from ...vendor_specific.primitives.capture.lasx_data_container import collect_lasx_data_container
-from .naming import Naming, build_state_name, data_dir, metadata_dir, projections_dir, state_dir
-from ...vendor_specific.primitives.capture.product import AcquisitionResult, ExportedAcquisition
+from ...vendor_specific.primitives.capture.files import (
+    DEFAULT_EXPORT_COMPLETION_POLL_INTERVAL_S,
+    DEFAULT_EXPORT_COMPLETION_TIMEOUT_S,
+)
+from ...vendor_specific.primitives.capture.lasx_data_container import (
+    collect_lasx_data_container,
+)
+from .naming import (
+    Naming,
+    build_state_name,
+    data_dir,
+    metadata_dir,
+    projections_dir,
+    state_dir,
+)
+from ...vendor_specific.primitives.capture.product import (
+    AcquisitionResult,
+    ExportedAcquisition,
+)
 from .saved_acquisition import SavedAcquisition
 
 log = logging.getLogger(__name__)
@@ -140,7 +155,9 @@ def save(
 WINDOWS_PATH_LIMIT = 259
 
 
-def say_when_the_path_is_too_long(error: FileNotFoundError, on_windows: bool = os.name == "nt") -> None:
+def say_when_the_path_is_too_long(
+    error: FileNotFoundError, on_windows: bool = os.name == "nt"
+) -> None:
     """Raise a plain explanation when *error* is Windows refusing a path that is too long.
 
     Windows answers a path longer than 259 characters with "file not found", which does

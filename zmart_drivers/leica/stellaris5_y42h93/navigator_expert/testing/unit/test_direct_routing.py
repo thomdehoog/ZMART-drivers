@@ -22,13 +22,28 @@ from limits_fixtures import install_permissive_limits
 from mock_lasx_api import MockLasxClient
 from state_tree_stand_in import StandInNodes, answer_json_read
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings import readings as capabilities
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.settings import changes as commands
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.objective_change_with_compensation import compensated_changes as commands_comp
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.profiles import prechecks
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings import state as readers
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitives.direct import direct_reader, state_tree
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.connection import hardware_server
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings import (
+    readings as capabilities,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.settings import (
+    changes as commands,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.objective_change_with_compensation import (
+    compensated_changes as commands_comp,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.profiles import (
+    prechecks,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings import (
+    state as readers,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitives.direct import (
+    direct_reader,
+    state_tree,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.connection import (
+    hardware_server,
+)
 
 #: The jobs' block and element ids as on the simulator (2026-10-13).
 JOBS = {"AF Job": (156, 1), "Overview": (154, 2), "HiRes": (152, 3)}
@@ -276,7 +291,9 @@ class TestDirectByDefault:
         self, client, tree, monkeypatch
     ):
         # The scan runs for three readings, then LAS X is idle again.
-        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.confirmations import confirmations
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.confirmations import (
+            confirmations,
+        )
 
         real, asked = readers.get_scan_status, []
 
@@ -302,7 +319,9 @@ class TestDirectByDefault:
         # The direct reader says HiRes is selected; a stale log line claims the
         # target, Overview, already is. The switch must still be made, and the
         # CAM API's job list is never read for it.
-        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.confirmations import confirm_select_job
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.confirmations import (
+            confirm_select_job,
+        )
 
         real_jobs, api_job_lists = readers.get_jobs, []
 

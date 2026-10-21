@@ -119,7 +119,11 @@ def test_the_rulebook_lives_in_the_dispatcher():
     vendor_specific/primitive_handling/settings/limit_rules.py; the gate only imports it. If the class definition
     moves back into the gate, rulebook and whistle have merged again."""
     checks_text = (
-        DRIVER_ROOT / "vendor_specific" / "primitive_handling" / "settings" / "limit_rules.py"
+        DRIVER_ROOT
+        / "vendor_specific"
+        / "primitive_handling"
+        / "settings"
+        / "limit_rules.py"
     ).read_text(encoding="utf-8")
     gate_text = (DRIVER_ROOT / "dispatcher" / "gate.py").read_text(encoding="utf-8")
     assert "class LeicaLimits" in checks_text
@@ -266,7 +270,13 @@ def test_each_part_only_imports_what_the_anatomy_allows():
 
 def test_a_reading_never_uses_a_change():
     """A get never calls a set: vendor_specific/primitive_handling/readings/readings.py must not import vendor_specific/primitive_handling/settings/changes.py."""
-    readings = DRIVER_ROOT / "vendor_specific" / "primitive_handling" / "readings" / "readings.py"
+    readings = (
+        DRIVER_ROOT
+        / "vendor_specific"
+        / "primitive_handling"
+        / "readings"
+        / "readings.py"
+    )
     tree = ast.parse(readings.read_text(encoding="utf-8"))
     for node in ast.walk(tree):
         if isinstance(node, ast.ImportFrom):
@@ -340,7 +350,17 @@ def test_the_driver_keeps_its_files_in_folders_that_say_what_they_are_for():
     """
     allowed_in_root = {"__init__.py", "README.md"}
     for folder in ("procedures", "vendor_specific"):
-        loose = sorted(p.name for p in (DRIVER_ROOT / folder).glob("*.py") if p.name != "__init__.py")
-        assert loose == [], f"{folder}/ has loose files {loose}; put each in a folder named for its job"
-    root_files = sorted(p.name for p in DRIVER_ROOT.glob("*") if p.is_file() and p.name not in allowed_in_root)
+        loose = sorted(
+            p.name
+            for p in (DRIVER_ROOT / folder).glob("*.py")
+            if p.name != "__init__.py"
+        )
+        assert loose == [], (
+            f"{folder}/ has loose files {loose}; put each in a folder named for its job"
+        )
+    root_files = sorted(
+        p.name
+        for p in DRIVER_ROOT.glob("*")
+        if p.is_file() and p.name not in allowed_in_root
+    )
     assert root_files == [], f"the driver's root has loose files {root_files}"

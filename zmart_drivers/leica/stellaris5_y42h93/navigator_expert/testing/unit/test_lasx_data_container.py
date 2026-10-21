@@ -16,15 +16,25 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.orientation import Orientation
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.save_data.naming import Naming
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.orientation import (
+    Orientation,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.save_data.naming import (
+    Naming,
+)
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitives.capture.product import (
     PlaneIndex,
     RawPlaneSource,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.acquisition import run_job as capture
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.save_data import save as acquisition
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitives.capture import lasx_data_container as container
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.acquisition import (
+    run_job as capture,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.save_data import (
+    save as acquisition,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitives.capture import (
+    lasx_data_container as container,
+)
 
 PID = "669c"
 
@@ -128,7 +138,9 @@ def acquisition_of(
 
 
 def plane(source: RawPlaneSource) -> np.ndarray:
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.save_data import materialize
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.save_data import (
+        materialize,
+    )
 
     return materialize._read_source_plane(source)
 

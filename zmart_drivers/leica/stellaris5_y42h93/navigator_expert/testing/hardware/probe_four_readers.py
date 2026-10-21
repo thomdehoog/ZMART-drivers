@@ -36,8 +36,12 @@ from typing import Any
 sys.path.insert(0, str(Path(__file__).resolve().parents[6]))  # the repository root
 
 import zmart_drivers.leica.stellaris5_y42h93.navigator_expert as drv
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings import readings as capabilities
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings import state as readers
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings import (
+    readings as capabilities,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings import (
+    state as readers,
+)
 
 HERE = Path(__file__).resolve().parent
 PASSIVE_MODES = ("api", "log", "hybrid")

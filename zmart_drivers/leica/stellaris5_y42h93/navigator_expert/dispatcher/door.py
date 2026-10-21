@@ -119,5 +119,7 @@ def write(client, request, description, *, command, values, **keywords):
 
     # Which way the command went, when the transport keeps several ("direct", "cam"):
     # None when nothing was sent.
-    result["route"] = getattr(getattr(keywords.get("profile"), "transport", None), "carried_by", None)
+    result["route"] = getattr(
+        getattr(keywords.get("profile"), "transport", None), "carried_by", None
+    )
     return result

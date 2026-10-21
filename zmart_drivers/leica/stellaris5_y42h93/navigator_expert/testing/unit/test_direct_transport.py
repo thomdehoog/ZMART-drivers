@@ -18,12 +18,18 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher.transport
     TransportChain,
     TransportUnavailable,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.connection import hardware_server
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.connection import (
+    hardware_server,
+)
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.profiles import (
     direct_transport,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitives.api.request import Request
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitives.direct import send_command
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitives.api.request import (
+    Request,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitives.direct import (
+    send_command,
+)
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitives.direct.state_tree import (
     Job,
     JobSequence,
@@ -46,7 +52,11 @@ class Hardware:
         monkeypatch.setattr(
             direct_transport,
             "job_sequence",
-            lambda: JobSequence(block_id=144, selected_element=1, jobs={"HiRes": Job(152, 3), "Overview": Job(150, 2)}),
+            lambda: JobSequence(
+                block_id=144,
+                selected_element=1,
+                jobs={"HiRes": Job(152, 3), "Overview": Job(150, 2)},
+            ),
         )
 
     def send(self, xml):
@@ -63,11 +73,18 @@ def hardware(monkeypatch):
 
 @pytest.fixture
 def client():
-    return SimpleNamespace(PyApiCommandEcho=SimpleNamespace(Model=SimpleNamespace(HasError=False, Error="", Result=0)))
+    return SimpleNamespace(
+        PyApiCommandEcho=SimpleNamespace(
+            Model=SimpleNamespace(HasError=False, Error="", Result=0)
+        )
+    )
 
 
 def zoom_request(value=1.5, job="HiRes"):
-    return Request("PyApiSetZoomByJobName", SimpleNamespace(Model=SimpleNamespace(JobName=job, ZoomValue=value)))
+    return Request(
+        "PyApiSetZoomByJobName",
+        SimpleNamespace(Model=SimpleNamespace(JobName=job, ZoomValue=value)),
+    )
 
 
 def send_zoom(route, client, **given):
@@ -82,7 +99,9 @@ def test_a_zoom_becomes_the_element_las_x_itself_logs(hardware, client):
     assert hardware.sent == ['<Scanner Command="SetZoom" Zoom="1.5" BlockId="152"/>']
 
 
-def test_the_job_ids_come_from_las_x_now_and_not_from_the_cam_apis_list(hardware, client):
+def test_the_job_ids_come_from_las_x_now_and_not_from_the_cam_apis_list(
+    hardware, client
+):
     send_zoom(direct_transport.DirectTransport(), client, job="Overview")
 
     assert 'BlockId="150"' in hardware.sent[0]
@@ -92,7 +111,9 @@ def test_the_job_ids_come_from_las_x_now_and_not_from_the_cam_apis_list(hardware
     ("answer", "has_error", "result"),
     [(ACCEPTED, False, 1), (BARE, False, 1), (ADJUSTED, False, 1), (REFUSED, True, 2)],
 )
-def test_las_xs_answer_lands_in_the_reply_the_error_check_reads(hardware, client, answer, has_error, result):
+def test_las_xs_answer_lands_in_the_reply_the_error_check_reads(
+    hardware, client, answer, has_error, result
+):
     hardware.answer = answer
 
     arrived, _ = send_zoom(direct_transport.DirectTransport(), client)
@@ -114,7 +135,9 @@ def test_a_command_without_a_translation_sends_nothing_and_says_so(hardware, cli
     request = Request("PyApiNothingLikeThis", SimpleNamespace(Model=SimpleNamespace()))
 
     with pytest.raises(TransportUnavailable, match="no direct translation"):
-        direct_transport.DirectTransport().send(client, request, "Nothing", asynchronous=False)
+        direct_transport.DirectTransport().send(
+            client, request, "Nothing", asynchronous=False
+        )
     assert hardware.sent == []
 
 
@@ -124,9 +147,13 @@ def test_a_job_that_las_x_does_not_have_sends_nothing_and_says_so(hardware, clie
     assert hardware.sent == []
 
 
-def test_an_unreachable_hardware_server_sends_nothing_and_says_so(hardware, client, monkeypatch):
+def test_an_unreachable_hardware_server_sends_nothing_and_says_so(
+    hardware, client, monkeypatch
+):
     def unreachable():
-        raise hardware_server.HardwareServerUnavailable("LAS X's hardware server is not running here")
+        raise hardware_server.HardwareServerUnavailable(
+            "LAS X's hardware server is not running here"
+        )
 
     monkeypatch.setattr(hardware_server, "connected_server", unreachable)
 
@@ -162,7 +189,9 @@ class CamRoute:
         return None
 
 
-def test_when_the_hardware_server_is_unreachable_the_cam_api_carries_the_command(hardware, client, monkeypatch):
+def test_when_the_hardware_server_is_unreachable_the_cam_api_carries_the_command(
+    hardware, client, monkeypatch
+):
     def unreachable():
         raise hardware_server.HardwareServerUnavailable("not running")
 
@@ -191,9 +220,13 @@ def test_a_refusal_by_las_x_is_not_tried_again_on_the_cam_api(hardware, client):
     assert chain.carried_by == "direct"
 
 
-def test_a_send_that_las_x_never_answered_is_not_tried_again_on_the_cam_api(hardware, client):
+def test_a_send_that_las_x_never_answered_is_not_tried_again_on_the_cam_api(
+    hardware, client
+):
     """The element may be held by LAS X and applied later, so it is never handed on."""
-    hardware.answer = hardware_server.HardwareServerUnavailable("no answer within four windows")
+    hardware.answer = hardware_server.HardwareServerUnavailable(
+        "no answer within four windows"
+    )
     cam = CamRoute()
     chain = chain_with(direct_transport.DirectTransport(), cam)
 
@@ -219,9 +252,15 @@ class Projects:
         self.image_in = {}
         self.made = []
         monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
-        monkeypatch.setattr(direct_transport, "open_experiments", lambda: dict(self.open))
-        monkeypatch.setattr(direct_transport, "experiment_is_open", lambda number: number in self.open)
-        monkeypatch.setattr(direct_transport, "experiment_of", lambda image: self.image_in[image])
+        monkeypatch.setattr(
+            direct_transport, "open_experiments", lambda: dict(self.open)
+        )
+        monkeypatch.setattr(
+            direct_transport, "experiment_is_open", lambda number: number in self.open
+        )
+        monkeypatch.setattr(
+            direct_transport, "experiment_of", lambda image: self.image_in[image]
+        )
 
         def new_experiment(name):
             self.made.append(name)
@@ -251,7 +290,9 @@ def test_when_the_last_image_is_gone_the_remembered_project_is_used(projects):
     assert transport.open_project_for(0) == 84
 
 
-def test_a_project_deleted_in_las_x_is_never_used_even_when_the_last_image_names_it(projects):
+def test_a_project_deleted_in_las_x_is_never_used_even_when_the_last_image_names_it(
+    projects,
+):
     """A deleted project stays in the Data Container, closed, and an image sent into it is seen nowhere."""
     projects.open = {90: "Open one"}
     projects.image_in = {2135: 698}
@@ -265,7 +306,9 @@ def test_with_no_remembered_project_the_newest_open_one_is_used(projects):
     assert direct_transport.DirectTransport().open_project_for(0) == 90
 
 
-def test_with_no_project_open_a_new_one_is_made_and_numbered_after_the_open_ones(projects):
+def test_with_no_project_open_a_new_one_is_made_and_numbered_after_the_open_ones(
+    projects,
+):
     chosen = direct_transport.DirectTransport().open_project_for(0)
 
     assert projects.made == ["ZMART_Experiment1"]
@@ -273,7 +316,10 @@ def test_with_no_project_open_a_new_one_is_made_and_numbered_after_the_open_ones
 
 
 def test_a_new_project_is_numbered_one_above_the_open_ones(projects):
-    assert direct_transport.new_project_name({1: "ZMART_Experiment3", 2: "Project"}) == "ZMART_Experiment4"
+    assert (
+        direct_transport.new_project_name({1: "ZMART_Experiment3", 2: "Project"})
+        == "ZMART_Experiment4"
+    )
 
 
 def test_the_chosen_project_is_written_down_for_the_next_start(projects, monkeypatch):

@@ -4,9 +4,15 @@ from __future__ import annotations
 
 import pytest
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.clear_cache import clear as clearing
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.clear_cache import release as release
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.session.handle import ZmartHandle
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.clear_cache import (
+    clear as clearing,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.clear_cache import (
+    release as release,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.session.handle import (
+    ZmartHandle,
+)
 
 
 class TestPreparing:
@@ -98,7 +104,9 @@ class TestDeleting:
 
 
 def _session(*in_cache):
-    return ZmartHandle(client=object(), connection={}, hash6="abc123", in_cache=list(in_cache))
+    return ZmartHandle(
+        client=object(), connection={}, hash6="abc123", in_cache=list(in_cache)
+    )
 
 
 class TestClearing:
@@ -112,7 +120,9 @@ class TestClearing:
 
     def test_every_saved_picture_is_let_go_of_and_the_list_empties(self, monkeypatch):
         elements = {1: FakeElement("HiRes001"), 2: FakeElement("HiRes002")}
-        monkeypatch.setattr(release, "connected_data_container", lambda: FakeFactory(elements))
+        monkeypatch.setattr(
+            release, "connected_data_container", lambda: FakeFactory(elements)
+        )
         handle = _session((1, "HiRes001"), (2, "HiRes002"))
 
         answer = clearing.clear(handle)
@@ -122,9 +132,13 @@ class TestClearing:
         assert all(e.deleted for e in elements.values())
         assert self.shown == [1]
 
-    def test_a_picture_that_cannot_be_let_go_of_stays_listed_and_the_rest_are_cleared(self, monkeypatch):
+    def test_a_picture_that_cannot_be_let_go_of_stays_listed_and_the_rest_are_cleared(
+        self, monkeypatch
+    ):
         elements = {1: FakeElement("Renamed"), 2: FakeElement("HiRes002")}
-        monkeypatch.setattr(release, "connected_data_container", lambda: FakeFactory(elements))
+        monkeypatch.setattr(
+            release, "connected_data_container", lambda: FakeFactory(elements)
+        )
         handle = _session((1, "HiRes001"), (2, "HiRes002"))
 
         answer = clearing.clear(handle)

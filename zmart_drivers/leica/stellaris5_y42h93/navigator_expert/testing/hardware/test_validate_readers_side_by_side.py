@@ -21,8 +21,12 @@ for _p in (_HERE, _HELPERS, _REPO_ROOT):
         sys.path.insert(0, str(_p))
 
 import validate_readers_side_by_side as sxs
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.profiles import profiles
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.connection import tuning
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.profiles import (
+    profiles,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.connection import (
+    tuning,
+)
 
 
 def _run_mock(tmp_path, *extra):

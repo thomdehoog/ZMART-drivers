@@ -81,7 +81,9 @@ def test_the_pretend_vendor_uses_only_the_dispatcher():
     imported = {
         node.module
         for node in ast.walk(tree)
-        if isinstance(node, ast.ImportFrom) and node.module and node.module.startswith(driver)
+        if isinstance(node, ast.ImportFrom)
+        and node.module
+        and node.module.startswith(driver)
     }
 
     assert imported

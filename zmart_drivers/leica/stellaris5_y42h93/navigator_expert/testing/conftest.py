@@ -69,7 +69,9 @@ def _writes_through_the_cam_api(monkeypatch):
     server for the reads, which the direct route would then try to write to.
     The tests of the direct route set ``WRITE_ROUTES`` themselves.
     """
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.profiles import routes
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.profiles import (
+        routes,
+    )
 
     monkeypatch.setattr(routes, "WRITE_ROUTES", ("cam",))
 
@@ -82,7 +84,9 @@ def _no_hardware_server(monkeypatch):
     hardware server would answer and a test would read the instrument's z.
     Tests that need the server hand in a stand-in through ``attach``.
     """
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.connection import hardware_server
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.connection import (
+        hardware_server,
+    )
 
     def unreachable():
         raise hardware_server.HardwareServerUnavailable(
@@ -103,12 +107,16 @@ def _no_lasx_window(tmp_path, monkeypatch):
     and could press a real dialog's button. Tests that need either hand in a
     stand-in log path and windows.
     """
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitives.interface import lasx_dialogs
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitives.interface import (
+        lasx_dialogs,
+    )
 
     def no_windows():
         raise lasx_dialogs.WindowsUnavailable("no LAS X windows in the test suite")
 
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitives.interface import lasx_navigator
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitives.interface import (
+        lasx_navigator,
+    )
 
     def no_automation():
         raise lasx_dialogs.WindowsUnavailable(
@@ -151,8 +159,12 @@ def fast_timing_windows(monkeypatch):
     wait. Shipped values are unchanged; a test that needs a specific window
     patches it itself (``test_waiting_rule``).
     """
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.connection import tuning
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.profiles import transport
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.connection import (
+        tuning,
+    )
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.profiles import (
+        transport,
+    )
 
     monkeypatch.setattr(tuning, "WINDOW_S", 0.25)
     monkeypatch.setattr(tuning, "POLL_S", 0.005)
@@ -169,6 +181,8 @@ def fresh_live_log(monkeypatch):
     that points the reader at its own files could be handed the previous
     test's snapshot.
     """
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitives.log import log_reader
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitives.log import (
+        log_reader,
+    )
 
     monkeypatch.setattr(log_reader, "LIVE_LOG", log_reader.SharedParse())

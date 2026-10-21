@@ -7,7 +7,9 @@ from pathlib import Path
 
 import pytest
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup import data_location as location
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup import (
+    data_location as location,
+)
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup import store
 
 NOTEBOOKS = Path(location.__file__).resolve().parent / "notebooks"

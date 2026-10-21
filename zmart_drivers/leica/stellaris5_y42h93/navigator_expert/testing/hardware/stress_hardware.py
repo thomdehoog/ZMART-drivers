@@ -1131,7 +1131,9 @@ def main(argv: list[str] | None = None) -> int:
         # exist; pin selected-job confirmation to the api leg.
         from dataclasses import replace  # noqa: PLC0415
 
-        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.profiles import profiles
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.profiles import (
+            profiles,
+        )
 
         profiles.STATE_READERS = replace(
             profiles.STATE_READERS, selected_job_confirm_source="api"

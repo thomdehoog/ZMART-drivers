@@ -67,13 +67,17 @@ class Sender:
 
     def __init__(self):
         self.waiting = queue.Queue()
-        threading.Thread(target=self.run, name="lasx-direct-sender", daemon=True).start()
+        threading.Thread(
+            target=self.run, name="lasx-direct-sender", daemon=True
+        ).start()
 
     def run(self):
         while True:
             xml, outcome, done = self.waiting.get()
             try:
-                outcome["answer"] = str(hardware_server.connected_server().SendCommand2(xml, ""))
+                outcome["answer"] = str(
+                    hardware_server.connected_server().SendCommand2(xml, "")
+                )
             except Exception as why:  # noqa: BLE001 -- handed to the caller as it is
                 hardware_server.forget_connection()
                 outcome["error"] = why
@@ -165,7 +169,9 @@ def element_xml(translation, model, route, enum_types) -> str:
         raise NoTranslation("this command has no direct translation yet")
     pairs = list(translation.attributes(Fields(model, enum_types), route))
     pairs.insert(translation.command_at, ("Command", translation.command))
-    attributes = "".join(f" {name}={quoteattr(number_text(value))}" for name, value in pairs)
+    attributes = "".join(
+        f" {name}={quoteattr(number_text(value))}" for name, value in pairs
+    )
     if translation.beam_route:
         return f"<{translation.element}{attributes}>{beam_route_xml(model.BeamRoute)}</{translation.element}>"
     return f"<{translation.element}{attributes}/>"

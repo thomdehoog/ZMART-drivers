@@ -8,8 +8,12 @@ from pathlib import Path
 import pytest
 from limits_fixtures import merged_limits_payload
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.limits import config as limits_config
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.store import MachineProfile
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.limits import (
+    config as limits_config,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.store import (
+    MachineProfile,
+)
 
 
 def _write_json(path, payload):
@@ -82,7 +86,9 @@ def test_adopt_limits_first_time_writes_complete_limits_snapshot(tmp_path):
 
 
 def test_adopt_limits_archives_the_saved_notebook_with_the_snapshot_timestamp(tmp_path):
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.store import format_snapshot_name
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.store import (
+        format_snapshot_name,
+    )
 
     m = MachineProfile(programdata_root=tmp_path / "programdata")
     notebook = tmp_path / "set_limits.ipynb"

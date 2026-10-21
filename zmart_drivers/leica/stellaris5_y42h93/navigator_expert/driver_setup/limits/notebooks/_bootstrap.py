@@ -15,7 +15,9 @@ NOTEBOOK_PATH = NOTEBOOKS_DIR / "set_limits.ipynb"
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.notebook_support import NotebookCheckpoint
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.notebook_support import (
+    NotebookCheckpoint,
+)
 
 NOTEBOOK = NotebookCheckpoint(
     NOTEBOOK_PATH,

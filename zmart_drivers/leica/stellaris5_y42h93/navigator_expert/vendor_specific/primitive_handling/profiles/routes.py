@@ -28,7 +28,9 @@ ROUTES = {"direct": DIRECT, "cam": _transport.LASX}
 
 #: The routes tried for a change, best first. Each name must be in ``ROUTES``.
 WRITE_ROUTES = tuple(
-    name.strip() for name in os.environ.get("ZMART_WRITE_ROUTES", "direct,cam").split(",") if name.strip()
+    name.strip()
+    for name in os.environ.get("ZMART_WRITE_ROUTES", "direct,cam").split(",")
+    if name.strip()
 )
 
 
