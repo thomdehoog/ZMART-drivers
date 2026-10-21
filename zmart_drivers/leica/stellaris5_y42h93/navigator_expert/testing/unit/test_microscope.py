@@ -1,0 +1,167 @@
+"""The driver used by itself: connect, move, change settings, capture, save and clear.
+
+``navigator_expert.connect()`` hands back a :class:`Microscope`, the driver's
+own way to drive the STELLARIS from a notebook or a script, without the ZMART
+Controller. These tests connect it to the offline LAS X stand-in and check
+what comes back. The capture, saving and clearing themselves are tested with
+their procedures; here they are checked to be called with what was asked.
+
+Author: Thom de Hoog, Center for Microscopy and Image Analysis (ZMB),
+University of Zurich (thom.dehoog@zmb.uzh.ch, thomdehoog@gmail.com).
+"""
+
+from __future__ import annotations
+
+import os
+from dataclasses import replace
+
+import pytest
+from limits_fixtures import hermetic_mock_machine_root
+from mock_lasx_api import MockLasxClient
+
+import zmart_drivers.leica.stellaris5_y42h93.navigator_expert as navigator_expert
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.for_direct_use import microscope
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.connection import lasx_client
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.profiles import profiles
+
+
+@pytest.fixture
+def scope(monkeypatch, tmp_path):
+    """A Microscope connected to the LAS X stand-in, with a throwaway machine folder."""
+    monkeypatch.setenv("ZMART_MICROSCOPY_ROOT", os.environ["ZMART_MICROSCOPY_ROOT"])
+    monkeypatch.setattr(
+        profiles,
+        "STATE_READERS",
+        replace(profiles.STATE_READERS, selected_job_confirm_source="api"),
+    )
+    hermetic_mock_machine_root()
+    monkeypatch.setattr(lasx_client, "connect_python_client", lambda **_kw: MockLasxClient(latency=0.0))
+    scope = navigator_expert.connect(output_root=str(tmp_path / "out"))
+    yield scope
+    scope.close()
+
+
+def test_connect_hands_back_a_microscope(scope):
+    assert isinstance(scope, navigator_expert.Microscope)
+
+
+def test_the_running_log_gets_the_messages_of_every_part_of_the_driver(scope):
+    """Not only of the folder that connects: the dispatcher's and the procedures' too."""
+    import logging
+
+    driver = logging.getLogger(microscope.DRIVER_PACKAGE)
+
+    assert microscope.DRIVER_PACKAGE == navigator_expert.__name__
+    assert any(getattr(h, "baseFilename", "").endswith("running_log.txt") for h in driver.handlers)
+
+
+def test_the_stage_moves_and_reads_back_in_the_sample_frame(scope):
+    start = {axis: scope.position()[axis]["position"] for axis in "xyz"}
+
+    moved = scope.move_to(start["x"] + 120.0, start["y"] - 40.0, start["z"] + 3.0)
+    here = scope.position()
+
+    assert moved["x"]["position"] == pytest.approx(start["x"] + 120.0, abs=1.0)
+    assert here["y"]["position"] == pytest.approx(start["y"] - 40.0, abs=1.0)
+    assert here["z"]["position"] == pytest.approx(start["z"] + 3.0, abs=0.5)
+    assert here["x"]["unit"] == "micrometer"
+
+
+def test_a_move_outside_the_limits_is_refused_and_the_stage_stays(scope):
+    before = scope.position()["x"]["position"]
+
+    with pytest.raises(RuntimeError, match="refused"):
+        scope.move_to(-1e9, 0.0, 0.0)
+
+    assert scope.position()["x"]["position"] == pytest.approx(before)
+
+
+def test_the_motors_of_each_axis_are_named(scope):
+    assert scope.motors()["z"] == {"options": ["z-wide"], "default": "z-wide"}
+
+
+def test_the_jobs_are_listed_with_the_autofocus_jobs_apart(scope):
+    jobs = scope.jobs()
+
+    assert "HiRes" in jobs["jobs"]
+    assert "AF Job" in jobs["autofocus_jobs"]
+    assert "AF Job" not in jobs["jobs"]
+    assert jobs["selected"] in jobs["jobs"]
+
+
+def test_a_job_is_selected_by_name(scope):
+    scope.select_job("Overview")
+
+    assert scope.jobs()["selected"] == "Overview"
+
+
+def test_an_unknown_job_is_refused(scope):
+    with pytest.raises(ValueError, match="no longer exists"):
+        scope.select_job("No such job")
+
+
+def test_a_setting_is_changed_by_name_and_read_back(scope):
+    scope.select_job("HiRes")
+
+    result = scope.change_setting("zoom", value=4.0)
+
+    assert result["confirmed"] is True
+    assert scope.job_settings()["zoom"]["current"] == pytest.approx(4.0)
+
+
+def test_a_setting_is_changed_for_the_job_named(scope):
+    scope.select_job("HiRes")
+
+    scope.change_setting("zoom", job="Overview", value=2.5)
+
+    assert scope.job_settings("Overview")["zoom"]["current"] == pytest.approx(2.5)
+    assert scope.job_settings("HiRes")["zoom"]["current"] == pytest.approx(10.0)
+
+
+def test_an_unknown_setting_is_refused_with_the_names_there_are(scope):
+    with pytest.raises(ValueError, match="zoom"):
+        scope.change_setting("brightness", value=1.0)
+
+
+def test_a_setting_lasx_refuses_raises_with_its_reason(scope):
+    scope.select_job("HiRes")
+
+    with pytest.raises(RuntimeError, match="out of range"):
+        scope.change_setting("zoom", value=500.0)
+
+
+def test_capture_save_and_clear_call_their_procedures(scope, monkeypatch):
+    calls = []
+    monkeypatch.setattr(microscope.acquire_step, "acquire", lambda handle, **asked: calls.append(("acquire", asked)) or {"position_label": "A1"})
+    monkeypatch.setattr(microscope.save_step, "save_waiting", lambda handle, label=None: calls.append(("save", label)) or [{"files": []}])
+    monkeypatch.setattr(microscope.clear_step, "clear", lambda handle: calls.append(("clear", None)) or {"cleared": [], "failed": {}})
+
+    scope.acquire("A1", acquisition_type="overview")
+    scope.save("A1")
+    scope.clear_cache()
+
+    assert calls == [
+        ("acquire", {"position_label": "A1", "acquisition_settings": None, "acquisition_type": "overview", "output_folder": None}),
+        ("save", "A1"),
+        ("clear", None),
+    ]
+
+
+def test_autofocus_runs_the_job_named(scope, monkeypatch):
+    asked = []
+    monkeypatch.setattr(microscope.autofocus_step, "run_autofocus", lambda handle, procedure: asked.append(procedure) or {"focus_um": 1.0})
+
+    assert scope.autofocus("AF Job") == {"focus_um": 1.0}
+    assert asked == [{"name": "autofocus", "job": "AF Job"}]
+
+
+def test_the_state_and_the_description_are_answered(scope):
+    assert scope.state()["changeable"]["job"] in scope.jobs()["jobs"]
+    assert "chooses_its_own_folder" in scope.info()
+
+
+def test_a_closed_microscope_refuses(scope):
+    scope.close()
+
+    with pytest.raises(RuntimeError, match="disconnected"):
+        scope.position()

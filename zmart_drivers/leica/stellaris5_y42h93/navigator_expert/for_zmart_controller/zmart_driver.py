@@ -44,7 +44,7 @@ from typing import Any
 from ..driver_setup.origin import saved_origin as _saved_origin
 from ..driver_setup.origin import set_origin as _set_origin
 from ..driver_setup import data_location as _data_location
-from . import running_log
+from ..for_direct_use import running_log
 from ..driver_setup.orientation import load_rig_orientation
 from ..driver_setup.optical_calibration.model import load_objective_calibration
 from ..session import loaded_config as _session_state

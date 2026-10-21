@@ -29,6 +29,9 @@ this repository)::
 __version__ = "7.0.0b1"
 
 __all__ = [
+    # the driver used by itself
+    "connect",
+    "Microscope",
     # logging
     "log",
     # parsing
@@ -184,3 +187,5 @@ from .procedures.save_data.save import save
 import logging
 
 log = logging.getLogger(__name__)
+
+from .for_direct_use.microscope import Microscope, connect  # noqa: E402
