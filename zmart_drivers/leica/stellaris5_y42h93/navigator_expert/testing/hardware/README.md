@@ -56,12 +56,15 @@ ready.
    beside the data. The driver does not use AutoSave, so it does not
    matter whether AutoSave is on. Metadata the OME schema refuses is
    reported as a failed check.
-7. **Letting go of LAS X's cache** (`check_cache_release.py`): ten captures,
-   each released once saved, the Navigator canvas cleared after each. It
-   fails when a capture fails, when a Clear press does not go through, or
-   when the hidden copies in LAS X's cache grew over the run (a press that
-   frees nothing). Before each capture the driver shows Navigator Expert's
-   Experiment tab, where the canvas is, when another tab is shown.
+7. **Clearing LAS X's cache** (`check_cache_release.py`): ten captures,
+   each saved and then cleared with the `clear_cache` procedure, the
+   Navigator canvas cleared after each. It fails when a capture fails, when
+   a Clear press does not go through, or when the hidden copies in LAS X's
+   cache grew over the run (a press that frees nothing). The procedure
+   shows Navigator Expert's Experiment tab, where the canvas is, just
+   before it clears, when another tab is shown. (Until 21 October 2026 the
+   driver did this before each capture; this order has not yet been run on
+   the simulator.)
 
 The captures of steps 6 and 7 go under the reports folder, so the run needs
 no data location.
