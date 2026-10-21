@@ -223,12 +223,9 @@ ALLOWED = {
     "for_zmart_controller": {
         "for_direct_use",
     },
+    # The package offers the driver used by itself, and nothing else.
     "__init__": {
         "for_direct_use",
-        "vendor_specific",
-        "dispatcher",
-        "procedures",
-        "driver_setup",  # the limits handshake is re-exported for the setup notebooks
     },
 }
 

@@ -45,6 +45,14 @@ def test_connect_hands_back_a_microscope(scope):
     assert isinstance(scope, navigator_expert.Microscope)
 
 
+def test_the_package_offers_only_the_microscope():
+    """Nothing that goes around the session: no raw reads or commands on a client."""
+    offered = {name for name in vars(navigator_expert) if not name.startswith("__")} - {"for_direct_use"}
+
+    assert sorted(navigator_expert.__all__) == ["Microscope", "__version__", "connect"]
+    assert offered <= {"Microscope", "connect"} | {"dispatcher", "driver_setup", "procedures", "session", "vendor_specific", "for_zmart_controller", "testing"}
+
+
 def test_the_running_log_gets_the_messages_of_every_part_of_the_driver(scope):
     """Not only of the folder that connects: the dispatcher's and the procedures' too."""
     import logging
