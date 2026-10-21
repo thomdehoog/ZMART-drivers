@@ -31,6 +31,7 @@ University of Zurich (thom.dehoog@zmb.uzh.ch, thomdehoog@gmail.com).
 
 from __future__ import annotations
 
+import inspect
 from typing import Any
 
 from ..dispatcher import gate
@@ -225,8 +226,14 @@ class Microscope:
         require_open(self.handle)
         if name not in SETTINGS:
             raise ValueError(f"no setting {name!r}; the settings are {sorted(SETTINGS)}")
+        # The named change holds which of its arguments may be left out.
+        change = getattr(changes, SETTINGS[name].command)
+        takes = [p for p in inspect.signature(change).parameters if p not in ("client", "job_name", "max_retries", "tolerance")]
+        unknown = sorted(set(arguments) - set(takes))
+        if unknown:
+            raise ValueError(f"{name} takes {takes}, not {unknown}")
         job = job or selected_job_name(self.handle)
-        result = changes.change_setting(SETTINGS[name], self.handle.client, {"job_name": job, **arguments})
+        result = change(self.handle.client, job, **arguments)
         return checked(self.handle, result, f"change_setting({name!r}, job={job!r})")
 
     def change_objective(self, slot: int | None = None, name: str | None = None, magnification: float | None = None) -> dict:
