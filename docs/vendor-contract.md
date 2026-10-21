@@ -29,6 +29,23 @@ with five methods. Leica: `vendor_specific/primitive_handling/profiles/transport
 | `await_reply(client)` | Waits for the microscope to fill in its reply. | `True` if it did, `False` if the time ran out |
 | `dialog_warning_since(started_at, description)` | Says whether a dialog box of the vendor software opened since the command began. Only asked when a command failed or stayed unconfirmed, as a clue. | a text, or `None` |
 
+### More than one way to send
+
+A microscope may be reached more than one way (for LAS X, the CAM API and LAS X's own
+hardware server). Each way is a transport as above. The dispatcher's `TransportChain`
+(`dispatcher/transport_chain.py`) holds an ordered list of them behind the one
+`transport` a profile names, and the vendor decides the order. Leica:
+`primitive_handling/profiles/routes.py` (`ROUTES`, `WRITE_ROUTES`; the order can be
+set with the environment variable `ZMART_WRITE_ROUTES`).
+
+The rule that keeps a command from being done twice: a route's `send` raises
+`TransportUnavailable` only while **nothing has left yet** (the connection is not
+there, or the route has no form for this command). The chain then tries the next
+route, and the log says so. Anything else, such as a send that went out but was not
+acknowledged, is never a reason to use another route, because the command may already
+have been carried out. A transport that does not need a fallback needs no chain: the
+profile can name it directly.
+
 ## 2. Command profiles
 
 How the dispatcher treats one command. A frozen dataclass (the dispatcher
