@@ -6,7 +6,7 @@ import json
 import os
 import shutil
 import time
-from collections.abc import Callable, Iterable
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TypeVar
@@ -129,10 +129,3 @@ def archive_notebook(
         temporary.unlink(missing_ok=True)
     return destination
 
-
-def archive_notebooks(
-    notebook_paths: Iterable[str | Path],
-    root: str | Path,
-) -> list[Path]:
-    """Archive notebooks using the shared ``data/notebook`` convention."""
-    return [archive_notebook(path, root) for path in notebook_paths]

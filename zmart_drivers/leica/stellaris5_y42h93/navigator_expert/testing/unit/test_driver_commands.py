@@ -12,7 +12,6 @@ import re
 import tempfile
 import unittest
 from contextlib import ExitStack, contextmanager
-from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch

@@ -29,7 +29,6 @@ from collections.abc import Callable
 from dataclasses import dataclass
 
 from . import routes as _routes
-from . import transport as _transport
 from .prechecks import check_idle
 from ..settings.limit_rules import NOTEBOOK_POINTER
 from ...connection import tuning
