@@ -126,6 +126,20 @@ def test_a_setting_is_changed_for_the_job_named(scope):
     assert scope.job_settings("HiRes")["zoom"]["current"] == pytest.approx(10.0)
 
 
+def test_a_setting_with_optional_arguments_takes_only_those_given(scope):
+    """The z-stack's reset flags may be left out, as they may in the named change."""
+    scope.select_job("HiRes")
+
+    result = scope.change_setting("z_stack_definition", begin_um=-5.0, end_um=5.0)
+
+    assert result["success"] is True
+
+
+def test_a_wrong_argument_is_refused_with_the_arguments_the_setting_takes(scope):
+    with pytest.raises(ValueError, match="value"):
+        scope.change_setting("zoom", factor=2.0)
+
+
 def test_an_unknown_setting_is_refused_with_the_names_there_are(scope):
     with pytest.raises(ValueError, match="zoom"):
         scope.change_setting("brightness", value=1.0)
