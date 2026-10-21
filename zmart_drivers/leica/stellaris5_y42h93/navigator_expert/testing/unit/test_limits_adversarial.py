@@ -1056,6 +1056,8 @@ def test_every_dispatching_wrapper_declares_and_calls_the_gate():
     for node in [*vendor_tree.body, *recipe_tree.body]:
         if not isinstance(node, ast.FunctionDef) or node.name.startswith("_"):
             continue
+        if node.name == "change_setting":
+            continue  # the shared runner of the settings table, checked below by its entries
         referenced = {n.id for n in ast.walk(node) if isinstance(n, ast.Name)}
         referenced_attrs = {
             n.attr for n in ast.walk(node) if isinstance(n, ast.Attribute)
@@ -1101,7 +1103,7 @@ def test_every_dispatching_wrapper_declares_and_calls_the_gate():
             if (
                 isinstance(call, ast.Call)
                 and isinstance(call.func, ast.Name)
-                and call.func.id == "_change_setting"
+                and call.func.id == "change_setting"
             ):
                 entry = getattr(settings_table, call.args[0].attr)
                 assert entry.command == node.name, (
@@ -1110,10 +1112,16 @@ def test_every_dispatching_wrapper_declares_and_calls_the_gate():
                 assert node.name in motion_limits.MUTATING_COMMANDS
                 checked.append(node.name)
 
+    # A setting changed by its name (the Microscope's change_setting) reaches the
+    # same runner; every name in the table carries a command the gate knows.
+    for name, entry in settings_table.BY_NAME.items():
+        assert entry.command == f"set_{name}"
+        assert entry.command in motion_limits.MUTATING_COMMANDS, entry.command
+
     runner = next(
         n
         for n in tree.body
-        if isinstance(n, ast.FunctionDef) and n.name == "_change_setting"
+        if isinstance(n, ast.FunctionDef) and n.name == "change_setting"
     )
     shown_to_gate = [
         call.args[1]

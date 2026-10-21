@@ -571,3 +571,32 @@ FILTER_WHEEL_SPECTRUM = Setting(
         target="position",
     ),
 )
+
+
+#: Every setting by the name a person uses for it: its command without ``set_``,
+#: such as ``"zoom"`` or ``"laser_intensity"``.
+BY_NAME = {
+    setting.command.removeprefix("set_"): setting
+    for setting in (
+        ZOOM,
+        SCAN_SPEED,
+        SCAN_MODE,
+        SCAN_FIELD_ROTATION,
+        SCAN_RESONANT,
+        SEQUENTIAL_MODE,
+        IMAGE_FORMAT,
+        Z_STACK_DEFINITION,
+        Z_STACK_STEP_SIZE,
+        Z_STACK_SIZE,
+        FRAME_ACCUMULATION,
+        FRAME_AVERAGE,
+        LINE_ACCUMULATION,
+        LINE_AVERAGE,
+        PINHOLE_AIRY,
+        DETECTOR_GAIN,
+        LASER_INTENSITY,
+        LASER_SHUTTER,
+        FILTER_WHEEL_SLOT,
+        FILTER_WHEEL_SPECTRUM,
+    )
+}

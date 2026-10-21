@@ -8,7 +8,7 @@ the stage to keep the sample in view are in
 ``procedures/objective_change_with_compensation/compensated_changes.py``.)
 
 The settings of a job (zoom, scan speed, laser intensity, and the rest) are
-all changed by the one runner, ``_change_setting``, from their entry in
+all changed by the one runner, ``change_setting``, from their entry in
 ``settings.py`` beside this file: that table says which LAS X request to fill
 in, in which order, how the result is checked, and which values the limits gate
 is shown. Each ``set_*`` function only gives the setting its name, its
@@ -237,7 +237,7 @@ def dispatch_change(
     )
 
 
-def _change_setting(setting, client, arguments, *, max_retries=None, tolerance=None):
+def change_setting(setting, client, arguments, *, max_retries=None, tolerance=None):
     """Change one LAS X setting, following its entry in ``primitive_handling/settings/settings.py``.
 
     The steps are the same for every setting: tidy the arguments, show the new
@@ -293,7 +293,7 @@ def set_zoom(client, job_name, value, *, max_retries=None, tolerance=None):
         max_retries: Transient error retry ceiling.
         tolerance: Readback confirmation tolerance.
     """
-    return _change_setting(
+    return change_setting(
         settings.ZOOM,
         client,
         {
@@ -307,7 +307,7 @@ def set_zoom(client, job_name, value, *, max_retries=None, tolerance=None):
 
 def set_scan_speed(client, job_name, value, *, max_retries=None):
     """Set scan speed for the specified job."""
-    return _change_setting(
+    return change_setting(
         settings.SCAN_SPEED,
         client,
         {
@@ -320,7 +320,7 @@ def set_scan_speed(client, job_name, value, *, max_retries=None):
 
 def set_scan_resonant(client, job_name, enable, *, max_retries=None):
     """Enable or disable resonant scanning for the specified job."""
-    return _change_setting(
+    return change_setting(
         settings.SCAN_RESONANT,
         client,
         {
@@ -333,7 +333,7 @@ def set_scan_resonant(client, job_name, enable, *, max_retries=None):
 
 def set_scan_mode(client, job_name, mode, *, max_retries=None):
     """Set scan mode (e.g. 'xyz', 'xyzt') for the specified job."""
-    return _change_setting(
+    return change_setting(
         settings.SCAN_MODE,
         client,
         {
@@ -346,7 +346,7 @@ def set_scan_mode(client, job_name, mode, *, max_retries=None):
 
 def set_sequential_mode(client, job_name, mode, *, max_retries=None):
     """Set sequential mode ('Line', 'Frame', or 'Stack') for the specified job."""
-    return _change_setting(
+    return change_setting(
         settings.SEQUENTIAL_MODE,
         client,
         {
@@ -361,7 +361,7 @@ def set_scan_field_rotation(
     client, job_name, angle, *, max_retries=None, tolerance=None
 ):
     """Set scan field rotation angle (degrees) for the specified job."""
-    return _change_setting(
+    return change_setting(
         settings.SCAN_FIELD_ROTATION,
         client,
         {
@@ -379,7 +379,7 @@ def set_image_format(client, job_name, format_str, *, max_retries=None):
     Args:
         format_str: Either a string like '512 x 512' or a tuple (w, h).
     """
-    return _change_setting(
+    return change_setting(
         settings.IMAGE_FORMAT,
         client,
         {
@@ -415,7 +415,7 @@ def set_z_stack_definition(
     report unconfirmed even though the command was accepted; reset
     outcomes are not confirmed at all (only non-None targets are).
     """
-    return _change_setting(
+    return change_setting(
         settings.Z_STACK_DEFINITION,
         client,
         {
@@ -434,7 +434,7 @@ def set_z_stack_step_size(
     client, job_name, step_size_um, *, max_retries=None, tolerance=None
 ):
     """Set z-stack step size (micrometers)."""
-    return _change_setting(
+    return change_setting(
         settings.Z_STACK_STEP_SIZE,
         client,
         {
@@ -452,7 +452,7 @@ def set_z_stack_size(client, job_name, size_um, *, max_retries=None, tolerance=N
     Note: LAS X may recalculate z-stack geometry when size is changed.
     Confirmation may report unconfirmed if "System Optimized" is active.
     """
-    return _change_setting(
+    return change_setting(
         settings.Z_STACK_SIZE,
         client,
         {
@@ -466,7 +466,7 @@ def set_z_stack_size(client, job_name, size_um, *, max_retries=None, tolerance=N
 
 def set_frame_accumulation(client, job_name, setting_index, value, *, max_retries=None):
     """Set frame accumulation count for a specific setting index."""
-    return _change_setting(
+    return change_setting(
         settings.FRAME_ACCUMULATION,
         client,
         {
@@ -480,7 +480,7 @@ def set_frame_accumulation(client, job_name, setting_index, value, *, max_retrie
 
 def set_frame_average(client, job_name, setting_index, value, *, max_retries=None):
     """Set frame average count for a specific setting index."""
-    return _change_setting(
+    return change_setting(
         settings.FRAME_AVERAGE,
         client,
         {
@@ -494,7 +494,7 @@ def set_frame_average(client, job_name, setting_index, value, *, max_retries=Non
 
 def set_line_accumulation(client, job_name, setting_index, value, *, max_retries=None):
     """Set line accumulation count for a specific setting index."""
-    return _change_setting(
+    return change_setting(
         settings.LINE_ACCUMULATION,
         client,
         {
@@ -508,7 +508,7 @@ def set_line_accumulation(client, job_name, setting_index, value, *, max_retries
 
 def set_line_average(client, job_name, setting_index, value, *, max_retries=None):
     """Set line average count for a specific setting index."""
-    return _change_setting(
+    return change_setting(
         settings.LINE_AVERAGE,
         client,
         {
@@ -530,7 +530,7 @@ def set_pinhole_airy(
     tolerance=None,
 ):
     """Set pinhole size in Airy units for a specific setting index."""
-    return _change_setting(
+    return change_setting(
         settings.PINHOLE_AIRY,
         client,
         {
@@ -554,7 +554,7 @@ def set_detector_gain(
     tolerance=None,
 ):
     """Set detector gain for a specific detector identified by beam route."""
-    return _change_setting(
+    return change_setting(
         settings.DETECTOR_GAIN,
         client,
         {
@@ -580,7 +580,7 @@ def set_laser_intensity(
     tolerance=None,
 ):
     """Set laser intensity (0.0-1.0) for a specific laser line."""
-    return _change_setting(
+    return change_setting(
         settings.LASER_INTENSITY,
         client,
         {
@@ -605,7 +605,7 @@ def set_laser_shutter(
     max_retries=None,
 ):
     """Open or close laser shutter for a specific beam route."""
-    return _change_setting(
+    return change_setting(
         settings.LASER_SHUTTER,
         client,
         {
@@ -629,7 +629,7 @@ def set_filter_wheel_slot(
     max_retries=None,
 ):
     """Set filter wheel to a specific slot."""
-    return _change_setting(
+    return change_setting(
         settings.FILTER_WHEEL_SLOT,
         client,
         {
@@ -655,7 +655,7 @@ def set_filter_wheel_spectrum(
     tolerance=None,
 ):
     """Set filter wheel spectrum position (nm)."""
-    return _change_setting(
+    return change_setting(
         settings.FILTER_WHEEL_SPECTRUM,
         client,
         {
