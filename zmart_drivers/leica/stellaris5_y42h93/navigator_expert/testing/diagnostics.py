@@ -9,7 +9,7 @@ so the answer is never missing:
     so the context is printed at the top of *every* pytest run (and therefore at
     the top of every captured CI log next to the failures).
   * ``run_ci.py`` runs this module as a script, which prints the same header and
-    writes a machine-readable ``testing/_report/env.json`` alongside the JUnit and
+    writes a machine-readable ``testing/report/env.json`` alongside the JUnit and
     coverage reports.
 
 Everything here is defensive: a missing package, absent git, or an unimportable
@@ -213,7 +213,7 @@ def _bootstrap_sys_path() -> None:
     """Make the driver importable when this file is run standalone (no PYTHONPATH).
 
     A no-op when run via run_ci.py or pytest (the import roots are already set),
-    but it lets ``python testing/_diagnostics.py`` report the driver version and
+    but it lets ``python testing/diagnostics.py`` report the driver version and
     location too -- handy as a quick setup check on a freshly cloned machine.
     """
     repo_root = _HERE.parents[4]  # navigator_expert/tests -> the repository root
@@ -225,7 +225,7 @@ def main() -> int:
     _bootstrap_sys_path()
     for line in header_lines():
         print(line)
-    target = write_env_json(_HERE / "_report")
+    target = write_env_json(_HERE / "report")
     print(f"  (context written to {target})")
     return 0
 

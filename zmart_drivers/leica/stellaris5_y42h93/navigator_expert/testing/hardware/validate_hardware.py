@@ -67,7 +67,7 @@ from typing import Any
 if str(Path(__file__).resolve().parent) not in sys.path:
     sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from _report import (  # noqa: E402
+from run_report import (  # noqa: E402
     RunReport,
     attempts_of,
     confirmation_of,

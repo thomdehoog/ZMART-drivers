@@ -15,8 +15,8 @@ Design goals (matching the suite's standard):
   * Explicit per step -- every step prints its command, its result, and its
     wall-clock time. Nothing runs silently.
   * Diagnosable across systems -- the run opens with a full environment header
-    (see testing/_diagnostics) and writes machine-readable reports to
-    testing/_report/ (env.json, junit.xml, coverage.xml, htmlcov/, ci_summary.json)
+    (see testing/diagnostics) and writes machine-readable reports to
+    testing/report/ (env.json, junit.xml, coverage.xml, htmlcov/, ci_summary.json)
     so a failure carries its own context off-machine.
   * Honest exit code -- lint is reported but non-fatal (pre-existing style debt
     must not mask test results); a test failure fails the run. CI can flip lint
@@ -40,7 +40,7 @@ from pathlib import Path
 
 DRIVER_ROOT = Path(__file__).resolve().parents[1]  # .../navigator_expert
 REPO_ROOT = DRIVER_ROOT.parents[3]  # the repository root (import root of zmart_drivers)
-REPORT_DIR = DRIVER_ROOT / "testing" / "_report"
+REPORT_DIR = DRIVER_ROOT / "testing" / "report"
 TEST_PATHS = [DRIVER_ROOT / "testing"]
 
 
@@ -158,7 +158,7 @@ def main(argv: list[str] | None = None) -> int:
     print("NAVIGATOR EXPERT DRIVER CI")
     print(_rule())
     subprocess.run(
-        [sys.executable, str(DRIVER_ROOT / "testing" / "_diagnostics.py")], env=env
+        [sys.executable, str(DRIVER_ROOT / "testing" / "diagnostics.py")], env=env
     )
 
     steps: list[dict] = []

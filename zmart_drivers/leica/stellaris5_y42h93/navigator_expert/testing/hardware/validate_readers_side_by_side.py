@@ -51,7 +51,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[6]))  # the repository r
 sys.path.insert(0, str(Path(__file__).resolve().parent))  # testing/hardware
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "helpers"))  # mock
 
-from _report import RunReport, attempts_of, confirmation_of, replay_envelope_logs
+from run_report import RunReport, attempts_of, confirmation_of, replay_envelope_logs
 
 import low_level as drv
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings import reading_table as capabilities

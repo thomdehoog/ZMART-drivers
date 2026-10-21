@@ -24,7 +24,7 @@ still produces a report (the crash is recorded in the metadata).
 
 The default file name is ``hardware_run_report_<YYYYMMDD-HHMMSS>.md`` in
 the working directory; pass ``report_dir`` to redirect (run_ci points it
-at ``testing/_report/``).
+at ``testing/report/``).
 """
 
 from __future__ import annotations
