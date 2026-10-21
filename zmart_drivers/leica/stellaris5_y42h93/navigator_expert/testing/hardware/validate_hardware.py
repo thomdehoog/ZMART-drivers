@@ -1449,6 +1449,131 @@ def phase_objective(drv: Any, v: Validator, client: Any, job_name: str) -> None:
             )
 
 
+def phase_lasers(drv: Any, v: Validator, client: Any, job_name: str) -> None:
+    """The first laser line's intensity and shutter: write another value, check it, put it back."""
+
+    def line() -> dict:
+        return _settings(drv, client, job_name, mode="direct")["activeSettings"][0]["activeLaserLines"][0]
+
+    with v.phase("laser round-trip"):
+        try:
+            first = line()
+        except (KeyError, IndexError, TypeError) as exc:
+            v.skip("laser: round-trip", f"the job has no active laser line: {exc}")
+            return
+        route = first.get("beamRoute", first.get("_beamRoute", ""))
+        index = first.get("lineIndex", first.get("_lineIndex", 0))
+        level = first["intensity"]["value"]
+        top = first["intensity"].get("max", level + 0.01)
+        _round_trip(
+            v,
+            "laser_intensity",
+            job_name,
+            read=lambda: line()["intensity"]["value"],
+            write=lambda x: drv.set_laser_intensity(client, job_name, 0, route, index, x),
+            candidates=[min(level + 0.01, top), max(level - 0.01, 0.0)],
+            tolerance=0.005,
+        )
+        _round_trip(
+            v,
+            "laser_shutter",
+            job_name,
+            read=lambda: line()["shutterOpen"],
+            write=lambda x: drv.set_laser_shutter(client, job_name, 0, route, x),
+            candidates=[True, False],
+        )
+
+
+def phase_filter_wheels(drv: Any, v: Validator, client: Any, job_name: str) -> None:
+    """Each filter wheel of the first setting: move to a neighbouring slot, check it, put it back.
+
+    LAS X manages some wheels itself and refuses a slot sent by hand. A wheel that
+    refuses its own current slot, or every neighbour, is skipped with LAS X's reason.
+    """
+
+    def wheels() -> list:
+        return _settings(drv, client, job_name, mode="direct")["activeSettings"][0].get("filterWheels", [])
+
+    with v.phase("filter wheel round-trip"):
+        try:
+            found = wheels()
+        except (KeyError, IndexError, TypeError) as exc:
+            v.skip("filter_wheel: round-trip", f"cannot read the filter wheels: {exc}")
+            return
+        if not found:
+            v.skip("filter_wheel: round-trip", "the job has no filter wheel")
+            return
+        for number, wheel in enumerate(found):
+            route, kind, slot = wheel["_beamRoute"], wheel.get("type"), wheel.get("filterIndex")
+            name = f"filter_wheel[{number}]"
+            if kind is None or slot is None:
+                v.skip(f"{name}: round-trip", "the wheel reports no type or slot")
+                continue
+
+            def read(route=route, kind=kind):
+                return next(w for w in wheels() if w["_beamRoute"] == route and w.get("type") == kind)["filterIndex"]
+
+            def write(x, route=route, kind=kind):
+                return drv.set_filter_wheel_slot(client, job_name, 0, route, kind, x)
+
+            own = write(slot)
+            if not own or not own.get("success"):
+                v.skip(f"{name}: round-trip", f"LAS X did not take the wheel's own slot: {(own or {}).get('message')}")
+                continue
+            for target in (slot + 1, slot - 1):
+                if target < 0:
+                    continue
+                moved = write(target)
+                if moved and moved.get("success"):
+                    try:
+                        v.compare(f"{name}: readback", read(), target)
+                    finally:
+                        v.command(f"{name}: restore", lambda: write(slot), context={"restore_to": slot})
+                    break
+            else:
+                v.skip(f"{name}: round-trip", "LAS X took no neighbouring slot")
+
+
+def phase_z_stack(drv: Any, v: Validator, client: Any, job_name: str) -> None:
+    """The z-stack's step size, size and begin/end: change each, check it, put it back.
+
+    LAS X keeps a stack's middle on its own grid, so a size change is put back by
+    the stack's own begin and end (STELLARIS, 2026-10-15).
+    """
+
+    def stack() -> dict | None:
+        return _settings(drv, client, job_name, mode="direct").get("stack")
+
+    with v.phase("z-stack round-trip"):
+        before = stack()
+        if not before:
+            v.skip("z_stack: round-trip", "the job has no z-stack")
+            return
+        begin, end, step = float(before["begin"]), float(before["end"]), float(before["stepSize"])
+        size = round(abs(end - begin), 6)
+        widened = (begin - 1.0, end + 1.0) if begin <= end else (begin + 1.0, end - 1.0)
+
+        def put_back() -> None:
+            v.command("z_stack: restore begin and end", lambda: drv.set_z_stack_definition(client, job_name, begin, end))
+            v.command("z_stack: restore step size", lambda: drv.set_z_stack_step_size(client, job_name, step))
+
+        try:
+            v.command("z_stack: step size +0.5 um", lambda: drv.set_z_stack_step_size(client, job_name, step + 0.5))
+            now = stack()
+            if now:
+                v.compare("z_stack: step size readback", float(now["stepSize"]), step + 0.5, tolerance=0.05)
+            # The driver confirms the new size against LAS X itself, so the command's own
+            # answer is the check; the begin and end are read back after the next step.
+            v.command("z_stack: size +2 um", lambda: drv.set_z_stack_size(client, job_name, round(size + 2, 6)))
+            v.command("z_stack: definition 1 um wider", lambda: drv.set_z_stack_definition(client, job_name, *widened))
+            now = stack()
+            if now:
+                v.compare("z_stack: begin readback", float(now["begin"]), widened[0], tolerance=0.1)
+                v.compare("z_stack: end readback", float(now["end"]), widened[1], tolerance=0.1)
+        finally:
+            put_back()
+
+
 def phase_acquire(drv: Any, v: Validator, client: Any, job_name: str) -> None:
     """One acquisition through the driver."""
     with v.phase("acquire"):
@@ -1508,6 +1633,21 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--allow-xy", action="store_true", help="enable XY stage validation pattern"
     )
     p.add_argument("--allow-z", action="store_true", help="enable Z galvo round-trip")
+    p.add_argument(
+        "--allow-lasers",
+        action="store_true",
+        help="enable the first laser line's intensity and shutter round-trip",
+    )
+    p.add_argument(
+        "--allow-wheels",
+        action="store_true",
+        help="enable the filter wheel slot round-trip",
+    )
+    p.add_argument(
+        "--allow-stack",
+        action="store_true",
+        help="enable the z-stack step, size and begin/end round-trip",
+    )
     p.add_argument(
         "--allow-objective",
         action="store_true",
@@ -1605,6 +1745,12 @@ def _confirm_live_write(args: argparse.Namespace) -> bool:
         parts.append("Z move")
     if args.allow_objective:
         parts.append("objective switch")
+    if args.allow_lasers:
+        parts.append("laser intensity and shutter")
+    if args.allow_wheels:
+        parts.append("filter wheel slots")
+    if args.allow_stack:
+        parts.append("z-stack changes")
     if args.allow_acquire:
         parts.append("one acquire")
     sys.stdout.write("LAS X session will receive: " + ", ".join(parts) + ".\n")
@@ -1791,8 +1937,32 @@ def main(argv: list[str] | None = None) -> int:
         else:
             v.skip("phase: z", "use --allow-z to enable")
 
+        if args.allow_lasers:
+            phase_lasers(drv, v, client, job_name)
+        else:
+            v.skip("phase: lasers", "use --allow-lasers to enable")
+
+        if args.allow_wheels:
+            phase_filter_wheels(drv, v, client, job_name)
+        else:
+            v.skip("phase: filter wheels", "use --allow-wheels to enable")
+
+        if args.allow_stack:
+            phase_z_stack(drv, v, client, job_name)
+        else:
+            v.skip("phase: z-stack", "use --allow-stack to enable")
+
         if args.allow_objective:
+            # A new objective makes LAS X recalculate a System Optimized stack's steps and keep
+            # them when the first objective is back; sending the stack's own begin and end
+            # again puts it right (STELLARIS, 2026-10-15).
+            kept = (_settings(drv, client, job_name).get("stack") or None) if args.allow_stack else None
             phase_objective(drv, v, client, job_name)
+            if kept:
+                v.command(
+                    "objective: define the stack again",
+                    lambda: drv.set_z_stack_definition(client, job_name, float(kept["begin"]), float(kept["end"])),
+                )
         else:
             v.skip("phase: objective", "use --allow-objective to enable")
 
