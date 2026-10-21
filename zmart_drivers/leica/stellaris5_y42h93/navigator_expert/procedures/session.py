@@ -91,6 +91,13 @@ class ZmartHandle:
     data_location: Path | None = None
     closed: bool = False
     unconfirmed: list[dict[str, Any]] = field(default_factory=list)
+    #: The captures taken whose files are not yet written, each with the note
+    #: made as it was taken. ``acquire`` adds to it; ``save_data`` empties it.
+    unsaved: list[Any] = field(default_factory=list)
+    #: The pictures in LAS X's cache whose captures are saved, as
+    #: ``(element number, name)``. ``save_data`` adds to it; ``clear_cache``
+    #: empties it.
+    in_cache: list[tuple[int, str]] = field(default_factory=list)
 
 
 def note_unconfirmed(handle: ZmartHandle, what: str, result: Any) -> None:

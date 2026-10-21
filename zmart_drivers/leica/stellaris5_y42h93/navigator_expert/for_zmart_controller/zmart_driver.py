@@ -53,6 +53,7 @@ from ..dispatcher import gate as _gate
 from ..driver_setup.limits import handshake as _handshake
 from ..procedures.save_data.naming import run_hash
 from ..procedures.acquisition import acquisition as _acquisition
+from ..procedures.save_data import save_captures as _save_captures
 from ..procedures.absolute_coordinate_system import frame as _frame
 from ..procedures import instrument as _instrument
 from ..procedures.session import ZmartHandle
@@ -272,19 +273,20 @@ class ZmartDriver:
         plane entry carries its file, its channel, depth and time index,
         and the stage position it was taken at, in the sample's frame.
         """
-        answer = _acquisition.acquire(
+        taken = _acquisition.acquire(
             self._handle,
             position_label=position_label,
             acquisition_settings=acquisition_settings,
             acquisition_type=acquisition_type,
             output_folder=output_folder,
         )
+        (answer,) = _save_captures.save_waiting(self._handle, taken["position_label"])
         return True, (answer["files"], answer["planes"])
 
     # --- procedures ---------------------------------------------------------------------
 
     def get_procedures(self):
-        """``True, procedures``: parking the z-galvo, autofocus."""
+        """``True, procedures``: parking the z-galvo, saving captures, clearing LAS X's cache, autofocus."""
         return True, _instrument.get_procedures(self._handle)
 
     def run_procedure(self, procedure):
