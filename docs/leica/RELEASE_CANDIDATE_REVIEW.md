@@ -14,7 +14,7 @@ This review covers the **release candidate** of the Leica driver, version `6.0.0
 
 - **Code reviewed:** the Leica driver from `thomdehoog/zmart-microscopy`, branch `release-candidate` at commit `decba69`. This is the code in this `zmart-drivers` release candidate.
 - **How it was reviewed:** the full review was done on `main` at `00fc8bc`. The `release-candidate` branch adds 7 commits on top of that. In the driver, they change only `zmart_adapter/zmart_adapter.py` and `config/machine.py`: the saved frame origin is now loaded at connect, and `set_origin` became a setup step. The findings in those two files were checked again against `decba69`, all of them still apply, and their line numbers below have been updated.
-- **Driver folder:** `zmart_drivers/leica/stellaris5_y42h93/navigator_expert/`
+- **Driver folder:** `zmart_drivers/leica/stellaris_y42h93/navigator_expert/`
 - **Date:** 2026-09-30
 - **Reviewers:** Review A (five parallel reviewers, one per part of the driver, plus checks by the lead session) and an independent review B supplied by the user. For each finding, the **Source** line says which review raised it. Where both reviews found the same problem, it appears once and names both.
 - **Scope:** an offline review only. Nothing was checked on a physical microscope or on the LAS X simulator, and the review itself changed no driver code. The only change made to the driver alongside this review marks it as a release candidate (its status line and its version number).

@@ -3,7 +3,7 @@
 Each driver lives in its own folder, organised by vendor, then by microscope,
 then by the vendor interface it uses. This beta holds one driver::
 
-    zmart_drivers/leica/stellaris5_y42h93/navigator_expert/   Leica STELLARIS 5, LAS X
+    zmart_drivers/leica/stellaris_y42h93/navigator_expert/   Leica STELLARIS, LAS X
 
 Importing this package does not import the driver. Use the driver by itself
 with its ``connect()``, or register its folder, which holds
