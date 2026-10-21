@@ -100,7 +100,8 @@ def write(client, request, description, *, command, values, **keywords):
     Before anything is sent, the limits gate is asked whether this connection's
     limits allow it. If not, nothing is sent and the answer is a refused result
     with the reason. Because the check sits here, no change can reach the
-    microscope without passing it, whichever recipe asked.
+    microscope without passing it, whichever recipe asked. The result also says,
+    under ``route``, which way the command went.
     """
     from . import confirm_loop, gate
 
@@ -114,4 +115,9 @@ def write(client, request, description, *, command, values, **keywords):
             "timing": make_timing(total_s=0.0, attempts=0),
             "logs": [make_log_entry("error", message)],
         }
-    return confirm_loop.confirm_and_fire(client, request, description, **keywords)
+    result = confirm_loop.confirm_and_fire(client, request, description, **keywords)
+
+    # Which way the command went, when the transport keeps several ("direct", "cam"):
+    # None when nothing was sent.
+    result["route"] = getattr(getattr(keywords.get("profile"), "transport", None), "carried_by", None)
+    return result

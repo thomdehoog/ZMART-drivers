@@ -225,6 +225,9 @@ def fire_block(
             )
             for message in answered:
                 all_logs.append(_make_log_entry("warning", message))
+            carried_by = getattr(transport, "carried_by", None)
+            if carried_by:
+                all_logs.append(_make_log_entry("info", f"{description} | sent through the {carried_by} route"))
             if delivered and not profile.skip_reply_check and not profile.send_without_receipt:
                 if not transport.await_reply(client):
                     # The reply never settled: a rejection arriving after this

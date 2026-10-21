@@ -828,3 +828,23 @@ class TestHelpers:
         assert exported.image_files == [tiff]
         assert exported.metadata_files == [xml]
         assert exported.source_files == [tiff, xml]
+
+
+class TestPathTooLong:
+    """Windows says "file not found" for a path over 259 characters; the driver says what is wrong."""
+
+    def test_a_long_path_is_explained_with_what_to_do(self):
+        error = FileNotFoundError(2, "No such file or directory", "C:\\" + "a" * 262 + ".partial")
+
+        with pytest.raises(RuntimeError, match="at most 259.*shorter folder.*LongPathsEnabled"):
+            acquisition.say_when_the_path_is_too_long(error, on_windows=True)
+
+    def test_a_short_path_that_is_really_missing_is_left_alone(self):
+        error = FileNotFoundError(2, "No such file or directory", "C:\\data\\x.partial")
+
+        assert acquisition.say_when_the_path_is_too_long(error, on_windows=True) is None
+
+    def test_other_systems_are_left_alone(self):
+        error = FileNotFoundError(2, "No such file or directory", "/" + "a" * 300)
+
+        assert acquisition.say_when_the_path_is_too_long(error, on_windows=False) is None

@@ -16,6 +16,7 @@ operator, and the command that met it is refused with the dialog's text.
 """
 
 import logging
+import sys
 import threading
 import time
 
@@ -310,6 +311,7 @@ class TestComInThisThread:
     2026-10-14: insisting on its own mode failed with "Cannot change thread
     mode after it is set", and the warning stayed open)."""
 
+    @pytest.mark.skipif(sys.platform != "win32", reason="OSError.winerror exists only on Windows")
     def test_com_set_up_in_another_mode_is_used_as_it_is(self):
         def already_set_up():
             raise OSError(

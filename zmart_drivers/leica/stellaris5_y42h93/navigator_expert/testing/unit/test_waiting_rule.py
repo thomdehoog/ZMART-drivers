@@ -320,12 +320,14 @@ def test_a_job_switch_keeps_its_objective_while_the_api_is_busy():
 def test_delivery_is_four_tries_of_one_window_without_a_pause():
     api_obj = MagicMock()
     api_obj.UpdateAwaitReceipt.return_value = False
-    with patch("time.sleep") as sleep:
-        assert delivery.deliver(api_obj) is False
+    assert delivery.deliver(api_obj) is False
     assert [c.args for c in api_obj.UpdateAwaitReceipt.call_args_list] == [
         (WINDOW_S,)
     ] * 4
-    sleep.assert_not_called()
+    # No pause between tries: the module does not even have a clock to sleep on. (A test
+    # that patched time.sleep for the whole process failed now and then, whenever
+    # another thread slept while it ran.)
+    assert not hasattr(delivery, "time")
 
 
 def test_delivery_stops_trying_once_received():
