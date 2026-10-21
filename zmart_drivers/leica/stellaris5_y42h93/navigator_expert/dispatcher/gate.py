@@ -1,57 +1,28 @@
-"""Limits gate for the commands layer.
+"""The limits gate: before anything is sent, the limits of this connection are asked.
 
-Maintainer decision (MAINTAINER_DECISIONS.md §7): limits are enforced as low
-as possible — at the command wrapper that populates the native function's
-model — so nothing built on top (adapter, controller, workflows, notebooks)
-can interfere with or bypass them. The rules themselves (what is allowed:
-``LeicaLimits`` and the stage checks) live in ``vendor_specific/primitive_handling/settings/limit_rules.py``; this
-module owns the *moment* of enforcement — per-connection state and refusal. It
-knows no microscope: the installed limits object answers ``check_command``.
-The wrappers in ``actions/`` call :func:`check_refusal` before anything fires.
+Every change goes through the dispatcher's door, and the door asks this gate
+first (:func:`check_refusal`). When the change is not allowed, nothing is sent
+and the answer says why. Because the check sits below everything a workflow, a
+notebook or a procedure can call, none of them can go around it.
 
-Wrapper -> key mapping
-----------------------
-The operator-facing ``limits.json`` is flat. Every constrained value explicitly
-uses ``range`` or ``allowed``; setter names with ``[]`` explicitly show that
-those setters are unrestricted. The internal mapping below is
-only the command chokepoint vocabulary—it is not the JSON shape.
+The gate keeps, for each connection, the limits object that the driver
+installed when it connected (:func:`install`). It knows no microscope: it asks
+that object one question, ``check_command(command, values)``, which raises when
+the values are not allowed. What is allowed is the vendor's own rulebook (for
+LAS X, ``vendor_specific/primitive_handling/settings/limit_rules.py``), and
+finding, checking and installing the operator's limits file is the driver's
+connect-time handshake (for LAS X, ``driver_setup/limits/handshake.py``). If
+the operator's file cannot be used, the handshake installs the limits that ship
+with the driver, so the session stays bounded. If even those cannot be used, the
+gate refuses every change and gives the recorded reason. A connection that was
+never handed limits refuses too.
 
-- each configurable ``set_*`` wrapper           -> its same-named flat entry
-- ``set_objective``                             -> ``objective_slot``
-  (``[]`` — the default — is unrestricted: which slots exist is hardware
-  knowledge the wrapper checks live; a written allow-list fences automation)
-- ``select_job``                                -> handshake/state gate only
-- ``move_xy`` / ``move_z``                      -> ``set_xyz``
-- ``acquire``                                   -> ``acquire``
+The gate assumes one microscope connection per process. It keys each
+connection by ``id(client)`` and keeps the client itself, so that the number
+can never be reused by a new connection that would then inherit old limits.
 
-``set_origin`` fires no native command, and procedure effects flow through the
-same gated movement/acquisition wrappers. They therefore need no JSON entries.
-
-State model
------------
-This module keeps, for each connection, the limits that govern it, and refuses
-any command they do not allow. It does not know where the limits come from.
-The connect-time handshake that finds the operator's ``limits.json``, checks it
-and installs it lives in ``driver_setup/limits/handshake.py``. If that file is
-missing or invalid, the handshake installs the limits that ship with the driver,
-so the session stays bounded. Only if even those are unusable does the session
-go fail-closed, and every gated command then refuses with the recorded reason
-(which names the notebook that creates the files:
-``driver_setup/limits/notebooks/set_limits.ipynb``). A connection that never
-shook hands at all still refuses fail-closed.
-
-Single-writer invariant: like command dispatch (``confirm_loop.py``) and the
-stage-envelope module global (``vendor_specific/primitive_handling/settings/limit_rules.py``), this registry assumes
-ONE instrument per process. The registry is keyed by ``id(client)`` and holds
-a strong reference to the client (microscope clients are process-lifetime), so an id
-can never be recycled onto a different client. A second ``connect_handshake``
-for the same client rebinds its state; the module-global stage envelope is
-rebound by whichever handshake ran last.
-
-Deviating from the old shared limits spec's "hang it off the driver handle"
-guidance (the since-dissolved ``shared/`` package) is deliberate (plan
-amendment PR-04): command wrappers receive the ``client``, not a handle, and
-the enforcement must live below anything a caller can skip.
+Author: Thom de Hoog, Center for Microscopy and Image Analysis (ZMB),
+University of Zurich (thom.dehoog@zmb.uzh.ch, thomdehoog@gmail.com).
 """
 
 from __future__ import annotations
