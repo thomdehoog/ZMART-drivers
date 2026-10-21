@@ -5,7 +5,7 @@ call, until LAS X answers "received" or its timeout passes. "Received" only
 means LAS X got the message; whether the setting, move or job switch then
 happened is the confirmation's business.
 
-Delivery follows the one rule in ``dispatcher.tuning``: ``WINDOWS`` tries of
+Delivery follows the one rule in ``vendor_specific/tuning.py``: ``WINDOWS`` tries of
 ``WINDOW_S`` each. There is no pause between tries, because each try already
 waits a full window for the answer.
 
@@ -24,8 +24,8 @@ from __future__ import annotations
 
 import logging
 
-from ....dispatcher import dispatcher
 from ..interface import lasx_dialogs
+from ... import tuning
 
 log = logging.getLogger(__name__)
 
@@ -38,10 +38,10 @@ def deliver(api_obj, *, label="message"):
     """
     lasx_dialogs.answer_warnings()
     with lasx_dialogs.watching():
-        for attempt in range(1, dispatcher.WINDOWS + 1):
-            if api_obj.UpdateAwaitReceipt(dispatcher.WINDOW_S):
+        for attempt in range(1, tuning.WINDOWS + 1):
+            if api_obj.UpdateAwaitReceipt(tuning.WINDOW_S):
                 return True
             log.warning(
-                "%s not received (try %d/%d)", label, attempt, dispatcher.WINDOWS
+                "%s not received (try %d/%d)", label, attempt, tuning.WINDOWS
             )
     return False

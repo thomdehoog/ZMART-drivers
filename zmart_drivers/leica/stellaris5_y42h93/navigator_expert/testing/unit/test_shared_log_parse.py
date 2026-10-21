@@ -16,7 +16,7 @@ from unittest.mock import patch
 import pytest
 
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling import state as readers
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher import dispatcher
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific import tuning
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitives.log import log_reader
 
 PARSE_S = 0.05
@@ -25,7 +25,7 @@ PARSE_S = 0.05
 @pytest.fixture(autouse=True)
 def fresh_shared_parse(monkeypatch):
     monkeypatch.setattr(log_reader, "LIVE_LOG", log_reader.SharedParse())
-    monkeypatch.setattr(dispatcher, "POLL_S", 0.02)
+    monkeypatch.setattr(tuning, "POLL_S", 0.02)
 
 
 class SlowParse:

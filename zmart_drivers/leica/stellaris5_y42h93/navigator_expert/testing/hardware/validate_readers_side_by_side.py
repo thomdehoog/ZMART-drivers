@@ -57,7 +57,7 @@ import zmart_drivers.leica.stellaris5_y42h93.navigator_expert as drv
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling import readings as capabilities
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling import profiles
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling import state as readers
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher import dispatcher
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific import tuning
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitives.log import log_reader as L
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.parsing import make_changeable_copy, parse_tile_geometry
 
@@ -280,7 +280,7 @@ def _settings_diffs(af, lf):
     ]
 
 
-# --- polling: the one rule in dispatcher.tuning ------------------------------
+# --- polling: the one rule in vendor_specific/tuning.py ------------------------------
 #
 # A post-change readback waits for the expected value by the same rule as the
 # driver: at most WINDOWS windows of WINDOW_S, looking again every POLL_S.
@@ -288,12 +288,12 @@ def _settings_diffs(af, lf):
 
 def _change_poll_params():
     """(wait_window_s, poll_interval_s) for a post-change settings readback."""
-    return dispatcher.WINDOWS * dispatcher.WINDOW_S, dispatcher.POLL_S
+    return tuning.WINDOWS * tuning.WINDOW_S, tuning.POLL_S
 
 
 def _select_poll_params():
     """(wait_window_s, poll_interval_s) for a post-select-job readback."""
-    return dispatcher.WINDOWS * dispatcher.WINDOW_S, dispatcher.POLL_S
+    return tuning.WINDOWS * tuning.WINDOW_S, tuning.POLL_S
 
 
 # --- phases ----------------------------------------------------------------

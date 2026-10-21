@@ -24,7 +24,7 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.prim
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.objective_change_with_compensation import objective_shift
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling import profiles
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling import prechecks
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher import dispatcher
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific import tuning
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling import state as readers
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitives.api import delivery
 
@@ -34,9 +34,9 @@ WINDOW_S = 0.5
 @pytest.fixture(autouse=True)
 def short_windows(monkeypatch):
     """Four windows of 0.5 s, looking every 10 ms, checking every 1 ms."""
-    monkeypatch.setattr(dispatcher, "WINDOW_S", WINDOW_S)
-    monkeypatch.setattr(dispatcher, "POLL_S", 0.01)
-    monkeypatch.setattr(dispatcher, "ANSWER_POLL_S", 0.001)
+    monkeypatch.setattr(tuning, "WINDOW_S", WINDOW_S)
+    monkeypatch.setattr(tuning, "POLL_S", 0.01)
+    monkeypatch.setattr(tuning, "ANSWER_POLL_S", 0.001)
     monkeypatch.setattr(profiles, "STATE_READERS", profiles.StateReaderProfile())
 
 
@@ -375,7 +375,7 @@ EXCEPTIONS = {
     ("vendor_specific/primitives/capture/files.py", "timeout"),
     ("vendor_specific/primitives/capture/files.py", "poll_interval"),
     # The rule itself.
-    ("dispatcher/dispatcher.py", "WINDOW_S"),
+    ("vendor_specific/tuning.py", "WINDOW_S"),
 }
 
 
@@ -431,7 +431,7 @@ def _waits_with_their_own_numbers(root):
 
 
 def test_no_wait_on_las_x_has_its_own_number():
-    """How long to wait and how often to look come from dispatcher.tuning only.
+    """How long to wait and how often to look come from vendor_specific/tuning.py only.
 
     A literal timeout, retry count, window, poll interval or sleep for waiting
     on LAS X anywhere else is a second rule; the named exceptions above are

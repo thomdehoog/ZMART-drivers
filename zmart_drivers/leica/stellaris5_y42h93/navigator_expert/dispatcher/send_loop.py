@@ -32,7 +32,6 @@ University of Zurich (thom.dehoog@zmb.uzh.ch, thomdehoog@gmail.com).
 import logging
 import time
 
-from . import dispatcher
 from .dispatcher import make_log_entry as _make_log_entry
 
 log = logging.getLogger(__name__)
@@ -242,7 +241,7 @@ def fire_block(
         if not delivered:
             msg = (
                 f"{description} | Transport failure: "
-                f"not received after {dispatcher.WINDOWS} tries of {dispatcher.WINDOW_S}s"
+                f"not received after {profile.waiting.WINDOWS} tries of {profile.waiting.WINDOW_S}s"
             )
             log.error(msg)
             all_logs.append(_make_log_entry("error", msg))

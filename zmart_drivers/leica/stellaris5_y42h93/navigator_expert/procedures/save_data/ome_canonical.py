@@ -7,7 +7,7 @@ Contract with ``ome.py``: that module owns TIFF tag-270 access
 (:func:`ome.read_tiff_tag_270`) and the validate/patch side; this module
 GENERATES metadata and only ever reads existing OME through that public
 function. The live settings read follows the one rule in
-``dispatcher.tuning``, like every other reading.
+``vendor_specific/tuning.py``, like every other reading.
 """
 
 from __future__ import annotations

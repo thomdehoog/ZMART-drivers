@@ -22,7 +22,7 @@ for _p in (_HERE, _HELPERS, _REPO_ROOT):
 
 import validate_readers_side_by_side as sxs
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling import profiles
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher import dispatcher
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific import tuning
 
 
 def _run_mock(tmp_path, *extra):
@@ -35,10 +35,10 @@ def _run_mock(tmp_path, *extra):
 
 
 def test_poll_params_come_from_the_rule():
-    """A post-change readback waits by the driver's one rule (dispatcher.tuning)."""
+    """A post-change readback waits by the driver's one rule (vendor_specific/tuning.py)."""
     assert not hasattr(profiles.LOG_READER, "poll_timeout")
     assert not hasattr(profiles.LOG_READER, "poll_interval")
-    expected = (dispatcher.WINDOWS * dispatcher.WINDOW_S, dispatcher.POLL_S)
+    expected = (tuning.WINDOWS * tuning.WINDOW_S, tuning.POLL_S)
     assert sxs._change_poll_params() == expected
     assert sxs._select_poll_params() == expected
 
