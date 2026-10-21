@@ -206,26 +206,23 @@ class TestTheOmeWritten:
         theirs = autosave_pixels(name)
 
         size_c = int(theirs.get("SizeC"))
-        for plane in theirs.iter(f"{OME}Plane"):
-            index = PlaneIndex(0, int(plane.get("TheZ")), int(plane.get("TheC")))
-            ours = ET.fromstring(
-                canonical.plane_xml(
-                    metadata, index=index, filename="p.ome.tif", shape_yx=(512, 512)
-                )
+        ours = ET.fromstring(canonical.image_xml(metadata, image_name="p"))
+        pixels = ours.find(f".//{OME}Pixels")
+        for key in ("SizeX", "SizeY", "SizeC", "SizeZ", "Type", "SignificantBits"):
+            assert pixels.get(key) == theirs.get(key), key
+        for axis in "XY":
+            assert math.isclose(
+                float(pixels.get(f"PhysicalSize{axis}")),
+                in_um(
+                    theirs.get(f"PhysicalSize{axis}"),
+                    theirs.get(f"PhysicalSize{axis}Unit"),
+                ),
+                rel_tol=1e-12,
             )
-            pixels = ours.find(f".//{OME}Pixels")
-            for key in ("SizeX", "SizeY", "Type", "SignificantBits"):
-                assert pixels.get(key) == theirs.get(key), key
-            for axis in "XY":
-                assert math.isclose(
-                    float(pixels.get(f"PhysicalSize{axis}")),
-                    in_um(
-                        theirs.get(f"PhysicalSize{axis}"),
-                        theirs.get(f"PhysicalSize{axis}Unit"),
-                    ),
-                    rel_tol=1e-12,
-                )
-            [our_plane] = ours.iter(f"{OME}Plane")
+        our_planes = {(p.get("TheZ"), p.get("TheC")): p for p in ours.iter(f"{OME}Plane")}
+        for plane in theirs.iter(f"{OME}Plane"):
+            index = (plane.get("TheZ"), plane.get("TheC"))
+            our_plane = our_planes[index]
             for axis in "XYZ":
                 assert in_um(
                     our_plane.get(f"Position{axis}"),
@@ -247,49 +244,29 @@ class TestTheOmeWritten:
         ome_types = pytest.importorskip("ome_types")
         metadata = metadata_of(name)
 
-        for index in (
-            PlaneIndex(0, 0, 0),
-            PlaneIndex(0, metadata.size_z - 1, metadata.size_c - 1),
-        ):
-            xml = canonical.plane_xml(
-                metadata,
-                index=index,
-                filename="p.ome.tif",
-                shape_yx=(512, 512),
-                state={"software": {"name": "ZMART"}},
-            )
-            ome = ome_types.from_xml(xml.decode("ascii"), validate=True)
-            image = ome.images[0]
-            assert image.acquisition_date is not None
-            assert image.pixels.channels[0].fluor
-            assert ome.instruments[0].objectives[0].lens_na == 0.4
+        xml = canonical.image_xml(
+            metadata, image_name="p", state={"software": {"name": "ZMART"}}
+        )
+        ome = ome_types.from_xml(xml.decode("ascii"), validate=True)
+        image = ome.images[0]
+        assert image.acquisition_date is not None
+        assert all(channel.fluor for channel in image.pixels.channels)
+        assert ome.instruments[0].objectives[0].lens_na == 0.4
 
     def test_the_file_text_is_plain_ascii(self):
         metadata = metadata_of(HIRES)
 
-        xml = canonical.plane_xml(
-            metadata,
-            index=PlaneIndex(0, 0, 0),
-            filename="p.ome.tif",
-            shape_yx=(512, 512),
-        )
+        xml = canonical.image_xml(metadata, image_name="p")
 
         xml.decode("ascii")
         assert b"&#181;m" in xml
 
-    def test_one_plane_carries_its_own_channel_and_the_instrument(self):
+    def test_each_channel_carries_its_dye_and_detector_and_the_instrument(self):
         metadata = metadata_of(HIRES)
 
-        root = ET.fromstring(
-            canonical.plane_xml(
-                metadata,
-                index=PlaneIndex(0, 0, 1),
-                filename="p.ome.tif",
-                shape_yx=(512, 512),
-            )
-        )
+        root = ET.fromstring(canonical.image_xml(metadata, image_name="p"))
 
-        [channel] = root.iter(f"{OME}Channel")
+        channel = list(root.iter(f"{OME}Channel"))[1]
         assert channel.get("Fluor") == "ALEXA 488"
         assert channel.get("ExcitationWavelength") == "497"
         detector_ref = channel.find(f"{OME}DetectorSettings").get("ID")
@@ -358,15 +335,10 @@ class TestEveryPlaneSaysWhereEachDriveStood:
         ome_types = pytest.importorskip("ome_types")
         metadata = with_z_wide_at(HIRES, "0.0012")
 
-        xml = canonical.plane_xml(
-            metadata,
-            index=PlaneIndex(0, 0, 1),
-            filename="p.ome.tif",
-            shape_yx=(512, 512),
-        )
+        xml = canonical.image_xml(metadata, image_name="p")
 
         ome = ome_types.from_xml(xml.decode("ascii"), validate=True)
-        [plane] = ome.images[0].pixels.planes
+        [plane] = [p for p in ome.images[0].pixels.planes if p.the_z == 0 and p.the_c == 1]
         assert plane.position_z == pytest.approx(1200.0, abs=1e-3)
         [ref] = plane.annotation_refs
         drives = next(

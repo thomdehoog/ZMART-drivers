@@ -86,20 +86,6 @@ def build_image_name(naming: Naming) -> str:
     return f"{naming.stem}_T{naming.t:06d}_C{naming.c:02d}_Z{naming.z:05d}.ome.tiff"
 
 
-def parse_image_name(filename: str) -> Naming | None:
-    """Parse a canonical Leica filename, or return ``None``."""
-
-    match = _IMAGE_RE.fullmatch(filename)
-    if match is None:
-        return None
-    return Naming(
-        stem=match.group("stem"),
-        t=int(match.group("t")),
-        c=int(match.group("c")),
-        z=int(match.group("z")),
-    )
-
-
 def free_stem(output_root: Path | str, stem: str) -> str:
     """``stem``, or ``stem_001``, ``stem_002``, ...: the first no earlier capture here used.
 

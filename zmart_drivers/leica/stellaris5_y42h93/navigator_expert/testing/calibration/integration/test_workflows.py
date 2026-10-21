@@ -33,7 +33,6 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.store i
 )
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.save_data.naming import (
     build_image_name,
-    parse_image_name,
 )
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.optical_calibration import (
     adopt_calibration as wf_adopt,
@@ -2452,8 +2451,7 @@ def test_objective_pair_rerun_2b_wipes_target_z_stack_dir(
     state["zwide"] = 94.0
     session = wf_obj.measure_parfocality_target(session)
     z_dir = session.paths.data_dir / "target_z_stack"
-    first_run_z = sorted(parse_image_name(p.name).z for p in z_dir.rglob("*.ome.tiff"))
-    assert first_run_z == list(range(21))
+    assert len(list(z_dir.rglob("*.ome.tiff"))) == 21
 
     # Operator reconfigures LAS X to a smaller stack (5 slices) and
     # reruns Step 3. The disk wipe must remove the stale z_005..z_020.
@@ -2466,8 +2464,7 @@ def test_objective_pair_rerun_2b_wipes_target_z_stack_dir(
     }
     state["zwide"] = 94.0
     session = wf_obj.measure_parfocality_target(session)
-    second_run_z = sorted(parse_image_name(p.name).z for p in z_dir.rglob("*.ome.tiff"))
-    assert second_run_z == list(range(5))
+    assert len(list(z_dir.rglob("*.ome.tiff"))) == 5
 
 
 # ---------------------------------------------------------------------
@@ -2809,10 +2806,7 @@ def test_objective_pair_rerun_2a_wipes_ref_z_stack_dir(
     )
     session = wf_obj.measure_parfocality_reference(session)
     ref_dir = session.paths.data_dir / "ref_z_stack"
-    first_run_z = sorted(
-        parse_image_name(p.name).z for p in ref_dir.rglob("*.ome.tiff")
-    )
-    assert first_run_z == list(range(11))
+    assert len(list(ref_dir.rglob("*.ome.tiff"))) == 11
 
     # Operator reconfigures the LAS X ref stack to 5 sections and
     # reruns Step 2. begin/end must keep the focus peak interior even
@@ -2828,10 +2822,7 @@ def test_objective_pair_rerun_2a_wipes_ref_z_stack_dir(
     state["stack_phase"] = "ref"
     session = wf_obj.measure_parfocality_reference(session)
 
-    second_run_z = sorted(
-        parse_image_name(p.name).z for p in ref_dir.rglob("*.ome.tiff")
-    )
-    assert second_run_z == list(range(5))
+    assert len(list(ref_dir.rglob("*.ome.tiff"))) == 5
 
 
 def test_objective_pair_missing_stack_positions_raises(

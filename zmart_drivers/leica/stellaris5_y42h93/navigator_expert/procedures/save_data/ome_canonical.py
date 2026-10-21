@@ -20,8 +20,6 @@ from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
-from ...vendor_specific.primitive_handling.readings import named_readings as _readers
-from ...vendor_specific.primitive_handling.readings import parsing as _parsing
 from ...vendor_specific.primitives.capture import tiff_tag as _ome
 from ...vendor_specific.primitives.capture.product import (
     AcquisitionMetadata,
@@ -53,112 +51,6 @@ MEDIA = ("Air", "Oil", "Water", "Glycerol", "Other")
 
 ET.register_namespace("", OME_NS)
 ET.register_namespace("xsi", XSI_NS)
-
-
-def metadata_with_shape_and_grid(
-    metadata: AcquisitionMetadata,
-    *,
-    size_x: int,
-    size_y: int,
-    size_t: int,
-    size_z: int,
-    size_c: int,
-    pixel_type: str,
-) -> AcquisitionMetadata:
-    """Override vendor-declared dimensions with the collected source product."""
-    return _ensure_channels(
-        replace(
-            metadata,
-            size_x=size_x,
-            size_y=size_y,
-            size_t=size_t,
-            size_z=size_z,
-            size_c=size_c,
-            pixel_type=pixel_type,
-        )
-    )
-
-
-def metadata_with_job_physical_sizes(
-    metadata: AcquisitionMetadata,
-    client: Any,
-    job_name: str,
-) -> AcquisitionMetadata:
-    """Prefer live job geometry for physical sizes, falling back to vendor OME.
-
-    Vendor OME can be internally valid but semantically wrong. LAS X native
-    AutoSave has been observed to write ``PhysicalSizeZ`` as range/sections
-    instead of the OME inter-plane spacing. The job settings are the
-    authoritative source for physical sampling, so the read waits for them by
-    the one rule (four windows of ``WINDOW_S``) rather than giving up early
-    and keeping a Z spacing known to be wrong.
-    """
-    settings = None
-    if client is not None and job_name:
-        settings = _readers.get_job_settings(client, job_name)
-    if not isinstance(settings, dict):
-        log.warning(
-            "job settings for '%s' unavailable; keeping vendor OME physical "
-            "sizes (native-AutoSave Z spacing may be wrong)",
-            job_name,
-        )
-        return metadata
-
-    x_um, y_um = _xy_pixel_sizes_from_job_settings(settings)
-    z_um = _z_spacing_from_job_settings(settings)
-
-    updates: dict[str, float | None] = {}
-    if x_um is not _UNKNOWN:
-        updates["physical_size_x_um"] = x_um
-    if y_um is not _UNKNOWN:
-        updates["physical_size_y_um"] = y_um
-    if z_um is not _UNKNOWN:
-        updates["physical_size_z_um"] = z_um
-    if not updates:
-        return metadata
-    return replace(metadata, **updates)
-
-
-def plane_xml(
-    metadata: AcquisitionMetadata,
-    *,
-    index: PlaneIndex,
-    filename: str,
-    shape_yx: tuple[int, int],
-    state: dict | None = None,
-) -> bytes:
-    """Return valid single-plane OME XML for one canonical image file.
-
-    When *state* is provided, the machine/software state at export time is
-    embedded as a ``StructuredAnnotations`` block (no sidecar XML).
-    """
-    plane_meta = metadata_with_shape_and_grid(
-        metadata,
-        size_x=shape_yx[1],
-        size_y=shape_yx[0],
-        size_t=1,
-        size_z=1,
-        size_c=1,
-        pixel_type=metadata.pixel_type,
-    )
-    # Keep the physical pixel sizes: many tools open the per-plane TIFF
-    # directly (never the companion) and would silently lose calibration.
-    # Z spacing is dropped only because a single-plane image has no
-    # inter-plane distance to describe.
-    plane_meta = replace(
-        plane_meta,
-        physical_size_z_um=None,
-    )
-    channel = metadata.channel(index.c)
-    plane = metadata.planes.get(index)
-    return _ome_xml(
-        plane_meta,
-        image_name=filename,
-        channels=(replace(channel, index=0),),
-        tiff_entries=[(0, 0, 0, filename)],
-        planes=[(PlaneIndex(t=0, z=0, c=0), plane)] if plane is not None else [],
-        state=state,
-    )
 
 
 def image_xml(
@@ -556,33 +448,6 @@ def _ensure_channels(metadata: AcquisitionMetadata) -> AcquisitionMetadata:
 
 
 _UNKNOWN = object()
-
-
-def _xy_pixel_sizes_from_job_settings(
-    settings: dict,
-) -> tuple[float | object, float | object]:
-    try:
-        geom = _parsing.parse_tile_geometry(settings)
-    except Exception:
-        return _UNKNOWN, _UNKNOWN
-    x_um = _positive_float_or_unknown(geom.get("pixel_w_um"))
-    y_um = _positive_float_or_unknown(geom.get("pixel_h_um"))
-    return x_um, y_um
-
-
-def _z_spacing_from_job_settings(settings: dict) -> float | None | object:
-    stack = _parsing.stack_from_settings(settings)
-    if not stack:
-        return _UNKNOWN
-
-    begin = _float_or_none(stack.get("begin"))
-    end = _float_or_none(stack.get("end"))
-    sections = _int_or_none(stack.get("sections"))
-    if begin is None or end is None or sections is None:
-        return _UNKNOWN
-    if sections <= 1:
-        return None
-    return abs(end - begin) / float(sections - 1)
 
 
 def _add_physical(attrs: dict[str, str], axis: str, value_um: float | None) -> None:

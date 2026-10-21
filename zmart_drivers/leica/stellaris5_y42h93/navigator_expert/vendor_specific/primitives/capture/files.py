@@ -37,19 +37,6 @@ DEFAULT_EXPORT_COMPLETION_TIMEOUT_S = 60.0
 DEFAULT_EXPORT_COMPLETION_POLL_INTERVAL_S = 0.5
 
 
-def read_relative_path(client):
-    """Read ``RelativePathName`` from the LAS X data model.
-
-    Returns an empty string on failure or when LAS X has not published a
-    path in the current session.
-    """
-    try:
-        return str(client.PyApiImagePathItem.Model.RelativePathName)
-    except Exception as e:
-        log.warning("Could not read RelativePathName: %s", e)
-        return ""
-
-
 # Exports often land on SMB shares whose mtime resolution is coarse (1-2 s)
 # and whose clock can drift from the driver host. Without an allowance, a
 # genuinely fresh export can be rejected as stale ("No ... files found").
@@ -70,39 +57,6 @@ def _relative_posix(path: Path, base: Path, *, fallback_to_str: bool) -> str | N
         return str(path.relative_to(base)).replace("\\", "/")
     except ValueError:
         return str(path).replace("\\", "/") if fallback_to_str else None
-
-
-def wait_all_stable(files, *, timeout=60, poll_interval=0.5, stable_readings=3):
-    """Block until every file in *files* is unlocked and size-stable.
-
-    ``timeout`` is the no-progress budget per file (see
-    :func:`_wait_file_stable`): a file that keeps growing is waited for
-    as long as it grows.
-    """
-    t0 = time.perf_counter()
-    unstable = []
-
-    for f in files:
-        if not _wait_file_stable(f, timeout, poll_interval, stable_readings):
-            unstable.append(f)
-
-    if unstable:
-        elapsed = time.perf_counter() - t0
-        log.warning(
-            "%d/%d files not stable after %.1fs",
-            len(unstable),
-            len(files),
-            elapsed,
-        )
-        return {
-            "success": False,
-            "error": f"{len(unstable)} file(s) not stable after {timeout}s",
-            "unstable": [str(f) for f in unstable],
-        }
-
-    elapsed = time.perf_counter() - t0
-    log.debug("All %d files stable in %.1fs", len(files), elapsed)
-    return {"success": True, "stable_count": len(files), "elapsed_s": elapsed}
 
 
 # ---------------------------------------------------------------------------

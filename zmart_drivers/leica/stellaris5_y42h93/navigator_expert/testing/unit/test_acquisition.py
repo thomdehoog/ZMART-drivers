@@ -35,7 +35,6 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.orienta
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.save_data.naming import (
     Naming,
     build_image_name,
-    parse_image_name,
 )
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitives.capture.product import (
     ExportedAcquisition,
@@ -43,12 +42,8 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.prim
 )
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.commands import run_job as capture
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.save_data import (
-    ome_canonical,
-)
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.save_data import (
     save as acquisition,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings import named_readings as readers_router
 
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.clear_cache import (
     release,
@@ -76,7 +71,6 @@ def test_leica_private_naming_round_trips_time_channel_and_z():
         z=34,
     )
     assert build_image_name(naming).endswith("_T000012_C02_Z00034.ome.tiff")
-    assert parse_image_name(build_image_name(naming)) == naming
 
 
 @pytest.mark.parametrize(("field", "value"), [("t", 1_000_000), ("c", 100), ("z", -1)])
@@ -261,101 +255,13 @@ class TestAcquire:
                 return_value={"success": True},
             ),
             patch.object(
-                acquisition._files,
-                "read_relative_path",
-            ) as read_relative_path,
-            patch.object(
                 acquisition,
                 "_persist_store",
             ) as persist,
         ):
             run_job.acquire("client", "HiRes")
 
-        read_relative_path.assert_not_called()
         persist.assert_not_called()
-
-
-class TestCanonicalPhysicalMetadataAuthority:
-    def test_job_settings_override_vendor_physical_sizes(self):
-        metadata = replace(
-            _metadata(),
-            physical_size_x_um=9.0,
-            physical_size_y_um=9.0,
-            physical_size_z_um=1.606305,
-        )
-        settings = _job_settings(
-            stack={"begin": -0.0, "end": 4.82, "sections": 3},
-        )
-
-        with patch.object(
-            readers_router,
-            "get_job_settings",
-            return_value=settings,
-        ) as read_settings:
-            out = ome_canonical.metadata_with_job_physical_sizes(
-                metadata,
-                "client",
-                "Overview",
-            )
-
-        assert "mode" not in read_settings.call_args.kwargs
-        assert out.physical_size_x_um == pytest.approx(2.27)
-        assert out.physical_size_y_um == pytest.approx(2.28)
-        assert out.physical_size_z_um == pytest.approx(2.41)
-
-    def test_z_spacing_survives_schema_degraded_settings(self):
-        """The stack parser is independent of the full-schema parse: a
-        settings dict missing the required top-level keys (which would
-        fail make_changeable_copy's schema guard) still yields z spacing
-        as long as its stack section is usable."""
-        metadata = replace(_metadata(), physical_size_z_um=1.0)
-        degraded = {"stack": {"begin": 95.0, "end": 105.0, "sections": 3}}
-
-        with patch.object(
-            readers_router,
-            "get_job_settings",
-            return_value=degraded,
-        ):
-            out = ome_canonical.metadata_with_job_physical_sizes(
-                metadata,
-                "client",
-                "Overview",
-            )
-
-        assert out.physical_size_z_um == pytest.approx(5.0)
-
-    def test_single_section_stack_overrides_vendor_z_to_none(self):
-        metadata = replace(_metadata(), physical_size_z_um=1.0)
-        settings = _job_settings(
-            stack={"begin": 10.0, "end": 10.0, "sections": 1},
-        )
-
-        with patch.object(
-            readers_router,
-            "get_job_settings",
-            return_value=settings,
-        ):
-            out = ome_canonical.metadata_with_job_physical_sizes(
-                metadata,
-                "client",
-                "Overview",
-            )
-
-        assert out.physical_size_z_um is None
-
-    def test_job_settings_unavailable_falls_back_to_vendor_metadata(self):
-        """The read waits by the one rule; when no settings arrive, vendor values stay."""
-        metadata = replace(
-            _metadata(),
-            physical_size_x_um=9.0,
-            physical_size_y_um=9.0,
-            physical_size_z_um=9.0,
-        )
-        with patch.object(readers_router, "get_job_settings", return_value=None):
-            out = ome_canonical.metadata_with_job_physical_sizes(
-                metadata, "client", "Overview"
-            )
-        assert out == metadata
 
 
 class TestSave:

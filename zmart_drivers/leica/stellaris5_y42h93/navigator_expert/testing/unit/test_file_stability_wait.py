@@ -50,13 +50,3 @@ def test_a_file_that_never_grows_is_given_up_on_after_the_budget(tmp_path):
 
     assert stable is False
     assert 0.2 <= time.perf_counter() - started < 1.5
-
-
-def test_wait_all_stable_gives_every_file_its_own_budget(tmp_path):
-    first, second = tmp_path / "a.tif", tmp_path / "b.tif"
-    first.write_bytes(b"done")
-    second.write_bytes(b"done")
-
-    outcome = _files.wait_all_stable([first, second], timeout=0.5, poll_interval=0.02)
-
-    assert outcome["success"] is True
