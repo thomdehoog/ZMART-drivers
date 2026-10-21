@@ -69,15 +69,21 @@ def _rule(char: str = "=") -> str:
     return char * 72
 
 
-def run_step(name: str, cmd: list[str], env: dict, *, fatal: bool) -> dict:
-    """Run one CI step, streaming its output, and return a structured record."""
+def run_step(
+    name: str, cmd: list[str], env: dict, *, fatal: bool, cwd: Path | None = None
+) -> dict:
+    """Run one CI step, streaming its output, and return a structured record.
+
+    *cwd* is the folder the step runs in, when it is not the one run_ci was
+    started from.
+    """
     print(f"\n{_rule('-')}")
     print(f"STEP: {name}{'' if fatal else '   (non-fatal)'}")
     print(f"  $ {' '.join(cmd)}")
     print(f"{_rule('-')}", flush=True)
     start = time.perf_counter()
     try:
-        completed = subprocess.run(cmd, env=env)
+        completed = subprocess.run(cmd, env=env, cwd=cwd)
         returncode = completed.returncode
         error = None
     except FileNotFoundError as exc:
@@ -421,8 +427,11 @@ def main(argv: list[str] | None = None) -> int:
                 True,
             ),
         ]
+        # LAS X's Data Container client writes DCLogFile.log into the folder it
+        # is started in. Run the hardware steps in the reports folder, so it lands
+        # there and not in the driver (seen on the simulator, 2026-10-21).
         for name, cmd, fatal in hardware_steps:
-            steps.append(run_step(name, cmd, env, fatal=fatal))
+            steps.append(run_step(name, cmd, env, fatal=fatal, cwd=REPORT_DIR))
 
     # --- summary -------------------------------------------------------------
     total_elapsed = time.perf_counter() - overall_start
