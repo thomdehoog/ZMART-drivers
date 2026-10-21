@@ -686,3 +686,35 @@ def test_the_z_readback_asks_the_direct_reader_not_the_cam_api():
     row = next(r for r in records if r.name == "z: readback")
     assert row.status == "PASS"
     assert "api" not in DummyDrv.asked
+
+
+def test_a_z_stack_without_its_begin_and_end_is_skipped_not_a_crash():
+    """The simulator's job has a z-stack whose begin and end were never set."""
+
+    class StackWithoutEnds:
+        changed = []
+
+        @staticmethod
+        def get_job_settings(_client, _job, **_kwargs):
+            return {}
+
+        @staticmethod
+        def make_changeable_copy(_raw):
+            return {"stack": {"begin": None, "end": None, "stepSize": 1.0, "size": 0.0}}
+
+        @staticmethod
+        def change_setting(*args, **kwargs):
+            StackWithoutEnds.changed.append((args, kwargs))
+
+    records = []
+    validator = validate_hardware.Validator(
+        sink=records.append,
+        log=validate_hardware._configure_logging("ERROR", jsonl_to_stdout=False),
+    )
+
+    validate_hardware.phase_z_stack(StackWithoutEnds, validator, object(), "HiRes")
+
+    (skipped,) = [r for r in records if r.name == "z_stack: round-trip"]
+    assert skipped.status == "SKIP"
+    assert StackWithoutEnds.changed == []  # nothing on the job was changed
+    assert validator.exit_code() == 0

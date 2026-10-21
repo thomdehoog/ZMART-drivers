@@ -1575,6 +1575,9 @@ def phase_z_stack(drv: Any, v: Validator, client: Any, job_name: str) -> None:
         if not before:
             v.skip("z_stack: round-trip", "the job has no z-stack")
             return
+        if any(before.get(key) is None for key in ("begin", "end", "stepSize")):
+            v.skip("z_stack: round-trip", "the job's z-stack has no begin, end or step set")
+            return
         begin, end, step = (
             float(before["begin"]),
             float(before["end"]),
@@ -2013,14 +2016,15 @@ def main(argv: list[str] | None = None) -> int:
         if args.allow_objective:
             # A new objective makes LAS X recalculate a System Optimized stack's steps and keep
             # them when the first objective is back; sending the stack's own begin and end
-            # again puts it right (STELLARIS, 2026-10-15).
+            # again puts it right (STELLARIS, 2026-10-15). A stack without a begin and an
+            # end has nothing to put back.
             kept = (
                 (_settings(drv, client, job_name).get("stack") or None)
                 if args.allow_stack
                 else None
             )
             phase_objective(drv, v, client, job_name)
-            if kept:
+            if kept and kept.get("begin") is not None and kept.get("end") is not None:
                 v.command(
                     "objective: define the stack again",
                     lambda: drv.change_setting(client, "z_stack_definition", job_name, begin_um=float(kept["begin"]), end_um=float(kept["end"])),
