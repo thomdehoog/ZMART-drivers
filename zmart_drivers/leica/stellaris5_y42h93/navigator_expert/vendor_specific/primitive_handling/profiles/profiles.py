@@ -73,6 +73,23 @@ class StateReaderProfile:
     position seen 3.3-4.2 ms after a move against 22-58 ms.
     """
 
+    # --- Which source answers when the first one cannot ---------------------
+    # Each reading asks the source named by its ``*_mode`` first. When that
+    # source cannot answer, one of these families takes its place, and the
+    # reading names the source it came from. Each is "api", "log" or "hybrid"
+    # (the API and the log asked together).
+    #
+    # An ordinary reading falls back to both, so that either can answer.
+    reading_fallback: str = "hybrid"
+    # A reading a command waits on (is the scanner idle, did the stage arrive)
+    # falls back to the API alone. The log writes a value only when it changes,
+    # so it can still show the state from before the command.
+    waiting_fallback: str = "api"
+    # Confirming a job change: when the direct reader cannot answer, this
+    # takes its place. Hybrid races the API against the log (see
+    # ``selected_job_confirm_source`` below).
+    selected_job_confirm_fallback: str = "hybrid"
+
     xy_mode: str = "direct"
     xy_log_max_age_s: float = 1.0
 
@@ -115,6 +132,13 @@ class StateReaderProfile:
 
     scan_status_mode: str = "direct"
     scan_status_log_max_age_s: float = 0.5
+
+    def __post_init__(self):
+        for name in ("reading_fallback", "waiting_fallback", "selected_job_confirm_fallback"):
+            if getattr(self, name) not in ("api", "log", "hybrid"):
+                raise ValueError(
+                    f"{name} must be 'api', 'log' or 'hybrid', not {getattr(self, name)!r}"
+                )
 
 
 LOG_READER = LogReaderProfile()

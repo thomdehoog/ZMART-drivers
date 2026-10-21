@@ -190,7 +190,7 @@ def wait_for(
     mode=None,
     deadline=None,
     api_kwargs=None,
-    fallback="hybrid",
+    fallback=None,
 ):
     """Wait for a reading by the one rule; return the winning Reading, or a failure.
 
@@ -214,7 +214,8 @@ def wait_for(
             the rule: ``WINDOWS`` windows of ``WINDOW_S``, requesting an
             unanswered read again at each new window.
         api_kwargs: Extra keyword arguments handed to the sources.
-        fallback: The family that answers when the source tried first cannot.
+        fallback: The family that answers when the source tried first cannot;
+            None lets the microscope's policy choose.
 
     Returns:
         The winning :class:`Reading`; else the latest error-carrying reading

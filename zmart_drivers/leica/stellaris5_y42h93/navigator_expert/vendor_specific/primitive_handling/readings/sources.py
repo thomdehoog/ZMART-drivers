@@ -172,6 +172,7 @@ def first_stage(spec, mode, fallback):
     when the hardware server cannot be reached, or the datum has no direct leg,
     the *fallback* family answers instead, within the same window.
     """
+    fallback = profile().reading_fallback if fallback is None else fallback
     if mode != "direct":
         return None, mode
     if spec.direct_fn is None:

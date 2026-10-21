@@ -1001,7 +1001,7 @@ def confirm_move_xy(
             _readers.get_xy(
                 client,
                 mode=_readers.on_demand_mode("xy"),
-                fallback="api",
+                fallback=_readers.on_demand_fallback(),
                 diagnostics=True,
                 deadline=deadline,
             ),
@@ -1097,7 +1097,7 @@ def confirm_acquire(
             _readers.get_scan_status(
                 client,
                 mode=_readers.on_demand_mode("scan_status"),
-                fallback="api",
+                fallback=_readers.on_demand_fallback(),
                 diagnostics=True,
                 deadline=time.monotonic() + poll_interval,
             ),

@@ -48,7 +48,7 @@ def check_idle(client):
     reading = _readers.get_scan_status(
         client,
         mode=_readers.on_demand_mode("scan_status"),
-        fallback="api",
+        fallback=_readers.on_demand_fallback(),
         diagnostics=True,
         accept=lambda s: "Idle" in s,
     )

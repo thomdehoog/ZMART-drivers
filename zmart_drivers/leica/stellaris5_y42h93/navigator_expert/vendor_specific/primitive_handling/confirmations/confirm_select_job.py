@@ -260,7 +260,7 @@ def select_job_confirm_legs(
             f"unknown selected-job confirmation source {source!r}; expected direct, api, log, or hybrid"
         )
     window_s = tuning.WINDOW_S if timeout is None else timeout
-    fallback = "hybrid" if source == "direct" else source
+    fallback = profile.selected_job_confirm_fallback if source == "direct" else source
     api_confirm = None
     log_leg = None
     budget_s = window_s if fallback == "hybrid" else None
@@ -392,7 +392,7 @@ def prepare_select_job(client, job_name):
     profile = _state_reader_profile()
     source = profile.selected_job_confirm_source
     if source == "direct":
-        source = "hybrid"  # the direct reader was asked just below; hybrid is its fallback
+        source = profile.selected_job_confirm_fallback  # the direct reader was asked just below
     context = {
         "api_baseline_name": None,
         "api_baseline_reason": "not_attempted",
