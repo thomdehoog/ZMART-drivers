@@ -17,10 +17,10 @@ Author: Thom de Hoog, Center for Microscopy and Image Analysis (ZMB),
 import logging
 import time
 
-from ..primitives.api.delivery import deliver
-from ..primitives.interface import lasx_dialogs
-from ..primitives.log import log_reader as _log_reader
-from .. import tuning
+from ...primitives.api.delivery import deliver
+from ...primitives.interface import lasx_dialogs
+from ...primitives.log import log_reader as _log_reader
+from ... import tuning
 
 log = logging.getLogger(__name__)
 

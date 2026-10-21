@@ -31,7 +31,7 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.prod
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.acquisition import acquire as capture
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.save_data import ome_canonical
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.save_data import save as acquisition
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling import state as readers_router
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings import state as readers_router
 
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.clear_cache import release
 

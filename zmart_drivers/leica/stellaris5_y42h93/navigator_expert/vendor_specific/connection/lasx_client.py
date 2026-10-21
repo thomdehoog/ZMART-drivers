@@ -13,14 +13,14 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from ..primitive_handling import state as _readers
+from ..primitive_handling.readings import state as _readers
 
 _log = logging.getLogger(__name__)
 
 
 def _profile_api_delay_ms() -> int | None:
     """Return the configured Leica API delay from the active profile."""
-    from ..primitive_handling import profiles
+    from ..primitive_handling.profiles import profiles
 
     return profiles.LASX_API.delay_ms
 

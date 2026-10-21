@@ -17,8 +17,8 @@ import math
 from collections.abc import Mapping, Sequence
 from typing import Any
 
-from ...vendor_specific.primitive_handling import state as _readers
-from ...vendor_specific.primitive_handling.limit_rules import STAGE_BACKSTOP_UM
+from ...vendor_specific.primitive_handling.readings import state as _readers
+from ...vendor_specific.primitive_handling.settings.limit_rules import STAGE_BACKSTOP_UM
 
 CORNERS = (1, 2, 3, 4)
 

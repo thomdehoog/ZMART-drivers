@@ -47,16 +47,16 @@ import time
 from dataclasses import replace
 from functools import partial
 
-from ...dispatcher import dispatcher as _dispatcher
-from ...dispatcher import gate as _gate
-from ...dispatcher.dispatcher import make_log_entry as _make_log_entry, make_timing as _make_timing
-from ..parsing import _hw_get
+from ....dispatcher import dispatcher as _dispatcher
+from ....dispatcher import gate as _gate
+from ....dispatcher.dispatcher import make_log_entry as _make_log_entry, make_timing as _make_timing
+from ...parsing import _hw_get
 from . import settings
-from .confirm_select_job import prepare_select_job, select_job_confirm_legs
-from .confirmations import confirm_acquire, confirm_move_xy, confirm_move_z, confirm_objective, race_confirmations
+from ..confirmations.confirm_select_job import prepare_select_job, select_job_confirm_legs
+from ..confirmations.confirmations import confirm_acquire, confirm_move_xy, confirm_move_z, confirm_objective, race_confirmations
 from .limit_rules import NOTEBOOK_POINTER, check_xy, check_z
 from .objectives import objective_by_slot
-from .profiles import ACQUIRE, MOVE_XY, MOVE_Z, OBJECTIVE, SELECT_JOB
+from ..profiles.profiles import ACQUIRE, MOVE_XY, MOVE_Z, OBJECTIVE, SELECT_JOB
 
 log = logging.getLogger(__name__)
 
@@ -225,7 +225,7 @@ def dispatch_change(
 
 
 def _change_setting(setting, client, arguments, *, max_retries=None, tolerance=None):
-    """Change one LAS X setting, following its entry in ``primitive_handling/settings.py``.
+    """Change one LAS X setting, following its entry in ``primitive_handling/settings/settings.py``.
 
     The steps are the same for every setting: tidy the arguments, show the new
     value to the limits gate (nothing is sent if the gate refuses), check that

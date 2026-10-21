@@ -63,7 +63,7 @@ import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
 from datetime import datetime
 
-from ...primitive_handling import derived
+from ...primitive_handling.readings import derived
 
 log = logging.getLogger(__name__)
 
@@ -75,7 +75,7 @@ log = logging.getLogger(__name__)
 
 def _profile():
     """Return the active low-level log-reader profile."""
-    from ...primitive_handling import profiles
+    from ...primitive_handling.profiles import profiles
 
     return profiles.LOG_READER
 

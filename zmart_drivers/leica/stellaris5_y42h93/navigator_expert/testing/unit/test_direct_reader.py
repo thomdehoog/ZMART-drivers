@@ -17,8 +17,8 @@ from limits_fixtures import install_permissive_limits
 from mock_lasx_api import MockLasxClient
 from state_tree_stand_in import StandInNodes, answer_json_read
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling import readings as capabilities
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.objectives import objective_by_slot
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings import readings as capabilities
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.settings.objectives import objective_by_slot
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitives.api import api_reader
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitives.direct import direct_reader, state_tree
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.connection import hardware_server

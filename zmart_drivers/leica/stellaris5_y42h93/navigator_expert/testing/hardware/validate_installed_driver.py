@@ -89,7 +89,7 @@ def _go_offline(args: argparse.Namespace) -> None:
     from limits_fixtures import hermetic_mock_machine_root
     from mock_lasx_api import MockLasxClient
 
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling import profiles
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.profiles import profiles
 
     hermetic_mock_machine_root()
     _adapter().connect_python_client = lambda **_kw: MockLasxClient(

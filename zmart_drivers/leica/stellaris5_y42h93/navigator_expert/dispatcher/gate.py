@@ -4,7 +4,7 @@ Maintainer decision (MAINTAINER_DECISIONS.md §7): limits are enforced as low
 as possible — at the command wrapper that populates the native function's
 model — so nothing built on top (adapter, controller, workflows, notebooks)
 can interfere with or bypass them. The rules themselves (what is allowed:
-``LeicaLimits`` and the stage checks) live in ``vendor_specific/primitive_handling/limit_rules.py``; this
+``LeicaLimits`` and the stage checks) live in ``vendor_specific/primitive_handling/settings/limit_rules.py``; this
 module owns the *moment* of enforcement — per-connection state and refusal. It
 knows no microscope: the installed limits object answers ``check_command``.
 The wrappers in ``actions/`` call :func:`check_refusal` before anything fires.
@@ -41,7 +41,7 @@ go fail-closed, and every gated command then refuses with the recorded reason
 shook hands at all still refuses fail-closed.
 
 Single-writer invariant: like command dispatch (``confirm_loop.py``) and the
-stage-envelope module global (``vendor_specific/primitive_handling/limit_rules.py``), this registry assumes
+stage-envelope module global (``vendor_specific/primitive_handling/settings/limit_rules.py``), this registry assumes
 ONE instrument per process. The registry is keyed by ``id(client)`` and holds
 a strong reference to the client (microscope clients are process-lifetime), so an id
 can never be recycled onto a different client. A second ``connect_handshake``

@@ -138,7 +138,7 @@ def fast_timing_windows(monkeypatch):
     patches it itself (``test_waiting_rule``).
     """
     from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific import tuning
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling import transport
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.profiles import transport
 
     monkeypatch.setattr(tuning, "WINDOW_S", 0.25)
     monkeypatch.setattr(tuning, "POLL_S", 0.005)

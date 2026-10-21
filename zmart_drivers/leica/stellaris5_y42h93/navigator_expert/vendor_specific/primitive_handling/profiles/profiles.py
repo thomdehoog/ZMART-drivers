@@ -30,11 +30,11 @@ from dataclasses import dataclass
 
 from . import transport as _transport
 from .prechecks import check_idle
-from .limit_rules import NOTEBOOK_POINTER
-from .. import tuning
-from ..tuning import WINDOW_S, WINDOWS
-from ..error_classification import _default_error_check
-from .confirmations import _confirm_detector_gain, _confirm_filter_wheel_slot, _confirm_filter_wheel_spectrum, _confirm_frame_accumulation, _confirm_frame_average, _confirm_image_format, _confirm_laser_intensity, _confirm_laser_shutter, _confirm_line_accumulation, _confirm_line_average, _confirm_pinhole_airy, _confirm_scan_field_rotation, _confirm_scan_mode, _confirm_scan_resonant, _confirm_scan_speed, _confirm_sequential_mode, _confirm_z_stack_definition, _confirm_z_stack_size, _confirm_z_stack_step_size, _confirm_zoom, confirm_acquire, confirm_move_xy, confirm_move_z, confirm_objective
+from ..settings.limit_rules import NOTEBOOK_POINTER
+from ... import tuning
+from ...tuning import WINDOW_S, WINDOWS
+from ...error_classification import _default_error_check
+from ..confirmations.confirmations import _confirm_detector_gain, _confirm_filter_wheel_slot, _confirm_filter_wheel_spectrum, _confirm_frame_accumulation, _confirm_frame_average, _confirm_image_format, _confirm_laser_intensity, _confirm_laser_shutter, _confirm_line_accumulation, _confirm_line_average, _confirm_pinhole_airy, _confirm_scan_field_rotation, _confirm_scan_mode, _confirm_scan_resonant, _confirm_scan_speed, _confirm_sequential_mode, _confirm_z_stack_definition, _confirm_z_stack_size, _confirm_z_stack_step_size, _confirm_zoom, confirm_acquire, confirm_move_xy, confirm_move_z, confirm_objective
 
 
 @dataclass(frozen=True)
