@@ -40,7 +40,7 @@ class TransportChain:
 
     def __init__(self, routes):
         self._routes = routes
-        self.carried_by = None  # the name of the route that carried the last command
+        self.carried_by = None  # the name of the route that carried the last command; None if none did
 
     def fill(self, request, setup_fn):
         """Write the command's values into the request, as the preferred route does.
@@ -61,6 +61,7 @@ class TransportChain:
         Returns ``(arrived, answered)`` like a single transport. Raises
         :class:`TransportUnavailable` when no route could send.
         """
+        self.carried_by = None
         skipped = []
         for name, transport in self._routes():
             try:

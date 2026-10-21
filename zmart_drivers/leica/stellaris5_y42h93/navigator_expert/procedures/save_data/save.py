@@ -107,15 +107,19 @@ def save(
     exported = replace(
         exported, metadata=on_the_canvas(exported.metadata, exported, placement)
     )
-    saved = _persist_store(
-        exported,
-        Path(output_root),
-        naming,
-        lineage=lineage,
-        state=state,
-        orientation=orientation,
-        placement=placement,
-    )
+    try:
+        saved = _persist_store(
+            exported,
+            Path(output_root),
+            naming,
+            lineage=lineage,
+            state=state,
+            orientation=orientation,
+            placement=placement,
+        )
+    except FileNotFoundError as why:
+        say_when_the_path_is_too_long(why)
+        raise
     if projection != "none" and exported.metadata.size_z > 1:
         saved = replace(
             saved,
@@ -129,6 +133,31 @@ def save(
             ),
         )
     return replace(saved, release_target=exported.release_target)
+
+
+#: The longest file path Windows allows unless "long paths" are switched on, less a margin
+#: for the characters its own checks add. It is Windows' 260, counting the drive and the end.
+WINDOWS_PATH_LIMIT = 259
+
+
+def say_when_the_path_is_too_long(error: FileNotFoundError, on_windows: bool = os.name == "nt") -> None:
+    """Raise a plain explanation when *error* is Windows refusing a path that is too long.
+
+    Windows answers a path longer than 259 characters with "file not found", which does
+    not say what is wrong. While a capture is written, the store keeps temporary files
+    whose paths are longer than the finished ones, so a folder that works for short
+    labels can fail for longer ones. Does nothing when the path is not long.
+    """
+    path = str(error.filename or "")
+    if not on_windows or len(path) < WINDOWS_PATH_LIMIT - 10:
+        return
+    raise RuntimeError(
+        f"the capture could not be saved because a file path is {len(path)} characters long, "
+        f"and Windows on this computer allows at most {WINDOWS_PATH_LIMIT} (long paths are "
+        "switched off). Either save into a shorter folder, use a shorter acquisition type "
+        "and position label, or switch long paths on in Windows (the LongPathsEnabled setting). "
+        f"The path was: {path}"
+    ) from error
 
 
 def _persist_projection(
