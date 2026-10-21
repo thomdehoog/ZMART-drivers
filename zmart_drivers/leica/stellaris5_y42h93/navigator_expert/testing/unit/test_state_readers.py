@@ -206,8 +206,13 @@ class TestStateReaders(unittest.TestCase):
             self.assertTrue(api_started.wait(timeout=1.0))
 
             second = readers.get_xy(client, diagnostics=True)
-            release_api.set()
+            # The API call stays hung until the first reading has moved on to
+            # the log. Releasing it earlier lets it answer on the last tick of
+            # the first reading's slice, which is a fair answer but not what
+            # this test is about (seen on Windows, whose clock ticks every
+            # 15 ms, 2026-10-21).
             first.join(timeout=2.0)
+            release_api.set()
 
         self.assertEqual(len(api_calls), 1)
         self.assertEqual(second.source, "log")
