@@ -107,9 +107,10 @@ A driver is built from the parts below. Read the picture from top to bottom:
 each part uses the parts below it, and never the parts above.
 
 ```
-  experiments and workflows, through the ZMART Controller
+  experiments and workflows, through the ZMART Controller   ·   a notebook or a script
   ───────────────────────────────────────────────────────────────
-  for_zmart_controller/   the ZmartDriver class: one method per command, kept thin
+  for_zmart_controller/   the ZmartDriver class: the controller's commands, each a call below
+  for_direct_use/         the driver used by itself: connect() and the Microscope
   procedures/             the recipes: take a picture, save it, clear the cache,
                           the coordinate system, an objective change, autofocus
   driver_setup/           what the operator sets up once and saves: limits, origin,
@@ -136,12 +137,15 @@ The folder layout inside a driver, as the Leica driver has it:
 
 ```
 navigator_expert/
-    __init__.py                makes the folder a package, so the parts can import each other
+    __init__.py                offers connect() and the Microscope, and nothing else
+
+    for_direct_use/            the driver used by itself, documented in the driver's README
+        microscope.py          connect() and the Microscope: everything the driver can do
+        running_log.py         the driver's rolling log file, for debugging
 
     for_zmart_controller/      everything that faces the controller; the folder you register
         zmart_driver.json      the driver's name and the class file beside it
-        zmart_driver.py        the ZmartDriver class the controller calls; kept thin
-        running_log.py         the driver's rolling log file, for debugging
+        zmart_driver.py        the ZmartDriver class: each command a call of the Microscope
 
     procedures/                the recipes, one folder each
         acquisition/           take a picture and keep a note of it (acquire, run_job, pending_capture)
@@ -213,8 +217,9 @@ three separate steps. "The simplified anatomy" explains why.
 micrometers" as the workflow says it:
 
 1. The workflow calls `set_xyz` on the controller, which calls the
-   `ZmartDriver` method of the same name.
-2. The method hands the position to the coordinate system procedure
+   `ZmartDriver` method of the same name. That method calls the
+   `Microscope`'s `move_to`, as a notebook using the driver by itself would.
+2. `move_to` hands the position to the coordinate system procedure
    (`procedures/absolute_coordinate_system/frame.py`), which converts it from
    user coordinates to raw stage coordinates, using the recorded origin and
    the objective offsets.
@@ -807,8 +812,14 @@ short:
   repair code are gone, and so is the old `cleanup_cache` setting. The
   calibration and orientation steps read their frames back from the saved
   store, by the plane number the capture gave each plane.
-- **`ZmartDriver` opens the connection itself**, and the old adapter is gone.
-  The driver keeps a running log (`for_zmart_controller/running_log.py`).
+- **The driver can be used by itself.** `connect()` hands back a `Microscope`
+  (`for_direct_use/microscope.py`) with everything the driver can do, under
+  plain names, and the driver's README documents it. `ZmartDriver` only gives
+  each controller command its name and answer, by calling the `Microscope`,
+  and the guard test lets it import nothing else. The package offers
+  `connect()` and the `Microscope` only; the low-level reads and commands on a
+  raw LAS X client are no longer its surface. The old adapter is gone, and the
+  driver keeps a running log of every part (`for_direct_use/running_log.py`).
 
 **Where the Leica tree still differs from the plan.** Each item is listed on
 purpose, so that it cannot be forgotten.
@@ -1390,7 +1401,9 @@ to fill in. A new driver starts by copying it.
 
 **Connecting.** Making the class is the connection: `__init__(connection)`
 opens the vendor software with what is in the `connection` dictionary and
-loads this microscope's configuration (part 6). `disconnect` closes the
+loads this microscope's configuration (part 6). In the Leica driver the class
+makes the driver's own `Microscope`, which does this, and every method is a
+call of it: the driver works the same with or without the controller. `disconnect` closes the
 vendor software again. Everything the class needs between calls, such as
 the vendor connection, the session and the command log, lives on
 `self`.
