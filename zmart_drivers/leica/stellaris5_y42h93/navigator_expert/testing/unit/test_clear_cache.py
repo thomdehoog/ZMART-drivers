@@ -1,14 +1,15 @@
-"""Letting go of a picture in LAS X's cache: only the picture read, and only by its name."""
+"""Clearing LAS X's cache: only pictures that were saved, and only by their name."""
 
 from __future__ import annotations
 
 import pytest
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.output import lasx_cache_release as release
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures import clear_cache
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.clear_cache import release
 
 
 class TestPreparing:
-    """Before a capture that will be released, the canvas is shown, so that the release can clear it."""
+    """Before pictures are released, the canvas is shown, so that the release can clear it."""
 
     def test_the_canvas_is_shown(self, monkeypatch):
         shown = []
@@ -65,6 +66,44 @@ class TestDeleting:
             release.delete(746, "HiRes002")
         assert not element.deleted
         assert canvas == []
+
+
+class TestClearing:
+    """The procedure lets go of what was saved, one by one, and leaves behind what it could not."""
+
+    @pytest.fixture(autouse=True)
+    def canvas(self, monkeypatch):
+        monkeypatch.setattr(release, "prepare", lambda: None)
+        monkeypatch.setattr(release.lasx_navigator, "clear_canvas", lambda: True)
+
+    def test_every_saved_picture_is_let_go_of_and_the_list_empties(self, monkeypatch):
+        elements = {1: FakeElement("HiRes001"), 2: FakeElement("HiRes002")}
+        monkeypatch.setattr(release, "connected_data_container", lambda: FakeFactory(elements))
+        pending = [(1, "HiRes001"), (2, "HiRes002")]
+
+        answer = clear_cache.clear(pending)
+
+        assert answer == {"cleared": ["HiRes001", "HiRes002"], "failed": {}}
+        assert pending == []
+        assert all(e.deleted for e in elements.values())
+
+    def test_a_picture_that_cannot_be_let_go_of_stays_listed_and_the_rest_are_cleared(self, monkeypatch):
+        elements = {1: FakeElement("Renamed"), 2: FakeElement("HiRes002")}
+        monkeypatch.setattr(release, "connected_data_container", lambda: FakeFactory(elements))
+        pending = [(1, "HiRes001"), (2, "HiRes002")]
+
+        answer = clear_cache.clear(pending)
+
+        assert answer["cleared"] == ["HiRes002"]
+        assert list(answer["failed"]) == ["HiRes001"]
+        assert pending == [(1, "HiRes001")]
+        assert not elements[1].deleted
+
+    def test_nothing_saved_means_nothing_touched(self, monkeypatch):
+        shown = []
+        monkeypatch.setattr(release, "prepare", lambda: shown.append(1))
+        assert clear_cache.clear([]) == {"cleared": [], "failed": {}}
+        assert shown == []
 
 
 class FakeElement:

@@ -7,7 +7,6 @@ output manifest (state is embedded per-plane; there is no sidecar XML).
 
 from __future__ import annotations
 
-from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -226,9 +225,11 @@ class ExportedAcquisition:
     relative_path: str | None = None
     source_exporter: str = "lasx_data_container"
     vendor_metadata_sources: tuple[VendorMetadataSource, ...] = ()
-    #: How LAS X lets go of the capture once it is saved (``cleanup_cache``);
-    #: None when there is no way to, and then letting go is refused.
-    release: Callable[[], None] | None = None
+    #: Which picture in LAS X's cache this capture was read from: its element
+    #: number and its name. The ``clear_cache`` procedure later uses the pair
+    #: to have LAS X let go of that picture; None when the source is not a
+    #: picture LAS X can let go of.
+    cache_element: tuple[int, str] | None = None
 
     @property
     def image_files(self) -> list[Path]:
@@ -265,3 +266,7 @@ class SavedAcquisition:
     state_paths: tuple[Path, ...] = ()
     #: The projections made from the capture, in ``<acquisition>/projections``.
     projection_paths: tuple[Path, ...] = ()
+    #: The picture in LAS X's cache this capture was read from (its element
+    #: number and name), carried here so a later ``clear_cache`` can let go of
+    #: it. Saving itself never touches the cache.
+    cache_element: tuple[int, str] | None = None

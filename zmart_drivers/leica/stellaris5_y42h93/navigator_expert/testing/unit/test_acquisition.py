@@ -53,7 +53,7 @@ def saves_as_ome_tiff(monkeypatch):
 
     from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.actions import profiles
 
-    monkeypatch.setattr(profiles, "IMAGE_SAVE", replaced(profiles.IMAGE_SAVE, format="ome-tiff", cleanup_cache=False))
+    monkeypatch.setattr(profiles, "IMAGE_SAVE", replaced(profiles.IMAGE_SAVE, format="ome-tiff"))
 
 
 @pytest.fixture
@@ -501,88 +501,23 @@ class TestSave:
         summary = json.loads((output_root / "summary.json").read_text())
         assert summary["acquisitions"][0]["lineage"] == lineage
 
-    @pytest.mark.parametrize("image_format", ["ome-zarr", "ome-tiff"])
-    def test_a_capture_with_no_way_to_be_let_go_of_is_refused_and_left_alone(
+    def test_saving_leaves_the_cache_alone_and_names_the_picture_it_read(
         self,
         patched_export,
         tmp_path,
         successful_acq,
         naming,
-        image_format,
     ):
-        """Only LAS X lets go of a capture; nothing is ever deleted by the driver itself.
+        """Clearing LAS X's cache is the ``clear_cache`` procedure's job, never the save's.
 
-        A source that gives no way for LAS X to let go of it (``release``) is
-        refused when releasing is asked for, before anything is saved, and its
-        files stay as they are.
+        The saved capture only says which picture it was read from, so that
+        the procedure can let go of exactly that one later.
         """
-        with pytest.raises(RuntimeError, match="cleanup_cache"):
-            drv.save(
-                None,
-                successful_acq,
-                tmp_path / "run_000001",
-                naming,
-                format=image_format,
-                cleanup_cache=True,
-                placement=lambda _planes: lambda z: {"x_um": 0.0, "y_um": 0.0, "z_um": float(z)},
-            )
-        assert all(p.is_file() for p in patched_export["image_paths"])
-        assert patched_export["xml_path"].is_file()
-        assert not (tmp_path / "run_000001").exists()
-
-    def test_cleanup_lets_go_of_a_source_that_says_how(
-        self,
-        patched_export,
-        tmp_path,
-        successful_acq,
-        naming,
-    ):
-        """A source LAS X holds (its cache) is let go of through LAS X, its files left alone."""
-        release = Mock()
-        patched_export["collect"].return_value = replace(patched_export["exported"], release=release)
-        drv.save(
-            None,
-            successful_acq,
-            tmp_path / "run_000001",
-            naming,
-            cleanup_cache=True,
+        patched_export["collect"].return_value = replace(
+            patched_export["exported"], cache_element=(746, "HiRes002")
         )
-        release.assert_called_once_with()
-        assert all(p.is_file() for p in patched_export["image_paths"])
-
-    @pytest.mark.parametrize("image_format", ["ome-zarr", "ome-tiff"])
-    def test_a_capture_whose_copy_does_not_read_back_is_never_let_go_of(
-        self,
-        patched_export,
-        tmp_path,
-        successful_acq,
-        naming,
-        monkeypatch,
-        image_format,
-    ):
-        """LAS X lets go of a capture only once our copy is on disk and reads back the same.
-
-        If the pixels read back differ, the save stops with an error, and the
-        capture stays in LAS X's cache (and its canvas is not cleared).
-        """
-        import numpy
-
-        # Every read-back comparison says the pixels differ.
-        monkeypatch.setattr(numpy, "array_equal", lambda *_args, **_kwargs: False)
-        release = Mock()
-        patched_export["collect"].return_value = replace(patched_export["exported"], release=release)
-        with pytest.raises(RuntimeError, match="read back"):
-            drv.save(
-                None,
-                successful_acq,
-                tmp_path / "run_000001",
-                naming,
-                format=image_format,
-                cleanup_cache=True,
-                # Where each plane lies on the canvas, which a store needs.
-                placement=lambda _planes: lambda z: {"x_um": 0.0, "y_um": 0.0, "z_um": float(z)},
-            )
-        release.assert_not_called()
+        saved = drv.save(None, successful_acq, tmp_path / "run_000001", naming)
+        assert saved.cache_element == (746, "HiRes002")
         assert all(p.is_file() for p in patched_export["image_paths"])
 
     def test_save_embeds_state_in_plane_ome_xml_when_provided(

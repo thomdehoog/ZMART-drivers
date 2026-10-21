@@ -159,7 +159,7 @@ class ZmartDriver:
     # --- procedures ---------------------------------------------------------------------
 
     def get_procedures(self):
-        """``True, procedures``: backlash takeup, parking the z-galvo, autofocus."""
+        """``True, procedures``: backlash takeup, parking the z-galvo, clearing LAS X's cache, autofocus."""
         return True, _adapter.get_procedures(self._handle)
 
     def run_procedure(self, procedure):

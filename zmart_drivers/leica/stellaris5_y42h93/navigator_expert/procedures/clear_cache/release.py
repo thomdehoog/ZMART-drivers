@@ -22,8 +22,9 @@ What it takes:
 - the picture's name, checked before deleting, so that nothing else is ever
   deleted.
 
-The save calls it last (``cleanup_cache``), only once its copy is written and
-read back identical. Seen on the LAS X simulator: the picture's pixels leave
+The ``clear_cache`` procedure calls it, never the save: a picture is let go
+of only when the operator asks, and only for captures whose copy was
+written and read back identical. Seen on the LAS X simulator: the picture's pixels leave
 the cache, the project file is rewritten without it, and LAS X captures on.
 About 0.2 MB of descriptions per picture stays while LAS X's window holds it.
 
@@ -32,28 +33,28 @@ a zoom pyramid and a histogram: about twice a 512 x 512 capture's pixels),
 which the Navigator canvas holds while it shows the capture's tile. So the
 release also clears the canvas (``vendor_interface.lasx_navigator``), which
 lets go of the hidden copies too (simulator, 2026-10-14). The canvas can be
-cleared only while LAS X shows it, so :func:`prepare` shows it before the
-capture, while LAS X is idle. A canvas that cannot be shown or cleared is
-logged; the capture is taken and released all the same.
+cleared only while LAS X shows it, so :func:`prepare` shows it just before the
+release, while LAS X is idle. A canvas that cannot be shown or cleared is
+logged; the picture is released all the same.
 """
 
 from __future__ import annotations
 
 import logging
 
-from ..vendor_interface import lasx_navigator
-from ..vendor_interface.data_container import connected_data_container
+from ...vendor_interface import lasx_navigator
+from ...vendor_interface.data_container import connected_data_container
 
 log = logging.getLogger(__name__)
 
 
 def prepare() -> None:
-    """Show the Navigator canvas before a capture that will be released, so that its Clear can be pressed after."""
+    """Show the Navigator canvas before pictures are released, so that its Clear can be pressed after."""
     try:
         if lasx_navigator.show_canvas():
             log.info("Navigator Expert's Experiment tab shown, so the canvas can be cleared after the capture")
     except lasx_navigator.NavigatorUnavailable as why:
-        log.warning("the Navigator canvas could not be shown, so this capture's hidden copy may stay in LAS X's cache: %s", why)
+        log.warning("the Navigator canvas could not be shown, so the pictures' hidden copies may stay in LAS X's cache: %s", why)
 
 
 def delete(number: int, name: str) -> None:

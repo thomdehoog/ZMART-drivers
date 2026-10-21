@@ -47,9 +47,11 @@ Scope of v1 (grow as needed):
       is LAS X's unit of configuration, so reapplying the selection
       restores the whole setup).
     - ``get_procedures`` offers backlash takeup, zero-z-galvo (park the
-      galvo at 0 with the focus kept), and autofocus (with job
-      discovery); ``run_procedure`` runs them.
-    - ``acquire`` runs the selected job and saves in one step; every file
+      galvo at 0 with the focus kept), autofocus (with job
+      discovery) and clear_cache (have LAS X let go of the pictures of the
+      captures saved so far); ``run_procedure`` runs them.
+    - ``acquire`` runs the selected job and saves in one step, and leaves
+      LAS X's cache alone (clearing it is the ``clear_cache`` procedure); every file
       name starts with ``position_label``, which travels verbatim in the
       save lineage.
 
@@ -94,10 +96,10 @@ from ..configuration import store as _machine
 from ..dispatcher import gate as _gate
 from ..dispatcher import read as _readers
 from ..output import command_log as _log
-from ..output import lasx_cache_release as _release
 from ..output import save as _save
 from ..output.naming import Naming, free_stem, run_hash
 from ..procedures import backlash as _motion
+from ..procedures import clear_cache as _clear_cache
 from ..vendor_interface.parsing import parse_tile_geometry as _parse_tile_geometry
 from ..configuration import data_location as _data_location
 from . import info as _info
@@ -214,6 +216,10 @@ class ZmartHandle:
     data_location: Path | None = None
     closed: bool = False
     unconfirmed: list[dict[str, Any]] = field(default_factory=list)
+    #: The pictures in LAS X's cache whose captures this session has saved and
+    #: whose cache copy is still there, as ``(element number, name)`` pairs.
+    #: Saving adds to it; the ``clear_cache`` procedure empties it.
+    in_cache: list[tuple[int, str]] = field(default_factory=list)
 
 
 def _note_unconfirmed(handle: ZmartHandle, what: str, result: Any) -> None:
@@ -1033,8 +1039,6 @@ def acquire(
         settled = steps["backlash"] = _motion.correct_backlash(handle.client, passes=backlash_rounds)
         if not settled.get("confirmed"):
             _note_unconfirmed(handle, "acquire: backlash takeup", settled)
-    if IMAGE_SAVE.cleanup_cache:
-        _release.prepare()
 
     acq = _capture.acquire(handle.client, job)
 
@@ -1058,13 +1062,16 @@ def acquire(
         # at connect (from the set_orientation setup notebook's file); a separate
         # concern from pixel-scale calibration and limits.
         orientation=_loaded_orientation(handle),
-        cleanup_cache=IMAGE_SAVE.cleanup_cache,
         format=IMAGE_SAVE.format,
         projection=IMAGE_SAVE.projection,
         # Where on the sample each plane was taken, the same answer the
         # acquisition gives below, so a store lies where its planes say.
         placement=lambda plane_z: _where_the_planes_are(handle, at, job, plane_z),
     )
+
+    cache_element = getattr(saved, "cache_element", None)
+    if cache_element is not None:
+        handle.in_cache.append(cache_element)
 
     written = sorted(saved.image_paths.items())
     depths = [int(getattr(index, "z", ordinal)) for ordinal, (index, _path) in enumerate(written)]
@@ -1323,6 +1330,11 @@ def get_procedures(handle: ZmartHandle) -> dict:
             "(its offset is transferred onto z-wide), freeing the galvo's "
             "full travel for a following z-stack"
         },
+        "clear_cache": {
+            "description": "have LAS X let go of the pictures of the captures saved so far "
+            "in this session, freeing the disk its cache fills; acquiring and saving never "
+            "do this, so run it when you choose, for example between plates"
+        },
         "autofocus": {
             "description": "run a LAS X autofocus job (capture only, nothing saved); "
             "restores the previously selected job and returns the focus readback",
@@ -1341,6 +1353,8 @@ def run_procedure(handle: ZmartHandle, procedure: dict) -> dict:
         return {"ran": dict(procedure)}
     if name == "zero_z_galvo":
         return {"ran": dict(procedure), **_zero_z_galvo(handle)}
+    if name == "clear_cache":
+        return {"ran": dict(procedure), **_clear_cache.clear(handle.in_cache)}
     if name == "autofocus":
         return _run_autofocus(handle, procedure)
     raise ValueError(f"unknown procedure {name!r}")

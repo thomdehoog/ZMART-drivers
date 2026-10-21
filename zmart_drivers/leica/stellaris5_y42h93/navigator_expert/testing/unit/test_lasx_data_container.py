@@ -24,9 +24,6 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.configuration.image_
     Orientation,
 )
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.output import (
-    lasx_cache_release as cache_release,
-)
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.output import (
     lasx_data_container as container,
 )
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.output import (
@@ -305,19 +302,15 @@ class TestWaitingUntilFinished:
             )
 
 
-class TestLettingGo:
-    """Once saved, the picture is let go of through LAS X's Data Container, never by deleting files."""
+class TestNamingThePicture:
+    """The capture names the picture it was read from, so clearing the cache can let go of exactly that one."""
 
-    def test_the_picture_read_is_the_one_let_go_of(self, cache, monkeypatch):
+    def test_the_picture_read_is_named_by_element_number_and_name(self, cache):
         two_channel_12_bit(cache)
-        asked = []
-        monkeypatch.setattr(cache_release, "delete", lambda number, name: asked.append((number, name)))
 
         exported = container.collect_lasx_data_container(None, acquisition_of("HiRes"), cache_root=cache)
-        exported.release()
 
-        assert exported.release is not None
-        assert asked == [(746, "HiRes002")]
+        assert exported.cache_element == (746, "HiRes002")
 
 
 

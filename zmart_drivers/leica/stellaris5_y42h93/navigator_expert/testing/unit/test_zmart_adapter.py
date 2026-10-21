@@ -867,7 +867,7 @@ class TestAcquire(unittest.TestCase):
             self.assertEqual(check_acquire_answer({"success": True, "content": record}), [])
 
     def test_saving_follows_this_microscopes_profile(self):
-        """The format, the projection and letting go of the cache are set up once.
+        """The format and the projection are set up once.
 
         They are this microscope's ``IMAGE_SAVE`` profile, the same for every
         capture, never a choice made per capture.
@@ -879,52 +879,25 @@ class TestAcquire(unittest.TestCase):
         self.assertNotIn("source", calls["save"])  # always LAS X's cache: nothing to choose
         self.assertEqual(calls["save"]["format"], adapter.IMAGE_SAVE.format)
         self.assertEqual(calls["save"]["projection"], adapter.IMAGE_SAVE.projection)
-        self.assertIs(calls["save"]["cleanup_cache"], adapter.IMAGE_SAVE.cleanup_cache)
         self.assertEqual(record["format"], adapter.IMAGE_SAVE.format)
 
-    def test_letting_go_of_the_cache_follows_the_profile(self):
-        """A capture read from LAS X's cache is let go of when the profile says so, never per capture."""
+    def test_acquiring_does_not_touch_the_cache_and_remembers_the_picture(self):
+        """Acquiring never clears LAS X's cache; it only notes which picture to clear later."""
         h = _handle()
         h.driven_to = {"x": 0.0, "y": 0.0, "z": 0.0, "z_wide_um": 0.0}
-        releasing = replace(adapter.IMAGE_SAVE, cleanup_cache=True)
-        with patch.object(adapter, "IMAGE_SAVE", releasing), self._capturing() as calls:
+        with self._capturing() as calls:
             adapter.acquire(h, position_label="A1")
-        self.assertIs(calls["save"]["cleanup_cache"], True)
+        self.assertNotIn("cleanup_cache", calls["save"])
+        self.assertFalse(hasattr(ImageSaveProfile(), "cleanup_cache"))
+        self.assertEqual(h.in_cache, [])  # the stubbed save names no picture
 
-    def test_a_capture_that_will_be_released_has_the_canvas_shown_first(self):
-        """The canvas is shown while LAS X is idle, before the capture, so the release can clear it after."""
+    def test_the_clear_cache_procedure_is_offered_and_clears_what_was_saved(self):
         h = _handle()
-        h.driven_to = {"x": 0.0, "y": 0.0, "z": 0.0, "z_wide_um": 0.0}
-        order = []
-        releasing = replace(adapter.IMAGE_SAVE, cleanup_cache=True)
-        with (
-            patch.object(adapter, "IMAGE_SAVE", releasing),
-            self._capturing(),
-            patch.object(adapter._release, "prepare", lambda: order.append("canvas shown")),
-            patch.object(adapter._capture, "acquire", lambda c, j, **k: order.append("captured") or _a_capture(j)),
-        ):
-            adapter.acquire(h, position_label="A1")
-        self.assertEqual(order, ["canvas shown", "captured"])
-
-    def test_a_capture_that_is_kept_leaves_the_screen_alone(self):
-        h = _handle()
-        h.driven_to = {"x": 0.0, "y": 0.0, "z": 0.0, "z_wide_um": 0.0}
-        prepared = []
-        keeping = replace(adapter.IMAGE_SAVE, cleanup_cache=False)
-        with (
-            patch.object(adapter, "IMAGE_SAVE", keeping),
-            self._capturing(),
-            patch.object(adapter._release, "prepare", lambda: prepared.append(1)),
-        ):
-            adapter.acquire(h, position_label="A1")
-        self.assertEqual(prepared, [])
-
-    def test_captures_come_from_the_cache_and_are_let_go_of_by_default(self):
-        """Every capture is read from LAS X's cache (AutoSave is not used, Thom, 2026-10-14),
-        and LAS X lets go of it once saved (on since the STELLARIS, 2026-10-15)."""
-        self.assertFalse(hasattr(ImageSaveProfile(), "source"))
-        self.assertIs(ImageSaveProfile().cleanup_cache, True)
-        self.assertIs(ImageSaveProfile(cleanup_cache=False).cleanup_cache, False)
+        h.in_cache.append((746, "HiRes002"))
+        self.assertIn("clear_cache", adapter.get_procedures(h))
+        with patch.object(adapter._clear_cache, "clear", lambda pending: {"cleared": ["HiRes002"], "failed": {}}):
+            answer = adapter.run_procedure(h, {"name": "clear_cache"})
+        self.assertEqual(answer["cleared"], ["HiRes002"])
 
     def test_the_capture_is_placed_where_the_answer_says_its_planes_are(self):
         """The store is placed where the answer says its planes are."""

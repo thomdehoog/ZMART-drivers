@@ -421,8 +421,8 @@ get_stage_limits() -> dict ; apply_stage_limits_from_config(stage_cfg) -> None
 select_job(client, job_name, *, compensate=None) -> dict                         # confirm defaults to hybrid
 acquire(client, job, *, poll_interval=None, poll_timeout=None, heartbeat_interval=None,
         start_timeout=None) -> AcquisitionResult                                  # RAISES on failure
-save(client, acq, output_root, naming, *, lineage=None, fix_ome=True,
-     cleanup_cache=False) -> SavedAcquisition                                    # image_paths / xml_paths / naming
+save(client, acq, output_root, naming, *, lineage=None, fix_ome=True) -> SavedAcquisition
+                                                                                 # image_paths / xml_paths / naming
 ```
 `save()` collects the capture from LAS X's cache as LAS X writes it (LAS X's AutoSave is not used)
 and writes it as one OME-Zarr store, or as single-plane OME-TIFFs with OME-XML embedded in each
@@ -455,17 +455,16 @@ there only in case the two accounts disagree.
 in place, preserving byte formatting; `output/ome_canonical.py` writes clean canonical ZMART OME;
 `save(..., fix_ome=True)` validates/repairs each written file.
 
-**LAS X's cache can be let go of once a capture is saved.** Every picture LAS X takes stays in its
-Data Container cache until LAS X restarts, so a long time course fills the disk twice. The cache
+**LAS X's cache is cleared by its own procedure, `clear_cache`.** Every picture LAS X takes stays in
+its Data Container cache until LAS X restarts, so a long time course fills the disk twice. The cache
 folder is the one the registry names under `Data Port` (`HKLM\SOFTWARE\Leica Microsystems\Data
 Container V2`): `D:\Temp2` on the STELLARIS Y42H93.
-With `cleanup_cache=True`, the profile's default since it passed on the STELLARIS (15 October
-2026), the save's last step asks LAS X itself to delete the picture it was read from: the delete of
-LAS X's own window, so the cache's files go and the project stays whole
-(`output/lasx_cache_release.py` says how). It runs only once the copy is written and read back
-identical, and the Navigator canvas is then cleared, which lets go of each capture's hidden copy.
-The driver never deletes a file itself: a capture LAS X gives no way to let go of is refused before
-anything is saved.
+Acquiring and saving never touch the cache. Run `run_procedure({"name": "clear_cache"})` when you
+choose, for example between plates: it asks LAS X itself to delete each picture of the captures this
+session has saved, the delete of LAS X's own window, so the cache's files go and the project stays
+whole (`procedures/clear_cache/release.py` says how). The Navigator canvas is then cleared, which
+lets go of each capture's hidden copy. The driver never deletes a file itself, and a picture that
+cannot be let go of stays on the list and is reported, so a later call can try again.
 
 **Acquiring never touches the scanning template.** Positions are never made in the Navigator Expert:
 they come from the ZMART interface. `acquire()` and the autofocus procedure capture at the current
@@ -539,9 +538,10 @@ zmart_drivers/leica/stellaris5_y42h93/navigator_expert/
 │                       objectives.py · objective_shift.py · galvo.py · acquire.py (the capture)
 ├── procedures/         backlash.py · measure_orientation.py · measure_limits.py ·
 │                       calibrate_objective_pair.py · check_calibration.py · adopt_calibration.py ·
-│                       calibration_common.py · algorithms/ (registration and focus scoring)
+│                       calibration_common.py · clear_cache/ (let go of LAS X's cache) ·
+│                       algorithms/ (registration and focus scoring)
 ├── output/             what comes out of one acquisition: lasx_data_container.py (collect) ·
-│                       lasx_cache_release.py · files.py · materialize.py · ome.py · ome_canonical.py ·
+│                       files.py · materialize.py · ome.py · ome_canonical.py ·
 │                       ome_zarr.py · naming.py · product.py · save.py
 ├── configuration/      what is measured once per microscope. limits/, image_stage_registration/
 │                       and optical_calibration/ each hold their defaults/ and their notebook;

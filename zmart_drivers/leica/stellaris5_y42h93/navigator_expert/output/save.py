@@ -64,7 +64,6 @@ def save(
     state: dict | None = None,
     orientation: Orientation | None = None,
     fix_ome: bool = True,
-    cleanup_cache: bool = False,
     export_completion_timeout_s: float = DEFAULT_EXPORT_COMPLETION_TIMEOUT_S,
     export_completion_poll_interval_s: float = (DEFAULT_EXPORT_COMPLETION_POLL_INTERVAL_S),
     cache_root: str | Path | None = None,
@@ -83,10 +82,9 @@ def save(
     as in the orientation measurement itself. *cache_root* names the Data
     Container cache folder when it is not the one the registry gives.
 
-    *cleanup_cache* asks LAS X to let go of the capture once everything is
-    written and read back the same. Only LAS X lets go of a capture, through
-    the collected product's ``release``; a product without one is refused
-    before anything is written, so the driver never deletes a file itself.
+    Saving never touches LAS X's cache. The saved capture names the picture
+    it was read from (``cache_element``), so that the ``clear_cache`` procedure
+    can have LAS X let go of it later, once the copy is known to be safe.
 
     *format* is one of ``FORMATS`` and defaults to the profile's
     (``IMAGE_SAVE.format``). With ``"ome-zarr"`` the capture becomes one
@@ -118,11 +116,6 @@ def save(
         timeout_s=export_completion_timeout_s,
         poll_interval_s=export_completion_poll_interval_s,
     )
-    if cleanup_cache and exported.release is None:
-        raise RuntimeError(
-            f"cleanup_cache asks LAS X to let go of the capture, but {exported.source_exporter} "
-            "gives no way to; nothing was saved and nothing deleted"
-        )
     exported = replace(exported, metadata=on_the_canvas(exported.metadata, exported, placement))
     if format == "ome-zarr":
         saved = _persist_store(
@@ -149,13 +142,7 @@ def save(
             exported, Path(output_root), naming, format=format, orientation=orientation, placement=placement,
             state=state,
         ))
-    # Last, once everything made from the source has been made from it.
-    if cleanup_cache:
-        try:
-            exported.release()
-        except Exception as e:  # noqa: BLE001 -- the capture is saved; letting go is the owner's
-            log.warning("cleanup_cache failed for %s: %s", exported.relative_path, e)
-    return saved
+    return replace(saved, cache_element=exported.cache_element)
 
 
 def _persist_projection(
