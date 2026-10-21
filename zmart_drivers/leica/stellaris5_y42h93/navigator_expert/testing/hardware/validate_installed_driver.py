@@ -73,7 +73,7 @@ FAR_UM = 1.0e7
 
 
 def _adapter() -> Any:
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.connection import (
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.connection import (
         lasx_client as connect,
     )
 
@@ -91,7 +91,7 @@ def _go_offline(args: argparse.Namespace) -> None:
     from limits_fixtures import hermetic_mock_machine_root
     from mock_lasx_api import MockLasxClient
 
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.profiles import command_profiles as profiles
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.sending import command_profiles as profiles
 
     hermetic_mock_machine_root()
     _adapter().connect_python_client = lambda **_kw: MockLasxClient(

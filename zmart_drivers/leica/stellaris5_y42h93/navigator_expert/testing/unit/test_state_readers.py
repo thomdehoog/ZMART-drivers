@@ -9,14 +9,14 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.confirmations import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.changes import (
     confirm_select_job,
 )
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.profiles import command_profiles as profiles
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings import reading_table as capabilities
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings import named_readings as readers
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings import named_readings as router
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.sending import command_profiles as profiles
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.readings import reading_table as capabilities
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.readings import named_readings as readers
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.readings import named_readings as router
 
 
 class TestStateReaders(unittest.TestCase):
@@ -425,7 +425,7 @@ class TestApiModeCappedWorker(unittest.TestCase):
 
 class TestDerivedZoom(unittest.TestCase):
     def test_sub_unity_zoom_is_not_clamped(self):
-        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitives.values import (
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.primitives.values import (
             derived,
         )
 

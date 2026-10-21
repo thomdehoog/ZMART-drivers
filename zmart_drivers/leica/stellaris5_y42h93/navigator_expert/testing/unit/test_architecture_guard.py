@@ -30,7 +30,7 @@ DRIVER_ROOT = Path(__file__).resolve().parents[2]
 # The parts that may fire native stage motion or call the limit-check functions.
 DISPATCHER = "dispatcher"
 # The Leica rulebook defines the check functions; the gate in the dispatcher enforces them.
-RULEBOOK = Path("vendor_specific/primitive_handling/commands/limit_rules.py")
+RULEBOOK = Path("operations/changes/limit_rules.py")
 
 # Source selection is policy, not caller behaviour. The read engine implements
 # the profile-controlled modes; the confirmation modules construct explicit
@@ -38,20 +38,20 @@ RULEBOOK = Path("vendor_specific/primitive_handling/commands/limit_rules.py")
 # ``mode`` unset and consume the configured reader abstraction.
 READER_SOURCE_POLICY_MODULES = {
     Path("dispatcher/reader.py"),
-    Path("vendor_specific/primitive_handling/readings/named_readings.py"),
-    Path("vendor_specific/primitive_handling/readings/sources.py"),
+    Path("operations/readings/named_readings.py"),
+    Path("operations/readings/sources.py"),
     Path("dispatcher/send_loop.py"),
     Path("dispatcher/confirm_loop.py"),
-    Path("vendor_specific/primitive_handling/readings/reading_table.py"),
-    Path("vendor_specific/primitive_handling/confirmations/confirm_changes.py"),
-    Path("vendor_specific/primitive_handling/confirmations/confirm_select_job.py"),
+    Path("operations/readings/reading_table.py"),
+    Path("operations/changes/confirm_changes.py"),
+    Path("operations/changes/confirm_select_job.py"),
     # Calibration geometry is saved for good, so it is read from the API
     # and never from a log entry that may be stale (review finding M4).
     Path("driver_setup/optical_calibration/calibration_common.py"),
     # The stage limits are saved for good too: the corners are read from the API.
     Path("driver_setup/limits/measure_limits.py"),
     # Whether a command may fire is the API's to decide: the idle check.
-    Path("vendor_specific/primitive_handling/profiles/prechecks.py"),
+    Path("operations/sending/prechecks.py"),
 }
 EXPLICIT_READER_MODE = re.compile(r"\bmode\s*=\s*['\"](?:api|log|hybrid)['\"]")
 LOW_LEVEL_READER_CALL = re.compile(r"(?<!\w)_?(?:api_reader|log_reader)\.")
@@ -69,7 +69,7 @@ def _driver_sources():
 def test_native_stage_motion_fires_only_from_the_actions():
     """The native CAM motion functions are the stage's real door.
 
-    Only the change definitions in ``vendor_specific/primitive_handling/commands/changes.py`` may touch them: that
+    Only the change definitions in ``operations/changes/changes.py`` may touch them: that
     is where the limit checks run, immediately before the native call. A
     native-motion reference anywhere else would be a second, unchecked door.
     """
@@ -79,27 +79,27 @@ def test_native_stage_motion_fires_only_from_the_actions():
         if "PyApiMoveHardware" in text
         and rel
         not in (
-            Path("vendor_specific/primitive_handling/commands/changes.py"),
+            Path("operations/changes/changes.py"),
             # The direct route's table of how each CAM command is written for the hardware
             # server. It sends nothing itself: only the direct transport does, and that is
             # reached through the same change definitions and the same limits gate.
-            Path("vendor_specific/primitives/direct/translations.py"),
+            Path("primitives/direct/translations.py"),
         )
     ]
     assert offenders == [], (
-        f"native stage motion referenced outside vendor_specific/primitive_handling/commands/changes.py: {offenders}; "
+        f"native stage motion referenced outside operations/changes/changes.py: {offenders}; "
         f"route the move through the move_xy / move_z actions instead"
     )
 
 
 def test_limit_checks_are_called_only_from_the_changes_and_the_dispatcher():
     """``check_xy`` / ``check_z`` are *defined* in the dispatcher's rulebook and
-    *called* only from the change definitions in ``vendor_specific/primitive_handling/commands/changes.py``. A call anywhere else
+    *called* only from the change definitions in ``operations/changes/changes.py``. A call anywhere else
     is a second whistle: a copy of enforcement that can drift out of sync with
     the real one."""
     allowed = {
         Path(
-            "vendor_specific/primitive_handling/commands/changes.py"
+            "operations/changes/changes.py"
         ),  # the change definitions: where the checks run
     }
     offenders = []
@@ -109,20 +109,19 @@ def test_limit_checks_are_called_only_from_the_changes_and_the_dispatcher():
         if "check_xy(" in text or "check_z(" in text:
             offenders.append(str(rel))
     assert offenders == [], (
-        f"limit checks called outside vendor_specific/primitive_handling/commands/changes.py and dispatcher/: {offenders}; "
+        f"limit checks called outside operations/changes/changes.py and dispatcher/: {offenders}; "
         f"the changes already check every move; delete the duplicate call"
     )
 
 
 def test_the_rulebook_lives_in_the_dispatcher():
     """``LeicaLimits`` (the compiled limits document) is defined in
-    vendor_specific/primitive_handling/commands/limit_rules.py; the gate only imports it. If the class definition
+    operations/changes/limit_rules.py; the gate only imports it. If the class definition
     moves back into the gate, rulebook and whistle have merged again."""
     checks_text = (
         DRIVER_ROOT
-        / "vendor_specific"
-        / "primitive_handling"
-        / "commands"
+        / "operations"
+        / "changes"
         / "limit_rules.py"
     ).read_text(encoding="utf-8")
     gate_text = (DRIVER_ROOT / "dispatcher" / "gate.py").read_text(encoding="utf-8")
@@ -154,7 +153,7 @@ def test_low_level_readers_are_called_only_by_reader_and_confirmation_policy():
     offenders = [
         str(rel)
         for rel, text in _driver_sources()
-        if rel.parts[0] != "vendor_specific"
+        if rel.parts[0] not in ("primitives", "operations")
         and rel not in READER_SOURCE_POLICY_MODULES
         and LOW_LEVEL_READER_CALL.search(text)
     ]
@@ -176,63 +175,42 @@ def test_the_utils_grab_bag_stays_dissolved():
 
 # --- the parts, and which may import which ----------------------------------------
 
-# The anatomy's order, bottom to top. A part may always import from itself.
-# Entries marked "upward" are imports the move kept as they were; each is to be
-# removed in a change of its own, and none may be added.
+# The layers, bottom to top. A part may always import from itself, and only
+# from the parts below it.
+BELOW_THE_SESSION = {"connection", "primitives", "dispatcher", "operations"}
 ALLOWED = {
-    "vendor_specific": {
-        # upward: the readers and the handling notes use the dispatcher's tuning,
-        # envelope and read engine
-        "dispatcher",
-    },
-    # The engines know no microscope: the vendor part hands in its sources,
+    # How the driver reaches LAS X, and its waiting numbers.
+    "connection": set(),
+    # One read or write each, one folder for each way of reaching LAS X.
+    "primitives": {"connection"},
+    # The engines know no microscope: the operations hand in their sources,
     # profiles, error sorting, waiting numbers and limits.
     "dispatcher": set(),
-    # What the driver remembers about one connection; every part that works
-    # on a connection reads it, and it uses only the vendor part to ask LAS X.
-    "session": {
-        "vendor_specific",
-    },
-    "procedures": {
+    # What the STELLARIS does: each change and reading, and how a command is sent.
+    "operations": {"connection", "primitives", "dispatcher"},
+    # What the driver remembers about one connection.
+    "session": {"connection", "primitives", "operations"},
+    "procedures": BELOW_THE_SESSION | {"session", "driver_setup"},
+    "driver_setup": BELOW_THE_SESSION | {
         "session",
-        "vendor_specific",
-        "dispatcher",
-        "driver_setup",
-    },
-    "driver_setup": {
-        "session",
-        "vendor_specific",  # the limits item validates through the rulebook
-        "dispatcher",  # the limits handshake installs the limits in the gate
         # The measuring code of an item takes pictures and moves the stage, so it
-        # uses the commands. Run-time procedures never import that measuring code
-        # (see the test below): they read the saved values only.
+        # uses the procedures. Run-time procedures never import that measuring
+        # code (see the test below): they read the saved values only.
         "procedures",
     },
-    # The driver used by itself: connect() and the Microscope, built on every
-    # part below it.
-    "for_direct_use": {
+    # The driver used by itself: connect() and the Microscope.
+    "driver_api": BELOW_THE_SESSION | {
         "session",
-        "vendor_specific",
-        "dispatcher",
         "procedures",
         "driver_setup",
-        "__version__",  # acquire.py records the driver version in the saved state
+        "__version__",  # the saved state records the driver version
     },
-    # Everything that faces the controller: the ZmartControllerPlugin class, which
-    # translates the controller's commands into calls of the Microscope, and
-    # what only the controller asks for: the description and the procedure menu.
-    "zmart_controller_plugin": {
-        "for_direct_use",
-        "session",
-        "dispatcher",
-        "vendor_specific",
-        "procedures",
-        "driver_setup",
-    },
+    # What faces the controller: the ZmartControllerPlugin class, which translates
+    # the controller's commands into calls of the Microscope, and what only the
+    # controller asks for: the description and the procedure menu.
+    "zmart_controller_plugin": BELOW_THE_SESSION | {"driver_api", "session", "procedures", "driver_setup"},
     # The package offers the driver used by itself, and nothing else.
-    "__init__": {
-        "for_direct_use",
-    },
+    "__init__": {"driver_api"},
 }
 
 
@@ -278,43 +256,11 @@ def test_each_part_only_imports_what_the_anatomy_allows():
 
 #: The bottom of the vendor part, bottom first: how the driver reaches LAS X, and
 #: one read or write each. Neither imports from anything above it.
-BOTTOM = ("connection", "primitives")
-
-
-def _vendor_layers_imported(path: Path) -> set[str]:
-    """The folders of ``vendor_specific`` that ``path`` imports from."""
-    tree = ast.parse(path.read_text(encoding="utf-8"))
-    here = list(path.relative_to(DRIVER_ROOT).parent.parts)
-    found = set()
-    for node in ast.walk(tree):
-        if isinstance(node, ast.ImportFrom) and node.level:
-            base = here[: len(here) - (node.level - 1)]
-            target = [*base, *(node.module or "").split(".")]
-            if target[0] == "vendor_specific" and len(target) > 1:
-                found.add(target[1])
-        elif isinstance(node, ast.ImportFrom) and "navigator_expert.vendor_specific." in (node.module or ""):
-            found.add(node.module.split("navigator_expert.vendor_specific.")[1].split(".")[0])
-    return found
-
-
-def test_the_connection_and_the_primitives_import_nothing_above_them():
-    """The connection imports only itself; the primitives only themselves and the connection."""
-    for depth, layer in enumerate(BOTTOM):
-        allowed = set(BOTTOM[: depth + 1])
-        for path in (DRIVER_ROOT / "vendor_specific" / layer).rglob("*.py"):
-            used = _vendor_layers_imported(path) | _imported_parts(path, "vendor_specific")
-            assert used <= allowed, (
-                f"{path.relative_to(DRIVER_ROOT)} imports {sorted(used - allowed)}; "
-                f"{layer}/ may import only {sorted(allowed)}"
-            )
-
-
 def test_a_reading_never_uses_a_change():
-    """A get never calls a set: vendor_specific/primitive_handling/readings/reading_table.py must not import vendor_specific/primitive_handling/commands/changes.py."""
+    """A get never calls a set: operations/readings/reading_table.py must not import operations/changes/changes.py."""
     readings = (
         DRIVER_ROOT
-        / "vendor_specific"
-        / "primitive_handling"
+        / "operations"
         / "readings"
         / "reading_table.py"
     )
@@ -323,7 +269,7 @@ def test_a_reading_never_uses_a_change():
         if isinstance(node, ast.ImportFrom):
             names = [node.module or "", *(a.name for a in node.names)]
             assert "changes" not in names, (
-                "vendor_specific/primitive_handling/readings/reading_table.py imports vendor_specific/primitive_handling/commands/changes.py"
+                "operations/readings/reading_table.py imports operations/changes/changes.py"
             )
 
 
@@ -385,12 +331,12 @@ def test_run_time_procedures_never_import_the_measuring_code():
 def test_the_driver_keeps_its_files_in_folders_that_say_what_they_are_for():
     """A file left loose in a part's root has no stated job, so the roots stay bare.
 
-    ``procedures/`` holds one folder per recipe, ``vendor_specific/`` holds
-    ``primitives/``, ``connection/`` and ``primitive_handling/``, and the
+    ``procedures/`` holds one folder per recipe, ``primitives/`` one folder for
+    each way of reaching LAS X, ``operations/`` its three parts, and the
     driver's own root holds only its ``__init__.py`` and README.
     """
     allowed_in_root = {"__init__.py", "README.md"}
-    for folder in ("procedures", "vendor_specific"):
+    for folder in ("procedures", "primitives", "operations"):
         loose = sorted(
             p.name
             for p in (DRIVER_ROOT / folder).glob("*.py")

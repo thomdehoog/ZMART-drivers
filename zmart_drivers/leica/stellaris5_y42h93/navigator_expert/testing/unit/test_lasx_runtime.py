@@ -4,8 +4,8 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.connection import lasx_settings
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.connection import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.connection import lasx_settings
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.connection import (
     lasx_runtime,
 )
 

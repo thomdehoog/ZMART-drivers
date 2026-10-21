@@ -20,11 +20,11 @@ import inspect
 
 import pytest
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.confirmations import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.changes import (
     confirm_specs,
 )
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.confirmations import confirm_changes as confirmations
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.changes import confirm_changes as confirmations
 
 CONFIRM_SPECS = confirm_specs.CONFIRM_SPECS
 

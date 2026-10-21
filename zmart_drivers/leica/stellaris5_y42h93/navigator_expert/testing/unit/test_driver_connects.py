@@ -16,10 +16,10 @@ import pytest
 from mock_lasx_api import MockLasxClient
 
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.zmart_controller_plugin.zmart_controller_plugin import ZmartControllerPlugin
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.connection import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.connection import (
     lasx_client,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.profiles.command_profiles import IMAGE_SAVE
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.sending.command_profiles import IMAGE_SAVE
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.session import (
     loaded_config as session_state,
 )

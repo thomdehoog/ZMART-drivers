@@ -21,9 +21,9 @@ for _p in (_HERE, _HELPERS, _REPO_ROOT):
         sys.path.insert(0, str(_p))
 
 import validate_readers_side_by_side as sxs
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitives.log import log_settings
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.profiles import command_profiles as profiles
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.connection import waiting
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.primitives.log import log_settings
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.sending import command_profiles as profiles
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.connection import waiting
 
 
 def _run_mock(tmp_path, *extra):
@@ -36,7 +36,7 @@ def _run_mock(tmp_path, *extra):
 
 
 def test_poll_params_come_from_the_rule():
-    """A post-change readback waits by the driver's one rule (vendor_specific/connection/waiting.py)."""
+    """A post-change readback waits by the driver's one rule (connection/waiting.py)."""
     assert not hasattr(log_settings.LOG_READER, "poll_timeout")
     assert not hasattr(log_settings.LOG_READER, "poll_interval")
     expected = (waiting.WINDOWS * waiting.WINDOW_S, waiting.POLL_S)

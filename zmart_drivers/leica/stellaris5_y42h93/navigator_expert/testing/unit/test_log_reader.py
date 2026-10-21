@@ -18,8 +18,8 @@ import tempfile
 import unittest
 from datetime import datetime, timedelta
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitives.log import log_settings
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitives.log import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.primitives.log import log_settings
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.primitives.log import (
     log_reader as L,
 )
 

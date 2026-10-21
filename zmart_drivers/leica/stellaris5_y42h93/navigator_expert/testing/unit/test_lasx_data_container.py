@@ -22,15 +22,15 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.orienta
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.save_data.naming import (
     Naming,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitives.capture.product import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.primitives.capture.product import (
     PlaneIndex,
     RawPlaneSource,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.commands import run_job as capture
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.changes import run_job as capture
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.save_data import (
     save as acquisition,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitives.capture import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.primitives.capture import (
     lasx_data_container as container,
 )
 

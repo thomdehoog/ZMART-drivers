@@ -48,7 +48,7 @@ import numpy as np
 from ...driver_setup.orientation import Orientation, reorient_array
 from . import materialize
 from . import ome_canonical as canonical
-from ...vendor_specific.primitives.capture.product import (
+from ...primitives.capture.product import (
     AcquisitionMetadata,
     ExportedAcquisition,
     PlaneIndex,

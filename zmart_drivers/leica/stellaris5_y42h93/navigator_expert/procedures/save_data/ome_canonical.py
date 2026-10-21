@@ -7,7 +7,7 @@ Contract with ``ome.py``: that module owns TIFF tag-270 access
 (:func:`ome.read_tiff_tag_270`) and the validate/patch side; this module
 GENERATES metadata and only ever reads existing OME through that public
 function. The live settings read follows the one rule in
-``vendor_specific/connection/waiting.py``, like every other reading.
+``connection/waiting.py``, like every other reading.
 """
 
 from __future__ import annotations
@@ -20,8 +20,8 @@ from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
-from ...vendor_specific.primitives.capture import tiff_tag as _ome
-from ...vendor_specific.primitives.capture.product import (
+from ...primitives.capture import tiff_tag as _ome
+from ...primitives.capture.product import (
     AcquisitionMetadata,
     ChannelMetadata,
     Instrument,

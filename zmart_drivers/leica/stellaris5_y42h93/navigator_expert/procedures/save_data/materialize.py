@@ -8,7 +8,7 @@ import uuid
 from pathlib import Path
 
 from . import ome_canonical as _canonical
-from ...vendor_specific.primitives.capture.product import (
+from ...primitives.capture.product import (
     PlaneSource,
     RawPlaneSource,
     VendorMetadataSource,

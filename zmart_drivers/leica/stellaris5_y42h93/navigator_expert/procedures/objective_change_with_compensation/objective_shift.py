@@ -98,7 +98,7 @@ def record_before_change(
             )
         return None
 
-    from ...vendor_specific.primitive_handling.readings import named_readings as _readers
+    from ...operations.readings import named_readings as _readers
 
     if job_name is None:
         selected = _readers.get_selected_job(client) or {}
@@ -151,7 +151,7 @@ def compensate_after_change(
         }
 
     try:
-        from ...vendor_specific.primitive_handling.readings import named_readings as _readers
+        from ...operations.readings import named_readings as _readers
 
         if new_slot is None:
             settings = _readers.get_job_settings(client, job_name) or {}
@@ -201,7 +201,7 @@ def compensate_after_change(
             # The moves go through the ordinary gated wrappers, so the
             # compensated targets are checked against the machine limits
             # exactly like any other motion; a refusal fails the change.
-            from ...vendor_specific.primitive_handling.commands import changes as _commands
+            from ...operations.changes import changes as _commands
 
             xy_result = _commands.move_xy(
                 client, before["x_um"] + delta[0], before["y_um"] + delta[1], unit="um"

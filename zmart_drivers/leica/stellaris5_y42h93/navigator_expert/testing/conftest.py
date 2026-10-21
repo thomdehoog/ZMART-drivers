@@ -69,7 +69,7 @@ def _writes_through_the_cam_api(monkeypatch):
     server for the reads, which the direct route would then try to write to.
     The tests of the direct route set ``WRITE_ROUTES`` themselves.
     """
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.profiles import (
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.sending import (
         routes,
     )
 
@@ -84,7 +84,7 @@ def _no_hardware_server(monkeypatch):
     hardware server would answer and a test would read the instrument's z.
     Tests that need the server hand in a stand-in through ``attach``.
     """
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.connection import (
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.connection import (
         hardware_server,
     )
 
@@ -107,14 +107,14 @@ def _no_lasx_window(tmp_path, monkeypatch):
     and could press a real dialog's button. Tests that need either hand in a
     stand-in log path and windows.
     """
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitives.interface import (
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.primitives.interface import (
         lasx_dialogs,
     )
 
     def no_windows():
         raise lasx_dialogs.WindowsUnavailable("no LAS X windows in the test suite")
 
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitives.interface import (
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.primitives.interface import (
         lasx_navigator,
     )
 
@@ -159,8 +159,8 @@ def fast_timing_windows(monkeypatch):
     wait. Shipped values are unchanged; a test that needs a specific window
     patches it itself (``test_waiting_rule``).
     """
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.connection import waiting
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.profiles import (
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.connection import waiting
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.sending import (
         transport,
     )
 
@@ -179,7 +179,7 @@ def fresh_live_log(monkeypatch):
     that points the reader at its own files could be handed the previous
     test's snapshot.
     """
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitives.log import (
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.primitives.log import (
         log_reader,
     )
 

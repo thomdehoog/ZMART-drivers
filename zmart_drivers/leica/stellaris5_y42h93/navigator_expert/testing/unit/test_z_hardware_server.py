@@ -20,25 +20,25 @@ from unittest.mock import patch
 import pytest
 from z_readback_settings import raw_settings
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.confirmations import confirm_changes as confirmations
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.commands import changes as commands
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitives.values.derived import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.changes import confirm_changes as confirmations
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.changes import changes as commands
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.primitives.values.derived import (
     z_um_from_settings,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.connection import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.connection import (
     hardware_server,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.connection.hardware_server import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.connection.hardware_server import (
     HardwareServerUnavailable,
     read_hardware_z_um,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitives.values.parsing import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.primitives.values.parsing import (
     make_changeable_copy,
 )
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.absolute_coordinate_system import (
     frame as _frame,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings import named_readings as _readers
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.readings import named_readings as _readers
 
 
 #: What the simulator's hardware server answered on 2026-10-12, at rest.

@@ -54,15 +54,15 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "helpers"))  # mock
 from run_report import RunReport, attempts_of, confirmation_of, replay_envelope_logs
 
 import low_level as drv
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings import reading_table as capabilities
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitives.log import log_settings
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.profiles import command_profiles as profiles
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings import named_readings as readers
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.connection import waiting
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitives.log import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.readings import reading_table as capabilities
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.primitives.log import log_settings
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.sending import command_profiles as profiles
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.readings import named_readings as readers
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.connection import waiting
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.primitives.log import (
     log_reader as L,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitives.values.parsing import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.primitives.values.parsing import (
     make_changeable_copy,
     parse_tile_geometry,
 )
@@ -286,7 +286,7 @@ def _settings_diffs(af, lf):
     ]
 
 
-# --- polling: the one rule in vendor_specific/connection/waiting.py ------------------------------
+# --- polling: the one rule in connection/waiting.py ------------------------------
 #
 # A post-change readback waits for the expected value by the same rule as the
 # driver: at most WINDOWS windows of WINDOW_S, looking again every POLL_S.
@@ -798,7 +798,7 @@ def _connect(args):
         print("Connect: mock (in-process MockLasxClient)")
         print(f"Limits: hermetic machine root provisioned at {root}")
         return MockLasxClient(latency=args.mock_latency)
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.connection.lasx_runtime import (
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.connection.lasx_runtime import (
         load_lasx_api_runtime,
     )
 

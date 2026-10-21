@@ -12,7 +12,7 @@ from __future__ import annotations
 import threading
 import time
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitives.capture import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.primitives.capture import (
     files as _files,
 )
 

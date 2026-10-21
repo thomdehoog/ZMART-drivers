@@ -20,17 +20,17 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings import reading_table as capabilities
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.readings import reading_table as capabilities
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.objective_change_with_compensation import (
     objective_shift,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.profiles import command_profiles as profiles
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.profiles import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.sending import command_profiles as profiles
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.sending import (
     prechecks,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.connection import waiting
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings import named_readings as readers
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitives.api import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.connection import waiting
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.readings import named_readings as readers
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.primitives.api import (
     delivery,
 )
 
@@ -345,7 +345,7 @@ def test_delivery_stops_trying_once_received():
 
 def test_commands_deliver_through_the_one_helper():
     """No other code hands a message to LAS X with its own tries or timeout."""
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.profiles import (
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.sending import (
         transport,
     )
 
@@ -353,11 +353,11 @@ def test_commands_deliver_through_the_one_helper():
 
 
 # Whole folders, plus the change definitions that moved from actions/ to procedures/.
-GUARDED = ("dispatcher", "vendor_specific")
+GUARDED = ("dispatcher", "connection", "primitives", "operations")
 GUARDED_FILES = (
     "procedures/objective_change_with_compensation/compensated_changes.py",
     "procedures/objective_change_with_compensation/objective_shift.py",
-    "vendor_specific/primitive_handling/commands/objectives.py",
+    "operations/changes/objectives.py",
 )
 WAIT_NAME = re.compile(
     r"(timeout|poll_interval|max_retries|max_confirm_attempts|grace|deadline|window_s|retry_delay)",
@@ -367,39 +367,39 @@ WAIT_NAME = re.compile(
 EXCEPTIONS = {
     # Acquisition is never sent again and watches one acquisition (ACQUIRE).
     (
-        "vendor_specific/primitive_handling/confirmations/confirm_changes.py",
+        "operations/changes/confirm_changes.py",
         "start_timeout",
     ),
     (
-        "vendor_specific/primitive_handling/confirmations/confirm_changes.py",
+        "operations/changes/confirm_changes.py",
         "poll_interval",
     ),
-    ("vendor_specific/primitive_handling/profiles/command_profiles.py", "max_retries"),
-    ("vendor_specific/primitive_handling/profiles/command_profiles.py", "max_confirm_attempts"),
-    ("vendor_specific/primitive_handling/profiles/command_profiles.py", "poll_interval"),
-    ("vendor_specific/primitive_handling/profiles/command_profiles.py", "start_timeout"),
+    ("operations/sending/command_profiles.py", "max_retries"),
+    ("operations/sending/command_profiles.py", "max_confirm_attempts"),
+    ("operations/sending/command_profiles.py", "poll_interval"),
+    ("operations/sending/command_profiles.py", "start_timeout"),
     # LAS X filling in the error report after a command stays at 1 s.
     (
-        "vendor_specific/primitive_handling/profiles/transport.py",
+        "operations/sending/transport.py",
         "ECHO_SETTLE_TIMEOUT_S",
     ),
     # How old a log entry may be to count as current: freshness, not a wait.
-    ("vendor_specific/primitives/log/log_settings.py", "current_window_s"),
+    ("primitives/log/log_settings.py", "current_window_s"),
     # Waiting for a finished picture's files to stop growing on disk. This is
     # about files, not about LAS X's state, and has its own decided numbers.
-    ("vendor_specific/primitives/capture/files.py", "DEFAULT_FILE_STABILITY_TIMEOUT_S"),
+    ("primitives/capture/files.py", "DEFAULT_FILE_STABILITY_TIMEOUT_S"),
     (
-        "vendor_specific/primitives/capture/files.py",
+        "primitives/capture/files.py",
         "DEFAULT_EXPORT_COMPLETION_TIMEOUT_S",
     ),
     (
-        "vendor_specific/primitives/capture/files.py",
+        "primitives/capture/files.py",
         "DEFAULT_EXPORT_COMPLETION_POLL_INTERVAL_S",
     ),
-    ("vendor_specific/primitives/capture/files.py", "timeout"),
-    ("vendor_specific/primitives/capture/files.py", "poll_interval"),
+    ("primitives/capture/files.py", "timeout"),
+    ("primitives/capture/files.py", "poll_interval"),
     # The rule itself.
-    ("vendor_specific/connection/waiting.py", "WINDOW_S"),
+    ("connection/waiting.py", "WINDOW_S"),
 }
 
 
@@ -455,7 +455,7 @@ def _waits_with_their_own_numbers(root):
 
 
 def test_no_wait_on_las_x_has_its_own_number():
-    """How long to wait and how often to look come from vendor_specific/connection/waiting.py only.
+    """How long to wait and how often to look come from connection/waiting.py only.
 
     A literal timeout, retry count, window, poll interval or sleep for waiting
     on LAS X anywhere else is a second rule; the named exceptions above are

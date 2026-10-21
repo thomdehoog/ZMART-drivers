@@ -24,10 +24,10 @@ import pytest
 import tifffile
 import zarr
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.commands import run_job
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.changes import run_job
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.save_data import save as saving
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.save_data import saved_acquisition
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitives.capture import product
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.primitives.capture import product
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.orientation import (
     Orientation,
     reorient_array,
@@ -36,11 +36,11 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.save_data
     Naming,
     build_image_name,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitives.capture.product import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.primitives.capture.product import (
     ExportedAcquisition,
     ExportedPosition,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.commands import run_job as capture
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.changes import run_job as capture
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.save_data import (
     save as acquisition,
 )

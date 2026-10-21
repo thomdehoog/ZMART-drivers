@@ -30,11 +30,11 @@ from typing import Any
 
 import numpy as np
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.commands import run_job
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.changes import run_job
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.save_data import save as saving
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitives.values import parsing
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings import named_readings as readers
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.commands import changes
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.primitives.values import parsing
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.readings import named_readings as readers
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.changes import changes
 
 from .. import orientation as _orientation
 from ...procedures.save_data.naming import Naming, run_hash

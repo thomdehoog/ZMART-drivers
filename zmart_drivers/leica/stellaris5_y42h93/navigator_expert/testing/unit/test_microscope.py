@@ -20,9 +20,9 @@ from limits_fixtures import hermetic_mock_machine_root
 from mock_lasx_api import MockLasxClient
 
 import zmart_drivers.leica.stellaris5_y42h93.navigator_expert as navigator_expert
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.for_direct_use import microscope
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.connection import lasx_client
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.profiles import command_profiles as profiles
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_api import microscope
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.connection import lasx_client
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.sending import command_profiles as profiles
 
 
 @pytest.fixture
@@ -47,10 +47,10 @@ def test_connect_hands_back_a_microscope(scope):
 
 def test_the_package_offers_only_the_microscope():
     """Nothing that goes around the session: no raw reads or commands on a client."""
-    offered = {name for name in vars(navigator_expert) if not name.startswith("__")} - {"for_direct_use"}
+    offered = {name for name in vars(navigator_expert) if not name.startswith("__")} - {"driver_api"}
 
     assert sorted(navigator_expert.__all__) == ["Microscope", "__version__", "connect"]
-    assert offered <= {"Microscope", "connect"} | {"dispatcher", "driver_setup", "procedures", "session", "vendor_specific", "zmart_controller_plugin", "testing"}
+    assert offered <= {"Microscope", "connect"} | {"dispatcher", "driver_setup", "procedures", "session", "connection", "primitives", "operations", "zmart_controller_plugin", "testing"}
 
 
 def test_the_running_log_gets_the_messages_of_every_part_of_the_driver(scope):

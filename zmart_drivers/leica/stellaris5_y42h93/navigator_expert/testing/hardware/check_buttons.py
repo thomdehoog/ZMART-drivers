@@ -1,7 +1,7 @@
 """At the microscope: the buttons the driver presses in LAS X, pressed and checked. No capture, no move.
 
 The driver presses two of Navigator Expert's buttons through Windows UI
-Automation (``vendor_specific/primitives/interface/lasx_navigator.py``): Experiment, which shows
+Automation (``primitives/interface/lasx_navigator.py``): Experiment, which shows
 the Navigator canvas before a capture that will be released, and the
 canvas's Clear, which makes LAS X let go of the hidden copies its captures
 leave in its cache. Nothing else can do either, so if LAS X lays its window
@@ -35,8 +35,8 @@ import sys
 import time
 from pathlib import Path
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.connection import waiting
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitives.interface import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.connection import waiting
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.primitives.interface import (
     lasx_dialogs,
     lasx_navigator,
 )

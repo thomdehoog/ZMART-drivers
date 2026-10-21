@@ -11,7 +11,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from ...vendor_specific.primitives.capture.product import PlaneIndex, PositionIndex
+from ...primitives.capture.product import PlaneIndex, PositionIndex
 from .naming import Naming
 
 

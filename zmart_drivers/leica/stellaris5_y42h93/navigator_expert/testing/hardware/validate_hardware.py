@@ -444,7 +444,7 @@ def _connect(
         log.info("limits | hermetic machine root provisioned at %s", root)
         return MockClient(latency=args.mock_latency)
     try:
-        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.connection.lasx_runtime import (
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.connection.lasx_runtime import (
             load_lasx_api_runtime,
         )
 
@@ -464,7 +464,7 @@ def _connect(
         )
         return None
     try:
-        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.connection.lasx_client import (
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.connection.lasx_client import (
             configure_lasx_api_delay,
         )
 
@@ -736,7 +736,7 @@ def _record_log_selected_job_poll(
     context: dict,
 ) -> None:
     """Record the experimental log-only selected-job wait."""
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitives.log.log_wait import (
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.primitives.log.log_wait import (
         wait_for_selected_job_log,
     )
 
@@ -888,7 +888,7 @@ def phase_readonly(
         v.callable("get_hardware_info", lambda: drv.get_hardware_info(client))
         v.callable("get_xy", lambda: drv.get_xy(client))
 
-        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings import reading_table as capabilities
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.readings import reading_table as capabilities
 
         jobs_has_log_leg = capabilities.DATUMS["jobs"].log_fn is not None
         if not jobs:
@@ -967,7 +967,7 @@ def phase_job_selection(
             v.skip("job selection: round-trip", "no jobs returned")
             return
 
-        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.connection import waiting
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.connection import waiting
 
         names = selectable_job_names(jobs)
         # The job to come back to is read the way the driver reads it, not
@@ -1852,7 +1852,7 @@ def _apply_state_reader_mode(mode: str | None, log: logging.Logger) -> None:
     """Override all profile-routed passive state readers for this run."""
     if mode is None:
         return
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.profiles import command_profiles as profiles
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.sending import command_profiles as profiles
 
     profiles.STATE_READERS = profiles.StateReaderProfile(
         xy_mode=mode,
@@ -1895,7 +1895,7 @@ def _apply_log_select_confirmation(
         or args.prime_log_select_cluster
     ):
         return
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.profiles import command_profiles as profiles
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.sending import command_profiles as profiles
 
     updates = {
         "selected_job_confirm_source": (

@@ -40,7 +40,7 @@ from mock_lasx_api import MockLasxClient
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.limits import (
     handshake as _handshake,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.commands import changes as commands_mod
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.changes import changes as commands_mod
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.objective_change_with_compensation import (
     compensated_changes as commands_mod_comp,
 )
@@ -50,7 +50,7 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.limits 
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.store import (
     MachineProfile,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.commands import limit_rules as motion_limits
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.changes import limit_rules as motion_limits
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher import gate
 
 DRIVER_ROOT = Path(__file__).resolve().parents[2]
@@ -60,10 +60,10 @@ DRIVER_ROOT = Path(__file__).resolve().parents[2]
 # =============================================================================
 
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.connection import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.connection import (
     lasx_client as _connect_module,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.for_direct_use.microscope import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_api.microscope import (
     DEFAULT_CONNECTION,
     Microscope,
 )
@@ -611,7 +611,7 @@ def test_absent_setter_falls_back_but_explicit_empty_list_is_unlimited(mock_clie
 def test_reads_work_without_a_handshake_while_mutations_refuse(mock_client):
     """No handshake == read-only session, not a dead session. Reads never touch
     the gate; mutations refuse fail-closed until a handshake runs."""
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings import named_readings as readers
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.readings import named_readings as readers
 
     # This client never handshook — the one path that stays fail-closed.
     assert gate.state_for(mock_client) is None
@@ -903,10 +903,10 @@ def test_adapter_bypass_refuses_at_the_commands_layer(clear_stage_limits):
     not a missing handshake."""
     from unittest.mock import patch
 
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitives.values import (
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.primitives.values import (
         parsing as _cmd_settings,
     )
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings import named_readings as _readers
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.readings import named_readings as _readers
 
     _raw_snapshot(_machine_root(), limits_text=_BAD_LIMITS_TEXTS["missing_axis"])
     client = MockLasxClient(latency=0.0)
@@ -940,10 +940,10 @@ def test_controller_session_bypass_refuses_at_the_commands_layer(clear_stage_lim
     import zmart_controller
 
     from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.zmart_controller_plugin.zmart_controller_plugin import ZmartControllerPlugin as driver
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitives.values import (
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.primitives.values import (
         parsing as _cmd_settings,
     )
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings import named_readings as _readers
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.readings import named_readings as _readers
 
     _raw_snapshot(_machine_root(), limits_text=_BAD_LIMITS_TEXTS["missing_axis"])
     client = MockLasxClient(latency=0.0)
@@ -1022,9 +1022,8 @@ def test_every_dispatching_wrapper_declares_and_calls_the_gate():
     vendor_tree = ast.parse(
         (
             DRIVER_ROOT
-            / "vendor_specific"
-            / "primitive_handling"
-            / "commands"
+            / "operations"
+            / "changes"
             / "changes.py"
         ).read_text(encoding="utf-8")
     )
@@ -1084,7 +1083,7 @@ def test_every_dispatching_wrapper_declares_and_calls_the_gate():
     # The settings of a job go through one runner, so their functions do not
     # call the gate themselves. Each must hand the runner the table entry that
     # carries its own name, and the runner must show the gate that name.
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.commands import settings as settings_table
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.changes import settings as settings_table
 
     for node in tree.body:
         if not isinstance(node, ast.FunctionDef) or node.name.startswith("_"):

@@ -6,8 +6,8 @@ import os
 
 import pytest
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitives.log import log_settings
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.profiles import command_profiles as profiles
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.primitives.log import log_settings
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.sending import command_profiles as profiles
 
 
 @pytest.fixture(autouse=True)

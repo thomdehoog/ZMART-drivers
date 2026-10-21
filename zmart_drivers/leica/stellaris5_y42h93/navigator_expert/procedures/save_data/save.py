@@ -22,14 +22,14 @@ from pathlib import Path
 from typing import Any
 
 from ...driver_setup.orientation import Orientation
-from ...vendor_specific.primitives.capture import files as _files
+from ...primitives.capture import files as _files
 from . import materialize as _materialize
 from . import ome_zarr
-from ...vendor_specific.primitives.capture.files import (
+from ...primitives.capture.files import (
     DEFAULT_EXPORT_COMPLETION_POLL_INTERVAL_S,
     DEFAULT_EXPORT_COMPLETION_TIMEOUT_S,
 )
-from ...vendor_specific.primitives.capture.lasx_data_container import (
+from ...primitives.capture.lasx_data_container import (
     collect_lasx_data_container,
 )
 from .naming import (
@@ -40,7 +40,7 @@ from .naming import (
     projections_dir,
     state_dir,
 )
-from ...vendor_specific.primitives.capture.product import (
+from ...primitives.capture.product import (
     AcquisitionResult,
     ExportedAcquisition,
 )
@@ -99,7 +99,7 @@ def save(
     a single plane is its own projection and gets none, so nothing is
     written twice.
     """
-    from ...vendor_specific.primitive_handling.profiles.command_profiles import IMAGE_SAVE
+    from ...operations.sending.command_profiles import IMAGE_SAVE
 
     projection = IMAGE_SAVE.projection if projection is None else projection
     if projection not in PROJECTIONS:

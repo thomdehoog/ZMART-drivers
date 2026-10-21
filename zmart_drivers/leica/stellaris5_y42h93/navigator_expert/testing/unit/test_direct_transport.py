@@ -18,19 +18,19 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher.transport
     TransportChain,
     TransportUnavailable,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.connection import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.connection import (
     hardware_server,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.profiles import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.sending import (
     direct_transport,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitives.api.request import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.primitives.api.request import (
     Request,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitives.direct import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.primitives.direct import (
     send_command,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitives.direct.state_tree import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.primitives.direct.state_tree import (
     Job,
     JobSequence,
 )

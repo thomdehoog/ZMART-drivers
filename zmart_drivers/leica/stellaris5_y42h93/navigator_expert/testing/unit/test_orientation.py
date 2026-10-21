@@ -20,7 +20,7 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup import 
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.save_data import (
     ome_zarr,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitives.capture.product import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.primitives.capture.product import (
     AcquisitionMetadata,
     ChannelMetadata,
     ExportedAcquisition,

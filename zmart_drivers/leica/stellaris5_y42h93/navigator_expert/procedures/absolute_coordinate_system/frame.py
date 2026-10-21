@@ -29,12 +29,12 @@ import logging
 
 from . import coordinates
 from ...dispatcher import gate as _gate
-from ...vendor_specific.primitive_handling.readings import named_readings as _readers
-from ...vendor_specific.primitives.values.derived import (
+from ...operations.readings import named_readings as _readers
+from ...primitives.values.derived import (
     stack_drive as _stack_drive,
     z_um_from_settings as _z_um_from_settings,
 )
-from ...vendor_specific.primitive_handling.commands import changes as _commands
+from ...operations.changes import changes as _commands
 from ...session import handle as _info
 from ...session.handle import Session, note_unconfirmed, require_open
 

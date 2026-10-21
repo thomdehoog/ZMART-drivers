@@ -9,7 +9,7 @@ Package layout, the anatomy of a ZMART driver (``docs/driver-anatomy.md`` in
 this repository)::
 
     navigator_expert/
-    - for_direct_use/     the driver used by itself: connect() and the Microscope, taking a
+    - driver_api/         the driver used by itself: connect() and the Microscope, taking a
                           picture, the state saved with it, and the driver's rolling log
     - zmart_controller_plugin/  what the controller sees: the ZmartControllerPlugin class (zmart_controller_plugin.py),
                           one method per controller command, each a call of the Microscope,
@@ -23,12 +23,14 @@ this repository)::
                           origin, orientation, optical_calibration and
                           data_location, each with its defaults, loader, measuring code
                           and notebook; plus the store that finds the saved values
+    - operations/         what the STELLARIS does: changes/ (each change with its
+                          confirmation), readings/ and sending/ (how a command reaches LAS X)
     - dispatcher/         the machinery that runs a command safely, and names no LAS X
                           object: the one door (read and write), the reader, the send and
                           confirm loops and the limits gate
-    - vendor_specific/    everything that is specific to LAS X: the connection and its waiting
-                          numbers, the primitives (the smallest reads and writes) and
-                          primitive_handling/, which says how each command is treated
+    - primitives/         the smallest reads and writes, one folder for each way of
+                          reaching LAS X
+    - connection/         opening LAS X, and the waiting numbers
     - testing/            the mock LAS X API, the offline suite, the hardware validators
 
 Author: Thom de Hoog, Center for Microscopy and Image Analysis (ZMB),
@@ -39,4 +41,4 @@ __version__ = "7.0.0b1"
 
 __all__ = ["__version__", "connect", "Microscope"]
 
-from .for_direct_use.microscope import Microscope, connect
+from .driver_api.microscope import Microscope, connect

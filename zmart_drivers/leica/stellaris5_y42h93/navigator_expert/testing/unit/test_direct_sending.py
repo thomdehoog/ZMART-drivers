@@ -17,23 +17,23 @@ from types import SimpleNamespace
 
 import pytest
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.connection import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.connection import (
     hardware_server,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.connection import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.connection import (
     waiting,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitives.direct import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.primitives.direct import (
     send_command,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitives.direct import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.primitives.direct import (
     translations,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitives.direct.translations import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.primitives.direct.translations import (
     Fields,
     NoTranslation,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitives.interface import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.primitives.interface import (
     lasx_dialogs,
 )
 

@@ -11,8 +11,8 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher.transport
     TransportChain,
     TransportUnavailable,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.profiles import routes
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.profiles import command_profiles as profiles
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.sending import routes
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.sending import command_profiles as profiles
 
 
 class FakeRoute:

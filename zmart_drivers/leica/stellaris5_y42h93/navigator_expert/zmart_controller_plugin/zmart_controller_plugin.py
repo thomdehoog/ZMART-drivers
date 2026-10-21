@@ -13,7 +13,7 @@ the driver once on the LAS X computer, then connect by name in every session::
     mic.get_xyz()
 
 The class translates. The driver itself is the ``Microscope`` in
-``for_direct_use/microscope.py``, which can also be used without the
+``driver_api/microscope.py``, which can also be used without the
 controller; each method here calls it and gives the answer the shape the
 controller takes. What only the controller asks for lives beside this file:
 the description of ``get_info`` (``info.py``) and the menu of named
@@ -31,7 +31,7 @@ itself.
 Positions are micrometres from the saved origin, in the sample's coordinate
 system. The ``connection`` dictionary comes from ``zmart_controller_plugin.json``; every
 key may be left out and then takes the driver's default
-(``for_direct_use/microscope.DEFAULT_CONNECTION``).
+(``driver_api/microscope.DEFAULT_CONNECTION``).
 
 Author: Thom de Hoog, Center for Microscopy and Image Analysis (ZMB),
 University of Zurich (thom.dehoog@zmb.uzh.ch, thomdehoog@gmail.com).
@@ -41,7 +41,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from ..for_direct_use.microscope import Microscope
+from ..driver_api.microscope import Microscope
 from . import info
 from . import procedure_menu
 

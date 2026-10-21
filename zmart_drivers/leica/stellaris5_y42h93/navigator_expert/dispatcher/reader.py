@@ -44,9 +44,9 @@ This file knows nothing of any one microscope. What the reader asks of the
   and the mode for the rest;
 - ``UnsupportedSource``: the error class for a missing source.
 
-For LAS X these are in ``vendor_specific/primitive_handling/readings/sources.py``, and the
+For LAS X these are in ``operations/readings/sources.py``, and the
 named readings the rest of the driver asks for (``get_xy`` and the others) are
-in ``vendor_specific/primitive_handling/readings/named_readings.py``, which call :func:`wait_for`.
+in ``operations/readings/named_readings.py``, which call :func:`wait_for`.
 
 Author: Thom de Hoog, Center for Microscopy and Image Analysis (ZMB),
 University of Zurich (thom.dehoog@zmb.uzh.ch, thomdehoog@gmail.com).
@@ -199,7 +199,7 @@ def wait_for(
     Args:
         vendor: The microscope's own sources: the object that knows its table
             of readings and how to ask each source (for LAS X,
-            ``primitive_handling/readings/sources.py``). The reader itself knows
+            ``operations/readings/sources.py``). The reader itself knows
             nothing of any one microscope.
         datum: A row of the vendor's table of readings.
         client: The connected microscope client.

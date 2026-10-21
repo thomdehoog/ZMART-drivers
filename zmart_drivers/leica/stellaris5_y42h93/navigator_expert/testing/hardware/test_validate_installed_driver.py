@@ -23,7 +23,7 @@ for _p in (_HERE, _HELPERS, _REPO_ROOT):
 
 import validate_installed_driver
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.connection import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.connection import (
     lasx_client as adapter,
 )
 

@@ -274,7 +274,7 @@ def _described(ome) -> dict:
 
 def _laser_power(record: dict) -> list[dict]:
     """Each laser's power fields, from the capture's own setting in LAS X's description."""
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitives.capture.metadata_map import (
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.primitives.capture.metadata_map import (
         image_of,
     )
 

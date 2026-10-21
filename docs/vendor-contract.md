@@ -19,7 +19,7 @@ named below.
 ## 1. A transport
 
 How a request reaches the microscope and how its reply is awaited. One object
-with five methods. Leica: `vendor_specific/primitive_handling/profiles/transport.py`.
+with five methods. Leica: `operations/sending/transport.py`.
 
 | Method | What it does | Answers |
 |---|---|---|
@@ -35,7 +35,7 @@ A microscope may be reached more than one way (for LAS X, the CAM API and LAS X'
 hardware server). Each way is a transport as above. The dispatcher's `TransportChain`
 (`dispatcher/transport_chain.py`) holds an ordered list of them behind the one
 `transport` a profile names, and the vendor decides the order. Leica:
-`primitive_handling/profiles/routes.py` (`ROUTES`, `WRITE_ROUTES`; the order can be
+`operations/sending/routes.py` (`ROUTES`, `WRITE_ROUTES`; the order can be
 set with the environment variable `ZMART_WRITE_ROUTES`).
 
 The rule that keeps a command from being done twice: a route's `send` raises
@@ -50,7 +50,7 @@ profile can name it directly.
 
 How the dispatcher treats one command. A frozen dataclass (the dispatcher
 changes a field with `dataclasses.replace`), with these fields. Leica:
-`CommandProfile` in `primitive_handling/profiles/command_profiles.py`.
+`CommandProfile` in `operations/sending/command_profiles.py`.
 
 | Field | Meaning |
 |---|---|
@@ -79,7 +79,7 @@ that they can carry the call's target:
 ## 3. Reading sources
 
 How a reading is answered. One object (Leica: the module
-`primitive_handling/readings/sources.py`) with:
+`operations/readings/sources.py`) with:
 
 | Name | What it is |
 |---|---|
@@ -102,7 +102,7 @@ The dispatcher never reads an error message. The vendor's `error_check_fn`
 reads the microscope's reply and says two things: whether the command failed,
 and whether the failure is temporary (`"transient": True`), so that sending
 again is worthwhile. Anything the vendor does not recognise should count as
-permanent. Leica: `classify_error` in `primitive_handling/profiles/error_classification.py`.
+permanent. Leica: `classify_error` in `operations/sending/error_classification.py`.
 
 ## 5. Waiting numbers
 
@@ -116,7 +116,7 @@ between them where that is safe. Any object with four numbers:
 | `POLL_S` | 0.1 | how often a source is looked at again, in seconds |
 | `ANSWER_POLL_S` | 0.01 | how often a reply already asked for is checked, in seconds |
 
-Leica: `vendor_specific/connection/waiting.py`.
+Leica: `connection/waiting.py`.
 
 ## 6. Limits
 
@@ -127,7 +127,7 @@ values are not allowed, and by returning when they are. It also answers
 with that as a dictionary. The driver installs it for each connection when it
 connects, with `gate.install(client, gate.GateState(limits=...))`. Until it is
 installed, every change is refused. Leica: `LeicaLimits` in
-`primitive_handling/commands/limit_rules.py`, installed by
+`operations/changes/limit_rules.py`, installed by
 `driver_setup/limits/handshake.py`.
 
 ## What comes back

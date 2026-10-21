@@ -129,7 +129,7 @@ def _lasx_runtime_status() -> str:
     on a clean "unavailable", which is the correct, expected answer there.
     """
     try:
-        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.connection import (
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.connection import (
             lasx_runtime,
         )
     except Exception as exc:

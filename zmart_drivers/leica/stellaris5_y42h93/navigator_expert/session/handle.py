@@ -20,7 +20,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from ..vendor_specific.primitive_handling.readings import named_readings as _readers
+from ..operations.readings import named_readings as _readers
 
 log = logging.getLogger(__name__)
 

@@ -31,8 +31,8 @@ _REPO_ROOT = Path(__file__).resolve().parents[6]
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings import named_readings as readers  # noqa: E402
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.zmart_controller_plugin.zmart_controller_plugin import # noqa: E402     ZmartControllerPlugin
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.readings import named_readings as readers  # noqa: E402
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.zmart_controller_plugin.zmart_controller_plugin import ZmartControllerPlugin  # noqa: E402
 
 
 def _timed_readings(t0: float):

@@ -18,10 +18,10 @@ CHILD_SCRIPT = """
 import sys
 # Mimic an example-script entry point: only the repository root on sys.path.
 sys.path.insert(0, r"{repo}")
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.commands import run_job
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.changes import run_job
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.save_data import save as saving
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.save_data import saved_acquisition
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.connection import lasx_runtime
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.connection import lasx_runtime
 assert run_job.acquire is not None
 assert saving.save is not None
 assert run_job.AcquisitionResult is not None
@@ -67,7 +67,7 @@ def test_lasx_runtime_load_smoke_when_installed():
     Bare dev/CI machines can import the loader but cannot load LAS X assemblies;
     hardware validation covers the required installed-runtime path.
     """
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.connection import (
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.connection import (
         lasx_runtime,
     )
 

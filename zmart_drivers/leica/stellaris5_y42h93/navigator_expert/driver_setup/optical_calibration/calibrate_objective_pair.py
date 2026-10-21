@@ -57,8 +57,8 @@ from typing import Any
 import numpy as np
 
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.limits import handshake
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.connection import lasx_client
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings import named_readings as readers
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.connection import lasx_client
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.readings import named_readings as readers
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.orientation.registration import (
     VOTING_METHODS,
     register_voting,
@@ -232,7 +232,7 @@ def start_session(
     # the adopted calibration so a named set never carries stale objective names.
     # Slots whose hardware record has no usable name are left out: an empty
     # name must never overwrite the human-set name already in the config.
-    from ...vendor_specific.primitive_handling.commands import objectives as _objectives
+    from ...operations.changes import objectives as _objectives
 
     hardware_objectives = {
         slot: name

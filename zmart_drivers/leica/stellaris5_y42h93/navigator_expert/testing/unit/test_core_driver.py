@@ -27,20 +27,20 @@ from unittest.mock import MagicMock, PropertyMock, patch
 
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher import door
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.objective_change_with_compensation import compensated_changes
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.profiles import error_classification
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitives.values import parsing
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.commands import changes
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.commands import limit_rules
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.connection import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.sending import error_classification
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.primitives.values import parsing
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.changes import changes
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.changes import limit_rules
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.connection import (
     lasx_client as session,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.confirmations import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.changes import (
     confirm_select_job,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.confirmations import confirm_changes as confirmations
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.connection import lasx_settings
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.profiles import command_profiles as profiles
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.commands import changes as commands
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.changes import confirm_changes as confirmations
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.connection import lasx_settings
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.sending import command_profiles as profiles
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.changes import changes as commands
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.objective_change_with_compensation import (
     compensated_changes as commands_comp,
 )
@@ -48,15 +48,15 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher import (
     confirm_loop as dispatch,
     send_loop,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.profiles import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.sending import (
     prechecks,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings import named_readings as readers
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.profiles import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.readings import named_readings as readers
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.sending import (
     error_classification as errors,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.commands import settings as settings_table
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.profiles import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.changes import settings as settings_table
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.sending import (
     transport as transport_module,
 )
 
@@ -787,7 +787,7 @@ class TestRetryBackoff(unittest.TestCase):
         client = make_client()
         api_obj = make_api_obj()
 
-        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.profiles.command_profiles import CommandProfile
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.sending.command_profiles import CommandProfile
 
         profile = CommandProfile(
             retry_backoff=2.0,
@@ -826,7 +826,7 @@ class TestRetryBackoff(unittest.TestCase):
         client = make_client()
         api_obj = make_api_obj()
 
-        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.profiles.command_profiles import CommandProfile
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.sending.command_profiles import CommandProfile
 
         profile = CommandProfile(
             refire_on_unconfirmed=False,
@@ -2918,7 +2918,7 @@ class TestHybridSelectJobApiLegEndToEnd(unittest.TestCase):
     """
 
     def test_api_leg_confirms_when_log_has_no_evidence(self):
-        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitives.log import (
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.primitives.log import (
             log_wait,
         )
 

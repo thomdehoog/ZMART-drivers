@@ -38,7 +38,7 @@ _REPO_ROOT = Path(__file__).resolve().parents[6]
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.confirmations import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.changes import (
     confirm_select_job as _confirm_select_job,
 )
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.objective_change_with_compensation import (
@@ -47,11 +47,11 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.objective
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher import (  # noqa: E402
     gate as _gate,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings import named_readings as _readers  # noqa: E402
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitives.log import (
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.operations.readings import named_readings as _readers  # noqa: E402
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.primitives.log import (
     log_reader as _log_reader,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.zmart_controller_plugin.zmart_controller_plugin import # noqa: E402     ZmartControllerPlugin
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.zmart_controller_plugin.zmart_controller_plugin import ZmartControllerPlugin  # noqa: E402
 
 #: A call slower than this is printed by name.
 SLOW_S = 0.3
