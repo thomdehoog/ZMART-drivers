@@ -49,6 +49,7 @@ from functools import partial
 
 from ....dispatcher import door as _dispatcher
 from ....dispatcher import gate as _gate
+from ...primitives.api.request import request_of
 from ....dispatcher.door import make_log_entry as _make_log_entry, make_timing as _make_timing
 from ..readings.parsing import _hw_get
 from . import settings
@@ -253,7 +254,7 @@ def _change_setting(setting, client, arguments, *, max_retries=None, tolerance=N
 
     return dispatch_change(
         client,
-        getattr(client, setting.request),
+        request_of(client, setting.request),
         setting.describe.format(**arguments),
         setting.profile,
         command=setting.command,
@@ -708,7 +709,7 @@ def move_xy(client, x, y, unit="um", *, max_retries=None, tolerance=None):
             "logs": [],
         }
 
-    api_obj = client.PyApiMoveHardwareXY
+    api_obj = request_of(client, "PyApiMoveHardwareXY")
 
     # Resolve .NET enums with integer fallback
     UNIT_ENUM_MAP = {"um": "eMicrons", "mm": "eMillimeter", "m": "eMeter"}
@@ -825,7 +826,7 @@ def move_z(
         }
 
     # Resolve .NET enums from the live model
-    api_obj = client.PyApiMoveZByJobName
+    api_obj = request_of(client, "PyApiMoveZByJobName")
     try:
         z_use_val = getattr(type(api_obj.Model.ZUseMode), z_member)
     except Exception:
@@ -904,7 +905,7 @@ def acquire(
     if refused:
         return refused
 
-    api_obj = client.PyApiAcquireJob
+    api_obj = request_of(client, "PyApiAcquireJob")
 
     def setup(m):
         m.JobName = job_name
@@ -1034,7 +1035,7 @@ def set_objective(
             refused.setdefault("timing", _make_timing(total_s=0.0, attempts=0))
             return refused
 
-    api_obj = client.PyApiSetObjectiveSlotByJobName
+    api_obj = request_of(client, "PyApiSetObjectiveSlotByJobName")
 
     def setup(m):
         m.JobName = job_name
@@ -1092,7 +1093,7 @@ def select_job(client, job_name, *, before_fire=None):
             )
             return refused
 
-    api_obj = client.PyApiSelectJobByName
+    api_obj = request_of(client, "PyApiSelectJobByName")
 
     def setup(m):
         m.JobName = job_name

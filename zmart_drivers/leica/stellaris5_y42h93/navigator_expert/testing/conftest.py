@@ -61,6 +61,20 @@ def pytest_report_header(config):
 
 
 @pytest.fixture(autouse=True)
+def _writes_through_the_cam_api(monkeypatch):
+    """Send every change through the CAM API unless a test asks for the direct route.
+
+    The shipped order is direct first, the CAM API behind it. Most tests are about
+    what a change does, not how it travels, and some hand in a stand-in hardware
+    server for the reads, which the direct route would then try to write to.
+    The tests of the direct route set ``WRITE_ROUTES`` themselves.
+    """
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.profiles import routes
+
+    monkeypatch.setattr(routes, "WRITE_ROUTES", ("cam",))
+
+
+@pytest.fixture(autouse=True)
 def _no_hardware_server(monkeypatch):
     """Make LAS X's hardware server unreachable for every test.
 

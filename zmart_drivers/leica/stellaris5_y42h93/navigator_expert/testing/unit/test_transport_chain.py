@@ -144,9 +144,9 @@ def test_the_vendor_policy_is_read_for_every_command(monkeypatch):
 
 
 def test_a_route_name_that_does_not_exist_is_refused_with_the_names_that_do(monkeypatch):
-    monkeypatch.setattr(routes, "WRITE_ROUTES", ("direct", "cam"))
+    monkeypatch.setattr(routes, "WRITE_ROUTES", ("sideways", "cam"))
 
-    with pytest.raises(ValueError, match="'direct'.*routes that exist are \\['cam'\\]"):
+    with pytest.raises(ValueError, match="'sideways'.*routes that exist are \\['cam', 'direct'\\]"):
         routes.write_routes()
 
 

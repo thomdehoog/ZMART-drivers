@@ -77,7 +77,14 @@ def test_native_stage_motion_fires_only_from_the_actions():
         str(rel)
         for rel, text in _driver_sources()
         if "PyApiMoveHardware" in text
-        and rel != Path("vendor_specific/primitive_handling/settings/changes.py")
+        and rel
+        not in (
+            Path("vendor_specific/primitive_handling/settings/changes.py"),
+            # The direct route's table of how each CAM command is written for the hardware
+            # server. It sends nothing itself: only the direct transport does, and that is
+            # reached through the same change definitions and the same limits gate.
+            Path("vendor_specific/primitives/direct/translations.py"),
+        )
     ]
     assert offenders == [], (
         f"native stage motion referenced outside vendor_specific/primitive_handling/settings/changes.py: {offenders}; "

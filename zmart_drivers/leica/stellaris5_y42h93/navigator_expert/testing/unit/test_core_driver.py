@@ -1817,7 +1817,7 @@ class TestSetFunctionWiring(unittest.TestCase):
 
         def mock_fire(client, api_obj, description, **kw):
             captured["description"] = description
-            captured["api_obj"] = api_obj
+            captured["api_obj"] = getattr(api_obj, "cam_object", api_obj)  # the request, without its name
             captured["kwargs"] = kw
             model = MagicMock()
             if kw.get("setup_fn"):
