@@ -52,7 +52,7 @@ from ..procedures.save_data.naming import run_hash
 from ..session import loaded_config
 from ..session.handle import ZmartHandle, job_catalog, note_unconfirmed, require_open, selected_job_name
 from ..vendor_specific.connection import lasx_client
-from ..vendor_specific.primitive_handling.readings import state as readings
+from ..vendor_specific.primitive_handling.readings import named_readings as readings
 from ..vendor_specific.primitive_handling.settings import changes
 from ..vendor_specific.primitive_handling.settings.settings import BY_NAME as SETTINGS
 from ..vendor_specific.primitives.interface import lasx_dialogs

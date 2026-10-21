@@ -98,7 +98,7 @@ def record_before_change(
             )
         return None
 
-    from ...vendor_specific.primitive_handling.readings import state as _readers
+    from ...vendor_specific.primitive_handling.readings import named_readings as _readers
 
     if job_name is None:
         selected = _readers.get_selected_job(client) or {}
@@ -151,7 +151,7 @@ def compensate_after_change(
         }
 
     try:
-        from ...vendor_specific.primitive_handling.readings import state as _readers
+        from ...vendor_specific.primitive_handling.readings import named_readings as _readers
 
         if new_slot is None:
             settings = _readers.get_job_settings(client, job_name) or {}

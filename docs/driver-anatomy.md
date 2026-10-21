@@ -170,7 +170,7 @@ navigator_expert/
         store.py               load, check and save, for every item
 
     vendor_specific/           the part you write for a new microscope
-        connection/            reach LAS X, keep the link; tuning.py holds the waiting numbers
+        connection/            reach LAS X, keep the link; waiting.py holds the waiting numbers
         primitives/            the smallest single reads and writes, one folder for each way of reaching LAS X
             direct/            reading LAS X's own state, through its hardware server
             api/               the CAM API
@@ -654,7 +654,7 @@ the dispatcher becomes a package of its own.
 Because the handling notes now live in the vendor interface, nothing in the
 `dispatcher/` folder belongs to one microscope. Even the waiting rule's
 numbers are handed in: Leica's are four windows of three seconds, in
-`vendor_specific/connection/tuning.py`, and a microscope that needs other
+`vendor_specific/connection/waiting.py`, and a microscope that needs other
 numbers hands in its own. The whole folder can move to the shared package
 once a second driver uses it.
 
@@ -667,10 +667,10 @@ vendor part:
   the reply, sends, waits for the reply and reports an open dialog
   (`primitive_handling/profiles/transport.py`);
 - the **command profiles**, with their pre-check (is the scanner idle), their
-  error check and their confirmation (`primitive_handling/profiles/profiles.py`);
+  error check and their confirmation (`primitive_handling/profiles/command_profiles.py`);
 - the **sources** a reading can ask, and the source tried alone first
   (`primitive_handling/readings/sources.py`);
-- the **waiting numbers** (`vendor_specific/connection/tuning.py`), handed in as
+- the **waiting numbers** (`vendor_specific/connection/waiting.py`), handed in as
   `profile.waiting` for a change and `sources.waiting` for a reading;
 - the **limits object**, which answers `check_command`, and the hint that says
   where the operator creates the limits files.
@@ -796,7 +796,7 @@ short:
   nothing else of the driver. The vendor part hands in everything LAS X does
   its own way (see "The dispatcher is fully shared").
 - **One waiting rule.** Every wait on LAS X follows four windows of three
-  seconds, with the numbers in `vendor_specific/connection/tuning.py`. A
+  seconds, with the numbers in `vendor_specific/connection/waiting.py`. A
   command profile can say `never_resend`; the acquisition does, and nothing a
   caller asks for can switch the resend back on.
 - **Primitives are grouped by channel**, not by reading or writing: `api`,
@@ -829,13 +829,13 @@ purpose, so that it cannot be forgotten.
    direct reader confirms a job change alone, as it is first choice for every
    read. Only when it cannot answer do the API and the log run together in two
    threads (`primitive_handling/confirmations/confirm_select_job.py` and the
-   race in `confirmations.py`). The log leg reads a file, which never reaches
+   race in `confirm_changes.py`). The log leg reads a file, which never reaches
    LAS X, so the one-request-at-a-time rule still holds.
 2. **The error vocabulary and its rules are not yet shared.** They sit in the
    Leica file `error_classification.py`, beside the sorting (see "Error
    vocabulary, classification and rules").
 3. **The shape of a command profile is Leica's.** `CommandProfile` lives in
-   `primitive_handling/profiles/profiles.py`, and the dispatcher reads its
+   `primitive_handling/profiles/command_profiles.py`, and the dispatcher reads its
    fields by name. A second vendor needs the same fields; the shape belongs to
    the dispatcher, with only the values in the vendor part.
 4. **Some procedures still call primitives directly.** `clear_cache` presses

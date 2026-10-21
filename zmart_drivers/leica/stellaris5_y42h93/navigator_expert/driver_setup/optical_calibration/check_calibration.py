@@ -32,7 +32,7 @@ import numpy as np
 
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.limits import handshake
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.connection import lasx_client
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings import state as readers
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings import named_readings as readers
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.orientation.registration import (
     register_voting,
 )

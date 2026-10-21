@@ -10,7 +10,7 @@ job-settings JSON from ``get_job_settings`` into a flat, navigable dict
 (validated required keys; ``_beamRoute``/``_lineIndex``/``_index`` markers so
 detectors, lasers, and filter wheels can be located without re-parsing; the
 ``stack``/``zPosition``/``time`` sections when present). The confirm
-functions in ``commands/confirmations.py`` read their readback through it.
+functions in ``confirmations/confirm_changes.py`` read their readback through it.
 """
 
 import re

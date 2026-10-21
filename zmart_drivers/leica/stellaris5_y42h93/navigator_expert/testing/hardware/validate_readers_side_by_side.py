@@ -54,18 +54,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "helpers"))  # mock
 from _report import RunReport, attempts_of, confirmation_of, replay_envelope_logs
 
 import low_level as drv
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings import (
-    readings as capabilities,
-)
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.profiles import (
-    profiles,
-)
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings import (
-    state as readers,
-)
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.connection import (
-    tuning,
-)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings import reading_table as capabilities
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.profiles import command_profiles as profiles
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings import named_readings as readers
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.connection import waiting
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitives.log import (
     log_reader as L,
 )
@@ -293,7 +285,7 @@ def _settings_diffs(af, lf):
     ]
 
 
-# --- polling: the one rule in vendor_specific/connection/tuning.py ------------------------------
+# --- polling: the one rule in vendor_specific/connection/waiting.py ------------------------------
 #
 # A post-change readback waits for the expected value by the same rule as the
 # driver: at most WINDOWS windows of WINDOW_S, looking again every POLL_S.
@@ -301,12 +293,12 @@ def _settings_diffs(af, lf):
 
 def _change_poll_params():
     """(wait_window_s, poll_interval_s) for a post-change settings readback."""
-    return tuning.WINDOWS * tuning.WINDOW_S, tuning.POLL_S
+    return waiting.WINDOWS * waiting.WINDOW_S, waiting.POLL_S
 
 
 def _select_poll_params():
     """(wait_window_s, poll_interval_s) for a post-select-job readback."""
-    return tuning.WINDOWS * tuning.WINDOW_S, tuning.POLL_S
+    return waiting.WINDOWS * waiting.WINDOW_S, waiting.POLL_S
 
 
 # --- phases ----------------------------------------------------------------

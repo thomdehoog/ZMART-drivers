@@ -617,7 +617,7 @@ def test_absent_setter_falls_back_but_explicit_empty_list_is_unlimited(mock_clie
 def test_reads_work_without_a_handshake_while_mutations_refuse(mock_client):
     """No handshake == read-only session, not a dead session. Reads never touch
     the gate; mutations refuse fail-closed until a handshake runs."""
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings import state as readers
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings import named_readings as readers
 
     # This client never handshook — the one path that stays fail-closed.
     assert gate.state_for(mock_client) is None
@@ -912,9 +912,7 @@ def test_adapter_bypass_refuses_at_the_commands_layer(clear_stage_limits):
     from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings import (
         parsing as _cmd_settings,
     )
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings import (
-        state as _readers,
-    )
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings import named_readings as _readers
 
     _raw_snapshot(_machine_root(), limits_text=_BAD_LIMITS_TEXTS["missing_axis"])
     client = MockLasxClient(latency=0.0)
@@ -953,9 +951,7 @@ def test_controller_session_bypass_refuses_at_the_commands_layer(clear_stage_lim
     from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings import (
         parsing as _cmd_settings,
     )
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings import (
-        state as _readers,
-    )
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings import named_readings as _readers
 
     _raw_snapshot(_machine_root(), limits_text=_BAD_LIMITS_TEXTS["missing_axis"])
     client = MockLasxClient(latency=0.0)

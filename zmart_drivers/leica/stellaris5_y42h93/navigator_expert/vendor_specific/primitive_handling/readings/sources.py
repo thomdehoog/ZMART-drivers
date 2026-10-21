@@ -22,9 +22,9 @@ from functools import partial
 from ....dispatcher.reader import Reading, counts
 from ...connection.hardware_server import HardwareServerUnavailable
 from ...primitives.log import log_reader
-from ..profiles import profiles
-from . import readings as capabilities
-from ...connection import tuning
+from ..profiles import command_profiles as profiles
+from . import reading_table as capabilities
+from ...connection import waiting  # how long the shared reader waits: this microscope's numbers
 
 log = logging.getLogger(__name__)
 
@@ -33,9 +33,6 @@ def spec(datum):
     """The row of the table of readings for *datum*."""
     return capabilities.spec(datum)
 
-
-#: How long the shared reader waits: the numbers of this microscope's waiting rule.
-waiting = tuning
 
 #: Handed to the shared reader so that it can tell a missing leg from a failure.
 UnsupportedSource = capabilities.UnsupportedSource
@@ -259,9 +256,9 @@ def watch_direct(spec, *, succeeded, deadline, observed_after, kwargs, waiting):
                     f"the direct reader answered {reading.value!r}"
                 ),
             )
-        if time.monotonic() + tuning.POLL_S >= deadline:
+        if time.monotonic() + waiting.POLL_S >= deadline:
             return None
-        time.sleep(tuning.POLL_S)
+        time.sleep(waiting.POLL_S)
 
 
 def _ask_api(spec, client, api_kwargs, *, until, answer_counts):
@@ -279,7 +276,7 @@ def _ask_api(spec, client, api_kwargs, *, until, answer_counts):
     reading = None
     while time.monotonic() < until:
         if not _API_TURNS.take(
-            key, until=until, stop=_NEVER_STOPPED, poll_s=tuning.POLL_S
+            key, until=until, stop=_NEVER_STOPPED, poll_s=waiting.POLL_S
         ):
             break
         done = threading.Event()
@@ -300,7 +297,7 @@ def _ask_api(spec, client, api_kwargs, *, until, answer_counts):
         reading = answers[0]
         if answer_counts(reading):
             return reading
-        time.sleep(max(0.0, min(tuning.POLL_S, until - time.monotonic())))
+        time.sleep(max(0.0, min(waiting.POLL_S, until - time.monotonic())))
     return reading
 
 
@@ -317,4 +314,4 @@ def _ask_log(spec, job_name, max_age_s, *, until, answer_counts):
         remaining = until - time.monotonic()
         if answer_counts(reading) or remaining <= 0:
             return reading
-        time.sleep(min(tuning.POLL_S, remaining))
+        time.sleep(min(waiting.POLL_S, remaining))

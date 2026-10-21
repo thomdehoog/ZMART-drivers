@@ -37,12 +37,8 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.conn
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.confirmations import (
     confirm_select_job,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.confirmations import (
-    confirmations,
-)
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.profiles import (
-    profiles,
-)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.confirmations import confirm_changes as confirmations
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.profiles import command_profiles as profiles
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.settings import (
     changes as commands,
 )
@@ -56,9 +52,7 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher import (
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.profiles import (
     prechecks,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings import (
-    state as readers,
-)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings import named_readings as readers
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.profiles import (
     error_classification as errors,
 )
@@ -796,9 +790,7 @@ class TestRetryBackoff(unittest.TestCase):
         client = make_client()
         api_obj = make_api_obj()
 
-        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.profiles.profiles import (
-            CommandProfile,
-        )
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.profiles.command_profiles import CommandProfile
 
         profile = CommandProfile(
             retry_backoff=2.0,
@@ -837,9 +829,7 @@ class TestRetryBackoff(unittest.TestCase):
         client = make_client()
         api_obj = make_api_obj()
 
-        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.profiles.profiles import (
-            CommandProfile,
-        )
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.profiles.command_profiles import CommandProfile
 
         profile = CommandProfile(
             refire_on_unconfirmed=False,

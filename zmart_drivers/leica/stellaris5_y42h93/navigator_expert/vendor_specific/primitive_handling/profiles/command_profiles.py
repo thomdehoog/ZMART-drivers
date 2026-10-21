@@ -31,35 +31,34 @@ from dataclasses import dataclass
 from . import routes as _routes
 from .prechecks import check_idle
 from ..settings.limit_rules import NOTEBOOK_POINTER
-from ...connection import tuning
-from ...connection.tuning import WINDOW_S, WINDOWS
+from ...connection import waiting
+from ...connection.waiting import WINDOW_S
+from ...connection.waiting import WINDOWS
 from .error_classification import _default_error_check
-from ..confirmations.confirmations import (
-    _confirm_detector_gain,
-    _confirm_filter_wheel_slot,
-    _confirm_filter_wheel_spectrum,
-    _confirm_frame_accumulation,
-    _confirm_frame_average,
-    _confirm_image_format,
-    _confirm_laser_intensity,
-    _confirm_laser_shutter,
-    _confirm_line_accumulation,
-    _confirm_line_average,
-    _confirm_pinhole_airy,
-    _confirm_scan_field_rotation,
-    _confirm_scan_mode,
-    _confirm_scan_resonant,
-    _confirm_scan_speed,
-    _confirm_sequential_mode,
-    _confirm_z_stack_definition,
-    _confirm_z_stack_size,
-    _confirm_z_stack_step_size,
-    _confirm_zoom,
-    confirm_acquire,
-    confirm_move_xy,
-    confirm_move_z,
-    confirm_objective,
-)
+from ..confirmations.confirm_changes import _confirm_detector_gain
+from ..confirmations.confirm_changes import _confirm_filter_wheel_slot
+from ..confirmations.confirm_changes import _confirm_filter_wheel_spectrum
+from ..confirmations.confirm_changes import _confirm_frame_accumulation
+from ..confirmations.confirm_changes import _confirm_frame_average
+from ..confirmations.confirm_changes import _confirm_image_format
+from ..confirmations.confirm_changes import _confirm_laser_intensity
+from ..confirmations.confirm_changes import _confirm_laser_shutter
+from ..confirmations.confirm_changes import _confirm_line_accumulation
+from ..confirmations.confirm_changes import _confirm_line_average
+from ..confirmations.confirm_changes import _confirm_pinhole_airy
+from ..confirmations.confirm_changes import _confirm_scan_field_rotation
+from ..confirmations.confirm_changes import _confirm_scan_mode
+from ..confirmations.confirm_changes import _confirm_scan_resonant
+from ..confirmations.confirm_changes import _confirm_scan_speed
+from ..confirmations.confirm_changes import _confirm_sequential_mode
+from ..confirmations.confirm_changes import _confirm_z_stack_definition
+from ..confirmations.confirm_changes import _confirm_z_stack_size
+from ..confirmations.confirm_changes import _confirm_z_stack_step_size
+from ..confirmations.confirm_changes import _confirm_zoom
+from ..confirmations.confirm_changes import confirm_acquire
+from ..confirmations.confirm_changes import confirm_move_xy
+from ..confirmations.confirm_changes import confirm_move_z
+from ..confirmations.confirm_changes import confirm_objective
 
 
 @dataclass(frozen=True)
@@ -84,7 +83,7 @@ class StateReaderProfile:
     capability table and source preference belongs here.
 
     Nothing here says how long to wait or how often to look: that is the one
-    rule in ``vendor_specific/connection/tuning.py``. A mode says which sources take part; a
+    rule in ``vendor_specific/connection/waiting.py``. A mode says which sources take part; a
     ``*_log_max_age_s`` says how old a log answer may be and still count,
     because each kind of state goes stale at its own pace.
 
@@ -139,7 +138,7 @@ class StateReaderProfile:
     # hybrid races the api leg (transition-admissible: a stale API readback
     # cannot witness a transition to a target it already read pre-command)
     # against the log leg (post-command CurrentBlock event). The race runs for
-    # one window (``tuning.WINDOW_S``), and the dispatcher runs four of them
+    # one window (``waiting.WINDOW_S``), and the dispatcher runs four of them
     # with the command fired again between: the one 4x3 rule.
     # The api confirm is measured-wrong on the real scope (stale 15 s+, wrong
     # job) and log-only is insufficient on the simulator; hybrid fits both
@@ -306,8 +305,8 @@ class CommandProfile:
     # ``transport.py``. Another microscope supplies its own.
     transport: object = _routes.ROUTED
     # The waiting rule (windows, window length, poll times) the engines follow
-    # for this command; see ``vendor_specific/connection/tuning.py``.
-    waiting: object = tuning
+    # for this command; see ``vendor_specific/connection/waiting.py``.
+    waiting: object = waiting
     # Where the operator creates the limits files, said when a command is refused
     # because no limits are installed.
     limits_setup_hint: str = NOTEBOOK_POINTER

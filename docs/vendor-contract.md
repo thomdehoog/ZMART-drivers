@@ -50,7 +50,7 @@ profile can name it directly.
 
 How the dispatcher treats one command. A frozen dataclass (the dispatcher
 changes a field with `dataclasses.replace`), with these fields. Leica:
-`CommandProfile` in `primitive_handling/profiles/profiles.py`.
+`CommandProfile` in `primitive_handling/profiles/command_profiles.py`.
 
 | Field | Meaning |
 |---|---|
@@ -116,7 +116,7 @@ between them where that is safe. Any object with four numbers:
 | `POLL_S` | 0.1 | how often a source is looked at again, in seconds |
 | `ANSWER_POLL_S` | 0.01 | how often a reply already asked for is checked, in seconds |
 
-Leica: `vendor_specific/connection/tuning.py`.
+Leica: `vendor_specific/connection/waiting.py`.
 
 ## 6. Limits
 

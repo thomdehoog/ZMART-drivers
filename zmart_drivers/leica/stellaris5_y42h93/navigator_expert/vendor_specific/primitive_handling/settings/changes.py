@@ -23,7 +23,7 @@ Every command follows three phases:
     **Phase C** - Post-processing: attach extra data to the result dict
         (e.g. ``move_xy`` attaches the target position).
 
-Numeric command tuning comes from the profiles in ``profiles.py``. Keyword
+Numeric command tuning comes from the profiles in ``command_profiles.py``. Keyword
 arguments such as ``max_retries`` are explicit overrides for tests and unusual
 hardware runs; ``None`` means "use the profile".
 
@@ -60,16 +60,18 @@ from ..confirmations.confirm_select_job import (
     prepare_select_job,
     select_job_confirm_legs,
 )
-from ..confirmations.confirmations import (
-    confirm_acquire,
-    confirm_move_xy,
-    confirm_move_z,
-    confirm_objective,
-    race_confirmations,
-)
+from ..confirmations.confirm_changes import confirm_acquire
+from ..confirmations.confirm_changes import confirm_move_xy
+from ..confirmations.confirm_changes import confirm_move_z
+from ..confirmations.confirm_changes import confirm_objective
+from ..confirmations.confirm_changes import race_confirmations
 from .limit_rules import NOTEBOOK_POINTER, check_xy, check_z
 from .objectives import objective_by_slot
-from ..profiles.profiles import ACQUIRE, MOVE_XY, MOVE_Z, OBJECTIVE, SELECT_JOB
+from ..profiles.command_profiles import ACQUIRE
+from ..profiles.command_profiles import MOVE_XY
+from ..profiles.command_profiles import MOVE_Z
+from ..profiles.command_profiles import OBJECTIVE
+from ..profiles.command_profiles import SELECT_JOB
 
 log = logging.getLogger(__name__)
 

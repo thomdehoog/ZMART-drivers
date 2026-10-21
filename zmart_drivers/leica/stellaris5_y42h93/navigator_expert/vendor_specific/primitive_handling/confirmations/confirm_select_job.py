@@ -16,20 +16,21 @@ import logging
 import time
 from functools import partial
 
-from ..readings import state as _readers
+from ..readings import named_readings as _readers
 from ....dispatcher.door import make_log_entry as _make_log_entry
 from ...primitives.direct import direct_reader
 from ...primitives.log import log_wait
 from ...connection.hardware_server import HardwareServerUnavailable
-from .confirmations import _reading_value_after, race_confirmations
-from ...connection import tuning
+from .confirm_changes import _reading_value_after
+from .confirm_changes import race_confirmations
+from ...connection import waiting
 
 log = logging.getLogger(__name__)
 
 
 def _state_reader_profile():
     """Return the current state-reader profile without importing at module load."""
-    from ..profiles import profiles
+    from ..profiles import command_profiles as profiles
 
     return profiles.STATE_READERS
 
@@ -70,7 +71,7 @@ def confirm_select_job_direct(client, *, job_name, timeout=None, otherwise=None)
         {"success": bool, "logs": [...], "source": "direct"}, or *otherwise*'s result.
     """
     if timeout is None:
-        timeout = tuning.WINDOW_S
+        timeout = waiting.WINDOW_S
     logs = []
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
@@ -88,7 +89,7 @@ def confirm_select_job_direct(client, *, job_name, timeout=None, otherwise=None)
             return otherwise(client)
         if selected and selected["Name"] == job_name:
             return {"success": True, "logs": logs, "source": "direct"}
-        time.sleep(tuning.POLL_S)
+        time.sleep(waiting.POLL_S)
     msg = f"Job selection timeout after {timeout:.1f}s for '{job_name}' (direct reader)"
     log.warning(msg)
     logs.append(_make_log_entry("warning", msg))
@@ -127,7 +128,7 @@ def confirm_select_job(
         {"success": bool, "logs": [...]}
     """
     if timeout is None:
-        timeout = tuning.WINDOW_S
+        timeout = waiting.WINDOW_S
     logs = []
     if require_transition_witness and inadmissible_baseline is None:
         msg = (
@@ -170,7 +171,7 @@ def confirm_select_job(
                 if j.get("Name") == job_name and j.get("IsSelected"):
                     return {"success": True, "logs": logs}
 
-        time.sleep(tuning.POLL_S)
+        time.sleep(waiting.POLL_S)
 
     msg = f"Job selection timeout after {timeout:.1f}s for '{job_name}'"
     log.warning(msg)
@@ -188,7 +189,7 @@ def _confirm_select_job_log(job_name, command_started_at, *, timeout=None):
         log.warning(msg)
         logs.append(_make_log_entry("warning", msg))
         return {"success": False, "logs": logs, "source": "log"}
-    log_timeout = tuning.WINDOW_S if timeout is None else max(0.0, timeout)
+    log_timeout = waiting.WINDOW_S if timeout is None else max(0.0, timeout)
     log_result = log_wait.wait_for_selected_job_log(
         job_name,
         command_started_at=command_started_at,
@@ -259,7 +260,7 @@ def select_job_confirm_legs(
         raise ValueError(
             f"unknown selected-job confirmation source {source!r}; expected direct, api, log, or hybrid"
         )
-    window_s = tuning.WINDOW_S if timeout is None else timeout
+    window_s = waiting.WINDOW_S if timeout is None else timeout
     fallback = profile.selected_job_confirm_fallback if source == "direct" else source
     api_confirm = None
     log_leg = None

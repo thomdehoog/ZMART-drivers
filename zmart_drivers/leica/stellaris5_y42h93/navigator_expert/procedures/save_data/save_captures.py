@@ -23,8 +23,8 @@ from pathlib import Path
 from typing import Any
 
 from ...driver_setup import orientation as _orientation
-from ...vendor_specific.primitive_handling.profiles.profiles import IMAGE_SAVE
-from ...vendor_specific.primitive_handling.readings import state as _readers
+from ...vendor_specific.primitive_handling.profiles.command_profiles import IMAGE_SAVE
+from ...vendor_specific.primitive_handling.readings import named_readings as _readers
 from ...session import loaded_config as _session_state
 from ...session.handle import ZmartHandle, require_open
 from . import command_log as _log

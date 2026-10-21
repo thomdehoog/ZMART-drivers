@@ -22,7 +22,7 @@ from mock_lasx_api import MockLasxClient
 import zmart_drivers.leica.stellaris5_y42h93.navigator_expert as navigator_expert
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.for_direct_use import microscope
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.connection import lasx_client
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.profiles import profiles
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.profiles import command_profiles as profiles
 
 
 @pytest.fixture

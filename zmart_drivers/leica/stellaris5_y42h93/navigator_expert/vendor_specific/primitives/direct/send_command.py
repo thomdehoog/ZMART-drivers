@@ -21,7 +21,8 @@ import threading
 import time
 from xml.sax.saxutils import quoteattr
 
-from ...connection import hardware_server, tuning
+from ...connection import hardware_server
+from ...connection import waiting
 from ..interface import lasx_dialogs
 from .translations import Fields, NoTranslation
 
@@ -105,8 +106,8 @@ def send(xml: str) -> str:
         sender = senders["current"]
     outcome, done = {}, threading.Event()
     sender.waiting.put((xml, outcome, done))
-    deadline = time.monotonic() + tuning.WINDOWS * tuning.WINDOW_S
-    while not done.wait(tuning.POLL_S):
+    deadline = time.monotonic() + waiting.WINDOWS * waiting.WINDOW_S
+    while not done.wait(waiting.POLL_S):
         try:
             lasx_dialogs.answer_warnings()
         except lasx_dialogs.DialogOpen:
@@ -116,7 +117,7 @@ def send(xml: str) -> str:
             abandon(sender)
             raise hardware_server.HardwareServerUnavailable(
                 f"the hardware server did not answer {xml[:120]} within "
-                f"{tuning.WINDOWS} windows of {tuning.WINDOW_S}s, and LAS X shows no dialog"
+                f"{waiting.WINDOWS} windows of {waiting.WINDOW_S}s, and LAS X shows no dialog"
             )
     if "error" in outcome:
         raise outcome["error"]

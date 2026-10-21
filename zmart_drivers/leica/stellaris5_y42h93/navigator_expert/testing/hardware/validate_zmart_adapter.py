@@ -168,9 +168,7 @@ def _connect_session(
         from limits_fixtures import hermetic_mock_machine_root  # noqa: PLC0415
         from mock_lasx_api import MockLasxClient  # noqa: PLC0415
 
-        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.profiles import (
-            profiles,
-        )
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.profiles import command_profiles as profiles
 
         # Use a hermetic ProgramData fixture so the adapter connect's REAL
         # limits handshake succeeds without touching this developer machine.

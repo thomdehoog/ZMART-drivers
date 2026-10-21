@@ -12,7 +12,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 
 from . import log_reader
-from ...connection import tuning
+from ...connection import waiting
 
 
 @dataclass(frozen=True)
@@ -29,7 +29,7 @@ class LogPollResult:
 
 
 def _profile():
-    from ...primitive_handling.profiles import profiles
+    from ...primitive_handling.profiles import command_profiles as profiles
 
     return profiles.STATE_READERS
 
@@ -48,7 +48,7 @@ def wait_for_selected_job_log(
     """Poll LAS X logs until *job_name* is selected after *command_started_at*.
 
     Watches one window (``WINDOW_S``) by default, reading the log every
-    ``POLL_S``: the one rule in ``vendor_specific/connection/tuning.py``.
+    ``POLL_S``: the one rule in ``vendor_specific/connection/waiting.py``.
 
     This is a log-only experiment helper. It succeeds only when the log can
     map the selected element to the target job name and the selected-element
@@ -56,8 +56,8 @@ def wait_for_selected_job_log(
     """
 
     profile = _profile()
-    timeout_s = tuning.WINDOW_S if timeout_s is None else timeout_s
-    poll_interval_s = tuning.POLL_S if poll_interval_s is None else poll_interval_s
+    timeout_s = waiting.WINDOW_S if timeout_s is None else timeout_s
+    poll_interval_s = waiting.POLL_S if poll_interval_s is None else poll_interval_s
     max_age_s = (
         profile.selected_job_log_cluster_max_age_s if max_age_s is None else max_age_s
     )
