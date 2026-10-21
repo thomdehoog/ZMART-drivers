@@ -210,6 +210,32 @@ class TestStackedDrive:
         with pytest.raises(RuntimeError, match="no job 'Elsewhere'"):
             z_um_from_settings(settings, "z-galvo", client=SavingClient(), job_name="Elsewhere")
 
+    def test_without_the_direct_reader_the_saved_experiment_answers_and_the_server_is_not_asked(
+        self, monkeypatch
+    ):
+        monkeypatch.setattr(
+            hardware_server, "attach", lambda: pytest.fail("the hardware server is the direct reader's")
+        )
+        hardware_server.forget_connection()
+        settings = raw_settings(galvo_um=-0.01, stack_on="z-galvo")
+
+        z = z_um_from_settings(settings, "z-galvo", client=SavingClient(), job_name="HiRes", direct=False)
+
+        assert z == pytest.approx(SIMULATOR_GALVO_M * 1e6)
+
+    def test_a_reader_mode_without_the_direct_reader_reads_the_saved_experiment(self, monkeypatch):
+        monkeypatch.setattr(
+            hardware_server, "attach", lambda: pytest.fail("api mode does not ask the hardware server")
+        )
+        hardware_server.forget_connection()
+        monkeypatch.setattr(
+            _readers, "get_job_settings", lambda *a, **k: raw_settings(galvo_um=-0.01, stack_on="z-galvo")
+        )
+
+        z = _readers.read_z_um(SavingClient(), "HiRes", "z-galvo", mode="api")
+
+        assert z == pytest.approx(SIMULATOR_GALVO_M * 1e6)
+
     def test_without_a_client_the_experiment_cannot_be_saved(self):
         settings = raw_settings(stack_on="z-galvo")
         with pytest.raises(RuntimeError, match="needs the client and the job"):

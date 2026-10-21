@@ -123,15 +123,16 @@ def stack_drive(settings) -> str | None:
 _STACK_NEEDS = ("begin", "end", "sections")
 
 
-def z_um_from_settings(settings, key, *, client=None, job_name=None):
+def z_um_from_settings(settings, key, *, client=None, job_name=None, direct=True):
     """Return one z drive's position (µm) for the job whose settings these are.
 
     The settings' ``zPosition`` is the job's stored z reference. LAS X keeps
     it current for a drive that carries no z-stack and stops refreshing it
     for the drive the job's stack is on (measured on the simulator
     2026-08-25/26). So for that one drive the value here is stale by
-    construction, and this function reads it from LAS X's hardware server
-    instead, which reports where the drive truly is, in milliseconds. When the
+    construction. With the direct reader (*direct*, the reading settings'
+    ``z_mode``), this function reads it from LAS X's hardware server, which
+    reports where the drive truly is, in milliseconds. Without it, or when the
     hardware server cannot be reached, it reads the experiment LAS X saves
     (``api.saved_experiment``, which needs *client* and *job_name*): the
     position last commanded through the job. The free drive costs nothing
@@ -151,26 +152,24 @@ def z_um_from_settings(settings, key, *, client=None, job_name=None):
 
     ch = make_changeable_copy(settings)
     if ch and (ch.get("stack") or {}).get("zDrive") == key:
-        try:
-            return read_hardware_z_um(key)
-        except HardwareServerUnavailable as why:
-            unreachable = why
+        unreachable = "the direct reader is not used"
+        if direct:
+            try:
+                return read_hardware_z_um(key)
+            except HardwareServerUnavailable as why:
+                unreachable = f"LAS X's hardware server could not be reached ({why})"
         if client is None or job_name is None:
             raise RuntimeError(
-                f"{key} carries the job's z-stack and LAS X's hardware server could not be "
-                f"reached ({unreachable}); reading the saved experiment needs the client and the job"
+                f"{key} carries the job's z-stack and {unreachable}; reading the saved "
+                f"experiment needs the client and the job"
             )
-        log.info(
-            "%s carries the z-stack and the hardware server cannot be reached; reading the saved experiment",
-            key,
-        )
+        log.info("%s carries the z-stack and %s; reading the saved experiment", key, unreachable)
         try:
             return saved_experiment.read_z_um(client, job_name, key)
         except RuntimeError as why:
             raise RuntimeError(
-                f"{key} carries {job_name!r}'s z-stack, so its settings value is stale; LAS X's "
-                f"hardware server could not be reached ({unreachable}), and the saved experiment "
-                f"did not answer ({why}) - no current Z available"
+                f"{key} carries {job_name!r}'s z-stack, so its settings value is stale; "
+                f"{unreachable}, and the saved experiment did not answer ({why}) - no current Z available"
             ) from why
     if not ch or "zPosition" not in ch:
         raise RuntimeError("zPosition not in job settings - LAS X version mismatch?")

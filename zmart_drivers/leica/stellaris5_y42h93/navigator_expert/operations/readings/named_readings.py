@@ -173,6 +173,17 @@ def z_um_direct(drive, *, mode=None):
     return None
 
 
+def z_um_from(settings, drive, *, client, job_name, mode=None):
+    """Where *drive* is (um), from *job_name*'s *settings*; see ``derived.z_um_from_settings``.
+
+    The drive carrying the job's z-stack is read from the hardware server
+    when the direct reader is used (the profile's ``z_mode``, unless *mode*
+    says), else from the experiment LAS X saves.
+    """
+    mode = mode if mode is not None else sources.profile().z_mode
+    return derived.z_um_from_settings(settings, drive, client=client, job_name=job_name, direct=mode == "direct")
+
+
 def read_z_um(client, job_name, drive, *, mode=None):
     """Where one z drive is (um), *drive* ``"z-galvo"`` or ``"z-wide"``; None when unreadable.
 
@@ -196,7 +207,7 @@ def read_z_um(client, job_name, drive, *, mode=None):
     if not settings:
         log.warning("read_z_um: could not read job settings for '%s'", job_name)
         return None
-    return derived.z_um_from_settings(settings, drive, client=client, job_name=job_name)
+    return z_um_from(settings, drive, client=client, job_name=job_name, mode=mode)
 
 
 def read_zwide_um(client, job_name, *, mode=None):

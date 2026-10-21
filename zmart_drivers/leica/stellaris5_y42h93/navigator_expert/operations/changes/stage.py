@@ -16,7 +16,6 @@ from functools import partial
 from ...connection import waiting
 from ...dispatcher.door import make_log_entry
 from ...primitives.api.request import request_of
-from ...primitives.values.derived import z_um_from_settings
 from ..readings import named_readings as readers
 from ..sending.command_profile import CommandProfile
 from ..sending.limit_rules import check_xy, check_z
@@ -247,7 +246,7 @@ def confirm_move_z(client, *, job_name, z_mode, target_um, tolerance=1.0, poll_w
         if actual is None:
             settings = confirming.readback(client, job_name, deadline=deadline, observed_after=observed_after)
             try:
-                actual = None if settings is None else z_um_from_settings(settings, key, client=client, job_name=job_name)
+                actual = None if settings is None else readers.z_um_from(settings, key, client=client, job_name=job_name)
             except (KeyError, TypeError, RuntimeError, ValueError):
                 actual = None
         if actual is not None:

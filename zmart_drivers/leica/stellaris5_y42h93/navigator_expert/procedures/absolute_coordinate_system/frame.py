@@ -30,10 +30,7 @@ import logging
 from . import coordinates
 from ...dispatcher import gate as _gate
 from ...operations.readings import named_readings as _readers
-from ...primitives.values.derived import (
-    stack_drive as _stack_drive,
-    z_um_from_settings as _z_um_from_settings,
-)
+from ...primitives.values.derived import stack_drive as _stack_drive
 from ...operations.changes import stage as _commands
 from ...session import handle as _info
 from ...session.handle import Session, note_unconfirmed, require_open
@@ -95,12 +92,8 @@ def hardware_snapshot(handle: Session) -> dict:
         "job": job,
         "x_um": float(xy["x_um"]),
         "y_um": float(xy["y_um"]),
-        "z_wide_um": _z_um_from_settings(
-            settings, "z-wide", client=handle.client, job_name=job
-        ),
-        "z_galvo_um": _z_um_from_settings(
-            settings, "z-galvo", client=handle.client, job_name=job
-        ),
+        "z_wide_um": _readers.z_um_from(settings, "z-wide", client=handle.client, job_name=job),
+        "z_galvo_um": _readers.z_um_from(settings, "z-galvo", client=handle.client, job_name=job),
         "objective": settings.get("objective"),
         "stack_drive": _stack_drive(settings),
     }

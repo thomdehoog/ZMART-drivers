@@ -113,15 +113,10 @@ def select_job(client, job_name, *, compensate=None):
                 client, context.get("api_baseline_name"), compensate=compensate
             )
         except Exception as exc:  # noqa: BLE001 -- fail closed before the change fires
-            return {
-                "success": False,
-                "confirmed": None,
-                "message": (
-                    "refusing the job change: could not record the pre-change "
-                    f"position for objective compensation: {exc}"
-                ),
-                "logs": [],
-            }
+            return run_change.refused(
+                "refusing the job change: could not record the pre-change "
+                f"position for objective compensation: {exc}"
+            )
         return None
 
     result = _select_job.select_job(client, job_name, before_fire=record_position)

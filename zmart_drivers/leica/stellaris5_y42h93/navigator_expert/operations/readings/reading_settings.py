@@ -87,9 +87,9 @@ class StateReaderProfile:
     selected_job_log_prime_cluster: bool = False
     selected_job_log_cluster_max_age_s: float | None = None
 
-    # Where a z drive is: "direct", or "hybrid" for the job settings (and, for
-    # the drive carrying the job's z-stack, the reads of
-    # ``derived.z_um_from_settings``).
+    # Where a z drive is: "direct", the hardware server; any other mode, the job
+    # settings, and for the drive carrying the job's z-stack, whose settings
+    # value is stale, the experiment LAS X saves (``derived.z_um_from_settings``).
     z_mode: str = "direct"
 
     hardware_info_mode: str = "direct"
