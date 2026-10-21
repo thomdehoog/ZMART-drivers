@@ -17,8 +17,8 @@ import logging
 from typing import Any
 
 from ...dispatcher import gate as _gate
-from ...vendor_specific.primitive_handling.settings import limit_rules as _rules
-from ...vendor_specific.primitive_handling.settings.limit_rules import NOTEBOOK_POINTER
+from ...vendor_specific.primitive_handling.commands import limit_rules as _rules
+from ...vendor_specific.primitive_handling.commands.limit_rules import NOTEBOOK_POINTER
 from .. import store as _machine
 from . import config as _limits_config
 

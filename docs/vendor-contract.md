@@ -127,7 +127,7 @@ values are not allowed, and by returning when they are. It also answers
 with that as a dictionary. The driver installs it for each connection when it
 connects, with `gate.install(client, gate.GateState(limits=...))`. Until it is
 installed, every change is refused. Leica: `LeicaLimits` in
-`primitive_handling/settings/limit_rules.py`, installed by
+`primitive_handling/commands/limit_rules.py`, installed by
 `driver_setup/limits/handshake.py`.
 
 ## What comes back

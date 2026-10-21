@@ -40,9 +40,7 @@ from mock_lasx_api import MockLasxClient
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.limits import (
     handshake as _handshake,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.settings import (
-    changes as commands_mod,
-)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.commands import changes as commands_mod
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.objective_change_with_compensation import (
     compensated_changes as commands_mod_comp,
 )
@@ -52,9 +50,7 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.limits 
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.store import (
     MachineProfile,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.settings import (
-    limit_rules as motion_limits,
-)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.commands import limit_rules as motion_limits
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher import gate
 
 DRIVER_ROOT = Path(__file__).resolve().parents[2]
@@ -1032,7 +1028,7 @@ def test_every_dispatching_wrapper_declares_and_calls_the_gate():
             DRIVER_ROOT
             / "vendor_specific"
             / "primitive_handling"
-            / "settings"
+            / "commands"
             / "changes.py"
         ).read_text(encoding="utf-8")
     )
@@ -1092,9 +1088,7 @@ def test_every_dispatching_wrapper_declares_and_calls_the_gate():
     # The settings of a job go through one runner, so their functions do not
     # call the gate themselves. Each must hand the runner the table entry that
     # carries its own name, and the runner must show the gate that name.
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.settings import (
-        settings as settings_table,
-    )
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.commands import settings as settings_table
 
     for node in tree.body:
         if not isinstance(node, ast.FunctionDef) or node.name.startswith("_"):

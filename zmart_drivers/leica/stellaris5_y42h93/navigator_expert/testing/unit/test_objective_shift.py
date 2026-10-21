@@ -18,9 +18,7 @@ import zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.pr
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.objective_change_with_compensation import (
     objective_shift as shift,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.settings import (
-    changes as cmds,
-)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.commands import changes as cmds
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.objective_change_with_compensation import (
     compensated_changes as cmds_comp,
 )

@@ -30,7 +30,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Any
 
-from ...vendor_specific.primitive_handling.settings import limit_rules as checks
+from ...vendor_specific.primitive_handling.commands import limit_rules as checks
 
 _REQUIRED_AXES = ("x", "y", "z_galvo", "z_wide")
 _AXIS_FILE_KEYS = {
@@ -43,7 +43,7 @@ _AXIS_FILE_KEYS = {
 # These are visible in the file even while unrestricted. Each entry is either
 # ``[]`` or one typed constraint, and the command wrapper with the same name
 # enforces a typed constraint immediately before its native CAM call.
-from ...vendor_specific.primitive_handling.settings.limit_rules import SETTER_LIMIT_KEYS
+from ...vendor_specific.primitive_handling.commands.limit_rules import SETTER_LIMIT_KEYS
 
 _REQUIRED_FILE_KEYS = (*_AXIS_FILE_KEYS.values(), "objective_slot", *SETTER_LIMIT_KEYS)
 

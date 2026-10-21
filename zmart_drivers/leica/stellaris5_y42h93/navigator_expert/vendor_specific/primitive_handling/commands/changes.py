@@ -240,7 +240,7 @@ def dispatch_change(
 
 
 def change_setting(setting, client, arguments, *, max_retries=None, tolerance=None):
-    """Change one LAS X setting, following its entry in ``primitive_handling/settings/settings.py``.
+    """Change one LAS X setting, following its entry in ``primitive_handling/commands/settings.py``.
 
     The steps are the same for every setting: tidy the arguments, show the new
     value to the limits gate (nothing is sent if the gate refuses), check that

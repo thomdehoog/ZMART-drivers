@@ -179,7 +179,7 @@ navigator_expert/
             capture/           the finished picture in LAS X's cache, and LAS X's description of it
         primitive_handling/    the handling notes: how the dispatcher treats each primitive
             profiles/          the command profiles, the transport, the error sorting, the idle check
-            settings/          the job settings, the changes, the limits rulebook
+            commands/          the changes, running a job, the job settings, the limits rulebook
             confirmations/     how each change is confirmed
             readings/          the table of readings, the sources, and the named readings
 
@@ -225,7 +225,7 @@ micrometers" as the workflow says it:
    user coordinates to raw stage coordinates, using the recorded origin and
    the objective offsets.
 3. The procedure asks for the change `move_xy`
-   (`vendor_specific/primitive_handling/settings/changes.py`), which goes to
+   (`vendor_specific/primitive_handling/commands/changes.py`), which goes to
    the dispatcher's door, `write`.
 4. The door asks the limits gate first. A position outside the allowed range
    is refused here, and nothing is sent.
@@ -607,7 +607,7 @@ microscope belongs in the vendor interface, as far as it can.
 Today the gate asks one question of the limits object the vendor installs:
 `check_command(command, values)`, which raises when the values are not allowed.
 For the Leica driver that object is `LeicaLimits`, in
-`vendor_specific/primitive_handling/settings/limit_rules.py`, built from the
+`vendor_specific/primitive_handling/commands/limit_rules.py`, built from the
 operator's `limits.json` when the driver connects
 (`driver_setup/limits/handshake.py`).
 

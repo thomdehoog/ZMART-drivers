@@ -34,7 +34,7 @@ from ...vendor_specific.primitive_handling.readings.derived import (
     stack_drive as _stack_drive,
     z_um_from_settings as _z_um_from_settings,
 )
-from ...vendor_specific.primitive_handling.settings import changes as _commands
+from ...vendor_specific.primitive_handling.commands import changes as _commands
 from ...session import handle as _info
 from ...session.handle import ZmartHandle, note_unconfirmed, require_open
 
