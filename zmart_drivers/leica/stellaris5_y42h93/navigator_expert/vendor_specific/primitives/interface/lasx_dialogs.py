@@ -31,7 +31,7 @@ import threading
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from ... import tuning
+from ...connection import tuning
 
 
 log = logging.getLogger(__name__)

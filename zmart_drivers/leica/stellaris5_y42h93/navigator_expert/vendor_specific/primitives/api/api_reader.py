@@ -47,7 +47,7 @@ import xml.etree.ElementTree as ET
 
 from ...primitive_handling.readings import derived
 from .delivery import deliver
-from ... import tuning
+from ...connection import tuning
 
 log = logging.getLogger(__name__)
 

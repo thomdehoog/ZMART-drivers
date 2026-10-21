@@ -41,12 +41,12 @@ import threading
 import time
 
 from ..readings import state as _readers
-from ....dispatcher.dispatcher import make_log_entry as _make_log_entry
-from ...error_classification import _check_api_error, _is_transient_error
-from ...parsing import make_changeable_copy
+from ....dispatcher.door import make_log_entry as _make_log_entry
+from ..profiles.error_classification import _check_api_error, _is_transient_error
+from ..readings.parsing import make_changeable_copy
 from .confirm_specs import CONFIRM_SPECS
 from ..readings.derived import z_um_from_settings
-from ... import tuning
+from ...connection import tuning
 
 log = logging.getLogger(__name__)
 

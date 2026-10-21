@@ -22,7 +22,7 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.prim
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitives.api import api_reader
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitives.direct import direct_reader, state_tree
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.connection import hardware_server
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.parsing import make_changeable_copy
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings.parsing import make_changeable_copy
 
 #: The jobs' block and element ids as on the simulator (2026-10-13).
 JOBS = {"AF Job": (156, 1), "Overview": (154, 2), "HiRes": (152, 3)}

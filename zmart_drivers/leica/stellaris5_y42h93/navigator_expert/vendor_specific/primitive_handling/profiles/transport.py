@@ -20,7 +20,7 @@ import time
 from ...primitives.api.delivery import deliver
 from ...primitives.interface import lasx_dialogs
 from ...primitives.log import log_reader as _log_reader
-from ... import tuning
+from ...connection import tuning
 
 log = logging.getLogger(__name__)
 

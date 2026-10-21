@@ -11,7 +11,7 @@ import ast
 from pathlib import Path
 from types import SimpleNamespace
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher import dispatcher
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher import door as dispatcher
 
 DRIVER_ROOT = Path(__file__).resolve().parents[2]
 

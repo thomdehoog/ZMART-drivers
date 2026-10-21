@@ -47,10 +47,10 @@ import time
 from dataclasses import replace
 from functools import partial
 
-from ....dispatcher import dispatcher as _dispatcher
+from ....dispatcher import door as _dispatcher
 from ....dispatcher import gate as _gate
-from ....dispatcher.dispatcher import make_log_entry as _make_log_entry, make_timing as _make_timing
-from ...parsing import _hw_get
+from ....dispatcher.door import make_log_entry as _make_log_entry, make_timing as _make_timing
+from ..readings.parsing import _hw_get
 from . import settings
 from ..confirmations.confirm_select_job import prepare_select_job, select_job_confirm_legs
 from ..confirmations.confirmations import confirm_acquire, confirm_move_xy, confirm_move_z, confirm_objective, race_confirmations

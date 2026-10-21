@@ -961,9 +961,7 @@ def phase_job_selection(
             v.skip("job selection: round-trip", "no jobs returned")
             return
 
-        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher import (
-            dispatcher as tuning,
-        )
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher import door as tuning
 
         names = selectable_job_names(jobs)
         # The job to come back to is read the way the driver reads it, not

@@ -20,7 +20,7 @@ University of Zurich (thom.dehoog@zmb.uzh.ch, thomdehoog@gmail.com).
 
 import logging
 
-from ...dispatcher.dispatcher import make_timing as _make_timing
+from ...dispatcher.door import make_timing as _make_timing
 from ...vendor_specific.primitive_handling.settings import changes as _changes
 from . import objective_shift as _objective_shift
 

@@ -177,13 +177,20 @@ ALLOWED = {
     # The engines know no microscope: the vendor part hands in its sources,
     # profiles, error sorting, waiting numbers and limits.
     "dispatcher": set(),
+    # What the driver remembers about one connection; every part that works
+    # on a connection reads it, and it uses only the vendor part to ask LAS X.
+    "session": {
+        "vendor_specific",
+    },
     "procedures": {
+        "session",
         "vendor_specific",
         "dispatcher",
         "driver_setup",
         "__version__",  # acquisition.py records the driver version in the saved state
     },
     "driver_setup": {
+        "session",
         "vendor_specific",  # the limits item validates through the rulebook
         "dispatcher",  # the limits handshake installs the limits in the gate
         # The measuring code of an item takes pictures and moves the stage, so it
@@ -194,11 +201,11 @@ ALLOWED = {
     # Everything that faces the controller: the ZmartDriver class and, until its
     # logic moves into the procedures, the adapter folder inside it.
     "for_zmart_controller": {
+        "session",
         "vendor_specific",
         "dispatcher",
         "procedures",
         "driver_setup",
-        "running_log",  # the driver's log file, opened when the driver is made
         "__version__",
     },
     "__init__": {

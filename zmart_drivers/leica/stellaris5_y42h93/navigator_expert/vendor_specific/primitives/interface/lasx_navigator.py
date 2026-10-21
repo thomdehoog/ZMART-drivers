@@ -40,7 +40,7 @@ import threading
 import time
 
 from .lasx_dialogs import WindowsUnavailable, automation
-from ... import tuning
+from ...connection import tuning
 
 log = logging.getLogger(__name__)
 

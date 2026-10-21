@@ -26,7 +26,17 @@ from __future__ import annotations
 import datetime
 import xml.etree.ElementTree as ET
 
-from .product import AcquisitionMetadata, ChannelMetadata, Detector, Filter, Instrument, Laser, Objective, PlaneIndex, PlaneMetadata
+from .product import (
+    AcquisitionMetadata,
+    ChannelMetadata,
+    Detector,
+    Filter,
+    Instrument,
+    Laser,
+    Objective,
+    PlaneIndex,
+    PlaneMetadata,
+)
 
 __all__ = ["axes", "image_of", "metadata_from_description"]
 

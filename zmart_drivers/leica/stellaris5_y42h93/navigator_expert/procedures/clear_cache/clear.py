@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import logging
 
-from ..session import ZmartHandle, require_open
+from ...session.handle import ZmartHandle, require_open
 from . import release
 
 log = logging.getLogger(__name__)

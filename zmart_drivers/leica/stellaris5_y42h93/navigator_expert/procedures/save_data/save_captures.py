@@ -25,8 +25,8 @@ from typing import Any
 from ...driver_setup import orientation as _orientation
 from ...vendor_specific.primitive_handling.profiles.profiles import IMAGE_SAVE
 from ...vendor_specific.primitive_handling.readings import state as _readers
-from .. import session_state as _session_state
-from ..session import ZmartHandle, require_open
+from ...session import loaded_config as _session_state
+from ...session.handle import ZmartHandle, require_open
 from . import command_log as _log
 from . import save as _save
 

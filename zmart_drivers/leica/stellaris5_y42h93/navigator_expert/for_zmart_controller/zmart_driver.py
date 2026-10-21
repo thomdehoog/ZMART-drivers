@@ -44,19 +44,19 @@ from typing import Any
 from ..driver_setup.origin import saved_origin as _saved_origin
 from ..driver_setup.origin import set_origin as _set_origin
 from ..driver_setup import data_location as _data_location
-from .. import running_log
+from . import running_log
 from ..driver_setup.orientation import load_rig_orientation
 from ..driver_setup.optical_calibration.model import load_objective_calibration
-from ..procedures import session_state as _session_state
+from ..session import loaded_config as _session_state
 from ..driver_setup.store import MACHINE
 from ..dispatcher import gate as _gate
 from ..driver_setup.limits import handshake as _handshake
 from ..procedures.save_data.naming import run_hash
-from ..procedures.acquisition import acquisition as _acquisition
+from ..procedures.acquisition import acquire as _acquisition
 from ..procedures.save_data import save_captures as _save_captures
 from ..procedures.absolute_coordinate_system import frame as _frame
 from ..procedures import instrument as _instrument
-from ..procedures.session import ZmartHandle
+from ..session.handle import ZmartHandle
 from ..vendor_specific.connection import lasx_client
 from ..vendor_specific.primitives.interface import lasx_dialogs
 

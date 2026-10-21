@@ -16,7 +16,14 @@ import zarr
 
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup import orientation as orient
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.save_data import ome_zarr
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.product import AcquisitionMetadata, ChannelMetadata, ExportedAcquisition, ExportedPosition, PlaneIndex, PlaneSource
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitives.capture.product import (
+    AcquisitionMetadata,
+    ChannelMetadata,
+    ExportedAcquisition,
+    ExportedPosition,
+    PlaneIndex,
+    PlaneSource,
+)
 
 Orientation = orient.Orientation
 

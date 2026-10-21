@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import logging
 
-from ....dispatcher import dispatcher as _door
+from ....dispatcher import door as _door
 from ....dispatcher.reader import Reading, derive as _derive, plain_or_diagnostic as _plain_or_diagnostic  # noqa: F401
 from ...connection.hardware_server import HardwareServerUnavailable
 from ...primitives.api import api_reader

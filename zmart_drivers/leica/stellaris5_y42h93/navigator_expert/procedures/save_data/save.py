@@ -28,7 +28,7 @@ from . import ome_zarr
 from ...vendor_specific.primitives.capture.files import DEFAULT_EXPORT_COMPLETION_POLL_INTERVAL_S, DEFAULT_EXPORT_COMPLETION_TIMEOUT_S
 from ...vendor_specific.primitives.capture.lasx_data_container import collect_lasx_data_container
 from .naming import Naming, build_state_name, data_dir, metadata_dir, projections_dir, state_dir
-from ...vendor_specific.product import AcquisitionResult, ExportedAcquisition
+from ...vendor_specific.primitives.capture.product import AcquisitionResult, ExportedAcquisition
 from .saved_acquisition import SavedAcquisition
 
 log = logging.getLogger(__name__)

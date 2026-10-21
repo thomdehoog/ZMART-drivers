@@ -14,7 +14,7 @@ import time
 
 from .. import store as _machine
 from ...procedures.absolute_coordinate_system.frame import hardware_snapshot
-from ...procedures.session import ZmartHandle, require_open
+from ...session.handle import ZmartHandle, require_open
 
 
 def set_origin(handle: ZmartHandle) -> dict:

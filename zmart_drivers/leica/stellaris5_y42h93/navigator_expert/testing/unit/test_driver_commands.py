@@ -25,42 +25,36 @@ from limits_fixtures import (
 
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.limits import handshake as _handshake
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.profiles.profiles import ImageSaveProfile
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.product import PlaneIndex
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitives.capture.product import PlaneIndex
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.settings import limit_rules as limits_checks
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher import (
     gate as _gate,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific import parsing as _readers_parsing
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings import parsing as _readers_parsing
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup import orientation as _orientation
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup import store as _machine
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.save_data import command_log as _log
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.clear_cache import release as _release
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.save_data import save_captures as _save_captures
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.save_data import save as _save
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.acquisition import acquire as _capture
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.acquisition import acquisition as _acquisition
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.acquisition import run_job as _capture
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.acquisition import acquire as _acquisition
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.settings import changes as _commands
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.objective_change_with_compensation import compensated_changes as _commands_comp
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.absolute_coordinate_system import frame as _frame
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures import (
     instrument as _instrument,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures import (
-    session as _info,
-)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.session import handle as _info
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings import state as _readers
 
 
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.connection import lasx_client as _connect_module
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures import (
-    session_state as _session_state,
-)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.session import loaded_config as _session_state
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.for_zmart_controller.zmart_driver import (
     ZmartDriver,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.session import (
-    ZmartHandle,
-)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.session.handle import ZmartHandle
 
 
 def _connect_handle(connection=None):

@@ -27,9 +27,9 @@ from dataclasses import dataclass
 from functools import partial
 from typing import Any
 
-from ....dispatcher.dispatcher import make_log_entry as _make_log_entry
-from ...error_classification import _check_api_error, classify_error, sends_again
-from ...parsing import parse_format
+from ....dispatcher.door import make_log_entry as _make_log_entry
+from ..profiles.error_classification import _check_api_error, classify_error, sends_again
+from ..readings.parsing import parse_format
 from ..confirmations import confirmations as _check
 from ..profiles import profiles as _profiles
 from ..profiles.profiles import CommandProfile

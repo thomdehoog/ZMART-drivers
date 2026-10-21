@@ -17,12 +17,12 @@ import time
 from functools import partial
 
 from ..readings import state as _readers
-from ....dispatcher.dispatcher import make_log_entry as _make_log_entry
+from ....dispatcher.door import make_log_entry as _make_log_entry
 from ...primitives.direct import direct_reader
 from ...primitives.log import log_wait
 from ...connection.hardware_server import HardwareServerUnavailable
 from .confirmations import _reading_value_after, race_confirmations
-from ... import tuning
+from ...connection import tuning
 
 log = logging.getLogger(__name__)
 

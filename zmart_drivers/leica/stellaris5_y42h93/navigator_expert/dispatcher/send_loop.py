@@ -33,7 +33,7 @@ University of Zurich (thom.dehoog@zmb.uzh.ch, thomdehoog@gmail.com).
 import logging
 import time
 
-from .dispatcher import make_log_entry as _make_log_entry
+from .door import make_log_entry as _make_log_entry
 
 log = logging.getLogger(__name__)
 

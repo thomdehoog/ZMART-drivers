@@ -58,7 +58,7 @@ def _translations_for(client: Any) -> dict | None:
     fails the command's result rather than silently leaving the stage at
     the old lens's spot.
     """
-    from .. import session_state
+    from ...session import loaded_config as session_state
 
     config = session_state.get(client)
     if config is None:

@@ -57,9 +57,12 @@ import zmart_drivers.leica.stellaris5_y42h93.navigator_expert as drv
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings import readings as capabilities
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.profiles import profiles
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings import state as readers
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific import tuning
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.connection import tuning
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitives.log import log_reader as L
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.parsing import make_changeable_copy, parse_tile_geometry
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings.parsing import (
+    make_changeable_copy,
+    parse_tile_geometry,
+)
 
 API_HANG_MS = 1500.0  # an API read slower than this is treated as a dialog-hang
 

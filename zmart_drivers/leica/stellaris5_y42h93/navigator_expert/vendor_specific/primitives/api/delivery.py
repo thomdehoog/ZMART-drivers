@@ -25,7 +25,7 @@ from __future__ import annotations
 import logging
 
 from ..interface import lasx_dialogs
-from ... import tuning
+from ...connection import tuning
 
 log = logging.getLogger(__name__)
 

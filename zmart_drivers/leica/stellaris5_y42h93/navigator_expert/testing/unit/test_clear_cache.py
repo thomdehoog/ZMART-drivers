@@ -6,7 +6,7 @@ import pytest
 
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.clear_cache import clear as clearing
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.clear_cache import release as release
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.session import ZmartHandle
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.session.handle import ZmartHandle
 
 
 class TestPreparing:

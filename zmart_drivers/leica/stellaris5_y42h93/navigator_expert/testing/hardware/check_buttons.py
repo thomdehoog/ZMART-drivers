@@ -35,7 +35,7 @@ import sys
 import time
 from pathlib import Path
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific import tuning
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.connection import tuning
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitives.interface import lasx_dialogs, lasx_navigator
 
 #: How long a press may take to show on screen: one window, by the driver's one waiting rule.
