@@ -148,19 +148,25 @@ def legs(spec, datum, mode):
     raise ValueError(f"unknown state-reader mode {mode!r}")
 
 
-def ask(leg, spec, client, *, until, answer_counts, job_name, api_kwargs):
+def success(spec, value, about):
+    """Whether *value* counts as an answer to the reading; for LAS X, *about* is the job asked about."""
+    return spec.success(value, job_name=about)
+
+
+def ask(leg, spec, client, *, until, answer_counts, about, source_kwargs):
     """Ask one source of LAS X, and again until an answer counts or *until*; return the last Reading.
 
     This is what the shared reader calls for each source of a window. The
     reader does not know how LAS X is asked: the CAM API one request at a time,
-    the log through its shared snapshot.
+    the log through its shared snapshot. For LAS X, *about* is the name of the
+    job a reading is about.
     """
     if leg == "api":
         return _ask_api(
-            spec, client, api_kwargs, until=until, answer_counts=answer_counts
+            spec, client, source_kwargs, until=until, answer_counts=answer_counts
         )
     return _ask_log(
-        spec, job_name, max_age_s(spec), until=until, answer_counts=answer_counts
+        spec, about, max_age_s(spec), until=until, answer_counts=answer_counts
     )
 
 

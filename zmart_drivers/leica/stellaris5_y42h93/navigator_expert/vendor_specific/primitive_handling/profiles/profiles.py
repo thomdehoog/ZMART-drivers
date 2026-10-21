@@ -215,9 +215,9 @@ class CommandProfile:
             accept a command while LAS X later settles to a different
             state, or an operator may change the setting manually.
         never_resend: True for a command that must reach the microscope at
-            most once (the acquisition). The profile then sets
-            ``max_retries`` to 0 and allows a single confirmation window with no
-            re-send, whatever a caller asks for.
+            most once (the acquisition). The dispatcher then sends it once,
+            with a single confirmation window and no send again, whatever a
+            caller asks for (``dispatcher/send_loop.resolve_profile``).
         confirm_poll_s: One confirmation window (seconds), ``WINDOW_S`` by
             the rule. NOT a timeout - the readback is watched for this long,
             then the command re-fires and is watched again up to
@@ -285,15 +285,10 @@ class CommandProfile:
     limits_setup_hint: str = NOTEBOOK_POINTER
     # A command that must reach the microscope at most once, because sending it
     # twice would do the work twice (an acquisition would save two data sets).
-    # Whatever else a caller asks for, such a command is never sent again: not
-    # after a transient error, and not after an unconfirmed reply.
+    # The dispatcher holds it to one send, whatever else a caller asks for.
     never_resend: bool = False
 
     def __post_init__(self):
-        if self.never_resend:
-            object.__setattr__(self, "max_retries", 0)
-            object.__setattr__(self, "max_confirm_attempts", 1)
-            object.__setattr__(self, "refire_on_unconfirmed", False)
         # Async fire blanks the echo, so an echo-based error check would read a
         # cleared echo and report a meaningless success. Couple the two fields.
         if self.send_without_receipt and self.error_check_fn is not None:
@@ -488,8 +483,12 @@ ACQUIRE = CommandProfile(
     # second acquisition (duplicate data). It declines retry on BOTH axes -
     # max_retries=0 (fire loop) and refire_on_unconfirmed=False (confirm loop).
     # It still returns unconfirmed rather than failing; save()'s freshness/grid
-    # check is the real gate against acting on missing data.
+    # check is the real gate against acting on missing data. The dispatcher
+    # holds a never_resend command to these three values whatever is asked.
     never_resend=True,
+    max_retries=0,
+    max_confirm_attempts=1,
+    refire_on_unconfirmed=False,
     poll_interval=0.1,
     poll_timeout=None,
     start_timeout=15.0,

@@ -60,13 +60,26 @@ def append_dialog_warning(transport, logs, command_started_at, description):
     return f"; dialog={msg!r}"
 
 
+#: What a command marked ``never_resend`` is held to: one send, one window, no send again.
+SENT_ONCE = {"max_retries": 0, "max_confirm_attempts": 1, "refire_on_unconfirmed": False}
+
+
 def resolve_profile(profile, **overrides):
-    """Apply explicit overrides to a command's profile; the microscope hands the profile in."""
+    """Apply explicit overrides to a command's profile; the microscope hands the profile in.
+
+    A profile that says ``never_resend``, such as the start of an acquisition,
+    is sent once whatever a caller or the profile itself asks for: not again
+    after a temporary error, and not again after an unconfirmed window.
+    Sending it twice would do the work twice. The rule is the dispatcher's, so
+    it holds for every microscope's profiles.
+    """
     from dataclasses import replace
 
     if profile is None:
         raise ValueError("a command profile must be handed in: the dispatcher has no default of its own")
     changes = {name: value for name, value in overrides.items() if value is not None}
+    if getattr(profile, "never_resend", False):
+        changes.update(SENT_ONCE)
     return replace(profile, **changes) if changes else profile
 
 

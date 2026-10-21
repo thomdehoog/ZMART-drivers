@@ -73,7 +73,7 @@ def _time_readings() -> None:
             answered = reading is not None and reading.error is None
             source = reading.source if answered else "NONE"
             print(
-                f"  [{started - _T0:7.2f}s] {datum:13s} job={kwargs.get('job_name')!s:10s} "
+                f"  [{started - _T0:7.2f}s] {datum:13s} job={kwargs.get('about')!s:10s} "
                 f"mode={kwargs.get('mode')!s:6s} -> {source:5s} "
                 f"in {time.monotonic() - started:5.2f}s",
                 flush=True,

@@ -133,20 +133,26 @@ def main() -> int:
             report["metadata"] = _described(ome)
 
         report["laser power, as LAS X writes it"] = _laser_power(record)
+
+        # The controller answers only with the files and the planes. What the
+        # driver did, and what it projected, is in the files it lists: the
+        # capture's log and the projections folder beside the data.
+        logs = [Path(p) for p in record["files"] if p.endswith(".log.json")]
+        projections = [p for p in record["files"] if Path(p).parent.name == "projections"]
         stack = level.shape[2] > 1
         checks[
             "projection beside the stack"
             if stack
             else "no projection for a single plane"
-        ] = bool(record.get("projections")) if stack else not record.get("projections")
-        checks["log beside the data"] = all(
-            Path(p).is_file() for p in record.get("log", [])
-        ) and bool(record.get("log"))
+        ] = bool(projections) if stack else not projections
+        checks["log beside the data"] = len(logs) == 1 and logs[0].is_file()
         report["planes, as the driver answered"] = [
             {k: plane.get(k) for k in ("c", "z", "x_um", "y_um", "z_um")}
             for plane in record["planes"]
         ]
-        report["unconfirmed"] = record.get("unconfirmed")
+        if checks["log beside the data"]:
+            entry = json.loads(logs[0].read_text(encoding="utf-8"))
+            report["unconfirmed"] = entry.get("unconfirmed")
         return _finish(report, Path(asked.report_dir))
     finally:
         session.disconnect()
@@ -273,7 +279,7 @@ def _laser_power(record: dict) -> list[dict]:
     description = next(
         (
             Path(p)
-            for p in record.get("vendor_metadata", [])
+            for p in record["files"]
             if p.endswith(".lasx-description.xml")
         ),
         None,
