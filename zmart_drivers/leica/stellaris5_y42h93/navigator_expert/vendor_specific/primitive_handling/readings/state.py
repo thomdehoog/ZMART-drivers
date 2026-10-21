@@ -34,13 +34,18 @@ def wait_for(datum, client, **keywords):
     return _door.read(sources, datum, client, **keywords)
 
 
+def on_demand_fallback():
+    """The family that answers a waited-on reading when the direct reader cannot (the profile's ``waiting_fallback``)."""
+    return sources.profile().waiting_fallback
+
+
 def on_demand_mode(datum):
     """The direct reader when the policy reads *datum* directly, else the API: the sources that answer on demand.
 
     For readings a command waits on (whether the scanner is idle, where the
     stage went), which the log cannot settle: it writes a value only when it
     changes, so it can still show the state from before. Pair it with
-    ``fallback="api"``.
+    :func:`on_demand_fallback`.
     """
     return "direct" if sources.mode_for(datum) == "direct" else "api"
 
@@ -54,9 +59,10 @@ def _routed(
     deadline=None,
     accept=None,
     job_name=None,
-    fallback="hybrid",
+    fallback=None,
 ):
     api_kwargs = {} if job_name is None else {"job_name": job_name}
+    fallback = sources.profile().reading_fallback if fallback is None else fallback
     reading = wait_for(
         datum,
         client,
@@ -82,7 +88,7 @@ def get_scan_status(
     diagnostics=False,
     deadline=None,
     accept=None,
-    fallback="hybrid",
+    fallback=None,
 ):
     return _routed(
         "scan_status",
@@ -126,7 +132,7 @@ def get_xy(
     diagnostics=False,
     deadline=None,
     accept=None,
-    fallback="hybrid",
+    fallback=None,
 ):
     return _routed(
         "xy",
@@ -223,7 +229,7 @@ def get_selected_job(
     diagnostics=False,
     deadline=None,
     accept=None,
-    fallback="hybrid",
+    fallback=None,
 ):
     return _routed(
         "selected_job",
