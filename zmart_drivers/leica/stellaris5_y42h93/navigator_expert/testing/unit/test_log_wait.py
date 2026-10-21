@@ -2,10 +2,18 @@
 
 import unittest
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.profiles import profiles
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.connection import tuning
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitives.log import log_reader
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitives.log.log_wait import wait_for_selected_job_log
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.profiles import (
+    profiles,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.connection import (
+    tuning,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitives.log import (
+    log_reader,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitives.log.log_wait import (
+    wait_for_selected_job_log,
+)
 
 
 def _job(block_id, name):

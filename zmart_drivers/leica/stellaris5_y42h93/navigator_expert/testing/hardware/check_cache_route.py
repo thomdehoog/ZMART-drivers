@@ -138,7 +138,9 @@ def main() -> int:
         # driver did, and what it projected, is in the files it lists: the
         # capture's log and the projections folder beside the data.
         logs = [Path(p) for p in record["files"] if p.endswith(".log.json")]
-        projections = [p for p in record["files"] if Path(p).parent.name == "projections"]
+        projections = [
+            p for p in record["files"] if Path(p).parent.name == "projections"
+        ]
         stack = level.shape[2] > 1
         checks[
             "projection beside the stack"
@@ -274,14 +276,12 @@ def _described(ome) -> dict:
 
 def _laser_power(record: dict) -> list[dict]:
     """Each laser's power fields, from the capture's own setting in LAS X's description."""
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitives.capture.metadata_map import image_of
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitives.capture.metadata_map import (
+        image_of,
+    )
 
     description = next(
-        (
-            Path(p)
-            for p in record["files"]
-            if p.endswith(".lasx-description.xml")
-        ),
+        (Path(p) for p in record["files"] if p.endswith(".lasx-description.xml")),
         None,
     )
     if description is None or not description.is_file():

@@ -41,7 +41,5 @@ def deliver(api_obj, *, label="message"):
         for attempt in range(1, tuning.WINDOWS + 1):
             if api_obj.UpdateAwaitReceipt(tuning.WINDOW_S):
                 return True
-            log.warning(
-                "%s not received (try %d/%d)", label, attempt, tuning.WINDOWS
-            )
+            log.warning("%s not received (try %d/%d)", label, attempt, tuning.WINDOWS)
     return False

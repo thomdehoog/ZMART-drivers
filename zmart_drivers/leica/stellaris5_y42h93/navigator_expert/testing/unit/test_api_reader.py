@@ -26,7 +26,9 @@ import time
 import unittest
 from types import SimpleNamespace
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitives.api import api_reader as A
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitives.api import (
+    api_reader as A,
+)
 
 SHORT = 0.03
 

@@ -12,7 +12,9 @@ Author: Thom de Hoog, Center for Microscopy and Image Analysis (ZMB),
 import numpy as np
 import pytest
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.optical_calibration.focus import subpixel_peak
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.optical_calibration.focus import (
+    subpixel_peak,
+)
 
 
 def parabola(true_peak, slices=7):

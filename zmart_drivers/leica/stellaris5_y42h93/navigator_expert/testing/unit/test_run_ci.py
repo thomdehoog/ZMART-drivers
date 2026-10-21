@@ -79,7 +79,9 @@ def test_the_hardware_steps_run_in_the_reports_folder(monkeypatch, tmp_path):
     folders = {}
     _capture_steps(run_ci, monkeypatch, tmp_path, ["--hardware"], folders)
 
-    hardware = {name: cwd for name, cwd in folders.items() if name.startswith("hardware:")}
+    hardware = {
+        name: cwd for name, cwd in folders.items() if name.startswith("hardware:")
+    }
     assert hardware
     assert set(hardware.values()) == {tmp_path}
 

@@ -9,7 +9,10 @@ buttons, Jobs and Experiment, and the canvas shown while Experiment is on.
 import check_buttons
 import pytest
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitives.interface import lasx_dialogs, lasx_navigator
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitives.interface import (
+    lasx_dialogs,
+    lasx_navigator,
+)
 
 
 class StandInNavigator:

@@ -12,7 +12,6 @@ from pathlib import Path
 from typing import Any
 
 
-
 @dataclass(frozen=True)
 class AcquisitionResult:
     """Save-agnostic result of one LAS X AcquireJob command."""

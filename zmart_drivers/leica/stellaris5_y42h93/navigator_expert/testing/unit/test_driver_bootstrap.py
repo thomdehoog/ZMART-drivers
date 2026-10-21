@@ -65,7 +65,9 @@ def test_lasx_runtime_load_smoke_when_installed():
     Bare dev/CI machines can import the loader but cannot load LAS X assemblies;
     hardware validation covers the required installed-runtime path.
     """
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.connection import lasx_runtime
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.connection import (
+        lasx_runtime,
+    )
 
     try:
         runtime = lasx_runtime.load_lasx_api_runtime()

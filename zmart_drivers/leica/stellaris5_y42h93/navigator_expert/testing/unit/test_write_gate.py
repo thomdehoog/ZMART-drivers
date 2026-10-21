@@ -11,7 +11,9 @@ import ast
 from pathlib import Path
 from types import SimpleNamespace
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher import door as dispatcher
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher import (
+    door as dispatcher,
+)
 
 DRIVER_ROOT = Path(__file__).resolve().parents[2]
 
@@ -38,8 +40,15 @@ def test_write_refuses_a_client_with_no_limits_and_sends_nothing():
 def test_every_change_hands_its_name_and_values_to_the_dispatcher():
     """Each call to ``dispatch_change`` says which command it is and what it sets."""
     sources = [
-        DRIVER_ROOT / "vendor_specific" / "primitive_handling" / "settings" / "changes.py",
-        DRIVER_ROOT / "procedures" / "objective_change_with_compensation" / "compensated_changes.py",
+        DRIVER_ROOT
+        / "vendor_specific"
+        / "primitive_handling"
+        / "settings"
+        / "changes.py",
+        DRIVER_ROOT
+        / "procedures"
+        / "objective_change_with_compensation"
+        / "compensated_changes.py",
     ]
     calls = 0
     for path in sources:

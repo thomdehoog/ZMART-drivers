@@ -50,11 +50,23 @@ from functools import partial
 from ....dispatcher import door as _dispatcher
 from ....dispatcher import gate as _gate
 from ...primitives.api.request import request_of
-from ....dispatcher.door import make_log_entry as _make_log_entry, make_timing as _make_timing
+from ....dispatcher.door import (
+    make_log_entry as _make_log_entry,
+    make_timing as _make_timing,
+)
 from ..readings.parsing import _hw_get
 from . import settings
-from ..confirmations.confirm_select_job import prepare_select_job, select_job_confirm_legs
-from ..confirmations.confirmations import confirm_acquire, confirm_move_xy, confirm_move_z, confirm_objective, race_confirmations
+from ..confirmations.confirm_select_job import (
+    prepare_select_job,
+    select_job_confirm_legs,
+)
+from ..confirmations.confirmations import (
+    confirm_acquire,
+    confirm_move_xy,
+    confirm_move_z,
+    confirm_objective,
+    race_confirmations,
+)
 from .limit_rules import NOTEBOOK_POINTER, check_xy, check_z
 from .objectives import objective_by_slot
 from ..profiles.profiles import ACQUIRE, MOVE_XY, MOVE_Z, OBJECTIVE, SELECT_JOB

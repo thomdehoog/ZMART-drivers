@@ -107,17 +107,65 @@ from .vendor_specific.primitive_handling.profiles.error_classification import (
     _check_api_error,
     _default_error_check,
 )
-from .vendor_specific.primitive_handling.readings.state import Reading, get_scan_status, ping, get_job_settings, get_hardware_info, get_xy, read_zwide_um, get_jobs, get_job_by_name, get_selected_job, get_fov, get_base_fov, get_lasx_settings, get_pending_dialog
+from .vendor_specific.primitive_handling.readings.state import (
+    Reading,
+    get_scan_status,
+    ping,
+    get_job_settings,
+    get_hardware_info,
+    get_xy,
+    read_zwide_um,
+    get_jobs,
+    get_job_by_name,
+    get_selected_job,
+    get_fov,
+    get_base_fov,
+    get_lasx_settings,
+    get_pending_dialog,
+)
 from .vendor_specific.primitive_handling.confirmations.confirmations import _readback
-from .vendor_specific.primitive_handling.settings.changes import set_zoom, set_scan_speed, set_scan_resonant, set_scan_mode, set_sequential_mode, set_scan_field_rotation, set_image_format, set_z_stack_definition, set_z_stack_step_size, set_z_stack_size, set_frame_accumulation, set_frame_average, set_line_accumulation, set_line_average, set_pinhole_airy, set_detector_gain, set_laser_intensity, set_laser_shutter, set_filter_wheel_slot, set_filter_wheel_spectrum, move_xy, move_z
-from .procedures.objective_change_with_compensation.compensated_changes import set_objective, select_job
+from .vendor_specific.primitive_handling.settings.changes import (
+    set_zoom,
+    set_scan_speed,
+    set_scan_resonant,
+    set_scan_mode,
+    set_sequential_mode,
+    set_scan_field_rotation,
+    set_image_format,
+    set_z_stack_definition,
+    set_z_stack_step_size,
+    set_z_stack_size,
+    set_frame_accumulation,
+    set_frame_average,
+    set_line_accumulation,
+    set_line_average,
+    set_pinhole_airy,
+    set_detector_gain,
+    set_laser_intensity,
+    set_laser_shutter,
+    set_filter_wheel_slot,
+    set_filter_wheel_spectrum,
+    move_xy,
+    move_z,
+)
+from .procedures.objective_change_with_compensation.compensated_changes import (
+    set_objective,
+    select_job,
+)
 from .vendor_specific.connection.lasx_client import connect_python_client
 
 # -- driver_setup/limits/handshake.py - the connect-time limits handshake
 from .driver_setup.limits.handshake import connect_handshake as connect_limits_handshake
 
 # -- vendor_specific/primitive_handling/settings/limit_rules.py - the rulebook: stage checks + the compiled limits document
-from .vendor_specific.primitive_handling.settings.limit_rules import _stage_limits, set_stage_limits, get_stage_limits, apply_stage_limits_from_config, check_xy, check_z
+from .vendor_specific.primitive_handling.settings.limit_rules import (
+    _stage_limits,
+    set_stage_limits,
+    get_stage_limits,
+    apply_stage_limits_from_config,
+    check_xy,
+    check_z,
+)
 
 # -- acquisition/ - capture, file arrival, and save handling
 from .procedures.acquisition.run_job import AcquisitionResult, acquire

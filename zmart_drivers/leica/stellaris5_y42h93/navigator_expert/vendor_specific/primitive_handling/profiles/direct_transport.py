@@ -26,7 +26,12 @@ from pathlib import Path
 from ....dispatcher.transport_chain import TransportUnavailable
 from ...connection import hardware_server
 from ...connection.hardware_server import HardwareServerUnavailable
-from ...primitives.capture.data_container import experiment_is_open, experiment_of, new_experiment, open_experiments
+from ...primitives.capture.data_container import (
+    experiment_is_open,
+    experiment_of,
+    new_experiment,
+    open_experiments,
+)
 from ...primitives.direct.send_command import accepted, answer_text, element_xml, send
 from ...primitives.direct.state_tree import last_image_id, job_sequence
 from ...primitives.direct.translations import ENUM_FIELDS, TRANSLATIONS, NoTranslation
@@ -52,7 +57,9 @@ def remembered_experiment_file() -> Path:
 def read_remembered_experiment() -> int | None:
     """The experiment written down by an earlier run; None when there is none or it cannot be read."""
     try:
-        number = json.loads(remembered_experiment_file().read_text(encoding="utf-8"))["experiment"]
+        number = json.loads(remembered_experiment_file().read_text(encoding="utf-8"))[
+            "experiment"
+        ]
     except (OSError, ValueError, KeyError, TypeError):
         return None
     return number if isinstance(number, int) and not isinstance(number, bool) else None
@@ -115,7 +122,12 @@ class DirectTransport:
         except HardwareServerUnavailable as why:
             raise TransportUnavailable(str(why)) from why
         try:
-            xml = element_xml(translation, request.Model, self, self.enum_types_of(name, request.Model))
+            xml = element_xml(
+                translation,
+                request.Model,
+                self,
+                self.enum_types_of(name, request.Model),
+            )
         except (NoTranslation, HardwareServerUnavailable) as why:
             raise TransportUnavailable(str(why)) from why
 
@@ -171,7 +183,9 @@ class DirectTransport:
         try:
             return job_sequence().block_id
         except HardwareServerUnavailable as why:
-            raise NoTranslation(f"no job sequence from LAS X's state tree: {why}") from why
+            raise NoTranslation(
+                f"no job sequence from LAS X's state tree: {why}"
+            ) from why
 
     def images_experiment_id(self) -> int:
         """The Data Container experiment, LAS X's project, an acquire's image goes into.
@@ -197,11 +211,15 @@ class DirectTransport:
         try:
             last = last_image_id()
         except HardwareServerUnavailable as why:
-            raise NoTranslation(f"no last image from LAS X's state tree: {why}") from why
+            raise NoTranslation(
+                f"no last image from LAS X's state tree: {why}"
+            ) from why
         try:
             chosen = self.open_project_for(last)
         except Exception as why:  # noqa: BLE001 -- any Data Container failure refuses, nothing is sent
-            raise NoTranslation(f"LAS X's Data Container did not give a project for the image: {why}") from why
+            raise NoTranslation(
+                f"LAS X's Data Container did not give a project for the image: {why}"
+            ) from why
         if chosen != self.experiment:
             write_remembered_experiment(chosen)
         self.experiment = chosen
@@ -213,7 +231,11 @@ class DirectTransport:
             found = experiment_of(last) if last else None
         except Exception:  # noqa: BLE001 -- the last image was removed, as the driver does after saving
             found = None
-        remembered = self.experiment if self.experiment is not None else read_remembered_experiment()
+        remembered = (
+            self.experiment
+            if self.experiment is not None
+            else read_remembered_experiment()
+        )
         for candidate in (found, remembered):
             if candidate is not None and experiment_is_open(candidate):
                 return candidate

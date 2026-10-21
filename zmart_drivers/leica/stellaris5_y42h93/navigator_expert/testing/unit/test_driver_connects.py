@@ -18,12 +18,25 @@ from mock_lasx_api import MockLasxClient
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.for_zmart_controller.zmart_driver import (
     ZmartDriver,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.connection import lasx_client
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.profiles.profiles import IMAGE_SAVE
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.session import loaded_config as session_state
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup import orientation as orientation_item
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.orientation import Orientation, orientation_config
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.store import MachineProfile
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.connection import (
+    lasx_client,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.profiles.profiles import (
+    IMAGE_SAVE,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.session import (
+    loaded_config as session_state,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup import (
+    orientation as orientation_item,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.orientation import (
+    Orientation,
+    orientation_config,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.store import (
+    MachineProfile,
+)
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher import gate
 
 
@@ -152,9 +165,7 @@ def test_orientation_and_readiness_evidence_come_from_one_validated_read():
     import json
 
     real_loads = json.loads
-    with patch.object(
-        orientation_item.json, "loads", wraps=real_loads
-    ) as loads:
+    with patch.object(orientation_item.json, "loads", wraps=real_loads) as loads:
         orientation, info = orientation_item.load_rig_orientation()
 
     loads.assert_called_once()

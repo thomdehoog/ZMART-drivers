@@ -392,7 +392,9 @@ def prepare_select_job(client, job_name):
     profile = _state_reader_profile()
     source = profile.selected_job_confirm_source
     if source == "direct":
-        source = profile.selected_job_confirm_fallback  # the direct reader was asked just below
+        source = (
+            profile.selected_job_confirm_fallback
+        )  # the direct reader was asked just below
     context = {
         "api_baseline_name": None,
         "api_baseline_reason": "not_attempted",

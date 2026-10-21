@@ -85,7 +85,9 @@ CI_DEFAULT_POSITION_UM = {
 
 def _register_adapter() -> Any:
     """Return the driver's connect module, whose LAS X connection the --mock mode swaps out."""
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.connection import lasx_client as connect
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.connection import (
+        lasx_client as connect,
+    )
 
     return connect
 
@@ -166,7 +168,9 @@ def _connect_session(
         from limits_fixtures import hermetic_mock_machine_root  # noqa: PLC0415
         from mock_lasx_api import MockLasxClient  # noqa: PLC0415
 
-        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.profiles import profiles
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.profiles import (
+            profiles,
+        )
 
         # Use a hermetic ProgramData fixture so the adapter connect's REAL
         # limits handshake succeeds without touching this developer machine.

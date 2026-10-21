@@ -60,7 +60,6 @@ import time
 from dataclasses import dataclass
 
 
-
 log = logging.getLogger(__name__)
 
 
@@ -274,7 +273,10 @@ def wait_for(
                 return reading
             failed = reading
         log.debug(
-            "%s: no answer counted in window %d/%d", datum, window, vendor.waiting.WINDOWS
+            "%s: no answer counted in window %d/%d",
+            datum,
+            window,
+            vendor.waiting.WINDOWS,
         )
     log.warning(
         "%s%s: no answer counted as a success in %d windows of %ss",

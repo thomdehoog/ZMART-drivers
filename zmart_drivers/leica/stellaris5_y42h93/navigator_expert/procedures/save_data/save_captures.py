@@ -65,7 +65,9 @@ def save_waiting(handle: ZmartHandle, label: str | None = None) -> list[dict]:
     return records
 
 
-def save_pending(client: Any, pending, *, orientation: Any, where_the_planes_are) -> tuple[dict, Any]:
+def save_pending(
+    client: Any, pending, *, orientation: Any, where_the_planes_are
+) -> tuple[dict, Any]:
     """Save one waiting capture and answer ``(record, saved)``.
 
     *where_the_planes_are* answers, for the depths of a capture, where on the
@@ -94,7 +96,10 @@ def save_pending(client: Any, pending, *, orientation: Any, where_the_planes_are
     )
 
     written = sorted(saved.image_paths.items())
-    depths = [int(getattr(index, "z", ordinal)) for ordinal, (index, _path) in enumerate(written)]
+    depths = [
+        int(getattr(index, "z", ordinal))
+        for ordinal, (index, _path) in enumerate(written)
+    ]
     taken_at = where_the_planes_are(depths)
 
     # Depth 0 is the lowest slice, as in a store, whichever way LAS X swept.
@@ -109,11 +114,20 @@ def save_pending(client: Any, pending, *, orientation: Any, where_the_planes_are
         }
         for ordinal, (index, path) in enumerate(written)
     ]
-    vendor_metadata = [str(path) for path in getattr(saved, "vendor_metadata_paths", ())]
+    vendor_metadata = [
+        str(path) for path in getattr(saved, "vendor_metadata_paths", ())
+    ]
     printed = [str(path) for path in getattr(saved, "state_paths", ())]
     projections = [str(path) for path in getattr(saved, "projection_paths", ())]
     files = list(
-        dict.fromkeys([*(plane["path"] for plane in planes), *projections, *vendor_metadata, *printed])
+        dict.fromkeys(
+            [
+                *(plane["path"] for plane in planes),
+                *projections,
+                *vendor_metadata,
+                *printed,
+            ]
+        )
     )
 
     log_path = _log.write(
@@ -133,7 +147,10 @@ def save_pending(client: Any, pending, *, orientation: Any, where_the_planes_are
             "unconfirmed": list(p.unconfirmed),
             # Paths from where the run starts, so they stay true when the
             # capture is moved into a run folder of the same shape.
-            "planes": [{**plane, "path": _from(p.output_root, plane["path"])} for plane in planes],
+            "planes": [
+                {**plane, "path": _from(p.output_root, plane["path"])}
+                for plane in planes
+            ],
             "files": [_from(p.output_root, path) for path in files],
         },
     )

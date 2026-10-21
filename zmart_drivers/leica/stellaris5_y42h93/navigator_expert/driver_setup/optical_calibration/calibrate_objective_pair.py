@@ -57,10 +57,31 @@ from typing import Any
 import numpy as np
 
 import zmart_drivers.leica.stellaris5_y42h93.navigator_expert as drv
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.orientation.registration import VOTING_METHODS, register_voting
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.optical_calibration.focus import brenner
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.orientation.registration import (
+    VOTING_METHODS,
+    register_voting,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.optical_calibration.focus import (
+    brenner,
+)
 
-from .calibration_common import STAGING_SCHEMA_VERSION, SessionPaths, acquire_frame_to, acquire_stack_to, make_session_paths, move_xy_and_verify, move_zwide_and_verify, now_iso, plot_brenner_curve, plot_overlay, read_active_objective, read_job_geometry, read_selected_job_name, read_stack_z_positions, write_json_atomic
+from .calibration_common import (
+    STAGING_SCHEMA_VERSION,
+    SessionPaths,
+    acquire_frame_to,
+    acquire_stack_to,
+    make_session_paths,
+    move_xy_and_verify,
+    move_zwide_and_verify,
+    now_iso,
+    plot_brenner_curve,
+    plot_overlay,
+    read_active_objective,
+    read_job_geometry,
+    read_selected_job_name,
+    read_stack_z_positions,
+    write_json_atomic,
+)
 
 _log = logging.getLogger(__name__)
 

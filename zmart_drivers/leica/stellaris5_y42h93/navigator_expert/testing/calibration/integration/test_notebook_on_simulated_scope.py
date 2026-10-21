@@ -41,9 +41,15 @@ pytest.importorskip("scipy")
 
 from scipy.ndimage import gaussian_filter
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.store import MachineProfile
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.optical_calibration import calibrate_objective_pair as wf_obj
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.optical_calibration import calibration_common as cm
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.store import (
+    MachineProfile,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.optical_calibration import (
+    calibrate_objective_pair as wf_obj,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.optical_calibration import (
+    calibration_common as cm,
+)
 
 NOTEBOOK_PATH = (
     Path(wf_obj.__file__).parents[2]

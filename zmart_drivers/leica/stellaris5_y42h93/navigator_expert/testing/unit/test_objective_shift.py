@@ -15,11 +15,21 @@ import pytest
 from limits_fixtures import install_permissive_limits
 
 import zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings.state as readers
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.objective_change_with_compensation import objective_shift as shift
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.settings import changes as cmds
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.objective_change_with_compensation import compensated_changes as cmds_comp
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.session import loaded_config as session_state
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.orientation import Orientation
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.objective_change_with_compensation import (
+    objective_shift as shift,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.settings import (
+    changes as cmds,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.objective_change_with_compensation import (
+    compensated_changes as cmds_comp,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.session import (
+    loaded_config as session_state,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.orientation import (
+    Orientation,
+)
 
 TRANSLATIONS = {1: (0.0, 0.0, 0.0), 2: (10.0, -6.0, 3.0)}
 
@@ -349,13 +359,17 @@ class TestSingleSourcedDelta:
     layers is structurally impossible."""
 
     def test_sign_convention_is_to_minus_from(self):
-        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.optical_calibration import model
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.optical_calibration import (
+            model,
+        )
 
         assert model.translation_delta_um(TRANSLATIONS, 1, 2) == (10.0, -6.0, 3.0)
         assert model.translation_delta_um(TRANSLATIONS, 2, 1) == (-10.0, 6.0, -3.0)
 
     def test_uncovered_pair_raises_the_one_shared_message(self):
-        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.optical_calibration import model
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.optical_calibration import (
+            model,
+        )
 
         with pytest.raises(RuntimeError, match="no calibration translation covers"):
             model.translation_delta_um(TRANSLATIONS, 1, 5)
@@ -367,7 +381,9 @@ class TestSingleSourcedDelta:
         swap-time stage move equals the adapter's per-move frame offset for
         the same lens pair. Swap-then-move-to-F therefore lands exactly
         where move-to-F-alone would."""
-        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.absolute_coordinate_system import frame as _frame
+        from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.absolute_coordinate_system import (
+            frame as _frame,
+        )
 
         _arm(client)
         slot = {"value": 1}

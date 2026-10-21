@@ -153,7 +153,11 @@ def check_refusal(
         return (
             f"{command} refused: no limits are installed for this session — run the "
             "connect-time limits handshake first (the driver does this when it connects)."
-            + (f" The machine-local limits files are created with {setup_hint}." if setup_hint else "")
+            + (
+                f" The machine-local limits files are created with {setup_hint}."
+                if setup_hint
+                else ""
+            )
         )
     if state.limits is None:
         return f"{command} refused: {state.error}"

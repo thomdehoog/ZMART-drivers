@@ -31,7 +31,9 @@ POLL_S = 0.5
 
 
 def look(minutes: float) -> None:
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitives.interface import lasx_dialogs
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitives.interface import (
+        lasx_dialogs,
+    )
 
     lasx_dialogs.pending()  # what the log said before the look starts
     print(f"looking for {minutes:g} min; open a LAS X dialog now", flush=True)
@@ -59,7 +61,9 @@ def look(minutes: float) -> None:
 
 
 def answer(minutes: float) -> None:
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitives.interface import lasx_dialogs
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitives.interface import (
+        lasx_dialogs,
+    )
 
     logging.basicConfig(
         level=logging.WARNING, format="%(asctime)s %(levelname)s %(message)s"

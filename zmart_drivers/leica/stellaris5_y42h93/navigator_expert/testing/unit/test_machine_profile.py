@@ -8,8 +8,14 @@ from pathlib import Path
 
 import pytest
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup import store as machine
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.store import MachineProfile, format_snapshot_name, is_snapshot_name
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup import (
+    store as machine,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.store import (
+    MachineProfile,
+    format_snapshot_name,
+    is_snapshot_name,
+)
 
 _AT_1400 = datetime(2026, 7, 1, 14, 0, tzinfo=timezone.utc)
 _AT_1430 = datetime(2026, 7, 1, 14, 30, tzinfo=timezone.utc)
@@ -355,7 +361,9 @@ def test_publish_rejects_non_monotonic_time_without_partial(tmp_path):
 
 
 def test_bundled_and_published_calibration_are_loadable(tmp_path):
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.optical_calibration import model
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.optical_calibration import (
+        model,
+    )
 
     profile = _profile(tmp_path)
     calibration = model.load_calibration(

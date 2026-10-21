@@ -37,12 +37,24 @@ from limits_fixtures import (
 )
 from mock_lasx_api import MockLasxClient
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.limits import handshake as _handshake
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.settings import changes as commands_mod
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.objective_change_with_compensation import compensated_changes as commands_mod_comp
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.limits import config as limits_config
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.store import MachineProfile
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.settings import limit_rules as motion_limits
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.limits import (
+    handshake as _handshake,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.settings import (
+    changes as commands_mod,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.objective_change_with_compensation import (
+    compensated_changes as commands_mod_comp,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.limits import (
+    config as limits_config,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.store import (
+    MachineProfile,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.settings import (
+    limit_rules as motion_limits,
+)
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher import gate
 
 DRIVER_ROOT = Path(__file__).resolve().parents[2]
@@ -52,11 +64,15 @@ DRIVER_ROOT = Path(__file__).resolve().parents[2]
 # =============================================================================
 
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.connection import lasx_client as _connect_module
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.connection import (
+    lasx_client as _connect_module,
+)
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.for_zmart_controller.zmart_driver import (
     ZmartDriver,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.absolute_coordinate_system import frame as _frame
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.absolute_coordinate_system import (
+    frame as _frame,
+)
 
 
 def _connect_handle(connection=None):
@@ -889,8 +905,12 @@ def test_adapter_bypass_refuses_at_the_commands_layer(clear_stage_limits):
     not a missing handshake."""
     from unittest.mock import patch
 
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings import parsing as _cmd_settings
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings import state as _readers
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings import (
+        parsing as _cmd_settings,
+    )
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings import (
+        state as _readers,
+    )
 
     _raw_snapshot(_machine_root(), limits_text=_BAD_LIMITS_TEXTS["missing_axis"])
     client = MockLasxClient(latency=0.0)
@@ -926,8 +946,12 @@ def test_controller_session_bypass_refuses_at_the_commands_layer(clear_stage_lim
     from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.for_zmart_controller.zmart_driver import (
         ZmartDriver as driver,
     )
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings import parsing as _cmd_settings
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings import state as _readers
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings import (
+        parsing as _cmd_settings,
+    )
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings import (
+        state as _readers,
+    )
 
     _raw_snapshot(_machine_root(), limits_text=_BAD_LIMITS_TEXTS["missing_axis"])
     client = MockLasxClient(latency=0.0)
@@ -1005,13 +1029,20 @@ def test_every_dispatching_wrapper_declares_and_calls_the_gate():
     (b) call the gate with ITS OWN name — a new command cannot ship ungated."""
     vendor_tree = ast.parse(
         (
-            DRIVER_ROOT / "vendor_specific" / "primitive_handling" / "settings" / "changes.py"
+            DRIVER_ROOT
+            / "vendor_specific"
+            / "primitive_handling"
+            / "settings"
+            / "changes.py"
         ).read_text(encoding="utf-8")
     )
     recipe_tree = ast.parse(
-        (DRIVER_ROOT / "procedures" / "objective_change_with_compensation" / "compensated_changes.py").read_text(
-            encoding="utf-8"
-        )
+        (
+            DRIVER_ROOT
+            / "procedures"
+            / "objective_change_with_compensation"
+            / "compensated_changes.py"
+        ).read_text(encoding="utf-8")
     )
     tree = vendor_tree
     fire_names = {"dispatch_change", "_dispatch_setting", "write"}
@@ -1059,7 +1090,9 @@ def test_every_dispatching_wrapper_declares_and_calls_the_gate():
     # The settings of a job go through one runner, so their functions do not
     # call the gate themselves. Each must hand the runner the table entry that
     # carries its own name, and the runner must show the gate that name.
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.settings import settings as settings_table
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.settings import (
+        settings as settings_table,
+    )
 
     for node in tree.body:
         if not isinstance(node, ast.FunctionDef) or node.name.startswith("_"):

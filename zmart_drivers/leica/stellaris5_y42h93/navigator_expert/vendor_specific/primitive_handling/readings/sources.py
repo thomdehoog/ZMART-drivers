@@ -288,9 +288,7 @@ def _ask_api(spec, client, api_kwargs, *, until, answer_counts):
         def request(answers=answers, done=done):
             try:
                 answers.append(
-                    api_read(
-                        lambda: spec.api_fn(client, deadline=until, **api_kwargs)
-                    )
+                    api_read(lambda: spec.api_fn(client, deadline=until, **api_kwargs))
                 )
             finally:
                 _API_TURNS.give_back(key)
@@ -320,5 +318,3 @@ def _ask_log(spec, job_name, max_age_s, *, until, answer_counts):
         if answer_counts(reading) or remaining <= 0:
             return reading
         time.sleep(min(tuning.POLL_S, remaining))
-
-

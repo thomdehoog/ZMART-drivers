@@ -42,7 +42,9 @@ def _build_gate_from_file(
     function_limits = _rules.build_limits(
         stage_cfg, source=source, path=limits_file, is_fallback=is_fallback
     )
-    state = _gate.GateState(limits=function_limits, stage_cfg=_gate.freeze(stage_cfg), error=None)
+    state = _gate.GateState(
+        limits=function_limits, stage_cfg=_gate.freeze(stage_cfg), error=None
+    )
     _gate.install(client, state)
     return state
 

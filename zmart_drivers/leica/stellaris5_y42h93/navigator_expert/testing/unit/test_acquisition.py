@@ -25,18 +25,35 @@ import tifffile
 import zarr
 
 import zmart_drivers.leica.stellaris5_y42h93.navigator_expert as drv
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.orientation import Orientation, reorient_array
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.save_data.naming import Naming, build_image_name, parse_image_name
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.orientation import (
+    Orientation,
+    reorient_array,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.save_data.naming import (
+    Naming,
+    build_image_name,
+    parse_image_name,
+)
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitives.capture.product import (
     ExportedAcquisition,
     ExportedPosition,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.acquisition import run_job as capture
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.save_data import ome_canonical
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.save_data import save as acquisition
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings import state as readers_router
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.acquisition import (
+    run_job as capture,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.save_data import (
+    ome_canonical,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.save_data import (
+    save as acquisition,
+)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings import (
+    state as readers_router,
+)
 
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.clear_cache import release
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.clear_cache import (
+    release,
+)
 
 
 @pytest.fixture(autouse=True)
@@ -834,9 +851,13 @@ class TestPathTooLong:
     """Windows says "file not found" for a path over 259 characters; the driver says what is wrong."""
 
     def test_a_long_path_is_explained_with_what_to_do(self):
-        error = FileNotFoundError(2, "No such file or directory", "C:\\" + "a" * 262 + ".partial")
+        error = FileNotFoundError(
+            2, "No such file or directory", "C:\\" + "a" * 262 + ".partial"
+        )
 
-        with pytest.raises(RuntimeError, match="at most 259.*shorter folder.*LongPathsEnabled"):
+        with pytest.raises(
+            RuntimeError, match="at most 259.*shorter folder.*LongPathsEnabled"
+        ):
             acquisition.say_when_the_path_is_too_long(error, on_windows=True)
 
     def test_a_short_path_that_is_really_missing_is_left_alone(self):
@@ -847,4 +868,6 @@ class TestPathTooLong:
     def test_other_systems_are_left_alone(self):
         error = FileNotFoundError(2, "No such file or directory", "/" + "a" * 300)
 
-        assert acquisition.say_when_the_path_is_too_long(error, on_windows=False) is None
+        assert (
+            acquisition.say_when_the_path_is_too_long(error, on_windows=False) is None
+        )

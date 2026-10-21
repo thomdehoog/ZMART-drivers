@@ -53,7 +53,10 @@ def run_procedure(handle: ZmartHandle, procedure: dict) -> dict:
     if name == "zero_z_galvo":
         return {"ran": dict(procedure), **zero_z_galvo(handle)}
     if name == "save_data":
-        return {"ran": dict(procedure), "saved": save_waiting(handle, procedure.get("label"))}
+        return {
+            "ran": dict(procedure),
+            "saved": save_waiting(handle, procedure.get("label")),
+        }
     if name == "clear_cache":
         return {"ran": dict(procedure), **clear(handle)}
     if name == "autofocus":

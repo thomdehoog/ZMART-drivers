@@ -237,7 +237,6 @@ STAGE_CHANGE_NOTE_UM = 1.0
 def _moved(before: dict, after: dict) -> bool:
     """Whether the stage position (in the driver's coordinates) differs by more than a settling."""
     return any(
-        abs(after[axis] - before[axis]) > STAGE_CHANGE_NOTE_UM for axis in ("x", "y", "z")
+        abs(after[axis] - before[axis]) > STAGE_CHANGE_NOTE_UM
+        for axis in ("x", "y", "z")
     )
-
-

@@ -35,7 +35,32 @@ from ..settings.limit_rules import NOTEBOOK_POINTER
 from ...connection import tuning
 from ...connection.tuning import WINDOW_S, WINDOWS
 from .error_classification import _default_error_check
-from ..confirmations.confirmations import _confirm_detector_gain, _confirm_filter_wheel_slot, _confirm_filter_wheel_spectrum, _confirm_frame_accumulation, _confirm_frame_average, _confirm_image_format, _confirm_laser_intensity, _confirm_laser_shutter, _confirm_line_accumulation, _confirm_line_average, _confirm_pinhole_airy, _confirm_scan_field_rotation, _confirm_scan_mode, _confirm_scan_resonant, _confirm_scan_speed, _confirm_sequential_mode, _confirm_z_stack_definition, _confirm_z_stack_size, _confirm_z_stack_step_size, _confirm_zoom, confirm_acquire, confirm_move_xy, confirm_move_z, confirm_objective
+from ..confirmations.confirmations import (
+    _confirm_detector_gain,
+    _confirm_filter_wheel_slot,
+    _confirm_filter_wheel_spectrum,
+    _confirm_frame_accumulation,
+    _confirm_frame_average,
+    _confirm_image_format,
+    _confirm_laser_intensity,
+    _confirm_laser_shutter,
+    _confirm_line_accumulation,
+    _confirm_line_average,
+    _confirm_pinhole_airy,
+    _confirm_scan_field_rotation,
+    _confirm_scan_mode,
+    _confirm_scan_resonant,
+    _confirm_scan_speed,
+    _confirm_sequential_mode,
+    _confirm_z_stack_definition,
+    _confirm_z_stack_size,
+    _confirm_z_stack_step_size,
+    _confirm_zoom,
+    confirm_acquire,
+    confirm_move_xy,
+    confirm_move_z,
+    confirm_objective,
+)
 
 
 @dataclass(frozen=True)
@@ -137,7 +162,11 @@ class StateReaderProfile:
     scan_status_log_max_age_s: float = 0.5
 
     def __post_init__(self):
-        for name in ("reading_fallback", "waiting_fallback", "selected_job_confirm_fallback"):
+        for name in (
+            "reading_fallback",
+            "waiting_fallback",
+            "selected_job_confirm_fallback",
+        ):
             if getattr(self, name) not in ("api", "log", "hybrid"):
                 raise ValueError(
                     f"{name} must be 'api', 'log' or 'hybrid', not {getattr(self, name)!r}"
