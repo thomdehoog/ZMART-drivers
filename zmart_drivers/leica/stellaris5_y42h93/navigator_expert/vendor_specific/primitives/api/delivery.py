@@ -5,7 +5,7 @@ call, until LAS X answers "received" or its timeout passes. "Received" only
 means LAS X got the message; whether the setting, move or job switch then
 happened is the confirmation's business.
 
-Delivery follows the one rule in ``vendor_specific/tuning.py``: ``WINDOWS`` tries of
+Delivery follows the one rule in ``vendor_specific/connection/tuning.py``: ``WINDOWS`` tries of
 ``WINDOW_S`` each. There is no pause between tries, because each try already
 waits a full window for the answer.
 

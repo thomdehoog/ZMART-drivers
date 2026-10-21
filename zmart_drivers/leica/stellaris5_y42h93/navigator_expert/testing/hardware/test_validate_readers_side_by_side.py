@@ -35,7 +35,7 @@ def _run_mock(tmp_path, *extra):
 
 
 def test_poll_params_come_from_the_rule():
-    """A post-change readback waits by the driver's one rule (vendor_specific/tuning.py)."""
+    """A post-change readback waits by the driver's one rule (vendor_specific/connection/tuning.py)."""
     assert not hasattr(profiles.LOG_READER, "poll_timeout")
     assert not hasattr(profiles.LOG_READER, "poll_interval")
     expected = (tuning.WINDOWS * tuning.WINDOW_S, tuning.POLL_S)

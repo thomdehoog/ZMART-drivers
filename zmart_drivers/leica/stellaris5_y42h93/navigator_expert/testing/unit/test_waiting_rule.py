@@ -346,7 +346,7 @@ def test_commands_deliver_through_the_one_helper():
 GUARDED = ("dispatcher", "vendor_specific")
 GUARDED_FILES = (
     "procedures/objective_change_with_compensation/compensated_changes.py",
-    "procedures/acquisition/acquire.py",
+    "procedures/acquisition/run_job.py",
     "procedures/objective_change_with_compensation/objective_shift.py",
     "vendor_specific/primitive_handling/settings/objectives.py",
 )
@@ -431,7 +431,7 @@ def _waits_with_their_own_numbers(root):
 
 
 def test_no_wait_on_las_x_has_its_own_number():
-    """How long to wait and how often to look come from vendor_specific/tuning.py only.
+    """How long to wait and how often to look come from vendor_specific/connection/tuning.py only.
 
     A literal timeout, retry count, window, poll interval or sleep for waiting
     on LAS X anywhere else is a second rule; the named exceptions above are

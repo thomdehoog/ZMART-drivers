@@ -91,7 +91,7 @@ class DatumSpec:
     ``log_max_age_attr`` name ``StateReaderProfile`` attributes, so every
     choice stays in the profile. ``success(value, *, job_name)`` says when an
     answer from either source counts; the first answer that does, wins. How
-    long to wait is not per datum: it is the one rule in ``vendor_specific/tuning.py``.
+    long to wait is not per datum: it is the one rule in ``vendor_specific/connection/tuning.py``.
     """
 
     mode_attr: str

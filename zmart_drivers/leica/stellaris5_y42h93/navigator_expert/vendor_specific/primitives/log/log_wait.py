@@ -48,7 +48,7 @@ def wait_for_selected_job_log(
     """Poll LAS X logs until *job_name* is selected after *command_started_at*.
 
     Watches one window (``WINDOW_S``) by default, reading the log every
-    ``POLL_S``: the one rule in ``vendor_specific/tuning.py``.
+    ``POLL_S``: the one rule in ``vendor_specific/connection/tuning.py``.
 
     This is a log-only experiment helper. It succeeds only when the log can
     map the selected element to the target job name and the selected-element

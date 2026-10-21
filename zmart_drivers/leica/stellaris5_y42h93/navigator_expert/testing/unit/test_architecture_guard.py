@@ -319,3 +319,21 @@ def test_run_time_procedures_never_import_the_measuring_code():
         f"procedures import measuring code: {offenders}; read the saved values "
         "through the item's loader instead"
     )
+
+
+# --- no loose files -----------------------------------------------------------------
+
+
+def test_the_driver_keeps_its_files_in_folders_that_say_what_they_are_for():
+    """A file left loose in a part's root has no stated job, so the roots stay bare.
+
+    ``procedures/`` holds one folder per recipe, ``vendor_specific/`` holds
+    ``primitives/``, ``connection/`` and ``primitive_handling/``, and the
+    driver's own root holds only its ``__init__.py`` and README.
+    """
+    allowed_in_root = {"__init__.py", "README.md"}
+    for folder in ("procedures", "vendor_specific"):
+        loose = sorted(p.name for p in (DRIVER_ROOT / folder).glob("*.py") if p.name != "__init__.py")
+        assert loose == [], f"{folder}/ has loose files {loose}; put each in a folder named for its job"
+    root_files = sorted(p.name for p in DRIVER_ROOT.glob("*") if p.is_file() and p.name not in allowed_in_root)
+    assert root_files == [], f"the driver's root has loose files {root_files}"
