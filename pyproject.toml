@@ -22,9 +22,7 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Image Acquisition",
 ]
 
-# What each driver needs beyond the controller. Install only the one for your
-# microscope, for example: pip install -e ".[leica]". The Nikon and mesoSPIM
-# drivers need nothing extra.
+# What the driver needs beyond the controller: pip install -e ".[leica]".
 [project.optional-dependencies]
 # The Leica driver: images and their metadata (numpy, tifffile; zarr and
 # OME's ome-zarr-models for saving a capture as OME-Zarr 0.5), the setup
@@ -49,13 +47,7 @@ leica = [
     "pywin32>=306; sys_platform == 'win32'",
     "comtypes>=1.4; sys_platform == 'win32'",
 ]
-# The ZEISS driver speaks gRPC through grpclib. ZEISS's own zen_api package is
-# not on PyPI and must match the ZEN version; install it from
-# zmart_drivers/zeiss/zenapi/requirements.txt.
-zeiss = [
-    "grpclib>=0.4.7",
-]
-# What the offline test suites need on top of the drivers' own extras.
+# What the offline test suite needs on top of the driver's own extra.
 test = [
     "pytest>=8",
     "pytest-cov>=5",
@@ -76,9 +68,7 @@ version = { attr = "zmart_drivers.__version__" }
 
 [tool.setuptools.packages.find]
 include = ["zmart_drivers*"]
-# Only folders with an __init__.py are packages. That leaves out the spikes
-# (Nikon, Evident), which are investigations rather than drivers, and the
-# test suites, which stay in the repository.
+# Only folders with an __init__.py are packages.
 namespaces = false
 exclude = ["*.tests", "*.tests.*"]
 
@@ -87,15 +77,13 @@ exclude = ["*.tests", "*.tests.*"]
 include-package-data = false
 
 [tool.setuptools.package-data]
-# Data files a driver reads at run time: the bundled default limits,
-# orientation and calibration, the ZEISS config.ini example, and the Leica
-# setup notebooks with their import helper.
+# Data files the driver reads at run time: the bundled default limits,
+# orientation and calibration, and the setup notebooks with their import helper.
 "*" = [
     "*.json",
     "defaults/*.json",
     "notebooks/*.ipynb",
     "notebooks/bootstrap.py",
-    "*.example",
 ]
 
 [tool.ruff.lint.isort]

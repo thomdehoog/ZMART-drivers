@@ -10,7 +10,7 @@ design is in "The simplified anatomy", right after the overview.
 The Leica driver (`zmart_drivers/leica/stellaris5_y42h93/navigator_expert/`)
 now has this layout, so it is the example to read alongside the text. Where
 this document says "today", it means that driver. The Nikon, ZEISS and
-mesoSPIM drivers still have their older layouts. What a new microscope has to
+mesoSPIM drivers are not in this beta. What a new microscope has to
 hand to the shared dispatcher is written on one page, in
 [the vendor contract](vendor-contract.md).
 
