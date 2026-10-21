@@ -1,9 +1,8 @@
-"""At the microscope: many captures, each released from LAS X's cache; does the cache stay flat?
+"""At the microscope: many captures, each cleared from LAS X's cache; does the cache stay flat?
 
 Selects one LAS X job and captures it again and again through the ZMART
-Controller, as a workflow does. For this run only, the driver's profile
-(``IMAGE_SAVE``) reads each capture from LAS X's cache with
-``cleanup_cache`` on, so that LAS X lets go of the capture once it is
+Controller, as a workflow does. After every capture it runs the driver's
+``clear_cache`` procedure, so that LAS X lets go of the picture once it is
 saved, and the Navigator canvas, which holds the capture's hidden copy
 (``TileScan <n>``), is cleared. It measures LAS X's cache (the
 ``V2LMSDC_*`` files in LAS X's cache folder) before, every ten captures and
@@ -154,7 +153,7 @@ def main() -> int:
     )
     from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.clear_cache import release as lasx_cache_release
     from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitives.capture import lasx_data_container as container
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.acquisition import acquire as _acquisition
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.save_data import save_captures as _saving
 
     releases = Releases()
     logging.getLogger(lasx_cache_release.__name__).addHandler(releases)
@@ -168,12 +167,7 @@ def main() -> int:
         "errors": [],
     }
 
-    _acquisition.IMAGE_SAVE = replace(
-        _acquisition.IMAGE_SAVE,
-        format="ome-zarr",
-        projection="none",
-        cleanup_cache=True,
-    )
+    _saving.IMAGE_SAVE = replace(_saving.IMAGE_SAVE, projection="none")
     session = ZmartController(
         driver, {"output_root": asked.save_to} if asked.save_to else {}
     )
@@ -199,6 +193,17 @@ def main() -> int:
             if not answer["success"]:
                 failed += 1
                 report["errors"].append(f"capture {i}: {answer['content']}"[:300])
+            else:
+                # The picture is saved; now have LAS X let go of it.
+                cleared = session.run_procedure({"name": "clear_cache"})
+                if not cleared["success"]:
+                    failed += 1
+                    report["errors"].append(f"clear_cache after {i}: {cleared['content']}"[:300])
+                elif cleared["content"]["ran"]["failed"]:
+                    failed += 1
+                    report["errors"].append(
+                        f"clear_cache after {i}: {cleared['content']['ran']['failed']}"[:300]
+                    )
             if i % 10 == 0 or i == asked.captures:
                 step = {
                     "captures": i,

@@ -454,12 +454,19 @@ get_stage_limits() -> dict ; apply_stage_limits_from_config(stage_cfg) -> None
 select_job(client, job_name, *, compensate=None) -> dict                         # confirm defaults to hybrid
 acquire(client, job, *, poll_interval=None, poll_timeout=None, heartbeat_interval=None,
         start_timeout=None) -> AcquisitionResult                                  # RAISES on failure
-save(client, acq, output_root, naming, *, lineage=None, fix_ome=True,
-     cleanup_cache=False) -> SavedAcquisition                                    # image_paths / xml_paths / naming
+save(client, acq, output_root, naming, *, lineage=None, state=None,
+     orientation=None, projection=None) -> SavedAcquisition                      # image_paths / naming / release_target
 ```
+**Taking a picture, saving it and clearing LAS X's cache are three steps.** `acquire` (in
+`procedures/acquisition/`) runs the selected job, writes nothing, and keeps a note of how the
+picture was taken (where the stage stood, which job ran, the state of the microscope). The
+`save_data` procedure then writes the waiting pictures, and `clear_cache` lets LAS X go of the
+pictures that were saved. The controller's `acquire` runs the first two in order and never the
+third. Run `save_data` or `clear_cache` by hand with `run_procedure({"name": "save_data"})` and
+`run_procedure({"name": "clear_cache"})`.
+
 `save()` collects the capture from LAS X's cache as LAS X writes it (LAS X's AutoSave is not used)
-and writes it as one OME-Zarr store, or as single-plane OME-TIFFs with OME-XML embedded in each
-image (`IMAGE_SAVE.format`). They land in `<output_root>/data/`, so what is made from
+and writes it as one OME-Zarr store. They land in `<output_root>/data/`, so what is made from
 them later (a stitched view, an analysis) becomes a folder beside `data` and is
 never confused with it. Everything describing the capture is under
 `data/metadata`, one folder per party:
@@ -496,17 +503,19 @@ there only in case the two accounts disagree.
 that is stored inside each OME-Zarr image (`OME/METADATA.ome.xml`). Captures are saved as OME-Zarr
 only.
 
-**LAS X's cache can be let go of once a capture is saved.** Every picture LAS X takes stays in its
+**LAS X's cache is let go of by the `clear_cache` procedure, never by acquiring or saving.** Every picture LAS X takes stays in its
 Data Container cache until LAS X restarts, so a long time course fills the disk twice. The cache
 folder is the one the registry names under `Data Port` (`HKLM\SOFTWARE\Leica Microsystems\Data
 Container V2`): `D:\Temp2` on the STELLARIS Y42H93.
-With `cleanup_cache=True`, the profile's default since it passed on the STELLARIS (15 October
-2026), the save's last step asks LAS X itself to delete the picture it was read from: the delete of
-LAS X's own window, so the cache's files go and the project stays whole
-(`procedures/clear_cache/release.py` says how). It runs only once the copy is written and read back
-identical, and the Navigator canvas is then cleared, which lets go of each capture's hidden copy.
-The driver never deletes a file itself: a capture LAS X gives no way to let go of is refused before
-anything is saved.
+When you run it, the driver asks LAS X itself to delete each picture whose capture was saved: the
+delete of LAS X's own window, so the cache's files go and the project stays whole
+(`procedures/clear_cache/release.py` says how). Only pictures whose copy was written and read back
+identical are on its list, and the Navigator canvas is then cleared, which lets go of each
+capture's hidden copy. The driver never deletes a file itself. A picture it cannot let go of stays
+on the list and is reported, so a later call can try again. The 15 October 2026 STELLARIS check
+(fifty and then ten captures let go of, the cache staying flat) was made with the earlier
+release-after-every-save; `testing/hardware/check_cache_release.py` now runs `clear_cache` after
+each capture and should be run again on the simulator.
 
 **Positions are never made in the Navigator Expert.** They come from the ZMART interface.
 `acquire()` and the autofocus procedure capture at the current position.
