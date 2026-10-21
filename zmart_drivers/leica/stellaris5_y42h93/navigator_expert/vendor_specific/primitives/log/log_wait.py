@@ -12,7 +12,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 
 from . import log_reader
-from ... import tuning
+from ...connection import tuning
 
 
 @dataclass(frozen=True)

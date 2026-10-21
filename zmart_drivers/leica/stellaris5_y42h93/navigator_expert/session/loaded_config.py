@@ -23,8 +23,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from ..driver_setup.orientation import Orientation
-
 
 @dataclass
 class SessionConfig:
@@ -41,7 +39,7 @@ class SessionConfig:
     readiness verdict without making workflows interpret configuration files.
     """
 
-    orientation: Orientation
+    orientation: Any  # the camera-to-stage turn, an ``Orientation`` from driver_setup/orientation
     translations: dict | None = None
     calibration_name: str | None = None
     orientation_info: dict | None = None

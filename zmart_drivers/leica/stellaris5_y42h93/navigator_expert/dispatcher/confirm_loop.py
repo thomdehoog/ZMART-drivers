@@ -23,8 +23,8 @@ University of Zurich (thom.dehoog@zmb.uzh.ch, thomdehoog@gmail.com).
 import logging
 import time
 
-from .dispatcher import make_log_entry as _make_log_entry
-from .dispatcher import make_timing as _make_timing
+from .door import make_log_entry as _make_log_entry
+from .door import make_timing as _make_timing
 from .send_loop import (
     append_dialog_warning as _append_dialog_warning,
     confirmation_detail as _confirmation_detail,

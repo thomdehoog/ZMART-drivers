@@ -18,8 +18,8 @@ import zarr
 
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.orientation import Orientation
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.save_data.naming import Naming
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.product import PlaneIndex
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.acquisition import acquire as capture
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitives.capture.product import PlaneIndex
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.acquisition import run_job as capture
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.save_data import save as saving
 
 DATA = Path(__file__).resolve().parents[1] / "data" / "lasx_description"

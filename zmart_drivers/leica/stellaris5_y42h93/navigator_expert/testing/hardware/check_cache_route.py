@@ -66,7 +66,7 @@ def main() -> int:
     from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.for_zmart_controller.zmart_driver import (
         ZmartDriver as driver,
     )
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.acquisition import acquisition as _acquisition
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.acquisition import acquire as _acquisition
 
     report: dict = {
         "job": asked.job,
@@ -273,7 +273,7 @@ def _described(ome) -> dict:
 
 def _laser_power(record: dict) -> list[dict]:
     """Each laser's power fields, from the capture's own setting in LAS X's description."""
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.metadata_map import image_of
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitives.capture.metadata_map import image_of
 
     description = next(
         (

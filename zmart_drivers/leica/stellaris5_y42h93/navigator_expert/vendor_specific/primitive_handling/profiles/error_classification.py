@@ -31,7 +31,7 @@ University of Zurich (thom.dehoog@zmb.uzh.ch, thomdehoog@gmail.com).
 import logging
 from enum import Enum
 
-from ..dispatcher.dispatcher import make_log_entry as _make_log_entry
+from ....dispatcher.door import make_log_entry as _make_log_entry
 
 log = logging.getLogger(__name__)
 

@@ -24,7 +24,7 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.prim
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.objective_change_with_compensation import objective_shift
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.profiles import profiles
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.profiles import prechecks
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific import tuning
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.connection import tuning
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings import state as readers
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitives.api import delivery
 
@@ -375,7 +375,7 @@ EXCEPTIONS = {
     ("vendor_specific/primitives/capture/files.py", "timeout"),
     ("vendor_specific/primitives/capture/files.py", "poll_interval"),
     # The rule itself.
-    ("vendor_specific/tuning.py", "WINDOW_S"),
+    ("vendor_specific/connection/tuning.py", "WINDOW_S"),
 }
 
 

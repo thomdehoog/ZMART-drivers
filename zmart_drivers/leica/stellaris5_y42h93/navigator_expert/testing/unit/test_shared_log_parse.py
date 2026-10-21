@@ -16,7 +16,7 @@ from unittest.mock import patch
 import pytest
 
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings import state as readers
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific import tuning
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.connection import tuning
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitives.log import log_reader
 
 PARSE_S = 0.05

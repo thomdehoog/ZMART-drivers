@@ -154,7 +154,7 @@ def main() -> int:
     )
     from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.clear_cache import release as lasx_cache_release
     from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitives.capture import lasx_data_container as container
-    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.acquisition import acquisition as _acquisition
+    from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.acquisition import acquire as _acquisition
 
     releases = Releases()
     logging.getLogger(lasx_cache_release.__name__).addHandler(releases)

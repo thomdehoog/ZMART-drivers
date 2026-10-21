@@ -31,11 +31,9 @@ import pytest
 import zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings.state as readers
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.objective_change_with_compensation import objective_shift as shift
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.settings import changes as commands_mod
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures import (
-    session_state,
-)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.session import loaded_config as session_state
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.orientation import Orientation
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific import parsing as _readers_parsing
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings import parsing as _readers_parsing
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.settings import changes as _commands
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings import state as _readers
 
@@ -47,9 +45,7 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.absolute_
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures import (
     instrument as _instrument,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.session import (
-    ZmartHandle,
-)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.session.handle import ZmartHandle
 
 
 class SimScope:

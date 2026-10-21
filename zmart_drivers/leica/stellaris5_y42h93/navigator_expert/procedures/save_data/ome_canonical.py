@@ -21,9 +21,15 @@ from pathlib import Path
 from typing import Any
 
 from ...vendor_specific.primitive_handling.readings import state as _readers
-from ...vendor_specific import parsing as _parsing
+from ...vendor_specific.primitive_handling.readings import parsing as _parsing
 from ...vendor_specific.primitives.capture import tiff_tag as _ome
-from ...vendor_specific.product import AcquisitionMetadata, ChannelMetadata, Instrument, PlaneIndex, PlaneMetadata
+from ...vendor_specific.primitives.capture.product import (
+    AcquisitionMetadata,
+    ChannelMetadata,
+    Instrument,
+    PlaneIndex,
+    PlaneMetadata,
+)
 
 log = logging.getLogger(__name__)
 

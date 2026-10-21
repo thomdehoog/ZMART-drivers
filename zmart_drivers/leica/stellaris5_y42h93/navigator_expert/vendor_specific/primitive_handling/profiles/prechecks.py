@@ -20,8 +20,8 @@ import logging
 import time
 
 from ..readings import state as _readers
-from ....dispatcher.dispatcher import make_log_entry as _make_log_entry
-from ... import tuning
+from ....dispatcher.door import make_log_entry as _make_log_entry
+from ...connection import tuning
 
 log = logging.getLogger(__name__)
 
