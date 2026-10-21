@@ -56,7 +56,9 @@ from typing import Any
 
 import numpy as np
 
-import zmart_drivers.leica.stellaris5_y42h93.navigator_expert as drv
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.limits import handshake
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.connection import lasx_client
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings import state as readers
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.orientation.registration import (
     VOTING_METHODS,
     register_voting,
@@ -213,13 +215,13 @@ def start_session(
             f"or change reference_slot in the first cell to "
             f"{stored_reference_slot}. Calibration file: {resolved_path}"
         )
-    client = drv.connect_python_client()
-    # Calibration moves the stage through gated drv.move_* wrappers, so it
+    client = lasx_client.connect_python_client()
+    # Calibration moves the stage through gated move_xy and move_z changes, so it
     # needs validated ProgramData limits exactly like any other session.
-    limits_state = drv.connect_limits_handshake(client)
+    limits_state = handshake.connect_handshake(client)
     if not limits_state.ok:
         raise RuntimeError(limits_state.error)
-    hw = drv.get_hardware_info(client)
+    hw = readers.get_hardware_info(client)
     if hw is None:
         raise RuntimeError("get_hardware_info returned None; LAS X unreachable")
     if job_name is None:
@@ -645,14 +647,14 @@ def measure_parfocality_reference(
     except Exception:
         display = None
 
-    xy = drv.get_xy(session.client) or {}
+    xy = readers.get_xy(session.client) or {}
     if "x_um" not in xy or "y_um" not in xy:
         raise RuntimeError(f"get_xy returned no readback: {xy}")
     session.home_xy = (float(xy["x_um"]), float(xy["y_um"]))
     # home_z is diagnostic -- the operator's approximate focus before
     # the reference stack runs. focus_z_ref_um is the load-bearing
     # value, fitted below.
-    session.home_z = float(drv.read_zwide_um(session.client, session.job_name))
+    session.home_z = float(readers.read_zwide_um(session.client, session.job_name))
 
     stack = acquire_stack_to(
         session,
@@ -739,7 +741,7 @@ def measure_parfocality_target(
     except Exception:
         display = None
 
-    z_post = float(drv.read_zwide_um(session.client, session.job_name))
+    z_post = float(readers.read_zwide_um(session.client, session.job_name))
     session.z_post = z_post
     # motor_shift_z = post-switch z-wide minus reference focus peak.
     session.motor_shift_z_um = z_post - session.focus_z_ref_um
@@ -889,7 +891,7 @@ def measure_parcentricity_target_and_save(
     except Exception:
         display = None
 
-    xy = drv.get_xy(session.client) or {}
+    xy = readers.get_xy(session.client) or {}
     if "x_um" not in xy or "y_um" not in xy:
         raise RuntimeError(f"get_xy returned no readback: {xy}")
     xy_post = (float(xy["x_um"]), float(xy["y_um"]))

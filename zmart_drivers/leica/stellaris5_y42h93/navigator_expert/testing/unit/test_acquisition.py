@@ -24,7 +24,10 @@ import pytest
 import tifffile
 import zarr
 
-import zmart_drivers.leica.stellaris5_y42h93.navigator_expert as drv
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.acquisition import run_job
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.save_data import save as saving
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.save_data import saved_acquisition
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitives.capture import product
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.orientation import (
     Orientation,
     reorient_array,
@@ -89,8 +92,8 @@ def test_leica_private_naming_rejects_unrepresentable_plane_indices(field, value
         )
 
 
-def _metadata() -> drv.AcquisitionMetadata:
-    return drv.AcquisitionMetadata(
+def _metadata() -> product.AcquisitionMetadata:
+    return product.AcquisitionMetadata(
         size_x=16,
         size_y=16,
         size_t=1,
@@ -99,12 +102,12 @@ def _metadata() -> drv.AcquisitionMetadata:
         pixel_type="uint8",
         physical_size_x_um=1.0,
         physical_size_y_um=1.0,
-        channels=(drv.ChannelMetadata(index=0, name="C0"),),
+        channels=(product.ChannelMetadata(index=0, name="C0"),),
     )
 
 
-def _grid_metadata() -> drv.AcquisitionMetadata:
-    return drv.AcquisitionMetadata(
+def _grid_metadata() -> product.AcquisitionMetadata:
+    return product.AcquisitionMetadata(
         size_x=16,
         size_y=16,
         size_t=1,
@@ -114,8 +117,8 @@ def _grid_metadata() -> drv.AcquisitionMetadata:
         physical_size_x_um=1.0,
         physical_size_y_um=1.0,
         channels=(
-            drv.ChannelMetadata(index=0, name="C0"),
-            drv.ChannelMetadata(index=1, name="C1"),
+            product.ChannelMetadata(index=0, name="C0"),
+            product.ChannelMetadata(index=1, name="C1"),
         ),
     )
 
@@ -153,7 +156,7 @@ def fake_export(tmp_path: Path) -> dict:
     plane_paths = {}
     for z in range(2):
         for c in range(2):
-            idx = drv.PlaneIndex(t=0, z=z, c=c)
+            idx = product.PlaneIndex(t=0, z=z, c=c)
             image_path = source_dir / f"image--Z{z:02d}--C{c:02d}.ome.tif"
             tifffile.imwrite(
                 str(image_path),
@@ -167,20 +170,20 @@ def fake_export(tmp_path: Path) -> dict:
         positions=[
             ExportedPosition(
                 t=0,
-                planes={idx: drv.PlaneSource(path=p) for idx, p in plane_paths.items()},
+                planes={idx: product.PlaneSource(path=p) for idx, p in plane_paths.items()},
             )
         ],
         metadata=_grid_metadata(),
         method="test",
         source_exporter="lasx_data_container",
         vendor_metadata_sources=(
-            drv.VendorMetadataSource(name="source.ome.xml", path=xml_path),
+            product.VendorMetadataSource(name="source.ome.xml", path=xml_path),
         ),
     )
 
     return {
         "source_root": source_root,
-        "image_path": plane_paths[drv.PlaneIndex(t=0, z=0, c=0)],
+        "image_path": plane_paths[product.PlaneIndex(t=0, z=0, c=0)],
         "plane_paths": plane_paths,
         "image_paths": [p for _idx, p in sorted(plane_paths.items())],
         "xml_path": xml_path,
@@ -212,8 +215,8 @@ def _placement(_planes):
 
 
 def _save(acq, output_root, naming, **kwargs):
-    """``drv.save`` with a placement, which an OME-Zarr store needs."""
-    return drv.save(None, acq, output_root, naming, placement=_placement, **kwargs)
+    """``saving.save`` with a placement, which an OME-Zarr store needs."""
+    return saving.save(None, acq, output_root, naming, placement=_placement, **kwargs)
 
 
 def _store_xml(store: Path) -> str:
@@ -228,7 +231,7 @@ class TestAcquire:
             "acquire",
             return_value={"success": True, "receipt": "ok"},
         ) as command:
-            result = drv.acquire("client", "HiRes")
+            result = run_job.acquire("client", "HiRes")
 
         command.assert_called_once_with(
             "client",
@@ -238,7 +241,7 @@ class TestAcquire:
             heartbeat_interval=None,
             start_timeout=None,
         )
-        assert isinstance(result, drv.AcquisitionResult)
+        assert isinstance(result, run_job.AcquisitionResult)
         assert result.job == "HiRes"
         assert result.command_result == {"success": True, "receipt": "ok"}
         assert result.started_at <= result.finished_at
@@ -252,7 +255,7 @@ class TestAcquire:
             ),
             pytest.raises(RuntimeError, match="acquire failed"),
         ):
-            drv.acquire("client", "HiRes")
+            run_job.acquire("client", "HiRes")
 
     def test_acquire_has_no_file_or_save_side_effects(self):
         with (
@@ -270,7 +273,7 @@ class TestAcquire:
                 "_persist_store",
             ) as persist,
         ):
-            drv.acquire("client", "HiRes")
+            run_job.acquire("client", "HiRes")
 
         read_relative_path.assert_not_called()
         persist.assert_not_called()
@@ -396,10 +399,10 @@ class TestSave:
         planes = {}
         positions = []
         for t in (0, 1):
-            index = drv.PlaneIndex(t=t, z=0, c=0)
+            index = product.PlaneIndex(t=t, z=0, c=0)
             source = source_root / f"time-{t}.tiff"
             tifffile.imwrite(source, np.full((16, 16), t + 5, dtype=np.uint8))
-            plane = drv.PlaneSource(path=source)
+            plane = product.PlaneSource(path=source)
             planes[index] = plane
             positions.append(ExportedPosition(t=t, planes={index: plane}))
         exported = ExportedAcquisition(
@@ -417,8 +420,8 @@ class TestSave:
 
         assert len(saved.image_paths) == 2
         assert len(set(saved.image_paths.values())) == 1
-        assert saved.read_plane(drv.PlaneIndex(t=0, z=0, c=0))[0, 0] == 5
-        assert saved.read_plane(drv.PlaneIndex(t=1, z=0, c=0))[0, 0] == 6
+        assert saved.read_plane(product.PlaneIndex(t=0, z=0, c=0))[0, 0] == 5
+        assert saved.read_plane(product.PlaneIndex(t=1, z=0, c=0))[0, 0] == 6
 
     def test_save_persists_the_store_and_summary(
         self,
@@ -433,7 +436,7 @@ class TestSave:
         result = _save(successful_acq, output_root, naming)
 
         expected_store = output_root / "data" / f"{naming.stem}.ome.zarr"
-        assert isinstance(result, drv.SavedAcquisition)
+        assert isinstance(result, saved_acquisition.SavedAcquisition)
         assert set(result.image_paths) == set(patched_export["plane_paths"])
         assert set(result.image_paths.values()) == {expected_store}
         assert expected_store.is_dir()
@@ -464,7 +467,7 @@ class TestSave:
     ):
         """A store records where the image lies on the sample; guessing would mislead."""
         with pytest.raises(ValueError, match="placed by its canvas position"):
-            drv.save(None, successful_acq, tmp_path / "out", naming)
+            saving.save(None, successful_acq, tmp_path / "out", naming)
 
     def test_save_does_not_issue_microscope_acquire(
         self,
@@ -819,16 +822,16 @@ class TestHelpers:
                 ExportedPosition(
                     t=0,
                     planes={
-                        drv.PlaneIndex(t=0, z=0, c=0): drv.PlaneSource(
+                        product.PlaneIndex(t=0, z=0, c=0): product.PlaneSource(
                             path=tiff, page_index=0
                         ),
-                        drv.PlaneIndex(t=0, z=0, c=1): drv.PlaneSource(
+                        product.PlaneIndex(t=0, z=0, c=1): product.PlaneSource(
                             path=tiff, page_index=1
                         ),
                     },
                 )
             ],
-            metadata=drv.AcquisitionMetadata(
+            metadata=product.AcquisitionMetadata(
                 size_x=8,
                 size_y=8,
                 size_t=1,
@@ -838,7 +841,7 @@ class TestHelpers:
             ),
             method="test",
             vendor_metadata_sources=(
-                drv.VendorMetadataSource(name="source.ome.xml", path=xml),
+                product.VendorMetadataSource(name="source.ome.xml", path=xml),
             ),
         )
 

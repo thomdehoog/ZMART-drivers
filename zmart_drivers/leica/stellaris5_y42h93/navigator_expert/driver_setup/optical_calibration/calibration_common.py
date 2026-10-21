@@ -30,7 +30,11 @@ from typing import Any
 
 import numpy as np
 
-import zmart_drivers.leica.stellaris5_y42h93.navigator_expert as drv
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.acquisition import run_job
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.save_data import save as saving
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings import parsing
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings import state as readers
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.settings import changes
 
 from .. import orientation as _orientation
 from ...procedures.save_data.naming import Naming, run_hash
@@ -119,8 +123,8 @@ def read_job_geometry(
     # Calibration geometry is kept and used later, so it is read from LAS X
     # itself: the direct reader, with the CAM API only when it cannot answer
     # (on the STELLARIS, 2026-10-15, both gave the same values).
-    settings = drv.get_job_settings(client, job_name, mode="direct") or {}
-    geom = drv.parse_tile_geometry(settings)
+    settings = readers.get_job_settings(client, job_name, mode="direct") or {}
+    geom = parsing.parse_tile_geometry(settings)
     if geom is None or geom.get("pixel_w_um") is None or geom.get("pixels_x") is None:
         raise ValueError(
             f"job settings for '{job_name}' are missing pixel size / image "
@@ -177,12 +181,12 @@ def move_xy_and_verify(
     settle_s: float = 0.5,
     tolerance_um: float = 0.5,
 ) -> None:
-    result = drv.move_xy(client, x_um, y_um, unit="um", tolerance=tolerance_um)
+    result = changes.move_xy(client, x_um, y_um, unit="um", tolerance=tolerance_um)
     if not result or not result.get("success"):
         raise RuntimeError(f"move_xy failed: {result}")
     if settle_s > 0:
         time.sleep(settle_s)
-    xy = drv.get_xy(client) or {}
+    xy = readers.get_xy(client) or {}
     if ("x_um" not in xy) or ("y_um" not in xy):
         raise RuntimeError(f"get_xy returned no readback: {xy}")
     if abs(xy["x_um"] - x_um) > tolerance_um or abs(xy["y_um"] - y_um) > tolerance_um:
@@ -199,7 +203,7 @@ def move_zwide_and_verify(
     *,
     tolerance_um: float = 1.0,
 ) -> None:
-    result = drv.move_z(
+    result = changes.move_z(
         client, job_name, z_um, unit="um", z_mode="zwide", tolerance=tolerance_um
     )
     if not result or not result.get("success"):
@@ -210,7 +214,7 @@ def move_zwide_and_verify(
 
 def read_selected_job_name(client: Any) -> str:
     """Return the active Navigator Expert job name."""
-    selected = drv.get_selected_job(client) or {}
+    selected = readers.get_selected_job(client) or {}
     job_name = str(selected.get("Name") or "").strip()
     if not job_name:
         raise RuntimeError("No Navigator Expert job is selected in LAS X.")
@@ -230,7 +234,7 @@ def read_active_objective(
     microscope reports as active. ``known_names`` supplies a fallback
     name per slot for hardware records that omit one.
     """
-    selected = drv.get_selected_job(client) or {}
+    selected = readers.get_selected_job(client) or {}
     selected_name = selected.get("Name")
     if selected_name != job_name:
         raise RuntimeError(
@@ -238,7 +242,7 @@ def read_active_objective(
             f"but {selected_name!r} is selected. Re-select {job_name!r}; "
             "change only the objective between calibration steps."
         )
-    settings = drv.get_job_settings(client, job_name) or {}
+    settings = readers.get_job_settings(client, job_name) or {}
     objective = settings.get("objective") or {}
     slot = objective.get("slotIndex")
     if slot is None:
@@ -342,8 +346,8 @@ def _capture_for_calibration(
         orientation = _orientation.rig_orientation()
     position_label = f"{len(session.exported_files):06d}"
     naming = Naming(stem=f"{folder}_{run_hash()}_{position_label}")
-    acq = drv.acquire(session.client, session.job_name)
-    return drv.save(
+    acq = run_job.acquire(session.client, session.job_name)
+    return saving.save(
         session.client,
         acq,
         session.paths.data_dir / name,
@@ -421,7 +425,7 @@ def read_stack_z_positions(
     # Z-stack positions are kept as calibration geometry, so they are read
     # from LAS X itself: the direct reader, with the CAM API only when it
     # cannot answer (on the STELLARIS, 2026-10-15, both gave the same stack).
-    raw = drv.get_job_settings(client, job_name, mode="direct")
+    raw = readers.get_job_settings(client, job_name, mode="direct")
     if not raw:
         raise RuntimeError(
             f"Could not read job settings for job {job_name!r}; cannot "
@@ -431,7 +435,7 @@ def read_stack_z_positions(
 
     stack: dict | None = None
     try:
-        normalized = drv.make_changeable_copy(raw)
+        normalized = parsing.make_changeable_copy(raw)
     except Exception:
         normalized = None
     if normalized and isinstance(normalized.get("stack"), dict):

@@ -44,6 +44,14 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.optical
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.optical_calibration import (
     calibration_common as cm,
 )
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.limits import handshake
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.acquisition import run_job
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.save_data import save as saving
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.connection import lasx_client
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings import parsing
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings import state as readers
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.settings import changes
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitives.capture import product
 
 # ---------------------------------------------------------------------
 # Explicit runtime roots
@@ -86,13 +94,13 @@ def test_calibration_capture_explicitly_passes_active_orientation(
     received = {}
 
     monkeypatch.setattr(cm._orientation, "rig_orientation", lambda: expected)
-    monkeypatch.setattr(cm.drv, "acquire", lambda client, job: acquisition)
+    monkeypatch.setattr(run_job, "acquire", lambda client, job: acquisition)
 
     def _save(client, result, output_root, naming, *, orientation, **_settings):
         received["orientation"] = orientation
         return saved
 
-    monkeypatch.setattr(cm.drv, "save", _save)
+    monkeypatch.setattr(saving, "save", _save)
 
     result = cm._capture_for_calibration(
         session,
@@ -187,12 +195,12 @@ def test_assert_geometry_matches_rejects_pixel_size():
 
 def test_read_job_geometry_rejects_non_square_pixels(monkeypatch):
     monkeypatch.setattr(
-        cm.drv,
+        readers,
         "get_job_settings",
         lambda *a, **k: {"some": "settings"},
     )
     monkeypatch.setattr(
-        cm.drv,
+        parsing,
         "parse_tile_geometry",
         lambda settings: {
             "pixel_w_um": 0.5,
@@ -212,9 +220,9 @@ def test_read_job_geometry_asks_the_direct_reader(monkeypatch):
         calls.append((job_name, kwargs))
         return {"some": "settings"}
 
-    monkeypatch.setattr(cm.drv, "get_job_settings", _get_job_settings)
+    monkeypatch.setattr(readers, "get_job_settings", _get_job_settings)
     monkeypatch.setattr(
-        cm.drv,
+        parsing,
         "parse_tile_geometry",
         lambda settings: {
             "pixel_w_um": 0.5,
@@ -231,12 +239,12 @@ def test_read_job_geometry_asks_the_direct_reader(monkeypatch):
 
 def test_read_job_geometry_uses_image_shape_when_provided(monkeypatch):
     monkeypatch.setattr(
-        cm.drv,
+        readers,
         "get_job_settings",
         lambda *a, **k: {"some": "settings"},
     )
     monkeypatch.setattr(
-        cm.drv,
+        parsing,
         "parse_tile_geometry",
         lambda settings: {
             "pixel_w_um": 0.5,
@@ -325,18 +333,18 @@ def _saved_manifest(output_root, naming, image):
         image_paths = {}
         for z, plane in enumerate(arr):
             plane_naming = replace(naming, z=z)
-            image_paths[cm.drv.PlaneIndex(t=0, z=z, c=0)] = _write_saved_image(
+            image_paths[product.PlaneIndex(t=0, z=z, c=0)] = _write_saved_image(
                 output_root, plane_naming, plane
             )
     else:
         image_paths = {
-            cm.drv.PlaneIndex(t=0, z=0, c=0): _write_saved_image(
+            product.PlaneIndex(t=0, z=0, c=0): _write_saved_image(
                 output_root, naming, arr
             )
         }
     return SimpleNamespace(
         image_paths=image_paths,
-        xml_paths={cm.drv.PositionIndex(t=0, v=0): Path(output_root) / "mock.ome.xml"},
+        xml_paths={product.PositionIndex(t=0, v=0): Path(output_root) / "mock.ome.xml"},
         naming=naming,
         read_plane=lambda index: tifffile.imread(image_paths[index]),
     )
@@ -944,13 +952,13 @@ def _patch_objective_driver(
     ``brenner(slice)`` reads ``slice.flat[0]`` to know the slice's z.
     """
     monkeypatch.setattr(
-        wf_obj.drv,
+        lasx_client,
         "connect_python_client",
         lambda *a, **k: object(),
     )
     monkeypatch.setattr(
-        wf_obj.drv,
-        "connect_limits_handshake",
+        handshake,
+        "connect_handshake",
         lambda client, **k: SimpleNamespace(
             ok=True,
             error=None,
@@ -958,7 +966,7 @@ def _patch_objective_driver(
         ),
     )
     monkeypatch.setattr(
-        wf_obj.drv,
+        readers,
         "get_hardware_info",
         # A realistic occupied turret: start_session resolves the configured
         # reference slot's name from this, exactly like the live driver.
@@ -1019,12 +1027,12 @@ def _patch_objective_driver(
         # simulate the firmware's post-switch z-wide reading.
         return float(state["zwide"])
 
-    monkeypatch.setattr(wf_obj.drv, "get_xy", _get_xy)
-    monkeypatch.setattr(cm.drv, "get_xy", _get_xy)
-    monkeypatch.setattr(cm.drv, "move_xy", _move_xy)
-    monkeypatch.setattr(cm.drv, "move_z", _move_z)
-    monkeypatch.setattr(cm.drv, "read_zwide_um", _read_zwide_um)
-    monkeypatch.setattr(wf_obj.drv, "read_zwide_um", _read_zwide_um)
+    monkeypatch.setattr(readers, "get_xy", _get_xy)
+    monkeypatch.setattr(readers, "get_xy", _get_xy)
+    monkeypatch.setattr(changes, "move_xy", _move_xy)
+    monkeypatch.setattr(changes, "move_z", _move_z)
+    monkeypatch.setattr(readers, "read_zwide_um", _read_zwide_um)
+    monkeypatch.setattr(readers, "read_zwide_um", _read_zwide_um)
 
     def _get_job_settings(client, job_name, **kw):
         return {
@@ -1035,7 +1043,7 @@ def _patch_objective_driver(
             "stack": dict(state[f"{state['stack_phase']}_stack"]),
         }
 
-    monkeypatch.setattr(cm.drv, "get_job_settings", _get_job_settings)
+    monkeypatch.setattr(readers, "get_job_settings", _get_job_settings)
 
     def _make_changeable_copy(settings):
         if settings is None:
@@ -1045,10 +1053,10 @@ def _patch_objective_driver(
             "stack": dict(stack) if isinstance(stack, dict) else None,
         }
 
-    monkeypatch.setattr(cm.drv, "make_changeable_copy", _make_changeable_copy)
+    monkeypatch.setattr(parsing, "make_changeable_copy", _make_changeable_copy)
 
     monkeypatch.setattr(
-        cm.drv,
+        parsing,
         "parse_tile_geometry",
         lambda settings: {
             "pixel_w_um": pixel_size_um,
@@ -1100,8 +1108,8 @@ def _patch_objective_driver(
                 image = img_template.copy()
         return _saved_manifest(output_root, naming, image)
 
-    monkeypatch.setattr(cm.drv, "acquire", _acquire)
-    monkeypatch.setattr(cm.drv, "save", _save)
+    monkeypatch.setattr(run_job, "acquire", _acquire)
+    monkeypatch.setattr(saving, "save", _save)
 
     def _acquire_frame(client, job, **kw):
         idx = frame_count["n"]
@@ -1184,7 +1192,7 @@ def test_objective_pair_defaults_to_machine_workspace_calibration_and_active_job
     )
     _patch_objective_driver(monkeypatch)
     monkeypatch.setattr(
-        wf_obj.drv, "get_selected_job", lambda client, **kwargs: {"Name": "Overview"}
+        readers, "get_selected_job", lambda client, **kwargs: {"Name": "Overview"}
     )
 
     session = wf_obj.start_session(
@@ -1479,14 +1487,14 @@ def test_start_session_reports_configured_reference_slot_and_hardware_name(
     calibration_path.write_text(
         json.dumps(_current_calibration_payload()), encoding="utf-8"
     )
-    monkeypatch.setattr(wf_obj.drv, "connect_python_client", lambda: object())
+    monkeypatch.setattr(lasx_client, "connect_python_client", lambda: object())
     monkeypatch.setattr(
-        wf_obj.drv,
-        "connect_limits_handshake",
+        handshake,
+        "connect_handshake",
         lambda _client: SimpleNamespace(ok=True, error=None),
     )
     monkeypatch.setattr(
-        wf_obj.drv,
+        readers,
         "get_hardware_info",
         lambda _client, **_kwargs: {
             "Microscope": {
@@ -1546,12 +1554,12 @@ def test_objective_cells_record_and_report_target_then_verify_both_roles(
     session = _live_objective_session()
     live = {"job": "Overview", "slot": 1, "name": session.from_objective}
     monkeypatch.setattr(
-        wf_obj.drv,
+        readers,
         "get_selected_job",
         lambda _client, **_kwargs: {"Name": live["job"]},
     )
     monkeypatch.setattr(
-        wf_obj.drv,
+        readers,
         "get_job_settings",
         lambda _client, _job, **_kwargs: {
             "objective": {"slotIndex": live["slot"], "name": live["name"]}
@@ -1581,12 +1589,12 @@ def test_objective_verification_refuses_wrong_slot_same_reference_as_target_and_
     session = _live_objective_session()
     live = {"job": "Overview", "slot": 2, "name": "20x"}
     monkeypatch.setattr(
-        wf_obj.drv,
+        readers,
         "get_selected_job",
         lambda _client, **_kwargs: {"Name": live["job"]},
     )
     monkeypatch.setattr(
-        wf_obj.drv,
+        readers,
         "get_job_settings",
         lambda _client, _job, **_kwargs: {
             "objective": {"slotIndex": live["slot"], "name": live["name"]}
@@ -1620,12 +1628,12 @@ def test_target_focus_rerun_with_a_different_lens_redefines_the_target(
     session.to_objective = "HC PL APO CS2 20x/0.75 DRY"
     live = {"job": "Overview", "slot": 3, "name": "HC PL APO CS2 40x/1.10 WATER"}
     monkeypatch.setattr(
-        wf_obj.drv,
+        readers,
         "get_selected_job",
         lambda _client, **_kwargs: {"Name": live["job"]},
     )
     monkeypatch.setattr(
-        wf_obj.drv,
+        readers,
         "get_job_settings",
         lambda _client, _job, **_kwargs: {
             "objective": {"slotIndex": live["slot"], "name": live["name"]}
@@ -1654,12 +1662,12 @@ def test_target_verify_refuses_changed_lens_without_adopting_it(monkeypatch):
     session.to_objective = "HC PL APO CS2 20x/0.75 DRY"
     live = {"job": "Overview", "slot": 3, "name": "HC PL APO CS2 40x/1.10 WATER"}
     monkeypatch.setattr(
-        wf_obj.drv,
+        readers,
         "get_selected_job",
         lambda _client, **_kwargs: {"Name": live["job"]},
     )
     monkeypatch.setattr(
-        wf_obj.drv,
+        readers,
         "get_job_settings",
         lambda _client, _job, **_kwargs: {
             "objective": {"slotIndex": live["slot"], "name": live["name"]}
@@ -1691,12 +1699,12 @@ def test_observe_reference_refuses_a_session_without_a_configured_reference(
     session = _live_objective_session()
     session.from_slot = None
     monkeypatch.setattr(
-        wf_obj.drv,
+        readers,
         "get_selected_job",
         lambda _client, **_kwargs: {"Name": "Overview"},
     )
     monkeypatch.setattr(
-        wf_obj.drv,
+        readers,
         "get_job_settings",
         lambda _client, _job, **_kwargs: {"objective": {"slotIndex": 2, "name": "20x"}},
     )
@@ -2014,14 +2022,14 @@ def test_objective_pair_target_xy_acquire_at_post_switch_xy(
     # use calibration-stack and are not relevant here).
     acquire_positions: list[tuple[float, float]] = []
 
-    real_save = cm.drv.save
+    real_save = saving.save
 
     def _tracking_save(client, acq, output_root, naming, **kw):
         if naming.stem.startswith("calibration-frame_"):
             acquire_positions.append((state["x"], state["y"]))
         return real_save(client, acq, output_root, naming, **kw)
 
-    monkeypatch.setattr(cm.drv, "save", _tracking_save)
+    monkeypatch.setattr(saving, "save", _tracking_save)
 
     session = wf_obj.start_session(
         session_id="obj_postswitch",
@@ -2710,7 +2718,7 @@ def test_objective_pair_parcentricity_xy_pixel_size_mismatch_raises(
     # Before Step 5, change the reported pixel size so target XY does
     # not match the ref XY's recorded pixel size.
     monkeypatch.setattr(
-        cm.drv,
+        parsing,
         "parse_tile_geometry",
         lambda settings: {
             "pixel_w_um": 1.0,
@@ -2835,7 +2843,7 @@ def test_objective_pair_missing_stack_positions_raises(
     _patch_objective_driver(monkeypatch)
     # Strip the stack block from get_job_settings.
     monkeypatch.setattr(
-        cm.drv,
+        readers,
         "get_job_settings",
         lambda *a, **k: {
             "zoom": {"current": 1.0},
@@ -2845,7 +2853,7 @@ def test_objective_pair_missing_stack_positions_raises(
         },
     )
     monkeypatch.setattr(
-        cm.drv,
+        parsing,
         "make_changeable_copy",
         lambda settings: {"stack": None} if settings else None,
     )
@@ -2990,13 +2998,13 @@ def test_read_stack_z_positions_falls_back_on_partial_normalized(monkeypatch):
         },
     }
     monkeypatch.setattr(
-        cm.drv,
+        readers,
         "get_job_settings",
         lambda *a, **k: full_raw,
     )
     # Normalized form has only `begin`; end/sections are None.
     monkeypatch.setattr(
-        cm.drv,
+        parsing,
         "make_changeable_copy",
         lambda settings: (
             {
@@ -3038,9 +3046,9 @@ def test_read_stack_z_positions_asks_the_direct_reader(monkeypatch):
         calls.append((job_name, kwargs))
         return full_raw
 
-    monkeypatch.setattr(cm.drv, "get_job_settings", _get_job_settings)
+    monkeypatch.setattr(readers, "get_job_settings", _get_job_settings)
     monkeypatch.setattr(
-        cm.drv,
+        parsing,
         "make_changeable_copy",
         lambda settings: {"stack": dict(settings["stack"])} if settings else None,
     )
@@ -3075,12 +3083,12 @@ def test_read_stack_z_positions_ignores_rounded_step_size(monkeypatch):
         },
     }
     monkeypatch.setattr(
-        cm.drv,
+        readers,
         "get_job_settings",
         lambda *a, **k: full_raw,
     )
     monkeypatch.setattr(
-        cm.drv,
+        parsing,
         "make_changeable_copy",
         lambda settings: {"stack": dict(settings["stack"])} if settings else None,
     )

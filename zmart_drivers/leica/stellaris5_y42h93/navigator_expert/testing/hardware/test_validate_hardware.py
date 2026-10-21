@@ -613,7 +613,7 @@ def test_the_readbacks_ask_the_direct_reader_not_the_cam_api(tmp_path, monkeypat
     Only the two deliberate CAM API checks (the job list as a control for the
     log reader, and the independent check of a job switch) still ask the API.
     """
-    import zmart_drivers.leica.stellaris5_y42h93.navigator_expert as drv
+    import low_level as drv
 
     asked = []
     for name in ("get_xy", "get_job_settings"):

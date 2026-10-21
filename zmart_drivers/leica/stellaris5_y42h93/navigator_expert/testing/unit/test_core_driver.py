@@ -25,7 +25,12 @@ from functools import partial
 from types import SimpleNamespace
 from unittest.mock import MagicMock, PropertyMock, patch
 
-import zmart_drivers.leica.stellaris5_y42h93.navigator_expert as drv
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.dispatcher import door
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.objective_change_with_compensation import compensated_changes
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.profiles import error_classification
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings import parsing
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.settings import changes
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.settings import limit_rules
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.connection import (
     lasx_client as session,
 )
@@ -197,11 +202,11 @@ def _make_v6_result(success=True, msg="OK", **extra):
 class TestCheckApiError(unittest.TestCase):
     def test_success_result_1(self):
         client = make_client(make_echo(has_error=False, result_code=1))
-        self.assertIsNone(drv._check_api_error(client))
+        self.assertIsNone(error_classification._check_api_error(client))
 
     def test_not_defined_no_error(self):
         client = make_client(make_echo(has_error=False, result_code=0))
-        self.assertIsNone(drv._check_api_error(client))
+        self.assertIsNone(error_classification._check_api_error(client))
 
     def test_warning_treated_as_success(self):
         client = make_client(
@@ -211,19 +216,19 @@ class TestCheckApiError(unittest.TestCase):
                 result_code=1,
             )
         )
-        self.assertIsNone(drv._check_api_error(client))
+        self.assertIsNone(error_classification._check_api_error(client))
 
     def test_warning_case_insensitive(self):
         client = make_client(
             make_echo(has_error=True, error="WARNING: value clamped", result_code=2)
         )
-        self.assertIsNone(drv._check_api_error(client))
+        self.assertIsNone(error_classification._check_api_error(client))
 
     def test_error_result_failure(self):
         client = make_client(
             make_echo(has_error=True, error="Zoom out of range", result_code=2)
         )
-        err = drv._check_api_error(client)
+        err = error_classification._check_api_error(client)
         self.assertIsNotNone(err)
         self.assertEqual(err["error"], "Zoom out of range")
         self.assertEqual(err["result"], "Failure")
@@ -231,7 +236,7 @@ class TestCheckApiError(unittest.TestCase):
 
     def test_not_implemented(self):
         client = make_client(make_echo(has_error=False, error="", result_code=3))
-        err = drv._check_api_error(client)
+        err = error_classification._check_api_error(client)
         self.assertIsNotNone(err)
         self.assertEqual(err["result"], "NotImplemented")
         self.assertIn("not implemented", err["error"].lower())
@@ -240,14 +245,14 @@ class TestCheckApiError(unittest.TestCase):
         client = make_client(
             make_echo(has_error=True, error="Custom not impl msg", result_code=3)
         )
-        err = drv._check_api_error(client)
+        err = error_classification._check_api_error(client)
         self.assertEqual(err["error"], "Custom not impl msg")
 
     def test_has_error_no_warning(self):
         client = make_client(
             make_echo(has_error=True, error="Something broke", result_code=1)
         )
-        err = drv._check_api_error(client)
+        err = error_classification._check_api_error(client)
         self.assertIsNotNone(err)
         self.assertEqual(err["error"], "Something broke")
 
@@ -258,7 +263,7 @@ class TestCheckApiError(unittest.TestCase):
         type(echo).Result = PropertyMock(side_effect=Exception("COM error"))
         client = MagicMock()
         client.PyApiCommandEcho.Model = echo
-        err = drv._check_api_error(client)
+        err = error_classification._check_api_error(client)
         self.assertIsNotNone(err)
         self.assertEqual(err["result"], "Unknown")
 
@@ -271,7 +276,7 @@ class TestCheckApiError(unittest.TestCase):
 class TestDefaultErrorCheck(unittest.TestCase):
     def test_success_shape(self):
         client = make_client(make_echo(has_error=False, result_code=1))
-        result = drv._default_error_check(client)
+        result = error_classification._default_error_check(client)
         self.assertTrue(result["success"])
         self.assertIsNone(result["error"])
         self.assertIsNone(result["transient"])
@@ -281,7 +286,7 @@ class TestDefaultErrorCheck(unittest.TestCase):
         client = make_client(
             make_echo(has_error=True, error="out of range", result_code=2)
         )
-        result = drv._default_error_check(client)
+        result = error_classification._default_error_check(client)
         self.assertFalse(result["success"])
         self.assertEqual(result["error"], "out of range")
         self.assertFalse(result["transient"])
@@ -291,7 +296,7 @@ class TestDefaultErrorCheck(unittest.TestCase):
         client = make_client(
             make_echo(has_error=True, error="block is being scanned", result_code=2)
         )
-        result = drv._default_error_check(client)
+        result = error_classification._default_error_check(client)
         self.assertFalse(result["success"])
         self.assertTrue(result["transient"])
 
@@ -1341,7 +1346,7 @@ class TestErrorClassification(unittest.TestCase):
             "Request timed out",
         ]:
             with self.subTest(msg=msg):
-                self.assertTrue(drv._is_transient_error(msg))
+                self.assertTrue(error_classification._is_transient_error(msg))
 
     def test_permanent_patterns(self):
         for msg in [
@@ -1354,21 +1359,21 @@ class TestErrorClassification(unittest.TestCase):
             "not implemented",
         ]:
             with self.subTest(msg=msg):
-                self.assertFalse(drv._is_transient_error(msg))
+                self.assertFalse(error_classification._is_transient_error(msg))
 
     def test_permanent_wins_over_transient(self):
-        self.assertFalse(drv._is_transient_error("timeout not found"))
-        self.assertFalse(drv._is_transient_error("locked out of range"))
+        self.assertFalse(error_classification._is_transient_error("timeout not found"))
+        self.assertFalse(error_classification._is_transient_error("locked out of range"))
 
     def test_unknown_is_permanent(self):
-        self.assertFalse(drv._is_transient_error("something unexpected"))
+        self.assertFalse(error_classification._is_transient_error("something unexpected"))
 
     def test_empty_string(self):
-        self.assertFalse(drv._is_transient_error(""))
+        self.assertFalse(error_classification._is_transient_error(""))
 
     def test_case_insensitive(self):
-        self.assertTrue(drv._is_transient_error("BEING SCANNED"))
-        self.assertFalse(drv._is_transient_error("OUT OF RANGE"))
+        self.assertTrue(error_classification._is_transient_error("BEING SCANNED"))
+        self.assertFalse(error_classification._is_transient_error("OUT OF RANGE"))
 
 
 # =============================================================================
@@ -1871,18 +1876,18 @@ class TestSetFunctionWiring(unittest.TestCase):
         return captured, r
 
     def test_set_zoom_model(self):
-        info, _ = self._run_set(drv.set_zoom, None, "HiRes", 5.0)
+        info, _ = self._run_set(changes.set_zoom, None, "HiRes", 5.0)
         self.assertIs(info["api_obj"], info["client"].PyApiSetZoomByJobName)
         self.assertEqual(info["model"].JobName, "HiRes")
         self.assertEqual(info["model"].ZoomValue, 5.0)
 
     def test_set_scan_speed_model(self):
-        info, _ = self._run_set(drv.set_scan_speed, None, "HiRes", 600)
+        info, _ = self._run_set(changes.set_scan_speed, None, "HiRes", 600)
         self.assertIs(info["api_obj"], info["client"].PyApiSetScanSpeedByJobName)
         self.assertEqual(info["model"].ScanSpeed, 600)
 
     def test_set_scan_resonant_model(self):
-        info, _ = self._run_set(drv.set_scan_resonant, None, "HiRes", True)
+        info, _ = self._run_set(changes.set_scan_resonant, None, "HiRes", True)
         self.assertIs(
             info["api_obj"], info["client"].PyApiSetScannerToResonantByJobName
         )
@@ -1918,31 +1923,31 @@ class TestSetFunctionWiring(unittest.TestCase):
         self.assertIn("desired state does not differ", result["error"])
 
     def test_set_scan_mode_model(self):
-        info, _ = self._run_set(drv.set_scan_mode, None, "HiRes", "xyz")
+        info, _ = self._run_set(changes.set_scan_mode, None, "HiRes", "xyz")
         self.assertIs(info["api_obj"], info["client"].PyApiSetScanModeByJobName)
         self.assertEqual(info["model"].ScanModeValue, "xyz")
 
     def test_set_rotation_model(self):
-        info, _ = self._run_set(drv.set_scan_field_rotation, None, "HiRes", 45.0)
+        info, _ = self._run_set(changes.set_scan_field_rotation, None, "HiRes", 45.0)
         self.assertIs(
             info["api_obj"], info["client"].PyApiSetScanFieldRotationByJobName
         )
         self.assertEqual(info["model"].Rotation, 45.0)
 
     def test_set_image_format_string(self):
-        info, _ = self._run_set(drv.set_image_format, None, "HiRes", "1024 x 1024")
+        info, _ = self._run_set(changes.set_image_format, None, "HiRes", "1024 x 1024")
         self.assertIs(info["api_obj"], info["client"].PyApiSetImageSizeByJobName)
         self.assertEqual(info["model"].ImageWidth, 1024)
         self.assertEqual(info["model"].ImageHeight, 1024)
 
     def test_set_image_format_tuple(self):
-        info, _ = self._run_set(drv.set_image_format, None, "HiRes", (512, 768))
+        info, _ = self._run_set(changes.set_image_format, None, "HiRes", (512, 768))
         self.assertIs(info["api_obj"], info["client"].PyApiSetImageSizeByJobName)
         self.assertEqual(info["model"].ImageWidth, 512)
         self.assertEqual(info["model"].ImageHeight, 768)
 
     def test_set_frame_accumulation_model(self):
-        info, _ = self._run_set(drv.set_frame_accumulation, None, "HiRes", 0, 4)
+        info, _ = self._run_set(changes.set_frame_accumulation, None, "HiRes", 0, 4)
         self.assertIs(
             info["api_obj"], info["client"].PyApiSetFrameAccumulationByJobName
         )
@@ -1950,48 +1955,48 @@ class TestSetFunctionWiring(unittest.TestCase):
         self.assertEqual(info["model"].FrameAccumulation, 4)
 
     def test_set_frame_average_model(self):
-        info, _ = self._run_set(drv.set_frame_average, None, "HiRes", 0, 2)
+        info, _ = self._run_set(changes.set_frame_average, None, "HiRes", 0, 2)
         self.assertIs(info["api_obj"], info["client"].PyApiSetFrameAverageByJobName)
         self.assertEqual(info["model"].FrameAverage, 2)
 
     def test_set_pinhole_airy_model(self):
-        info, _ = self._run_set(drv.set_pinhole_airy, None, "HiRes", 0, 1.5)
+        info, _ = self._run_set(changes.set_pinhole_airy, None, "HiRes", 0, 1.5)
         self.assertIs(info["api_obj"], info["client"].PyApiSetPinholeAUByJobName)
         self.assertEqual(info["model"].PinholeAiry, 1.5)
 
     def test_set_detector_gain_model(self):
-        info, _ = self._run_set(drv.set_detector_gain, None, "HiRes", 0, "BR1", 750)
+        info, _ = self._run_set(changes.set_detector_gain, None, "HiRes", 0, "BR1", 750)
         self.assertIs(info["api_obj"], info["client"].PyApiSetDetectorGainByJobName)
         self.assertEqual(info["model"].BeamRoute, "BR1")
         self.assertEqual(info["model"].GainValue, 750)
 
     def test_set_laser_intensity_model(self):
         info, _ = self._run_set(
-            drv.set_laser_intensity, None, "HiRes", 0, "BR1", 0, 0.5
+            changes.set_laser_intensity, None, "HiRes", 0, "BR1", 0, 0.5
         )
         self.assertIs(info["api_obj"], info["client"].PyApiSetLaserIntensityByJobName)
         self.assertEqual(info["model"].IntensityValue, 0.5)
         self.assertEqual(info["model"].LaserLineIndex, 0)
 
     def test_set_laser_shutter_model(self):
-        info, _ = self._run_set(drv.set_laser_shutter, None, "HiRes", 0, "BR1", True)
+        info, _ = self._run_set(changes.set_laser_shutter, None, "HiRes", 0, "BR1", True)
         self.assertIs(info["api_obj"], info["client"].PyApiSetLaserShutterByJobName)
         self.assertEqual(info["model"].Activate, True)
 
     def test_set_z_stack_step_size_model(self):
-        info, _ = self._run_set(drv.set_z_stack_step_size, None, "HiRes", 2.0)
+        info, _ = self._run_set(changes.set_z_stack_step_size, None, "HiRes", 2.0)
         self.assertIs(
             info["api_obj"], info["client"].PyApiCommandSetZStackStepSizeByJobName
         )
         self.assertAlmostEqual(info["model"].StackStepSize, 2.0e-6, places=10)
 
     def test_set_z_stack_size_model(self):
-        info, _ = self._run_set(drv.set_z_stack_size, None, "HiRes", 10.0)
+        info, _ = self._run_set(changes.set_z_stack_size, None, "HiRes", 10.0)
         self.assertIs(info["api_obj"], info["client"].PyApiSetZStackSizeByJobName)
         self.assertAlmostEqual(info["model"].StackSize, 10.0e-6, places=10)
 
     def test_set_zoom_provides_confirm_fn(self):
-        info, _ = self._run_set(drv.set_zoom, None, "HiRes", 5.0)
+        info, _ = self._run_set(changes.set_zoom, None, "HiRes", 5.0)
         self.assertIs(info["api_obj"], info["client"].PyApiSetZoomByJobName)
         self.assertIsNotNone(info["kwargs"].get("confirm_fn"))
 
@@ -2000,7 +2005,7 @@ class TestSetFunctionWiring(unittest.TestCase):
     def _run_move_z(self, *args, **kwargs):
         """Like _run_set but also mocks check_z."""
         with patch.object(commands, "check_z"):
-            return self._run_set(drv.move_z, *args, **kwargs)
+            return self._run_set(changes.move_z, *args, **kwargs)
 
     def test_move_z_galvo_model(self):
         info, _ = self._run_move_z(None, "J", 50.0, unit="um", z_mode="galvo")
@@ -2025,7 +2030,7 @@ class TestSetFunctionWiring(unittest.TestCase):
         self.assertIs(info["api_obj"], info["client"].PyApiMoveZByJobName)
 
     def test_move_z_invalid_mode(self):
-        r = drv.move_z(make_client(), "J", 50.0, z_mode="invalid")
+        r = changes.move_z(make_client(), "J", 50.0, z_mode="invalid")
         self.assertFalse(r["success"])
         self.assertIn("Unknown z_mode", r["message"])
 
@@ -2035,14 +2040,14 @@ class TestSetFunctionWiring(unittest.TestCase):
 
     def test_move_z_limit_check_failure(self):
         """When check_z raises, move_z returns failure without dispatch."""
-        r = drv.move_z(make_client(), "J", 99999.0, z_mode="galvo")
+        r = changes.move_z(make_client(), "J", 99999.0, z_mode="galvo")
         self.assertFalse(r["success"])
 
     # â”€â”€ set_z_stack_definition wiring â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     def test_set_z_stack_definition_begin_end(self):
         info, _ = self._run_set(
-            drv.set_z_stack_definition, None, "J", begin_um=-5.0, end_um=5.0
+            changes.set_z_stack_definition, None, "J", begin_um=-5.0, end_um=5.0
         )
         self.assertIs(info["api_obj"], info["client"].PyApiSetZStackDefinitionByJobName)
         self.assertEqual(info["model"].JobName, "J")
@@ -2052,32 +2057,32 @@ class TestSetFunctionWiring(unittest.TestCase):
         self.assertAlmostEqual(info["model"].EndValue, 5.0e-6, places=12)
 
     def test_set_z_stack_definition_begin_only(self):
-        info, _ = self._run_set(drv.set_z_stack_definition, None, "J", begin_um=10.0)
+        info, _ = self._run_set(changes.set_z_stack_definition, None, "J", begin_um=10.0)
         self.assertEqual(info["model"].SetBegin, 1)
         self.assertEqual(info["model"].SetEnd, 2)  # ignore
 
     def test_set_z_stack_definition_end_only(self):
-        info, _ = self._run_set(drv.set_z_stack_definition, None, "J", end_um=10.0)
+        info, _ = self._run_set(changes.set_z_stack_definition, None, "J", end_um=10.0)
         self.assertEqual(info["model"].SetBegin, 2)  # ignore
         self.assertEqual(info["model"].SetEnd, 1)
 
     def test_set_z_stack_definition_reset_begin(self):
         info, _ = self._run_set(
-            drv.set_z_stack_definition, None, "J", old_begin_um=-3.0
+            changes.set_z_stack_definition, None, "J", old_begin_um=-3.0
         )
         self.assertEqual(info["model"].SetBegin, 0)  # reset
 
     def test_set_z_stack_definition_zero_begin(self):
         """begin_um=0.0 is a valid z-position - must not be treated as None."""
         info, _ = self._run_set(
-            drv.set_z_stack_definition, None, "J", begin_um=0.0, end_um=10.0
+            changes.set_z_stack_definition, None, "J", begin_um=0.0, end_um=10.0
         )
         self.assertEqual(info["model"].SetBegin, 1)
         self.assertAlmostEqual(info["model"].BeginValue, 0.0, places=12)
 
     def test_set_z_stack_definition_provides_confirm_fn(self):
         info, _ = self._run_set(
-            drv.set_z_stack_definition, None, "J", begin_um=-5.0, end_um=5.0
+            changes.set_z_stack_definition, None, "J", begin_um=-5.0, end_um=5.0
         )
         self.assertIsNotNone(info["kwargs"].get("confirm_fn"))
 
@@ -2085,7 +2090,7 @@ class TestSetFunctionWiring(unittest.TestCase):
 
     def test_set_filter_wheel_slot_model(self):
         info, _ = self._run_set(
-            drv.set_filter_wheel_slot, None, "J", 0, "BR1", "emission", 2
+            changes.set_filter_wheel_slot, None, "J", 0, "BR1", "emission", 2
         )
         self.assertIs(info["api_obj"], info["client"].PyApiSetFilterWheelSlotByJobName)
         self.assertEqual(info["model"].JobName, "J")
@@ -2095,13 +2100,13 @@ class TestSetFunctionWiring(unittest.TestCase):
 
     def test_set_filter_wheel_slot_provides_confirm_fn(self):
         info, _ = self._run_set(
-            drv.set_filter_wheel_slot, None, "J", 0, "BR1", "emission", 2
+            changes.set_filter_wheel_slot, None, "J", 0, "BR1", "emission", 2
         )
         self.assertIsNotNone(info["kwargs"].get("confirm_fn"))
 
     def test_set_filter_wheel_spectrum_model(self):
         info, _ = self._run_set(
-            drv.set_filter_wheel_spectrum, None, "J", 0, "BR1", "emission", 525
+            changes.set_filter_wheel_spectrum, None, "J", 0, "BR1", "emission", 525
         )
         self.assertIs(
             info["api_obj"], info["client"].PyApiSetFilterWheelSpectrumPositionByJobName
@@ -2113,7 +2118,7 @@ class TestSetFunctionWiring(unittest.TestCase):
 
     def test_set_filter_wheel_spectrum_provides_confirm_fn(self):
         info, _ = self._run_set(
-            drv.set_filter_wheel_spectrum, None, "J", 0, "BR1", "emission", 525
+            changes.set_filter_wheel_spectrum, None, "J", 0, "BR1", "emission", 525
         )
         self.assertIsNotNone(info["kwargs"].get("confirm_fn"))
 
@@ -2136,12 +2141,12 @@ class TestSetFunctionDefaults(unittest.TestCase):
         return captured
 
     def test_zoom_defaults(self):
-        d = self._get_kwargs(lambda c, j: drv.set_zoom(c, j, 5.0))
+        d = self._get_kwargs(lambda c, j: changes.set_zoom(c, j, 5.0))
         self.assertEqual(d["profile"].max_retries, profiles.ZOOM.max_retries)
         self.assertIsNotNone(d["confirm_fn"])
 
     def test_scan_speed_defaults(self):
-        d = self._get_kwargs(lambda c, j: drv.set_scan_speed(c, j, 600))
+        d = self._get_kwargs(lambda c, j: changes.set_scan_speed(c, j, 600))
         self.assertEqual(d["profile"].max_retries, profiles.SCAN_SPEED.max_retries)
         self.assertIsNotNone(d["confirm_fn"])
 
@@ -2190,37 +2195,37 @@ class TestMakeChangeableCopy(unittest.TestCase):
         return s
 
     def test_none_returns_none(self):
-        self.assertIsNone(drv.make_changeable_copy(None))
+        self.assertIsNone(parsing.make_changeable_copy(None))
 
     def test_basic_fields(self):
-        ch = drv.make_changeable_copy(self._settings())
+        ch = parsing.make_changeable_copy(self._settings())
         self.assertEqual(ch["zoom"]["current"], 5.0)
         self.assertEqual(ch["scanSpeed"]["value"], 600)
 
     def test_objective(self):
-        ch = drv.make_changeable_copy(self._settings())
+        ch = parsing.make_changeable_copy(self._settings())
         self.assertEqual(ch["objective"]["name"], "HC PL APO 63x")
 
     def test_active_settings(self):
-        ch = drv.make_changeable_copy(self._settings())
+        ch = parsing.make_changeable_copy(self._settings())
         self.assertEqual(
             ch["activeSettings"][0]["activeDetectors"][0]["_beamRoute"], "BR1"
         )
 
     def test_laser_lines(self):
-        ch = drv.make_changeable_copy(self._settings())
+        ch = parsing.make_changeable_copy(self._settings())
         self.assertEqual(
             ch["activeSettings"][0]["activeLaserLines"][0]["_beamRoute"], "BR1"
         )
 
     def test_stack_with_z(self):
-        ch = drv.make_changeable_copy(
+        ch = parsing.make_changeable_copy(
             self._settings(stack={"begin": -5.0, "end": 5.0, "stepSize": 1.0})
         )
         self.assertAlmostEqual(ch["stack"]["size"], 10.0)
 
     def test_no_stack_no_z(self):
-        ch = drv.make_changeable_copy(self._settings(scanMode="xy"))
+        ch = parsing.make_changeable_copy(self._settings(scanMode="xy"))
         self.assertNotIn("stack", ch)
 
     def test_multiple_settings(self):
@@ -2238,13 +2243,13 @@ class TestMakeChangeableCopy(unittest.TestCase):
                 "activeLaserLines": [],
             }
         )
-        ch = drv.make_changeable_copy(settings)
+        ch = parsing.make_changeable_copy(settings)
         self.assertEqual(len(ch["activeSettings"]), 2)
 
 
 class TestStageLimits(unittest.TestCase):
     def setUp(self):
-        drv.set_stage_limits(
+        limit_rules.set_stage_limits(
             x_min=0,
             x_max=130000,
             y_min=0,
@@ -2256,98 +2261,98 @@ class TestStageLimits(unittest.TestCase):
         )
 
     def test_valid_xy(self):
-        drv.check_xy(50000, 50000)
+        limit_rules.check_xy(50000, 50000)
 
     def test_x_below_min(self):
         with self.assertRaises(RuntimeError):
-            drv.check_xy(-1, 50000)
+            limit_rules.check_xy(-1, 50000)
 
     def test_x_above_max(self):
         with self.assertRaises(RuntimeError):
-            drv.check_xy(130001, 50000)
+            limit_rules.check_xy(130001, 50000)
 
     def test_y_below_min(self):
         with self.assertRaises(RuntimeError):
-            drv.check_xy(50000, -1)
+            limit_rules.check_xy(50000, -1)
 
     def test_y_above_max(self):
         with self.assertRaises(RuntimeError):
-            drv.check_xy(50000, 100001)
+            limit_rules.check_xy(50000, 100001)
 
     def test_z_galvo_valid(self):
-        drv.check_z(0, "galvo")
+        limit_rules.check_z(0, "galvo")
 
     def test_z_galvo_below(self):
         with self.assertRaises(RuntimeError):
-            drv.check_z(-251, "galvo")
+            limit_rules.check_z(-251, "galvo")
 
     def test_z_galvo_above(self):
         with self.assertRaises(RuntimeError):
-            drv.check_z(251, "galvo")
+            limit_rules.check_z(251, "galvo")
 
     def test_z_wide_above(self):
         with self.assertRaises(RuntimeError):
-            drv.check_z(8001, "zwide")
+            limit_rules.check_z(8001, "zwide")
 
     def test_z_unknown_mode_raises(self):
         with self.assertRaises(ValueError):
-            drv.check_z(100, "unknown")
+            limit_rules.check_z(100, "unknown")
 
     def test_unconfigured_raises(self):
-        old = dict(drv._stage_limits)
-        drv._stage_limits["x_min"] = None
+        old = dict(limit_rules._stage_limits)
+        limit_rules._stage_limits["x_min"] = None
         try:
             with self.assertRaises(RuntimeError):
-                drv.check_xy(0, 0)
+                limit_rules.check_xy(0, 0)
         finally:
-            drv._stage_limits.update(old)
+            limit_rules._stage_limits.update(old)
 
 
 class TestFormatParsing(unittest.TestCase):
     def test_parse_standard(self):
-        self.assertEqual(drv.parse_format("512 x 512"), (512, 512))
+        self.assertEqual(parsing.parse_format("512 x 512"), (512, 512))
 
     def test_parse_rectangular(self):
-        self.assertEqual(drv.parse_format("1024 x 768"), (1024, 768))
+        self.assertEqual(parsing.parse_format("1024 x 768"), (1024, 768))
 
     def test_roundtrip(self):
-        self.assertEqual(drv.parse_format("2048 x 2048"), (2048, 2048))
+        self.assertEqual(parsing.parse_format("2048 x 2048"), (2048, 2048))
 
     def test_parse_bad_input(self):
         with self.assertRaises(ValueError):
-            drv.parse_format("banana")
+            parsing.parse_format("banana")
 
 
 class TestSafeFloat(unittest.TestCase):
     def test_int(self):
-        self.assertEqual(drv._safe_float(5), 5.0)
+        self.assertEqual(parsing._safe_float(5), 5.0)
 
     def test_string(self):
-        self.assertEqual(drv._safe_float("3.14"), 3.14)
+        self.assertEqual(parsing._safe_float("3.14"), 3.14)
 
     def test_none_default(self):
-        self.assertEqual(drv._safe_float(None, -1), -1)
+        self.assertEqual(parsing._safe_float(None, -1), -1)
 
     def test_bad_string_default(self):
-        self.assertEqual(drv._safe_float("abc", 0), 0)
+        self.assertEqual(parsing._safe_float("abc", 0), 0)
 
     def test_none_no_default(self):
-        self.assertIsNone(drv._safe_float(None))
+        self.assertIsNone(parsing._safe_float(None))
 
 
 class TestSequentialModeGuard(unittest.TestCase):
     def test_empty_string(self):
-        r = drv.set_sequential_mode(None, "J", "")
+        r = changes.set_sequential_mode(None, "J", "")
         self.assertFalse(r["success"])
 
     def test_whitespace(self):
-        self.assertFalse(drv.set_sequential_mode(None, "J", "   ")["success"])
+        self.assertFalse(changes.set_sequential_mode(None, "J", "   ")["success"])
 
     def test_non_string(self):
-        self.assertFalse(drv.set_sequential_mode(None, "J", 123)["success"])
+        self.assertFalse(changes.set_sequential_mode(None, "J", 123)["success"])
 
     def test_none(self):
-        self.assertFalse(drv.set_sequential_mode(None, "J", None)["success"])
+        self.assertFalse(changes.set_sequential_mode(None, "J", None)["success"])
 
 
 class TestReadback(unittest.TestCase):
@@ -2363,14 +2368,14 @@ class TestReadback(unittest.TestCase):
             "activeSettings": [],
         }
         with patch.object(readers, "get_job_settings", return_value=settings):
-            ch = drv._readback(None, "HiRes", deadline=time.monotonic() + 1.0)
+            ch = confirmations._readback(None, "HiRes", deadline=time.monotonic() + 1.0)
         self.assertIsNotNone(ch)
         self.assertEqual(ch["zoom"]["current"], 5.0)
 
     def test_failure(self):
         with patch.object(readers, "get_job_settings", return_value=None):
             self.assertIsNone(
-                drv._readback(None, "HiRes", deadline=time.monotonic() + 1.0)
+                confirmations._readback(None, "HiRes", deadline=time.monotonic() + 1.0)
             )
 
     def test_rejects_reading_from_before_command(self):
@@ -2387,7 +2392,7 @@ class TestReadback(unittest.TestCase):
         )
         with patch.object(readers, "get_job_settings", return_value=reading):
             self.assertIsNone(
-                drv._readback(
+                confirmations._readback(
                     None, "HiRes", deadline=time.monotonic() + 1.0, observed_after=10.0
                 )
             )
@@ -2405,7 +2410,7 @@ class TestReadback(unittest.TestCase):
             age_s=0.0,
         )
         with patch.object(readers, "get_job_settings", return_value=reading):
-            result = drv._readback(
+            result = confirmations._readback(
                 None, "HiRes", deadline=time.monotonic() + 1.0, observed_after=10.0
             )
         self.assertEqual(result["zPosition"]["z-wide"], 100.0)
@@ -2469,7 +2474,7 @@ class TestCheckIdle(unittest.TestCase):
 class TestMoveXYConsistency(unittest.TestCase):
     def test_move_xy_has_full_timing(self):
         client = make_client()
-        drv.set_stage_limits(
+        limit_rules.set_stage_limits(
             x_min=0,
             x_max=130000,
             y_min=0,
@@ -2495,7 +2500,7 @@ class TestMoveXYConsistency(unittest.TestCase):
                 return_value={"success": True, "logs": []},
             ),
         ):
-            r = drv.move_xy(client, 50000, 50000, unit="um")
+            r = changes.move_xy(client, 50000, 50000, unit="um")
         self.assertTrue(r["success"])
         for key in (
             "pre_check_s",
@@ -2514,7 +2519,7 @@ class TestMoveXYConsistency(unittest.TestCase):
     def test_move_xy_no_confirm_bool(self):
         import inspect
 
-        params = list(inspect.signature(drv.move_xy).parameters.keys())
+        params = list(inspect.signature(changes.move_xy).parameters.keys())
         self.assertNotIn("confirm", params)
         self.assertIn("max_retries", params)
         self.assertIn("tolerance", params)
@@ -2522,7 +2527,7 @@ class TestMoveXYConsistency(unittest.TestCase):
 
 class TestGetStageLimits(unittest.TestCase):
     def test_returns_copy(self):
-        drv.set_stage_limits(
+        limit_rules.set_stage_limits(
             x_min=1,
             x_max=2,
             y_min=3,
@@ -2532,15 +2537,15 @@ class TestGetStageLimits(unittest.TestCase):
             z_wide_min=7,
             z_wide_max=8,
         )
-        limits = drv.get_stage_limits()
+        limits = limit_rules.get_stage_limits()
         self.assertEqual(limits["x_min"], 1)
         limits["x_min"] = 9999
-        self.assertEqual(drv.get_stage_limits()["x_min"], 1)
+        self.assertEqual(limit_rules.get_stage_limits()["x_min"], 1)
 
 
 class TestPing(unittest.TestCase):
     def test_ping_success(self):
-        self.assertTrue(drv.ping(make_client()))
+        self.assertTrue(readers.ping(make_client()))
 
     def test_ping_failure(self):
         client = MagicMock()
@@ -2548,27 +2553,27 @@ class TestPing(unittest.TestCase):
         type(client.PyApiStatus.Model).ScanStatus = PropertyMock(
             side_effect=Exception("COM error")
         )
-        self.assertFalse(drv.ping(client))
+        self.assertFalse(readers.ping(client))
 
 
 class TestSchemaValidation(unittest.TestCase):
     def test_missing_zoom_raises(self):
         with self.assertRaises(ValueError) as ctx:
-            drv.make_changeable_copy(
+            parsing.make_changeable_copy(
                 {"scanSpeed": {"value": 600, "isResonant": False}, "activeSettings": []}
             )
         self.assertIn("zoom", str(ctx.exception))
 
     def test_missing_active_settings_raises(self):
         with self.assertRaises(ValueError) as ctx:
-            drv.make_changeable_copy(
+            parsing.make_changeable_copy(
                 {"zoom": {"current": 5.0}, "scanSpeed": {"value": 600}}
             )
         self.assertIn("activeSettings", str(ctx.exception))
 
     def test_valid_settings_pass(self):
         self.assertIsNotNone(
-            drv.make_changeable_copy(
+            parsing.make_changeable_copy(
                 {
                     "zoom": {"current": 5.0},
                     "scanSpeed": {"value": 600, "isResonant": False},
@@ -2580,14 +2585,14 @@ class TestSchemaValidation(unittest.TestCase):
 
 class TestUnclassifiedErrorLogging(unittest.TestCase):
     def test_unknown_error_logs_warning(self):
-        with self.assertLogs(drv.log, level="WARNING") as cm:
-            result = drv._is_transient_error("totally unexpected error xyz")
+        with self.assertLogs("zmart_drivers.leica.stellaris5_y42h93.navigator_expert", level="WARNING") as cm:
+            result = error_classification._is_transient_error("totally unexpected error xyz")
         self.assertFalse(result)
         self.assertTrue(any("Unclassified" in msg for msg in cm.output))
 
     def test_known_patterns_no_warning(self):
-        self.assertTrue(drv._is_transient_error("block is being scanned"))
-        self.assertFalse(drv._is_transient_error("out of range"))
+        self.assertTrue(error_classification._is_transient_error("block is being scanned"))
+        self.assertFalse(error_classification._is_transient_error("out of range"))
 
 
 # =============================================================================
@@ -2641,23 +2646,23 @@ class TestDispatchCheckExceptions(unittest.TestCase):
 
 class TestUnitValidation(unittest.TestCase):
     def test_move_xy_unknown_unit_returns_failure_dict(self):
-        result = drv.move_xy(None, 1.0, 2.0, unit="nm")
+        result = changes.move_xy(None, 1.0, 2.0, unit="nm")
         self.assertFalse(result["success"])
         self.assertIn("unknown unit", result["message"])
 
     def test_move_z_unknown_unit_returns_failure_dict(self):
-        result = drv.move_z(None, "Job", 1.0, unit="nm")
+        result = changes.move_z(None, "Job", 1.0, unit="nm")
         self.assertFalse(result["success"])
         self.assertIn("unknown unit", result["message"])
 
     def test_set_objective_requires_exactly_one_selector(self):
         client = make_client()  # gate-permissive; the selector validation is under test
-        result = drv.set_objective(
+        result = compensated_changes.set_objective(
             client, "Job", {}, slot_index=1, name="HC PL APO 63x"
         )
         self.assertFalse(result["success"])
         self.assertIn("exactly one", result["message"])
-        result = drv.set_objective(client, "Job", {})
+        result = compensated_changes.set_objective(client, "Job", {})
         self.assertFalse(result["success"])
 
 
@@ -3003,7 +3008,7 @@ class TestHybridSelectJobApiLegEndToEnd(unittest.TestCase):
 
 class TestMakeLogEntry(unittest.TestCase):
     def test_shape(self):
-        entry = drv._make_log_entry("info", "test message")
+        entry = door.make_log_entry("info", "test message")
         self.assertIn("ts", entry)
         self.assertEqual(entry["level"], "info")
         self.assertEqual(entry["msg"], "test message")

@@ -29,12 +29,17 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.noteboo
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.save_data.naming import (
     build_image_name,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.optical_calibration import (
-    calibration_common as cm,
-)
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.orientation import (
     measure_orientation as wf,
 )
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.limits import handshake
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.acquisition import run_job
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.save_data import save as saving
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.connection import lasx_client
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings import parsing
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings import state as readers
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.settings import changes
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitives.capture import product
 
 
 @pytest.fixture
@@ -53,8 +58,8 @@ def _saved_manifest(output_root, naming, image):
     image_path.parent.mkdir(parents=True, exist_ok=True)
     tifffile.imwrite(image_path, np.asarray(image))
     return SimpleNamespace(
-        image_paths={cm.drv.PlaneIndex(t=0, z=0, c=0): image_path},
-        xml_paths={cm.drv.PositionIndex(t=0, v=0): Path(output_root) / "mock.ome.xml"},
+        image_paths={product.PlaneIndex(t=0, z=0, c=0): image_path},
+        xml_paths={product.PositionIndex(t=0, v=0): Path(output_root) / "mock.ome.xml"},
         naming=naming,
         read_plane=lambda index: tifffile.imread(image_path),
     )
@@ -99,19 +104,19 @@ def _patch(
     home_xy=(1000.0, 2000.0),
     image_to_stage=None,
 ):
-    monkeypatch.setattr(wf.drv, "connect_python_client", lambda *a, **k: object())
+    monkeypatch.setattr(lasx_client, "connect_python_client", lambda *a, **k: object())
     monkeypatch.setattr(
-        wf.drv,
-        "connect_limits_handshake",
+        handshake,
+        "connect_handshake",
         lambda client, **k: SimpleNamespace(
             ok=True,
             error=None,
             stage_cfg={"stage_um": {"x": [1000.0, 130000.0], "y": [1000.0, 100000.0]}},
         ),
     )
-    monkeypatch.setattr(wf.drv, "get_hardware_info", lambda client, **kw: {"ok": True})
+    monkeypatch.setattr(readers, "get_hardware_info", lambda client, **kw: {"ok": True})
     monkeypatch.setattr(
-        wf.drv, "get_selected_job", lambda client, **kw: {"Name": "Overview"}
+        readers, "get_selected_job", lambda client, **kw: {"Name": "Overview"}
     )
 
     pos = {"x": home_xy[0], "y": home_xy[1]}
@@ -124,16 +129,16 @@ def _patch(
         pos["y"] = y
         return {"success": True}
 
-    monkeypatch.setattr(wf.drv, "get_xy", _get_xy)
-    monkeypatch.setattr(cm.drv, "get_xy", _get_xy)
-    monkeypatch.setattr(cm.drv, "move_xy", _move_xy)
+    monkeypatch.setattr(readers, "get_xy", _get_xy)
+    monkeypatch.setattr(readers, "get_xy", _get_xy)
+    monkeypatch.setattr(changes, "move_xy", _move_xy)
     monkeypatch.setattr(
-        cm.drv,
+        readers,
         "get_job_settings",
         lambda *a, **k: {"objective": {"slotIndex": 1, "name": "10x"}},
     )
     monkeypatch.setattr(
-        cm.drv,
+        parsing,
         "parse_tile_geometry",
         lambda settings: {
             "pixel_w_um": pixel_size_um,
@@ -163,8 +168,8 @@ def _patch(
             image = _translate_without_wrap(image, dx_px, dy_px)
         return _saved_manifest(output_root, naming, image)
 
-    monkeypatch.setattr(cm.drv, "acquire", _acquire)
-    monkeypatch.setattr(cm.drv, "save", _save)
+    monkeypatch.setattr(run_job, "acquire", _acquire)
+    monkeypatch.setattr(saving, "save", _save)
     return pos
 
 
@@ -461,7 +466,7 @@ def test_measure_acquire_failure_returns_home(monkeypatch, sessions_root):
     boom = RuntimeError("acquire failed")
 
     calls = {"n": 0}
-    real_save = cm.drv.save
+    real_save = saving.save
 
     def _save(client, acq, output_root, naming, **kw):
         calls["n"] += 1
@@ -469,7 +474,7 @@ def test_measure_acquire_failure_returns_home(monkeypatch, sessions_root):
             raise boom
         return real_save(client, acq, output_root, naming, **kw)
 
-    monkeypatch.setattr(cm.drv, "save", _save)
+    monkeypatch.setattr(saving, "save", _save)
 
     session = _start(sessions_root, session_id="recover")
     with pytest.raises(RuntimeError, match="acquire failed"):
@@ -701,7 +706,7 @@ def test_validation_stays_in_run_and_reloads_saved_image(tmp_path, monkeypatch):
     acquired = object()
     expected_image = np.arange(12, dtype=np.uint16).reshape(3, 4)
 
-    monkeypatch.setattr(wf.drv, "acquire", lambda client, job: acquired)
+    monkeypatch.setattr(run_job, "acquire", lambda client, job: acquired)
 
     def _save(client, acquisition, output_root, naming, *, orientation):
         assert client is session.client
@@ -716,7 +721,7 @@ def test_validation_stays_in_run_and_reloads_saved_image(tmp_path, monkeypatch):
             read_plane=lambda _index: expected_image,
         )
 
-    monkeypatch.setattr(wf.drv, "save", _save)
+    monkeypatch.setattr(saving, "save", _save)
 
     image, image_path = wf.acquire_validation_image(session)
 

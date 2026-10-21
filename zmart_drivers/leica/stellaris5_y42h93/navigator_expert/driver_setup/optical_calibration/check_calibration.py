@@ -30,7 +30,9 @@ from typing import Any
 
 import numpy as np
 
-import zmart_drivers.leica.stellaris5_y42h93.navigator_expert as drv
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.limits import handshake
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.connection import lasx_client
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings import state as readers
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.orientation.registration import (
     register_voting,
 )
@@ -147,11 +149,11 @@ def start_session(
             sessions_root,
             acquisition_name=acquisition_name,
         )
-    client = drv.connect_python_client()
-    limits_state = drv.connect_limits_handshake(client)
+    client = lasx_client.connect_python_client()
+    limits_state = handshake.connect_handshake(client)
     if not limits_state.ok:
         raise RuntimeError(limits_state.error)
-    if drv.get_hardware_info(client) is None:
+    if readers.get_hardware_info(client) is None:
         raise RuntimeError("get_hardware_info returned None; LAS X unreachable")
     if job_name is None:
         job_name = read_selected_job_name(client)
@@ -185,11 +187,11 @@ def measure_reference(session: CalibrationCheckSession) -> CalibrationCheckSessi
     session.from_slot, session.from_objective = slot, name
     print(f"Reference objective: slot {slot} — {name}")
 
-    xy = drv.get_xy(session.client) or {}
+    xy = readers.get_xy(session.client) or {}
     if "x_um" not in xy or "y_um" not in xy:
         raise RuntimeError(f"get_xy returned no readback: {xy}")
     session.home_xy = (float(xy["x_um"]), float(xy["y_um"]))
-    session.home_z = float(drv.read_zwide_um(session.client, session.job_name))
+    session.home_z = float(readers.read_zwide_um(session.client, session.job_name))
     session.ref_image = acquire_frame_to(session, "reference")
     session.ref_pixel_size_um = read_job_geometry(
         session.client, session.job_name, session.ref_image

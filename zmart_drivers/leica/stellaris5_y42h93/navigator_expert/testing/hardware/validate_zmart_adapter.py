@@ -881,7 +881,7 @@ def main(argv: list[str] | None = None) -> int:
 
     adapter = _register_adapter()
     vh._apply_state_reader_mode(args.state_reader_mode, log)
-    import zmart_drivers.leica.stellaris5_y42h93.navigator_expert as drv  # noqa: PLC0415
+    import low_level as drv  # noqa: PLC0415
 
     output_root = args.output_root
     if args.mock and output_root is None:

@@ -47,9 +47,14 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.store i
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.optical_calibration import (
     calibrate_objective_pair as wf_obj,
 )
-from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.optical_calibration import (
-    calibration_common as cm,
-)
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.limits import handshake
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.acquisition import run_job
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.save_data import save as saving
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.connection import lasx_client
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings import parsing
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings import state as readers
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.settings import changes
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitives.capture import product
 
 NOTEBOOK_PATH = (
     Path(wf_obj.__file__).parents[2]
@@ -123,20 +128,19 @@ class SimulatedScope:
 def _install_simulator(monkeypatch, machine) -> SimulatedScope:
     """Wire the simulator into every LAS X seam the workflow talks to."""
     sim = SimulatedScope()
-    drv = cm.drv  # objective-pair workflow modules import the same driver module
 
     monkeypatch.setattr(
         "zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.store.MACHINE",
         machine,
     )
-    monkeypatch.setattr(drv, "connect_python_client", lambda *a, **k: object())
+    monkeypatch.setattr(lasx_client, "connect_python_client", lambda *a, **k: object())
     monkeypatch.setattr(
-        drv,
-        "connect_limits_handshake",
+        handshake,
+        "connect_handshake",
         lambda client, **k: SimpleNamespace(ok=True, error=None),
     )
     monkeypatch.setattr(
-        drv,
+        readers,
         "get_hardware_info",
         lambda client, **kw: {
             "Microscope": {
@@ -147,7 +151,7 @@ def _install_simulator(monkeypatch, machine) -> SimulatedScope:
             }
         },
     )
-    monkeypatch.setattr(drv, "get_selected_job", lambda client, **kw: {"Name": sim.job})
+    monkeypatch.setattr(readers, "get_selected_job", lambda client, **kw: {"Name": sim.job})
 
     def _get_job_settings(client, job_name, **kw):
         return {
@@ -159,9 +163,9 @@ def _install_simulator(monkeypatch, machine) -> SimulatedScope:
             "stack": dict(sim.stack),
         }
 
-    monkeypatch.setattr(drv, "get_job_settings", _get_job_settings)
+    monkeypatch.setattr(readers, "get_job_settings", _get_job_settings)
     monkeypatch.setattr(
-        drv,
+        parsing,
         "make_changeable_copy",
         lambda settings: (
             None
@@ -170,7 +174,7 @@ def _install_simulator(monkeypatch, machine) -> SimulatedScope:
         ),
     )
     monkeypatch.setattr(
-        drv,
+        parsing,
         "parse_tile_geometry",
         lambda settings: {
             "pixel_w_um": PIXEL_UM,
@@ -180,7 +184,7 @@ def _install_simulator(monkeypatch, machine) -> SimulatedScope:
         },
     )
     monkeypatch.setattr(
-        drv, "get_xy", lambda client, **kw: {"x_um": sim.x, "y_um": sim.y}
+        readers, "get_xy", lambda client, **kw: {"x_um": sim.x, "y_um": sim.y}
     )
 
     def _move_xy(client, x, y, unit="um", **kw):
@@ -192,10 +196,10 @@ def _install_simulator(monkeypatch, machine) -> SimulatedScope:
             sim.zwide = float(z)
         return {"success": True, "confirmed": True}
 
-    monkeypatch.setattr(drv, "move_xy", _move_xy)
-    monkeypatch.setattr(drv, "move_z", _move_z)
+    monkeypatch.setattr(changes, "move_xy", _move_xy)
+    monkeypatch.setattr(changes, "move_z", _move_z)
     monkeypatch.setattr(
-        drv, "read_zwide_um", lambda client, job_name, **kw: float(sim.zwide)
+        readers, "read_zwide_um", lambda client, job_name, **kw: float(sim.zwide)
     )
 
     # Acquisition: render real pixels from the scene, write real TIFFs, and
@@ -216,19 +220,19 @@ def _install_simulator(monkeypatch, machine) -> SimulatedScope:
             for i, z in enumerate(positions):
                 path = output_root / f"plane_z{i:03d}.tif"
                 tifffile.imwrite(path, sim.render(zwide=float(z)))
-                image_paths[drv.PlaneIndex(t=0, z=i, c=0)] = path
+                image_paths[product.PlaneIndex(t=0, z=i, c=0)] = path
         else:
             path = output_root / "plane_z000.tif"
             tifffile.imwrite(path, sim.render())
-            image_paths[drv.PlaneIndex(t=0, z=0, c=0)] = path
+            image_paths[product.PlaneIndex(t=0, z=0, c=0)] = path
         return SimpleNamespace(
             image_paths=image_paths,
             naming=naming,
             read_plane=lambda index: tifffile.imread(image_paths[index]),
         )
 
-    monkeypatch.setattr(drv, "acquire", _acquire)
-    monkeypatch.setattr(drv, "save", _save)
+    monkeypatch.setattr(run_job, "acquire", _acquire)
+    monkeypatch.setattr(saving, "save", _save)
     return sim
 
 

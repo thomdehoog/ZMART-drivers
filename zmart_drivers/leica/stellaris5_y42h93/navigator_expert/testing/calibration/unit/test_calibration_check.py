@@ -37,6 +37,14 @@ from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.optical
 from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.optical_calibration import (
     check_calibration as chk,
 )
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.limits import handshake
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.acquisition import run_job
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.procedures.save_data import save as saving
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.connection import lasx_client
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings import parsing
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.readings import state as readers
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitive_handling.settings import changes
+from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.vendor_specific.primitives.capture import product
 
 PIXEL_UM = 0.5
 JOB = "Overview"
@@ -44,12 +52,12 @@ JOB = "Overview"
 
 def test_zwide_move_uses_command_confirmation(monkeypatch):
     monkeypatch.setattr(
-        cm.drv,
+        changes,
         "move_z",
         lambda *args, **kwargs: {"success": True, "confirmed": True},
     )
     monkeypatch.setattr(
-        cm.drv,
+        readers,
         "read_zwide_um",
         lambda *args, **kwargs: pytest.fail("redundant one-shot readback called"),
     )
@@ -84,8 +92,8 @@ def _manifest(output_root, naming, image):
     path.parent.mkdir(parents=True, exist_ok=True)
     tifffile.imwrite(path, np.asarray(image))
     return SimpleNamespace(
-        image_paths={cm.drv.PlaneIndex(t=0, z=0, c=0): path},
-        xml_paths={cm.drv.PositionIndex(t=0, v=0): Path(output_root) / "mock.ome.xml"},
+        image_paths={product.PlaneIndex(t=0, z=0, c=0): path},
+        xml_paths={product.PositionIndex(t=0, v=0): Path(output_root) / "mock.ome.xml"},
         naming=naming,
         read_plane=lambda index: tifffile.imread(path),
     )
@@ -131,13 +139,13 @@ def _patch(
         "zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.optical_calibration.adopt_calibration.compile_session_calibration",
         lambda session: Path(session.paths.session_dir) / "calibration.json",
     )
-    monkeypatch.setattr(chk.drv, "connect_python_client", lambda *a, **k: object())
+    monkeypatch.setattr(lasx_client, "connect_python_client", lambda *a, **k: object())
     monkeypatch.setattr(
-        chk.drv,
-        "connect_limits_handshake",
+        handshake,
+        "connect_handshake",
         lambda c, **k: SimpleNamespace(ok=True, error=None),
     )
-    monkeypatch.setattr(chk.drv, "get_hardware_info", lambda c, **k: {"ok": True})
+    monkeypatch.setattr(readers, "get_hardware_info", lambda c, **k: {"ok": True})
     monkeypatch.setattr(
         "zmart_drivers.leica.stellaris5_y42h93.navigator_expert.driver_setup.orientation.rig_orientation",
         Orientation,
@@ -158,15 +166,15 @@ def _patch(
     def job_settings(c, job, **k):
         return {"objective": {"slotIndex": rig["slot"], "name": f"obj-{rig['slot']}"}}
 
-    monkeypatch.setattr(chk.drv, "get_xy", get_xy)
-    monkeypatch.setattr(cm.drv, "get_xy", get_xy)
-    monkeypatch.setattr(cm.drv, "move_xy", move_xy)
-    monkeypatch.setattr(cm.drv, "move_z", move_z)
-    monkeypatch.setattr(cm.drv, "read_zwide_um", lambda c, job, **k: rig["z"])
-    monkeypatch.setattr(cm.drv, "get_selected_job", lambda c, **k: {"Name": JOB})
-    monkeypatch.setattr(cm.drv, "get_job_settings", job_settings)
+    monkeypatch.setattr(readers, "get_xy", get_xy)
+    monkeypatch.setattr(readers, "get_xy", get_xy)
+    monkeypatch.setattr(changes, "move_xy", move_xy)
+    monkeypatch.setattr(changes, "move_z", move_z)
+    monkeypatch.setattr(readers, "read_zwide_um", lambda c, job, **k: rig["z"])
+    monkeypatch.setattr(readers, "get_selected_job", lambda c, **k: {"Name": JOB})
+    monkeypatch.setattr(readers, "get_job_settings", job_settings)
     monkeypatch.setattr(
-        cm.drv,
+        parsing,
         "parse_tile_geometry",
         lambda s: {
             "pixel_w_um": PIXEL_UM,
@@ -176,13 +184,13 @@ def _patch(
         },
     )
     monkeypatch.setattr(
-        cm.drv,
+        run_job,
         "acquire",
         lambda c, job, **k: SimpleNamespace(job=job, command_result={"ok": True}),
     )
     seq = iter(frames)
     monkeypatch.setattr(
-        cm.drv,
+        saving,
         "save",
         lambda c, acq, output_root, naming, **k: _manifest(
             output_root, naming, next(seq)
