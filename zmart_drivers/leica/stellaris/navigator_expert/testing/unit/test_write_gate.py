@@ -43,8 +43,7 @@ def test_every_change_hands_its_name_and_values_to_the_dispatcher():
     ] + [
         DRIVER_ROOT
         / "procedures"
-        / "keep_in_view"
-        / "compensated_changes.py",
+        / "keep_in_view.py",
     ]
     calls = 0
     for path in sources:

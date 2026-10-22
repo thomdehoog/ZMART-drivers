@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 
-from ..direct.hardware_server import HardwareServerUnavailable, read_hardware_z_um
+from ..direct.client import HardwareServerUnavailable, read_hardware_z_um
 from ...procedures import saved_experiment
 from .parsing import parse_tile_geometry
 

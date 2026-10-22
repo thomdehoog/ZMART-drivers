@@ -34,7 +34,7 @@ from zmart_drivers.leica.stellaris.navigator_expert.dispatcher import (
     dispatch as door,
     limits as gate,
 )
-from zmart_drivers.leica.stellaris.navigator_expert.dispatcher.limit_errors import (
+from zmart_drivers.leica.stellaris.navigator_expert.dispatcher.limits import (
     LimitsStatus,
     LimitViolation,
 )

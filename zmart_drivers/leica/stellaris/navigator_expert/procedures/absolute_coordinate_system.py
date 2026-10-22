@@ -1,4 +1,20 @@
-"""Where the stage is, in the frame the controller uses, and how to move it there.
+"""The absolute coordinate system: one place for the stage's position and the lens's offsets.
+
+The vendor part of the driver only reports plain readings from the microscope:
+the stage position, each actuator (z-wide and z-galvo), and the selected
+objective. This folder turns those readings into the driver's one absolute
+coordinate system, and turns a requested position in that system back into
+moves. It takes into account the origin the operator set, the actuators that
+share the focus, and the measured offsets between objectives (how far the
+centre of the view shifts, and how far the focus shifts, when the lens is
+changed). When the lens or job changes, it moves the stage so the sample stays
+in view.
+
+The images are placed in the same system when they are saved: the orientation
+measured by the setup (``driver_setup/orientation``) is applied in
+``save_data`` so that a picture lines up with the stage moves.
+
+Where the stage is, in the frame the controller uses, and how to move it there.
 
 The driver speaks absolute stage micrometres; the controller speaks
 micrometres from a zero point (the *origin*) saved once for this microscope.
@@ -19,6 +35,20 @@ The z model assumes that the two drives add up with the same sign. The
 arithmetic and the sign are checked on a real microscope by
 ``testing/hardware/validate_zmart_adapter.py``.
 
+The arithmetic between the stage's own coordinates and the controller's frame.
+
+The microscope reports positions in its own stage coordinates. The controller
+works in a frame whose zero point, the *origin*, was saved once for this
+microscope: a position in the frame is the stage position minus the origin.
+When the objective in place differs from the one the origin was saved under,
+the objective calibration says how far the two objectives are offset
+(called ΔT here), and that offset is taken into account as well, so that the
+same number names the same point of the sample under either objective.
+
+Everything here is plain arithmetic on numbers and dictionaries. Nothing
+talks to the microscope, so each function can be checked on paper. The
+session handling (what to read, what to move) is below.
+
 Author: Thom de Hoog, Center for Microscopy and Image Analysis (ZMB),
 University of Zurich (thom.dehoog@zmb.uzh.ch, thomdehoog@gmail.com).
 """
@@ -26,14 +56,11 @@ University of Zurich (thom.dehoog@zmb.uzh.ch, thomdehoog@gmail.com).
 from __future__ import annotations
 
 import logging
+from ..dispatcher import limits as _gate
+from . import readings as _readers
+from ..primitives.cam_api.derived import stack_drive as _stack_drive
+from ..operations.changes import stage as _commands
 
-from . import coordinates
-from ...dispatcher import limits as _gate
-from .. import readings as _readers
-from ...primitives.cam_api.derived import stack_drive as _stack_drive
-from ...operations.changes import stage as _commands
-from ... import session as _info
-from ...session import Session, note_unconfirmed, require_open
 
 log = logging.getLogger(__name__)
 
@@ -63,14 +90,14 @@ _DEFAULT_ACTUATORS = {"x": "motoric", "y": "motoric", "z": "z-wide"}
 UNIT = "micrometer"
 
 
-def objective_delta_um(handle: Session, current_objective: dict | None) -> tuple:
-    """ΔT for this session's origin and calibration; see :func:`coordinates.objective_delta_um`."""
-    return coordinates.objective_delta_um(
+def objective_delta_um(handle, current_objective: dict | None) -> tuple:
+    """ΔT for this session's origin and calibration; see :func:`delta_between_objectives_um`."""
+    return delta_between_objectives_um(
         handle.origin, handle.translations, current_objective
     )
 
 
-def hardware_snapshot(handle: Session) -> dict:
+def hardware_snapshot(handle) -> dict:
     """One consistent read of everything the frame math needs.
 
     Stage XY, both z drives, and the current objective use the configured
@@ -79,7 +106,7 @@ def hardware_snapshot(handle: Session) -> dict:
     xy = _readers.get_xy(handle.client)
     if not xy:
         raise RuntimeError("could not read stage XY position")
-    job = _info.selected_job_name(handle)
+    job = handle.selected_job_name()
     if job is None:
         raise RuntimeError(
             "could not determine the selected LAS X job, which this command needs "
@@ -99,7 +126,7 @@ def hardware_snapshot(handle: Session) -> dict:
     }
 
 
-def delta_or_warn(handle: Session, snapshot: dict) -> tuple:
+def delta_or_warn(handle, snapshot: dict) -> tuple:
     """ΔT for a READ: uncompensated-but-loud when translations are missing.
 
     Reads must stay available (a read cannot land the stage anywhere wrong),
@@ -113,7 +140,7 @@ def delta_or_warn(handle: Session, snapshot: dict) -> tuple:
         return (0.0, 0.0, 0.0)
 
 
-def get_actuators(handle: Session) -> dict:
+def get_actuators(handle) -> dict:
     """The motors that can move each axis, and the one used when none is chosen.
 
     ``{"x": {"options": ["motoric"], "default": "motoric"}, ...,
@@ -122,7 +149,7 @@ def get_actuators(handle: Session) -> dict:
     with z-wide, the drive the objective offsets are measured on; the z-galvo
     is still read and reported by :func:`get_xyz`, but never used to move.
     """
-    require_open(handle)
+    handle.require_open()
     return {
         axis: {"options": list(opts), "default": _DEFAULT_ACTUATORS[axis]}
         for axis, opts in _ACTUATORS.items()
@@ -139,7 +166,7 @@ def _resolve_actuators(with_actuators: dict | None) -> dict[str, str]:
     return chosen
 
 
-def get_xyz(handle: Session, *, with_actuators: dict | None = None) -> dict:
+def get_xyz(handle, *, with_actuators: dict | None = None) -> dict:
     """Where the stage is, per axis: ``position``, ``unit``, ``actuator_readings`` and ``canvas``.
 
     The answer has the keys ``x``, ``y`` and ``z``. Each axis carries the
@@ -170,11 +197,11 @@ def get_xyz(handle: Session, *, with_actuators: dict | None = None) -> dict:
     ``objective_translation_um``: the ΔT that was subtracted, as
     ``[x, y, z]``, so an operator can see when a compensation is in play.
     """
-    require_open(handle)
+    handle.require_open()
     chosen = _resolve_actuators(with_actuators)
     snap = hardware_snapshot(handle)
     dt = delta_or_warn(handle, snap)
-    frame = coordinates.frame_position(snap, handle.origin, dt)
+    frame = frame_position(snap, handle.origin, dt)
     allowed = canvas(handle) or {}
     result = {
         axis: {
@@ -202,7 +229,7 @@ def get_xyz(handle: Session, *, with_actuators: dict | None = None) -> dict:
 Z_GALVO_PARKED_TOLERANCE_UM = 0.5
 
 
-def zero_z_galvo(handle: Session) -> dict:
+def zero_z_galvo(handle) -> dict:
     """Park the z-galvo at 0 while keeping the focus.
 
     The driver moves the focus with z-wide alone, so the fast z-galvo is kept
@@ -226,14 +253,13 @@ def zero_z_galvo(handle: Session) -> dict:
         if not result.get("success"):
             raise RuntimeError(f"zero_z_galvo: move_z ({z_mode}) failed: {result}")
         if not result.get("confirmed"):
-            note_unconfirmed(
-                handle, f"zero_z_galvo: move_z ({z_mode}) to {target}", result
+            handle.note_unconfirmed(f"zero_z_galvo: move_z ({z_mode}) to {target}", result
             )
     return {"transferred_um": offset}
 
 
 def set_xyz(
-    handle: Session,
+    handle,
     x: float,
     y: float,
     z: float,
@@ -265,7 +291,7 @@ def set_xyz(
     back from the microscope anyway, so the workflow sees where the stage
     really is and decides for itself.
     """
-    require_open(handle)
+    handle.require_open()
     _resolve_actuators(with_actuators)
     snap = hardware_snapshot(handle)
     if abs(snap["z_galvo_um"]) > Z_GALVO_PARKED_TOLERANCE_UM:
@@ -275,14 +301,12 @@ def set_xyz(
         # The driver moves the focus with z-wide only. LAS X offers no request
         # to change which drive the job's z-stack uses, so this can only be
         # said, not fixed: the operator sets the stack to z-wide in LAS X.
-        note_unconfirmed(
-            handle,
-            "set_xyz: the job's z-stack is on the z-galvo",
+        handle.note_unconfirmed("set_xyz: the job's z-stack is on the z-galvo",
             "the selected job takes its z-stack with the z-galvo; the driver moves "
             "the focus with z-wide only, so set the job's z drive to z-wide in LAS X",
         )
     dt = objective_delta_um(handle, snap.get("objective"))  # raises if unavailable
-    abs_x, abs_y, target_focus = coordinates.stage_target(x, y, z, handle.origin, dt)
+    abs_x, abs_y, target_focus = stage_target(x, y, z, handle.origin, dt)
     # The focus is moved with z-wide alone: it takes up the whole difference
     # to the target focus, with the z-galvo parked at 0 (see above).
     z_target = target_focus - snap["z_galvo_um"]
@@ -295,7 +319,7 @@ def set_xyz(
     if not arrived.get("success"):
         raise RuntimeError(f"move_xy failed: {arrived}")
     if not arrived.get("confirmed"):
-        note_unconfirmed(handle, f"set_xyz: xy to ({x}, {y})", arrived)
+        handle.note_unconfirmed(f"set_xyz: xy to ({x}, {y})", arrived)
 
     for z_mode, target in z_targets:
         z_result = _commands.move_z(
@@ -308,13 +332,13 @@ def set_xyz(
         if not z_result.get("success"):
             raise RuntimeError(f"move_z ({z_mode}) failed: {z_result}")
         if not z_result.get("confirmed"):
-            note_unconfirmed(handle, f"set_xyz: z ({z_mode}) to {target}", z_result)
+            handle.note_unconfirmed(f"set_xyz: z ({z_mode}) to {target}", z_result)
 
     # Read back from the microscope, so the answer is where the stage is now.
     return get_xyz(handle, with_actuators=with_actuators)
 
 
-def canvas(handle: Session) -> dict | None:
+def canvas(handle) -> dict | None:
     """Everywhere a picture can show, per axis, in the frame. None when no limits govern the session.
 
     On z the frame follows the focus, the sum of the two z drives, so the
@@ -329,4 +353,80 @@ def canvas(handle: Session) -> dict | None:
     state = _gate.state_for(handle.client)
     if state is None or state.stage_cfg is None:
         return None
-    return coordinates.canvas_in_frame(state.stage_cfg["stage_um"], handle.origin)
+    return canvas_in_frame(state.stage_cfg["stage_um"], handle.origin)
+
+
+def delta_between_objectives_um(
+    origin: dict, translations: dict | None, current_objective: dict | None
+) -> tuple:
+    """ΔT = T[current objective] − T[origin's objective], in µm (x, y, z-focus).
+
+    Zero when the origin has no objective anchor or the objective is
+    unchanged. Raises RuntimeError when the objective HAS changed but the
+    translations are unavailable — the caller decides whether that refuses
+    (moves) or warns (reads).
+    """
+    origin_slot = (origin.get("objective") or {}).get("slotIndex")
+    current_slot = (current_objective or {}).get("slotIndex")
+    if origin_slot is None or current_slot == origin_slot:
+        return (0.0, 0.0, 0.0)
+    if current_slot is None:
+        raise RuntimeError(
+            f"objective changed since the origin was captured (slot {origin_slot} -> "
+            f"unidentified) so the frame cannot be mapped; capture the origin "
+            f"again under the current objective"
+        )
+    # The delta math and the missing-pair policy live in ONE place —
+    # calibration/core/model.py — shared with the driver's swap-time
+    # compensation, so the two layers can never drift apart. Imported
+    # lazily, matching the connection layer's calibration imports.
+    from ..driver_setup.optical_calibration import model as _cal_model
+
+    try:
+        return _cal_model.translation_delta_um(translations, origin_slot, current_slot)
+    except RuntimeError as exc:
+        raise RuntimeError(
+            f"objective changed since the origin was captured but {exc} — or "
+            f"capture the origin again under the current objective"
+        ) from exc
+
+
+def frame_position(snapshot: dict, origin: dict, delta: tuple) -> dict:
+    """The stage position in the controller's frame: reading − origin − ΔT, per axis.
+
+    ``z`` is the focus: the sum of the two z drives, compared with the
+    origin's focus sum.
+    """
+    z_focus = snapshot["z_wide_um"] + snapshot["z_galvo_um"]
+    return {
+        "x": snapshot["x_um"] - origin["x_um"] - delta[0],
+        "y": snapshot["y_um"] - origin["y_um"] - delta[1],
+        "z": z_focus - origin["z_focus_um"] - delta[2],
+    }
+
+
+def stage_target(x: float, y: float, z: float, origin: dict, delta: tuple) -> tuple:
+    """The stage coordinates (x, y, focus) that belong to a frame position: origin + position + ΔT."""
+    return (
+        origin["x_um"] + x + delta[0],
+        origin["y_um"] + y + delta[1],
+        origin["z_focus_um"] + z + delta[2],
+    )
+
+
+def canvas_in_frame(stage: dict, origin: dict) -> dict:
+    """Everywhere a picture can show, per axis, in the frame.
+
+    *stage* is the stage travel from the limits (``x``, ``y``, ``z_wide`` and
+    optionally ``z_galvo``). On z the frame follows the focus, so the canvas is
+    the z-wide travel widened by the z-galvo travel.
+    """
+    galvo = stage.get("z_galvo") or [0.0, 0.0]
+    return {
+        "x_um": [stage["x"][0] - origin["x_um"], stage["x"][1] - origin["x_um"]],
+        "y_um": [stage["y"][0] - origin["y_um"], stage["y"][1] - origin["y_um"]],
+        "z_um": [
+            stage["z_wide"][0] + galvo[0] - origin["z_focus_um"],
+            stage["z_wide"][1] + galvo[1] - origin["z_focus_um"],
+        ],
+    }

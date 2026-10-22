@@ -18,10 +18,10 @@ from limits_fixtures import hermetic_mock_machine_root
 from mock_lasx_api import MockLasxClient
 from zmart_controller.registry import load_driver
 
-from zmart_drivers.leica.stellaris.navigator_expert import methods as microscope
+from zmart_drivers.leica.stellaris.navigator_expert import methods
 from zmart_drivers.leica.stellaris.navigator_expert.zmart_controller_plugin import procedure_menu
 from zmart_drivers.leica.stellaris.navigator_expert.zmart_controller_plugin import zmart_controller_plugin
-from zmart_drivers.leica.stellaris.navigator_expert.primitives.log import log_settings
+from zmart_drivers.leica.stellaris.navigator_expert.primitives.log import reads as log_settings
 
 
 # The folder to register is the driver's: the one that holds zmart_controller_plugin/.
@@ -125,8 +125,8 @@ def test_the_class_hands_the_type_and_the_folder_to_the_capture(monkeypatch, tmp
 
     session = zmart_controller.ZmartController(zmart_controller_plugin.ZmartControllerPlugin, connection)
     try:
-        monkeypatch.setattr(microscope.acquire_step, "acquire", capture)
-        monkeypatch.setattr(microscope.save_step, "save_waiting", save_waiting)
+        monkeypatch.setattr(methods.acquire_step, "acquire", capture)
+        monkeypatch.setattr(methods.save_step, "save_waiting", save_waiting)
         answer = session.acquire(
             "A1", acquisition_type="overview", output_folder=str(tmp_path / "run")
         )

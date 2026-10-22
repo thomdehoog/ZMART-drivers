@@ -1,4 +1,4 @@
-r"""The STELLARIS driven directly, from a notebook or a script, without the ZMART Controller.
+"""The STELLARIS driven directly, from a notebook or a script: connect(), the Microscope, its Session and its running log.
 
 ``connect()`` opens LAS X, loads this microscope's configuration and hands back
 a :class:`Microscope`. Its methods are everything the driver can do: read and
@@ -25,6 +25,33 @@ X refused or that failed raises ``RuntimeError`` with the reason.
 The ZMART Controller's ``ZmartControllerPlugin`` class (``zmart_controller_plugin/``) is
 this class with the controller's names and answers.
 
+The session every call works in, and the questions nearly every call asks.
+
+A :class:`Session` is made when the driver connects, and the ``Microscope``
+keeps it. It holds the open connection to LAS X and everything the driver remembers about
+this session: the zero point of the frame, the objective calibration, the
+data location, and the changes that were sent but could not be confirmed.
+The small functions here are the ones nearly every command needs: refuse a
+closed session, record an unconfirmed change, name the selected job, list the
+jobs, and say where files are saved.
+
+The running log: one file that records what the driver did, for finding out later what went wrong.
+
+When something unexpected happens at the microscope, the most useful thing to
+have is a plain record of what the driver sent, what came back, and what it
+decided. This file starts that record. Every message the driver already
+writes (each send, retry, fallback to another source and final answer) is
+copied into one text file with a time on each line.
+
+The file is kept small on purpose: when it reaches about five megabytes it is
+renamed and a new one is started, and only the three newest old files are
+kept, so the record can never fill the disk. This is separate from the log
+that is saved beside the pictures of one acquisition, which says how those
+pictures were made.
+
+A problem with the log file itself (a full disk, a folder that cannot be
+written) is noted once and never stops the experiment.
+
 Author: Thom de Hoog, Center for Microscopy and Image Analysis (ZMB),
 University of Zurich (thom.dehoog@zmb.uzh.ch, thomdehoog@gmail.com).
 """
@@ -32,7 +59,6 @@ University of Zurich (thom.dehoog@zmb.uzh.ch, thomdehoog@gmail.com).
 from __future__ import annotations
 
 from typing import Any
-
 from .dispatcher import limits as gate
 from .driver_setup import data_location
 from .driver_setup.limits import handshake
@@ -41,20 +67,24 @@ from .driver_setup.orientation import load_rig_orientation
 from .driver_setup.origin import saved_origin
 from .driver_setup.origin import set_origin as origin_step
 from .driver_setup.store import MACHINE
-from .procedures.absolute_coordinate_system import frame
+from .procedures import absolute_coordinate_system
 from .procedures import acquire as acquire_step
 from .procedures.clear_cache import clear as clear_step
 from .procedures import state as state_step
-from .procedures.keep_in_view import compensated_changes
+from .procedures import keep_in_view
 from .procedures.save_data import save_waiting as save_step
 from .procedures.save_data.naming import run_hash
-from . import loaded_config
-from .session import Session, job_catalog, note_unconfirmed, require_open, selected_job_name
 from .primitives.cam_api import client as lasx_client
 from .procedures import readings
 from .operations.changes import job_settings
-from .procedures import answer_dialogs as lasx_dialogs
-from . import running_log
+from .procedures import answer_dialogs
+import logging
+from dataclasses import dataclass, field
+from datetime import datetime, timezone
+from pathlib import Path
+from .procedures import readings as _readers
+from logging.handlers import RotatingFileHandler
+
 
 #: The driver's package: every part of the driver logs under this name.
 DRIVER_PACKAGE = __package__
@@ -106,7 +136,7 @@ class Microscope:
         location = saved_data_location()
         MACHINE.ensure_layout()
         # Kept beside the saved settings, so that it survives a restart of the driver.
-        running_log.start(MACHINE.snapshot_root() / "logs", DRIVER_PACKAGE)
+        start(MACHINE.snapshot_root() / "logs", DRIVER_PACKAGE)
         client = lasx_client.connect_python_client(
             client_name=connection["client"], api_delay_ms=connection["api_delay_ms"]
         )
@@ -115,24 +145,21 @@ class Microscope:
 
         # The limits are loaded first, so nothing can move before they govern.
         handshake.connect_handshake(client, load=connection["load_limits"])
-        lasx_dialogs.keep_watching()
+        answer_dialogs.keep_watching()
         orientation, orientation_info = load_rig_orientation()
         translations, calibration_info = load_objective_calibration(
             connection.get("calibration_name"), enabled=connection["load_calibration"]
         )
-        loaded_config.install(
-            client,
-            loaded_config.SessionConfig(
-                orientation=orientation,
-                translations=translations,
-                calibration_name=calibration_info["name"],
-                orientation_info=orientation_info,
-                calibration_info=calibration_info,
-            ),
+        handle = Session(
+            client=client,
+            connection=dict(connection),
+            hash6=run_hash(),
+            translations=translations,
+            orientation=orientation,
+            calibration_name=calibration_info["name"],
+            orientation_info=orientation_info,
+            calibration_info=calibration_info,
         )
-
-        handle = Session(client=client, connection=dict(connection), hash6=run_hash())
-        handle.translations = translations
         if origin is not None:
             handle.origin = origin
         handle.data_location = location
@@ -151,7 +178,6 @@ class Microscope:
         the session closed; every later call is then refused.
         """
         gate.uninstall(self.handle.client)
-        loaded_config.uninstall(self.handle.client)
         self.handle.closed = True
 
     # --- the stage ----------------------------------------------------------------------
@@ -164,7 +190,7 @@ class Microscope:
         picture can show (``canvas``). ``z`` is the focus: the two z drives
         added together.
         """
-        return frame.get_xyz(self.handle, with_actuators=with_actuators)
+        return absolute_coordinate_system.get_xyz(self.handle, with_actuators=with_actuators)
 
     def move_to(self, x: float, y: float, z: float, with_actuators: dict | None = None) -> dict:
         """Move to ``x``, ``y``, ``z`` (micrometres from the origin) and answer as :meth:`position`.
@@ -173,11 +199,11 @@ class Microscope:
         moves. The focus moves with z-wide, and the answer is read back from
         LAS X once the stage has arrived.
         """
-        return frame.set_xyz(self.handle, x, y, z, with_actuators=with_actuators)
+        return absolute_coordinate_system.set_xyz(self.handle, x, y, z, with_actuators=with_actuators)
 
     def motors(self) -> dict:
         """The motors of each axis, and the one used to move it: ``{"options": [...], "default": ...}``."""
-        return frame.get_actuators(self.handle)
+        return absolute_coordinate_system.get_actuators(self.handle)
 
     def set_origin(self) -> dict:
         """Make the current stage position the zero point of the frame, and save it for later connections."""
@@ -185,15 +211,15 @@ class Microscope:
 
     def zero_z_galvo(self) -> dict:
         """Park the z-galvo at 0 without changing the focus: its offset moves onto z-wide."""
-        return frame.zero_z_galvo(self.handle)
+        return absolute_coordinate_system.zero_z_galvo(self.handle)
 
     # --- jobs and settings -----------------------------------------------------------------
 
     def jobs(self) -> dict:
         """The LAS X jobs: ``{"selected", "jobs", "autofocus_jobs"}``, by name."""
-        normal, autofocus = job_catalog(self.handle)
+        normal, autofocus = self.handle.job_catalog()
         return {
-            "selected": selected_job_name(self.handle),
+            "selected": self.handle.selected_job_name(),
             "jobs": [job["Name"] for job in normal if job.get("Name")],
             "autofocus_jobs": [job["Name"] for job in autofocus if job.get("Name")],
         }
@@ -208,8 +234,8 @@ class Microscope:
 
     def job_settings(self, job: str | None = None) -> dict:
         """The settings of *job* (the selected job when None), as LAS X reports them."""
-        require_open(self.handle)
-        return readings.get_job_settings(self.handle.client, job or selected_job_name(self.handle))
+        self.handle.require_open()
+        return readings.get_job_settings(self.handle.client, job or self.handle.selected_job_name())
 
     def change_setting(self, name: str, job: str | None = None, **arguments: Any) -> dict:
         """Change the setting *name* of *job* (the selected job when None), and read it back.
@@ -220,9 +246,9 @@ class Microscope:
         result, with ``confirmed`` True when the readback showed the new
         value; a change that was never seen is recorded and does not raise.
         """
-        require_open(self.handle)
+        self.handle.require_open()
         job_settings.arguments_of(name, job or "", arguments)  # a wrong name or argument raises here
-        job = job or selected_job_name(self.handle)
+        job = job or self.handle.selected_job_name()
         result = job_settings.change(self.handle.client, name, job, **arguments)
         return checked(self.handle, result, f"change_setting({name!r}, job={job!r})")
 
@@ -232,14 +258,15 @@ class Microscope:
         The stage is moved by the measured offset between the two objectives,
         so the frame still points at the same place on the sample.
         """
-        require_open(self.handle)
-        result = compensated_changes.set_objective(
+        self.handle.require_open()
+        result = keep_in_view.set_objective(
             self.handle.client,
-            selected_job_name(self.handle),
+            self.handle.selected_job_name(),
             readings.get_hardware_info(self.handle.client),
             slot_index=slot,
             name=name,
             magnification=magnification,
+            translations=self.handle.translations,
         )
         return checked(self.handle, result, "change_objective")
 
@@ -292,7 +319,7 @@ def checked(handle: Session, result: dict, what: str) -> dict:
     if not result.get("success"):
         raise RuntimeError(f"{what} failed: {result.get('message')}")
     if not result.get("confirmed"):
-        note_unconfirmed(handle, what, result)
+        handle.note_unconfirmed(what, result)
     return result
 
 
@@ -309,3 +336,193 @@ def saved_data_location():
             f"this microscope's saved data location could not be read ({exc}); "
             "set it again with driver_setup/data_location/notebooks/set_data_location.ipynb"
         ) from exc
+
+
+log = logging.getLogger(__name__)
+
+#: What to run when no data location was set up, said in every refusal.
+SET_UP = (
+    "set this microscope's data location once with "
+    "driver_setup/data_location/notebooks/set_data_location.ipynb, "
+    "or connect with an output_root"
+)
+
+
+@dataclass
+class Session:
+    """One connection's session: the LAS X client and everything the driver remembers about it.
+
+    Attributes:
+        client: Connected LAS X CAM client (process-lifetime, no close).
+        connection: The connection dict this session was opened with
+            (carries ``output_root`` and the connect params).
+        hash6: SESSION hash, minted at connect. Travels in lineage /
+            ``session_hash6`` provenance only — each :func:`acquire` mints
+            its own acquired-position hash for the output Naming.
+        origin: The frame zero point: stage XY, both z drives, their focus
+            sum, and the objective it was captured under. :func:`connect`
+            fills it from the newest origin saved by :func:`set_origin`.
+            When no origin has been saved, it stays all-zero, which means
+            the frame is simply the absolute stage coordinates.
+        position_counter: Next per-session position index handed to an
+            unlabeled :func:`acquire` (formatted 6-digit zero-padded). An
+            explicit ``position_label`` does not consume a counter value.
+        translations: Per-objective-slot translation triples (µm) from the
+            active calibration, loaded at connect; ``None`` when it could not
+            be read (cross-objective moves are then refused, reads warn, and
+            an objective change is not compensated).
+        orientation: The camera-to-stage turn applied to the pixels this
+            session saves, loaded at connect; ``None`` when none was loaded.
+        calibration_name: Which named calibration set was loaded.
+        orientation_info, calibration_info: What was loaded at connect, as
+            the driver reports it in its readiness verdict.
+
+    Loaded once, at connect, so one connection carries one consistent picture
+    of the microscope for its whole life; re-measuring takes effect on the
+    next connection.
+        closed: Set by :func:`disconnect`; every op refuses a closed
+            handle.
+        unconfirmed: Every change this session sent that was accepted but
+            could not be confirmed by a readback, newest last: what it was,
+            when, and the driver's message. The driver does its best to
+            confirm every change; when it cannot, it says so here (and in a
+            warning) and carries on, so a workflow is told rather than
+            stopped. ``get_state`` reports the list under ``observed``.
+    """
+
+    client: Any
+    connection: dict[str, Any]
+    hash6: str
+    origin: dict[str, Any] = field(
+        default_factory=lambda: {
+            "x_um": 0.0,
+            "y_um": 0.0,
+            "z_wide_um": 0.0,
+            "z_galvo_um": 0.0,
+            "z_focus_um": 0.0,
+            "objective": None,
+        }
+    )
+    #: Where :func:`get_xyz` last read the stage (and :func:`set_xyz` ends by
+    #: reading it): the frame position, with the z-wide and galvo readings.
+    #: Remembered rather than re-read, so that the capture path holds no extra
+    #: call that can hang. The drives ride along because a job states its stack
+    #: in its drive's own positions, and without them those slices cannot be
+    #: put in the frame.
+    driven_to: dict[str, float] | None = None
+    position_counter: int = 0
+    translations: dict[int, tuple[float, float, float]] | None = None
+    orientation: Any = None
+    calibration_name: str | None = None
+    orientation_info: dict | None = None
+    calibration_info: dict | None = None
+    #: This microscope's data location, set up once and loaded at connect
+    #: (driver_setup/data_location); None when it was never set up.
+    data_location: Path | None = None
+    closed: bool = False
+    unconfirmed: list[dict[str, Any]] = field(default_factory=list)
+    #: The captures taken whose files are not yet written, each with the note
+    #: made as it was taken. ``acquire`` adds to it; ``save_data`` empties it.
+    unsaved: list[Any] = field(default_factory=list)
+    #: The pictures in LAS X's cache whose captures are saved, as
+    #: ``(element number, name)``. ``save_data`` adds to it; ``clear_cache``
+    #: empties it.
+    in_cache: list[tuple[int, str]] = field(default_factory=list)
+
+    def require_open(self) -> None:
+        """Refuse to drive a disconnected self."""
+        if self.closed:
+            raise RuntimeError("session is disconnected")
+
+    def note_unconfirmed(self, what: str, result: Any) -> None:
+        """Record a change that was sent and accepted but never confirmed, and carry on.
+
+        The driver confirms what it can. When a readback never matched in
+        time, the change is not known to have failed, only not known to have
+        happened, so it is written down here, said in a warning, and the
+        command goes on. The workflow sees the list in ``get_state``.
+        """
+        message = result.get("message") if isinstance(result, dict) else str(result)
+        note = {
+            "what": what,
+            "at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+            "message": message or "readback did not confirm the change",
+        }
+        self.unconfirmed.append(note)
+        del self.unconfirmed[:-50]  # keep the newest fifty
+        log.warning("unconfirmed, carrying on: %s: %s", what, note["message"])
+
+    def selected_job_name(self) -> str | None:
+        """Name of the currently selected LAS X job, or ``None`` when it cannot be read.
+
+        A reading that fails is unknown, not a stop. The commands that only
+        use this to decide whether a selection is needed go ahead and select;
+        the ones that need the name to compute a move say so and refuse.
+        """
+        selected = _readers.get_selected_job(self.client)
+        name = selected.get("Name") if selected else None
+        if not name:
+            log.warning("could not determine the selected LAS X job")
+            return None
+        return name
+
+    def job_catalog(self) -> tuple[list[dict], list[dict]]:
+        """The live job catalog split into (normal, autofocus) jobs.
+
+        Autofocus jobs are a separate category: they never appear as acquisition
+        or state options, and the driver does not select them.
+        """
+        jobs = _readers.get_jobs(self.client) or []
+        normal = [dict(j) for j in jobs if not j.get("IsAutofocus")]
+        autofocus = [dict(j) for j in jobs if j.get("IsAutofocus")]
+        return normal, autofocus
+
+    def output_root(self) -> Path:
+        """The folder this session saves under: its own ``output_root``, else the set-up data location.
+
+        Raises ``RuntimeError`` saying how to set one up when neither is there:
+        data saved somewhere nobody chose is data lost.
+        """
+        root = self.connection.get("output_root") or self.data_location
+        if not root:
+            raise RuntimeError(
+                f"this microscope does not know where to save its data: {SET_UP}"
+            )
+        return Path(root).expanduser().resolve()
+
+
+FILE_NAME = "running_log.txt"
+MAX_BYTES = 5_000_000
+OLD_FILES_KEPT = 3
+LINE_FORMAT = "%(asctime)s  %(levelname)-7s  %(name)s  %(message)s"
+
+_log = logging.getLogger(__name__)
+
+
+def start(folder, logger_name, *, level=logging.INFO) -> Path | None:
+    """Begin copying the driver's messages into ``<folder>/running_log.txt``.
+
+    *logger_name* is the driver's package name; every message from every part
+    of the driver reaches it. Calling this again for the same file does
+    nothing, so each connect can call it safely. Returns the path of the
+    file, or None when it could not be opened.
+    """
+    path = Path(folder) / FILE_NAME
+    package_logger = logging.getLogger(logger_name)
+    for handler in package_logger.handlers:
+        if getattr(handler, "baseFilename", None) == str(path.resolve()):
+            return path
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        handler = RotatingFileHandler(
+            path, maxBytes=MAX_BYTES, backupCount=OLD_FILES_KEPT, encoding="utf-8"
+        )
+    except OSError as why:
+        _log.warning("the running log could not be opened at %s: %s", path, why)
+        return None
+    handler.setLevel(level)
+    handler.setFormatter(logging.Formatter(LINE_FORMAT))
+    package_logger.addHandler(handler)
+    if package_logger.level == logging.NOTSET or package_logger.level > level:
+        package_logger.setLevel(level)
+    return path

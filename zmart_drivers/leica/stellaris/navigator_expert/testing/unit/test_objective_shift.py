@@ -15,17 +15,9 @@ import pytest
 from limits_fixtures import install_permissive_limits
 
 import zmart_drivers.leica.stellaris.navigator_expert.procedures.readings as readers
-from zmart_drivers.leica.stellaris.navigator_expert.procedures.keep_in_view import (
-    objective_shift as shift,
-)
+from zmart_drivers.leica.stellaris.navigator_expert.procedures import keep_in_view as shift
 
-from zmart_drivers.leica.stellaris.navigator_expert.procedures.keep_in_view import (
-    compensated_changes as cmds_comp,
-)
-from zmart_drivers.leica.stellaris.navigator_expert import loaded_config as session_state
-from zmart_drivers.leica.stellaris.navigator_expert.driver_setup.orientation import (
-    Orientation,
-)
+from zmart_drivers.leica.stellaris.navigator_expert.procedures import keep_in_view as cmds_comp
 from zmart_drivers.leica.stellaris.navigator_expert.operations.changes import run_change
 from zmart_drivers.leica.stellaris.navigator_expert.operations.changes import select_job as select_job_change
 from zmart_drivers.leica.stellaris.navigator_expert.operations.changes import stage
@@ -36,19 +28,16 @@ TRANSLATIONS = {1: (0.0, 0.0, 0.0), 2: (10.0, -6.0, 3.0)}
 @pytest.fixture
 def client():
     c = SimpleNamespace(
-        PyApiSelectJobByName=object(), PyApiSetObjectiveSlotByJobName=object()
+        PyApiSelectJobByName=object(),
+        PyApiSetObjectiveSlotByJobName=object(),
+        translations=None,  # what its session loaded at connect: nothing yet
     )
     yield c
-    session_state.uninstall(c)
 
 
 def _arm(client, translations=TRANSLATIONS):
-    session_state.install(
-        client,
-        session_state.SessionConfig(
-            orientation=Orientation(), translations=translations
-        ),
-    )
+    """Load a calibration for *client*, as connecting would."""
+    client.translations = translations
 
 
 def _rig(monkeypatch, *, slot):
@@ -96,13 +85,13 @@ def test_unarmed_client_is_left_completely_untouched(client, monkeypatch):
         raise AssertionError("an unarmed client must not be probed")
 
     monkeypatch.setattr(readers, "get_xy", _explode)
-    assert shift.record_before_change(client) is None
+    assert shift.record_before_change(client, translations=client.translations) is None
 
 
 def test_record_before_change_reads_position_and_objective(client, monkeypatch):
     _arm(client)
     _rig(monkeypatch, slot={"value": 1})
-    before = shift.record_before_change(client)
+    before = shift.record_before_change(client, translations=client.translations)
     assert before == {
         "job": "Overview",
         "x_um": 1000.0,
@@ -121,7 +110,7 @@ def test_compensation_adds_the_translation_difference_to_the_recorded_values(
     _rig(monkeypatch, slot=slot)
     moves = _moves(monkeypatch)
 
-    before = shift.record_before_change(client)
+    before = shift.record_before_change(client, translations=client.translations)
     slot["value"] = 2  # the change swapped the objective
     report = shift.compensate_after_change(client, "HiRes", before)
 
@@ -134,7 +123,7 @@ def test_same_objective_means_no_move(client, monkeypatch):
     _arm(client)
     _rig(monkeypatch, slot={"value": 2})
     moves = _moves(monkeypatch)
-    before = shift.record_before_change(client)
+    before = shift.record_before_change(client, translations=client.translations)
     report = shift.compensate_after_change(client, "HiRes", before)
     assert report == {
         "ok": True,
@@ -151,7 +140,7 @@ def test_uncovered_objective_swap_fails_the_command_result(client, monkeypatch):
     _rig(monkeypatch, slot=slot)
     moves = _moves(monkeypatch)
 
-    before = shift.record_before_change(client)
+    before = shift.record_before_change(client, translations=client.translations)
     slot["value"] = 3
     report = shift.compensate_after_change(client, "HiRes", before)
     assert not report["ok"]
@@ -208,7 +197,7 @@ def test_select_job_records_before_the_switch_and_compensates_after(
         ),
     )
 
-    result = cmds_comp.select_job(client, "HiRes")
+    result = cmds_comp.select_job(client, "HiRes", translations=client.translations)
 
     # Measured before the switch, switched, then moved by exactly ΔT.
     assert order == [
@@ -249,7 +238,7 @@ def test_select_job_on_an_unarmed_client_behaves_as_before(client, monkeypatch):
         lambda *a, **k: {"success": True, "confirmed": True, "logs": []},
     )
 
-    result = cmds_comp.select_job(client, "HiRes")
+    result = cmds_comp.select_job(client, "HiRes", translations=client.translations)
     assert result["success"]
     assert "objective_compensation" not in result
 
@@ -294,7 +283,7 @@ def test_set_objective_records_before_and_compensates_with_the_commanded_slot(
         }
     }
 
-    result = cmds_comp.set_objective(client, "Overview", hw_info, slot_index=2)
+    result = cmds_comp.set_objective(client, "Overview", hw_info, slot_index=2, translations=client.translations)
 
     assert order == [
         "read_xy",
@@ -322,7 +311,7 @@ class TestCompensateParameter:
         declared itself uncalibrated, so a lens swap records nothing,
         compensates nothing, and refuses nothing."""
         _arm(client, translations=None)
-        assert shift.record_before_change(client) is None
+        assert shift.record_before_change(client, translations=client.translations) is None
 
     def test_wanted_but_unusable_calibration_still_refuses(self, client, monkeypatch):
         """An empty table means the session WANTED calibration but none is
@@ -330,7 +319,7 @@ class TestCompensateParameter:
         _arm(client, translations={})
         _rig(monkeypatch, slot={"value": 1})
         moves = _moves(monkeypatch)
-        before = shift.record_before_change(client)
+        before = shift.record_before_change(client, translations=client.translations)
         assert before is not None  # armed: the pre-change position is recorded
         report = shift.compensate_after_change(client, "Overview", before, new_slot=2)
         assert not report["ok"]
@@ -339,16 +328,16 @@ class TestCompensateParameter:
 
     def test_compensate_false_is_a_bare_change_even_when_calibrated(self, client):
         _arm(client)  # full table loaded
-        assert shift.record_before_change(client, compensate=False) is None
+        assert shift.record_before_change(client, translations=client.translations, compensate=False) is None
 
     def test_compensate_true_refuses_up_front_without_calibration(self, client):
         _arm(client, translations=None)
         with pytest.raises(RuntimeError, match="compensate=True"):
-            shift.record_before_change(client, compensate=True)
+            shift.record_before_change(client, translations=client.translations, compensate=True)
 
     def test_compensate_true_on_unarmed_client_refuses_up_front(self, client):
         with pytest.raises(RuntimeError, match="compensate=True"):
-            shift.record_before_change(client, compensate=True)
+            shift.record_before_change(client, translations=client.translations, compensate=True)
 
 
 class TestSingleSourcedDelta:
@@ -380,15 +369,13 @@ class TestSingleSourcedDelta:
         swap-time stage move equals the adapter's per-move frame offset for
         the same lens pair. Swap-then-move-to-F therefore lands exactly
         where move-to-F-alone would."""
-        from zmart_drivers.leica.stellaris.navigator_expert.procedures.absolute_coordinate_system import (
-            frame as _frame,
-        )
+        from zmart_drivers.leica.stellaris.navigator_expert.procedures import absolute_coordinate_system as _frame
 
         _arm(client)
         slot = {"value": 1}
         _rig(monkeypatch, slot=slot)
         moves = _moves(monkeypatch)
-        before = shift.record_before_change(client)
+        before = shift.record_before_change(client, translations=client.translations)
         slot["value"] = 2
         report = shift.compensate_after_change(client, "Overview", before)
         assert report["ok"]

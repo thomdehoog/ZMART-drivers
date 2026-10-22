@@ -17,16 +17,14 @@ import unittest
 from unittest.mock import patch
 
 from zmart_drivers.leica.stellaris.navigator_expert.procedures import readings as readers
-from zmart_drivers.leica.stellaris.navigator_expert.primitives.log import (
-    log_wait,
-)
+from zmart_drivers.leica.stellaris.navigator_expert.primitives.log import reads as log_reader
 from zmart_drivers.leica.stellaris.navigator_expert.operations.changes import confirming
 from zmart_drivers.leica.stellaris.navigator_expert.operations.readings import reading_settings
 from zmart_drivers.leica.stellaris.navigator_expert.operations.changes import select_job as select_job_change
 
 
 def _poll_result(success, value=None, reason="matched"):
-    return log_wait.LogPollResult(
+    return log_reader.LogPollResult(
         success=success,
         value=value,
         matched_at=101.0 if success else None,

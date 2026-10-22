@@ -1,13 +1,13 @@
-"""Collect a picture straight from LAS X's Data Container cache.
+r"""Collect a picture straight from LAS X's Data Container cache, and the files LAS X writes.
 
 While LAS X takes a picture it writes the pixels, uncompressed, into its
 Data Container cache (the folder named under ``Data Port`` in the registry,
-``D:\\Temp2`` on the STELLARIS Y42H93), one file per picture:
+``D:\Temp2`` on the STELLARIS Y42H93), one file per picture:
 
 - ``V2LMSDC_MMF<n>_0_<pid>.tmp`` holds the raw pixels: no header, x fastest,
   then y, each channel and each plane starting where the description says.
 - ``V2LMSDC_OBJ<n>_<pid>.tmp`` describes them: a run of records, each
-  ``p\\0\\0\\0`` + a 4-byte length + the payload. The second record is the
+  ``p\0\0\0`` + a 4-byte length + the payload. The second record is the
   LAS X XML (size, bit depth, axis lengths, where each channel starts, a time
   stamp per plane); the third starts with the picture's name.
 
@@ -18,7 +18,18 @@ for AutoSave.
 
 The cache belongs to LAS X and is only ever read: deleting or changing a file
 in it corrupts LAS X projects. Once the picture is saved, LAS X itself can be
-asked to let go of it, which is clean (see ``procedures/clear_cache/release.py``).
+asked to let go of it, which is clean (see ``procedures/clear_cache/clear.py``).
+
+LAS X source-side file primitives.
+
+This module stays deliberately small. Collection from LAS X's cache lives
+above; persistence and OME checks live in
+``save`` / ``ome``.
+
+Source naming (LAS X auto-export)::
+
+    image--L0000--J08--E00--X00--Y00--T0000--Z00--C00.ome.tif
+    metadata/image--L0000--J08--E00--T0000.ome.xml
 """
 
 from __future__ import annotations
@@ -28,13 +39,7 @@ import struct
 import time
 from pathlib import Path
 from typing import Any
-
 from . import metadata as described
-from .files import (
-    DEFAULT_EXPORT_COMPLETION_POLL_INTERVAL_S,
-    DEFAULT_EXPORT_COMPLETION_TIMEOUT_S,
-    MTIME_SKEW_ALLOWANCE_S,
-)
 from .product import (
     AcquisitionResult,
     AcquisitionMetadata,
@@ -44,6 +49,9 @@ from .product import (
     RawPlaneSource,
     VendorMetadataSource,
 )
+import logging
+from typing import TYPE_CHECKING
+
 
 __all__ = ["collect_lasx_data_container", "data_container_root"]
 
@@ -55,6 +63,20 @@ DESCRIPTION = re.compile(r"V2LMSDC_OBJ(\d+)_([0-9a-fA-F]+)\.tmp")
 
 #: The job a picture's description says made it.
 JOB = re.compile(r'<LDM_Block_Sequential\b[^>]*\bBlockName="([^"]*)"')
+
+
+# How long a file may sit WITHOUT GROWING before the wait gives up on it. A
+# file that is still being written is never timed out: every change in size
+# restarts this budget, so a large export takes as long as it takes. Only a
+# file that stops changing yet never becomes readable (stuck, still locked)
+# exhausts it.
+DEFAULT_FILE_STABILITY_TIMEOUT_S = 120
+# Detection window: how long to wait for native AutoSave to produce ANY output
+# (a project directory or OME-TIFF) after the scan completes before concluding
+# AutoSave is disabled. Once a project appears the collector waits WITHOUT a
+# deadline for the file to flush -- a long/large save is healthy, not a failure.
+DEFAULT_EXPORT_COMPLETION_TIMEOUT_S = 60.0
+DEFAULT_EXPORT_COMPLETION_POLL_INTERVAL_S = 0.5
 
 
 def collect_lasx_data_container(
@@ -271,3 +293,103 @@ def layout(
         for plane in range(metadata.size_z)
     }
     return metadata, planes
+
+
+if TYPE_CHECKING:
+    pass
+
+log = logging.getLogger(__name__)
+
+
+
+
+# Exports often land on SMB shares whose mtime resolution is coarse (1-2 s)
+# and whose clock can drift from the driver host. Without an allowance, a
+# genuinely fresh export can be rejected as stale ("No ... files found").
+# The residual risk — accepting a stale file written within the allowance
+# before the acquire — is bounded by this constant and by
+# _detect_from_mtime's refusal of ambiguous multi-candidate matches.
+MTIME_SKEW_ALLOWANCE_S = 2.0
+
+
+def _relative_posix(path: Path, base: Path, *, fallback_to_str: bool) -> str | None:
+    """Return *path* relative to *base* as a POSIX string.
+
+    When *path* is not under *base*, fall back to the POSIX form of the
+    absolute path (``fallback_to_str=True``) or to ``None``
+    (``fallback_to_str=False``).
+    """
+    try:
+        return str(path.relative_to(base)).replace("\\", "/")
+    except ValueError:
+        return str(path).replace("\\", "/") if fallback_to_str else None
+
+
+# ---------------------------------------------------------------------------
+# File-stability helpers. LAS X writes its files asynchronously and holds
+# locks while it does; these wait until a file is complete and released
+# before anyone reads it.
+# ---------------------------------------------------------------------------
+
+
+def _is_file_locked(path):
+    """Return True if *path* is locked by another process (Windows).
+
+    Opens the file in read+write mode; a ``PermissionError`` means
+    another process (typically LAS X) holds an exclusive lock.
+    """
+    try:
+        with open(path, "r+b"):
+            return False
+    except PermissionError:
+        return True
+    except OSError:
+        return False
+
+
+def _wait_file_stable(path, timeout, poll_interval=0.5, stable_readings=3):
+    """Block until *path* has stable size and is unlocked.
+
+    Requires *stable_readings* consecutive checks where the file
+    exists, has non-zero size, the size hasn't changed, and the file
+    is not locked.
+
+    ``timeout`` is a no-progress budget, not a total: it restarts every
+    time the file's size changes, so a file that is still being written
+    is never given up on, however long the export takes. The wait only
+    returns False when the file has gone ``timeout`` seconds without
+    growing and still is not readable (absent, empty, or locked).
+    """
+    path = Path(path)
+    since_progress = time.perf_counter()
+    consecutive = 0
+    last_size = -1
+
+    while (time.perf_counter() - since_progress) < timeout:
+        try:
+            if not path.is_file():
+                consecutive = 0
+                time.sleep(poll_interval)
+                continue
+
+            size = path.stat().st_size
+            locked = _is_file_locked(path)
+
+            if size == last_size and size > 0 and not locked:
+                consecutive += 1
+                if consecutive >= stable_readings:
+                    return True
+            else:
+                consecutive = 0
+
+            if size != last_size:
+                since_progress = (
+                    time.perf_counter()
+                )  # still growing: the budget restarts
+            last_size = size
+        except OSError:
+            consecutive = 0
+
+        time.sleep(poll_interval)
+
+    return False

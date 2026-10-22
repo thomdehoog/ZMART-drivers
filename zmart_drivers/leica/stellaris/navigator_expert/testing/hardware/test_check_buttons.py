@@ -9,7 +9,7 @@ buttons, Jobs and Experiment, and the canvas shown while Experiment is on.
 import check_buttons
 import pytest
 
-from zmart_drivers.leica.stellaris.navigator_expert.procedures import answer_dialogs as lasx_dialogs
+from zmart_drivers.leica.stellaris.navigator_expert.procedures import answer_dialogs
 from zmart_drivers.leica.stellaris.navigator_expert.procedures.clear_cache import navigator as lasx_navigator
 
 
@@ -61,8 +61,8 @@ def navigator(monkeypatch):
     monkeypatch.setattr(lasx_navigator, "canvas_shown", stand_in.canvas_shown)
     monkeypatch.setattr(lasx_navigator, "show_canvas", stand_in.show_canvas)
     monkeypatch.setattr(lasx_navigator, "clear_canvas", stand_in.clear_canvas)
-    monkeypatch.setattr(lasx_dialogs, "pending", lambda: None)
-    monkeypatch.setattr(lasx_dialogs, "lasx_windows", NoDialogs)
+    monkeypatch.setattr(answer_dialogs, "pending", lambda: None)
+    monkeypatch.setattr(answer_dialogs, "lasx_windows", NoDialogs)
     monkeypatch.setattr(check_buttons, "WAIT_S", 0.2)
     return stand_in
 
@@ -103,9 +103,9 @@ def test_clear_is_not_tried_without_the_canvas(navigator, monkeypatch):
 
 def test_an_open_dialog_fails(navigator, monkeypatch):
     monkeypatch.setattr(
-        lasx_dialogs,
+        answer_dialogs,
         "pending",
-        lambda: lasx_dialogs.Dialog("now", "Warning", "Please keep minimum distance"),
+        lambda: answer_dialogs.Dialog("now", "Warning", "Please keep minimum distance"),
     )
     checks = check_buttons.run_checks()
     assert str(checks["no LAS X dialog open, in its log or on screen"]).startswith("NO")

@@ -13,7 +13,7 @@ import functools
 import os
 from typing import Any
 
-from ...primitives.cam_api.lasx_runtime import _runtime_root
+from ...primitives.cam_api.client import _runtime_root
 
 __all__ = [
     "connected_data_container",

@@ -1,6 +1,4 @@
-"""
-Log-file state probe.
-=====================
+"""Reading LAS X's state from its log files, the log's settings, and waiting for a log answer.
 Reads LAS X state from LAS X's hardware log (``lcsCommand.log``) instead
 of the NavigatorExpert CAM API. The CAM API can
 freeze for seconds while a modal dialog blocks its channel; the log keeps
@@ -45,14 +43,30 @@ The routed public reader layer may use this module for passive ``log`` or
 ``hybrid`` reads, and dispatch uses it as a dialog diagnostic when the CAM API is
 blocked. Command-control reads should pin the API backend instead.
 
-Parameters live in ``log_settings.LOG_READER`` - no hardcoded values in the
+Parameters live in ``LOG_READER`` - no hardcoded values in the
 read paths.
 
 Dependency direction:
     - Imports: stdlib, shared ``derived`` helpers.
     - Imported by: ``readers.router``, dispatch diagnostics, tests, and
       hardware validators.
+
+Where LAS X writes its logs, and how old a log answer may be.
+
+The log reader reads ``LOG_READER`` each time it reads, so a test or a
+validator can point it at other files by replacing it.
+
+Log-backed polling helpers for selected state transitions.
+
+The low-level log reader stays a single-snapshot parser. Helpers in this
+module poll those snapshots for a caller-owned expected condition. They are
+used narrowly by selected production confirmations and hardware validators.
+
+Author: Thom de Hoog, Center for Microscopy and Image Analysis (ZMB),
+University of Zurich (thom.dehoog@zmb.uzh.ch, thomdehoog@gmail.com).
 """
+
+from __future__ import annotations
 
 import json
 import logging
@@ -62,9 +76,10 @@ import time
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
 from datetime import datetime
-
 from ..cam_api import derived
-from . import log_settings
+from collections.abc import Callable
+from ..cam_api import waiting
+
 
 log = logging.getLogger(__name__)
 
@@ -280,7 +295,7 @@ class SharedParse:
     def snapshot(self):
         """The live logs as a :class:`Snapshot`, from a parse begun after this call."""
         asked = time.monotonic()
-        profile = log_settings.LOG_READER
+        profile = LOG_READER
         files = (profile.lcs_log_path, profile.msgbox_log_path)
         with self._changed:
             while True:
@@ -330,7 +345,7 @@ def parse_files(lcs_path=None, msgbox_path=None, now=None, lines=None):
     "Latest valid wins" per datum. Tolerant of partial/malformed final
     lines. ``lines``/``now`` are injectable for tests.
     """
-    profile = log_settings.LOG_READER
+    profile = LOG_READER
     lcs_path = lcs_path or profile.lcs_log_path
     msgbox_path = msgbox_path or profile.msgbox_log_path
     snap = Snapshot(now=now if now is not None else time.time())
@@ -387,7 +402,7 @@ def parse_files(lcs_path=None, msgbox_path=None, now=None, lines=None):
 
 def parse_msgbox_log(msgbox_path=None, now=None):
     """Parse only the NavigatorExpert log entries used for scan/dialog state."""
-    profile = log_settings.LOG_READER
+    profile = LOG_READER
     snap = Snapshot(now=now if now is not None else time.time())
     _read_msgbox_state(snap, msgbox_path or profile.msgbox_log_path)
     return snap
@@ -453,7 +468,7 @@ def _current_blocks(s, apply_max_age=True, *, max_age_s=None):
         if apply_max_age and _too_old(ts, s.now, max_age_s=max_age_s):
             continue
         if newest is None or (
-            ts is not None and ts >= newest - log_settings.LOG_READER.current_window_s
+            ts is not None and ts >= newest - LOG_READER.current_window_s
         ):
             current.append((bid, j, ts))
 
@@ -473,7 +488,7 @@ def _current_blocks(s, apply_max_age=True, *, max_age_s=None):
 
 def _too_old(ts, now, *, max_age_s=None):
     if max_age_s is None:
-        max_age_s = log_settings.LOG_READER.max_age_s
+        max_age_s = LOG_READER.max_age_s
     if max_age_s is None:
         return False  # no policy -> expose age, never refuse
     if ts is None:
@@ -716,3 +731,216 @@ def read_zwide_um(job_name, snapshot=None, *, max_age_s=None):
     if not settings:
         raise RuntimeError(f"log_reader: no fresh settings for '{job_name}'")
     return derived.zwide_um_from_settings(settings)
+
+
+@dataclass(frozen=True)
+class LogReaderProfile:
+    """Low-level LAS X log-reader paths and freshness defaults."""
+
+    lcs_log_path: str = r"C:\ProgramData\Leica Microsystems\LAS X\lcsCommand.log"
+    msgbox_log_path: str = r"C:\ProgramData\Leica Microsystems\LAS X\MatrixScreener.log"
+    current_window_s: float = 180.0
+    max_age_s: float | None = None
+
+
+LOG_READER = LogReaderProfile()
+
+
+@dataclass(frozen=True)
+class LogPollResult:
+    """Outcome of one log-backed polling wait."""
+
+    success: bool
+    value: object | None
+    matched_at: float | None
+    elapsed_s: float
+    attempts: int
+    reason: str
+    diagnostics: dict
+
+
+def wait_for_selected_job_log(
+    job_name: str,
+    command_started_at: float,
+    *,
+    timeout_s: float | None = None,
+    poll_interval_s: float | None = None,
+    max_age_s: float | None = None,
+    parse_fn: Callable[[], Snapshot] | None = None,
+    sleep_fn: Callable[[float], None] | None = None,
+    monotonic_fn: Callable[[], float] | None = None,
+) -> LogPollResult:
+    """Poll LAS X logs until *job_name* is selected after *command_started_at*.
+
+    Watches one window (``WINDOW_S``) by default, reading the log every
+    ``POLL_S``: the one rule in ``connection/waiting.py``.
+
+    This is a log-only experiment helper. It succeeds only when the log can
+    map the selected element to the target job name and the selected-element
+    log timestamp is newer than the command start time.
+    """
+
+    timeout_s = waiting.WINDOW_S if timeout_s is None else timeout_s
+    poll_interval_s = waiting.POLL_S if poll_interval_s is None else poll_interval_s
+    parse_fn = parse_log if parse_fn is None else parse_fn
+    sleep_fn = time.sleep if sleep_fn is None else sleep_fn
+    monotonic_fn = time.monotonic if monotonic_fn is None else monotonic_fn
+
+    started = monotonic_fn()
+    deadline = started + timeout_s
+    attempts = 0
+    last_reason = "not_polled"
+    base_diag = {
+        "target_job": job_name,
+        "command_started_at": command_started_at,
+        "timeout_s": timeout_s,
+        "poll_interval_s": poll_interval_s,
+        "max_age_s": max_age_s,
+    }
+    last_diag = dict(base_diag)
+
+    while True:
+        attempts += 1
+        try:
+            snapshot = parse_fn()
+            jobs = get_jobs(snapshot, max_age_s=max_age_s)
+            selected = get_selected_job(snapshot, max_age_s=max_age_s)
+            last_reason, selected_diag = _selected_job_reason(
+                snapshot=snapshot,
+                jobs=jobs,
+                selected=selected,
+                target_job=job_name,
+                command_started_at=command_started_at,
+                max_age_s=max_age_s,
+            )
+            last_diag = {**base_diag, **selected_diag}
+        except Exception as exc:  # pragma: no cover - defensive, parser is tolerant
+            last_reason = "reader_error"
+            last_diag = {
+                **base_diag,
+                "last_reason": last_reason,
+                "error": f"{type(exc).__name__}: {exc}",
+            }
+
+        if last_reason == "matched":
+            return LogPollResult(
+                success=True,
+                value=last_diag.get("selected_job_name"),
+                matched_at=last_diag.get("matched_ts"),
+                elapsed_s=monotonic_fn() - started,
+                attempts=attempts,
+                reason="matched",
+                diagnostics={**last_diag, "last_reason": "matched"},
+            )
+
+        now = monotonic_fn()
+        if now >= deadline:
+            return LogPollResult(
+                success=False,
+                value=last_diag.get("selected_job_name"),
+                matched_at=None,
+                elapsed_s=now - started,
+                attempts=attempts,
+                reason="timeout",
+                diagnostics={**last_diag, "last_reason": last_reason},
+            )
+
+        sleep_s = min(poll_interval_s, max(0.0, deadline - now))
+        if sleep_s > 0:
+            sleep_fn(sleep_s)
+
+
+def _selected_job_reason(
+    *,
+    snapshot: Snapshot,
+    jobs,
+    selected,
+    target_job: str,
+    command_started_at: float,
+    max_age_s: float | None,
+) -> tuple[str, dict]:
+    selected_name = selected.get("Name") if selected else None
+    selected_ts = snapshot.selected_ts
+    selected_after = selected_ts is not None and selected_ts > command_started_at
+    current_block_name = snapshot.current_block_name
+    current_block_ts = snapshot.current_block_ts
+    current_block_after = (
+        current_block_ts is not None and current_block_ts > command_started_at
+    )
+    current_block_fresh = not _too_old(
+        current_block_ts, snapshot.now, max_age_s=max_age_s
+    )
+    cluster = _cluster_diagnostics(snapshot, max_age_s=max_age_s)
+    diagnostics = {
+        "target_job": target_job,
+        "command_started_at": command_started_at,
+        "selected_element": snapshot.selected_element,
+        "selected_ts": selected_ts,
+        "selected_after_command": selected_after,
+        "selected_job_name": selected_name,
+        "current_block_name": current_block_name,
+        "current_block_id": snapshot.current_block_id,
+        "current_block_ts": current_block_ts,
+        "current_block_after_command": current_block_after,
+        "current_block_fresh": current_block_fresh,
+        "matched_ts": selected_ts,
+        "jobs_count": 0 if jobs is None else len(jobs),
+        "job_names": [] if jobs is None else [j.get("Name") for j in jobs],
+        **cluster,
+    }
+
+    if (
+        current_block_name is not None
+        and current_block_ts is not None
+        and current_block_after
+        and current_block_fresh
+    ):
+        diagnostics["selected_job_name"] = current_block_name
+        diagnostics["matched_ts"] = current_block_ts
+        if current_block_name == target_job:
+            return "matched", diagnostics
+        return "selected_other_job", diagnostics
+
+    if snapshot.selected_element is None:
+        return "no_selected_element", diagnostics
+    if selected_ts is None:
+        return "selected_timestamp_missing", diagnostics
+    if not selected_after:
+        return "selected_before_command", diagnostics
+    if not jobs:
+        return "no_jobs", diagnostics
+    if not cluster["cluster_complete"]:
+        return "partial_job_cluster", diagnostics
+    if cluster["ambiguous_job_names"]:
+        return "ambiguous_job_cluster", diagnostics
+    if not cluster["block_ids_numeric"]:
+        return "selected_unmapped", diagnostics
+    if selected_name is None:
+        return "selected_unmapped", diagnostics
+    if selected_name != target_job:
+        return "selected_other_job", diagnostics
+    return "matched", diagnostics
+
+
+def _cluster_diagnostics(snapshot: Snapshot, *, max_age_s):
+    latest, ambiguous = _current_blocks(  # same-package diagnostic
+        snapshot,
+        max_age_s=max_age_s,
+    )
+    latest_names = set(latest.keys())
+    all_names = {
+        j.get("jobName")
+        for (j, _ts) in snapshot.atl_by_block.values()
+        if j.get("jobName")
+    }
+    block_ids_numeric = all(
+        _block_id_int(block_id) is not None
+        for block_id, _job, _ts in latest.values()
+    )
+    return {
+        "current_job_names": sorted(latest_names),
+        "all_job_names": sorted(all_names),
+        "cluster_complete": bool(latest_names) and latest_names == all_names,
+        "ambiguous_job_names": sorted(ambiguous),
+        "block_ids_numeric": block_ids_numeric,
+    }

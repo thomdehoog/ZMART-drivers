@@ -7,10 +7,8 @@ import pytest
 from zmart_drivers.leica.stellaris.navigator_expert.procedures.clear_cache import (
     clear as clearing,
 )
-from zmart_drivers.leica.stellaris.navigator_expert.procedures.clear_cache import (
-    release as release,
-)
-from zmart_drivers.leica.stellaris.navigator_expert.session import Session
+from zmart_drivers.leica.stellaris.navigator_expert.procedures.clear_cache import clear as release
+from zmart_drivers.leica.stellaris.navigator_expert.methods import Session
 
 
 class TestPreparing:
@@ -19,7 +17,7 @@ class TestPreparing:
     def test_the_canvas_is_shown(self, monkeypatch):
         shown = []
         monkeypatch.setattr(
-            release.lasx_navigator, "show_canvas", lambda: shown.append(1) or True
+            release.navigator, "show_canvas", lambda: shown.append(1) or True
         )
         release.prepare()
         assert shown == [1]
@@ -28,11 +26,11 @@ class TestPreparing:
         self, monkeypatch, caplog
     ):
         def unavailable():
-            raise release.lasx_navigator.NavigatorUnavailable(
+            raise release.navigator.NavigatorUnavailable(
                 "Navigator Expert's Experiment button was not found"
             )
 
-        monkeypatch.setattr(release.lasx_navigator, "show_canvas", unavailable)
+        monkeypatch.setattr(release.navigator, "show_canvas", unavailable)
         release.prepare()
         assert "Experiment button was not found" in caplog.text
 
@@ -42,7 +40,7 @@ class TestDeleting:
     def canvas(self, monkeypatch):
         cleared = []
         monkeypatch.setattr(
-            release.lasx_navigator, "clear_canvas", lambda: cleared.append(1) or True
+            release.navigator, "clear_canvas", lambda: cleared.append(1) or True
         )
         return cleared
 
@@ -78,11 +76,11 @@ class TestDeleting:
         )
 
         def unavailable():
-            raise release.lasx_navigator.NavigatorUnavailable(
+            raise release.navigator.NavigatorUnavailable(
                 "the Navigator is not shown"
             )
 
-        monkeypatch.setattr(release.lasx_navigator, "clear_canvas", unavailable)
+        monkeypatch.setattr(release.navigator, "clear_canvas", unavailable)
         release.delete(746, "HiRes002")
         assert element.deleted
         assert "the Navigator is not shown" in caplog.text
@@ -114,7 +112,7 @@ class TestClearing:
     def canvas(self, monkeypatch):
         self.shown = []
         monkeypatch.setattr(release, "prepare", lambda: self.shown.append(1))
-        monkeypatch.setattr(release.lasx_navigator, "clear_canvas", lambda: True)
+        monkeypatch.setattr(release.navigator, "clear_canvas", lambda: True)
 
     def test_every_saved_picture_is_let_go_of_and_the_list_empties(self, monkeypatch):
         elements = {1: FakeElement("HiRes001"), 2: FakeElement("HiRes002")}

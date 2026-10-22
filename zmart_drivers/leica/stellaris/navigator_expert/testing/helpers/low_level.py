@@ -19,14 +19,12 @@ from zmart_drivers.leica.stellaris.navigator_expert.driver_setup.limits.handshak
     connect_handshake as connect_limits_handshake,
 )
 
-from zmart_drivers.leica.stellaris.navigator_expert.procedures.keep_in_view.compensated_changes import (
+from zmart_drivers.leica.stellaris.navigator_expert.procedures.keep_in_view import (
     select_job,
     set_objective,
 )
 from zmart_drivers.leica.stellaris.navigator_expert.procedures.save_data.save import save
-from zmart_drivers.leica.stellaris.navigator_expert.procedures.save_data.saved_acquisition import (
-    SavedAcquisition,
-)
+from zmart_drivers.leica.stellaris.navigator_expert.procedures.save_data.product import SavedAcquisition
 from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api.client import connect_python_client
 
 from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api.error_classification import (

@@ -39,9 +39,9 @@ RULEBOOK = Path("driver_setup/limits/limit_rules.py")
 READER_SOURCE_POLICY_MODULES = {
     Path("dispatcher/read.py"),
     Path("procedures/readings.py"),
-    Path("dispatcher/sources.py"),
+    Path("dispatcher/read.py"),
     Path("dispatcher/write.py"),
-    Path("dispatcher/confirm_loop.py"),
+    Path("dispatcher/write.py"),
     Path("operations/readings/reading_table.py"),
     Path("operations/changes/confirming.py"),
     Path("operations/changes/select_job.py"),
@@ -170,8 +170,8 @@ def test_the_utils_grab_bag_stays_dissolved():
 
 # The parts of the anatomy, and what each may import. A part may always import
 # from itself. Entries marked ``# upward`` run against the anatomy and are removed
-# in steps 4 to 6 of the layout plan; ``operations``, ``session``, ``running_log``
-# and ``loaded_config`` are parts only until those steps fold them in.
+# in steps 4 to 6 of the layout plan; ``operations`` is a part only until those
+# steps fold it in.
 ALLOWED = {
     # One folder for each way of reaching LAS X.
     "primitives": {
@@ -185,15 +185,10 @@ ALLOWED = {
         "operations",  # upward: the sources read the reading table
     },
     "operations": {"primitives", "dispatcher", "procedures", "driver_setup"},
-    "session": {"procedures"},
-    "running_log": set(),
-    "loaded_config": set(),
     "procedures": {
         "primitives",
         "dispatcher",
         "operations",
-        "session",
-        "loaded_config",
         "driver_setup",
         "__version__",  # the saved state records the driver version
     },
@@ -201,7 +196,6 @@ ALLOWED = {
         "primitives",
         "dispatcher",
         "operations",
-        "session",
         # The measuring code of an item takes pictures and moves the stage, so it
         # uses the procedures. Run-time procedures never import that measuring
         # code (see the test below): they read the saved values only.
@@ -214,16 +208,11 @@ ALLOWED = {
         "operations",
         "procedures",
         "driver_setup",
-        "session",
-        "loaded_config",
-        "running_log",
     },
     # What faces the controller: the ZmartControllerPlugin class, and the
     # description and procedure menu only the controller asks for.
     "zmart_controller_plugin": {
         "methods",
-        "session",
-        "loaded_config",
         "procedures",
         "driver_setup",
         "dispatcher",
@@ -349,18 +338,13 @@ def test_run_time_procedures_never_import_the_measuring_code():
 
 def test_the_driver_keeps_its_files_where_the_anatomy_puts_them():
     """``primitives/`` holds only one folder for each way of reaching LAS X; the
-    driver's root holds ``__init__.py``, ``methods.py`` and its README, and until
-    the later steps of the layout plan the session, running log and loaded
-    configuration."""
+    driver's root holds ``__init__.py``, ``methods.py`` and its README."""
     loose = sorted(p.name for p in (DRIVER_ROOT / "primitives").glob("*.py") if p.name != "__init__.py")
     assert loose == [], f"primitives/ has loose files {loose}; each belongs in its class's folder"
     allowed_in_root = {
         "__init__.py",
         "README.md",
         "methods.py",
-        "session.py",
-        "running_log.py",
-        "loaded_config.py",
     }
     root_files = sorted(
         p.name

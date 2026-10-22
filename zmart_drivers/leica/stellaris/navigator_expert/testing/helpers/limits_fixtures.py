@@ -17,7 +17,7 @@ import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 
-from zmart_drivers.leica.stellaris.navigator_expert.primitives.log import log_settings
+from zmart_drivers.leica.stellaris.navigator_expert.primitives.log import reads as log_settings
 from zmart_drivers.leica.stellaris.navigator_expert.driver_setup.limits import (
     config as _limits_config,
 )

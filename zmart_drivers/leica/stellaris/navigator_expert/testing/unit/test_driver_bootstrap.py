@@ -21,13 +21,13 @@ sys.path.insert(0, r"{repo}")
 from zmart_drivers.leica.stellaris.navigator_expert.operations.changes import acquire
 from zmart_drivers.leica.stellaris.navigator_expert.procedures.save_data.product import AcquisitionResult
 from zmart_drivers.leica.stellaris.navigator_expert.procedures.save_data import save as saving
-from zmart_drivers.leica.stellaris.navigator_expert.procedures.save_data import saved_acquisition
-from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import lasx_runtime
+from zmart_drivers.leica.stellaris.navigator_expert.procedures.save_data.product import SavedAcquisition
+from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import client
 assert acquire.take_picture is not None
 assert saving.save is not None
 assert AcquisitionResult is not None
-assert saved_acquisition.SavedAcquisition is not None
-assert lasx_runtime.REQUIRED_DLLS
+assert SavedAcquisition is not None
+assert client.REQUIRED_DLLS
 print("bootstrap-ok")
 """
 
@@ -68,10 +68,10 @@ def test_lasx_runtime_load_smoke_when_installed():
     Bare dev/CI machines can import the loader but cannot load LAS X assemblies;
     hardware validation covers the required installed-runtime path.
     """
-    from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import lasx_runtime
+    from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import client as lasx_client
 
     try:
-        runtime = lasx_runtime.load_lasx_api_runtime()
+        runtime = lasx_client.load_lasx_api_runtime()
     except (ImportError, ModuleNotFoundError, RuntimeError) as exc:
         pytest.skip(f"LAS X CAM API runtime unavailable: {exc}")
 

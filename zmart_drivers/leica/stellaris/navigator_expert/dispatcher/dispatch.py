@@ -103,7 +103,7 @@ def write(client, request, description, *, command, values, **keywords):
     microscope without passing it, whichever recipe asked. The result also says,
     under ``route``, which way the command went.
     """
-    from . import confirm_loop, limits as gate
+    from . import write as confirm_loop, limits as gate
 
     hint = getattr(keywords.get("profile"), "limits_setup_hint", None)
     message = gate.check_refusal(client, command, values, hint)

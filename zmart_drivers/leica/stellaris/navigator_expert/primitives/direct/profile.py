@@ -19,7 +19,7 @@ University of Zurich (thom.dehoog@zmb.uzh.ch, thomdehoog@gmail.com).
 
 import os
 
-from ...dispatcher.transport_chain import TransportChain
+from ...dispatcher.write import TransportChain
 from ..cam_api import transfer as _transport
 from .transfer import DIRECT
 

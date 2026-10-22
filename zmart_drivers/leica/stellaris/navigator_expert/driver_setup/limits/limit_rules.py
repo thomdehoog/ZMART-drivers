@@ -38,7 +38,7 @@ from dataclasses import dataclass
 from types import MappingProxyType
 from typing import Any
 
-from ...dispatcher.limit_errors import LimitsError, LimitsStatus, LimitViolation
+from ...dispatcher.limits import LimitsError, LimitsStatus, LimitViolation
 
 # =============================================================================
 # Hardcoded physical backstop

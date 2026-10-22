@@ -1,4 +1,4 @@
-"""How a request reaches LAS X, and how the driver learns that it arrived.
+"""How a request reaches LAS X through the CAM API, and how the driver learns that it arrived.
 
 Every change the driver makes is a LAS X request that is filled in and sent. LAS X
 answers in two steps: first it says that it received the request, then, a moment
@@ -10,17 +10,46 @@ way. They live here, and the dispatcher's engine asks for them through the
 ``transport`` of the command's profile. Another microscope supplies a transport of
 its own and leaves the engine as it is.
 
+Hand a message to LAS X and wait until it says "received".
+
+``UpdateAwaitReceipt`` both hands the message over and waits, inside the
+call, until LAS X answers "received" or its timeout passes. "Received" only
+means LAS X got the message; whether the setting, move or job switch then
+happened is the confirmation's business.
+
+Delivery follows the one rule in ``primitives/cam_api/waiting.py``: ``WINDOWS`` tries of
+``WINDOW_S`` each. There is no pause between tries, because each try already
+waits a full window for the answer.
+
+Acquisition never comes through here: a second acquire is a second
+acquisition, so it is sent once with ``UpdateAsync``.
+
+Before a message goes out, a LAS X warning that asks only for OK is answered,
+and a message is not sent while another dialog is open
+(``lasx_dialogs.DialogOpen``): LAS X's hardware server waits for every open
+dialog, and a message sent into it waits too. While the message is out, a
+watcher answers an OK-only warning it causes, which a message sent straight to
+the hardware server would otherwise wait for without end.
+
+A CAM API request object that knows its own name.
+
+A change is written into one of the CAM API's request objects (``client.PyApiSetZoomByJobName``
+and so on). A route that does not use the CAM API to send it, the direct route, needs to know
+which command it is, and the object itself does not say. This wrapper carries the name and
+passes everything else (``Model``, ``UpdateAsync``, ``UpdateAwaitReceipt``) on to the object.
+
 Author: Thom de Hoog, Center for Microscopy and Image Analysis (ZMB),
-        University of Zurich (thom.dehoog@zmb.uzh.ch, thomdehoog@gmail.com)
+University of Zurich (thom.dehoog@zmb.uzh.ch, thomdehoog@gmail.com).
 """
+
+from __future__ import annotations
 
 import logging
 import time
-
-from .delivery import deliver
-from ...procedures import answer_dialogs as lasx_dialogs
+from ...procedures import answer_dialogs
 from ..log import reads as _log_reader
 from . import waiting
+
 
 log = logging.getLogger(__name__)
 
@@ -101,13 +130,13 @@ class LasxTransport:
         """
         fired_at = time.monotonic()
         if asynchronous:
-            lasx_dialogs.answer_warnings()
-            with lasx_dialogs.watching():
+            answer_dialogs.answer_warnings()
+            with answer_dialogs.watching():
                 api_obj.UpdateAsync()
             arrived = True
         else:
             arrived = deliver(api_obj, label=label)
-        answered = [note.message for note in lasx_dialogs.answered_since(fired_at)]
+        answered = [note.message for note in answer_dialogs.answered_since(fired_at)]
         return arrived, answered
 
     def await_reply(self, client):
@@ -133,3 +162,34 @@ class LasxTransport:
 
 
 LASX = LasxTransport()
+
+
+def deliver(api_obj, *, label="message"):
+    """Deliver *api_obj*'s message; True once LAS X says "received", else False.
+
+    Raises ``lasx_dialogs.DialogOpen``, with nothing sent, while a LAS X dialog
+    the driver does not answer is open.
+    """
+    answer_dialogs.answer_warnings()
+    with answer_dialogs.watching():
+        for attempt in range(1, waiting.WINDOWS + 1):
+            if api_obj.UpdateAwaitReceipt(waiting.WINDOW_S):
+                return True
+            log.warning("%s not received (try %d/%d)", label, attempt, waiting.WINDOWS)
+    return False
+
+
+class Request:
+    """A CAM request object together with its name, such as ``"PyApiSetZoomByJobName"``."""
+
+    def __init__(self, name, cam_object):
+        self.name = name
+        self.cam_object = cam_object
+
+    def __getattr__(self, attribute):
+        return getattr(self.cam_object, attribute)
+
+
+def request_of(client, name):
+    """The CAM client's request object called *name*, wrapped with its name."""
+    return Request(name, getattr(client, name))

@@ -18,7 +18,6 @@ from mock_lasx_api import MockLasxClient
 from zmart_drivers.leica.stellaris.navigator_expert.zmart_controller_plugin.zmart_controller_plugin import ZmartControllerPlugin
 from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import client as lasx_client
 
-from zmart_drivers.leica.stellaris.navigator_expert import loaded_config as session_state
 from zmart_drivers.leica.stellaris.navigator_expert.driver_setup import (
     orientation as orientation_item,
 )
@@ -30,20 +29,20 @@ from zmart_drivers.leica.stellaris.navigator_expert.driver_setup.store import (
     MachineProfile,
 )
 from zmart_drivers.leica.stellaris.navigator_expert.dispatcher import limits as gate
-from zmart_drivers.leica.stellaris.navigator_expert.procedures.save_data import save_settings
+from zmart_drivers.leica.stellaris.navigator_expert.procedures.save_data import save_waiting
 
 
-def _connect(**kwargs) -> MockLasxClient:
+def _connect(**kwargs):
+    """Connect through the plugin to a mock LAS X; the session it made."""
     client = MockLasxClient(latency=0.0)
     with patch.object(lasx_client, "connect_python_client", return_value=client):
-        ZmartControllerPlugin(kwargs)
-    return client
+        return ZmartControllerPlugin(kwargs).microscope.handle
 
 
 def test_connect_loads_limits_orientation_and_calibration_by_default():
-    assert save_settings.IMAGE_SAVE.apply_orientation is True
-    client = _connect()
-    cfg = session_state.get(client)
+    assert save_waiting.IMAGE_SAVE.apply_orientation is True
+    session = _connect()
+    cfg = session
     assert cfg is not None
     assert isinstance(cfg.orientation, Orientation)
     # Bundled defaults are deliberately uncalibrated.
@@ -55,7 +54,7 @@ def test_connect_loads_limits_orientation_and_calibration_by_default():
     # for a measured 0-degree machine orientation.
     assert cfg.orientation_info["measured"] is False
     # limits are installed and govern this client
-    assert gate.state_for(client).ok
+    assert gate.state_for(session.client).ok
 
 
 def test_connect_creates_programdata_layout_when_all_config_loading_is_skipped(
@@ -89,29 +88,29 @@ def test_connect_records_adopted_calibration_slots_as_measured():
     }
     (snap / "calibration.json").write_text(json.dumps(calibration), encoding="utf-8")
 
-    client = _connect()
+    session = _connect()
 
-    info = session_state.get(client).calibration_info
+    info = session.calibration_info
     assert info["loaded"] is True
     assert info["measured_slots"] == [1, 2]
     assert info["slots"] == [1, 2]
 
 
 def test_connect_can_skip_calibration():
-    client = _connect(load_calibration=False)
-    assert session_state.get(client).translations is None
+    session = _connect(load_calibration=False)
+    assert session.translations is None
 
 
 def test_connect_skipping_limits_installs_the_default_fallback():
-    client = _connect(load_limits=False)
-    state = gate.state_for(client)
+    session = _connect(load_limits=False)
+    state = gate.state_for(session.client)
     assert state.ok
     assert state.limits.describe()["is_fallback"] is True
 
 
 def test_connect_records_the_selected_calibration_name():
-    client = _connect(calibration_name=None)
-    assert session_state.get(client).calibration_name is None
+    session = _connect(calibration_name=None)
+    assert session.calibration_name is None
 
 
 def test_connect_records_measured_orientation_as_positive_preflight_evidence():
@@ -122,9 +121,9 @@ def test_connect_records_measured_orientation_as_positive_preflight_evidence():
         encoding="utf-8",
     )
 
-    client = _connect()
+    session = _connect()
 
-    info = session_state.get(client).orientation_info
+    info = session.orientation_info
     assert info["loaded"] is True
     assert info["measured"] is True
     assert info["rotate_deg"] == 0
@@ -141,9 +140,9 @@ def test_connect_loads_mirror_signs_and_matrix_from_complete_orientation():
         encoding="utf-8",
     )
 
-    client = _connect()
+    session = _connect()
 
-    cfg = session_state.get(client)
+    cfg = session
     assert cfg.orientation == expected
     assert cfg.orientation_info["mirrored"] is True
     assert cfg.orientation_info["axis_signs"] == {"stage_x": 1, "stage_y": 1}
@@ -175,9 +174,9 @@ def test_invalid_orientation_cannot_claim_measured_preflight_evidence(caplog):
     )
 
     with caplog.at_level(logging.WARNING):
-        client = _connect()
+        session = _connect()
 
-    info = session_state.get(client).orientation_info
+    info = session.orientation_info
     assert info["loaded"] is False
     assert info["measured"] is False
     assert "error" in info
@@ -202,11 +201,11 @@ def test_connect_survives_a_bad_orientation_file(bad_text, caplog):
     (snap / "orientation.json").write_text(bad_text, encoding="utf-8")
 
     with caplog.at_level(logging.WARNING):
-        client = _connect()
+        session = _connect()
 
-    cfg = session_state.get(client)
+    cfg = session
     assert cfg is not None
     assert cfg.orientation.is_identity
     # the rest of the connection proceeded normally
-    assert gate.state_for(client).ok
+    assert gate.state_for(session.client).ok
     assert any("orientation unavailable" in r.message for r in caplog.records)

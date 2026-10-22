@@ -14,16 +14,14 @@ from types import SimpleNamespace
 
 import pytest
 
-from zmart_drivers.leica.stellaris.navigator_expert.dispatcher.transport_chain import (
+from zmart_drivers.leica.stellaris.navigator_expert.dispatcher.write import (
     TransportChain,
     TransportUnavailable,
 )
-from zmart_drivers.leica.stellaris.navigator_expert.primitives.direct import hardware_server
-from zmart_drivers.leica.stellaris.navigator_expert.primitives.direct import transfer as direct_transport
-from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api.request import Request
-from zmart_drivers.leica.stellaris.navigator_expert.primitives.direct import (
-    send_command,
-)
+from zmart_drivers.leica.stellaris.navigator_expert.primitives.direct import client as hardware_server
+from zmart_drivers.leica.stellaris.navigator_expert.primitives.direct import transfer as direct_transfer
+from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api.transfer import Request
+from zmart_drivers.leica.stellaris.navigator_expert.primitives.direct import transfer as send_command
 from zmart_drivers.leica.stellaris.navigator_expert.primitives.direct.state_tree import (
     Job,
     JobSequence,
@@ -42,9 +40,9 @@ class Hardware:
         self.sent = []
         self.answer = ACCEPTED
         monkeypatch.setattr(hardware_server, "connected_server", lambda: object())
-        monkeypatch.setattr(direct_transport, "send", self.send)
+        monkeypatch.setattr(direct_transfer, "send", self.send)
         monkeypatch.setattr(
-            direct_transport,
+            direct_transfer,
             "job_sequence",
             lambda: JobSequence(
                 block_id=144,
@@ -88,7 +86,7 @@ def send_zoom(route, client, **given):
 
 
 def test_a_zoom_becomes_the_element_las_x_itself_logs(hardware, client):
-    send_zoom(direct_transport.DirectTransport(), client)
+    send_zoom(direct_transfer.DirectTransport(), client)
 
     assert hardware.sent == ['<Scanner Command="SetZoom" Zoom="1.5" BlockId="152"/>']
 
@@ -96,7 +94,7 @@ def test_a_zoom_becomes_the_element_las_x_itself_logs(hardware, client):
 def test_the_job_ids_come_from_las_x_now_and_not_from_the_cam_apis_list(
     hardware, client
 ):
-    send_zoom(direct_transport.DirectTransport(), client, job="Overview")
+    send_zoom(direct_transfer.DirectTransport(), client, job="Overview")
 
     assert 'BlockId="150"' in hardware.sent[0]
 
@@ -110,7 +108,7 @@ def test_las_xs_answer_lands_in_the_reply_the_error_check_reads(
 ):
     hardware.answer = answer
 
-    arrived, _ = send_zoom(direct_transport.DirectTransport(), client)
+    arrived, _ = send_zoom(direct_transfer.DirectTransport(), client)
 
     echo = client.PyApiCommandEcho.Model
     assert arrived is True
@@ -120,7 +118,7 @@ def test_las_xs_answer_lands_in_the_reply_the_error_check_reads(
 def test_a_refusal_carries_las_xs_reason(hardware, client):
     hardware.answer = REFUSED
 
-    send_zoom(direct_transport.DirectTransport(), client)
+    send_zoom(direct_transfer.DirectTransport(), client)
 
     assert "above the maximum of 48" in client.PyApiCommandEcho.Model.Error
 
@@ -129,7 +127,7 @@ def test_a_command_without_a_translation_sends_nothing_and_says_so(hardware, cli
     request = Request("PyApiNothingLikeThis", SimpleNamespace(Model=SimpleNamespace()))
 
     with pytest.raises(TransportUnavailable, match="no direct translation"):
-        direct_transport.DirectTransport().send(
+        direct_transfer.DirectTransport().send(
             client, request, "Nothing", asynchronous=False
         )
     assert hardware.sent == []
@@ -137,7 +135,7 @@ def test_a_command_without_a_translation_sends_nothing_and_says_so(hardware, cli
 
 def test_a_job_that_las_x_does_not_have_sends_nothing_and_says_so(hardware, client):
     with pytest.raises(TransportUnavailable, match="no job 'Gone'"):
-        send_zoom(direct_transport.DirectTransport(), client, job="Gone")
+        send_zoom(direct_transfer.DirectTransport(), client, job="Gone")
     assert hardware.sent == []
 
 
@@ -152,7 +150,7 @@ def test_an_unreachable_hardware_server_sends_nothing_and_says_so(
     monkeypatch.setattr(hardware_server, "connected_server", unreachable)
 
     with pytest.raises(TransportUnavailable, match="not running"):
-        send_zoom(direct_transport.DirectTransport(), client)
+        send_zoom(direct_transfer.DirectTransport(), client)
     assert hardware.sent == []
 
 
@@ -191,7 +189,7 @@ def test_when_the_hardware_server_is_unreachable_the_cam_api_carries_the_command
 
     monkeypatch.setattr(hardware_server, "connected_server", unreachable)
     cam = CamRoute()
-    chain = chain_with(direct_transport.DirectTransport(), cam)
+    chain = chain_with(direct_transfer.DirectTransport(), cam)
 
     request = zoom_request()
     chain.fill(request, lambda model: None)
@@ -204,7 +202,7 @@ def test_when_the_hardware_server_is_unreachable_the_cam_api_carries_the_command
 def test_a_refusal_by_las_x_is_not_tried_again_on_the_cam_api(hardware, client):
     hardware.answer = REFUSED
     cam = CamRoute()
-    chain = chain_with(direct_transport.DirectTransport(), cam)
+    chain = chain_with(direct_transfer.DirectTransport(), cam)
 
     request = zoom_request(100)
     chain.fill(request, lambda model: None)
@@ -222,7 +220,7 @@ def test_a_send_that_las_x_never_answered_is_not_tried_again_on_the_cam_api(
         "no answer within four windows"
     )
     cam = CamRoute()
-    chain = chain_with(direct_transport.DirectTransport(), cam)
+    chain = chain_with(direct_transfer.DirectTransport(), cam)
 
     request = zoom_request()
     chain.fill(request, lambda model: None)
@@ -247,13 +245,13 @@ class Projects:
         self.made = []
         monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
         monkeypatch.setattr(
-            direct_transport, "open_experiments", lambda: dict(self.open)
+            direct_transfer, "open_experiments", lambda: dict(self.open)
         )
         monkeypatch.setattr(
-            direct_transport, "experiment_is_open", lambda number: number in self.open
+            direct_transfer, "experiment_is_open", lambda number: number in self.open
         )
         monkeypatch.setattr(
-            direct_transport, "experiment_of", lambda image: self.image_in[image]
+            direct_transfer, "experiment_of", lambda image: self.image_in[image]
         )
 
         def new_experiment(name):
@@ -261,7 +259,7 @@ class Projects:
             self.open[900 + len(self.made)] = name
             return 900 + len(self.made)
 
-        monkeypatch.setattr(direct_transport, "new_experiment", new_experiment)
+        monkeypatch.setattr(direct_transfer, "new_experiment", new_experiment)
 
 
 @pytest.fixture
@@ -273,12 +271,12 @@ def test_an_acquire_goes_into_the_project_of_the_last_image(projects):
     projects.open = {84: "Project", 90: "Other"}
     projects.image_in = {5148: 84}
 
-    assert direct_transport.DirectTransport().open_project_for(5148) == 84
+    assert direct_transfer.DirectTransport().open_project_for(5148) == 84
 
 
 def test_when_the_last_image_is_gone_the_remembered_project_is_used(projects):
     projects.open = {84: "Project", 90: "Other"}
-    transport = direct_transport.DirectTransport()
+    transport = direct_transfer.DirectTransport()
     transport.experiment = 84
 
     assert transport.open_project_for(0) == 84
@@ -291,19 +289,19 @@ def test_a_project_deleted_in_las_x_is_never_used_even_when_the_last_image_names
     projects.open = {90: "Open one"}
     projects.image_in = {2135: 698}
 
-    assert direct_transport.DirectTransport().open_project_for(2135) == 90
+    assert direct_transfer.DirectTransport().open_project_for(2135) == 90
 
 
 def test_with_no_remembered_project_the_newest_open_one_is_used(projects):
     projects.open = {84: "Project", 90: "Other"}
 
-    assert direct_transport.DirectTransport().open_project_for(0) == 90
+    assert direct_transfer.DirectTransport().open_project_for(0) == 90
 
 
 def test_with_no_project_open_a_new_one_is_made_and_numbered_after_the_open_ones(
     projects,
 ):
-    chosen = direct_transport.DirectTransport().open_project_for(0)
+    chosen = direct_transfer.DirectTransport().open_project_for(0)
 
     assert projects.made == ["ZMART_Experiment1"]
     assert chosen == 901
@@ -311,7 +309,7 @@ def test_with_no_project_open_a_new_one_is_made_and_numbered_after_the_open_ones
 
 def test_a_new_project_is_numbered_one_above_the_open_ones(projects):
     assert (
-        direct_transport.new_project_name({1: "ZMART_Experiment3", 2: "Project"})
+        direct_transfer.new_project_name({1: "ZMART_Experiment3", 2: "Project"})
         == "ZMART_Experiment4"
     )
 
@@ -319,8 +317,8 @@ def test_a_new_project_is_numbered_one_above_the_open_ones(projects):
 def test_the_chosen_project_is_written_down_for_the_next_start(projects, monkeypatch):
     projects.open = {84: "Project"}
     projects.image_in = {5148: 84}
-    monkeypatch.setattr(direct_transport, "last_image_id", lambda: 5148)
+    monkeypatch.setattr(direct_transfer, "last_image_id", lambda: 5148)
 
-    direct_transport.DirectTransport().images_experiment_id()
+    direct_transfer.DirectTransport().images_experiment_id()
 
-    assert direct_transport.read_remembered_experiment() == 84
+    assert direct_transfer.read_remembered_experiment() == 84

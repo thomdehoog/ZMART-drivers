@@ -6,7 +6,7 @@ import os
 
 import pytest
 
-from zmart_drivers.leica.stellaris.navigator_expert.primitives.log import log_settings
+from zmart_drivers.leica.stellaris.navigator_expert.primitives.log import reads as log_settings
 from zmart_drivers.leica.stellaris.navigator_expert.operations.readings import reading_settings
 
 

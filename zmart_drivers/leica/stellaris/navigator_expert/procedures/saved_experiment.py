@@ -22,7 +22,7 @@ from typing import Any
 
 from ..primitives.cam_api import waiting
 from ..primitives.cam_api.parsing import saved_z_um
-from ..primitives.cam_api.delivery import deliver
+from ..primitives.cam_api.transfer import deliver
 
 #: Navigator Expert's ScanningTemplates folder, where it saves an experiment.
 FOLDER = os.path.join(

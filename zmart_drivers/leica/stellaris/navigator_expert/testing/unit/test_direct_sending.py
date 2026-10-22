@@ -17,17 +17,15 @@ from types import SimpleNamespace
 
 import pytest
 
-from zmart_drivers.leica.stellaris.navigator_expert.primitives.direct import hardware_server
+from zmart_drivers.leica.stellaris.navigator_expert.primitives.direct import client as hardware_server
 from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import waiting
-from zmart_drivers.leica.stellaris.navigator_expert.primitives.direct import (
-    send_command,
-)
+from zmart_drivers.leica.stellaris.navigator_expert.primitives.direct import transfer as send_command
 from zmart_drivers.leica.stellaris.navigator_expert.primitives.direct import writes as translations
 from zmart_drivers.leica.stellaris.navigator_expert.primitives.direct.writes import (
     Fields,
     NoTranslation,
 )
-from zmart_drivers.leica.stellaris.navigator_expert.procedures import answer_dialogs as lasx_dialogs
+from zmart_drivers.leica.stellaris.navigator_expert.procedures import answer_dialogs
 
 
 class Server:
@@ -55,7 +53,7 @@ def server(monkeypatch):
     forgotten = []
     monkeypatch.setattr(hardware_server, "connected_server", lambda: server)
     monkeypatch.setattr(hardware_server, "forget_connection", lambda: forgotten.append(1))
-    monkeypatch.setattr(lasx_dialogs, "answer_warnings", lambda: None)
+    monkeypatch.setattr(answer_dialogs, "answer_warnings", lambda: None)
     monkeypatch.setattr(waiting, "WINDOWS", 2)
     monkeypatch.setattr(waiting, "WINDOW_S", 0.1)
     monkeypatch.setattr(waiting, "POLL_S", 0.01)
@@ -124,11 +122,11 @@ def test_an_open_dialog_ends_the_wait_with_its_text(server, monkeypatch):
     turret = SimpleNamespace(caption="LAS X", text="Turn the turret manually", at="12:00:00")
 
     def a_dialog():
-        raise lasx_dialogs.DialogOpen(turret, "it asks for more than OK")
+        raise answer_dialogs.DialogOpen(turret, "it asks for more than OK")
 
-    monkeypatch.setattr(lasx_dialogs, "answer_warnings", a_dialog)
+    monkeypatch.setattr(answer_dialogs, "answer_warnings", a_dialog)
 
-    with pytest.raises(lasx_dialogs.DialogOpen, match="turret"):
+    with pytest.raises(answer_dialogs.DialogOpen, match="turret"):
         send_command.send("<a/>")
 
     assert server.received == ["<a/>"]

@@ -82,7 +82,7 @@ def _no_hardware_server(monkeypatch):
     hardware server would answer and a test would read the instrument's z.
     Tests that need the server hand in a stand-in through ``attach``.
     """
-    from zmart_drivers.leica.stellaris.navigator_expert.primitives.direct import hardware_server
+    from zmart_drivers.leica.stellaris.navigator_expert.primitives.direct import client as hardware_server
 
     def unreachable():
         raise hardware_server.HardwareServerUnavailable(
@@ -103,29 +103,29 @@ def _no_lasx_window(tmp_path, monkeypatch):
     and could press a real dialog's button. Tests that need either hand in a
     stand-in log path and windows.
     """
-    from zmart_drivers.leica.stellaris.navigator_expert.procedures import answer_dialogs as lasx_dialogs
+    from zmart_drivers.leica.stellaris.navigator_expert.procedures import answer_dialogs
 
     def no_windows():
-        raise lasx_dialogs.WindowsUnavailable("no LAS X windows in the test suite")
+        raise answer_dialogs.WindowsUnavailable("no LAS X windows in the test suite")
 
-    from zmart_drivers.leica.stellaris.navigator_expert.procedures.clear_cache import navigator as lasx_navigator
+    from zmart_drivers.leica.stellaris.navigator_expert.procedures.clear_cache import navigator
 
     def no_automation():
-        raise lasx_dialogs.WindowsUnavailable(
+        raise answer_dialogs.WindowsUnavailable(
             "no Windows UI Automation in the test suite"
         )
 
     from zmart_drivers.leica.stellaris.navigator_expert.procedures import saved_experiment
 
-    monkeypatch.setattr(lasx_dialogs, "LASX_LOG", tmp_path / "no LAS X.log")
+    monkeypatch.setattr(answer_dialogs, "LASX_LOG", tmp_path / "no LAS X.log")
     monkeypatch.setattr(saved_experiment, "FOLDER", str(tmp_path / "ScanningTemplates"))
-    monkeypatch.setattr(lasx_dialogs, "lasx_windows", no_windows)
-    monkeypatch.setattr(lasx_navigator, "automation", no_automation)
-    lasx_navigator.forget()
-    lasx_dialogs.forget()
+    monkeypatch.setattr(answer_dialogs, "lasx_windows", no_windows)
+    monkeypatch.setattr(navigator, "automation", no_automation)
+    navigator.forget()
+    answer_dialogs.forget()
     yield
-    lasx_dialogs.stop_watching()
-    lasx_dialogs.forget()
+    answer_dialogs.stop_watching()
+    answer_dialogs.forget()
 
 
 @pytest.fixture(autouse=True)

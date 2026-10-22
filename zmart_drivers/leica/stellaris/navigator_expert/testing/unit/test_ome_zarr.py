@@ -627,9 +627,7 @@ class TestTheProjection:
 
 
 def test_the_log_is_written_beside_data(tmp_path):
-    from zmart_drivers.leica.stellaris.navigator_expert.procedures.save_data import (
-        command_log,
-    )
+    from zmart_drivers.leica.stellaris.navigator_expert.procedures.save_data import naming as command_log
 
     naming = Naming(stem="high-res_000001_A1")
     path = command_log.write(tmp_path / "out", naming, {"job": "HiRes", "µ": "µm"})

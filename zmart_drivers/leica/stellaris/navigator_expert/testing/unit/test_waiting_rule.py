@@ -10,6 +10,7 @@ that gave up in 0.06 s because the API was busy with an abandoned question,
 and an idle check that waited forever in log-only mode.
 """
 
+import inspect
 import ast
 import pathlib
 import re
@@ -21,14 +22,12 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from zmart_drivers.leica.stellaris.navigator_expert.operations.readings import reading_table as capabilities
-from zmart_drivers.leica.stellaris.navigator_expert.procedures.keep_in_view import (
-    objective_shift,
-)
+from zmart_drivers.leica.stellaris.navigator_expert.procedures import keep_in_view as objective_shift
 
 from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import prechecks
 from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import waiting
 from zmart_drivers.leica.stellaris.navigator_expert.procedures import readings as readers
-from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import delivery
+from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import transfer as delivery
 from zmart_drivers.leica.stellaris.navigator_expert.operations.readings import reading_settings
 
 WINDOW_S = 0.5
@@ -327,10 +326,10 @@ def test_delivery_is_four_tries_of_one_window_without_a_pause():
     assert [c.args for c in api_obj.UpdateAwaitReceipt.call_args_list] == [
         (WINDOW_S,)
     ] * 4
-    # No pause between tries: the module does not even have a clock to sleep on. (A test
-    # that patched time.sleep for the whole process failed now and then, whenever
-    # another thread slept while it ran.)
-    assert not hasattr(delivery, "time")
+    # No pause between tries: delivering never sleeps. (A test that patched
+    # time.sleep for the whole process failed now and then, whenever another
+    # thread slept while it ran.)
+    assert "sleep" not in inspect.getsource(delivery.deliver)
 
 
 def test_delivery_stops_trying_once_received():
@@ -350,8 +349,8 @@ def test_commands_deliver_through_the_one_helper():
 # Whole folders, plus the change definitions that moved from actions/ to procedures/.
 GUARDED = ("dispatcher", "connection", "primitives", "operations")
 GUARDED_FILES = (
-    "procedures/keep_in_view/compensated_changes.py",
-    "procedures/keep_in_view/objective_shift.py",
+    "procedures/keep_in_view.py",
+    "procedures/keep_in_view.py",
 )
 WAIT_NAME = re.compile(
     r"(timeout|poll_interval|max_retries|max_confirm_attempts|grace|deadline|window_s|retry_delay)",
@@ -374,20 +373,20 @@ EXCEPTIONS = {
         "ECHO_SETTLE_TIMEOUT_S",
     ),
     # How old a log entry may be to count as current: freshness, not a wait.
-    ("primitives/log/log_settings.py", "current_window_s"),
+    ("primitives/log/reads.py", "current_window_s"),
     # Waiting for a finished picture's files to stop growing on disk. This is
     # about files, not about LAS X's state, and has its own decided numbers.
-    ("procedures/save_data/files.py", "DEFAULT_FILE_STABILITY_TIMEOUT_S"),
+    ("procedures/save_data/collect.py", "DEFAULT_FILE_STABILITY_TIMEOUT_S"),
     (
-        "procedures/save_data/files.py",
+        "procedures/save_data/collect.py",
         "DEFAULT_EXPORT_COMPLETION_TIMEOUT_S",
     ),
     (
-        "procedures/save_data/files.py",
+        "procedures/save_data/collect.py",
         "DEFAULT_EXPORT_COMPLETION_POLL_INTERVAL_S",
     ),
-    ("procedures/save_data/files.py", "timeout"),
-    ("procedures/save_data/files.py", "poll_interval"),
+    ("procedures/save_data/collect.py", "timeout"),
+    ("procedures/save_data/collect.py", "poll_interval"),
     # The rule itself.
     ("primitives/cam_api/waiting.py", "WINDOW_S"),
 }

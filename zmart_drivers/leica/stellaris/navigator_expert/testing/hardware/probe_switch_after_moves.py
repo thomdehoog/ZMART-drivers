@@ -41,9 +41,7 @@ if str(_REPO_ROOT) not in sys.path:
 from zmart_drivers.leica.stellaris.navigator_expert.operations.changes import (
     select_job as _confirm_select_job,
 )
-from zmart_drivers.leica.stellaris.navigator_expert.procedures.keep_in_view import (
-    objective_shift as _objective_shift,
-)
+from zmart_drivers.leica.stellaris.navigator_expert.procedures import keep_in_view as _objective_shift
 from zmart_drivers.leica.stellaris.navigator_expert.dispatcher import limits as _gate  # noqa: E402
 from zmart_drivers.leica.stellaris.navigator_expert.procedures import readings as _readers  # noqa: E402
 from zmart_drivers.leica.stellaris.navigator_expert.primitives.log import reads as _log_reader

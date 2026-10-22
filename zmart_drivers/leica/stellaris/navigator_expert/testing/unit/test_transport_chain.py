@@ -6,8 +6,8 @@ University of Zurich (thom.dehoog@zmb.uzh.ch, thomdehoog@gmail.com).
 
 import pytest
 
-from zmart_drivers.leica.stellaris.navigator_expert.dispatcher import write as send_loop
-from zmart_drivers.leica.stellaris.navigator_expert.dispatcher.transport_chain import (
+from zmart_drivers.leica.stellaris.navigator_expert.dispatcher import write
+from zmart_drivers.leica.stellaris.navigator_expert.dispatcher.write import (
     TransportChain,
     TransportUnavailable,
 )
@@ -143,7 +143,7 @@ def test_the_send_loop_works_through_a_chain_and_reports_the_fallback():
     )
     request = type("Request", (), {"Model": object()})()
 
-    result = send_loop.fire_block(
+    result = write.fire_block(
         object(), request, "SetZoom", profile=profile, setup_fn=lambda r: "zoom written"
     )
 

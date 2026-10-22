@@ -26,19 +26,17 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock, PropertyMock, patch
 
 from zmart_drivers.leica.stellaris.navigator_expert.dispatcher import dispatch as door
-from zmart_drivers.leica.stellaris.navigator_expert.procedures.keep_in_view import compensated_changes
+from zmart_drivers.leica.stellaris.navigator_expert.procedures import keep_in_view as compensated_changes
 from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import error_classification
 from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import parsing
 
 from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import client as session
 
-from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import lasx_settings
+from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import client as lasx_client
 
-from zmart_drivers.leica.stellaris.navigator_expert.procedures.keep_in_view import (
-    compensated_changes as commands_comp,
-)
+from zmart_drivers.leica.stellaris.navigator_expert.procedures import keep_in_view as commands_comp
 from zmart_drivers.leica.stellaris.navigator_expert.dispatcher import (
-    confirm_loop as dispatch,
+    write as dispatch,
     write as send_loop,
 )
 from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import prechecks
@@ -113,8 +111,8 @@ class TestLasxApiSessionProfile(unittest.TestCase):
             class PyApiClient:
                 DelayInMilliseconds = 0
 
-        profile = lasx_settings.LasxApiProfile(delay_ms=123)
-        with patch.object(lasx_settings, "LASX_API", profile):
+        profile = lasx_client.LasxApiProfile(delay_ms=123)
+        with patch.object(lasx_client, "LASX_API", profile):
             applied = session.configure_lasx_api_delay(FakeLasxApi)
 
         self.assertEqual(applied, 123)
@@ -792,7 +790,7 @@ class TestRetryBackoff(unittest.TestCase):
         )
 
         with patch.object(
-            run_change.door,
+            run_change.dispatch,
             "write",
             return_value={
                 "success": True,
@@ -828,7 +826,7 @@ class TestRetryBackoff(unittest.TestCase):
         )
 
         with patch.object(
-            run_change.door,
+            run_change.dispatch,
             "write",
             return_value={
                 "success": True,
@@ -865,7 +863,7 @@ class TestRetryBackoff(unittest.TestCase):
         profile = command_profile.CommandProfile(confirm_poll_s=5.0)
 
         with patch.object(
-            run_change.door,
+            run_change.dispatch,
             "write",
             return_value={
                 "success": True,
@@ -905,7 +903,7 @@ class TestRetryBackoff(unittest.TestCase):
         profile = command_profile.CommandProfile(confirm_poll_s=5.0)
 
         with patch.object(
-            run_change.door,
+            run_change.dispatch,
             "write",
             return_value={
                 "success": True,
@@ -1189,7 +1187,7 @@ class TestConfirmation(unittest.TestCase):
             ]
         )
 
-        with patch.object(dispatch, "_fire_block", return_value=fire_result) as fire:
+        with patch.object(dispatch, "fire_block", return_value=fire_result) as fire:
             r = _fire(
                 client,
                 api_obj,
@@ -1222,7 +1220,7 @@ class TestConfirmation(unittest.TestCase):
         }
         confirm_fn = MagicMock(return_value={"success": False, "logs": []})
 
-        with patch.object(dispatch, "_fire_block", return_value=fire_result) as fire:
+        with patch.object(dispatch, "fire_block", return_value=fire_result) as fire:
             r = _fire(
                 client,
                 api_obj,
@@ -1265,7 +1263,7 @@ class TestConfirmation(unittest.TestCase):
             }
         )
 
-        with patch.object(dispatch, "_fire_block", return_value=fire_result) as fire:
+        with patch.object(dispatch, "fire_block", return_value=fire_result) as fire:
             r = _fire(
                 client,
                 api_obj,
@@ -1782,7 +1780,7 @@ class TestSetFunctionWiring(unittest.TestCase):
             captured["model"] = model
             return _make_v6_result(msg=description)
 
-        with patch.object(run_change.door, "write", side_effect=mock_fire):
+        with patch.object(run_change.dispatch, "write", side_effect=mock_fire):
             r = set_fn(*args, **kwargs)
         return captured, r
 
@@ -2024,7 +2022,7 @@ class TestSetFunctionDefaults(unittest.TestCase):
             captured.update(kw)
             return _make_v6_result(msg=desc)
 
-        with patch.object(run_change.door, "write", side_effect=mock_fire):
+        with patch.object(run_change.dispatch, "write", side_effect=mock_fire):
             fn(make_client(), "J")
         return captured
 
@@ -2813,9 +2811,7 @@ class TestHybridSelectJobApiLegEndToEnd(unittest.TestCase):
     """
 
     def test_api_leg_confirms_when_log_has_no_evidence(self):
-        from zmart_drivers.leica.stellaris.navigator_expert.primitives.log import (
-            log_wait,
-        )
+        from zmart_drivers.leica.stellaris.navigator_expert.primitives.log import reads as log_reader
 
         client = make_client()
         api_obj = make_api_obj()
@@ -2844,7 +2840,7 @@ class TestHybridSelectJobApiLegEndToEnd(unittest.TestCase):
                 {"Name": "HiRes", "IsSelected": False},
             ]
 
-        silent_log = log_wait.LogPollResult(
+        silent_log = log_reader.LogPollResult(
             success=False,
             value=None,
             matched_at=None,

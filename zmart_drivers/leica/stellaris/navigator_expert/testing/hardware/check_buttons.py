@@ -36,8 +36,8 @@ import time
 from pathlib import Path
 
 from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import waiting
-from zmart_drivers.leica.stellaris.navigator_expert.procedures import answer_dialogs as lasx_dialogs
-from zmart_drivers.leica.stellaris.navigator_expert.procedures.clear_cache import navigator as lasx_navigator
+from zmart_drivers.leica.stellaris.navigator_expert.procedures import answer_dialogs
+from zmart_drivers.leica.stellaris.navigator_expert.procedures.clear_cache import navigator
 
 #: How long a press may take to show on screen: one window, by the driver's one waiting rule.
 WAIT_S = waiting.WINDOW_S
@@ -49,8 +49,8 @@ def press_jobs() -> None:
     The driver itself never presses Jobs; the check does, so that the canvas
     is gone and the driver has to bring it back.
     """
-    c, uia, found = lasx_navigator.walked(
-        lasx_navigator.SWITCH_PATH, "so no Jobs button; is Navigator Expert open?"
+    c, uia, found = navigator.walked(
+        navigator.SWITCH_PATH, "so no Jobs button; is Navigator Expert open?"
     )
     p = uia.CreatePropertyCondition
     switch = found.FindFirst(
@@ -69,7 +69,7 @@ def press_jobs() -> None:
         else None
     )
     if not button:
-        raise lasx_navigator.NavigatorUnavailable(
+        raise navigator.NavigatorUnavailable(
             "Navigator Expert's Jobs button was not found"
         )
     toggle = button.GetCurrentPattern(c.UIA_TogglePatternId).QueryInterface(
@@ -105,36 +105,36 @@ def run_checks() -> dict:
         press_jobs()
         return (
             True
-            if until(lambda: not lasx_navigator.canvas_shown(), WAIT_S)
+            if until(lambda: not navigator.canvas_shown(), WAIT_S)
             else "NO: the canvas stayed shown after Jobs"
         )
 
     def experiment_brings_it_back():
-        pressed = lasx_navigator.show_canvas()
+        pressed = navigator.show_canvas()
         if not pressed:
             return "NO: the driver did not press Experiment, though the canvas was gone"
         return (
             True
-            if lasx_navigator.canvas_shown()
+            if navigator.canvas_shown()
             else "NO: Experiment pressed, the canvas not reachable"
         )
 
     def shown_is_left_alone():
         return (
             True
-            if lasx_navigator.show_canvas() is False
+            if navigator.show_canvas() is False
             else "NO: Experiment pressed again on a shown canvas"
         )
 
     def clear_is_pressed():
         # The press itself: the driver found the button and pressed it, or it
         # says the canvas showed nothing to clear. Its effect: check_cache_release.py.
-        pressed = lasx_navigator.clear_canvas()
+        pressed = navigator.clear_canvas()
         return True if isinstance(pressed, bool) else f"NO: Clear answered {pressed!r}"
 
     def no_dialog():
-        in_log = lasx_dialogs.pending()
-        on_screen = lasx_dialogs.lasx_windows().dialogs()
+        in_log = answer_dialogs.pending()
+        on_screen = answer_dialogs.lasx_windows().dialogs()
         if in_log is not None or on_screen:
             return f"NO: in the log {in_log!r}, on screen {len(on_screen)} dialog(s)"
         return True
@@ -145,7 +145,7 @@ def run_checks() -> dict:
             experiment_brings_it_back,
         )
         check("a shown canvas is left alone", shown_is_left_alone)
-    if lasx_navigator.canvas_shown():
+    if navigator.canvas_shown():
         check("Clear found and pressed", clear_is_pressed)
     else:
         checks["Clear found and pressed"] = "NO: not tried, the canvas is not shown"

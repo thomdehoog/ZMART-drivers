@@ -13,11 +13,10 @@ from __future__ import annotations
 import time
 
 from .. import store as _machine
-from ...procedures.absolute_coordinate_system.frame import hardware_snapshot
-from ...session import Session, require_open
+from ...procedures.absolute_coordinate_system import hardware_snapshot
 
 
-def set_origin(handle: Session) -> dict:
+def set_origin(handle) -> dict:
     """Make the current stage position the (0, 0, 0) of the frame and save it.
 
     This is a setup step for the driver, not a controller command. The
@@ -52,7 +51,7 @@ def set_origin(handle: Session) -> dict:
     stays in the ``limits.json`` ``functions`` list so machine files remain
     explicit about it.)
     """
-    require_open(handle)
+    handle.require_open()
     snap = hardware_snapshot(handle)
     handle.origin = {
         "x_um": snap["x_um"],

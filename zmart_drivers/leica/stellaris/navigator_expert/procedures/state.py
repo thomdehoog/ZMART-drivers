@@ -14,19 +14,16 @@ from __future__ import annotations
 import logging
 import math
 from typing import Any
-from .. import loaded_config as _session_state
 from ..dispatcher import limits as _gate
 from ..primitives.cam_api.parsing import parse_tile_geometry as _parse_tile_geometry
 from . import readings as _readers
-from .keep_in_view import compensated_changes as _compensated
-from .. import session as _info
-from ..session import Session, job_catalog, note_unconfirmed, require_open
+from . import keep_in_view as _compensated
 
 log = logging.getLogger(__name__)
 
 
 def setup_readiness(
-    handle: Session,
+    handle,
     active_objective: dict | None,
     limits: dict | None,
 ) -> dict:
@@ -35,9 +32,8 @@ def setup_readiness(
     Workflows consume only ``ready`` and ``issues``. The Leica driver owns the
     meaning of the evidence and all machine-configuration application.
     """
-    loaded = _session_state.get(handle.client)
-    orientation = dict((loaded.orientation_info if loaded else None) or {})
-    calibration = dict((loaded.calibration_info if loaded else None) or {})
+    orientation = dict(handle.orientation_info or {})
+    calibration = dict(handle.calibration_info or {})
     slot = (active_objective or {}).get("slotIndex")
     slot = None if slot is None else int(slot)
     origin_slot = (handle.origin.get("objective") or {}).get("slotIndex")
@@ -101,7 +97,7 @@ def setup_readiness(
     }
 
 
-def get_state(handle: Session) -> dict:
+def get_state(handle) -> dict:
     """The instrument state: the changeable part first, then the observed report.
 
     ``changeable`` is the promise — exactly what :func:`set_state` reapplies.
@@ -114,7 +110,7 @@ def get_state(handle: Session) -> dict:
     the job catalog, and the provenance of the function limits governing this
     session. All LAS X-derived values are fresh reads.
     """
-    require_open(handle)
+    handle.require_open()
     hw = _readers.get_hardware_info(handle.client) or {}
     microscope = hw.get("Microscope") or {}
     selected = _readers.get_selected_job(handle.client) or {}
@@ -157,7 +153,7 @@ def get_state(handle: Session) -> dict:
         frame_size = None
         image_size_px = pixel_size_um = None
     active_objective = settings.get("objective")
-    normal, autofocus = job_catalog(handle)
+    normal, autofocus = handle.job_catalog()
     limits = _gate.describe(handle.client)
     return {
         "changeable": {"job": selected.get("Name")},
@@ -202,15 +198,14 @@ def _as_saved(size_px, pixel_size_um, orientation) -> tuple[list, list]:
     return list(size_px), list(pixel_size_um)
 
 
-def _saved_orientation(handle: Session):
+def _saved_orientation(handle):
     """The turn this connection applies to the pixels it saves (none when it has none)."""
     from ..driver_setup.orientation import Orientation
 
-    loaded = _session_state.get(handle.client)
-    return loaded.orientation if loaded is not None else Orientation()
+    return handle.orientation if handle.orientation is not None else Orientation()
 
 
-def set_state(handle: Session, state: dict) -> dict:
+def set_state(handle, state: dict) -> dict:
     """Apply the changeable part; report what stuck.
 
     ``observed`` is a report, never an instruction — it is not read here
@@ -220,14 +215,14 @@ def set_state(handle: Session, state: dict) -> dict:
     changes legitimately, so only the REFERENT is guarded — with an error
     that lists what is available.
     """
-    require_open(handle)
+    handle.require_open()
     applied: dict[str, Any] = {}
     noted_before = len(handle.unconfirmed)
     job = (state.get("changeable") or {}).get("job")
     # When the selected job cannot be read, the one asked for is selected
     # anyway: selecting is harmless to repeat.
-    if job and job != _info.selected_job_name(handle):
-        normal, autofocus = job_catalog(handle)
+    if job and job != handle.selected_job_name():
+        normal, autofocus = handle.job_catalog()
         names = [j.get("Name") for j in normal if j.get("Name")]
         if job in (j.get("Name") for j in autofocus):
             raise ValueError(
@@ -238,11 +233,11 @@ def set_state(handle: Session, state: dict) -> dict:
             raise ValueError(
                 f"job {job!r} no longer exists on this instrument (available: {names})"
             )
-        result = _compensated.select_job(handle.client, job)
+        result = _compensated.select_job(handle.client, job, translations=handle.translations)
         if not result.get("success"):
             raise RuntimeError(f"select_job('{job}') failed: {result}")
         if not result.get("confirmed"):
-            note_unconfirmed(handle, f"set_state: select_job('{job}')", result)
+            handle.note_unconfirmed(f"set_state: select_job('{job}')", result)
         applied["job"] = job
     # What was applied, and what was sent but could not be confirmed by a
     # readback (the selection went ahead; the workflow is told, not stopped).

@@ -25,7 +25,7 @@ import tifffile
 import zarr
 
 from zmart_drivers.leica.stellaris.navigator_expert.procedures.save_data import save as saving
-from zmart_drivers.leica.stellaris.navigator_expert.procedures.save_data import saved_acquisition
+from zmart_drivers.leica.stellaris.navigator_expert.procedures.save_data import product as saved_acquisition
 from zmart_drivers.metadata_convention import Notes
 from zmart_drivers.leica.stellaris.navigator_expert.procedures.save_data import product
 from zmart_drivers.leica.stellaris.navigator_expert.driver_setup.orientation import (
@@ -45,9 +45,7 @@ from zmart_drivers.leica.stellaris.navigator_expert.procedures.save_data import 
     save as acquisition,
 )
 
-from zmart_drivers.leica.stellaris.navigator_expert.procedures.clear_cache import (
-    release,
-)
+from zmart_drivers.leica.stellaris.navigator_expert.procedures.clear_cache import clear
 from zmart_drivers.leica.stellaris.navigator_expert.operations.changes import acquire as acquire_change
 
 
@@ -425,7 +423,7 @@ class TestSave:
         patched_export["collect"].return_value = replace(
             patched_export["exported"], release_target=(7, "HiRes")
         )
-        with patch.object(release, "delete") as delete:
+        with patch.object(clear, "delete") as delete:
             saved = _save(successful_acq, tmp_path / "run_000001", naming)
         delete.assert_not_called()
         assert saved.release_target == (7, "HiRes")

@@ -135,11 +135,9 @@ def acquisition_of(
 
 
 def plane(source: RawPlaneSource) -> np.ndarray:
-    from zmart_drivers.leica.stellaris.navigator_expert.procedures.save_data import (
-        materialize,
-    )
+    from zmart_drivers.leica.stellaris.navigator_expert.procedures.save_data import ome_canonical
 
-    return materialize._read_source_plane(source)
+    return ome_canonical._read_source_plane(source)
 
 
 class TestCollecting:

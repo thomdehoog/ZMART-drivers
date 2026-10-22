@@ -41,9 +41,7 @@ from zmart_drivers.leica.stellaris.navigator_expert.driver_setup.limits import (
     handshake as _handshake,
 )
 
-from zmart_drivers.leica.stellaris.navigator_expert.procedures.keep_in_view import (
-    compensated_changes as commands_mod_comp,
-)
+from zmart_drivers.leica.stellaris.navigator_expert.procedures import keep_in_view as commands_mod_comp
 from zmart_drivers.leica.stellaris.navigator_expert.driver_setup.limits import (
     config as limits_config,
 )
@@ -62,9 +60,7 @@ DRIVER_ROOT = Path(__file__).resolve().parents[2]
 from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import client as _connect_module
 from zmart_drivers.leica.stellaris.navigator_expert.methods import DEFAULT_CONNECTION, Microscope
 from zmart_drivers.leica.stellaris.navigator_expert.zmart_controller_plugin.zmart_controller_plugin import ZmartControllerPlugin
-from zmart_drivers.leica.stellaris.navigator_expert.procedures.absolute_coordinate_system import (
-    frame as _frame,
-)
+from zmart_drivers.leica.stellaris.navigator_expert.procedures import absolute_coordinate_system as _frame
 from zmart_drivers.leica.stellaris.navigator_expert.operations.changes import acquire as acquire_change
 from zmart_drivers.leica.stellaris.navigator_expert.operations.changes import job_settings
 from zmart_drivers.leica.stellaris.navigator_expert.driver_setup.limits import limit_rules
@@ -992,7 +988,7 @@ def test_every_dispatching_wrapper_declares_and_calls_the_gate():
     files = [
         DRIVER_ROOT / "operations" / "changes" / f"{name}.py"
         for name in ("stage", "objective", "select_job", "acquire")
-    ] + [DRIVER_ROOT / "procedures" / "keep_in_view" / "compensated_changes.py"]
+    ] + [DRIVER_ROOT / "procedures" / "keep_in_view.py"]
     fire_names = {"dispatch_change", "write"}
     fire_attrs = {"UpdateAwaitReceipt", "UpdateAsync", "dispatch_change"}
     checked = []

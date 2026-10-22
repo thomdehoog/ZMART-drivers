@@ -1,8 +1,15 @@
-"""How a capture's files and folders are named.
+"""How a capture's files and folders are named, and the log written beside them.
 
 A capture is named by its stem, then the time point, channel and plane. This
 file also says where in the output folder the data, the metadata, the state
 and the projections go.
+
+The log of one capture: what the driver was asked, and what it did.
+
+One JSON file a capture, ``log/<stem>.log.json``,
+beside ``data``: the settings asked for and the ones used, when the
+capture started and finished, what was sent but never confirmed, where every
+plane was taken, and which files were saved. The pictures and their metadata say what was captured; this says how.
 
 Author: Thom de Hoog, Center for Microscopy and Image Analysis (ZMB),
 University of Zurich (thom.dehoog@zmb.uzh.ch, thomdehoog@gmail.com).
@@ -14,6 +21,10 @@ import re
 import time
 from dataclasses import dataclass
 from pathlib import Path
+import json
+import os
+import uuid
+
 
 EPOCH = 1767225600  # 2026-01-01 00:00:00 UTC
 _ALPHABET = "0123456789abcdefghijklmnopqrstuvwxyz"
@@ -153,3 +164,18 @@ def build_state_name(naming: Naming) -> str:
     """
 
     return f"{naming.stem}_T{naming.t:06d}_ZMART_state.json"
+
+
+__all__ = ["write"]
+
+
+def write(output_root: Path | str, naming: Naming, entry: dict) -> Path:
+    """Write *entry* as the capture's log, whole, and return its path."""
+    path = log_dir(output_root) / f"{naming.stem}.log.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    writing = path.with_name(f"{path.name}.{uuid.uuid4().hex[:8]}.writing")
+    writing.write_text(
+        json.dumps(entry, indent=2, ensure_ascii=False, default=str), encoding="utf-8"
+    )
+    os.replace(writing, path)
+    return path

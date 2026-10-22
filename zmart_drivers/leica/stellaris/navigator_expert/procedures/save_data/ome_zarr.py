@@ -46,7 +46,7 @@ from pathlib import Path
 import numpy as np
 
 from ...driver_setup.orientation import Orientation, reorient_array
-from . import materialize
+from . import ome_canonical as materialize
 from zmart_drivers import metadata_convention as convention
 from . import ome_canonical as canonical
 from .product import AcquisitionMetadata, ExportedAcquisition, PlaneIndex

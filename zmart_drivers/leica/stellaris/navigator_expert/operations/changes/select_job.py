@@ -21,11 +21,11 @@ import time
 from functools import partial
 
 from ...primitives.cam_api import waiting
-from ...primitives.direct.hardware_server import HardwareServerUnavailable
+from ...primitives.direct.client import HardwareServerUnavailable
 from ...dispatcher.dispatch import make_log_entry, make_timing
-from ...primitives.cam_api.request import request_of
+from ...primitives.cam_api.transfer import request_of
 from ...primitives.direct import reads as direct_reader
-from ...primitives.log import log_wait
+from ...primitives.log import reads as log_wait
 from ...procedures import readings as readers
 from ..readings import reading_settings
 from ...primitives.cam_api.profile import CommandProfile

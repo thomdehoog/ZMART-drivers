@@ -18,7 +18,7 @@ from typing import Any
 
 from ...primitives.cam_api import waiting
 from ...dispatcher.dispatch import make_log_entry, make_timing
-from ...primitives.cam_api.request import request_of
+from ...primitives.cam_api.transfer import request_of
 from ...primitives.cam_api.parsing import _hw_get
 from ...primitives.cam_api.profile import CommandProfile
 from ...primitives.cam_api.prechecks import check_idle

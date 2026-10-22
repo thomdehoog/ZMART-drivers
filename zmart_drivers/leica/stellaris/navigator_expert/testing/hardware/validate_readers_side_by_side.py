@@ -55,7 +55,7 @@ from run_report import RunReport, attempts_of, confirmation_of, replay_envelope_
 
 import low_level as drv
 from zmart_drivers.leica.stellaris.navigator_expert.operations.readings import reading_table as capabilities
-from zmart_drivers.leica.stellaris.navigator_expert.primitives.log import log_settings
+from zmart_drivers.leica.stellaris.navigator_expert.primitives.log import reads as log_settings
 
 from zmart_drivers.leica.stellaris.navigator_expert.procedures import readings as readers
 from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import waiting
@@ -797,7 +797,7 @@ def _connect(args):
         print("Connect: mock (in-process MockLasxClient)")
         print(f"Limits: hermetic machine root provisioned at {root}")
         return MockLasxClient(latency=args.mock_latency)
-    from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api.lasx_runtime import load_lasx_api_runtime
+    from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api.client import load_lasx_api_runtime
 
     lasx_api = load_lasx_api_runtime()
     client = lasx_api.LasxApiClientPyModel

@@ -22,7 +22,7 @@ from limits_fixtures import hermetic_mock_machine_root
 from mock_lasx_api import MockLasxClient
 
 import zmart_drivers.leica.stellaris.navigator_expert as navigator_expert
-from zmart_drivers.leica.stellaris.navigator_expert import methods as microscope
+from zmart_drivers.leica.stellaris.navigator_expert import methods
 from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import client as lasx_client
 from zmart_drivers.leica.stellaris.navigator_expert.operations.readings import reading_settings
 
@@ -53,16 +53,16 @@ def test_the_package_offers_only_the_microscope():
     offered = {name for name in vars(navigator_expert) if not name.startswith("__")} - {"methods"}
 
     assert sorted(navigator_expert.__all__) == ["Microscope", "__version__", "connect"]
-    assert offered <= {"Microscope", "connect"} | {"dispatcher", "driver_setup", "procedures", "session", "running_log", "loaded_config", "primitives", "operations", "zmart_controller_plugin", "testing"}
+    assert offered <= {"Microscope", "connect"} | {"dispatcher", "driver_setup", "procedures", "primitives", "operations", "zmart_controller_plugin", "testing"}
 
 
 def test_the_running_log_gets_the_messages_of_every_part_of_the_driver(scope):
     """Not only of the folder that connects: the dispatcher's and the procedures' too."""
     import logging
 
-    driver = logging.getLogger(microscope.DRIVER_PACKAGE)
+    driver = logging.getLogger(methods.DRIVER_PACKAGE)
 
-    assert microscope.DRIVER_PACKAGE == navigator_expert.__name__
+    assert methods.DRIVER_PACKAGE == navigator_expert.__name__
     assert any(getattr(h, "baseFilename", "").endswith("running_log.txt") for h in driver.handlers)
 
 
@@ -157,9 +157,9 @@ def test_a_setting_lasx_refuses_raises_with_its_reason(scope):
 
 def test_capture_save_and_clear_call_their_procedures(scope, monkeypatch):
     calls = []
-    monkeypatch.setattr(microscope.acquire_step, "acquire", lambda handle, **asked: calls.append(("acquire", asked)) or {"position_label": "A1"})
-    monkeypatch.setattr(microscope.save_step, "save_waiting", lambda handle, label=None: calls.append(("save", label)) or [{"files": []}])
-    monkeypatch.setattr(microscope.clear_step, "clear", lambda handle: calls.append(("clear", None)) or {"cleared": [], "failed": {}})
+    monkeypatch.setattr(methods.acquire_step, "acquire", lambda handle, **asked: calls.append(("acquire", asked)) or {"position_label": "A1"})
+    monkeypatch.setattr(methods.save_step, "save_waiting", lambda handle, label=None: calls.append(("save", label)) or [{"files": []}])
+    monkeypatch.setattr(methods.clear_step, "clear", lambda handle: calls.append(("clear", None)) or {"cleared": [], "failed": {}})
 
     scope.acquire("A1", acquisition_type="overview")
     scope.save("A1")
@@ -195,7 +195,7 @@ def test_every_call_of_the_microscope_and_every_setting_is_in_the_readme():
     import re
     from pathlib import Path
 
-    readme = (Path(microscope.__file__).resolve().parent / "README.md").read_text(encoding="utf-8")
+    readme = (Path(methods.__file__).resolve().parent / "README.md").read_text(encoding="utf-8")
     section = readme[readme.index("## 4. Using the driver by itself") : readme.index("## 5.")]
     calls = [name for name, _ in inspect.getmembers(navigator_expert.Microscope) if not name.startswith("_")]
 

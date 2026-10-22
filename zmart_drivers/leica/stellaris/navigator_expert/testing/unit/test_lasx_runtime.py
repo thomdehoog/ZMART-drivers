@@ -4,24 +4,24 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import lasx_settings
-from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import lasx_runtime
+from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import client as lasx_settings
+from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import client as lasx_client
 
 
 class TestLasxRuntime(unittest.TestCase):
     def test_missing_dlls_reports_required_names(self):
         root = Path(self._tmpdir.name)
 
-        missing = lasx_runtime._missing_dlls(root)
+        missing = lasx_client._missing_dlls(root)
 
-        self.assertEqual(missing, list(lasx_runtime.REQUIRED_DLLS))
+        self.assertEqual(missing, list(lasx_client.REQUIRED_DLLS))
 
     def test_missing_dlls_accepts_complete_runtime_root(self):
         root = Path(self._tmpdir.name)
-        for name in lasx_runtime.REQUIRED_DLLS:
+        for name in lasx_client.REQUIRED_DLLS:
             (root / name).write_bytes(b"")
 
-        self.assertEqual(lasx_runtime._missing_dlls(root), [])
+        self.assertEqual(lasx_client._missing_dlls(root), [])
 
     def test_missing_runtime_fails_before_importing_clr(self):
         root = Path(self._tmpdir.name)
@@ -29,7 +29,7 @@ class TestLasxRuntime(unittest.TestCase):
 
         with mock.patch.object(lasx_settings, "LASX_API", profile):
             with self.assertRaisesRegex(RuntimeError, "Is LAS X installed"):
-                lasx_runtime.load_lasx_api_runtime()
+                lasx_client.load_lasx_api_runtime()
 
     def setUp(self):
         import tempfile

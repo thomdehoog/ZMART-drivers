@@ -25,7 +25,7 @@ import unittest
 from unittest.mock import patch
 
 from zmart_drivers.leica.stellaris.navigator_expert.procedures import readings as readers
-from zmart_drivers.leica.stellaris.navigator_expert.dispatcher import sources as engine
+from zmart_drivers.leica.stellaris.navigator_expert.dispatcher import read as engine
 from zmart_drivers.leica.stellaris.navigator_expert.operations.changes import confirming
 from zmart_drivers.leica.stellaris.navigator_expert.operations.readings import reading_settings
 

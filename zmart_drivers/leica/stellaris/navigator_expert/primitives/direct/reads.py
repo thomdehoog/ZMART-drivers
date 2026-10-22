@@ -47,7 +47,7 @@ from __future__ import annotations
 import json
 import math
 
-from .hardware_server import HardwareServerUnavailable, connected_server, forget_connection
+from .client import HardwareServerUnavailable, connected_server, forget_connection
 from .state_tree import (
     SCAN_STATES,
     STAGE_PATHS,

@@ -25,7 +25,7 @@ import logging
 from dataclasses import replace
 from functools import partial
 
-from ...dispatcher import dispatch as door
+from ...dispatcher import dispatch
 from ...dispatcher import limits as gate
 from .confirming import race_confirmations
 from ...driver_setup.limits.limit_rules import NOTEBOOK_POINTER
@@ -43,8 +43,8 @@ def refused(message, *, logged=False, **extra):
         "success": False,
         "confirmed": None,
         "message": message,
-        "timing": door.make_timing(total_s=0.0, attempts=0),
-        "logs": [door.make_log_entry("error", message)] if logged else [],
+        "timing": dispatch.make_timing(total_s=0.0, attempts=0),
+        "logs": [dispatch.make_log_entry("error", message)] if logged else [],
         **extra,
     }
 
@@ -129,7 +129,7 @@ def dispatch_change(
         for name, value in (("max_retries", max_retries), ("max_confirm_attempts", max_confirm_attempts))
         if value is not None
     }
-    return door.write(
+    return dispatch.write(
         client,
         api_obj,
         description,

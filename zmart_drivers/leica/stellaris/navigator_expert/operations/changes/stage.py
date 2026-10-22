@@ -15,7 +15,7 @@ from functools import partial
 
 from ...primitives.cam_api import waiting
 from ...dispatcher.dispatch import make_log_entry
-from ...primitives.cam_api.request import request_of
+from ...primitives.cam_api.transfer import request_of
 from ...procedures import readings as readers
 from ...primitives.cam_api.profile import CommandProfile
 from ...driver_setup.limits.limit_rules import check_xy, check_z

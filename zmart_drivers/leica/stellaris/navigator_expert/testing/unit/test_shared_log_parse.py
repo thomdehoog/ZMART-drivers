@@ -170,7 +170,7 @@ def test_a_snapshot_counts_only_for_the_log_files_it_was_parsed_from(
     monkeypatch, tmp_path
 ):
     """Pointing the reader at other files (the --mock validators do) never serves the old ones."""
-    from zmart_drivers.leica.stellaris.navigator_expert.primitives.log import log_settings
+    from zmart_drivers.leica.stellaris.navigator_expert.primitives.log import reads as log_settings
 
     seen = []
 

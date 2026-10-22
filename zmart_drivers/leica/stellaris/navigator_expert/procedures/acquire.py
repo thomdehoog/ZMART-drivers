@@ -1,10 +1,10 @@
-"""Taking a picture: the ``acquire`` step, and the notes it keeps for saving.
+"""Taking a picture: the ``acquire`` step, and the note it keeps for saving (:class:`PendingCapture`).
 
 ``acquire`` runs the selected LAS X job and leaves the picture in LAS X's
 cache. It writes no files and clears nothing. Instead it notes what only the
 moment of the capture can tell (where the stage stood, which job ran, the
 state of the microscope) and keeps the note with the session, as a
-:class:`~.pending_capture.PendingCapture`. Saving the files is the
+:class:`PendingCapture`. Saving the files is the
 ``save_data`` procedure, and letting LAS X go of the picture is the
 ``clear_cache`` procedure.
 
@@ -17,6 +17,13 @@ calls of the workflow, and the driver cannot see that as it happens. So
 plane from that reading. If it differs from what the workflow last saw, a note
 is added to the result, and the capture goes ahead.
 
+The note kept for a capture whose files are not written yet.
+
+The stage position and the microscope's state can only be known at the moment
+of the capture, so they are written down then. ``save_data`` uses the note
+later, whenever it is run, so the files describe the capture as it was and not
+as things stand by then.
+
 Author: Thom de Hoog, Center for Microscopy and Image Analysis (ZMB),
 University of Zurich (thom.dehoog@zmb.uzh.ch, thomdehoog@gmail.com).
 """
@@ -26,20 +33,21 @@ from __future__ import annotations
 import logging
 from datetime import datetime, timezone
 from pathlib import Path
+from dataclasses import dataclass, field
+from typing import Any
+from .save_data.naming import Naming
+
 
 try:  # driver version for embedded export state; never fail acquire over it
     from .. import __version__ as _DRIVER_VERSION
 except Exception:  # noqa: BLE001 -- best-effort provenance
     _DRIVER_VERSION = None
 
-from .save_data.naming import Naming, free_stem
-from .pending_capture import PendingCapture
+from .save_data.naming import free_stem
 from . import readings as _readers
 from ..operations.changes import acquire as acquire_change
-from .. import session as _info
-from .absolute_coordinate_system.frame import get_xyz
+from .absolute_coordinate_system import get_xyz
 from .state import get_state
-from ..session import Session, note_unconfirmed, require_open, try_
 
 #: This driver, as the capture record names it.
 DRIVER_PACKAGE = __package__.rpartition(".")[0]
@@ -47,7 +55,16 @@ DRIVER_PACKAGE = __package__.rpartition(".")[0]
 log = logging.getLogger(__name__)
 
 
-def get_acquisition_settings(handle: Session) -> dict:
+def try_(fn):
+    """Call ``fn()``; degrade any failure to ``None`` (state must not fail save)."""
+    try:
+        return fn()
+    except Exception as exc:  # noqa: BLE001 -- provenance capture is best-effort
+        log.debug("export-state field unavailable: %s", exc)
+        return None
+
+
+def get_acquisition_settings(handle) -> dict:
     """How a capture is triggered: ``full``, the whole of the selected LAS X job.
 
     That is the only way this driver captures, so it is the only option and
@@ -57,11 +74,11 @@ def get_acquisition_settings(handle: Session) -> dict:
     this microscope's profile (``IMAGE_SAVE``), and where they go from its
     data location, set up once.
     """
-    require_open(handle)
+    handle.require_open()
     return {"trigger": {"options": ["full"], "default": "full", "active": "full"}}
 
 
-def _with_defaults(handle: Session, settings: dict | None) -> dict:
+def _with_defaults(handle, settings: dict | None) -> dict:
     """Validate settings against the menu, filling omissions from the active values."""
     menu = get_acquisition_settings(handle)
     resolved = {name: spec["active"] for name, spec in menu.items()}
@@ -77,7 +94,7 @@ def _with_defaults(handle: Session, settings: dict | None) -> dict:
     return resolved
 
 
-def _next_position_label(handle: Session) -> str:
+def _next_position_label(handle) -> str:
     """The next per-session position label ("000000", "000001", ...).
 
     Consumes one counter value. Only used when :func:`acquire` gets no
@@ -89,7 +106,7 @@ def _next_position_label(handle: Session) -> str:
 
 
 def _export_state(
-    handle: Session,
+    handle,
     *,
     stem: str,
     job: str,
@@ -130,7 +147,7 @@ def _export_state(
 
 
 def acquire(
-    handle: Session,
+    handle,
     *,
     position_label: str | None = None,
     acquisition_settings: dict | None = None,
@@ -168,7 +185,7 @@ def acquire(
     job cannot be read, the stage is unknown, the label is still waiting to be
     saved, or the capture itself fails.
     """
-    require_open(handle)
+    handle.require_open()
     resolved = _with_defaults(handle, acquisition_settings)
     if output_folder is not None:
         output_root = Path(output_folder)
@@ -176,10 +193,10 @@ def acquire(
         # Staging lives under the folder saved to, so moving a capture into
         # its run is a rename on the same disk, never a copy. Where that is
         # was set up once on this microscope; without it, this says how.
-        output_root = Path(_info.output_root(handle)) / ".staging" / handle.hash6
+        output_root = Path(handle.output_root()) / ".staging" / handle.hash6
     # The job that runs is the one selected in LAS X: part of the state, chosen
     # with set_state or in LAS X itself, never by a capture setting.
-    job = _info.selected_job_name(handle)
+    job = handle.selected_job_name()
     if not job:
         raise RuntimeError(
             "which LAS X job is selected could not be read, or none is; "
@@ -200,9 +217,7 @@ def acquire(
             "check that LAS X answers, then capture again"
         )
     if last_seen is not None and fresh is not None and _moved(last_seen, at):
-        note_unconfirmed(
-            handle,
-            "acquire: the stage or the objective changed",
+        handle.note_unconfirmed("acquire: the stage or the objective changed",
             "the stage position or the objective is not what get_xyz or set_xyz "
             "last reported (changed in LAS X?); the capture is placed from the "
             "fresh reading",
@@ -253,3 +268,21 @@ def _moved(before: dict, after: dict) -> bool:
         abs(after[axis] - before[axis]) > STAGE_CHANGE_NOTE_UM
         for axis in ("x", "y", "z")
     )
+
+
+@dataclass
+class PendingCapture:
+    """One captured picture, waiting to be saved, with the notes taken as it was captured."""
+
+    acq: Any
+    label: str
+    acquisition_type: str
+    naming: Naming
+    state: dict
+    job: str
+    at: dict
+    output_root: Path
+    session_hash6: str
+    asked: dict
+    settings: dict
+    unconfirmed: list = field(default_factory=list)

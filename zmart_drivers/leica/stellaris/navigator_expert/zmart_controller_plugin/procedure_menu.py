@@ -11,13 +11,12 @@ from __future__ import annotations
 
 from ..procedures.clear_cache.clear import clear
 from ..procedures.save_data.save_waiting import save_waiting
-from ..procedures.absolute_coordinate_system.frame import zero_z_galvo
-from ..session import Session, require_open
+from ..procedures.absolute_coordinate_system import zero_z_galvo
 
 
-def get_procedures(handle: Session) -> dict:
+def get_procedures(handle) -> dict:
     """The named procedures this instrument offers (discover-then-apply)."""
-    require_open(handle)
+    handle.require_open()
     return {
         "zero_z_galvo": {
             "description": "park the z-galvo at 0 without changing the focus "
@@ -38,9 +37,9 @@ def get_procedures(handle: Session) -> dict:
     }
 
 
-def run_procedure(handle: Session, procedure: dict) -> dict:
+def run_procedure(handle, procedure: dict) -> dict:
     """Run a procedure from :func:`get_procedures`; report what ran."""
-    require_open(handle)
+    handle.require_open()
     name = procedure.get("name")
     if name == "zero_z_galvo":
         return {"ran": dict(procedure), **zero_z_galvo(handle)}

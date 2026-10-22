@@ -24,7 +24,7 @@ from zmart_drivers.leica.stellaris.navigator_expert.primitives.direct import (
     reads as direct_reader,
     state_tree,
 )
-from zmart_drivers.leica.stellaris.navigator_expert.primitives.direct import hardware_server
+from zmart_drivers.leica.stellaris.navigator_expert.primitives.direct import client as hardware_server
 from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api.parsing import make_changeable_copy
 from zmart_drivers.leica.stellaris.navigator_expert.operations.changes import objective as objective_change
 

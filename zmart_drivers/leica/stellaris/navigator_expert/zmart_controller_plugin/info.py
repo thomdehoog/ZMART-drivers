@@ -10,24 +10,23 @@ University of Zurich (thom.dehoog@zmb.uzh.ch, thomdehoog@gmail.com).
 from __future__ import annotations
 
 from pathlib import Path
-from .. import loaded_config as _session_state
 from ..driver_setup import store as _machine
 from ..dispatcher import limits as _gate
 from ..procedures import readings as _readers
-from .. import session as _info
-from ..procedures.absolute_coordinate_system.frame import canvas, get_xyz
-from ..session import Session, job_catalog, require_open, try_
+from ..procedures.acquire import try_
+from ..methods import SET_UP
+from ..procedures.absolute_coordinate_system import canvas, get_xyz
 
 
-def get_info(handle: Session) -> dict:
+def get_info(handle) -> dict:
     """Read the session's setup and resolved output root live.
 
     The LAS X scanning template is never read: positions are never made in
     the Navigator Expert, so there are no tile or focus positions to report,
     and answering never saves the experiment.
     """
-    require_open(handle)
-    selected = _info.selected_job_name(handle)
+    handle.require_open()
+    selected = handle.selected_job_name()
     root = _where_it_saves(handle)
     return {
         "setup": _setup(handle),
@@ -59,7 +58,7 @@ Objectives on the turret, as slot: LAS X objective number: {objectives}.
 Acquiring has one trigger, full: it runs the selected LAS X job and saves what LAS X captured in the output folder acquire is given, or else under this microscope's data location, each file named by the acquisition type and the position label it was given, then the time point, the channel and the plane."""
 
 
-def _described(handle: Session) -> str:
+def _described(handle) -> str:
     """The description, filled in from the loaded limits and what LAS X reports now."""
     state = _gate.state_for(handle.client)
     galvo_range = None
@@ -71,7 +70,7 @@ def _described(handle: Session) -> str:
         if galvo_range
         else "No limits are loaded in this session, so every move is refused."
     )
-    normal, autofocus = job_catalog(handle)
+    normal, autofocus = handle.job_catalog()
     names = [j["Name"] for j in normal if j.get("Name")]
     af_names = [j["Name"] for j in autofocus if j.get("Name")]
     jobs = f"The jobs on this microscope now: {', '.join(names) or 'none'}."
@@ -89,12 +88,11 @@ def _described(handle: Session) -> str:
     return DESCRIPTION.format(galvo=galvo, jobs=jobs, objectives=objectives)
 
 
-def _setup(handle: Session) -> dict:
+def _setup(handle) -> dict:
     """Each thing set up once on this microscope, whether it is done, and in words what it holds or what to do."""
     limits = _gate.describe(handle.client) or {}
-    loaded = _session_state.get(handle.client)
-    orientation = dict((loaded.orientation_info if loaded is not None else None) or {})
-    calibration = dict((loaded.calibration_info if loaded is not None else None) or {})
+    orientation = dict(handle.orientation_info or {})
+    calibration = dict(handle.calibration_info or {})
     published = limits.get("source") == "machine" and not limits.get("is_fallback")
     origin_saved = try_(_machine.MACHINE.read_origin) is not None
     measured_slots = calibration.get("measured_slots") or []
@@ -139,16 +137,16 @@ def _setup(handle: Session) -> dict:
             "says": (
                 f"{handle.data_location}, as OME-Zarr"
                 if handle.data_location is not None
-                else _info.SET_UP
+                else SET_UP
             ),
         },
     }
 
 
-def _where_it_saves(handle: Session) -> Path | None:
+def _where_it_saves(handle) -> Path | None:
     """The folder this session saves under, or None when there is none yet."""
     try:
-        return _info.output_root(handle)
+        return handle.output_root()
     except RuntimeError:
         return None
 
@@ -172,12 +170,11 @@ def _calibration_status(calibration: dict | None) -> str:
     return "failed — no usable calibration, so objective changes are refused"
 
 
-def _connection_status(handle: Session, root: Path | None) -> dict:
+def _connection_status(handle, root: Path | None) -> dict:
     """What a session stands on, from what the driver already holds; a
     failure names itself."""
     limits = _gate.describe(handle.client)
-    loaded = _session_state.get(handle.client)
-    calibration = loaded.calibration_info if loaded is not None else None
+    calibration = handle.calibration_info
 
     def stage() -> str:
         at = get_xyz(handle)
@@ -197,5 +194,5 @@ def _connection_status(handle: Session, root: Path | None) -> dict:
         ),
         "calibration": _calibration_status(calibration),
         "stage": try_(stage) or "failed — no reading",
-        "output root": str(root) if root is not None else f"not set up: {_info.SET_UP}",
+        "output root": str(root) if root is not None else f"not set up: {SET_UP}",
     }

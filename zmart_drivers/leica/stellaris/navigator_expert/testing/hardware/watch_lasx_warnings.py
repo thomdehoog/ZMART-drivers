@@ -31,13 +31,13 @@ POLL_S = 0.5
 
 
 def look(minutes: float) -> None:
-    from zmart_drivers.leica.stellaris.navigator_expert.procedures import answer_dialogs as lasx_dialogs
+    from zmart_drivers.leica.stellaris.navigator_expert.procedures import answer_dialogs
 
-    lasx_dialogs.pending()  # what the log said before the look starts
+    answer_dialogs.pending()  # what the log said before the look starts
     print(f"looking for {minutes:g} min; open a LAS X dialog now", flush=True)
     shown, until = None, time.monotonic() + minutes * 60
     while time.monotonic() < until:
-        dialog = lasx_dialogs.pending()
+        dialog = answer_dialogs.pending()
         if dialog != shown:
             shown = dialog
             if dialog is None:
@@ -48,30 +48,30 @@ def look(minutes: float) -> None:
                     flush=True,
                 )
                 try:
-                    windows = lasx_dialogs.lasx_windows().dialogs()
+                    windows = answer_dialogs.lasx_windows().dialogs()
                     print(
                         f"  on screen: {len(windows)} dialog window(s), buttons {[w.buttons for w in windows]}",
                         flush=True,
                     )
-                except lasx_dialogs.WindowsUnavailable as why:
+                except answer_dialogs.WindowsUnavailable as why:
                     print(f"  on screen: not found: {why}", flush=True)
         time.sleep(POLL_S)
 
 
 def answer(minutes: float) -> None:
-    from zmart_drivers.leica.stellaris.navigator_expert.procedures import answer_dialogs as lasx_dialogs
+    from zmart_drivers.leica.stellaris.navigator_expert.procedures import answer_dialogs
 
     logging.basicConfig(
         level=logging.WARNING, format="%(asctime)s %(levelname)s %(message)s"
     )
-    lasx_dialogs.keep_watching()
+    answer_dialogs.keep_watching()
     print(
         f"the driver's watcher answers OK-only warnings for {minutes:g} min", flush=True
     )
     try:
         time.sleep(minutes * 60)
     finally:
-        lasx_dialogs.stop_watching()
+        answer_dialogs.stop_watching()
 
 
 def main() -> int:

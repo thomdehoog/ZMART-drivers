@@ -29,14 +29,8 @@ from unittest.mock import patch
 import pytest
 
 import zmart_drivers.leica.stellaris.navigator_expert.procedures.readings as readers
-from zmart_drivers.leica.stellaris.navigator_expert.procedures.keep_in_view import (
-    objective_shift as shift,
-)
+from zmart_drivers.leica.stellaris.navigator_expert.procedures import keep_in_view as shift
 
-from zmart_drivers.leica.stellaris.navigator_expert import loaded_config as session_state
-from zmart_drivers.leica.stellaris.navigator_expert.driver_setup.orientation import (
-    Orientation,
-)
 from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import parsing as _readers_parsing
 
 from zmart_drivers.leica.stellaris.navigator_expert.procedures import readings as _readers
@@ -44,12 +38,10 @@ from zmart_drivers.leica.stellaris.navigator_expert.procedures import readings a
 # The ground-truth translation table (µm). Slot 1 is the reference lens.
 TRUE_T = {1: (0.0, 0.0, 0.0), 2: (50.0, -30.0, 7.0), 3: (-12.5, 4.0, -3.25)}
 
-from zmart_drivers.leica.stellaris.navigator_expert.procedures.absolute_coordinate_system import (
-    frame as _frame,
-)
+from zmart_drivers.leica.stellaris.navigator_expert.procedures import absolute_coordinate_system as _frame
 from zmart_drivers.leica.stellaris.navigator_expert.zmart_controller_plugin import procedure_menu as _procedure_menu
 
-from zmart_drivers.leica.stellaris.navigator_expert.session import Session
+from zmart_drivers.leica.stellaris.navigator_expert.methods import Session
 from zmart_drivers.leica.stellaris.navigator_expert.operations.changes import stage
 
 
@@ -274,57 +266,48 @@ def test_swap_compensation_keeps_the_viewed_point():
     """
     sim = SimScope(x=12_345.0, y=6_789.0, z_wide=90.0, z_galvo=0.0, slot=1)
     client = SimpleNamespace()
-    session_state.install(
-        client,
-        session_state.SessionConfig(
-            orientation=Orientation(), translations=dict(TRUE_T)
+
+    def fake_move_xy(c, x, y, unit="um", **_k):
+        sim.x, sim.y = float(x), float(y)
+        return {"success": True, "confirmed": True}
+
+    def fake_move_z(c, job, z, unit="um", z_mode="galvo", **_k):
+        if z_mode == "zwide":
+            sim.z_wide = float(z)
+        else:
+            sim.z_galvo = float(z)
+        return {"success": True, "confirmed": True}
+
+    with (
+        patch.object(
+            readers,
+            "get_xy",
+            side_effect=lambda c, **k: {"x_um": sim.x, "y_um": sim.y},
         ),
-    )
-    try:
+        patch.object(
+            readers,
+            "get_selected_job",
+            return_value={"Name": "Overview", "IsSelected": True},
+        ),
+        patch.object(
+            readers,
+            "get_job_settings",
+            side_effect=lambda c, j, **k: {"objective": {"slotIndex": sim.slot}},
+        ),
+        patch.object(
+            readers, "read_zwide_um", side_effect=lambda c, j, **k: sim.z_wide
+        ),
+        patch.object(stage, "move_xy", fake_move_xy),
+        patch.object(stage, "move_z", fake_move_z),
+    ):
+        viewed_before = sim.viewed_point()
+        before = shift.record_before_change(client, translations=dict(TRUE_T))
+        sim.slot = 2  # the swap itself moves nothing
+        report = shift.compensate_after_change(client, "Overview", before)
 
-        def fake_move_xy(c, x, y, unit="um", **_k):
-            sim.x, sim.y = float(x), float(y)
-            return {"success": True, "confirmed": True}
-
-        def fake_move_z(c, job, z, unit="um", z_mode="galvo", **_k):
-            if z_mode == "zwide":
-                sim.z_wide = float(z)
-            else:
-                sim.z_galvo = float(z)
-            return {"success": True, "confirmed": True}
-
-        with (
-            patch.object(
-                readers,
-                "get_xy",
-                side_effect=lambda c, **k: {"x_um": sim.x, "y_um": sim.y},
-            ),
-            patch.object(
-                readers,
-                "get_selected_job",
-                return_value={"Name": "Overview", "IsSelected": True},
-            ),
-            patch.object(
-                readers,
-                "get_job_settings",
-                side_effect=lambda c, j, **k: {"objective": {"slotIndex": sim.slot}},
-            ),
-            patch.object(
-                readers, "read_zwide_um", side_effect=lambda c, j, **k: sim.z_wide
-            ),
-            patch.object(stage, "move_xy", fake_move_xy),
-            patch.object(stage, "move_z", fake_move_z),
-        ):
-            viewed_before = sim.viewed_point()
-            before = shift.record_before_change(client)
-            sim.slot = 2  # the swap itself moves nothing
-            report = shift.compensate_after_change(client, "Overview", before)
-
-        assert report["ok"] and report["objective_changed"]
-        # z-galvo is untouched by compensation, so compare the full point:
-        assert sim.viewed_point() == pytest.approx(viewed_before)
-    finally:
-        session_state.uninstall(client)
+    assert report["ok"] and report["objective_changed"]
+    # z-galvo is untouched by compensation, so compare the full point:
+    assert sim.viewed_point() == pytest.approx(viewed_before)
 
 
 def test_zero_z_galvo_procedure_preserves_frame_z():

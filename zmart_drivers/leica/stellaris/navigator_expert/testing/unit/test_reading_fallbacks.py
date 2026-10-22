@@ -13,7 +13,7 @@ import pytest
 
 from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import prechecks
 
-from zmart_drivers.leica.stellaris.navigator_expert.dispatcher import sources
+from zmart_drivers.leica.stellaris.navigator_expert.dispatcher import read
 from zmart_drivers.leica.stellaris.navigator_expert.procedures import readings as readers
 from zmart_drivers.leica.stellaris.navigator_expert.operations.readings import reading_settings
 from zmart_drivers.leica.stellaris.navigator_expert.operations.changes import select_job as select_job_change
@@ -86,9 +86,9 @@ def test_the_idle_check_falls_back_to_the_waiting_family(use_profile, monkeypatc
 
 def test_the_first_stage_names_the_profiles_family_when_none_is_given(use_profile):
     use_profile(reading_fallback="log")
-    spec = sources.spec("xy")
+    spec = read.spec("xy")
 
-    stage, rest = sources.first_stage(spec, "direct", None)
+    stage, rest = read.first_stage(spec, "direct", None)
 
     assert stage is not None
     assert rest == "log"

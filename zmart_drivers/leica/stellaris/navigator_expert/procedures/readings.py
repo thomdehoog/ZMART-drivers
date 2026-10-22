@@ -21,13 +21,13 @@ from ..dispatcher.read import (
     derive as _derive,
     plain_or_diagnostic as _plain_or_diagnostic,
 )  # noqa: F401
-from ..primitives.direct.hardware_server import HardwareServerUnavailable
+from ..primitives.direct.client import HardwareServerUnavailable
 from ..primitives.cam_api import reads as api_reader
 from ..primitives.direct import reads as direct_reader
 from ..primitives.log import reads as log_reader
 from ..primitives.cam_api import derived
 from ..operations.readings import reading_table as capabilities
-from ..dispatcher import sources
+from ..dispatcher import read
 from ..primitives.cam_api.derived import stack_drive, stack_slices_um  # noqa: F401  re-exported, as the readers package did
 
 log = logging.getLogger(__name__)
@@ -35,12 +35,12 @@ log = logging.getLogger(__name__)
 
 def wait_for(datum, client, **keywords):
     """Wait for a reading of *datum*, asking LAS X's sources; see :func:`dispatcher.dispatcher.read`."""
-    return _door.read(sources, datum, client, **keywords)
+    return _door.read(read, datum, client, **keywords)
 
 
 def on_demand_fallback():
     """The family that answers a waited-on reading when the direct reader cannot (the profile's ``waiting_fallback``)."""
-    return sources.profile().waiting_fallback
+    return read.profile().waiting_fallback
 
 
 def on_demand_mode(datum):
@@ -51,7 +51,7 @@ def on_demand_mode(datum):
     changes, so it can still show the state from before. Pair it with
     :func:`on_demand_fallback`.
     """
-    return "direct" if sources.mode_for(datum) == "direct" else "api"
+    return "direct" if read.mode_for(datum) == "direct" else "api"
 
 
 def _routed(
@@ -66,7 +66,7 @@ def _routed(
     fallback=None,
 ):
     api_kwargs = {} if job_name is None else {"job_name": job_name}
-    fallback = sources.profile().reading_fallback if fallback is None else fallback
+    fallback = read.profile().reading_fallback if fallback is None else fallback
     reading = wait_for(
         datum,
         client,
@@ -156,7 +156,7 @@ def z_um_direct(drive, *, mode=None):
     *mode* says); None also when the hardware server cannot be reached, so
     the caller reads the job settings instead.
     """
-    mode = mode if mode is not None else sources.profile().z_mode
+    mode = mode if mode is not None else read.profile().z_mode
     if mode != "direct":
         return None
     try:
@@ -180,7 +180,7 @@ def z_um_from(settings, drive, *, client, job_name, mode=None):
     when the direct reader is used (the profile's ``z_mode``, unless *mode*
     says), else from the experiment LAS X saves.
     """
-    mode = mode if mode is not None else sources.profile().z_mode
+    mode = mode if mode is not None else read.profile().z_mode
     return derived.z_um_from_settings(settings, drive, client=client, job_name=job_name, direct=mode == "direct")
 
 

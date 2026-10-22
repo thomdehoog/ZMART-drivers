@@ -445,7 +445,7 @@ def _connect(
         log.info("limits | hermetic machine root provisioned at %s", root)
         return MockClient(latency=args.mock_latency)
     try:
-        from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api.lasx_runtime import load_lasx_api_runtime
+        from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api.client import load_lasx_api_runtime
 
         lasx_api = load_lasx_api_runtime()
     except (ImportError, ModuleNotFoundError, RuntimeError) as exc:
@@ -674,11 +674,9 @@ def embedded_ome_xml(path) -> bytes:
     path = Path(path)
     if path.is_dir():
         return (path / "OME" / "METADATA.ome.xml").read_bytes()
-    from zmart_drivers.leica.stellaris.navigator_expert.procedures.save_data import (
-        materialize,
-    )
+    from zmart_drivers.leica.stellaris.navigator_expert.procedures.save_data import ome_canonical
 
-    return materialize.extract_embedded_ome_xml(path)
+    return ome_canonical.extract_embedded_ome_xml(path)
 
 
 def selectable_job_names(jobs: list[dict]) -> list[str]:
@@ -733,9 +731,7 @@ def _record_log_selected_job_poll(
     context: dict,
 ) -> None:
     """Record the experimental log-only selected-job wait."""
-    from zmart_drivers.leica.stellaris.navigator_expert.primitives.log.log_wait import (
-        wait_for_selected_job_log,
-    )
+    from zmart_drivers.leica.stellaris.navigator_expert.primitives.log.reads import wait_for_selected_job_log
 
     started_at = _now_iso()
     result = wait_for_selected_job_log(

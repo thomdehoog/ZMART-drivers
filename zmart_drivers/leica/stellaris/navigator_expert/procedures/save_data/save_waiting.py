@@ -1,7 +1,7 @@
-"""Saving the captures that are waiting: the ``save_data`` procedure.
+"""Saving the captures that are waiting: the ``save_data`` procedure, and how this microscope saves (``IMAGE_SAVE``).
 
 Taking a picture leaves it in LAS X's cache with a note of how it was taken (a
-:class:`~..acquisition.pending_capture.PendingCapture`). This procedure reads
+:class:`~..acquire.PendingCapture`). This procedure reads
 each waiting picture from the cache and writes it to disk as an OME-Zarr image
 store, with its max projection when it has several planes, and a log of what
 was asked and done. It never clears LAS X's cache: that is the ``clear_cache``
@@ -10,6 +10,8 @@ picture each saved capture came from, so that ``clear_cache`` knows what it may
 let go of.
 
 A capture that cannot be saved stays waiting, so a later call can try again.
+
+How a capture is saved: with the measured orientation, and with which projection.
 
 Author: Thom de Hoog, Center for Microscopy and Image Analysis (ZMB),
 University of Zurich (thom.dehoog@zmb.uzh.ch, thomdehoog@gmail.com).
@@ -21,27 +23,25 @@ import logging
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
-
 from ...driver_setup import orientation as _orientation
-from .save_settings import IMAGE_SAVE
 from .. import readings as _readers
-from ... import loaded_config as _session_state
-from ...session import Session, require_open
-from . import command_log as _log
+from . import naming as _log
 from . import save as _save
 from zmart_drivers import metadata_convention as convention
+from dataclasses import dataclass
+
 
 log = logging.getLogger(__name__)
 
 
-def save_waiting(handle: Session, label: str | None = None) -> list[dict]:
+def save_waiting(handle, label: str | None = None) -> list[dict]:
     """Save the captures taken and not yet saved; answer one record for each.
 
     With *label*, only the capture of that name is saved. Each record lists the
     files written, which plane is in which file and where on the sample it was
     taken. A capture that cannot be saved stays waiting and the error is raised.
     """
-    require_open(handle)
+    handle.require_open()
     chosen = [c for c in handle.unsaved if label is None or c.label == label]
     if label is not None and not chosen:
         raise ValueError(f"no capture waiting to be saved is labelled {label!r}")
@@ -223,20 +223,18 @@ def _controller_version() -> str | None:
         return None
 
 
-def _loaded_orientation(handle: Session):
+def _loaded_orientation(handle):
     """The camera-to-stage turn loaded for this connection (identity if none).
 
-    Read from the per-connection session registry the driver populated at
-    connect, so every saved image in a session uses the same orientation the
-    connection loaded — rather than each save re-reading the file.
+    The session holds what was loaded at connect, so every saved image in a
+    session uses the same orientation -- rather than each save re-reading the
+    file.
     """
-    loaded = _session_state.get(handle.client)
-    if loaded is not None:
-        return loaded.orientation
-    # No per-connection state for this handle (built without a ZmartControllerPlugin,
-    # or its registry entry was uninstalled). Fall back to reading the file
-    # fresh — loudly, because this re-read can differ from what the connection
-    # loaded and can differ from what the connection loaded.
+    if handle.orientation is not None:
+        return handle.orientation
+    # A session made without connecting holds none. Fall back to reading the
+    # file fresh -- loudly, because this re-read can differ from what the
+    # connection loaded.
     log.warning(
         "no per-connection orientation is installed for this handle; reading "
         "orientation.json fresh for this save"
@@ -244,7 +242,7 @@ def _loaded_orientation(handle: Session):
     return _orientation.rig_orientation()
 
 
-def _where_the_planes_are(handle: Session, at: dict, job: str, plane_z: list[int]):
+def _where_the_planes_are(handle, at: dict, job: str, plane_z: list[int]):
     """Answer, per plane number in z, where on the sample it was captured.
 
     In the frame :func:`set_xyz` takes, so a position handed back can be
@@ -295,3 +293,24 @@ def _when(seconds: float | None) -> str | None:
     if not isinstance(seconds, (int, float)):
         return None
     return datetime.fromtimestamp(seconds, tz=timezone.utc).isoformat()
+
+
+@dataclass(frozen=True)
+class ImageSaveProfile:
+    """Default image persistence policy.
+
+    Normal saves apply the active camera-to-stage orientation. The orientation
+    measurement is the only workflow that explicitly requests raw pixels.
+
+    The pixels are collected from LAS X's own cache, read as the picture is
+    taken; LAS X's AutoSave is not used, so it stays off (Thom, 2026-10-14).
+    """
+
+    apply_orientation: bool = True
+    #: What a capture with more than one plane also gets, in
+    #: ``<acquisition>/projections`` (``output.save.PROJECTIONS``): its
+    #: ``"max"`` projection over z, or ``"none"``.
+    projection: str = "max"
+
+
+IMAGE_SAVE = ImageSaveProfile()

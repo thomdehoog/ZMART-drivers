@@ -312,7 +312,7 @@ def load_rig_orientation() -> tuple[Any, dict]:
     with new readiness evidence. Invalid or disabled configuration returns the
     identity mapping with an explicit not-ready record.
     """
-    from ...procedures.save_data.save_settings import IMAGE_SAVE
+    from ...procedures.save_data.save_waiting import IMAGE_SAVE
     from ..store import MACHINE
 
     identity = Orientation()

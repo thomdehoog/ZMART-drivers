@@ -24,16 +24,14 @@ from state_tree_stand_in import StandInNodes, answer_json_read
 
 from zmart_drivers.leica.stellaris.navigator_expert.operations.readings import reading_table as capabilities
 
-from zmart_drivers.leica.stellaris.navigator_expert.procedures.keep_in_view import (
-    compensated_changes as commands_comp,
-)
+from zmart_drivers.leica.stellaris.navigator_expert.procedures import keep_in_view as commands_comp
 from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import prechecks
 from zmart_drivers.leica.stellaris.navigator_expert.procedures import readings as readers
 from zmart_drivers.leica.stellaris.navigator_expert.primitives.direct import (
     reads as direct_reader,
     state_tree,
 )
-from zmart_drivers.leica.stellaris.navigator_expert.primitives.direct import hardware_server
+from zmart_drivers.leica.stellaris.navigator_expert.primitives.direct import client as hardware_server
 from zmart_drivers.leica.stellaris.navigator_expert.operations.changes import acquire as acquire_change
 from zmart_drivers.leica.stellaris.navigator_expert.operations.changes import select_job as select_job_change
 from zmart_drivers.leica.stellaris.navigator_expert.operations.changes import stage

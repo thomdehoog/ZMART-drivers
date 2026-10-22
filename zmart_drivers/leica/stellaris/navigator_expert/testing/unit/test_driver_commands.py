@@ -36,12 +36,8 @@ from zmart_drivers.leica.stellaris.navigator_expert.driver_setup import (
 from zmart_drivers.leica.stellaris.navigator_expert.driver_setup import (
     store as _machine,
 )
-from zmart_drivers.leica.stellaris.navigator_expert.procedures.save_data import (
-    command_log as _log,
-)
-from zmart_drivers.leica.stellaris.navigator_expert.procedures.clear_cache import (
-    release as _release,
-)
+from zmart_drivers.leica.stellaris.navigator_expert.procedures.save_data import naming as _log
+from zmart_drivers.leica.stellaris.navigator_expert.procedures.clear_cache import clear as _release
 from zmart_drivers.leica.stellaris.navigator_expert.procedures.save_data import (
     save_waiting as _save_waiting,
 )
@@ -51,24 +47,18 @@ from zmart_drivers.leica.stellaris.navigator_expert.procedures.save_data import 
 
 from zmart_drivers.leica.stellaris.navigator_expert.procedures import acquire as _acquisition
 
-from zmart_drivers.leica.stellaris.navigator_expert.procedures.keep_in_view import (
-    compensated_changes as _commands_comp,
-)
-from zmart_drivers.leica.stellaris.navigator_expert.procedures.absolute_coordinate_system import (
-    frame as _frame,
-)
+from zmart_drivers.leica.stellaris.navigator_expert.procedures import keep_in_view as _commands_comp
+from zmart_drivers.leica.stellaris.navigator_expert.procedures import absolute_coordinate_system as _frame
 from zmart_drivers.leica.stellaris.navigator_expert.zmart_controller_plugin import info as _controller_info
 from zmart_drivers.leica.stellaris.navigator_expert.zmart_controller_plugin import procedure_menu as _procedure_menu
 from zmart_drivers.leica.stellaris.navigator_expert.procedures import state as _state_record
 
-from zmart_drivers.leica.stellaris.navigator_expert import session as _info
 from zmart_drivers.leica.stellaris.navigator_expert.procedures import readings as _readers
 
 from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import client as _connect_module
-from zmart_drivers.leica.stellaris.navigator_expert import loaded_config as _session_state
 from zmart_drivers.leica.stellaris.navigator_expert.methods import DEFAULT_CONNECTION, Microscope
 from zmart_drivers.leica.stellaris.navigator_expert.zmart_controller_plugin.zmart_controller_plugin import ZmartControllerPlugin
-from zmart_drivers.leica.stellaris.navigator_expert.session import Session
+from zmart_drivers.leica.stellaris.navigator_expert.methods import Session
 
 
 def answering_client():
@@ -206,7 +196,7 @@ from zmart_drivers.leica.stellaris.navigator_expert.driver_setup.origin import (
 )
 from zmart_drivers.leica.stellaris.navigator_expert.operations.changes import acquire as acquire_change
 from zmart_drivers.leica.stellaris.navigator_expert.driver_setup.limits import limit_rules
-from zmart_drivers.leica.stellaris.navigator_expert.procedures.save_data import save_settings
+from zmart_drivers.leica.stellaris.navigator_expert.procedures.save_data import save_waiting as save_settings
 from zmart_drivers.leica.stellaris.navigator_expert.operations.changes import stage
 
 
@@ -837,7 +827,7 @@ class TestAcquire(unittest.TestCase):
         """Where this microscope saves is set up once and said in ``setup``, not asked per capture."""
         with tempfile.TemporaryDirectory() as tmp:
             h = _handle(data_location=Path(tmp))
-            with patch.object(_info, "selected_job_name", return_value="Overview"):
+            with patch.object(Session, "selected_job_name", return_value="Overview"):
                 info = _controller_info.get_info(h)
             self.assertNotIn("output_root", info)
             self.assertTrue(info["setup"]["data_location"]["done"])
@@ -914,7 +904,7 @@ class TestAcquire(unittest.TestCase):
             # Where to save is otherwise this microscope's set-up data location.
             if output_root is not None:
                 standing_in.enter_context(
-                    patch.object(_info, "output_root", return_value=output_root)
+                    patch.object(Session, "output_root", return_value=output_root)
                 )
             yield calls
 
@@ -963,8 +953,8 @@ class TestAcquire(unittest.TestCase):
         )
         patches = _patch_position(x_um=1_000.0, y_um=500.0, z_wide_um=100.0)
         with (
-            patch.object(_info, "selected_job_name", return_value="Overview"),
-            patch.object(_info, "output_root", return_value=Path("/runs")),
+            patch.object(Session, "selected_job_name", return_value="Overview"),
+            patch.object(Session, "output_root", return_value=Path("/runs")),
             patch.object(_readers, "ping", return_value=True),
             patches[0],
             patches[1],
@@ -2099,7 +2089,7 @@ class TestGetInfoReportsNoPositions(unittest.TestCase):
         h = _handle()
         h.connection["output_root"] = "/tmp/zmart-test"
         with (
-            patch.object(_info, "selected_job_name", return_value="Overview"),
+            patch.object(Session, "selected_job_name", return_value="Overview"),
         ):
             info = _controller_info.get_info(h)
         self.assertNotIn("tile_positions", info)
@@ -2393,22 +2383,16 @@ class TestDriverSetupReadiness(unittest.TestCase):
         self,
     ):
         h = _handle(origin=_origin(objective={"slotIndex": 1, "name": "10x"}))
-        _session_state.install(
-            h.client,
-            _session_state.SessionConfig(
-                orientation=_orientation.Orientation(rotate_deg=0),
-                translations={1: (0.0, 0.0, 0.0), 2: (1.0, 2.0, 3.0)},
-                calibration_name="water_lens_setup",
-                orientation_info={"loaded": True, "measured": True, "rotate_deg": 0},
-                calibration_info={
-                    "loaded": True,
-                    "name": "water_lens_setup",
-                    "slots": [1, 2],
-                    "measured_slots": [1, 2],
-                },
-            ),
-        )
-        self.addCleanup(_session_state.uninstall, h.client)
+        h.orientation = _orientation.Orientation(rotate_deg=0)
+        h.translations = {1: (0.0, 0.0, 0.0), 2: (1.0, 2.0, 3.0)}
+        h.calibration_name = "water_lens_setup"
+        h.orientation_info = {"loaded": True, "measured": True, "rotate_deg": 0}
+        h.calibration_info = {
+                "loaded": True,
+                "name": "water_lens_setup",
+                "slots": [1, 2],
+                "measured_slots": [1, 2],
+            }
 
         ready = _state_record.setup_readiness(
             h, {"slotIndex": 2, "name": "20x"}, self.measured_limits
@@ -2437,22 +2421,16 @@ class TestDriverSetupReadiness(unittest.TestCase):
         compensate objective changes with the repository's placeholder numbers.
         """
         h = _handle(origin=_origin(objective={"slotIndex": 1, "name": "10x"}))
-        _session_state.install(
-            h.client,
-            _session_state.SessionConfig(
-                orientation=_orientation.Orientation(rotate_deg=0),
-                translations={1: (0.0, 0.0, 0.0), 2: (-6.5, 21.5, -3.7)},
-                calibration_name="water_lens_setup",
-                orientation_info={"loaded": True, "measured": True, "rotate_deg": 0},
-                calibration_info={
-                    "loaded": True,
-                    "name": "water_lens_setup",
-                    "slots": [1, 2],
-                    "measured_slots": [],  # seeded from the bundled placeholder
-                },
-            ),
-        )
-        self.addCleanup(_session_state.uninstall, h.client)
+        h.orientation = _orientation.Orientation(rotate_deg=0)
+        h.translations = {1: (0.0, 0.0, 0.0), 2: (-6.5, 21.5, -3.7)}
+        h.calibration_name = "water_lens_setup"
+        h.orientation_info = {"loaded": True, "measured": True, "rotate_deg": 0}
+        h.calibration_info = {
+                "loaded": True,
+                "name": "water_lens_setup",
+                "slots": [1, 2],
+                "measured_slots": [],  # seeded from the bundled placeholder
+            }
 
         setup = _state_record.setup_readiness(
             h, {"slotIndex": 2, "name": "20x"}, self.measured_limits
@@ -2467,16 +2445,10 @@ class TestDriverSetupReadiness(unittest.TestCase):
     def test_calibration_info_without_provenance_field_fails_closed(self):
         """An info dict lacking measured_slots must count as unmeasured."""
         h = _handle(origin=_origin(objective={"slotIndex": 1, "name": "10x"}))
-        _session_state.install(
-            h.client,
-            _session_state.SessionConfig(
-                orientation=_orientation.Orientation(rotate_deg=0),
-                translations={1: (0.0, 0.0, 0.0)},
-                orientation_info={"loaded": True, "measured": True, "rotate_deg": 0},
-                calibration_info={"loaded": True, "slots": [1]},
-            ),
-        )
-        self.addCleanup(_session_state.uninstall, h.client)
+        h.orientation = _orientation.Orientation(rotate_deg=0)
+        h.translations = {1: (0.0, 0.0, 0.0)}
+        h.orientation_info = {"loaded": True, "measured": True, "rotate_deg": 0}
+        h.calibration_info = {"loaded": True, "slots": [1]}
 
         setup = _state_record.setup_readiness(
             h, {"slotIndex": 1, "name": "10x"}, self.measured_limits
@@ -2487,16 +2459,10 @@ class TestDriverSetupReadiness(unittest.TestCase):
 
     def test_placeholder_orientation_is_not_ready_even_when_rotation_is_zero(self):
         h = _handle(origin=_origin(objective={"slotIndex": 1, "name": "10x"}))
-        _session_state.install(
-            h.client,
-            _session_state.SessionConfig(
-                orientation=_orientation.Orientation(rotate_deg=0),
-                translations={1: (0.0, 0.0, 0.0)},
-                orientation_info={"loaded": True, "measured": False, "rotate_deg": 0},
-                calibration_info={"loaded": True, "slots": [1]},
-            ),
-        )
-        self.addCleanup(_session_state.uninstall, h.client)
+        h.orientation = _orientation.Orientation(rotate_deg=0)
+        h.translations = {1: (0.0, 0.0, 0.0)}
+        h.orientation_info = {"loaded": True, "measured": False, "rotate_deg": 0}
+        h.calibration_info = {"loaded": True, "slots": [1]}
 
         setup = _state_record.setup_readiness(
             h, {"slotIndex": 1}, self.measured_limits
@@ -2507,16 +2473,10 @@ class TestDriverSetupReadiness(unittest.TestCase):
 
     def test_fallback_limits_are_part_of_the_single_driver_readiness_verdict(self):
         h = _handle(origin=_origin(objective={"slotIndex": 1, "name": "10x"}))
-        _session_state.install(
-            h.client,
-            _session_state.SessionConfig(
-                orientation=_orientation.Orientation(rotate_deg=0),
-                translations={1: (0.0, 0.0, 0.0)},
-                orientation_info={"loaded": True, "measured": True, "rotate_deg": 0},
-                calibration_info={"loaded": True, "slots": [1], "measured_slots": [1]},
-            ),
-        )
-        self.addCleanup(_session_state.uninstall, h.client)
+        h.orientation = _orientation.Orientation(rotate_deg=0)
+        h.translations = {1: (0.0, 0.0, 0.0)}
+        h.orientation_info = {"loaded": True, "measured": True, "rotate_deg": 0}
+        h.calibration_info = {"loaded": True, "slots": [1], "measured_slots": [1]}
 
         setup = _state_record.setup_readiness(
             h,

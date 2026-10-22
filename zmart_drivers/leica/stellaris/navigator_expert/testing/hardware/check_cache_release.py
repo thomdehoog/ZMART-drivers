@@ -151,9 +151,7 @@ def main() -> int:
     from zmart_controller import ZmartController
 
     from zmart_drivers.leica.stellaris.navigator_expert.zmart_controller_plugin.zmart_controller_plugin import ZmartControllerPlugin as driver
-    from zmart_drivers.leica.stellaris.navigator_expert.procedures.clear_cache import (
-        release as lasx_cache_release,
-    )
+    from zmart_drivers.leica.stellaris.navigator_expert.procedures.clear_cache import clear as lasx_cache_release
     from zmart_drivers.leica.stellaris.navigator_expert.procedures.save_data import collect as container
     from zmart_drivers.leica.stellaris.navigator_expert.procedures.save_data import (
         save_waiting as _saving,

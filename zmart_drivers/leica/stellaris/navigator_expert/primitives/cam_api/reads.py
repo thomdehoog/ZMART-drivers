@@ -46,7 +46,7 @@ import time
 import xml.etree.ElementTree as ET
 
 from . import derived
-from .delivery import deliver
+from .transfer import deliver
 from . import waiting
 
 log = logging.getLogger(__name__)

@@ -31,12 +31,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from .hardware_server import (
-    HardwareServerUnavailable,
-    connected_server,
-    connections,
-    forget_connection,
-)
+from .client import HardwareServerUnavailable, connected_server, connections, forget_connection
 
 SEQUENCE_PATH = ("Acquire", "ATL", "CurrentSequenceList")
 STAGE_PATHS = {"x": ("Stage", "PositionX"), "y": ("Stage", "PositionY")}

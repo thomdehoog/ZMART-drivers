@@ -18,7 +18,7 @@ from functools import partial
 from typing import Any
 
 from ...dispatcher.dispatch import make_log_entry
-from ...primitives.cam_api.request import request_of
+from ...primitives.cam_api.transfer import request_of
 from ...procedures.save_data.product import AcquisitionResult
 from ...procedures import readings as readers
 from ...primitives.cam_api.profile import CommandProfile
