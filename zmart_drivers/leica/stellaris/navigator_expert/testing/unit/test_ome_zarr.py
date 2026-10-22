@@ -306,13 +306,36 @@ class TestTheStore:
         assert "type" not in multiscale
         assert "one level" in multiscale["metadata"]["description"]
 
+    def test_it_follows_the_metadata_convention(self, hires, tmp_path):
+        """Everything the convention asks of a store, as check_store reads it."""
+        from zmart_drivers import metadata_convention as convention
+
+        root, _ = hires
+        notes = convention.Notes(
+            controller_state={"changeable": {}, "observed": {}},
+            capture_record={key: None for key in convention.CAPTURE_RECORD_KEYS},
+        )
+
+        saved = saving.save(
+            None,
+            acquisition_of("HiRes"),
+            tmp_path / "out",
+            Naming(stem="high-res_000001_A1"),
+            cache_root=root,
+            placement=at(0.0, 0.0, {0: 0.0}),
+            orientation=Orientation(),
+            notes=notes,
+        )
+
+        assert convention.check_store(saved.image_paths[PlaneIndex(0, 0, 0)]) == []
+
     def test_it_says_which_store_agreement_it_follows(self, hires, tmp_path):
-        """ZMART-controller docs/the_store, version 1."""
+        """The ZMART metadata convention, version 1."""
         root, _ = hires
 
         saved = save_as_zarr(root, tmp_path, "HiRes", placement=at(0.0, 0.0, {0: 0.0}))
 
-        assert attributes(saved.image_paths[PlaneIndex(0, 0, 0)])["zmart"] == {"store": "1"}
+        assert attributes(saved.image_paths[PlaneIndex(0, 0, 0)])["zmart"] == {"metadata_convention": "1"}
 
     def test_a_single_plane_says_its_z_scale_is_a_placeholder(self, hires, tmp_path):
         root, _ = hires

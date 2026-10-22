@@ -149,9 +149,15 @@ def get_state(handle: Session) -> dict:
             "y": float(geometry["tile_h_um"]),
             "unit": "um",
         }
+        image_size_px, pixel_size_um = _as_saved(
+            (int(geometry["pixels_x"]), int(geometry["pixels_y"])),
+            (pixel_x, pixel_y),
+            _saved_orientation(handle),
+        )
     except (KeyError, TypeError, ValueError):
         pixel_size = None
         frame_size = None
+        image_size_px = pixel_size_um = None
     active_objective = settings.get("objective")
     normal, autofocus = job_catalog(handle)
     limits = _gate.describe(handle.client)
@@ -171,6 +177,10 @@ def get_state(handle: Session) -> dict:
             "active_objective": dict(active_objective or {}),
             "pixel_size": pixel_size,
             "frame_size": frame_size,
+            # The controller's own keys: the image size and pixel size of these
+            # settings, as a picture is saved.
+            "image_size_px": image_size_px,
+            "pixel_size_um": pixel_size_um,
             "jobs": normal,
             "autofocus_jobs": autofocus,
             # Which function-limits file governs this session (evidence, not
@@ -185,6 +195,21 @@ def get_state(handle: Session) -> dict:
             "unconfirmed": list(handle.unconfirmed),
         },
     }
+
+
+def _as_saved(size_px, pixel_size_um, orientation) -> tuple[list, list]:
+    """The image size and pixel size as a picture is saved: a quarter turn swaps width and height."""
+    if orientation.swaps_axes:
+        size_px, pixel_size_um = size_px[::-1], pixel_size_um[::-1]
+    return list(size_px), list(pixel_size_um)
+
+
+def _saved_orientation(handle: Session):
+    """The turn this connection applies to the pixels it saves (none when it has none)."""
+    from ..driver_setup.orientation import Orientation
+
+    loaded = _session_state.get(handle.client)
+    return loaded.orientation if loaded is not None else Orientation()
 
 
 def set_state(handle: Session, state: dict) -> dict:

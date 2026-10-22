@@ -1,8 +1,8 @@
 # Plan: everything about a capture in its OME-Zarr store
 
 A capture's OME-Zarr store is the complete record of that capture: its pixels and
-everything that says how they were made. The Leica driver writes it as the agreement in
-ZMART-controller [`docs/the_store`](https://github.com/ZMB-UZH/ZMART-controller/blob/release-candidate/docs/the_store/README.md)
+everything that says how they were made. The Leica driver writes it as the ZMART
+metadata convention, [`zmart_drivers/metadata_convention`](../zmart_drivers/metadata_convention/README.md),
 says; the interface, the analysis and the viewer take what they need from it. The files
 beside it (the log, LAS X's description, `summary.json`) stay as extras for debugging;
 the store does not depend on them.
@@ -35,7 +35,7 @@ Unchanged: the store's root is the image, its pixels at `0`, the XML at
 
 ## 2. The Leica driver
 
-What goes into the store, layer by layer (the agreement's sections in brackets):
+What goes into the store, layer by layer (the convention's sections in brackets):
 
 - **Layer 1** (3): `metadata` saying the store has one level and, for a single plane, that
   its z scale is a placeholder; no `type` while there is one level; `omero.rdefs` and per
@@ -122,7 +122,7 @@ setting.
 
 ## 5. Order
 
-1. The agreement, in ZMART-controller `docs/the_store`.
+1. The convention, in ZMART-drivers `zmart_drivers/metadata_convention`.
 2. The Leica driver writes it: drivers 0.7.0b4.
 3. The readers take what they need from the store (3): analysis 0.6.0rc5, viewer 0.5.0rc9,
    interface 0.1.0rc4, and the for-coders template.

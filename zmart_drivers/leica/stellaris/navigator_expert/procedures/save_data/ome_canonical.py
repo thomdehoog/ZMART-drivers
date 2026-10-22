@@ -2,10 +2,10 @@
 
 Vendor OME is parsed as input/provenance. The files written by ``save``
 use this module as the output metadata contract: the store's description
-follows ZMART-controller's agreement (``docs/the_store``). Layer 2 is the
-OME data model; layer 3 holds only what the controller's contract defines,
-under the agreement's namespaces; layer 4 holds what is LAS X's or this
-driver's own.
+follows the ZMART metadata convention (``zmart_drivers.metadata_convention``).
+This module writes the OME data model from what LAS X described; the
+convention writes ZMART's annotations, and LAS X's own goes in its vendor
+layer.
 
 Contract with ``ome.py``: that module owns TIFF tag-270 access
 (:func:`ome.read_tiff_tag_270`) and the validate/patch side; this module
@@ -16,14 +16,14 @@ function. The live settings read follows the one rule in
 
 from __future__ import annotations
 
-import json
 import logging
 import uuid
 import xml.etree.ElementTree as ET
-from dataclasses import dataclass, replace
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
+from zmart_drivers import metadata_convention as convention
 from ...primitives.capture import tiff_tag as _ome
 from ...primitives.capture.product import (
     AcquisitionMetadata,
@@ -39,16 +39,8 @@ OME_NS = "http://www.openmicroscopy.org/Schemas/OME/2016-06"
 XSI_NS = "http://www.w3.org/2001/XMLSchema-instance"
 MICROMETER = "\u00b5m"
 
-#: The version of ZMART-controller's store agreement (docs/the_store) this driver writes.
-STORE_VERSION = "1"
-#: The agreement's namespaces: its version is part of each, so it travels with the XML.
-STORE_NS = f"https://github.com/ZMB-UZH/ZMART-controller/the_store/{STORE_VERSION}/"
-CONTROLLER_STATE_NS = STORE_NS + "controller-state"
-CAPTURE_RECORD_NS = STORE_NS + "capture-record"
-IMAGE_FRAME_NS = STORE_NS + "image-frame"
-ACTUATOR_READINGS_NS = STORE_NS + "actuator-readings"
-#: Layer 4: what is LAS X's or this driver's own.
-VENDOR_NS = STORE_NS + "vendor/leica-lasx"
+#: The name LAS X's own description and facts go under (the convention's vendor layer).
+VENDOR = "leica-lasx"
 
 INSTRUMENT_ID = "Instrument:0"
 OBJECTIVE_ID = "Objective:0"
@@ -59,43 +51,17 @@ ET.register_namespace("", OME_NS)
 ET.register_namespace("xsi", XSI_NS)
 
 
-@dataclass(frozen=True)
-class StoreNotes:
-    """What a store says besides its pixels and the OME fields: layers 3 and 4.
-
-    ``controller_state`` is ``get_state()`` whole. ``capture_record`` is the
-    capture in the controller's words (the agreement's keys). ``pixels_to_position``
-    is the 2x2 turn or mirror already applied to the pixels. ``vendor`` holds
-    this driver's and LAS X's own facts, and ``vendor_descriptions`` LAS X's
-    descriptions of the image, each as its text, byte for byte.
-    ``description`` is what LAS X calls the image, its OME ``Description``.
-    """
-
-    controller_state: dict | None = None
-    capture_record: dict | None = None
-    pixels_to_position: tuple = ((1, 0), (0, 1))
-    vendor: dict | None = None
-    vendor_descriptions: tuple[str, ...] = ()
-    description: str | None = None
-
-    def as_json(self) -> dict:
-        """Everything but the vendor's descriptions, as one JSON object, for the side file."""
-        return {
-            "controller_state": self.controller_state,
-            "capture_record": self.capture_record,
-            "pixels_to_position": [list(row) for row in self.pixels_to_position],
-            "vendor": self.vendor,
-        }
-
-
 def image_xml(
-    metadata: AcquisitionMetadata, *, image_name: str, notes: StoreNotes | None = None
+    metadata: AcquisitionMetadata,
+    *,
+    image_name: str,
+    notes: convention.Notes | None = None,
 ) -> bytes:
     """OME XML for a whole capture whose pixels live elsewhere (an OME-Zarr store).
 
     Every channel and every plane, with the pixels declared absent from the
     XML itself (``MetadataOnly``): the store beside it holds them. With
-    *notes*, layers 3 and 4 of the agreement as well.
+    *notes*, the convention's annotations as well.
     """
     return _ome_xml(
         metadata,
@@ -143,7 +109,7 @@ def _ome_xml(
     channels: tuple[ChannelMetadata, ...],
     tiff_entries: list[tuple[int, int, int, str]],
     planes: list[tuple[PlaneIndex, PlaneMetadata]] = (),
-    notes: StoreNotes | None = None,
+    notes: convention.Notes | None = None,
 ) -> bytes:
     """OME 2016-06 XML for the planes named, in the order the schema requires.
 
@@ -165,8 +131,8 @@ def _ome_xml(
     image = ET.SubElement(root, _tag("Image"), {"ID": "Image:0", "Name": image_name})
     if metadata.acquisition_date:
         ET.SubElement(image, _tag("AcquisitionDate")).text = metadata.acquisition_date
-    if notes is not None and notes.description:
-        ET.SubElement(image, _tag("Description")).text = notes.description
+    if notes is not None and notes.image_description:
+        ET.SubElement(image, _tag("Description")).text = notes.image_description
     if instrument is not None:
         ET.SubElement(image, _tag("InstrumentRef"), {"ID": INSTRUMENT_ID})
         objective = instrument.objective
@@ -226,13 +192,17 @@ def _ome_xml(
     # StructuredAnnotations block AFTER Image in the OME element.
     annotations = ET.Element(_tag("StructuredAnnotations"))
     for ref, plane in readings.items():
-        _append_map(annotations, ref, ACTUATOR_READINGS_NS, plane.actuators)
+        convention.append_map(
+            annotations, ref, convention.ACTUATOR_READINGS, plane.actuators
+        )
     if notes is not None:
-        _append_notes(annotations, image, notes)
+        convention.append_notes(annotations, image, notes)
     if metadata.annotations:
-        ref = "Annotation:leica-lasx-facts"
-        ET.SubElement(image, _tag("AnnotationRef"), {"ID": ref})
-        _append_map(annotations, ref, VENDOR_NS, metadata.annotations)
+        ref = f"Annotation:{VENDOR}-highlights"
+        convention.reference(image, ref)
+        convention.append_map(
+            annotations, ref, convention.vendor_namespace(VENDOR), metadata.annotations
+        )
     if len(annotations):
         root.append(annotations)
 
@@ -345,61 +315,9 @@ def _append_plane(
     element = ET.SubElement(pixels, _tag("Plane"), attrs)
     if not plane.actuators:
         return None
-    ref = f"Annotation:actuator-readings-t{index.t}-z{index.z}"
-    ET.SubElement(element, _tag("AnnotationRef"), {"ID": ref})
+    ref = convention.actuator_readings_id(index.t, index.z)
+    convention.reference(element, ref)
     return ref
-
-
-def _append_notes(
-    annotations: ET.Element, image: ET.Element, notes: StoreNotes
-) -> None:
-    """Layers 3 and 4: each annotation in its namespace, referenced from the Image."""
-    texts = [
-        (CONTROLLER_STATE_NS, "controller-state", notes.controller_state),
-        (CAPTURE_RECORD_NS, "capture-record", notes.capture_record),
-        (VENDOR_NS, "leica-lasx-driver", notes.vendor),
-    ]
-    for namespace, name, value in texts:
-        if value is not None:
-            _append_comment(
-                annotations, image, f"Annotation:{name}", namespace, _json(value)
-            )
-    frame = [("pixels", json.dumps([list(row) for row in notes.pixels_to_position]))]
-    ET.SubElement(image, _tag("AnnotationRef"), {"ID": "Annotation:image-frame"})
-    _append_map(annotations, "Annotation:image-frame", IMAGE_FRAME_NS, frame)
-    for number, description in enumerate(notes.vendor_descriptions):
-        _append_comment(
-            annotations,
-            image,
-            f"Annotation:leica-lasx-description-{number}",
-            VENDOR_NS,
-            description,
-        )
-
-
-def _append_comment(
-    annotations: ET.Element, image: ET.Element, ref: str, namespace: str, text: str
-) -> None:
-    ET.SubElement(image, _tag("AnnotationRef"), {"ID": ref})
-    comment = ET.SubElement(
-        annotations, _tag("CommentAnnotation"), {"ID": ref, "Namespace": namespace}
-    )
-    ET.SubElement(comment, _tag("Value")).text = text
-
-
-def _append_map(annotations: ET.Element, ref: str, namespace: str, pairs) -> None:
-    made = ET.SubElement(
-        annotations, _tag("MapAnnotation"), {"ID": ref, "Namespace": namespace}
-    )
-    value = ET.SubElement(made, _tag("Value"))
-    for key, text in pairs:
-        ET.SubElement(value, _tag("M"), {"K": key}).text = (
-            _num(text) if isinstance(text, float) else str(text)
-        )
-
-
-def _json(value) -> str:
-    return json.dumps(value, ensure_ascii=True, default=str, sort_keys=True)
 
 
 def _channel_attrs(channel: ChannelMetadata) -> dict[str, str]:

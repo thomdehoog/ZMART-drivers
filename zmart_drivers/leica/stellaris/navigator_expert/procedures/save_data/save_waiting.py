@@ -29,7 +29,7 @@ from ...session import loaded_config as _session_state
 from ...session.handle import Session, require_open
 from . import command_log as _log
 from . import save as _save
-from .ome_canonical import StoreNotes
+from zmart_drivers import metadata_convention as convention
 
 log = logging.getLogger(__name__)
 
@@ -180,11 +180,11 @@ def save_pending(
     return record, saved
 
 
-def store_notes(pending) -> StoreNotes:
+def store_notes(pending) -> convention.Notes:
     """What the store says about a capture besides its pixels, from the note taken at the capture.
 
-    The capture record is in the keys of ZMART-controller's store agreement
-    (docs/the_store); what is this driver's own (how LAS X answered, the
+    The capture record is in the keys of the ZMART metadata convention
+    (``zmart_drivers.metadata_convention``); what is this driver's own (how LAS X answered, the
     changes it could not confirm) goes with the rest of the driver's own facts.
     """
     noted = pending.state or {}
@@ -206,10 +206,10 @@ def store_notes(pending) -> StoreNotes:
         "answered": getattr(pending.acq, "command_result", None),
         "unconfirmed": list(pending.unconfirmed),
     }
-    return StoreNotes(
+    return convention.Notes(
         controller_state=noted.get("controller_state"),
         capture_record=record,
-        vendor=vendor,
+        vendor_facts=vendor,
     )
 
 

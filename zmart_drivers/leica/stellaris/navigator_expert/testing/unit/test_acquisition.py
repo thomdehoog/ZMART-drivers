@@ -26,9 +26,7 @@ import zarr
 
 from zmart_drivers.leica.stellaris.navigator_expert.procedures.save_data import save as saving
 from zmart_drivers.leica.stellaris.navigator_expert.procedures.save_data import saved_acquisition
-from zmart_drivers.leica.stellaris.navigator_expert.procedures.save_data.ome_canonical import (
-    StoreNotes,
-)
+from zmart_drivers.metadata_convention import Notes
 from zmart_drivers.leica.stellaris.navigator_expert.primitives.capture import product
 from zmart_drivers.leica.stellaris.navigator_expert.driver_setup.orientation import (
     Orientation,
@@ -462,16 +460,16 @@ class TestSave:
         naming,
     ):
         """The controller state and the capture record travel inside the image, in its OME-XML."""
-        notes = StoreNotes(
+        notes = Notes(
             controller_state={"changeable": {"job": "Overview"}, "observed": {}},
             capture_record={"position_label": "000003", "acquisition_type": "overview-scan"},
-            vendor={"hardware": {"Microscope": {"name": "DM Manual-6"}}},
+            vendor_facts={"hardware": {"Microscope": {"name": "DM Manual-6"}}},
         )
 
         saved = _save(successful_acq, tmp_path / "run_000001", naming, notes=notes)
 
         embedded = _store_xml(next(iter(saved.image_paths.values())))
-        store = "https://github.com/ZMB-UZH/ZMART-controller/the_store/1/"
+        store = "https://github.com/ZMB-UZH/ZMART-drivers/metadata_convention/1/"
         for namespace in ("controller-state", "capture-record", "image-frame"):
             assert f'Namespace="{store}{namespace}"' in embedded
         assert f'Namespace="{store}vendor/leica-lasx"' in embedded
@@ -562,10 +560,10 @@ class TestSave:
         # check never silently skips.
         from ome_types import from_xml
 
-        notes = StoreNotes(
+        notes = Notes(
             controller_state={"changeable": {}, "observed": {}},
             capture_record={"position_label": "000003"},
-            vendor={"software": {"api": "navigator-expert"}},
+            vendor_facts={"software": {"api": "navigator-expert"}},
         )
         saved = _save(successful_acq, tmp_path / "run_000001", naming, notes=notes)
 
@@ -607,7 +605,7 @@ class TestSave:
         """
         output_root = tmp_path / "run_000001"
 
-        _save(successful_acq, output_root, naming, notes=StoreNotes(controller_state={}))
+        _save(successful_acq, output_root, naming, notes=Notes(controller_state={}))
 
         data = output_root / "data"
         assert {path.name for path in output_root.iterdir()} == {
@@ -658,7 +656,7 @@ class TestSave:
         timepoint.
         """
         output_root = tmp_path / "run_000001"
-        notes = StoreNotes(
+        notes = Notes(
             controller_state={"changeable": {}, "observed": {}},
             capture_record={"position_label": "000003"},
         )

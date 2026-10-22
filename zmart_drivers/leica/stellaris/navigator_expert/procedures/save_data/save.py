@@ -25,7 +25,8 @@ from ...driver_setup.orientation import Orientation
 from ...primitives.capture import files as _files
 from . import materialize as _materialize
 from . import ome_zarr
-from .ome_canonical import StoreNotes
+from zmart_drivers import metadata_convention as convention
+from .ome_canonical import VENDOR
 from ...primitives.capture.files import (
     DEFAULT_EXPORT_COMPLETION_POLL_INTERVAL_S,
     DEFAULT_EXPORT_COMPLETION_TIMEOUT_S,
@@ -64,7 +65,7 @@ def save(
     naming: Naming,
     *,
     lineage: dict | None = None,
-    notes: StoreNotes | None = None,
+    notes: convention.Notes | None = None,
     orientation: Orientation | None = None,
     export_completion_timeout_s: float = DEFAULT_EXPORT_COMPLETION_TIMEOUT_S,
     export_completion_poll_interval_s: float = (
@@ -190,7 +191,7 @@ def _persist_projection(
     *,
     orientation: Orientation,
     placement,
-    notes: StoreNotes | None,
+    notes: convention.Notes | None,
     projected_from: Path,
     vendor_files,
 ) -> tuple[Path, ...]:
@@ -214,7 +215,9 @@ def _persist_projection(
         "operation": "max over z",
     }
     told = _the_stores_notes(
-        replace(notes or StoreNotes(), capture_record=record), vendor_files, orientation
+        replace(notes or convention.Notes(), capture_record=record),
+        vendor_files,
+        orientation,
     )
     return (ome_zarr.write_store(projected, store, notes=told),)
 
@@ -253,7 +256,7 @@ def _persist_store(
     naming: Naming,
     *,
     lineage: dict | None,
-    notes: StoreNotes | None,
+    notes: convention.Notes | None,
     orientation: Orientation,
     placement: Callable[[list[int]], Callable[[int], dict]] | None,
 ) -> SavedAcquisition:
@@ -276,7 +279,7 @@ def _persist_store(
     ome_zarr.write_store(
         capture,
         store,
-        notes=_the_stores_notes(notes or StoreNotes(), vendor_files, orientation),
+        notes=_the_stores_notes(notes or convention.Notes(), vendor_files, orientation),
     )
     printed = _print_state(notes, output_root, naming)
 
@@ -311,8 +314,8 @@ def _persist_store(
 
 
 def _the_stores_notes(
-    notes: StoreNotes, vendor_files, orientation: Orientation
-) -> StoreNotes:
+    notes: convention.Notes, vendor_files, orientation: Orientation
+) -> convention.Notes:
     """*notes* with what every store says: the turn applied to its pixels, and LAS X's description.
 
     *vendor_files* are this capture's own descriptions, as saved beside it.
@@ -320,15 +323,16 @@ def _the_stores_notes(
     files = [Path(path) for path in vendor_files]
     return replace(
         notes,
+        vendor=VENDOR,
         pixels_to_position=orientation.image_to_stage,
         vendor_descriptions=tuple(path.read_text(encoding="utf-8") for path in files),
         # What LAS X calls the image is only in its description's file name.
-        description=", ".join(path.name.split(".")[0] for path in files) or None,
+        image_description=", ".join(path.name.split(".")[0] for path in files) or None,
     )
 
 
 def _print_state(
-    notes: StoreNotes | None, output_root: Path, naming: Naming
+    notes: convention.Notes | None, output_root: Path, naming: Naming
 ) -> Path | None:
     """Write one acquisition's state beside its images, once.
 

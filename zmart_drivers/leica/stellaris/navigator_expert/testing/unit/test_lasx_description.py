@@ -19,6 +19,7 @@ import pytest
 from zmart_drivers.leica.stellaris.navigator_expert.primitives.capture import (
     metadata_map as described,
 )
+from zmart_drivers import metadata_convention as convention
 from zmart_drivers.leica.stellaris.navigator_expert.procedures.save_data import (
     ome_canonical as canonical,
 )
@@ -247,7 +248,7 @@ class TestTheOmeWritten:
         xml = canonical.image_xml(
             metadata,
             image_name="p",
-            notes=canonical.StoreNotes(controller_state={"changeable": {}, "observed": {}}),
+            notes=convention.Notes(controller_state={"changeable": {}, "observed": {}}),
         )
         ome = ome_types.from_xml(xml.decode("ascii"), validate=True)
         image = ome.images[0]

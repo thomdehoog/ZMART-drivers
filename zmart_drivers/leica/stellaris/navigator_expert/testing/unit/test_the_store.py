@@ -1,4 +1,4 @@
-"""The store's description follows ZMART-controller's agreement, docs/the_store.
+"""The store's description follows the ZMART metadata convention.
 
 Layer 2 is the OME data model, schema-valid; layer 3 holds only what the
 controller's contract defines, under the agreement's namespaces; layer 4 holds
@@ -18,6 +18,7 @@ import pytest
 from zmart_drivers.leica.stellaris.navigator_expert.primitives.capture import (
     metadata_map as described,
 )
+from zmart_drivers import metadata_convention as convention
 from zmart_drivers.leica.stellaris.navigator_expert.procedures.save_data import (
     ome_canonical as canonical,
 )
@@ -25,7 +26,7 @@ from zmart_drivers.leica.stellaris.navigator_expert.procedures.save_data import 
 DATA = Path(__file__).resolve().parents[1] / "data" / "lasx_description"
 HIRES = "hires004-two-channels-12-bit"
 STACK = "af-job002-17-planes-16-bit"
-STORE = "https://github.com/ZMB-UZH/ZMART-controller/the_store/1/"
+STORE = "https://github.com/ZMB-UZH/ZMART-drivers/metadata_convention/1/"
 
 CONTROLLER_STATE = {
     "changeable": {"job": "Overview"},
@@ -56,15 +57,16 @@ CAPTURE_RECORD = {
 }
 
 
-def notes(**overrides) -> canonical.StoreNotes:
+def notes(**overrides) -> convention.Notes:
     given = {
         "controller_state": CONTROLLER_STATE,
         "capture_record": CAPTURE_RECORD,
         "pixels_to_position": ((0, -1), (1, 0)),
-        "vendor": {"origin": {"x": 5.0}},
+        "vendor": "leica-lasx",
+        "vendor_facts": {"origin": {"x": 5.0}},
         "vendor_descriptions": ('<Data><Image Name="Overview007"/></Data>',),
     }
-    return canonical.StoreNotes(**{**given, **overrides})
+    return convention.Notes(**{**given, **overrides})
 
 
 def the_xml(name: str = HIRES, **overrides):
@@ -156,7 +158,7 @@ class TestLayerThree:
 
 class TestLayerTwo:
     def test_what_las_x_calls_the_image_is_its_description(self):
-        ome = the_xml(description="Overview007")
+        ome = the_xml(image_description="Overview007")
 
         assert ome.images[0].description == "Overview007"
 

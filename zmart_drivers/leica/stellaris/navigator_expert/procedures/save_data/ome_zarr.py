@@ -47,6 +47,7 @@ import numpy as np
 
 from ...driver_setup.orientation import Orientation, reorient_array
 from . import materialize
+from zmart_drivers import metadata_convention as convention
 from . import ome_canonical as canonical
 from ...primitives.capture.product import (
     AcquisitionMetadata,
@@ -109,7 +110,7 @@ def write_position_store(
     *,
     orientation: Orientation,
     where: Placement | None = None,
-    notes: canonical.StoreNotes | None = None,
+    notes: convention.Notes | None = None,
 ) -> Path:
     """Write *exported* as the OME-Zarr image *store*, and return it.
 
@@ -277,12 +278,13 @@ def max_projection(capture: Capture) -> Capture:
 
 
 def write_store(
-    capture: Capture, store: Path, *, notes: canonical.StoreNotes | None = None
+    capture: Capture, store: Path, *, notes: convention.Notes | None = None
 ) -> Path:
     """Write one gathered capture as the OME-Zarr image *store*, whole, and return it.
 
-    Layer 1 of ZMART-controller's store agreement (docs/the_store) in its
-    ``zarr.json``, and layers 2 to 4 (*notes*) in ``OME/METADATA.ome.xml``.
+    The ZMART metadata convention: the image and the convention's version in
+    its ``zarr.json``, and the OME data model with the convention's
+    annotations (*notes*) in ``OME/METADATA.ome.xml``.
     """
     import zarr
     from ome_zarr_models.v05.axes import Axis
@@ -365,7 +367,7 @@ def write_store(
         "rdefs": {"defaultT": 0, "defaultZ": metadata.size_z // 2, "model": "color"},
     }
     group.attrs["ome"] = ome
-    group.attrs["zmart"] = {"store": canonical.STORE_VERSION}
+    group.attrs["zmart"] = convention.zarr_attributes()
     (writing / "OME").mkdir()
     (writing / "OME" / "METADATA.ome.xml").write_bytes(
         canonical.image_xml(metadata, image_name=store.name, notes=notes)

@@ -96,8 +96,8 @@ def _export_state(
 ) -> dict:
     """What only the moment of the capture can tell, for the store it will be saved as.
 
-    In the controller's words, for layer 3 of ZMART-controller's store
-    agreement (docs/the_store): ``controller_state`` is ``get_state()`` whole,
+    In the controller's words, for the ZMART metadata convention
+    (``zmart_drivers.metadata_convention``): ``controller_state`` is ``get_state()`` whole,
     ``xyz`` is ``get_xyz()`` as the contract defines it, and ``driver`` names
     this driver. ``vendor`` is this driver's and LAS X's own, for layer 4:
     how a position is made from the readings, the hardware report, the job's

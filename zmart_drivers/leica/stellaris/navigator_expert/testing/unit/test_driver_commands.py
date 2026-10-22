@@ -1057,7 +1057,7 @@ class TestAcquire(unittest.TestCase):
         notes = calls["notes"]
         self.assertEqual(notes.capture_record["position_label"], "prescan_a1b2c3_well-7")
         self.assertEqual(notes.capture_record["acquisition_settings"]["used"]["trigger"], "full")
-        self.assertEqual(notes.vendor["stem"], "acquisition_prescan_a1b2c3_well-7")
+        self.assertEqual(notes.vendor_facts["stem"], "acquisition_prescan_a1b2c3_well-7")
         self.assertEqual(record["trigger"], "full")
         self.assertNotIn("folder", record)
         self.assertEqual(
@@ -1990,6 +1990,33 @@ class TestStateAndProcedures(unittest.TestCase):
             observed["pixel_size"],
             {"x": 0.1, "y": 0.2, "unit": "um"},
         )
+        # The contract's own keys: the image size and pixel size of these settings.
+        self.assertEqual(observed["image_size_px"], [1000, 400])
+        self.assertEqual(observed["pixel_size_um"], [0.1, 0.2])
+
+    def test_the_image_size_is_the_picture_as_saved_turned_with_it(self):
+        """A quarter turn of the pixels swaps width and height, as in the saved picture."""
+        h = _handle()
+        p = self._state_patches()
+        settings = {
+            "imageSize": "100 um x 80 um",
+            "pixelSize": "0.10 um x 0.20 um",
+            "format": "1000 x 400",
+        }
+        with (
+            p[0],
+            p[1],
+            p[2],
+            patch.object(_readers, "get_job_settings", return_value=settings),
+            patch.object(
+                _state_record,
+                "_saved_orientation",
+                return_value=_orientation.Orientation(rotate_deg=90),
+            ),
+        ):
+            observed = _state_record.get_state(h)["observed"]
+        self.assertEqual(observed["image_size_px"], [400, 1000])
+        self.assertEqual(observed["pixel_size_um"], [0.2, 0.1])
 
     def test_set_state_refuses_an_autofocus_job(self):
         h = _handle()
