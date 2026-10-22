@@ -317,12 +317,13 @@ def _the_stores_notes(
 
     *vendor_files* are this capture's own descriptions, as saved beside it.
     """
+    files = [Path(path) for path in vendor_files]
     return replace(
         notes,
         pixels_to_position=orientation.image_to_stage,
-        vendor_descriptions=tuple(
-            Path(path).read_text(encoding="utf-8") for path in vendor_files
-        ),
+        vendor_descriptions=tuple(path.read_text(encoding="utf-8") for path in files),
+        # What LAS X calls the image is only in its description's file name.
+        description=", ".join(path.name.split(".")[0] for path in files) or None,
     )
 
 

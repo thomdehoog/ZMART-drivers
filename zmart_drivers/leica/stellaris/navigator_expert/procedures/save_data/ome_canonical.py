@@ -68,6 +68,7 @@ class StoreNotes:
     is the 2x2 turn or mirror already applied to the pixels. ``vendor`` holds
     this driver's and LAS X's own facts, and ``vendor_descriptions`` LAS X's
     descriptions of the image, each as its text, byte for byte.
+    ``description`` is what LAS X calls the image, its OME ``Description``.
     """
 
     controller_state: dict | None = None
@@ -75,6 +76,7 @@ class StoreNotes:
     pixels_to_position: tuple = ((1, 0), (0, 1))
     vendor: dict | None = None
     vendor_descriptions: tuple[str, ...] = ()
+    description: str | None = None
 
     def as_json(self) -> dict:
         """Everything but the vendor's descriptions, as one JSON object, for the side file."""
@@ -163,6 +165,8 @@ def _ome_xml(
     image = ET.SubElement(root, _tag("Image"), {"ID": "Image:0", "Name": image_name})
     if metadata.acquisition_date:
         ET.SubElement(image, _tag("AcquisitionDate")).text = metadata.acquisition_date
+    if notes is not None and notes.description:
+        ET.SubElement(image, _tag("Description")).text = notes.description
     if instrument is not None:
         ET.SubElement(image, _tag("InstrumentRef"), {"ID": INSTRUMENT_ID})
         objective = instrument.objective

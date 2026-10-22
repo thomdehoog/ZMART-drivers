@@ -154,6 +154,13 @@ class TestLayerThree:
         assert ome.images[0].stage_label.name == "A1"
 
 
+class TestLayerTwo:
+    def test_what_las_x_calls_the_image_is_its_description(self):
+        ome = the_xml(description="Overview007")
+
+        assert ome.images[0].description == "Overview007"
+
+
 class TestLayerFour:
     """LAS X's own, byte for byte, and the driver's own facts."""
 
