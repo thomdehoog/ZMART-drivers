@@ -49,7 +49,7 @@ capture where the stage already stands.
    10 October, then moves XY in a small pattern around it and z by a few um.
 7. **A folder for the reports**, for example `D:\ZMART-check`. Run every command from it, in
    the driver's environment. `<driver>` stands for
-   `ZMART-drivers\zmart_drivers\leica\stellaris_y42h93\navigator_expert`.
+   `ZMART-drivers\zmart_drivers\leica\stellaris\navigator_expert`.
 
 ---
 

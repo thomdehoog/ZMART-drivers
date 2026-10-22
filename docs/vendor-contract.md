@@ -5,7 +5,7 @@ of a ZMART driver: it asks the limits first, waits by one rule, sends again
 when that is safe, and confirms what it sent. It knows no microscope. Each
 microscope's vendor part hands it six things, and this page lists them. The
 dispatcher is today in the Leica driver,
-`zmart_drivers/leica/stellaris_y42h93/navigator_expert/dispatcher/`, and
+`zmart_drivers/leica/stellaris/navigator_expert/dispatcher/`, and
 [the driver anatomy](driver-anatomy.md) says where it sits among the other
 parts.
 

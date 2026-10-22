@@ -146,8 +146,8 @@ rewritten on 15 October), once the commits are pushed. Then:
   environment `C:\Users\t.de\conda\zmart-drivers-readers` (the ZMART controller is installed in
   it), started from `D:\ZMART-check`; the data location is `D:\ZMART-data`.
   ```
-  python <clone>\zmart_drivers\leica\stellaris_y42h93\navigator_expert\testing\run_ci.py                    # offline
-  python <clone>\zmart_drivers\leica\stellaris_y42h93\navigator_expert\testing\run_ci.py --hardware --full  # live
+  python <clone>\zmart_drivers\leica\stellaris\navigator_expert\testing\run_ci.py                    # offline
+  python <clone>\zmart_drivers\leica\stellaris\navigator_expert\testing\run_ci.py --hardware --full  # live
   ```
 - **On the simulator PC:** offline tests from `testing/`, environment `zmart-integration`, with
   `TMP`/`TEMP` on D: and the controller clone on `PYTHONPATH` (that environment has an older

@@ -34,7 +34,7 @@ jobs:
         include:
           - driver: leica
             extras: leica,test
-            run: python zmart_drivers/leica/stellaris_y42h93/navigator_expert/testing/run_ci.py
+            run: python zmart_drivers/leica/stellaris/navigator_expert/testing/run_ci.py
     steps:
       - uses: actions/checkout@v4
         with:

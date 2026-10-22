@@ -7,7 +7,7 @@ Nikon, ZEISS and mesoSPIM drivers and with the ZMART Controller, and it was
 then simplified while we walked the Leica driver through it. The simplified
 design is in "The simplified anatomy", right after the overview.
 
-The Leica driver (`zmart_drivers/leica/stellaris_y42h93/navigator_expert/`)
+The Leica driver (`zmart_drivers/leica/stellaris/navigator_expert/`)
 now has this layout, so it is the example to read alongside the text. Where
 this document says "today", it means that driver. The Nikon, ZEISS and
 mesoSPIM drivers are not in this beta. What a new microscope has to

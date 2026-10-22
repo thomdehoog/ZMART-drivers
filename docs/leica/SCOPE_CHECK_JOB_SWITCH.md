@@ -43,7 +43,7 @@ selected_job: no answer counted as a success in 4 windows of 3s
 ## Step 1. Look in the reports of the run you already made
 
 No LAS X needed, nothing moves. In the driver folder on the microscope PC
-(`zmart_drivers\leica\stellaris_y42h93\navigator_expert`), in PowerShell:
+(`zmart_drivers\leica\stellaris\navigator_expert`), in PowerShell:
 
 ```powershell
 Select-String -Path testing\_report\* -Pattern "no answer counted"
@@ -59,7 +59,7 @@ About five minutes. The stage must be clear, as for every hardware run. From the
 
 ```powershell
 git pull
-python zmart_drivers\leica\stellaris_y42h93\navigator_expert\testing\run_ci.py --hardware
+python zmart_drivers\leica\stellaris\navigator_expert\testing\run_ci.py --hardware
 ```
 
 This also covers the commit after the full run (`c1c0092`: the scanner status races the API against
@@ -76,7 +76,7 @@ nothing, but a job that uses another objective makes the driver move the stage t
 point, so the stage must be clear. From the repository root:
 
 ```powershell
-python zmart_drivers\leica\stellaris_y42h93\navigator_expert\testing\hardware\probe_job_switch_timing.py --yes --rounds 3
+python zmart_drivers\leica\stellaris\navigator_expert\testing\hardware\probe_job_switch_timing.py --yes --rounds 3
 ```
 
 A line looks like this:
@@ -222,7 +222,7 @@ to keep the sample point. Nothing is acquired. From the repository root, LAS X r
 
 ```powershell
 git pull
-python zmart_drivers\leica\stellaris_y42h93\navigator_expert\testing\hardware\probe_switch_after_moves.py --yes
+python zmart_drivers\leica\stellaris\navigator_expert\testing\hardware\probe_switch_after_moves.py --yes
 ```
 
 Run it three times. On the microscope it showed, before the fix: about sixty threads alive after the
@@ -235,7 +235,7 @@ burst, and the switch after it taking 8 to 11 s. What to look for now:
 Then the quick acceptance, which runs the same switch straight after its own move phase:
 
 ```powershell
-python zmart_drivers\leica\stellaris_y42h93\navigator_expert\testing\run_ci.py --hardware
+python zmart_drivers\leica\stellaris\navigator_expert\testing\run_ci.py --hardware
 ```
 
 It should pass all eight acceptance points, with `set_state: switch job` in the adapter step taking

@@ -41,7 +41,7 @@ microscope, is described in [the anatomy of a ZMART driver](docs/driver-anatomy.
 
 | Microscope | Vendor interface | Driver | Status |
 |---|---|---|---|
-| Leica STELLARIS | LAS X: its hardware server first, the Python (CAM) API behind it | [`zmart_drivers/leica/stellaris_y42h93/navigator_expert/`](zmart_drivers/leica/stellaris_y42h93/navigator_expert/README.md) | **Beta `0.7.0b1`.** Tested on the LAS X simulator and on a STELLARIS. Laid out as [the anatomy of a ZMART driver](docs/driver-anatomy.md) describes. |
+| Leica STELLARIS | LAS X: its hardware server first, the Python (CAM) API behind it | [`zmart_drivers/leica/stellaris/navigator_expert/`](zmart_drivers/leica/stellaris/navigator_expert/README.md) | **Beta `0.7.0b2`.** Tested on the LAS X simulator and on a STELLARIS. Laid out as [the anatomy of a ZMART driver](docs/driver-anatomy.md) describes. |
 
 This beta holds only the Leica driver. The Nikon, ZEISS, mesoSPIM and Evident drivers are in
 the repository's history.
@@ -66,7 +66,7 @@ The driver runs on the computer that runs LAS X, because it loads Leica's interf
 Python. Use it by itself:
 
 ```python
-import zmart_drivers.leica.stellaris_y42h93.navigator_expert as navigator_expert
+import zmart_drivers.leica.stellaris.navigator_expert as navigator_expert
 
 scope = navigator_expert.connect()
 scope.move_to(100.0, 250.0, 0.0)
@@ -79,10 +79,14 @@ Or register it once with the ZMART Controller, and connect by name in every sess
 ```python
 from zmart_controller import mic
 
-mic.register_driver("C:/ZMART-drivers/zmart_drivers/leica/stellaris_y42h93/navigator_expert")
+mic.register_driver("C:/ZMART-drivers/zmart_drivers/leica/stellaris/navigator_expert")
 mic.connect("stellaris")
-print(mic.get_info()["content"]["description"])
+print(mic.get_info()["output"]["description"])
 ```
+
+From 0.7.0b2 the driver's folder is `leica/stellaris`, one folder for every STELLARIS; which
+microscope it is stays in its configuration. A computer that registered the driver from
+`leica/stellaris_y42h93` registers it again from the new folder.
 
 ### Status
 
@@ -99,7 +103,7 @@ software. Install the test extra, then run it from the root folder of this repos
 
 ```bash
 pip install -e ".[leica,test]"
-python zmart_drivers/leica/stellaris_y42h93/navigator_expert/testing/run_ci.py
+python zmart_drivers/leica/stellaris/navigator_expert/testing/run_ci.py
 ```
 
 The continuous-integration workflow in `.github/workflows/` runs it on Linux and Windows, with

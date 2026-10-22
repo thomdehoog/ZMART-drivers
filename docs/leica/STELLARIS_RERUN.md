@@ -41,7 +41,7 @@ his hands off for the run.
 python <driver>\testing\run_ci.py --hardware
 ```
 
-`<driver>` is `ZMART-drivers\zmart_drivers\leica\stellaris_y42h93\navigator_expert`; run it
+`<driver>` is `ZMART-drivers\zmart_drivers\leica\stellaris\navigator_expert`; run it
 in the driver's environment, with `ZMART-controller` on `PYTHONPATH` if it is not installed.
 
 **Pass:** all seven steps `OK`, and **LAS X stayed behind the other window the whole time**
