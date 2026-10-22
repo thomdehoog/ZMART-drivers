@@ -35,7 +35,6 @@ from typing import Any
 
 from ...primitives.cam_api import waiting
 from ...dispatcher.dispatch import make_log_entry
-from ...primitives.cam_api.transfer import request_of
 from ...primitives.cam_api.parsing import parse_format
 from ...primitives.cam_api.profile import CommandProfile
 from ...primitives.cam_api.error_classification import _check_api_error, classify_error, sends_again
@@ -537,16 +536,13 @@ def change(client, name: str, job_name: str, *, max_retries=None, tolerance=None
     """
     setting, a = arguments_of(name, job_name, given)
     gated_values = setting.gate(a) if setting.gate else {"job_name": job_name, "value": a[setting.value]}
-    refusal = run_change.limits_refusal(client, setting.command, gated_values)
-    if refusal:
-        return refusal
     problem = setting.validate(a) if setting.validate else None
     if problem is not None:
         return run_change.refused(problem)
 
     return run_change.dispatch_change(
         client,
-        request_of(client, setting.request),
+        setting.request,
         setting.describe.format(**a),
         PROFILE,
         command=setting.command,

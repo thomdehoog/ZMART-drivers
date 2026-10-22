@@ -18,7 +18,6 @@ from functools import partial
 from typing import Any
 
 from ...dispatcher.dispatch import make_log_entry
-from ...primitives.cam_api.transfer import request_of
 from ...procedures.save_data.product import AcquisitionResult
 from ...procedures import readings as readers
 from ...primitives.cam_api.profile import CommandProfile
@@ -69,9 +68,6 @@ def acquire(client, job_name, poll_interval=None, poll_timeout=None, heartbeat_i
         start_timeout: Seconds to wait for the scan to start.
     """
     gated_values = {"job_name": job_name}
-    refusal = run_change.limits_refusal(client, "acquire", gated_values)
-    if refusal:
-        return refusal
 
     def setup(m):
         m.JobName = job_name
@@ -81,7 +77,7 @@ def acquire(client, job_name, poll_interval=None, poll_timeout=None, heartbeat_i
 
     return run_change.dispatch_change(
         client,
-        request_of(client, "PyApiAcquireJob"),
+        "PyApiAcquireJob",
         f"Acquire '{job_name}'",
         ACQUIRE,
         command="acquire",

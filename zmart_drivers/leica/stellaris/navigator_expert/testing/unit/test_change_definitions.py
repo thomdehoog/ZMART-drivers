@@ -86,17 +86,15 @@ def record(call):
     asked = {"gate": [], "dispatch": None, "result": None}
     client = RecordingClient()
 
-    def gate(_client, command, values, _setup_hint=None):
-        asked["gate"].append([command, values])
-        return None
-
-    def dispatch(_client, api_obj, description, profile, **kw):
+    def dispatch(_client, request_name, description, profile, **kw):
+        # What the dispatcher shows the limits gate before anything is sent.
+        asked["gate"].append([kw["command"], kw["values"]])
         model = RecordingModel()
         setup = kw.get("setup_fn")
         if setup is not None:
             setup(model)
         asked["dispatch"] = {
-            "request": api_obj.name,
+            "request": request_name,
             "description": description,
             "profile": _profile_name(profile),
             "writes": model.writes,
@@ -106,12 +104,12 @@ def record(call):
         }
         return {"success": True, "confirmed": True, "message": description, "logs": []}
 
-    original = (run_change.gate.check_refusal, run_change.dispatch_change)
-    run_change.gate.check_refusal, run_change.dispatch_change = gate, dispatch
+    original = run_change.dispatch_change
+    run_change.dispatch_change = dispatch
     try:
         result = call(client)
     finally:
-        run_change.gate.check_refusal, run_change.dispatch_change = original
+        run_change.dispatch_change = original
     asked["result"] = (
         {"success": result.get("success"), "message": result.get("message")}
         if asked["dispatch"] is None

@@ -92,23 +92,20 @@ def test_native_stage_motion_fires_only_from_the_actions():
     )
 
 
-def test_limit_checks_are_called_only_from_the_changes_and_the_dispatcher():
-    """``check_xy`` / ``check_z`` are *defined* in the dispatcher's rulebook and
-    *called* only from the stage moves in ``operations/changes/stage.py``. A call anywhere else
-    is a second whistle: a copy of enforcement that can drift out of sync with
-    the real one."""
-    allowed = {
-        Path("operations/changes/stage.py"),  # the stage moves: where the checks run
-    }
+def test_limit_checks_are_called_only_from_the_rules():
+    """``check_xy`` / ``check_z`` are defined in the rulebook and called only by
+    its own rules, which the dispatcher's gate asks before anything is sent. A
+    call anywhere else is a second whistle: a copy of enforcement that can
+    drift out of sync with the real one."""
     offenders = []
     for rel, text in _driver_sources():
-        if rel.parts[0] == DISPATCHER or rel in allowed or rel == RULEBOOK:
+        if rel.parts[0] == DISPATCHER or rel == RULEBOOK:
             continue
         if "check_xy(" in text or "check_z(" in text:
             offenders.append(str(rel))
     assert offenders == [], (
-        f"limit checks called outside operations/changes/stage.py and dispatcher/: {offenders}; "
-        f"the changes already check every move; delete the duplicate call"
+        f"limit checks called outside the rulebook: {offenders}; the dispatcher "
+        f"already asks the limits for every change; delete the duplicate call"
     )
 
 

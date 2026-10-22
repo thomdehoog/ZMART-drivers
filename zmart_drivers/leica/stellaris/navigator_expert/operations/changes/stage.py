@@ -15,10 +15,8 @@ from functools import partial
 
 from ...primitives.cam_api import waiting
 from ...dispatcher.dispatch import make_log_entry
-from ...primitives.cam_api.transfer import request_of
 from ...procedures import readings as readers
 from ...primitives.cam_api.profile import CommandProfile
-from ...driver_setup.limits.limit_rules import check_xy, check_z
 from ...primitives.cam_api.prechecks import check_idle
 from . import confirming, run_change
 
@@ -77,32 +75,27 @@ def move_xy(client, x, y, unit="um", *, max_retries=None, tolerance=None):
         return run_change.refused(f"unknown unit {unit!r} (expected 'um', 'mm', or 'm')", position=None)
     try:
         x_um, y_um = x * UM_PER_UNIT[unit], y * UM_PER_UNIT[unit]
-        gated_values = {"x_um": x_um, "y_um": y_um}
-        refusal = run_change.limits_refusal(client, "move_xy", gated_values, position=None)
-        if refusal:
-            return refusal
-        check_xy(x_um, y_um)
-    except (RuntimeError, TypeError) as e:
+    except TypeError as e:
         return run_change.refused(str(e), position=None)
-
-    api_obj = request_of(client, "PyApiMoveHardwareXY")
-    unit_val = unit_enum(api_obj.Model.Units, unit)
-    try:
-        mode_val = type(api_obj.Model.MoveXyMode).eMoveXY
-    except Exception:
-        mode_val = 2  # eMoveXY=2 (NOT 0 which is eDontMove!)
-        log.warning("MoveXyMode enum resolution failed, using int fallback: %d", mode_val)
+    gated_values = {"x_um": x_um, "y_um": y_um}
 
     def setup(m):
+        # LAS X's enums are read from the request as it is filled in: the
+        # request is made only once the limits allow the move.
+        try:
+            mode_val = type(m.MoveXyMode).eMoveXY
+        except Exception:
+            mode_val = 2  # eMoveXY=2 (NOT 0 which is eDontMove!)
+            log.warning("MoveXyMode enum resolution failed, using int fallback: %d", mode_val)
+        m.Units = unit_enum(m.Units, unit)
         m.RelativePosition = False
         m.XPosition = x
         m.YPosition = y
         m.MoveXyMode = mode_val
-        m.Units = unit_val
 
     result = run_change.dispatch_change(
         client,
-        api_obj,
+        "PyApiMoveHardwareXY",
         f"MoveXY -> ({x}, {y}) {unit}",
         MOVE_XY,
         command="move_xy",
@@ -116,7 +109,9 @@ def move_xy(client, x, y, unit="um", *, max_retries=None, tolerance=None):
         ),
         max_retries=max_retries,
     )
-    result["position"] = {"x": x_um * 1e-6, "y": y_um * 1e-6, "x_um": x_um, "y_um": y_um}
+    # The target, once the move was sent; nothing sent, no position.
+    sent = result["timing"].get("attempts", 0) > 0
+    result["position"] = {"x": x_um * 1e-6, "y": y_um * 1e-6, "x_um": x_um, "y_um": y_um} if sent else None
     return result
 
 
@@ -137,32 +132,27 @@ def move_z(client, job_name, z, unit="um", z_mode="galvo", *, max_retries=None, 
         return run_change.refused(f"unknown unit {unit!r}. Use: {list(UM_PER_UNIT)}")
     try:
         z_um = z * UM_PER_UNIT[unit]
-        gated_values = {f"z_{'galvo' if z_mode == 'galvo' else 'wide'}_um": z_um}
-        refusal = run_change.limits_refusal(client, "move_z", gated_values)
-        if refusal:
-            return refusal
-        check_z(z_um, z_mode)
-    except (RuntimeError, ValueError, TypeError) as e:
+    except TypeError as e:
         return run_change.refused(str(e))
-
-    api_obj = request_of(client, "PyApiMoveZByJobName")
-    try:
-        z_use_val = getattr(type(api_obj.Model.ZUseMode), Z_DRIVE_ENUM[z_mode])
-    except Exception:
-        z_use_val = Z_DRIVE_ENUM[z_mode]
-        log.warning("ZUseMode enum resolution failed for '%s'", z_use_val)
-    unit_val = unit_enum(api_obj.Model.Units, unit)
+    gated_values = {f"z_{'galvo' if z_mode == 'galvo' else 'wide'}_um": z_um}
 
     def setup(m):
+        # LAS X's enums are read from the request as it is filled in: the
+        # request is made only once the limits allow the move.
+        try:
+            z_use_val = getattr(type(m.ZUseMode), Z_DRIVE_ENUM[z_mode])
+        except Exception:
+            z_use_val = Z_DRIVE_ENUM[z_mode]
+            log.warning("ZUseMode enum resolution failed for '%s'", z_use_val)
+        m.Units = unit_enum(m.Units, unit)
         m.JobName = job_name
         m.RelativePosition = False
         m.ZPosition = z
         m.ZUseMode = z_use_val
-        m.Units = unit_val
 
     return run_change.dispatch_change(
         client,
-        api_obj,
+        "PyApiMoveZByJobName",
         f"Z -> {z} {unit} ({z_mode})",
         MOVE_Z,
         command="move_z",

@@ -93,15 +93,17 @@ def read(vendor, datum, client, **keywords):
     return reader.wait_for(vendor, datum, client, **keywords)
 
 
-def write(client, request, description, *, command, values, **keywords):
+def write(client, request, description, *, command, values, make_request=None, **keywords):
     """Send a change, check it, and confirm it; see :func:`confirm_loop.confirm_and_fire`.
 
     ``command`` is the name of the change and ``values`` is what it would set.
     Before anything is sent, the limits gate is asked whether this connection's
     limits allow it. If not, nothing is sent and the answer is a refused result
     with the reason. Because the check sits here, no change can reach the
-    microscope without passing it, whichever recipe asked. The result also says,
-    under ``route``, which way the command went.
+    microscope without passing it, whichever recipe asked. ``make_request``,
+    when given, makes the request only once the limits allow the change, so a
+    refused change never touches the client. The result also says, under
+    ``route``, which way the command went.
     """
     from . import write as confirm_loop, limits as gate
 
@@ -115,6 +117,8 @@ def write(client, request, description, *, command, values, **keywords):
             "timing": make_timing(total_s=0.0, attempts=0),
             "logs": [make_log_entry("error", message)],
         }
+    if make_request is not None:
+        request = make_request()
     result = confirm_loop.confirm_and_fire(client, request, description, **keywords)
 
     # Which way the command went, when the transport keeps several ("direct", "cam"):

@@ -820,15 +820,7 @@
   },
   "sequential_empty": {
     "dispatch": null,
-    "gate": [
-      [
-        "set_sequential_mode",
-        {
-          "job_name": "J",
-          "value": " "
-        }
-      ]
-    ],
+    "gate": [],
     "result": {
       "message": "SequentialMode -> ' ' | Invalid: mode must be a non-empty string. Valid: ['Line', 'Frame', 'Stack']",
       "success": false
@@ -876,15 +868,7 @@
   },
   "sequential_unknown": {
     "dispatch": null,
-    "gate": [
-      [
-        "set_sequential_mode",
-        {
-          "job_name": "J",
-          "value": "Bogus"
-        }
-      ]
-    ],
+    "gate": [],
     "result": {
       "message": "Could not map 'Bogus' to SequentialMode enum. Valid: ['Line', 'Frame', 'Stack']",
       "success": false

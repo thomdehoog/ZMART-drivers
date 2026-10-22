@@ -982,9 +982,10 @@ def test_every_dispatching_wrapper_declares_and_calls_the_gate():
     """AST sweep over the changes and the two recipes: a public function that
     reaches the fire path (``dispatch_change``, the dispatcher's ``write`` or a
     raw ``UpdateAwaitReceipt``/``UpdateAsync``) must (a) be declared in
-    ``MUTATING_COMMANDS`` and (b) call the gate with ITS OWN name, so a new
-    change cannot ship ungated. The job settings go through one runner, which
-    shows the gate each entry's own command name."""
+    ``MUTATING_COMMANDS`` and (b) hand the dispatcher ITS OWN name, which the
+    dispatcher shows the gate before anything is sent, so a new change cannot
+    ship ungated. The job settings go through one runner, which hands over
+    each entry's own command name."""
     files = [
         DRIVER_ROOT / "operations" / "changes" / f"{name}.py"
         for name in ("stage", "objective", "select_job", "acquire")
@@ -1004,15 +1005,14 @@ def test_every_dispatching_wrapper_declares_and_calls_the_gate():
                 f"{node.name} dispatches to the fire path but has no MUTATING_COMMANDS entry"
             )
             gate_literals = {
-                call.args[1].value
+                keyword.value.value
                 for call in ast.walk(node)
                 if isinstance(call, ast.Call)
-                and isinstance(call.func, (ast.Name, ast.Attribute))
-                and getattr(call.func, "id", getattr(call.func, "attr", None)) in ("check_refusal", "limits_refusal")
-                and len(call.args) >= 2
-                and isinstance(call.args[1], ast.Constant)
+                and getattr(call.func, "attr", None) == "dispatch_change"
+                for keyword in call.keywords
+                if keyword.arg == "command" and isinstance(keyword.value, ast.Constant)
             }
-            assert node.name in gate_literals, f"{node.name} never calls the limits gate with its own name"
+            assert node.name in gate_literals, f"{node.name} never hands the dispatcher its own name"
             checked.append(node.name)
 
     # Every setting of a job carries a command the gate knows ...
@@ -1024,13 +1024,15 @@ def test_every_dispatching_wrapper_declares_and_calls_the_gate():
     tree = ast.parse((DRIVER_ROOT / "operations" / "changes" / "job_settings.py").read_text(encoding="utf-8"))
     runner = next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == "change")
     shown_to_gate = [
-        call.args[1]
+        keyword.value
         for call in ast.walk(runner)
-        if isinstance(call, ast.Call) and getattr(call.func, "attr", None) == "limits_refusal"
+        if isinstance(call, ast.Call) and getattr(call.func, "attr", None) == "dispatch_change"
+        for keyword in call.keywords
+        if keyword.arg == "command"
     ]
     assert shown_to_gate and all(
         isinstance(arg, ast.Attribute) and arg.attr == "command" for arg in shown_to_gate
-    ), "the settings runner must show the limits gate the entry's own command name"
+    ), "the settings runner must hand the dispatcher the entry's own command name"
 
     # the sweep saw every change the limits know
     assert set(checked) == set(limit_rules.MUTATING_COMMANDS)

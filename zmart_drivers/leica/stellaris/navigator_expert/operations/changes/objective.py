@@ -18,7 +18,6 @@ from typing import Any
 
 from ...primitives.cam_api import waiting
 from ...dispatcher.dispatch import make_log_entry, make_timing
-from ...primitives.cam_api.transfer import request_of
 from ...primitives.cam_api.parsing import _hw_get
 from ...primitives.cam_api.profile import CommandProfile
 from ...primitives.cam_api.prechecks import check_idle
@@ -93,9 +92,6 @@ def set_objective(
 
     # The limits may fence automation to some slots (objective_slot; [] is unrestricted).
     gated_values = {"job_name": job_name, "objective_slot": slot}
-    refusal = run_change.limits_refusal(client, "set_objective", gated_values)
-    if refusal:
-        return refusal
     if before_fire is not None:
         refusal = before_fire({"slot": slot, "name": target_name})
         if refusal:
@@ -108,7 +104,7 @@ def set_objective(
 
     return run_change.dispatch_change(
         client,
-        request_of(client, "PyApiSetObjectiveSlotByJobName"),
+        "PyApiSetObjectiveSlotByJobName",
         f"Objective -> {target_name} (slot {slot})",
         OBJECTIVE,
         command="set_objective",

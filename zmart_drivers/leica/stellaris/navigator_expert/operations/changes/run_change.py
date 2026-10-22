@@ -1,11 +1,13 @@
-"""One change, the same way for every change: the limits first, then the dispatcher.
+"""One change, the same way for every change: through the dispatcher, which asks the limits.
 
 Every change follows three phases:
 
-    **Phase A** - before anything is sent: check the arguments, show the new
-        values to the limits gate (``limits_refusal``), resolve LAS X's enums.
+    **Phase A** - before anything is sent: check the arguments, resolve LAS X's
+        enums.
     **Phase B** - ``dispatch_change`` hands the request to the dispatcher's
-        ``write`` with the change's profile, which sends it and reads it back.
+        ``write`` with the change's name and the values it would set. The
+        dispatcher asks the limits gate, once, before anything is sent, then
+        sends the request and reads it back.
     **Phase C** - add what the caller needs to the result (``move_xy`` adds
         the target position).
 
@@ -26,9 +28,8 @@ from dataclasses import replace
 from functools import partial
 
 from ...dispatcher import dispatch
-from ...dispatcher import limits as gate
+from ...primitives.cam_api.transfer import request_of
 from .confirming import race_confirmations
-from ...driver_setup.limits.limit_rules import NOTEBOOK_POINTER
 
 log = logging.getLogger(__name__)
 
@@ -49,19 +50,6 @@ def refused(message, *, logged=False, **extra):
     }
 
 
-def limits_refusal(client, command, values, **extra):
-    """The limits gate, asked before anything is sent: None, or the refusal.
-
-    ``command`` is the change's name in ``limit_rules.MUTATING_COMMANDS``, and
-    ``values`` what it would set, as the gate reads it.
-    """
-    message = gate.check_refusal(client, command, values, NOTEBOOK_POINTER)
-    if message is None:
-        return None
-    log.error(message)
-    return refused(message, logged=True, **extra)
-
-
 def binds(fn, name):
     """True when the partial ``fn`` already holds the keyword ``name``."""
     return isinstance(fn, partial) and name in (fn.keywords or {})
@@ -69,7 +57,7 @@ def binds(fn, name):
 
 def dispatch_change(
     client,
-    api_obj,
+    request_name,
     description,
     profile,
     *,
@@ -87,12 +75,15 @@ def dispatch_change(
 
     Args:
         client: LAS X API client.
-        api_obj: The LAS X request.
+        request_name: The LAS X request's name, such as
+            ``"PyApiSetZoomByJobName"``. The dispatcher makes the request only
+            once the limits allow the change: a refused change never touches
+            the client.
         description: What the change does, for the log.
         profile: The change's ``CommandProfile``.
         command: The change's name in ``limit_rules.MUTATING_COMMANDS``.
         values: What the change would set, as the limits gate reads it; the
-            dispatcher asks the gate again before anything is sent.
+            dispatcher asks the gate before anything is sent.
         setup_fn: ``setup_fn(model)`` fills in the request.
         confirm_fn: ``confirm_fn(client)`` reads the change back; None uses
             the profile's (which may be None: no confirmation). One window
@@ -131,9 +122,10 @@ def dispatch_change(
     }
     return dispatch.write(
         client,
-        api_obj,
+        None,
         description,
         command=command,
+        make_request=partial(request_of, client, request_name),
         values=values,
         profile=replace(profile, **overrides) if overrides else profile,
         setup_fn=setup_fn,

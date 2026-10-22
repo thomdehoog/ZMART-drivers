@@ -23,7 +23,6 @@ from functools import partial
 from ...primitives.cam_api import waiting
 from ...primitives.direct.client import HardwareServerUnavailable
 from ...dispatcher.dispatch import make_log_entry, make_timing
-from ...primitives.cam_api.transfer import request_of
 from ...primitives.direct import reads as direct_reader
 from ...primitives.log import reads as log_wait
 from ...procedures import readings as readers
@@ -49,9 +48,6 @@ def select_job(client, job_name, *, before_fire=None):
     return a refusal, and then nothing is sent.
     """
     gated_values = {"job_name": job_name}
-    refusal = run_change.limits_refusal(client, "select_job", gated_values)
-    if refusal:
-        return refusal
 
     t0 = time.perf_counter()
     noop, context = prepare_select_job(client, job_name)
@@ -75,7 +71,7 @@ def select_job(client, job_name, *, before_fire=None):
     )
     result = run_change.dispatch_change(
         client,
-        request_of(client, "PyApiSelectJobByName"),
+        "PyApiSelectJobByName",
         f"SelectJob '{job_name}'",
         SELECT_JOB,
         command="select_job",

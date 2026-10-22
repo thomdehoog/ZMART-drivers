@@ -1769,6 +1769,8 @@ class TestSetFunctionWiring(unittest.TestCase):
         captured = {"client": args[0]}
 
         def mock_fire(client, api_obj, description, **kw):
+            if api_obj is None and kw.get("make_request"):
+                api_obj = kw["make_request"]()  # made once the limits allow it
             captured["description"] = description
             captured["api_obj"] = getattr(
                 api_obj, "cam_object", api_obj
@@ -1905,9 +1907,8 @@ class TestSetFunctionWiring(unittest.TestCase):
     # â”€â”€ move_z wiring â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     def _run_move_z(self, *args, **kwargs):
-        """Like _run_set but also mocks check_z."""
-        with patch.object(stage, "check_z"):
-            return self._run_set(stage.move_z, *args, **kwargs)
+        """Like _run_set, for move_z: the limits are the dispatcher's, mocked away here."""
+        return self._run_set(stage.move_z, *args, **kwargs)
 
     def test_move_z_galvo_model(self):
         info, _ = self._run_move_z(None, "J", 50.0, unit="um", z_mode="galvo")
@@ -1941,7 +1942,7 @@ class TestSetFunctionWiring(unittest.TestCase):
         self.assertIsNotNone(info["kwargs"].get("confirm_fn"))
 
     def test_move_z_limit_check_failure(self):
-        """When check_z raises, move_z returns failure without dispatch."""
+        """A move past the galvo's travel is refused, and nothing is sent."""
         r = stage.move_z(make_client(), "J", 99999.0, z_mode="galvo")
         self.assertFalse(r["success"])
 

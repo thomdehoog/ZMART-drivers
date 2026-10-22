@@ -191,7 +191,7 @@ def check_xy(x, y):
         if value < lo or value > hi:
             raise RuntimeError(
                 f"{axis.upper()}={value} outside the physical backstop [{lo}, {hi}] "
-                f"(operations/changes/limit_rules.py STAGE_BACKSTOP_UM) — refused regardless of the "
+                f"(driver_setup/limits/limit_rules.py STAGE_BACKSTOP_UM) — refused regardless of the "
                 f"configured envelope"
             )
 
@@ -223,7 +223,7 @@ def check_z(z, z_mode):
     if z < backstop_lo or z > backstop_hi:
         raise RuntimeError(
             f"Z={z} ({z_mode}) outside the physical backstop [{backstop_lo}, {backstop_hi}] "
-            f"(operations/changes/limit_rules.py STAGE_BACKSTOP_UM) — refused regardless of the "
+            f"(driver_setup/limits/limit_rules.py STAGE_BACKSTOP_UM) — refused regardless of the "
             f"configured envelope"
         )
 
@@ -325,6 +325,16 @@ class LeicaLimits:
             for param in ("x_um", "y_um", "z_galvo_um", "z_wide_um"):
                 if param in values:
                     self._check_one(param, self._policy[param], values[param])
+            # The stage envelope and the physical backstop, after the file's
+            # limits: even a hand-widened envelope cannot pass the travel.
+            try:
+                if "x_um" in values and "y_um" in values:
+                    check_xy(values["x_um"], values["y_um"])
+                for param, z_mode in (("z_galvo_um", "galvo"), ("z_wide_um", "zwide")):
+                    if param in values:
+                        check_z(values[param], z_mode)
+            except RuntimeError as exc:
+                raise LimitViolation(str(exc)) from exc
             return
         if function == "set_objective":
             if "objective_slot" in values:
