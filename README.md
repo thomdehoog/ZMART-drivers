@@ -41,7 +41,7 @@ microscope, is described in [the anatomy of a ZMART driver](docs/driver-anatomy.
 
 | Microscope | Vendor interface | Driver | Status |
 |---|---|---|---|
-| Leica STELLARIS | LAS X: its hardware server first, the Python (CAM) API behind it | [`zmart_drivers/leica/stellaris/navigator_expert/`](zmart_drivers/leica/stellaris/navigator_expert/README.md) | **Beta `0.7.0b2`.** Tested on the LAS X simulator and on a STELLARIS. Laid out as [the anatomy of a ZMART driver](docs/driver-anatomy.md) describes. |
+| Leica STELLARIS | LAS X: its hardware server first, the Python (CAM) API behind it | [`zmart_drivers/leica/stellaris/navigator_expert/`](zmart_drivers/leica/stellaris/navigator_expert/README.md) | **Beta `0.7.0b3`.** Tested on the LAS X simulator and on a STELLARIS. Laid out as [the anatomy of a ZMART driver](docs/driver-anatomy.md) describes. |
 
 This beta holds only the Leica driver. The Nikon, ZEISS, mesoSPIM and Evident drivers are in
 the repository's history.
@@ -56,10 +56,12 @@ and the zero point of the coordinates. The notebooks for them are in the driver'
 ## Try it yourself
 
 The driver needs Python 3.11 or newer. Download this repository, open a terminal in its root
-folder, and install it with the Leica extra. This also installs the ZMART Controller.
+folder, and install it with the Leica extra. The driver works on its own; add the `controller`
+extra to drive it through the ZMART Controller as well.
 
 ```bash
-pip install -e ".[leica]"
+pip install -e ".[leica]"              # the driver on its own
+pip install -e ".[leica,controller]"   # with the ZMART Controller
 ```
 
 The driver runs on the computer that runs LAS X, because it loads Leica's interface into
@@ -74,7 +76,8 @@ scope.acquire("A1")
 scope.save()
 ```
 
-Or register it once with the ZMART Controller, and connect by name in every session:
+Or, with the controller installed, register it once with the ZMART Controller, and connect by
+name in every session:
 
 ```python
 from zmart_controller import mic
