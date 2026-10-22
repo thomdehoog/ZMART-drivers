@@ -19,19 +19,13 @@ from state_tree_stand_in import StandInNodes, answer_json_read
 
 from zmart_drivers.leica.stellaris.navigator_expert.operations.readings import reading_table as capabilities
 
-from zmart_drivers.leica.stellaris.navigator_expert.primitives.api import (
-    api_reader,
-)
+from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import reads as api_reader
 from zmart_drivers.leica.stellaris.navigator_expert.primitives.direct import (
-    direct_reader,
+    reads as direct_reader,
     state_tree,
 )
-from zmart_drivers.leica.stellaris.navigator_expert.connection import (
-    hardware_server,
-)
-from zmart_drivers.leica.stellaris.navigator_expert.primitives.values.parsing import (
-    make_changeable_copy,
-)
+from zmart_drivers.leica.stellaris.navigator_expert.primitives.direct import hardware_server
+from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api.parsing import make_changeable_copy
 from zmart_drivers.leica.stellaris.navigator_expert.operations.changes import objective as objective_change
 
 #: The jobs' block and element ids as on the simulator (2026-10-13).

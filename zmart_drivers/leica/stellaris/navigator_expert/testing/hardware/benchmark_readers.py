@@ -34,9 +34,7 @@ READERS = ("direct", "api", "log")
 
 
 def readings_direct(_client):
-    from zmart_drivers.leica.stellaris.navigator_expert.primitives.direct import (
-        direct_reader as d,
-    )
+    from zmart_drivers.leica.stellaris.navigator_expert.primitives.direct import reads as d
 
     # The job's settings are read for JOB, as the other two readers read them,
     # so that an unselected job is compared on its own settings. (Read from
@@ -73,9 +71,7 @@ def from_settings(settings, xy, selected, status):
 
 
 def readings_api(client):
-    from zmart_drivers.leica.stellaris.navigator_expert.primitives.api import (
-        api_reader as a,
-    )
+    from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import reads as a
 
     return from_settings(
         a.get_job_settings(client, JOB),
@@ -86,9 +82,7 @@ def readings_api(client):
 
 
 def readings_log(_client):
-    from zmart_drivers.leica.stellaris.navigator_expert.primitives.log import (
-        log_reader as lr,
-    )
+    from zmart_drivers.leica.stellaris.navigator_expert.primitives.log import reads as lr
 
     snap = lr.parse_log()
     return from_settings(
@@ -103,9 +97,7 @@ def poll(reader, out: Path, until: Path):
     """Read as fast as possible until *until* exists; one JSON line per reading."""
     client = None
     if reader == "api":
-        from zmart_drivers.leica.stellaris.navigator_expert.connection.lasx_client import (
-            connect_python_client,
-        )
+        from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api.client import connect_python_client
 
         client = connect_python_client()
     read = {"direct": readings_direct, "api": readings_api, "log": readings_log}[reader]
@@ -154,9 +146,7 @@ def main() -> int:
     asked = parser.parse_args()
     JOB = asked.job
     if JOB is None:
-        from zmart_drivers.leica.stellaris.navigator_expert.primitives.direct import (
-            direct_reader,
-        )
+        from zmart_drivers.leica.stellaris.navigator_expert.primitives.direct import reads as direct_reader
 
         JOB = direct_reader.get_selected_job()["Name"]
     out = Path(asked.out)

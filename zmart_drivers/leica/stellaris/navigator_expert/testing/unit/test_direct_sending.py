@@ -17,25 +17,17 @@ from types import SimpleNamespace
 
 import pytest
 
-from zmart_drivers.leica.stellaris.navigator_expert.connection import (
-    hardware_server,
-)
-from zmart_drivers.leica.stellaris.navigator_expert.connection import (
-    waiting,
-)
+from zmart_drivers.leica.stellaris.navigator_expert.primitives.direct import hardware_server
+from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import waiting
 from zmart_drivers.leica.stellaris.navigator_expert.primitives.direct import (
     send_command,
 )
-from zmart_drivers.leica.stellaris.navigator_expert.primitives.direct import (
-    translations,
-)
-from zmart_drivers.leica.stellaris.navigator_expert.primitives.direct.translations import (
+from zmart_drivers.leica.stellaris.navigator_expert.primitives.direct import writes as translations
+from zmart_drivers.leica.stellaris.navigator_expert.primitives.direct.writes import (
     Fields,
     NoTranslation,
 )
-from zmart_drivers.leica.stellaris.navigator_expert.primitives.interface import (
-    lasx_dialogs,
-)
+from zmart_drivers.leica.stellaris.navigator_expert.procedures import answer_dialogs as lasx_dialogs
 
 
 class Server:

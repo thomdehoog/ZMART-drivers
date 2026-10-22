@@ -25,14 +25,10 @@ from zmart_drivers.leica.stellaris.navigator_expert.procedures.keep_in_view impo
     objective_shift,
 )
 
-from zmart_drivers.leica.stellaris.navigator_expert.operations.sending import (
-    prechecks,
-)
-from zmart_drivers.leica.stellaris.navigator_expert.connection import waiting
-from zmart_drivers.leica.stellaris.navigator_expert.operations.readings import named_readings as readers
-from zmart_drivers.leica.stellaris.navigator_expert.primitives.api import (
-    delivery,
-)
+from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import prechecks
+from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import waiting
+from zmart_drivers.leica.stellaris.navigator_expert.procedures import readings as readers
+from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import delivery
 from zmart_drivers.leica.stellaris.navigator_expert.operations.readings import reading_settings
 
 WINDOW_S = 0.5
@@ -346,9 +342,7 @@ def test_delivery_stops_trying_once_received():
 
 def test_commands_deliver_through_the_one_helper():
     """No other code hands a message to LAS X with its own tries or timeout."""
-    from zmart_drivers.leica.stellaris.navigator_expert.operations.sending import (
-        transport,
-    )
+    from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import transfer as transport
 
     assert transport.deliver is delivery.deliver
 
@@ -370,32 +364,32 @@ EXCEPTIONS = {
     ("operations/changes/acquire.py", "poll_interval"),
     ("operations/changes/acquire.py", "max_retries"),
     ("operations/changes/acquire.py", "max_confirm_attempts"),
-    ("operations/sending/command_profile.py", "max_retries"),
-    ("operations/sending/command_profile.py", "max_confirm_attempts"),
-    ("operations/sending/command_profile.py", "poll_interval"),
-    ("operations/sending/command_profile.py", "start_timeout"),
+    ("primitives/cam_api/profile.py", "max_retries"),
+    ("primitives/cam_api/profile.py", "max_confirm_attempts"),
+    ("primitives/cam_api/profile.py", "poll_interval"),
+    ("primitives/cam_api/profile.py", "start_timeout"),
     # LAS X filling in the error report after a command stays at 1 s.
     (
-        "operations/sending/transport.py",
+        "primitives/cam_api/transfer.py",
         "ECHO_SETTLE_TIMEOUT_S",
     ),
     # How old a log entry may be to count as current: freshness, not a wait.
     ("primitives/log/log_settings.py", "current_window_s"),
     # Waiting for a finished picture's files to stop growing on disk. This is
     # about files, not about LAS X's state, and has its own decided numbers.
-    ("primitives/capture/files.py", "DEFAULT_FILE_STABILITY_TIMEOUT_S"),
+    ("procedures/save_data/files.py", "DEFAULT_FILE_STABILITY_TIMEOUT_S"),
     (
-        "primitives/capture/files.py",
+        "procedures/save_data/files.py",
         "DEFAULT_EXPORT_COMPLETION_TIMEOUT_S",
     ),
     (
-        "primitives/capture/files.py",
+        "procedures/save_data/files.py",
         "DEFAULT_EXPORT_COMPLETION_POLL_INTERVAL_S",
     ),
-    ("primitives/capture/files.py", "timeout"),
-    ("primitives/capture/files.py", "poll_interval"),
+    ("procedures/save_data/files.py", "timeout"),
+    ("procedures/save_data/files.py", "poll_interval"),
     # The rule itself.
-    ("connection/waiting.py", "WINDOW_S"),
+    ("primitives/cam_api/waiting.py", "WINDOW_S"),
 }
 
 

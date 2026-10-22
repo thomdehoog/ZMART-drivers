@@ -67,9 +67,7 @@ class Cache:
         self.root, self.names = root, {}
 
     def name_of(self, number: str) -> str:
-        from zmart_drivers.leica.stellaris.navigator_expert.primitives.capture import (
-            lasx_data_container as container,
-        )
+        from zmart_drivers.leica.stellaris.navigator_expert.procedures.save_data import collect as container
 
         if number not in self.names:
             description = next(self.root.glob(f"V2LMSDC_OBJ{number}_*.tmp"), None)
@@ -156,9 +154,7 @@ def main() -> int:
     from zmart_drivers.leica.stellaris.navigator_expert.procedures.clear_cache import (
         release as lasx_cache_release,
     )
-    from zmart_drivers.leica.stellaris.navigator_expert.primitives.capture import (
-        lasx_data_container as container,
-    )
+    from zmart_drivers.leica.stellaris.navigator_expert.procedures.save_data import collect as container
     from zmart_drivers.leica.stellaris.navigator_expert.procedures.save_data import (
         save_waiting as _saving,
     )

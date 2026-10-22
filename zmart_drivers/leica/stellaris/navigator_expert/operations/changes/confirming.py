@@ -16,9 +16,9 @@ import queue
 import threading
 import time
 
-from ...dispatcher.door import make_log_entry
-from ...primitives.values.parsing import make_changeable_copy
-from ..readings import named_readings as readers
+from ...dispatcher.dispatch import make_log_entry
+from ...primitives.cam_api.parsing import make_changeable_copy
+from ...procedures import readings as readers
 
 log = logging.getLogger(__name__)
 

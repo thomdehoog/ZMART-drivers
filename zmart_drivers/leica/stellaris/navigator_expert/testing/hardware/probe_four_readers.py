@@ -38,7 +38,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "helpers"))  # low_
 
 import low_level as drv
 from zmart_drivers.leica.stellaris.navigator_expert.operations.readings import reading_table as capabilities
-from zmart_drivers.leica.stellaris.navigator_expert.operations.readings import named_readings as readers
+from zmart_drivers.leica.stellaris.navigator_expert.procedures import readings as readers
 
 HERE = Path(__file__).resolve().parent
 PASSIVE_MODES = ("api", "log", "hybrid")

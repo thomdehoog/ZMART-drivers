@@ -11,11 +11,9 @@ University of Zurich (thom.dehoog@zmb.uzh.ch, thomdehoog@gmail.com).
 
 from dataclasses import replace
 
-from zmart_drivers.leica.stellaris.navigator_expert.dispatcher.send_loop import (
-    resolve_profile as _resolve_profile,
-)
+from zmart_drivers.leica.stellaris.navigator_expert.dispatcher.write import resolve_profile as _resolve_profile
 
-from zmart_drivers.leica.stellaris.navigator_expert.operations.sending.command_profile import CommandProfile
+from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api.profile import CommandProfile
 from zmart_drivers.leica.stellaris.navigator_expert.operations.changes import acquire as acquire_change
 from zmart_drivers.leica.stellaris.navigator_expert.operations.changes import select_job as select_job_change
 

@@ -22,18 +22,13 @@ from pathlib import Path
 from typing import Any
 
 from ...driver_setup.orientation import Orientation
-from ...primitives.capture import files as _files
+from . import files as _files
 from . import materialize as _materialize
 from . import ome_zarr
 from zmart_drivers import metadata_convention as convention
 from .ome_canonical import VENDOR
-from ...primitives.capture.files import (
-    DEFAULT_EXPORT_COMPLETION_POLL_INTERVAL_S,
-    DEFAULT_EXPORT_COMPLETION_TIMEOUT_S,
-)
-from ...primitives.capture.lasx_data_container import (
-    collect_lasx_data_container,
-)
+from .files import DEFAULT_EXPORT_COMPLETION_POLL_INTERVAL_S, DEFAULT_EXPORT_COMPLETION_TIMEOUT_S
+from .collect import collect_lasx_data_container
 from .naming import (
     Naming,
     build_state_name,
@@ -42,10 +37,7 @@ from .naming import (
     projections_dir,
     state_dir,
 )
-from ...primitives.capture.product import (
-    AcquisitionResult,
-    ExportedAcquisition,
-)
+from .product import AcquisitionResult, ExportedAcquisition
 from .saved_acquisition import SavedAcquisition
 
 log = logging.getLogger(__name__)

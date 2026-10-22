@@ -23,7 +23,7 @@ for _p in (_HERE, _HELPERS, _REPO_ROOT):
 import validate_readers_side_by_side as sxs
 from zmart_drivers.leica.stellaris.navigator_expert.primitives.log import log_settings
 
-from zmart_drivers.leica.stellaris.navigator_expert.connection import waiting
+from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import waiting
 from zmart_drivers.leica.stellaris.navigator_expert.operations.readings import reading_settings
 
 

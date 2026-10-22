@@ -13,9 +13,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from zmart_drivers.leica.stellaris.navigator_expert.primitives.interface import (
-    lasx_navigator,
-)
+from zmart_drivers.leica.stellaris.navigator_expert.procedures.clear_cache import navigator as lasx_navigator
 
 
 class StandInButton:

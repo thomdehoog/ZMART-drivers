@@ -17,13 +17,13 @@ import time
 from functools import partial
 from typing import Any
 
-from ...dispatcher.door import make_log_entry
-from ...primitives.api.request import request_of
-from ...primitives.capture.product import AcquisitionResult
-from ..readings import named_readings as readers
-from ..sending.command_profile import CommandProfile
-from ..sending.error_classification import _check_api_error, _is_transient_error
-from ..sending.prechecks import check_idle
+from ...dispatcher.dispatch import make_log_entry
+from ...primitives.cam_api.request import request_of
+from ...procedures.save_data.product import AcquisitionResult
+from ...procedures import readings as readers
+from ...primitives.cam_api.profile import CommandProfile
+from ...primitives.cam_api.error_classification import _check_api_error, _is_transient_error
+from ...primitives.cam_api.prechecks import check_idle
 from . import confirming, run_change
 
 log = logging.getLogger(__name__)

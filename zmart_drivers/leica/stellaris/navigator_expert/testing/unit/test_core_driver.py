@@ -25,40 +25,32 @@ from functools import partial
 from types import SimpleNamespace
 from unittest.mock import MagicMock, PropertyMock, patch
 
-from zmart_drivers.leica.stellaris.navigator_expert.dispatcher import door
+from zmart_drivers.leica.stellaris.navigator_expert.dispatcher import dispatch as door
 from zmart_drivers.leica.stellaris.navigator_expert.procedures.keep_in_view import compensated_changes
-from zmart_drivers.leica.stellaris.navigator_expert.operations.sending import error_classification
-from zmart_drivers.leica.stellaris.navigator_expert.primitives.values import parsing
+from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import error_classification
+from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import parsing
 
-from zmart_drivers.leica.stellaris.navigator_expert.connection import (
-    lasx_client as session,
-)
+from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import client as session
 
-from zmart_drivers.leica.stellaris.navigator_expert.connection import lasx_settings
+from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import lasx_settings
 
 from zmart_drivers.leica.stellaris.navigator_expert.procedures.keep_in_view import (
     compensated_changes as commands_comp,
 )
 from zmart_drivers.leica.stellaris.navigator_expert.dispatcher import (
     confirm_loop as dispatch,
-    send_loop,
+    write as send_loop,
 )
-from zmart_drivers.leica.stellaris.navigator_expert.operations.sending import (
-    prechecks,
-)
-from zmart_drivers.leica.stellaris.navigator_expert.operations.readings import named_readings as readers
-from zmart_drivers.leica.stellaris.navigator_expert.operations.sending import (
-    error_classification as errors,
-)
+from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import prechecks
+from zmart_drivers.leica.stellaris.navigator_expert.procedures import readings as readers
+from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import error_classification as errors
 
-from zmart_drivers.leica.stellaris.navigator_expert.operations.sending import (
-    transport as transport_module,
-)
+from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import transfer as transport_module
 from zmart_drivers.leica.stellaris.navigator_expert.operations.changes import acquire as acquire_change
-from zmart_drivers.leica.stellaris.navigator_expert.operations.sending import command_profile
+from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import profile as command_profile
 from zmart_drivers.leica.stellaris.navigator_expert.operations.changes import confirming
 from zmart_drivers.leica.stellaris.navigator_expert.operations.changes import job_settings
-from zmart_drivers.leica.stellaris.navigator_expert.operations.sending import limit_rules
+from zmart_drivers.leica.stellaris.navigator_expert.driver_setup.limits import limit_rules
 from zmart_drivers.leica.stellaris.navigator_expert.operations.changes import objective as objective_change
 from zmart_drivers.leica.stellaris.navigator_expert.operations.readings import reading_settings
 from zmart_drivers.leica.stellaris.navigator_expert.operations.changes import run_change
@@ -569,7 +561,7 @@ class TestRetryBackoff(unittest.TestCase):
 
         with (
             patch(
-                "zmart_drivers.leica.stellaris.navigator_expert.dispatcher.send_loop.time.sleep",
+                "zmart_drivers.leica.stellaris.navigator_expert.dispatcher.write.time.sleep",
                 # patching dispatch.time.sleep rebinds the STDLIB time.sleep;
                 # leftover daemon threads (confirmation-race legs from earlier
                 # tests) also call it, so record main-thread sleeps only
@@ -606,7 +598,7 @@ class TestRetryBackoff(unittest.TestCase):
 
         with (
             patch(
-                "zmart_drivers.leica.stellaris.navigator_expert.dispatcher.send_loop.time.sleep",
+                "zmart_drivers.leica.stellaris.navigator_expert.dispatcher.write.time.sleep",
                 # patching dispatch.time.sleep rebinds the STDLIB time.sleep;
                 # leftover daemon threads (confirmation-race legs from earlier
                 # tests) also call it, so record main-thread sleeps only
@@ -642,7 +634,7 @@ class TestRetryBackoff(unittest.TestCase):
 
         with (
             patch(
-                "zmart_drivers.leica.stellaris.navigator_expert.dispatcher.send_loop.time.sleep",
+                "zmart_drivers.leica.stellaris.navigator_expert.dispatcher.write.time.sleep",
                 # patching dispatch.time.sleep rebinds the STDLIB time.sleep;
                 # leftover daemon threads (confirmation-race legs from earlier
                 # tests) also call it, so record main-thread sleeps only
@@ -688,7 +680,7 @@ class TestRetryBackoff(unittest.TestCase):
 
         with (
             patch(
-                "zmart_drivers.leica.stellaris.navigator_expert.dispatcher.send_loop.time.sleep",
+                "zmart_drivers.leica.stellaris.navigator_expert.dispatcher.write.time.sleep",
                 # patching dispatch.time.sleep rebinds the STDLIB time.sleep;
                 # leftover daemon threads (confirmation-race legs from earlier
                 # tests) also call it, so record main-thread sleeps only
@@ -724,7 +716,7 @@ class TestRetryBackoff(unittest.TestCase):
 
         with (
             patch(
-                "zmart_drivers.leica.stellaris.navigator_expert.dispatcher.send_loop.time.sleep",
+                "zmart_drivers.leica.stellaris.navigator_expert.dispatcher.write.time.sleep",
                 # patching dispatch.time.sleep rebinds the STDLIB time.sleep;
                 # leftover daemon threads (confirmation-race legs from earlier
                 # tests) also call it, so record main-thread sleeps only
@@ -759,7 +751,7 @@ class TestRetryBackoff(unittest.TestCase):
 
         with (
             patch(
-                "zmart_drivers.leica.stellaris.navigator_expert.dispatcher.send_loop.time.sleep",
+                "zmart_drivers.leica.stellaris.navigator_expert.dispatcher.write.time.sleep",
                 # patching dispatch.time.sleep rebinds the STDLIB time.sleep;
                 # leftover daemon threads (confirmation-race legs from earlier
                 # tests) also call it, so record main-thread sleeps only

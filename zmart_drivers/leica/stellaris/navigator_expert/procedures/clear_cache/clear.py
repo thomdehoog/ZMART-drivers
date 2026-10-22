@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import logging
 
-from ...session.handle import Session, require_open
+from ...session import Session, require_open
 from . import release
 
 log = logging.getLogger(__name__)

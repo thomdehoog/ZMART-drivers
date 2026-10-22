@@ -11,9 +11,7 @@ against Unknown status (Unknown is not idle).
 import unittest
 from unittest.mock import patch
 
-from zmart_drivers.leica.stellaris.navigator_expert.operations.sending import (
-    prechecks,
-)
+from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import prechecks
 from zmart_drivers.leica.stellaris.navigator_expert.operations.readings import reading_settings
 from zmart_drivers.leica.stellaris.navigator_expert.operations.changes import stage
 from zmart_drivers.leica.stellaris.navigator_expert.operations.changes import objective as objective_change

@@ -12,9 +12,7 @@ the CAM API's own job list still said 145/147/149 after an experiment load.
 import pytest
 from state_tree_stand_in import StandInNodes
 
-from zmart_drivers.leica.stellaris.navigator_expert.connection import (
-    hardware_server,
-)
+from zmart_drivers.leica.stellaris.navigator_expert.primitives.direct import hardware_server
 from zmart_drivers.leica.stellaris.navigator_expert.primitives.direct import (
     state_tree,
 )

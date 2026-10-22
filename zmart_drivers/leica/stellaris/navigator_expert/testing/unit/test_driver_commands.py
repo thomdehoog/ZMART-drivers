@@ -26,16 +26,10 @@ from zmart_drivers.leica.stellaris.navigator_expert.driver_setup.limits import (
     handshake as _handshake,
 )
 
-from zmart_drivers.leica.stellaris.navigator_expert.primitives.capture.product import (
-    PlaneIndex,
-)
+from zmart_drivers.leica.stellaris.navigator_expert.procedures.save_data.product import PlaneIndex
 
-from zmart_drivers.leica.stellaris.navigator_expert.dispatcher import (
-    gate as _gate,
-)
-from zmart_drivers.leica.stellaris.navigator_expert.primitives.values import (
-    parsing as _readers_parsing,
-)
+from zmart_drivers.leica.stellaris.navigator_expert.dispatcher import limits as _gate
+from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import parsing as _readers_parsing
 from zmart_drivers.leica.stellaris.navigator_expert.driver_setup import (
     orientation as _orientation,
 )
@@ -55,7 +49,7 @@ from zmart_drivers.leica.stellaris.navigator_expert.procedures.save_data import 
     save as _save,
 )
 
-from zmart_drivers.leica.stellaris.navigator_expert.driver_api import acquire as _acquisition
+from zmart_drivers.leica.stellaris.navigator_expert.procedures import acquire as _acquisition
 
 from zmart_drivers.leica.stellaris.navigator_expert.procedures.keep_in_view import (
     compensated_changes as _commands_comp,
@@ -65,27 +59,16 @@ from zmart_drivers.leica.stellaris.navigator_expert.procedures.absolute_coordina
 )
 from zmart_drivers.leica.stellaris.navigator_expert.zmart_controller_plugin import info as _controller_info
 from zmart_drivers.leica.stellaris.navigator_expert.zmart_controller_plugin import procedure_menu as _procedure_menu
-from zmart_drivers.leica.stellaris.navigator_expert.driver_api import state as _state_record
+from zmart_drivers.leica.stellaris.navigator_expert.procedures import state as _state_record
 
-from zmart_drivers.leica.stellaris.navigator_expert.session import (
-    handle as _info,
-)
-from zmart_drivers.leica.stellaris.navigator_expert.operations.readings import named_readings as _readers
+from zmart_drivers.leica.stellaris.navigator_expert import session as _info
+from zmart_drivers.leica.stellaris.navigator_expert.procedures import readings as _readers
 
-from zmart_drivers.leica.stellaris.navigator_expert.connection import (
-    lasx_client as _connect_module,
-)
-from zmart_drivers.leica.stellaris.navigator_expert.session import (
-    loaded_config as _session_state,
-)
-from zmart_drivers.leica.stellaris.navigator_expert.driver_api.microscope import (
-    DEFAULT_CONNECTION,
-    Microscope,
-)
+from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import client as _connect_module
+from zmart_drivers.leica.stellaris.navigator_expert import loaded_config as _session_state
+from zmart_drivers.leica.stellaris.navigator_expert.methods import DEFAULT_CONNECTION, Microscope
 from zmart_drivers.leica.stellaris.navigator_expert.zmart_controller_plugin.zmart_controller_plugin import ZmartControllerPlugin
-from zmart_drivers.leica.stellaris.navigator_expert.session.handle import (
-    Session,
-)
+from zmart_drivers.leica.stellaris.navigator_expert.session import Session
 
 
 def answering_client():
@@ -222,7 +205,7 @@ from zmart_drivers.leica.stellaris.navigator_expert.driver_setup.origin import (
     set_origin as _set_origin,
 )
 from zmart_drivers.leica.stellaris.navigator_expert.operations.changes import acquire as acquire_change
-from zmart_drivers.leica.stellaris.navigator_expert.operations.sending import limit_rules
+from zmart_drivers.leica.stellaris.navigator_expert.driver_setup.limits import limit_rules
 from zmart_drivers.leica.stellaris.navigator_expert.procedures.save_data import save_settings
 from zmart_drivers.leica.stellaris.navigator_expert.operations.changes import stage
 

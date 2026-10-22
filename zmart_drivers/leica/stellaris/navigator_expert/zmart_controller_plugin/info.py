@@ -10,13 +10,13 @@ University of Zurich (thom.dehoog@zmb.uzh.ch, thomdehoog@gmail.com).
 from __future__ import annotations
 
 from pathlib import Path
-from ..session import loaded_config as _session_state
+from .. import loaded_config as _session_state
 from ..driver_setup import store as _machine
-from ..dispatcher import gate as _gate
-from ..operations.readings import named_readings as _readers
-from ..session import handle as _info
+from ..dispatcher import limits as _gate
+from ..procedures import readings as _readers
+from .. import session as _info
 from ..procedures.absolute_coordinate_system.frame import canvas, get_xyz
-from ..session.handle import Session, job_catalog, require_open, try_
+from ..session import Session, job_catalog, require_open, try_
 
 
 def get_info(handle: Session) -> dict:

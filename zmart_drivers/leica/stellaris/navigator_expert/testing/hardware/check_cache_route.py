@@ -274,9 +274,7 @@ def _described(ome) -> dict:
 
 def _laser_power(record: dict) -> list[dict]:
     """Each laser's power fields, from the capture's own setting in LAS X's description."""
-    from zmart_drivers.leica.stellaris.navigator_expert.primitives.capture.metadata_map import (
-        image_of,
-    )
+    from zmart_drivers.leica.stellaris.navigator_expert.procedures.save_data.metadata import image_of
 
     description = next(
         (Path(p) for p in record["files"] if p.endswith(".lasx-description.xml")),

@@ -86,9 +86,7 @@ CI_DEFAULT_POSITION_UM = {
 
 def _register_adapter() -> Any:
     """Return the driver's connect module, whose LAS X connection the --mock mode swaps out."""
-    from zmart_drivers.leica.stellaris.navigator_expert.connection import (
-        lasx_client as connect,
-    )
+    from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import client as connect
 
     return connect
 

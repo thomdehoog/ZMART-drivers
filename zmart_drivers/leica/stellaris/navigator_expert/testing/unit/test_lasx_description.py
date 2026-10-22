@@ -16,14 +16,12 @@ from pathlib import Path
 
 import pytest
 
-from zmart_drivers.leica.stellaris.navigator_expert.primitives.capture import (
-    metadata_map as described,
-)
+from zmart_drivers.leica.stellaris.navigator_expert.procedures.save_data import metadata as described
 from zmart_drivers import metadata_convention as convention
 from zmart_drivers.leica.stellaris.navigator_expert.procedures.save_data import (
     ome_canonical as canonical,
 )
-from zmart_drivers.leica.stellaris.navigator_expert.primitives.capture.product import (
+from zmart_drivers.leica.stellaris.navigator_expert.procedures.save_data.product import (
     AcquisitionMetadata,
     PlaneIndex,
 )

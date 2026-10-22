@@ -41,7 +41,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from ..driver_api.microscope import Microscope
+from ..methods import Microscope
 from . import info
 from . import procedure_menu
 

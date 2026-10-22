@@ -20,16 +20,16 @@ import logging
 import time
 from functools import partial
 
-from ...connection import waiting
-from ...connection.hardware_server import HardwareServerUnavailable
-from ...dispatcher.door import make_log_entry, make_timing
-from ...primitives.api.request import request_of
-from ...primitives.direct import direct_reader
+from ...primitives.cam_api import waiting
+from ...primitives.direct.hardware_server import HardwareServerUnavailable
+from ...dispatcher.dispatch import make_log_entry, make_timing
+from ...primitives.cam_api.request import request_of
+from ...primitives.direct import reads as direct_reader
 from ...primitives.log import log_wait
-from ..readings import named_readings as readers
+from ...procedures import readings as readers
 from ..readings import reading_settings
-from ..sending.command_profile import CommandProfile
-from ..sending.prechecks import check_idle
+from ...primitives.cam_api.profile import CommandProfile
+from ...primitives.cam_api.prechecks import check_idle
 from . import confirming, run_change
 
 log = logging.getLogger(__name__)
@@ -420,7 +420,7 @@ def prime_log_cluster(client, jobs):
 def selected_job_from_log(profile):
     """Fresh selected-job name from LAS X logs, or None when unavailable."""
     try:
-        from ...primitives.log import log_reader
+        from ...primitives.log import reads as log_reader
 
         max_age_s = profile.selected_job_log_cluster_max_age_s
         if max_age_s is None:

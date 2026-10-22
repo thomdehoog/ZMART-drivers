@@ -18,10 +18,10 @@ import math
 from collections.abc import Callable
 from dataclasses import dataclass
 
-from ...primitives.api import api_reader
-from ...primitives.direct import direct_reader
-from ...primitives.log import log_reader
-from ...primitives.values import derived
+from ...primitives.cam_api import reads as api_reader
+from ...primitives.direct import reads as direct_reader
+from ...primitives.log import reads as log_reader
+from ...primitives.cam_api import derived
 
 
 class UnsupportedSource(RuntimeError):

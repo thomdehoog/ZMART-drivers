@@ -18,7 +18,7 @@ from limits_fixtures import hermetic_mock_machine_root
 from mock_lasx_api import MockLasxClient
 from zmart_controller.registry import load_driver
 
-from zmart_drivers.leica.stellaris.navigator_expert.driver_api import microscope
+from zmart_drivers.leica.stellaris.navigator_expert import methods as microscope
 from zmart_drivers.leica.stellaris.navigator_expert.zmart_controller_plugin import procedure_menu
 from zmart_drivers.leica.stellaris.navigator_expert.zmart_controller_plugin import zmart_controller_plugin
 from zmart_drivers.leica.stellaris.navigator_expert.primitives.log import log_settings
@@ -27,9 +27,7 @@ from zmart_drivers.leica.stellaris.navigator_expert.primitives.log import log_se
 # The folder to register is the driver's: the one that holds zmart_controller_plugin/.
 DRIVER_FOLDER = Path(zmart_controller_plugin.__file__).resolve().parents[1]
 
-from zmart_drivers.leica.stellaris.navigator_expert.connection import (
-    lasx_client as _connect_module,
-)
+from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import client as _connect_module
 from zmart_drivers.leica.stellaris.navigator_expert.operations.readings import reading_settings
 
 

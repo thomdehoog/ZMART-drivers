@@ -35,11 +35,9 @@ import sys
 import time
 from pathlib import Path
 
-from zmart_drivers.leica.stellaris.navigator_expert.connection import waiting
-from zmart_drivers.leica.stellaris.navigator_expert.primitives.interface import (
-    lasx_dialogs,
-    lasx_navigator,
-)
+from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import waiting
+from zmart_drivers.leica.stellaris.navigator_expert.procedures import answer_dialogs as lasx_dialogs
+from zmart_drivers.leica.stellaris.navigator_expert.procedures.clear_cache import navigator as lasx_navigator
 
 #: How long a press may take to show on screen: one window, by the driver's one waiting rule.
 WAIT_S = waiting.WINDOW_S

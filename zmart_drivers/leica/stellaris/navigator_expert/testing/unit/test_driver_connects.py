@@ -16,13 +16,9 @@ import pytest
 from mock_lasx_api import MockLasxClient
 
 from zmart_drivers.leica.stellaris.navigator_expert.zmart_controller_plugin.zmart_controller_plugin import ZmartControllerPlugin
-from zmart_drivers.leica.stellaris.navigator_expert.connection import (
-    lasx_client,
-)
+from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import client as lasx_client
 
-from zmart_drivers.leica.stellaris.navigator_expert.session import (
-    loaded_config as session_state,
-)
+from zmart_drivers.leica.stellaris.navigator_expert import loaded_config as session_state
 from zmart_drivers.leica.stellaris.navigator_expert.driver_setup import (
     orientation as orientation_item,
 )
@@ -33,7 +29,7 @@ from zmart_drivers.leica.stellaris.navigator_expert.driver_setup.orientation imp
 from zmart_drivers.leica.stellaris.navigator_expert.driver_setup.store import (
     MachineProfile,
 )
-from zmart_drivers.leica.stellaris.navigator_expert.dispatcher import gate
+from zmart_drivers.leica.stellaris.navigator_expert.dispatcher import limits as gate
 from zmart_drivers.leica.stellaris.navigator_expert.procedures.save_data import save_settings
 
 

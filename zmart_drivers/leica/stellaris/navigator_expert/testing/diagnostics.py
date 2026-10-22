@@ -129,9 +129,7 @@ def _lasx_runtime_status() -> str:
     on a clean "unavailable", which is the correct, expected answer there.
     """
     try:
-        from zmart_drivers.leica.stellaris.navigator_expert.connection import (
-            lasx_runtime,
-        )
+        from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import lasx_runtime
     except Exception as exc:
         return f"module import failed: {type(exc).__name__}: {exc}"
 

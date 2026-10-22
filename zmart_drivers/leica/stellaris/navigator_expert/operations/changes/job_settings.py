@@ -33,12 +33,12 @@ from dataclasses import dataclass
 from functools import partial
 from typing import Any
 
-from ...connection import waiting
-from ...dispatcher.door import make_log_entry
-from ...primitives.api.request import request_of
-from ...primitives.values.parsing import parse_format
-from ..sending.command_profile import CommandProfile
-from ..sending.error_classification import _check_api_error, classify_error, sends_again
+from ...primitives.cam_api import waiting
+from ...dispatcher.dispatch import make_log_entry
+from ...primitives.cam_api.request import request_of
+from ...primitives.cam_api.parsing import parse_format
+from ...primitives.cam_api.profile import CommandProfile
+from ...primitives.cam_api.error_classification import _check_api_error, classify_error, sends_again
 from . import confirming, run_change
 
 log = logging.getLogger(__name__)

@@ -22,14 +22,12 @@ from zmart_drivers.leica.stellaris.navigator_expert.driver_setup.orientation imp
 from zmart_drivers.leica.stellaris.navigator_expert.procedures.save_data.naming import (
     Naming,
 )
-from zmart_drivers.leica.stellaris.navigator_expert.primitives.capture.product import (
-    PlaneIndex,
-)
+from zmart_drivers.leica.stellaris.navigator_expert.procedures.save_data.product import PlaneIndex
 
 from zmart_drivers.leica.stellaris.navigator_expert.procedures.save_data import (
     save as saving,
 )
-from zmart_drivers.leica.stellaris.navigator_expert.primitives.capture import product
+from zmart_drivers.leica.stellaris.navigator_expert.procedures.save_data import product
 
 DATA = Path(__file__).resolve().parents[1] / "data" / "lasx_description"
 PID = "669c"

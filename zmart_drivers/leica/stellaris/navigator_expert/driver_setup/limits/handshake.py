@@ -16,9 +16,9 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from ...dispatcher import gate as _gate
-from ...operations.sending import limit_rules as _rules
-from ...operations.sending.limit_rules import NOTEBOOK_POINTER
+from ...dispatcher import limits as _gate
+from . import limit_rules as _rules
+from .limit_rules import NOTEBOOK_POINTER
 from .. import store as _machine
 from . import config as _limits_config
 

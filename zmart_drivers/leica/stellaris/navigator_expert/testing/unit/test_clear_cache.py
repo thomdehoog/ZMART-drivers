@@ -10,9 +10,7 @@ from zmart_drivers.leica.stellaris.navigator_expert.procedures.clear_cache impor
 from zmart_drivers.leica.stellaris.navigator_expert.procedures.clear_cache import (
     release as release,
 )
-from zmart_drivers.leica.stellaris.navigator_expert.session.handle import (
-    Session,
-)
+from zmart_drivers.leica.stellaris.navigator_expert.session import Session
 
 
 class TestPreparing:

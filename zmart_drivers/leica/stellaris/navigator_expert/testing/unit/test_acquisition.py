@@ -27,7 +27,7 @@ import zarr
 from zmart_drivers.leica.stellaris.navigator_expert.procedures.save_data import save as saving
 from zmart_drivers.leica.stellaris.navigator_expert.procedures.save_data import saved_acquisition
 from zmart_drivers.metadata_convention import Notes
-from zmart_drivers.leica.stellaris.navigator_expert.primitives.capture import product
+from zmart_drivers.leica.stellaris.navigator_expert.procedures.save_data import product
 from zmart_drivers.leica.stellaris.navigator_expert.driver_setup.orientation import (
     Orientation,
     reorient_array,
@@ -36,7 +36,7 @@ from zmart_drivers.leica.stellaris.navigator_expert.procedures.save_data.naming 
     Naming,
     build_image_name,
 )
-from zmart_drivers.leica.stellaris.navigator_expert.primitives.capture.product import (
+from zmart_drivers.leica.stellaris.navigator_expert.procedures.save_data.product import (
     ExportedAcquisition,
     ExportedPosition,
 )

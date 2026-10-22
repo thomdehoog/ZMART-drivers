@@ -22,7 +22,7 @@ from zmart_drivers.leica.stellaris.navigator_expert.driver_setup.orientation imp
 from zmart_drivers.leica.stellaris.navigator_expert.procedures.save_data.naming import (
     Naming,
 )
-from zmart_drivers.leica.stellaris.navigator_expert.primitives.capture.product import (
+from zmart_drivers.leica.stellaris.navigator_expert.procedures.save_data.product import (
     PlaneIndex,
     RawPlaneSource,
 )
@@ -30,10 +30,8 @@ from zmart_drivers.leica.stellaris.navigator_expert.primitives.capture.product i
 from zmart_drivers.leica.stellaris.navigator_expert.procedures.save_data import (
     save as acquisition,
 )
-from zmart_drivers.leica.stellaris.navigator_expert.primitives.capture import (
-    lasx_data_container as container,
-)
-from zmart_drivers.leica.stellaris.navigator_expert.primitives.capture import product
+from zmart_drivers.leica.stellaris.navigator_expert.procedures.save_data import collect as container
+from zmart_drivers.leica.stellaris.navigator_expert.procedures.save_data import product
 
 PID = "669c"
 

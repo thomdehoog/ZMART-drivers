@@ -4,10 +4,8 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from zmart_drivers.leica.stellaris.navigator_expert.connection import lasx_settings
-from zmart_drivers.leica.stellaris.navigator_expert.connection import (
-    lasx_runtime,
-)
+from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import lasx_settings
+from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import lasx_runtime
 
 
 class TestLasxRuntime(unittest.TestCase):

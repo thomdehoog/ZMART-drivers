@@ -24,14 +24,8 @@ from pathlib import Path
 from typing import Any
 
 from zmart_drivers import metadata_convention as convention
-from ...primitives.capture import tiff_tag as _ome
-from ...primitives.capture.product import (
-    AcquisitionMetadata,
-    ChannelMetadata,
-    Instrument,
-    PlaneIndex,
-    PlaneMetadata,
-)
+from . import tiff_tag as _ome
+from .product import AcquisitionMetadata, ChannelMetadata, Instrument, PlaneIndex, PlaneMetadata
 
 log = logging.getLogger(__name__)
 

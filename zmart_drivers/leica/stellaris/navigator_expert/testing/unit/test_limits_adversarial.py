@@ -51,7 +51,7 @@ from zmart_drivers.leica.stellaris.navigator_expert.driver_setup.store import (
     MachineProfile,
 )
 
-from zmart_drivers.leica.stellaris.navigator_expert.dispatcher import gate
+from zmart_drivers.leica.stellaris.navigator_expert.dispatcher import limits as gate
 
 DRIVER_ROOT = Path(__file__).resolve().parents[2]
 
@@ -59,20 +59,15 @@ DRIVER_ROOT = Path(__file__).resolve().parents[2]
 # Helpers
 # =============================================================================
 
-from zmart_drivers.leica.stellaris.navigator_expert.connection import (
-    lasx_client as _connect_module,
-)
-from zmart_drivers.leica.stellaris.navigator_expert.driver_api.microscope import (
-    DEFAULT_CONNECTION,
-    Microscope,
-)
+from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import client as _connect_module
+from zmart_drivers.leica.stellaris.navigator_expert.methods import DEFAULT_CONNECTION, Microscope
 from zmart_drivers.leica.stellaris.navigator_expert.zmart_controller_plugin.zmart_controller_plugin import ZmartControllerPlugin
 from zmart_drivers.leica.stellaris.navigator_expert.procedures.absolute_coordinate_system import (
     frame as _frame,
 )
 from zmart_drivers.leica.stellaris.navigator_expert.operations.changes import acquire as acquire_change
 from zmart_drivers.leica.stellaris.navigator_expert.operations.changes import job_settings
-from zmart_drivers.leica.stellaris.navigator_expert.operations.sending import limit_rules
+from zmart_drivers.leica.stellaris.navigator_expert.driver_setup.limits import limit_rules
 from zmart_drivers.leica.stellaris.navigator_expert.operations.changes import stage
 
 
@@ -614,7 +609,7 @@ def test_absent_setter_falls_back_but_explicit_empty_list_is_unlimited(mock_clie
 def test_reads_work_without_a_handshake_while_mutations_refuse(mock_client):
     """No handshake == read-only session, not a dead session. Reads never touch
     the gate; mutations refuse fail-closed until a handshake runs."""
-    from zmart_drivers.leica.stellaris.navigator_expert.operations.readings import named_readings as readers
+    from zmart_drivers.leica.stellaris.navigator_expert.procedures import readings as readers
 
     # This client never handshook — the one path that stays fail-closed.
     assert gate.state_for(mock_client) is None
@@ -880,10 +875,8 @@ def test_adapter_bypass_refuses_at_the_commands_layer(clear_stage_limits):
     not a missing handshake."""
     from unittest.mock import patch
 
-    from zmart_drivers.leica.stellaris.navigator_expert.primitives.values import (
-        parsing as _cmd_settings,
-    )
-    from zmart_drivers.leica.stellaris.navigator_expert.operations.readings import named_readings as _readers
+    from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import parsing as _cmd_settings
+    from zmart_drivers.leica.stellaris.navigator_expert.procedures import readings as _readers
 
     _raw_snapshot(_machine_root(), limits_text=_BAD_LIMITS_TEXTS["missing_axis"])
     client = MockLasxClient(latency=0.0)
@@ -917,10 +910,8 @@ def test_controller_session_bypass_refuses_at_the_commands_layer(clear_stage_lim
     import zmart_controller
 
     from zmart_drivers.leica.stellaris.navigator_expert.zmart_controller_plugin.zmart_controller_plugin import ZmartControllerPlugin as driver
-    from zmart_drivers.leica.stellaris.navigator_expert.primitives.values import (
-        parsing as _cmd_settings,
-    )
-    from zmart_drivers.leica.stellaris.navigator_expert.operations.readings import named_readings as _readers
+    from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import parsing as _cmd_settings
+    from zmart_drivers.leica.stellaris.navigator_expert.procedures import readings as _readers
 
     _raw_snapshot(_machine_root(), limits_text=_BAD_LIMITS_TEXTS["missing_axis"])
     client = MockLasxClient(latency=0.0)

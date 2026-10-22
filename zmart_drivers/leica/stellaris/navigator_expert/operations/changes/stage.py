@@ -13,13 +13,13 @@ import logging
 import time
 from functools import partial
 
-from ...connection import waiting
-from ...dispatcher.door import make_log_entry
-from ...primitives.api.request import request_of
-from ..readings import named_readings as readers
-from ..sending.command_profile import CommandProfile
-from ..sending.limit_rules import check_xy, check_z
-from ..sending.prechecks import check_idle
+from ...primitives.cam_api import waiting
+from ...dispatcher.dispatch import make_log_entry
+from ...primitives.cam_api.request import request_of
+from ...procedures import readings as readers
+from ...primitives.cam_api.profile import CommandProfile
+from ...driver_setup.limits.limit_rules import check_xy, check_z
+from ...primitives.cam_api.prechecks import check_idle
 from . import confirming, run_change
 
 log = logging.getLogger(__name__)

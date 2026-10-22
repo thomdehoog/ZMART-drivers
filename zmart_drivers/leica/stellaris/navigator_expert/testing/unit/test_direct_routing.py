@@ -27,17 +27,13 @@ from zmart_drivers.leica.stellaris.navigator_expert.operations.readings import r
 from zmart_drivers.leica.stellaris.navigator_expert.procedures.keep_in_view import (
     compensated_changes as commands_comp,
 )
-from zmart_drivers.leica.stellaris.navigator_expert.operations.sending import (
-    prechecks,
-)
-from zmart_drivers.leica.stellaris.navigator_expert.operations.readings import named_readings as readers
+from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import prechecks
+from zmart_drivers.leica.stellaris.navigator_expert.procedures import readings as readers
 from zmart_drivers.leica.stellaris.navigator_expert.primitives.direct import (
-    direct_reader,
+    reads as direct_reader,
     state_tree,
 )
-from zmart_drivers.leica.stellaris.navigator_expert.connection import (
-    hardware_server,
-)
+from zmart_drivers.leica.stellaris.navigator_expert.primitives.direct import hardware_server
 from zmart_drivers.leica.stellaris.navigator_expert.operations.changes import acquire as acquire_change
 from zmart_drivers.leica.stellaris.navigator_expert.operations.changes import select_job as select_job_change
 from zmart_drivers.leica.stellaris.navigator_expert.operations.changes import stage

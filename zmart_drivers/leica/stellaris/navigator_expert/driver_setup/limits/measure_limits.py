@@ -17,8 +17,8 @@ import math
 from collections.abc import Mapping, Sequence
 from typing import Any
 
-from ...operations.readings import named_readings as _readers
-from ...operations.sending.limit_rules import STAGE_BACKSTOP_UM
+from ...procedures import readings as _readers
+from .limit_rules import STAGE_BACKSTOP_UM
 
 CORNERS = (1, 2, 3, 4)
 

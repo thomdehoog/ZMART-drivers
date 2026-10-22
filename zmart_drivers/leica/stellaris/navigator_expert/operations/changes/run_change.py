@@ -25,10 +25,10 @@ import logging
 from dataclasses import replace
 from functools import partial
 
-from ...dispatcher import door
-from ...dispatcher import gate
+from ...dispatcher import dispatch as door
+from ...dispatcher import limits as gate
 from .confirming import race_confirmations
-from ..sending.limit_rules import NOTEBOOK_POINTER
+from ...driver_setup.limits.limit_rules import NOTEBOOK_POINTER
 
 log = logging.getLogger(__name__)
 

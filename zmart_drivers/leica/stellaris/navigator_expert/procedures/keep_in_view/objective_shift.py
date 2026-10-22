@@ -25,7 +25,7 @@ driver-performed job or objective change is covered no matter who asked for
 it — but the behaviour is explicit, not hidden: ``set_objective`` and
 ``select_job`` take a ``compensate`` parameter (decision §8). The default
 follows the session's connect-time policy from the per-connection config
-(:mod:`navigator_expert.connection.session_state`): compensation runs when
+(:mod:`navigator_expert.loaded_config`): compensation runs when
 calibration was loaded, and stays off for a client the driver never
 connected through (bare command-level use, tests, the setup notebooks) or a
 session that declined calibration (``load_calibration=False``). The delta
@@ -58,7 +58,7 @@ def _translations_for(client: Any) -> dict | None:
     fails the command's result rather than silently leaving the stage at
     the old lens's spot.
     """
-    from ...session import loaded_config as session_state
+    from ... import loaded_config as session_state
 
     config = session_state.get(client)
     if config is None:
@@ -98,7 +98,7 @@ def record_before_change(
             )
         return None
 
-    from ...operations.readings import named_readings as _readers
+    from .. import readings as _readers
 
     if job_name is None:
         selected = _readers.get_selected_job(client) or {}
@@ -151,7 +151,7 @@ def compensate_after_change(
         }
 
     try:
-        from ...operations.readings import named_readings as _readers
+        from .. import readings as _readers
 
         if new_slot is None:
             settings = _readers.get_job_settings(client, job_name) or {}

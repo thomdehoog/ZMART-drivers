@@ -49,11 +49,7 @@ from ...driver_setup.orientation import Orientation, reorient_array
 from . import materialize
 from zmart_drivers import metadata_convention as convention
 from . import ome_canonical as canonical
-from ...primitives.capture.product import (
-    AcquisitionMetadata,
-    ExportedAcquisition,
-    PlaneIndex,
-)
+from .product import AcquisitionMetadata, ExportedAcquisition, PlaneIndex
 
 __all__ = [
     "Capture",

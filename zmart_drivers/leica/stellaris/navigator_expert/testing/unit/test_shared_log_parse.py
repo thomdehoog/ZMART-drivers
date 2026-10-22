@@ -15,11 +15,9 @@ from unittest.mock import patch
 
 import pytest
 
-from zmart_drivers.leica.stellaris.navigator_expert.operations.readings import named_readings as readers
-from zmart_drivers.leica.stellaris.navigator_expert.connection import waiting
-from zmart_drivers.leica.stellaris.navigator_expert.primitives.log import (
-    log_reader,
-)
+from zmart_drivers.leica.stellaris.navigator_expert.procedures import readings as readers
+from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import waiting
+from zmart_drivers.leica.stellaris.navigator_expert.primitives.log import reads as log_reader
 from zmart_drivers.leica.stellaris.navigator_expert.operations.readings import reading_settings
 
 PARSE_S = 0.05

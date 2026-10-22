@@ -2,10 +2,8 @@
 
 import unittest
 
-from zmart_drivers.leica.stellaris.navigator_expert.connection import waiting
-from zmart_drivers.leica.stellaris.navigator_expert.primitives.log import (
-    log_reader,
-)
+from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import waiting
+from zmart_drivers.leica.stellaris.navigator_expert.primitives.log import reads as log_reader
 from zmart_drivers.leica.stellaris.navigator_expert.primitives.log.log_wait import (
     wait_for_selected_job_log,
 )

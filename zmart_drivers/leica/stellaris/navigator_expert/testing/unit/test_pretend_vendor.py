@@ -15,7 +15,7 @@ from pathlib import Path
 import pretend_vendor
 import pytest
 
-from zmart_drivers.leica.stellaris.navigator_expert.dispatcher import gate
+from zmart_drivers.leica.stellaris.navigator_expert.dispatcher import limits as gate
 
 
 @pytest.fixture

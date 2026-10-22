@@ -12,7 +12,7 @@ from __future__ import annotations
 from ..procedures.clear_cache.clear import clear
 from ..procedures.save_data.save_waiting import save_waiting
 from ..procedures.absolute_coordinate_system.frame import zero_z_galvo
-from ..session.handle import Session, require_open
+from ..session import Session, require_open
 
 
 def get_procedures(handle: Session) -> dict:

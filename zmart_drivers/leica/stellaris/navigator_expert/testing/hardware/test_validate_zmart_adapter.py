@@ -28,9 +28,7 @@ for _p in (_HERE, _HELPERS, _REPO_ROOT):
         sys.path.insert(0, str(_p))
 
 import validate_zmart_adapter
-from zmart_drivers.leica.stellaris.navigator_expert.connection import (
-    lasx_client as adapter,
-)
+from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import client as adapter
 from zmart_drivers.leica.stellaris.navigator_expert.driver_setup import (
     store as _machine,
 )

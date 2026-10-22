@@ -14,7 +14,7 @@ import time
 
 from .. import store as _machine
 from ...procedures.absolute_coordinate_system.frame import hardware_snapshot
-from ...session.handle import Session, require_open
+from ...session import Session, require_open
 
 
 def set_origin(handle: Session) -> dict:

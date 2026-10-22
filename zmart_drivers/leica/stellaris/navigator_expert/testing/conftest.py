@@ -69,9 +69,7 @@ def _writes_through_the_cam_api(monkeypatch):
     server for the reads, which the direct route would then try to write to.
     The tests of the direct route set ``WRITE_ROUTES`` themselves.
     """
-    from zmart_drivers.leica.stellaris.navigator_expert.operations.sending import (
-        routes,
-    )
+    from zmart_drivers.leica.stellaris.navigator_expert.primitives.direct import profile as routes
 
     monkeypatch.setattr(routes, "WRITE_ROUTES", ("cam",))
 
@@ -84,9 +82,7 @@ def _no_hardware_server(monkeypatch):
     hardware server would answer and a test would read the instrument's z.
     Tests that need the server hand in a stand-in through ``attach``.
     """
-    from zmart_drivers.leica.stellaris.navigator_expert.connection import (
-        hardware_server,
-    )
+    from zmart_drivers.leica.stellaris.navigator_expert.primitives.direct import hardware_server
 
     def unreachable():
         raise hardware_server.HardwareServerUnavailable(
@@ -107,25 +103,19 @@ def _no_lasx_window(tmp_path, monkeypatch):
     and could press a real dialog's button. Tests that need either hand in a
     stand-in log path and windows.
     """
-    from zmart_drivers.leica.stellaris.navigator_expert.primitives.interface import (
-        lasx_dialogs,
-    )
+    from zmart_drivers.leica.stellaris.navigator_expert.procedures import answer_dialogs as lasx_dialogs
 
     def no_windows():
         raise lasx_dialogs.WindowsUnavailable("no LAS X windows in the test suite")
 
-    from zmart_drivers.leica.stellaris.navigator_expert.primitives.interface import (
-        lasx_navigator,
-    )
+    from zmart_drivers.leica.stellaris.navigator_expert.procedures.clear_cache import navigator as lasx_navigator
 
     def no_automation():
         raise lasx_dialogs.WindowsUnavailable(
             "no Windows UI Automation in the test suite"
         )
 
-    from zmart_drivers.leica.stellaris.navigator_expert.primitives.api import (
-        saved_experiment,
-    )
+    from zmart_drivers.leica.stellaris.navigator_expert.procedures import saved_experiment
 
     monkeypatch.setattr(lasx_dialogs, "LASX_LOG", tmp_path / "no LAS X.log")
     monkeypatch.setattr(saved_experiment, "FOLDER", str(tmp_path / "ScanningTemplates"))
@@ -146,7 +136,7 @@ def _clean_limits_gate():
     installed by one test must never govern another test's client, and the
     adversarial suite depends on starting from the fail-closed empty state.
     """
-    from zmart_drivers.leica.stellaris.navigator_expert.dispatcher import gate
+    from zmart_drivers.leica.stellaris.navigator_expert.dispatcher import limits as gate
 
     gate._GATE_STATE.clear()
     yield
@@ -164,10 +154,8 @@ def fast_timing_windows(monkeypatch):
     wait. Shipped values are unchanged; a test that needs a specific window
     patches it itself (``test_waiting_rule``).
     """
-    from zmart_drivers.leica.stellaris.navigator_expert.connection import waiting
-    from zmart_drivers.leica.stellaris.navigator_expert.operations.sending import (
-        transport,
-    )
+    from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import waiting
+    from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import transfer as transport
 
     monkeypatch.setattr(waiting, "WINDOW_S", 0.25)
     monkeypatch.setattr(waiting, "POLL_S", 0.005)
@@ -184,8 +172,6 @@ def fresh_live_log(monkeypatch):
     that points the reader at its own files could be handed the previous
     test's snapshot.
     """
-    from zmart_drivers.leica.stellaris.navigator_expert.primitives.log import (
-        log_reader,
-    )
+    from zmart_drivers.leica.stellaris.navigator_expert.primitives.log import reads as log_reader
 
     monkeypatch.setattr(log_reader, "LIVE_LOG", log_reader.SharedParse())

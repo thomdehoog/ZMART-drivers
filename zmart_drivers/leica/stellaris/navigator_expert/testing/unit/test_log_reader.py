@@ -19,9 +19,7 @@ import unittest
 from datetime import datetime, timedelta
 
 from zmart_drivers.leica.stellaris.navigator_expert.primitives.log import log_settings
-from zmart_drivers.leica.stellaris.navigator_expert.primitives.log import (
-    log_reader as L,
-)
+from zmart_drivers.leica.stellaris.navigator_expert.primitives.log import reads as L
 
 BASE = datetime(2026, 5, 28, 20, 0, 0)
 NOWE = (BASE + timedelta(seconds=5)).timestamp()

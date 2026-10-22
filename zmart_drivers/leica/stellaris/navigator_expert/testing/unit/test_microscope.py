@@ -22,8 +22,8 @@ from limits_fixtures import hermetic_mock_machine_root
 from mock_lasx_api import MockLasxClient
 
 import zmart_drivers.leica.stellaris.navigator_expert as navigator_expert
-from zmart_drivers.leica.stellaris.navigator_expert.driver_api import microscope
-from zmart_drivers.leica.stellaris.navigator_expert.connection import lasx_client
+from zmart_drivers.leica.stellaris.navigator_expert import methods as microscope
+from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import client as lasx_client
 from zmart_drivers.leica.stellaris.navigator_expert.operations.readings import reading_settings
 
 
@@ -50,10 +50,10 @@ def test_connect_hands_back_a_microscope(scope):
 
 def test_the_package_offers_only_the_microscope():
     """Nothing that goes around the session: no raw reads or commands on a client."""
-    offered = {name for name in vars(navigator_expert) if not name.startswith("__")} - {"driver_api"}
+    offered = {name for name in vars(navigator_expert) if not name.startswith("__")} - {"methods"}
 
     assert sorted(navigator_expert.__all__) == ["Microscope", "__version__", "connect"]
-    assert offered <= {"Microscope", "connect"} | {"dispatcher", "driver_setup", "procedures", "session", "connection", "primitives", "operations", "zmart_controller_plugin", "testing"}
+    assert offered <= {"Microscope", "connect"} | {"dispatcher", "driver_setup", "procedures", "session", "running_log", "loaded_config", "primitives", "operations", "zmart_controller_plugin", "testing"}
 
 
 def test_the_running_log_gets_the_messages_of_every_part_of_the_driver(scope):
@@ -195,7 +195,7 @@ def test_every_call_of_the_microscope_and_every_setting_is_in_the_readme():
     import re
     from pathlib import Path
 
-    readme = (Path(microscope.__file__).resolve().parents[1] / "README.md").read_text(encoding="utf-8")
+    readme = (Path(microscope.__file__).resolve().parent / "README.md").read_text(encoding="utf-8")
     section = readme[readme.index("## 4. Using the driver by itself") : readme.index("## 5.")]
     calls = [name for name, _ in inspect.getmembers(navigator_expert.Microscope) if not name.startswith("_")]
 

@@ -445,9 +445,7 @@ def _connect(
         log.info("limits | hermetic machine root provisioned at %s", root)
         return MockClient(latency=args.mock_latency)
     try:
-        from zmart_drivers.leica.stellaris.navigator_expert.connection.lasx_runtime import (
-            load_lasx_api_runtime,
-        )
+        from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api.lasx_runtime import load_lasx_api_runtime
 
         lasx_api = load_lasx_api_runtime()
     except (ImportError, ModuleNotFoundError, RuntimeError) as exc:
@@ -465,9 +463,7 @@ def _connect(
         )
         return None
     try:
-        from zmart_drivers.leica.stellaris.navigator_expert.connection.lasx_client import (
-            configure_lasx_api_delay,
-        )
+        from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api.client import configure_lasx_api_delay
 
         applied_delay_ms = configure_lasx_api_delay(lasx_api, args.api_delay_ms)
     except RuntimeError as exc:
@@ -968,7 +964,7 @@ def phase_job_selection(
             v.skip("job selection: round-trip", "no jobs returned")
             return
 
-        from zmart_drivers.leica.stellaris.navigator_expert.connection import waiting
+        from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import waiting
 
         names = selectable_job_names(jobs)
         # The job to come back to is read the way the driver reads it, not

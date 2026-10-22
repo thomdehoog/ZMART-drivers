@@ -11,12 +11,10 @@ University of Zurich (thom.dehoog@zmb.uzh.ch, thomdehoog@gmail.com).
 
 import pytest
 
-from zmart_drivers.leica.stellaris.navigator_expert.operations.sending import prechecks
+from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import prechecks
 
-from zmart_drivers.leica.stellaris.navigator_expert.operations.readings import (
-    sources,
-)
-from zmart_drivers.leica.stellaris.navigator_expert.operations.readings import named_readings as readers
+from zmart_drivers.leica.stellaris.navigator_expert.dispatcher import sources
+from zmart_drivers.leica.stellaris.navigator_expert.procedures import readings as readers
 from zmart_drivers.leica.stellaris.navigator_expert.operations.readings import reading_settings
 from zmart_drivers.leica.stellaris.navigator_expert.operations.changes import select_job as select_job_change
 

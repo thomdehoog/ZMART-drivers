@@ -30,17 +30,17 @@ DRIVER_ROOT = Path(__file__).resolve().parents[2]
 # The parts that may fire native stage motion or call the limit-check functions.
 DISPATCHER = "dispatcher"
 # The Leica rulebook defines the check functions; the gate in the dispatcher enforces them.
-RULEBOOK = Path("operations/sending/limit_rules.py")
+RULEBOOK = Path("driver_setup/limits/limit_rules.py")
 
 # Source selection is policy, not caller behaviour. The read engine implements
 # the profile-controlled modes; the confirmation modules construct explicit
 # API/log legs that the command policy races. Higher-level code must leave
 # ``mode`` unset and consume the configured reader abstraction.
 READER_SOURCE_POLICY_MODULES = {
-    Path("dispatcher/reader.py"),
-    Path("operations/readings/named_readings.py"),
-    Path("operations/readings/sources.py"),
-    Path("dispatcher/send_loop.py"),
+    Path("dispatcher/read.py"),
+    Path("procedures/readings.py"),
+    Path("dispatcher/sources.py"),
+    Path("dispatcher/write.py"),
     Path("dispatcher/confirm_loop.py"),
     Path("operations/readings/reading_table.py"),
     Path("operations/changes/confirming.py"),
@@ -51,7 +51,7 @@ READER_SOURCE_POLICY_MODULES = {
     # The stage limits are saved for good too: the corners are read from the API.
     Path("driver_setup/limits/measure_limits.py"),
     # Whether a command may fire is the API's to decide: the idle check.
-    Path("operations/sending/prechecks.py"),
+    Path("primitives/cam_api/prechecks.py"),
 }
 EXPLICIT_READER_MODE = re.compile(r"\bmode\s*=\s*['\"](?:api|log|hybrid)['\"]")
 LOW_LEVEL_READER_CALL = re.compile(r"(?<!\w)_?(?:api_reader|log_reader)\.")
@@ -83,7 +83,7 @@ def test_native_stage_motion_fires_only_from_the_actions():
             # The direct route's table of how each CAM command is written for the hardware
             # server. It sends nothing itself: only the direct transport does, and that is
             # reached through the same change definitions and the same limits gate.
-            Path("primitives/direct/translations.py"),
+            Path("primitives/direct/writes.py"),
         )
     ]
     assert offenders == [], (
@@ -114,15 +114,10 @@ def test_limit_checks_are_called_only_from_the_changes_and_the_dispatcher():
 
 def test_the_rulebook_lives_in_the_dispatcher():
     """``LeicaLimits`` (the compiled limits document) is defined in
-    operations/sending/limit_rules.py; the gate only imports it. If the class definition
+    driver_setup/limits/limit_rules.py; the gate only imports it. If the class definition
     moves back into the gate, rulebook and whistle have merged again."""
-    checks_text = (
-        DRIVER_ROOT
-        / "operations"
-        / "sending"
-        / "limit_rules.py"
-    ).read_text(encoding="utf-8")
-    gate_text = (DRIVER_ROOT / "dispatcher" / "gate.py").read_text(encoding="utf-8")
+    checks_text = (DRIVER_ROOT / RULEBOOK).read_text(encoding="utf-8")
+    gate_text = (DRIVER_ROOT / "dispatcher" / "limits.py").read_text(encoding="utf-8")
     assert "class LeicaLimits" in checks_text
     assert "class LeicaLimits" not in gate_text
 
@@ -173,42 +168,68 @@ def test_the_utils_grab_bag_stays_dissolved():
 
 # --- the parts, and which may import which ----------------------------------------
 
-# The layers, bottom to top. A part may always import from itself, and only
-# from the parts below it.
-BELOW_THE_SESSION = {"connection", "primitives", "dispatcher", "operations"}
+# The parts of the anatomy, and what each may import. A part may always import
+# from itself. Entries marked ``# upward`` run against the anatomy and are removed
+# in steps 4 to 6 of the layout plan; ``operations``, ``session``, ``running_log``
+# and ``loaded_config`` are parts only until those steps fold them in.
 ALLOWED = {
-    # How the driver reaches LAS X, and its waiting numbers.
-    "connection": set(),
-    # One read or write each, one folder for each way of reaching LAS X.
-    "primitives": {"connection"},
-    # The engines know no microscope: the operations hand in their sources,
-    # profiles, error sorting, waiting numbers and limits.
-    "dispatcher": set(),
-    # What the STELLARIS does: each change and reading, and how a command is sent.
-    "operations": {"connection", "primitives", "dispatcher"},
-    # What the driver remembers about one connection.
-    "session": {"connection", "primitives", "operations"},
-    "procedures": BELOW_THE_SESSION | {"session", "driver_setup"},
-    "driver_setup": BELOW_THE_SESSION | {
+    # One folder for each way of reaching LAS X.
+    "primitives": {
+        "dispatcher",  # upward: the log entry helper, the transport chain
+        "procedures",  # upward: the dialog check, opening the experiment, the idle check
+        "driver_setup",  # upward: the notebook pointer of the limits
+    },
+    # Runs one primitive and knows no microscope.
+    "dispatcher": {
+        "primitives",  # upward: the sources ask the log and the hardware server
+        "operations",  # upward: the sources read the reading table
+    },
+    "operations": {"primitives", "dispatcher", "procedures", "driver_setup"},
+    "session": {"procedures"},
+    "running_log": set(),
+    "loaded_config": set(),
+    "procedures": {
+        "primitives",
+        "dispatcher",
+        "operations",
+        "session",
+        "loaded_config",
+        "driver_setup",
+        "__version__",  # the saved state records the driver version
+    },
+    "driver_setup": {
+        "primitives",
+        "dispatcher",
+        "operations",
         "session",
         # The measuring code of an item takes pictures and moves the stage, so it
         # uses the procedures. Run-time procedures never import that measuring
         # code (see the test below): they read the saved values only.
         "procedures",
     },
-    # The driver used by itself: connect() and the Microscope.
-    "driver_api": BELOW_THE_SESSION | {
-        "session",
+    # What the user calls: connect() and the Microscope.
+    "methods": {
+        "primitives",
+        "dispatcher",
+        "operations",
         "procedures",
         "driver_setup",
-        "__version__",  # the saved state records the driver version
+        "session",
+        "loaded_config",
+        "running_log",
     },
-    # What faces the controller: the ZmartControllerPlugin class, which translates
-    # the controller's commands into calls of the Microscope, and what only the
-    # controller asks for: the description and the procedure menu.
-    "zmart_controller_plugin": BELOW_THE_SESSION | {"driver_api", "session", "procedures", "driver_setup"},
+    # What faces the controller: the ZmartControllerPlugin class, and the
+    # description and procedure menu only the controller asks for.
+    "zmart_controller_plugin": {
+        "methods",
+        "session",
+        "loaded_config",
+        "procedures",
+        "driver_setup",
+        "dispatcher",
+    },
     # The package offers the driver used by itself, and nothing else.
-    "__init__": {"driver_api"},
+    "__init__": {"methods"},
 }
 
 
@@ -326,23 +347,21 @@ def test_run_time_procedures_never_import_the_measuring_code():
 # --- no loose files -----------------------------------------------------------------
 
 
-def test_the_driver_keeps_its_files_in_folders_that_say_what_they_are_for():
-    """A file left loose in a part's root has no stated job, so the roots stay bare.
-
-    ``procedures/`` holds one folder per recipe, ``primitives/`` one folder for
-    each way of reaching LAS X, ``operations/`` its three parts, and the
-    driver's own root holds only its ``__init__.py`` and README.
-    """
-    allowed_in_root = {"__init__.py", "README.md"}
-    for folder in ("procedures", "primitives", "operations"):
-        loose = sorted(
-            p.name
-            for p in (DRIVER_ROOT / folder).glob("*.py")
-            if p.name != "__init__.py"
-        )
-        assert loose == [], (
-            f"{folder}/ has loose files {loose}; put each in a folder named for its job"
-        )
+def test_the_driver_keeps_its_files_where_the_anatomy_puts_them():
+    """``primitives/`` holds only one folder for each way of reaching LAS X; the
+    driver's root holds ``__init__.py``, ``methods.py`` and its README, and until
+    the later steps of the layout plan the session, running log and loaded
+    configuration."""
+    loose = sorted(p.name for p in (DRIVER_ROOT / "primitives").glob("*.py") if p.name != "__init__.py")
+    assert loose == [], f"primitives/ has loose files {loose}; each belongs in its class's folder"
+    allowed_in_root = {
+        "__init__.py",
+        "README.md",
+        "methods.py",
+        "session.py",
+        "running_log.py",
+        "loaded_config.py",
+    }
     root_files = sorted(
         p.name
         for p in DRIVER_ROOT.glob("*")

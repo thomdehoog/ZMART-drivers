@@ -16,7 +16,7 @@ import time
 import unittest
 from unittest.mock import patch
 
-from zmart_drivers.leica.stellaris.navigator_expert.operations.readings import named_readings as readers
+from zmart_drivers.leica.stellaris.navigator_expert.procedures import readings as readers
 from zmart_drivers.leica.stellaris.navigator_expert.primitives.log import (
     log_wait,
 )

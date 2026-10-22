@@ -10,8 +10,8 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 from zmart_drivers.leica.stellaris.navigator_expert.operations.readings import reading_table as capabilities
-from zmart_drivers.leica.stellaris.navigator_expert.operations.readings import named_readings as readers
-from zmart_drivers.leica.stellaris.navigator_expert.operations.readings import named_readings as router
+from zmart_drivers.leica.stellaris.navigator_expert.procedures import readings as readers
+from zmart_drivers.leica.stellaris.navigator_expert.procedures import readings as router
 from zmart_drivers.leica.stellaris.navigator_expert.operations.readings import reading_settings
 from zmart_drivers.leica.stellaris.navigator_expert.operations.changes import select_job as select_job_change
 
@@ -422,9 +422,7 @@ class TestApiModeCappedWorker(unittest.TestCase):
 
 class TestDerivedZoom(unittest.TestCase):
     def test_sub_unity_zoom_is_not_clamped(self):
-        from zmart_drivers.leica.stellaris.navigator_expert.primitives.values import (
-            derived,
-        )
+        from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import derived
 
         settings = {
             "imageSize": "100.0 um x 100.0 um",

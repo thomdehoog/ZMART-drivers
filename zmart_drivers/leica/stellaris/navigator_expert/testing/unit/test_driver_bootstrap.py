@@ -19,10 +19,10 @@ import sys
 # Mimic an example-script entry point: only the repository root on sys.path.
 sys.path.insert(0, r"{repo}")
 from zmart_drivers.leica.stellaris.navigator_expert.operations.changes import acquire
-from zmart_drivers.leica.stellaris.navigator_expert.primitives.capture.product import AcquisitionResult
+from zmart_drivers.leica.stellaris.navigator_expert.procedures.save_data.product import AcquisitionResult
 from zmart_drivers.leica.stellaris.navigator_expert.procedures.save_data import save as saving
 from zmart_drivers.leica.stellaris.navigator_expert.procedures.save_data import saved_acquisition
-from zmart_drivers.leica.stellaris.navigator_expert.connection import lasx_runtime
+from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import lasx_runtime
 assert acquire.take_picture is not None
 assert saving.save is not None
 assert AcquisitionResult is not None
@@ -68,9 +68,7 @@ def test_lasx_runtime_load_smoke_when_installed():
     Bare dev/CI machines can import the loader but cannot load LAS X assemblies;
     hardware validation covers the required installed-runtime path.
     """
-    from zmart_drivers.leica.stellaris.navigator_expert.connection import (
-        lasx_runtime,
-    )
+    from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import lasx_runtime
 
     try:
         runtime = lasx_runtime.load_lasx_api_runtime()

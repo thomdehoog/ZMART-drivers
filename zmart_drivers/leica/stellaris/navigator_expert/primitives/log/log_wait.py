@@ -11,8 +11,8 @@ import time
 from collections.abc import Callable
 from dataclasses import dataclass
 
-from . import log_reader
-from ...connection import waiting
+from . import reads as log_reader
+from ..cam_api import waiting
 
 
 @dataclass(frozen=True)

@@ -41,4 +41,4 @@ __version__ = "0.7.0b5"
 
 __all__ = ["__version__", "connect", "Microscope"]
 
-from .driver_api.microscope import Microscope, connect
+from .methods import Microscope, connect

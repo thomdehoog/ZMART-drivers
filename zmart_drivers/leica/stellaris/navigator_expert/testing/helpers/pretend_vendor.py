@@ -30,14 +30,15 @@ import time
 from dataclasses import dataclass, field
 from typing import Any, Callable
 
-from zmart_drivers.leica.stellaris.navigator_expert.dispatcher import door, gate
+from zmart_drivers.leica.stellaris.navigator_expert.dispatcher import (
+    dispatch as door,
+    limits as gate,
+)
 from zmart_drivers.leica.stellaris.navigator_expert.dispatcher.limit_errors import (
     LimitsStatus,
     LimitViolation,
 )
-from zmart_drivers.leica.stellaris.navigator_expert.dispatcher.reader import (
-    Reading,
-)
+from zmart_drivers.leica.stellaris.navigator_expert.dispatcher.read import Reading
 
 # =============================================================================
 # The pretend microscope

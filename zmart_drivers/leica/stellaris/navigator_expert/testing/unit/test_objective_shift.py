@@ -14,7 +14,7 @@ from types import SimpleNamespace
 import pytest
 from limits_fixtures import install_permissive_limits
 
-import zmart_drivers.leica.stellaris.navigator_expert.operations.readings.named_readings as readers
+import zmart_drivers.leica.stellaris.navigator_expert.procedures.readings as readers
 from zmart_drivers.leica.stellaris.navigator_expert.procedures.keep_in_view import (
     objective_shift as shift,
 )
@@ -22,9 +22,7 @@ from zmart_drivers.leica.stellaris.navigator_expert.procedures.keep_in_view impo
 from zmart_drivers.leica.stellaris.navigator_expert.procedures.keep_in_view import (
     compensated_changes as cmds_comp,
 )
-from zmart_drivers.leica.stellaris.navigator_expert.session import (
-    loaded_config as session_state,
-)
+from zmart_drivers.leica.stellaris.navigator_expert import loaded_config as session_state
 from zmart_drivers.leica.stellaris.navigator_expert.driver_setup.orientation import (
     Orientation,
 )

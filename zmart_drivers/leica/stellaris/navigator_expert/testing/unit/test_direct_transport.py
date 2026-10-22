@@ -18,15 +18,9 @@ from zmart_drivers.leica.stellaris.navigator_expert.dispatcher.transport_chain i
     TransportChain,
     TransportUnavailable,
 )
-from zmart_drivers.leica.stellaris.navigator_expert.connection import (
-    hardware_server,
-)
-from zmart_drivers.leica.stellaris.navigator_expert.operations.sending import (
-    direct_transport,
-)
-from zmart_drivers.leica.stellaris.navigator_expert.primitives.api.request import (
-    Request,
-)
+from zmart_drivers.leica.stellaris.navigator_expert.primitives.direct import hardware_server
+from zmart_drivers.leica.stellaris.navigator_expert.primitives.direct import transfer as direct_transport
+from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api.request import Request
 from zmart_drivers.leica.stellaris.navigator_expert.primitives.direct import (
     send_command,
 )

@@ -74,9 +74,7 @@ FAR_UM = 1.0e7
 
 
 def _adapter() -> Any:
-    from zmart_drivers.leica.stellaris.navigator_expert.connection import (
-        lasx_client as connect,
-    )
+    from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import client as connect
 
     return connect
 

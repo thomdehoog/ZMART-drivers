@@ -23,24 +23,18 @@ from unittest.mock import patch
 import pytest
 from z_readback_settings import raw_settings
 
-from zmart_drivers.leica.stellaris.navigator_expert.primitives.api import saved_experiment
-from zmart_drivers.leica.stellaris.navigator_expert.primitives.values.derived import (
-    z_um_from_settings,
-)
-from zmart_drivers.leica.stellaris.navigator_expert.connection import (
-    hardware_server,
-)
-from zmart_drivers.leica.stellaris.navigator_expert.connection.hardware_server import (
+from zmart_drivers.leica.stellaris.navigator_expert.procedures import saved_experiment
+from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api.derived import z_um_from_settings
+from zmart_drivers.leica.stellaris.navigator_expert.primitives.direct import hardware_server
+from zmart_drivers.leica.stellaris.navigator_expert.primitives.direct.hardware_server import (
     HardwareServerUnavailable,
     read_hardware_z_um,
 )
-from zmart_drivers.leica.stellaris.navigator_expert.primitives.values.parsing import (
-    make_changeable_copy,
-)
+from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api.parsing import make_changeable_copy
 from zmart_drivers.leica.stellaris.navigator_expert.procedures.absolute_coordinate_system import (
     frame as _frame,
 )
-from zmart_drivers.leica.stellaris.navigator_expert.operations.readings import named_readings as _readers
+from zmart_drivers.leica.stellaris.navigator_expert.procedures import readings as _readers
 from zmart_drivers.leica.stellaris.navigator_expert.operations.changes import confirming
 from zmart_drivers.leica.stellaris.navigator_expert.operations.changes import stage
 

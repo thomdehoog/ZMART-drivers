@@ -21,10 +21,10 @@ import threading
 import time
 from xml.sax.saxutils import quoteattr
 
-from ...connection import hardware_server
-from ...connection import waiting
-from ..interface import lasx_dialogs
-from .translations import Fields, NoTranslation
+from . import hardware_server
+from ..cam_api import waiting
+from ...procedures import answer_dialogs as lasx_dialogs
+from .writes import Fields, NoTranslation
 
 RESULT = re.compile(r"<Result\b([^>]*?)/?>")
 ERROR = re.compile(r'\bError="([^"]*)"')

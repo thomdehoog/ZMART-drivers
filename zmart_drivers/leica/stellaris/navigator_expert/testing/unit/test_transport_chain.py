@@ -6,14 +6,14 @@ University of Zurich (thom.dehoog@zmb.uzh.ch, thomdehoog@gmail.com).
 
 import pytest
 
-from zmart_drivers.leica.stellaris.navigator_expert.dispatcher import send_loop
+from zmart_drivers.leica.stellaris.navigator_expert.dispatcher import write as send_loop
 from zmart_drivers.leica.stellaris.navigator_expert.dispatcher.transport_chain import (
     TransportChain,
     TransportUnavailable,
 )
-from zmart_drivers.leica.stellaris.navigator_expert.operations.sending import routes
+from zmart_drivers.leica.stellaris.navigator_expert.primitives.direct import profile as routes
 from zmart_drivers.leica.stellaris.navigator_expert.operations.changes import acquire as acquire_change
-from zmart_drivers.leica.stellaris.navigator_expert.operations.sending import command_profile
+from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import profile as command_profile
 
 
 

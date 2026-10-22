@@ -37,8 +37,8 @@ import numpy as np
 from zmart_drivers.leica.stellaris.navigator_expert.driver_setup.limits import handshake
 from zmart_drivers.leica.stellaris.navigator_expert.operations.changes import acquire as acquire_change
 from zmart_drivers.leica.stellaris.navigator_expert.procedures.save_data import save as saving
-from zmart_drivers.leica.stellaris.navigator_expert.connection import lasx_client
-from zmart_drivers.leica.stellaris.navigator_expert.operations.readings import named_readings as readers
+from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import client as lasx_client
+from zmart_drivers.leica.stellaris.navigator_expert.procedures import readings as readers
 from zmart_drivers.leica.stellaris.navigator_expert.procedures.save_data.naming import (
     Naming,
     run_hash,

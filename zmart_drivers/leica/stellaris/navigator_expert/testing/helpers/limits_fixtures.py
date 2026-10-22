@@ -25,10 +25,8 @@ from zmart_drivers.leica.stellaris.navigator_expert.driver_setup.store import (
     MachineProfile,
 )
 
-from zmart_drivers.leica.stellaris.navigator_expert.dispatcher import (
-    gate as _gate,
-)
-from zmart_drivers.leica.stellaris.navigator_expert.operations.sending import limit_rules
+from zmart_drivers.leica.stellaris.navigator_expert.dispatcher import limits as _gate
+from zmart_drivers.leica.stellaris.navigator_expert.driver_setup.limits import limit_rules
 
 # The bundled conservative default envelope. The absolute X/Y backstop
 # (operations/changes/limit_rules.py) extends down to coordinate zero, so measured limits may
