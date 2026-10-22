@@ -58,7 +58,7 @@ import validate_hardware as vh
 import zmart_controller
 from validate_zmart_adapter import _ReportingSession
 from zmart_controller.registry import registry_file
-from zmart_drivers.leica.stellaris.navigator_expert.operations.readings import reading_settings
+from zmart_drivers.leica.stellaris.navigator_expert.primitives.direct import profile as reading_settings
 
 #: The driver's name in zmart_controller_plugin.json, and what get_instruments lists it under.
 DRIVER_NAME = "stellaris"

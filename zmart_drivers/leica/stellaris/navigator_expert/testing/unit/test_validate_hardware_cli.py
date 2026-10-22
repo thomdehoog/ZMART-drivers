@@ -4,7 +4,7 @@ import sys
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
-from zmart_drivers.leica.stellaris.navigator_expert.operations.readings import reading_settings
+from zmart_drivers.leica.stellaris.navigator_expert.primitives.direct import profile as reading_settings
 
 
 

@@ -79,6 +79,7 @@ from datetime import datetime
 from ..cam_api import derived
 from collections.abc import Callable
 from ..cam_api import waiting
+from ...dispatcher.read import Reading
 
 
 log = logging.getLogger(__name__)
@@ -524,6 +525,44 @@ def ages(snapshot=None):
     }
 
 
+def age_for_snapshot(snapshot, *, age_key=None, job_name=None, max_age_s=None):
+    """Age of a datum's log value within *snapshot*, in seconds.
+
+    Mirrors the log readers' value derivation, so the reported age belongs
+    to the datum that actually produced the value -- not a min/max over
+    tangential timestamps (which made fresh job lists report ancient ages
+    and stale selections report fresh intent-echo ages):
+
+    - ``jobs``: :func:`get_jobs` derives the list from the matrix
+      summary when it is present and fresh under *max_age_s*; otherwise from
+      the ATL cluster, whose staleness is bounded by its oldest per-job line.
+      Selection markers only tag ``IsSelected`` and are not the value's age.
+    - ``selected_job``: :func:`get_selected_job` prefers the
+      ``CurrentBlock`` applied state; the element-index intent echo is only
+      the fallback.
+    """
+    found = ages(snapshot)
+    if job_name is not None:
+        return found.get("jobs", {}).get(job_name)
+
+    def fresh(age):
+        return age is not None and (max_age_s is None or age <= max_age_s)
+
+    if age_key == "jobs":
+        job_list_age = found.get("job_list")
+        if fresh(job_list_age):
+            return job_list_age
+        cluster = [age for age in (found.get("jobs") or {}).values() if age is not None]
+        return max(cluster) if cluster else job_list_age
+    if age_key == "selected_job":
+        current_block_age = found.get("current_block")
+        if fresh(current_block_age):
+            return current_block_age
+        selected_age = found.get("selected")
+        return selected_age if selected_age is not None else current_block_age
+    return found.get(age_key)
+
+
 # =============================================================================
 # Readers (API-shaped values; None when stale/ambiguous/absent - never wrong)
 # =============================================================================
@@ -944,3 +983,43 @@ def _cluster_diagnostics(snapshot: Snapshot, *, max_age_s):
         "ambiguous_job_names": sorted(ambiguous),
         "block_ids_numeric": block_ids_numeric,
     }
+
+
+# =============================================================================
+# Asking the log for a reading
+# =============================================================================
+
+
+def snapshot_read(spec, *, max_age_s, job_name=None) -> Reading:
+    try:
+        snapshot = parse_log()
+        if job_name is None:
+            value = spec.log_fn(snapshot, max_age_s=max_age_s)
+        else:
+            value = spec.log_fn(snapshot, max_age_s=max_age_s, job_name=job_name)
+        age_s = age_for_snapshot(
+            snapshot, age_key=spec.age_key, job_name=job_name, max_age_s=max_age_s
+        )
+        observed_at = None if age_s is None else snapshot.now - age_s
+        return Reading(value=value, source="log", observed_at=observed_at, age_s=age_s)
+    except Exception as exc:
+        log.debug("log reader failed", exc_info=True)
+        return Reading(
+            value=None, source="log", observed_at=time.time(), age_s=None, error=exc
+        )
+
+
+def _ask_log(spec, job_name, max_age_s, *, until, answer_counts):
+    """Read the LAS X log, and again every ``POLL_S`` until an answer counts or *until*.
+
+    Each read takes the shared live snapshot (``LIVE_LOG``), so
+    however many readings are taken at once, the log is parsed by one parse
+    at a time.
+    """
+    reading = None
+    while True:
+        reading = snapshot_read(spec, max_age_s=max_age_s, job_name=job_name)
+        remaining = until - time.monotonic()
+        if answer_counts(reading) or remaining <= 0:
+            return reading
+        time.sleep(min(waiting.POLL_S, remaining))

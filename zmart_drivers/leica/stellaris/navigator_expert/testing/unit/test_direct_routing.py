@@ -22,7 +22,7 @@ from limits_fixtures import install_permissive_limits
 from mock_lasx_api import MockLasxClient
 from state_tree_stand_in import StandInNodes, answer_json_read
 
-from zmart_drivers.leica.stellaris.navigator_expert.operations.readings import reading_table as capabilities
+from zmart_drivers.leica.stellaris.navigator_expert.primitives.direct import profile as capabilities
 
 from zmart_drivers.leica.stellaris.navigator_expert.procedures import keep_in_view as commands_comp
 from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import prechecks

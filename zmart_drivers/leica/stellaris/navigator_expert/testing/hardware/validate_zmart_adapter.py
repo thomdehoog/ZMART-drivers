@@ -63,7 +63,7 @@ for _p in (str(_HERE.parent), str(_REPO_ROOT), str(_HELPERS)):
 
 import validate_hardware as vh  # reuse Record/Validator/sink/logging
 import zmart_controller
-from zmart_drivers.leica.stellaris.navigator_expert.operations.readings import reading_settings
+from zmart_drivers.leica.stellaris.navigator_expert.primitives.direct import profile as reading_settings
 
 # Readback tolerances: match the driver's own confirmation gates
 # (confirm_move_xy default 20 um, confirm_move_z default 1.0 um).

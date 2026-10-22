@@ -26,7 +26,8 @@ from ...dispatcher.dispatch import make_log_entry, make_timing
 from ...primitives.direct import reads as direct_reader
 from ...primitives.log import reads as log_wait
 from ...procedures import readings as readers
-from ..readings import reading_settings
+from ...primitives.direct import profile as direct_profile
+from ...primitives.log.profile import MAX_AGE_S
 from ...primitives.cam_api.profile import CommandProfile
 from ...primitives.cam_api.prechecks import check_idle
 from . import confirming, run_change
@@ -99,7 +100,7 @@ def selected_job_direct():
     It reads LAS X's live selection, so unlike the CAM API's job list it
     cannot be stale, and unlike the log it answers without a new event.
     """
-    if reading_settings.STATE_READERS.selected_job_mode != "direct":
+    if direct_profile.STATE_READERS.selected_job_mode != "direct":
         return None
     try:
         selected = direct_reader.get_selected_job()
@@ -239,7 +240,7 @@ def confirm_select_job(
 def confirm_select_job_log(job_name, command_started_at, *, timeout=None):
     """Log confirmation leg: a fresh post-command ``CurrentBlock`` event
     naming *job_name* (see ``log_wait``). Applied state, never intent."""
-    profile = reading_settings.STATE_READERS
+    profile = direct_profile.STATE_READERS
     logs = []
     if command_started_at is None:
         msg = "Log-backed job confirmation requires command_started_at"
@@ -311,7 +312,7 @@ def select_job_confirm_legs(
     either may be None. ``budget_s`` (the race window) is just the confirm
     window. Raises ``ValueError`` on an unknown source BEFORE anything fires.
     """
-    profile = reading_settings.STATE_READERS
+    profile = direct_profile.STATE_READERS
     source = profile.selected_job_confirm_source
     if source not in ("direct", "api", "log", "hybrid"):
         raise ValueError(
@@ -397,7 +398,7 @@ def prime_log_cluster(client, jobs):
     This is explicit API-assisted log priming: it generates log evidence, but
     the confirmation decision still gates only on post-command log content.
     """
-    profile = reading_settings.STATE_READERS
+    profile = direct_profile.STATE_READERS
     if (
         profile.selected_job_confirm_source not in ("log", "hybrid", "direct")
         or not profile.selected_job_log_prime_cluster
@@ -420,7 +421,7 @@ def selected_job_from_log(profile):
 
         max_age_s = profile.selected_job_log_cluster_max_age_s
         if max_age_s is None:
-            max_age_s = profile.selected_job_log_max_age_s
+            max_age_s = MAX_AGE_S["selected_job"]
         selected = log_reader.get_selected_job(max_age_s=max_age_s)
     except Exception:
         log.debug("Could not read selected job from LAS X log", exc_info=True)
@@ -447,7 +448,7 @@ def prepare_select_job(client, job_name):
     fires and may time out unconfirmed: that is correct fail-closed
     behavior, not a bug.
     """
-    profile = reading_settings.STATE_READERS
+    profile = direct_profile.STATE_READERS
     source = profile.selected_job_confirm_source
     if source == "direct":
         source = (

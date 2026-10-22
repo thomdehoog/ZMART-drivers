@@ -11,9 +11,8 @@ comment. If one of these fails, the fix is almost never to edit this file:
 move the offending call down into ``actions/`` or ``dispatcher/`` instead.
 
 The last test records which parts import which. Today the Leica driver still
-has imports that run upward against the anatomy (the dispatcher reading the
-actions' table, the vendor interface reading the tuning, the limits item
-asking the rulebook). They are listed in ``ALLOWED`` so that the move that
+has imports that run upward against the anatomy (the vendor interface reading
+the tuning, the limits item asking the rulebook). They are listed in ``ALLOWED`` so that the move that
 put every file in its part stays honest about them, and so that no new
 upward import can appear unnoticed. Each entry marked ``# upward`` is one to
 remove, in a change of its own.
@@ -42,7 +41,7 @@ READER_SOURCE_POLICY_MODULES = {
     Path("dispatcher/read.py"),
     Path("dispatcher/write.py"),
     Path("dispatcher/write.py"),
-    Path("operations/readings/reading_table.py"),
+    Path("primitives/direct/profile.py"),
     Path("operations/changes/confirming.py"),
     Path("operations/changes/select_job.py"),
     # Calibration geometry is saved for good, so it is read from the API
@@ -172,15 +171,12 @@ def test_the_utils_grab_bag_stays_dissolved():
 ALLOWED = {
     # One folder for each way of reaching LAS X.
     "primitives": {
-        "dispatcher",  # upward: the log entry helper, the transport chain
+        "dispatcher",  # the reading, the log entry helper, the transport chain
         "procedures",  # upward: the dialog check, opening the experiment, the idle check
         "driver_setup",  # upward: the notebook pointer of the limits
     },
     # Runs one primitive and knows no microscope.
-    "dispatcher": {
-        "primitives",  # upward: the sources ask the log and the hardware server
-        "operations",  # upward: the sources read the reading table
-    },
+    "dispatcher": set(),
     "operations": {"primitives", "dispatcher", "procedures", "driver_setup"},
     "procedures": {
         "primitives",
@@ -262,19 +258,14 @@ def test_each_part_only_imports_what_the_anatomy_allows():
 #: The bottom of the vendor part, bottom first: how the driver reaches LAS X, and
 #: one read or write each. Neither imports from anything above it.
 def test_a_reading_never_uses_a_change():
-    """A get never calls a set: operations/readings/reading_table.py must not import a change."""
-    readings = (
-        DRIVER_ROOT
-        / "operations"
-        / "readings"
-        / "reading_table.py"
-    )
+    """A get never calls a set: the table of readings, primitives/direct/profile.py, must not import a change."""
+    readings = DRIVER_ROOT / "primitives" / "direct" / "profile.py"
     tree = ast.parse(readings.read_text(encoding="utf-8"))
     for node in ast.walk(tree):
         if isinstance(node, ast.ImportFrom):
             names = [node.module or "", *(a.name for a in node.names)]
             assert "changes" not in names, (
-                "operations/readings/reading_table.py imports a change"
+                "primitives/direct/profile.py imports a change"
             )
 
 

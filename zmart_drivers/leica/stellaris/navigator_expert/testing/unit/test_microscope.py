@@ -24,7 +24,7 @@ from mock_lasx_api import MockLasxClient
 import zmart_drivers.leica.stellaris.navigator_expert as navigator_expert
 from zmart_drivers.leica.stellaris.navigator_expert import methods
 from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import client as lasx_client
-from zmart_drivers.leica.stellaris.navigator_expert.operations.readings import reading_settings
+from zmart_drivers.leica.stellaris.navigator_expert.primitives.direct import profile as reading_settings
 
 
 

@@ -21,14 +21,14 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from zmart_drivers.leica.stellaris.navigator_expert.operations.readings import reading_table as capabilities
+from zmart_drivers.leica.stellaris.navigator_expert.primitives.direct import profile as capabilities
 from zmart_drivers.leica.stellaris.navigator_expert.procedures import keep_in_view as objective_shift
 
 from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import prechecks
 from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import waiting
 from zmart_drivers.leica.stellaris.navigator_expert.procedures import readings as readers
 from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import transfer as delivery
-from zmart_drivers.leica.stellaris.navigator_expert.operations.readings import reading_settings
+from zmart_drivers.leica.stellaris.navigator_expert.primitives.direct import profile as reading_settings
 
 WINDOW_S = 0.5
 

@@ -50,7 +50,7 @@ from zmart_drivers.leica.stellaris.navigator_expert.operations.changes import co
 from zmart_drivers.leica.stellaris.navigator_expert.operations.changes import job_settings
 from zmart_drivers.leica.stellaris.navigator_expert.driver_setup.limits import limit_rules
 from zmart_drivers.leica.stellaris.navigator_expert.operations.changes import objective as objective_change
-from zmart_drivers.leica.stellaris.navigator_expert.operations.readings import reading_settings
+from zmart_drivers.leica.stellaris.navigator_expert.primitives.direct import profile as reading_settings
 from zmart_drivers.leica.stellaris.navigator_expert.operations.changes import run_change
 from zmart_drivers.leica.stellaris.navigator_expert.operations.changes import select_job as select_job_change
 from zmart_drivers.leica.stellaris.navigator_expert.operations.changes import stage

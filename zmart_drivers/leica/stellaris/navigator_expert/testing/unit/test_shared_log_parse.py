@@ -18,7 +18,7 @@ import pytest
 from zmart_drivers.leica.stellaris.navigator_expert.procedures import readings as readers
 from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import waiting
 from zmart_drivers.leica.stellaris.navigator_expert.primitives.log import reads as log_reader
-from zmart_drivers.leica.stellaris.navigator_expert.operations.readings import reading_settings
+from zmart_drivers.leica.stellaris.navigator_expert.primitives.direct import profile as reading_settings
 
 PARSE_S = 0.05
 

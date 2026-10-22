@@ -5,7 +5,7 @@ import unittest
 from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import waiting
 from zmart_drivers.leica.stellaris.navigator_expert.primitives.log import reads as log_reader
 from zmart_drivers.leica.stellaris.navigator_expert.primitives.log.reads import wait_for_selected_job_log
-from zmart_drivers.leica.stellaris.navigator_expert.operations.readings import reading_settings
+from zmart_drivers.leica.stellaris.navigator_expert.primitives.direct import profile as reading_settings
 
 
 def _job(block_id, name):

@@ -9,10 +9,12 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from zmart_drivers.leica.stellaris.navigator_expert.operations.readings import reading_table as capabilities
+from zmart_drivers.leica.stellaris.navigator_expert.primitives.direct import profile as capabilities
 from zmart_drivers.leica.stellaris.navigator_expert.procedures import readings as readers
 from zmart_drivers.leica.stellaris.navigator_expert.procedures import readings as router
-from zmart_drivers.leica.stellaris.navigator_expert.operations.readings import reading_settings
+from zmart_drivers.leica.stellaris.navigator_expert.primitives.direct import profile as reading_settings
+from zmart_drivers.leica.stellaris.navigator_expert.primitives.log import profile as log_profile
+from zmart_drivers.leica.stellaris.navigator_expert.primitives.log import reads as log_reader
 from zmart_drivers.leica.stellaris.navigator_expert.operations.changes import select_job as select_job_change
 
 
@@ -81,8 +83,8 @@ class TestStateReaders(unittest.TestCase):
     def test_log_mode_returns_fresh_log_value(self):
         reading_settings.STATE_READERS = reading_settings.StateReaderProfile(
             xy_mode="log",
-            xy_log_max_age_s=1.0,
         )
+        self.enterContext(patch.dict(log_profile.MAX_AGE_S, {"xy": 1.0}))
         snapshot = SimpleNamespace(now=100.0)
         expected = {"x_um": 3.0, "y_um": 4.0}
         with (
@@ -96,8 +98,8 @@ class TestStateReaders(unittest.TestCase):
     def test_log_mode_rejects_stale_log_value(self):
         reading_settings.STATE_READERS = reading_settings.StateReaderProfile(
             xy_mode="log",
-            xy_log_max_age_s=1.0,
         )
+        self.enterContext(patch.dict(log_profile.MAX_AGE_S, {"xy": 1.0}))
         snapshot = SimpleNamespace(now=100.0)
         with (
             patch.object(router.log_reader, "parse_log", return_value=snapshot),
@@ -109,8 +111,8 @@ class TestStateReaders(unittest.TestCase):
     def test_hybrid_returns_log_when_api_hangs(self):
         reading_settings.STATE_READERS = reading_settings.StateReaderProfile(
             xy_mode="hybrid",
-            xy_log_max_age_s=1.0,
         )
+        self.enterContext(patch.dict(log_profile.MAX_AGE_S, {"xy": 1.0}))
         snapshot = SimpleNamespace(now=100.0)
         expected = {"x_um": 5.0, "y_um": 6.0}
 
@@ -133,8 +135,8 @@ class TestStateReaders(unittest.TestCase):
         # answer that arrives later (the old 0.25 s log head start is gone).
         reading_settings.STATE_READERS = reading_settings.StateReaderProfile(
             xy_mode="hybrid",
-            xy_log_max_age_s=1.0,
         )
+        self.enterContext(patch.dict(log_profile.MAX_AGE_S, {"xy": 1.0}))
         snapshot = SimpleNamespace(now=100.0)
         api_value = {"x_um": 100.0, "y_um": 200.0}
         log_value = {"x_um": 5.0, "y_um": 6.0}
@@ -156,8 +158,8 @@ class TestStateReaders(unittest.TestCase):
     def test_hybrid_ignores_untrustworthy_log_and_returns_api(self):
         reading_settings.STATE_READERS = reading_settings.StateReaderProfile(
             xy_mode="hybrid",
-            xy_log_max_age_s=1.0,
         )
+        self.enterContext(patch.dict(log_profile.MAX_AGE_S, {"xy": 1.0}))
         snapshot = SimpleNamespace(now=100.0)
         expected = {"x_um": 7.0, "y_um": 8.0}
         with (
@@ -173,8 +175,8 @@ class TestStateReaders(unittest.TestCase):
     def test_hybrid_does_not_start_second_api_read_while_one_is_pending(self):
         reading_settings.STATE_READERS = reading_settings.StateReaderProfile(
             xy_mode="hybrid",
-            xy_log_max_age_s=1.0,
         )
+        self.enterContext(patch.dict(log_profile.MAX_AGE_S, {"xy": 1.0}))
         client = object()
         snapshot = SimpleNamespace(now=100.0)
         log_value = {"x_um": 5.0, "y_um": 6.0}
@@ -243,8 +245,8 @@ class TestStateReaders(unittest.TestCase):
         reading_settings.STATE_READERS = reading_settings.StateReaderProfile(
             jobs_mode="log",
             selected_job_mode="log",
-            selected_job_log_max_age_s=2.0,
         )
+        self.enterContext(patch.dict(log_profile.MAX_AGE_S, {"selected_job": 2.0}))
         snapshot = SimpleNamespace(now=100.0)
         selected = {"Name": "Overview", "IsSelected": True}
         ages = {"jobs": {}, "job_list": 30.0, "current_block": 0.3}
@@ -482,8 +484,8 @@ class TestAgeForSnapshot(unittest.TestCase):
     tangential timestamps."""
 
     def _age(self, ages, **kwargs):
-        with patch.object(capabilities.log_reader, "ages", return_value=ages):
-            return capabilities.age_for_snapshot(SimpleNamespace(now=100.0), **kwargs)
+        with patch.object(log_reader, "ages", return_value=ages):
+            return log_reader.age_for_snapshot(SimpleNamespace(now=100.0), **kwargs)
 
     def test_jobs_fresh_summary_ignores_ancient_cluster(self):
         # get_jobs derives the list from the fresh matrix summary; ancient

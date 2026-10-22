@@ -1,7 +1,7 @@
 """The named readings of a LAS X session: where the stage is, which job is selected, and so on.
 
-Each function asks the shared reader in ``dispatcher/reader.py`` for one row of
-the table in :mod:`readings` and hands back a plain value, or, with
+Each function asks the read loop in ``dispatcher/read.py`` for one row of
+the table of readings in ``primitives/direct/profile.py`` and hands back a plain value, or, with
 ``diagnostics=True``, a :class:`~...dispatcher.read.Reading` that also says
 which source answered and how old the answer was. A reading that cannot be
 had comes back as None; the readers here do not raise, except where a
@@ -26,8 +26,7 @@ from ..primitives.cam_api import reads as api_reader
 from ..primitives.direct import reads as direct_reader
 from ..primitives.log import reads as log_reader
 from ..primitives.cam_api import derived
-from ..operations.readings import reading_table as capabilities
-from ..dispatcher import read
+from ..primitives.direct import profile as direct_profile
 from ..primitives.cam_api.derived import stack_drive, stack_slices_um  # noqa: F401  re-exported, as the readers package did
 
 log = logging.getLogger(__name__)
@@ -35,12 +34,12 @@ log = logging.getLogger(__name__)
 
 def wait_for(datum, client, **keywords):
     """Wait for a reading of *datum*, asking LAS X's sources; see :func:`dispatcher.dispatcher.read`."""
-    return _door.read(read, datum, client, **keywords)
+    return _door.read(direct_profile, datum, client, **keywords)
 
 
 def on_demand_fallback():
     """The family that answers a waited-on reading when the direct reader cannot (the profile's ``waiting_fallback``)."""
-    return read.profile().waiting_fallback
+    return direct_profile.STATE_READERS.waiting_fallback
 
 
 def on_demand_mode(datum):
@@ -51,7 +50,7 @@ def on_demand_mode(datum):
     changes, so it can still show the state from before. Pair it with
     :func:`on_demand_fallback`.
     """
-    return "direct" if read.mode_for(datum) == "direct" else "api"
+    return "direct" if direct_profile.mode_for(datum) == "direct" else "api"
 
 
 def _routed(
@@ -66,7 +65,7 @@ def _routed(
     fallback=None,
 ):
     api_kwargs = {} if job_name is None else {"job_name": job_name}
-    fallback = read.profile().reading_fallback if fallback is None else fallback
+    fallback = direct_profile.STATE_READERS.reading_fallback if fallback is None else fallback
     reading = wait_for(
         datum,
         client,
@@ -156,7 +155,7 @@ def z_um_direct(drive, *, mode=None):
     *mode* says); None also when the hardware server cannot be reached, so
     the caller reads the job settings instead.
     """
-    mode = mode if mode is not None else read.profile().z_mode
+    mode = mode if mode is not None else direct_profile.STATE_READERS.z_mode
     if mode != "direct":
         return None
     try:
@@ -180,7 +179,7 @@ def z_um_from(settings, drive, *, client, job_name, mode=None):
     when the direct reader is used (the profile's ``z_mode``, unless *mode*
     says), else from the experiment LAS X saves.
     """
-    mode = mode if mode is not None else read.profile().z_mode
+    mode = mode if mode is not None else direct_profile.STATE_READERS.z_mode
     return derived.z_um_from_settings(settings, drive, client=client, job_name=job_name, direct=mode == "direct")
 
 
@@ -290,7 +289,7 @@ def get_lasx_settings(settings_path=None):
 def get_pending_dialog(*, diagnostics=False):
     snapshot = log_reader.parse_msgbox_log()
     value = log_reader.get_pending_dialog(snapshot)
-    age_s = capabilities.age_for_snapshot(snapshot, age_key="dialog")
+    age_s = log_reader.age_for_snapshot(snapshot, age_key="dialog")
     observed_at = None if age_s is None else snapshot.now - age_s
     reading = Reading(
         value=value,

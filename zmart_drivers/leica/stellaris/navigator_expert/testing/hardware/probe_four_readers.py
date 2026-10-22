@@ -37,7 +37,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[6]))  # the repository r
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "helpers"))  # low_level
 
 import low_level as drv
-from zmart_drivers.leica.stellaris.navigator_expert.operations.readings import reading_table as capabilities
+from zmart_drivers.leica.stellaris.navigator_expert.primitives.direct import profile as capabilities
 from zmart_drivers.leica.stellaris.navigator_expert.procedures import readings as readers
 
 HERE = Path(__file__).resolve().parent

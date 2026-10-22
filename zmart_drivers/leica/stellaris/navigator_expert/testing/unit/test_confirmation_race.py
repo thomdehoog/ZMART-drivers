@@ -25,9 +25,9 @@ import unittest
 from unittest.mock import patch
 
 from zmart_drivers.leica.stellaris.navigator_expert.procedures import readings as readers
-from zmart_drivers.leica.stellaris.navigator_expert.dispatcher import read as engine
+from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import reads as engine
 from zmart_drivers.leica.stellaris.navigator_expert.operations.changes import confirming
-from zmart_drivers.leica.stellaris.navigator_expert.operations.readings import reading_settings
+from zmart_drivers.leica.stellaris.navigator_expert.primitives.direct import profile as reading_settings
 
 
 def _ok(msg="ok"):

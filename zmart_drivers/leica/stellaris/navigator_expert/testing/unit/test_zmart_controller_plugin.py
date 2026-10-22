@@ -28,7 +28,7 @@ from zmart_drivers.leica.stellaris.navigator_expert.primitives.log import reads 
 DRIVER_FOLDER = Path(zmart_controller_plugin.__file__).resolve().parents[1]
 
 from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import client as _connect_module
-from zmart_drivers.leica.stellaris.navigator_expert.operations.readings import reading_settings
+from zmart_drivers.leica.stellaris.navigator_expert.primitives.direct import profile as reading_settings
 
 
 def _offline(monkeypatch, tmp_path):

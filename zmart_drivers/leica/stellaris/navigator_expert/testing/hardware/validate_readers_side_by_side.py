@@ -54,7 +54,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "helpers"))  # mock
 from run_report import RunReport, attempts_of, confirmation_of, replay_envelope_logs
 
 import low_level as drv
-from zmart_drivers.leica.stellaris.navigator_expert.operations.readings import reading_table as capabilities
+from zmart_drivers.leica.stellaris.navigator_expert.primitives.direct import profile as capabilities
 from zmart_drivers.leica.stellaris.navigator_expert.primitives.log import reads as log_settings
 
 from zmart_drivers.leica.stellaris.navigator_expert.procedures import readings as readers
@@ -64,7 +64,7 @@ from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api.parsing i
     make_changeable_copy,
     parse_tile_geometry,
 )
-from zmart_drivers.leica.stellaris.navigator_expert.operations.readings import reading_settings
+from zmart_drivers.leica.stellaris.navigator_expert.primitives.direct import profile as reading_settings
 
 API_HANG_MS = 1500.0  # an API read slower than this is treated as a dialog-hang
 

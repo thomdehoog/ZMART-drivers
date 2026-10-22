@@ -20,7 +20,7 @@ for _p in (_HERE, _REPO_ROOT):
         sys.path.insert(0, str(_p))
 
 import probe_four_readers as probe
-from zmart_drivers.leica.stellaris.navigator_expert.operations.readings import reading_table as capabilities
+from zmart_drivers.leica.stellaris.navigator_expert.primitives.direct import profile as capabilities
 
 
 def test_jobs_log_read_is_expected_skip_not_error():

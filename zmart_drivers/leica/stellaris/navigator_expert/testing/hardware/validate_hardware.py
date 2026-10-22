@@ -73,7 +73,7 @@ from run_report import (  # noqa: E402
     confirmation_of,
     replay_envelope_logs,
 )
-from zmart_drivers.leica.stellaris.navigator_expert.operations.readings import reading_settings
+from zmart_drivers.leica.stellaris.navigator_expert.primitives.direct import profile as reading_settings
 
 # --- Record + classification ------------------------------------------------
 
@@ -881,7 +881,7 @@ def phase_readonly(
         v.callable("get_hardware_info", lambda: drv.get_hardware_info(client))
         v.callable("get_xy", lambda: drv.get_xy(client))
 
-        from zmart_drivers.leica.stellaris.navigator_expert.operations.readings import reading_table as capabilities
+        from zmart_drivers.leica.stellaris.navigator_expert.primitives.direct import profile as capabilities
 
         jobs_has_log_leg = capabilities.DATUMS["jobs"].log_fn is not None
         if not jobs:

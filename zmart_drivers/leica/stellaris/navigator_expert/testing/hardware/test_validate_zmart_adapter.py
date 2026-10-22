@@ -36,7 +36,7 @@ from zmart_drivers.leica.stellaris.navigator_expert.procedures.save_data import 
     save as _save,
 )
 from zmart_drivers.leica.stellaris.navigator_expert.operations.changes import acquire as acquire_change
-from zmart_drivers.leica.stellaris.navigator_expert.operations.readings import reading_settings
+from zmart_drivers.leica.stellaris.navigator_expert.primitives.direct import profile as reading_settings
 
 
 

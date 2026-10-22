@@ -26,7 +26,7 @@ if str(_REPO_ROOT) not in sys.path:
 
 import validate_hardware
 from mock_lasx_api import MockLasxClient, _SET_DISPATCH
-from zmart_drivers.leica.stellaris.navigator_expert.operations.readings import reading_settings
+from zmart_drivers.leica.stellaris.navigator_expert.primitives.direct import profile as reading_settings
 
 
 
