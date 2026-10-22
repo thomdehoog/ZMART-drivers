@@ -46,13 +46,15 @@ What goes into the store, layer by layer (the agreement's sections in brackets):
   attenuation), detector gain and gating, the stack's z step and direction;
   `Description` (the LAS X image name) and `StageLabel` (the position label) in their
   places.
-- **Layer 3** (5): the controller state (`get_state()` whole), the capture record, the
-  coordinate frame (origin, objective calibration offset, the turn or mirror of the
-  pixels, and how each axis's position is made from the readings), the actuator readings
-  per plane position (stage x and y, z-wide, z-galvo, and the used actuator).
-- **Layer 4** (6): LAS X's description, whole, its root carrying `xmlns=""`; beside it the
-  readable LAS X key–value list there is now, the LAS X job settings and hardware report,
-  and the capture's route and timing.
+- **Layer 3** (5), only what the controller contract defines: the controller state
+  (`get_state()` whole), the capture record, the image frame (the turn or mirror applied
+  to the pixels), the actuator readings per plane position (as `get_xyz` names them, and
+  the used actuator).
+- **Layer 4** (6), what is the Leica driver's or LAS X's own: LAS X's description, whole,
+  its root carrying `xmlns=""`; beside it the readable LAS X key–value list there is now,
+  the LAS X job settings and hardware report, the capture's route and timing, the
+  changes it could not confirm, and how it makes a position from its readings (the
+  origin, the objective calibration offset, z = z-wide + z-galvo).
 
 The export state embedded now is split between layer 3 (what the controller says) and
 layer 4 (what LAS X says). With LAS X's description whole, nothing LAS X knows is lost,
@@ -68,9 +70,9 @@ Where:
   from the capture record.
 - `primitives/capture/metadata_map.py`: the new layer-2 fields.
 - `driver_api/acquire.py:108`: keeps `observed` as well as `changeable`.
-- `procedures/save_data/save.py` / `save_waiting.py`: the capture record and the
-  coordinate frame are known before the store is written and handed to it; the log is
-  written from the same record.
+- `procedures/save_data/save.py` / `save_waiting.py`: the capture record and the image
+  frame are known before the store is written and handed to it; the log is written from
+  the same record.
 - `procedures/save_data/save.py:271`: `summary.json`'s pixel size is swapped with the image
   when the orientation turns it, as the store's already is.
 - `procedures/save_data/naming.py`: its description of OME-TIFF goes.
@@ -104,8 +106,8 @@ microscope reports *now*, which can be another job's.
 - The OME-XML is valid against schema 2016-06, annotations included.
 - The LAS X description in the store has the same content as the one LAS X gave. (That it
   holds what a `.lif` holds was checked once, by hand: Overview007, 756 against 772 facts.)
-- The controller state, the capture record, the coordinate frame and the actuator
-  readings are in the store, under their namespaces.
+- The controller state, the capture record, the image frame and the actuator readings
+  are in the store, under their namespaces; nothing Leica's is among them.
 - napari (ome-zarr-py) opens the store.
 - The whole chain on the LAS X simulator: the for-coders notebook, and the interface's scan
   with the viewer.
