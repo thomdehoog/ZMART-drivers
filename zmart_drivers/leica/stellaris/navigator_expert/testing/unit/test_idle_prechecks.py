@@ -72,3 +72,26 @@ class TestIdlePrecheckPolicy(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def test_the_direct_reader_is_asked_again_while_the_scanner_is_busy(monkeypatch):
+    """A direct answer that does not count yet ("Busy") is asked again until it does."""
+    import time
+    from types import SimpleNamespace
+
+    from zmart_drivers.leica.stellaris.navigator_expert.dispatcher import read
+
+    answers = iter(["Busy", "Busy", "Idle"])
+    spec = SimpleNamespace(direct_fn=lambda **_k: next(answers))
+    monkeypatch.setattr(read.waiting, "POLL_S", 0.001)
+
+    reading = read.watch_direct(
+        spec,
+        succeeded=lambda s: "Idle" in s,
+        deadline=time.monotonic() + 5.0,
+        observed_after=None,
+        kwargs={},
+        waiting_for_change=True,
+    )
+
+    assert reading is not None and reading.value == "Idle"

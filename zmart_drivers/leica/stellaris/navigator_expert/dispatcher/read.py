@@ -258,7 +258,7 @@ def wait_for(
             deadline=until,
             observed_after=observed_after,
             kwargs=source_kwargs or {},
-            waiting=accept is not None or observed_after is not None,
+            waiting_for_change=accept is not None or observed_after is not None,
         )
         if reading is None or reading.error is None:
             return reading
@@ -508,10 +508,10 @@ def _client_api_key(client):
     return id(client)
 
 
-def watch_direct(spec, *, succeeded, deadline, observed_after, kwargs, waiting):
+def watch_direct(spec, *, succeeded, deadline, observed_after, kwargs, waiting_for_change):
     """Ask the direct reader until an answer counts; a carried error at once when it fails.
 
-    A caller *waiting* for a change (a confirmation's ``accept`` or
+    A caller waiting for a change (*waiting_for_change*: a confirmation's ``accept`` or
     ``observed_after``) is asked again every ``POLL_S`` until *deadline*,
     and gets None when nothing counted in time. Any other caller gets one
     answer: one that does not count is a failure, so the fallback answers
@@ -521,7 +521,7 @@ def watch_direct(spec, *, succeeded, deadline, observed_after, kwargs, waiting):
         reading = direct_read(spec, kwargs)
         if reading.error is not None or counts(reading, succeeded, observed_after):
             return reading
-        if not waiting:
+        if not waiting_for_change:
             return Reading(
                 value=None,
                 source="direct",
