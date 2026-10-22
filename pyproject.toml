@@ -48,12 +48,12 @@ leica = [
 # The ZMART Controller the driver plugs into. It is not on PyPI, so it is
 # installed from its own repository: pip install "zmart-drivers[leica,controller]".
 controller = [
-    "zmart-controller @ git+https://github.com/ZMB-UZH/ZMART-controller@v0.4.0rc4",
+    "zmart-controller @ git+https://github.com/ZMB-UZH/ZMART-controller@v0.4.0rc7",
 ]
 # What the offline test suite needs on top of the driver's own extra; the
 # plug-in's tests run it in the controller.
 test = [
-    "zmart-controller @ git+https://github.com/ZMB-UZH/ZMART-controller@v0.4.0rc4",
+    "zmart-controller @ git+https://github.com/ZMB-UZH/ZMART-controller@v0.4.0rc7",
     "pytest>=8",
     "pytest-cov>=5",
     "ruff>=0.6",
