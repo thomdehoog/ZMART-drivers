@@ -26,6 +26,9 @@ import zarr
 
 from zmart_drivers.leica.stellaris.navigator_expert.procedures.save_data import save as saving
 from zmart_drivers.leica.stellaris.navigator_expert.procedures.save_data import saved_acquisition
+from zmart_drivers.leica.stellaris.navigator_expert.procedures.save_data.ome_canonical import (
+    StoreNotes,
+)
 from zmart_drivers.leica.stellaris.navigator_expert.primitives.capture import product
 from zmart_drivers.leica.stellaris.navigator_expert.driver_setup.orientation import (
     Orientation,
@@ -458,29 +461,22 @@ class TestSave:
         tmp_path,
         naming,
     ):
-        """The machine and software state travels inside the image, in its OME-XML."""
-        state = {
-            "software": {"driver_version": "6.0.0"},
-            "hardware": {"Microscope": {"name": "DM Manual-6"}},
-            "provenance": {
-                "folder": "overview-scan",
-                "position_label": "000003",
-                "acquisition_hash": "9k2m4p",
-                "session_hash6": "000abc",
-                "exported_at": "2026-07-07T00:00:00+00:00",
-            },
-        }
+        """The controller state and the capture record travel inside the image, in its OME-XML."""
+        notes = StoreNotes(
+            controller_state={"changeable": {"job": "Overview"}, "observed": {}},
+            capture_record={"position_label": "000003", "acquisition_type": "overview-scan"},
+            vendor={"hardware": {"Microscope": {"name": "DM Manual-6"}}},
+        )
 
-        saved = _save(successful_acq, tmp_path / "run_000001", naming, state=state)
+        saved = _save(successful_acq, tmp_path / "run_000001", naming, notes=notes)
 
         embedded = _store_xml(next(iter(saved.image_paths.values())))
-        assert "StructuredAnnotations" in embedded
-        assert 'ID="Annotation:zmart-state-map"' in embedded
-        assert 'ID="Annotation:zmart-state-json"' in embedded
-        assert 'Namespace="https://zmart-microscopy/state"' in embedded
-        # Both the short list of highlights and the full dump are present.
-        assert 'K="position_label"' in embedded
-        assert '"driver_version": "6.0.0"' in embedded
+        store = "https://github.com/ZMB-UZH/ZMART-controller/the_store/1/"
+        for namespace in ("controller-state", "capture-record", "image-frame"):
+            assert f'Namespace="{store}{namespace}"' in embedded
+        assert f'Namespace="{store}vendor/leica-lasx"' in embedded
+        assert '<StageLabel Name="000003"' in embedded
+        assert "DM Manual-6" in embedded
 
     def test_save_omits_state_annotations_when_not_provided(
         self,
@@ -491,7 +487,8 @@ class TestSave:
     ):
         saved = _save(successful_acq, tmp_path / "run_000001", naming)
         embedded = _store_xml(next(iter(saved.image_paths.values())))
-        assert 'Namespace="https://zmart-microscopy/state"' not in embedded
+        assert "controller-state" not in embedded
+        assert "capture-record" not in embedded
 
     def test_save_has_no_channel_selector(
         self,
@@ -565,11 +562,12 @@ class TestSave:
         # check never silently skips.
         from ome_types import from_xml
 
-        state = {
-            "software": {"driver_version": "6.0.0"},
-            "provenance": {"folder": "overview-scan", "position_label": "000003"},
-        }
-        saved = _save(successful_acq, tmp_path / "run_000001", naming, state=state)
+        notes = StoreNotes(
+            controller_state={"changeable": {}, "observed": {}},
+            capture_record={"position_label": "000003"},
+            vendor={"software": {"api": "navigator-expert"}},
+        )
+        saved = _save(successful_acq, tmp_path / "run_000001", naming, notes=notes)
 
         store = next(iter(saved.image_paths.values()))
         from_xml(store / "OME" / "METADATA.ome.xml", validate=True)
@@ -609,7 +607,7 @@ class TestSave:
         """
         output_root = tmp_path / "run_000001"
 
-        _save(successful_acq, output_root, naming, state={"software": {}})
+        _save(successful_acq, output_root, naming, notes=StoreNotes(controller_state={}))
 
         data = output_root / "data"
         assert {path.name for path in output_root.iterdir()} == {
@@ -660,12 +658,12 @@ class TestSave:
         timepoint.
         """
         output_root = tmp_path / "run_000001"
-        state = {
-            "software": {"driver_version": "6.0.0"},
-            "provenance": {"folder": "overview-scan"},
-        }
+        notes = StoreNotes(
+            controller_state={"changeable": {}, "observed": {}},
+            capture_record={"position_label": "000003"},
+        )
 
-        saved = _save(successful_acq, output_root, naming, state=state)
+        saved = _save(successful_acq, output_root, naming, notes=notes)
 
         metadata = output_root / "data" / "metadata" / "ZMART_state"
         printed = list(metadata.iterdir())
@@ -673,7 +671,7 @@ class TestSave:
             "overview-scan_000001_000003_T000000_ZMART_state.json"
         ]
         assert saved.state_paths == tuple(printed)
-        assert json.loads(printed[0].read_text(encoding="utf-8")) == state
+        assert json.loads(printed[0].read_text(encoding="utf-8")) == notes.as_json()
 
     def test_no_state_is_printed_when_the_caller_captured_none(
         self,

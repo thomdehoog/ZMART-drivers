@@ -100,6 +100,14 @@ microscope reports *now*, which can be another job's.
 - What lies beyond layer 1 (the objective, the controller state, the capture record) is
   read through one small helper per repo, by namespace, when a reader needs it.
 
+**Nothing above the controller speaks a vendor's language.** The interface, the analysis,
+the viewer and the workflows depend on the controller's words and the store's layers 1 to
+3 only: no LAS X file, no vendor setting name, no actuator name, in what they read from a
+store or what they send to and expect from the controller. Every place that does today is
+found and moved to the controller's words, for example the interface's check for the
+simulator's stand-in pixels, which reads LAS X's files, and every use of `job` as a
+setting.
+
 ## 4. Checks
 
 - ome-zarr-models accepts the store as an OME-Zarr 0.5 image.

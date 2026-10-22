@@ -29,6 +29,7 @@ from ...session import loaded_config as _session_state
 from ...session.handle import Session, require_open
 from . import command_log as _log
 from . import save as _save
+from .ome_canonical import StoreNotes
 
 log = logging.getLogger(__name__)
 
@@ -87,7 +88,7 @@ def save_pending(
             "job": p.job,
             "session_hash6": p.session_hash6,
         },
-        state=p.state,
+        notes=store_notes(p),
         # Rig image->stage orientation, applied to the saved planes behind the
         # scenes so the workflow only ever sees stage-aligned images.
         orientation=orientation,
@@ -177,6 +178,49 @@ def save_pending(
         "projections": projections,
     }
     return record, saved
+
+
+def store_notes(pending) -> StoreNotes:
+    """What the store says about a capture besides its pixels, from the note taken at the capture.
+
+    The capture record is in the keys of ZMART-controller's store agreement
+    (docs/the_store); what is this driver's own (how LAS X answered, the
+    changes it could not confirm) goes with the rest of the driver's own facts.
+    """
+    noted = pending.state or {}
+    record = {
+        "position_label": pending.label,
+        "acquisition_type": pending.acquisition_type,
+        "acquisition_settings": {
+            "asked": dict(pending.asked or {}),
+            "used": pending.settings,
+        },
+        "started": _when(pending.acq.started_at),
+        "finished": _when(pending.acq.finished_at),
+        "xyz": noted.get("xyz"),
+        "driver": noted.get("driver"),
+        "controller": {"version": _controller_version()},
+    }
+    vendor = {
+        **(noted.get("vendor") or {}),
+        "answered": getattr(pending.acq, "command_result", None),
+        "unconfirmed": list(pending.unconfirmed),
+    }
+    return StoreNotes(
+        controller_state=noted.get("controller_state"),
+        capture_record=record,
+        vendor=vendor,
+    )
+
+
+def _controller_version() -> str | None:
+    """The installed ZMART Controller's version; None when it is not installed."""
+    from importlib import metadata
+
+    try:
+        return metadata.version("zmart-controller")
+    except metadata.PackageNotFoundError:
+        return None
 
 
 def _loaded_orientation(handle: Session):

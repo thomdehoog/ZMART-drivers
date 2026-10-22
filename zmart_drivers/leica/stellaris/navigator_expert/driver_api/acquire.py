@@ -41,6 +41,9 @@ from ..procedures.absolute_coordinate_system.frame import get_xyz
 from .state import get_state
 from ..session.handle import Session, note_unconfirmed, require_open, try_
 
+#: This driver, as the capture record names it.
+DRIVER_PACKAGE = __package__.rpartition(".")[0]
+
 log = logging.getLogger(__name__)
 
 
@@ -91,27 +94,37 @@ def _export_state(
     stem: str,
     job: str,
 ) -> dict:
-    """A JSON-serialisable snapshot of machine/software state at export time.
+    """What only the moment of the capture can tell, for the store it will be saved as.
 
-    Every field is captured best-effort: a missing reader degrades to
-    ``None`` rather than failing the save. Embedded per-plane by ``save``.
+    In the controller's words, for layer 3 of ZMART-controller's store
+    agreement (docs/the_store): ``controller_state`` is ``get_state()`` whole,
+    ``xyz`` is ``get_xyz()`` as the contract defines it, and ``driver`` names
+    this driver. ``vendor`` is this driver's and LAS X's own, for layer 4:
+    how a position is made from the readings, the hardware report, the job's
+    settings. Every field is read best-effort: a missing reader leaves
+    ``None`` rather than failing the capture.
     """
-    machine_state = try_(lambda: get_state(handle))
+    xyz = try_(lambda: get_xyz(handle)) or {}
     return {
-        "software": {
-            "driver_version": _DRIVER_VERSION,
-            "client": handle.connection.get("client"),
-            "api": "navigator-expert",
-        },
-        "hardware": try_(lambda: _readers.get_hardware_info(handle.client)),
-        "job_settings": try_(lambda: _readers.get_job_settings(handle.client, job)),
-        "job_state": (machine_state or {}).get("changeable") if machine_state else None,
-        "position": try_(lambda: get_xyz(handle)),
-        "provenance": {
-            "stem": stem,
+        "controller_state": try_(lambda: get_state(handle)),
+        "xyz": {axis: xyz[axis] for axis in ("x", "y", "z") if axis in xyz} or None,
+        "driver": {"name": DRIVER_PACKAGE, "version": _DRIVER_VERSION},
+        "vendor": {
+            "position": {
+                "made as": "reading - origin - objective translation; z is z-wide + z-galvo",
+                "origin": dict(handle.origin or {}),
+                "objective translation (um)": xyz.get("objective_translation_um"),
+            },
+            "software": {
+                "client": handle.connection.get("client"),
+                "api": "navigator-expert",
+            },
+            "hardware": try_(lambda: _readers.get_hardware_info(handle.client)),
+            "job settings": try_(lambda: _readers.get_job_settings(handle.client, job)),
             "job": job,
-            "session_hash6": handle.hash6,
-            "exported_at": datetime.now(timezone.utc).isoformat(),
+            "stem": stem,
+            "session": handle.hash6,
+            "noted at": datetime.now(timezone.utc).isoformat(),
         },
     }
 

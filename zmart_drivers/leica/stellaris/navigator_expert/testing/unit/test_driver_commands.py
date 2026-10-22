@@ -1018,7 +1018,7 @@ class TestAcquire(unittest.TestCase):
         def fake_save(client, acq, output_root, naming, **kwargs):
             calls["saved"] = (str(output_root), naming)
             calls["lineage"] = kwargs.get("lineage")
-            calls["state"] = kwargs.get("state")
+            calls["notes"] = kwargs.get("notes")
             return SimpleNamespace(
                 image_paths={0: Path("/tmp/out/img.ome.tif")},
                 naming=naming,
@@ -1053,11 +1053,11 @@ class TestAcquire(unittest.TestCase):
         self.assertEqual(calls["lineage"]["position_label"], "prescan_a1b2c3_well-7")
         self.assertEqual(calls["lineage"]["stem"], "acquisition_prescan_a1b2c3_well-7")
         self.assertEqual(calls["lineage"]["session_hash6"], h.hash6)
-        # the machine/software state is captured and threaded into save()
-        self.assertIsInstance(calls["state"], dict)
-        self.assertEqual(
-            calls["state"]["provenance"]["stem"], "acquisition_prescan_a1b2c3_well-7"
-        )
+        # What the store says about the capture is noted at the capture and threaded into save()
+        notes = calls["notes"]
+        self.assertEqual(notes.capture_record["position_label"], "prescan_a1b2c3_well-7")
+        self.assertEqual(notes.capture_record["acquisition_settings"]["used"]["trigger"], "full")
+        self.assertEqual(notes.vendor["stem"], "acquisition_prescan_a1b2c3_well-7")
         self.assertEqual(record["trigger"], "full")
         self.assertNotIn("folder", record)
         self.assertEqual(

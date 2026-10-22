@@ -1,7 +1,11 @@
 """Generate canonical ZMART OME metadata.
 
 Vendor OME is parsed as input/provenance. The files written by ``save``
-use this module as the output metadata contract.
+use this module as the output metadata contract: the store's description
+follows ZMART-controller's agreement (``docs/the_store``). Layer 2 is the
+OME data model; layer 3 holds only what the controller's contract defines,
+under the agreement's namespaces; layer 4 holds what is LAS X's or this
+driver's own.
 
 Contract with ``ome.py``: that module owns TIFF tag-270 access
 (:func:`ome.read_tiff_tag_270`) and the validate/patch side; this module
@@ -16,7 +20,7 @@ import json
 import logging
 import uuid
 import xml.etree.ElementTree as ET
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
 
@@ -35,14 +39,16 @@ OME_NS = "http://www.openmicroscopy.org/Schemas/OME/2016-06"
 XSI_NS = "http://www.w3.org/2001/XMLSchema-instance"
 MICROMETER = "\u00b5m"
 
-# Namespace + annotation IDs for the embedded machine/software state block.
-STATE_NS = "https://zmart-microscopy/state"
-STATE_MAP_ID = "Annotation:zmart-state-map"
-STATE_JSON_ID = "Annotation:zmart-state-json"
-
-# The vendor's facts that OME has no field for, kept by name.
-VENDOR_NS = "https://zmart-microscopy/vendor"
-VENDOR_MAP_ID = "Annotation:vendor-facts"
+#: The version of ZMART-controller's store agreement (docs/the_store) this driver writes.
+STORE_VERSION = "1"
+#: The agreement's namespaces: its version is part of each, so it travels with the XML.
+STORE_NS = f"https://github.com/ZMB-UZH/ZMART-controller/the_store/{STORE_VERSION}/"
+CONTROLLER_STATE_NS = STORE_NS + "controller-state"
+CAPTURE_RECORD_NS = STORE_NS + "capture-record"
+IMAGE_FRAME_NS = STORE_NS + "image-frame"
+ACTUATOR_READINGS_NS = STORE_NS + "actuator-readings"
+#: Layer 4: what is LAS X's or this driver's own.
+VENDOR_NS = STORE_NS + "vendor/leica-lasx"
 
 INSTRUMENT_ID = "Instrument:0"
 OBJECTIVE_ID = "Objective:0"
@@ -53,13 +59,41 @@ ET.register_namespace("", OME_NS)
 ET.register_namespace("xsi", XSI_NS)
 
 
+@dataclass(frozen=True)
+class StoreNotes:
+    """What a store says besides its pixels and the OME fields: layers 3 and 4.
+
+    ``controller_state`` is ``get_state()`` whole. ``capture_record`` is the
+    capture in the controller's words (the agreement's keys). ``pixels_to_position``
+    is the 2x2 turn or mirror already applied to the pixels. ``vendor`` holds
+    this driver's and LAS X's own facts, and ``vendor_descriptions`` LAS X's
+    descriptions of the image, each as its text, byte for byte.
+    """
+
+    controller_state: dict | None = None
+    capture_record: dict | None = None
+    pixels_to_position: tuple = ((1, 0), (0, 1))
+    vendor: dict | None = None
+    vendor_descriptions: tuple[str, ...] = ()
+
+    def as_json(self) -> dict:
+        """Everything but the vendor's descriptions, as one JSON object, for the side file."""
+        return {
+            "controller_state": self.controller_state,
+            "capture_record": self.capture_record,
+            "pixels_to_position": [list(row) for row in self.pixels_to_position],
+            "vendor": self.vendor,
+        }
+
+
 def image_xml(
-    metadata: AcquisitionMetadata, *, image_name: str, state: dict | None = None
+    metadata: AcquisitionMetadata, *, image_name: str, notes: StoreNotes | None = None
 ) -> bytes:
     """OME XML for a whole capture whose pixels live elsewhere (an OME-Zarr store).
 
     Every channel and every plane, with the pixels declared absent from the
-    XML itself (``MetadataOnly``): the store beside it holds them.
+    XML itself (``MetadataOnly``): the store beside it holds them. With
+    *notes*, layers 3 and 4 of the agreement as well.
     """
     return _ome_xml(
         metadata,
@@ -67,7 +101,7 @@ def image_xml(
         channels=metadata.channels,
         tiff_entries=[],
         planes=sorted(metadata.planes.items()),
-        state=state,
+        notes=notes,
     )
 
 
@@ -107,7 +141,7 @@ def _ome_xml(
     channels: tuple[ChannelMetadata, ...],
     tiff_entries: list[tuple[int, int, int, str]],
     planes: list[tuple[PlaneIndex, PlaneMetadata]] = (),
-    state: dict | None = None,
+    notes: StoreNotes | None = None,
 ) -> bytes:
     """OME 2016-06 XML for the planes named, in the order the schema requires.
 
@@ -139,6 +173,9 @@ def _ome_xml(
             if objective.immersion in MEDIA:
                 settings["Medium"] = objective.immersion
             ET.SubElement(image, _tag("ObjectiveSettings"), settings)
+    label = (notes.capture_record or {}).get("position_label") if notes else None
+    if label:
+        ET.SubElement(image, _tag("StageLabel"), {"Name": str(label)})
     pixels_attrs = {
         "ID": "Pixels:0",
         "DimensionOrder": "XYZCT",
@@ -174,34 +211,25 @@ def _ome_xml(
         )
         uuid_el = ET.SubElement(tiff_data, _tag("UUID"), {"FileName": filename})
         uuid_el.text = "urn:uuid:" + str(uuid.uuid5(uuid.NAMESPACE_URL, filename))
-    drive_maps = [
-        (_append_plane(pixels, index, plane), plane) for index, plane in planes
-    ]
-    drive_maps = [(ref, plane) for ref, plane in drive_maps if ref is not None]
+    # The actuator readings of a plane position, shared by its channels: one map per t and z.
+    readings: dict[str, PlaneMetadata] = {}
+    for index, plane in planes:
+        ref = _append_plane(pixels, index, plane)
+        if ref is not None:
+            readings.setdefault(ref, plane)
 
-    if metadata.annotations or drive_maps or state is not None:
-        # AnnotationRefs come AFTER Pixels in the Image element, and the one
-        # StructuredAnnotations block AFTER Image in the OME element.
-        annotations = ET.Element(_tag("StructuredAnnotations"))
-        if metadata.annotations:
-            ET.SubElement(image, _tag("AnnotationRef"), {"ID": VENDOR_MAP_ID})
-            vendor = ET.SubElement(
-                annotations,
-                _tag("MapAnnotation"),
-                {"ID": VENDOR_MAP_ID, "Namespace": VENDOR_NS},
-            )
-            value = ET.SubElement(vendor, _tag("Value"))
-            for key, text in metadata.annotations:
-                ET.SubElement(value, _tag("M"), {"K": key}).text = text
-        for ref, plane in drive_maps:
-            drives = ET.SubElement(
-                annotations, _tag("MapAnnotation"), {"ID": ref, "Namespace": VENDOR_NS}
-            )
-            value = ET.SubElement(drives, _tag("Value"))
-            for name, micrometres in plane.actuators:
-                ET.SubElement(value, _tag("M"), {"K": name}).text = _num(micrometres)
-        if state is not None:
-            _append_state_annotations(annotations, image, state)
+    # AnnotationRefs come AFTER Pixels in the Image element, and the one
+    # StructuredAnnotations block AFTER Image in the OME element.
+    annotations = ET.Element(_tag("StructuredAnnotations"))
+    for ref, plane in readings.items():
+        _append_map(annotations, ref, ACTUATOR_READINGS_NS, plane.actuators)
+    if notes is not None:
+        _append_notes(annotations, image, notes)
+    if metadata.annotations:
+        ref = "Annotation:leica-lasx-facts"
+        ET.SubElement(image, _tag("AnnotationRef"), {"ID": ref})
+        _append_map(annotations, ref, VENDOR_NS, metadata.annotations)
+    if len(annotations):
         root.append(annotations)
 
     text = ET.tostring(root, encoding="unicode")
@@ -313,103 +341,61 @@ def _append_plane(
     element = ET.SubElement(pixels, _tag("Plane"), attrs)
     if not plane.actuators:
         return None
-    ref = f"Annotation:drives-t{index.t}-z{index.z}-c{index.c}"
+    ref = f"Annotation:actuator-readings-t{index.t}-z{index.z}"
     ET.SubElement(element, _tag("AnnotationRef"), {"ID": ref})
     return ref
 
 
-def _append_state_annotations(
-    annotations: ET.Element, image: ET.Element, state: dict
+def _append_notes(
+    annotations: ET.Element, image: ET.Element, notes: StoreNotes
 ) -> None:
-    """Embed the machine/software state as schema-valid StructuredAnnotations.
+    """Layers 3 and 4: each annotation in its namespace, referenced from the Image."""
+    texts = [
+        (CONTROLLER_STATE_NS, "controller-state", notes.controller_state),
+        (CAPTURE_RECORD_NS, "capture-record", notes.capture_record),
+        (VENDOR_NS, "leica-lasx-driver", notes.vendor),
+    ]
+    for namespace, name, value in texts:
+        if value is not None:
+            _append_comment(
+                annotations, image, f"Annotation:{name}", namespace, _json(value)
+            )
+    frame = [("pixels", json.dumps([list(row) for row in notes.pixels_to_position]))]
+    ET.SubElement(image, _tag("AnnotationRef"), {"ID": "Annotation:image-frame"})
+    _append_map(annotations, "Annotation:image-frame", IMAGE_FRAME_NS, frame)
+    for number, description in enumerate(notes.vendor_descriptions):
+        _append_comment(
+            annotations,
+            image,
+            f"Annotation:leica-lasx-description-{number}",
+            VENDOR_NS,
+            description,
+        )
 
-    Two annotations in the ``StructuredAnnotations`` block: a
-    ``MapAnnotation`` of flat human-readable highlights and a
-    ``CommentAnnotation`` carrying the full JSON dump. The ``<Image>`` gets
-    an ``AnnotationRef`` (after ``<Pixels>``) to each.
-    """
-    ET.SubElement(image, _tag("AnnotationRef"), {"ID": STATE_MAP_ID})
-    ET.SubElement(image, _tag("AnnotationRef"), {"ID": STATE_JSON_ID})
 
-    map_ann = ET.SubElement(
-        annotations, _tag("MapAnnotation"), {"ID": STATE_MAP_ID, "Namespace": STATE_NS}
-    )
-    value = ET.SubElement(map_ann, _tag("Value"))
-    for key, text in _state_map_entries(state):
-        m = ET.SubElement(value, _tag("M"), {"K": key})
-        m.text = _ascii(text)
-
+def _append_comment(
+    annotations: ET.Element, image: ET.Element, ref: str, namespace: str, text: str
+) -> None:
+    ET.SubElement(image, _tag("AnnotationRef"), {"ID": ref})
     comment = ET.SubElement(
-        annotations,
-        _tag("CommentAnnotation"),
-        {"ID": STATE_JSON_ID, "Namespace": STATE_NS},
+        annotations, _tag("CommentAnnotation"), {"ID": ref, "Namespace": namespace}
     )
-    comment_value = ET.SubElement(comment, _tag("Value"))
-    comment_value.text = json.dumps(
-        state, ensure_ascii=True, default=str, sort_keys=True
+    ET.SubElement(comment, _tag("Value")).text = text
+
+
+def _append_map(annotations: ET.Element, ref: str, namespace: str, pairs) -> None:
+    made = ET.SubElement(
+        annotations, _tag("MapAnnotation"), {"ID": ref, "Namespace": namespace}
     )
+    value = ET.SubElement(made, _tag("Value"))
+    for key, text in pairs:
+        ET.SubElement(value, _tag("M"), {"K": key}).text = (
+            _num(text) if isinstance(text, float) else str(text)
+        )
 
 
-def _state_map_entries(state: dict) -> list[tuple[str, str]]:
-    """Flat human-readable highlights pulled defensively from *state*."""
-    entries: list[tuple[str, str]] = []
-    if not isinstance(state, dict):
-        return entries
-
-    software = state.get("software")
-    if isinstance(software, dict):
-        for key, val in software.items():
-            if val is not None:
-                entries.append((f"software.{key}", str(val)))
-
-    hardware = state.get("hardware")
-    if isinstance(hardware, dict):
-        microscope = hardware.get("Microscope")
-        if isinstance(microscope, dict) and microscope.get("name"):
-            entries.append(("microscope", str(microscope["name"])))
-
-    objective = _state_objective_name(state)
-    if objective:
-        entries.append(("objective", objective))
-
-    provenance = state.get("provenance")
-    if isinstance(provenance, dict):
-        for key in (
-            "folder",
-            "position_label",
-            "acquisition_hash",
-            "session_hash6",
-            "exported_at",
-        ):
-            val = provenance.get(key)
-            if val is not None:
-                entries.append((key, str(val)))
-    return entries
-
-
-def _state_objective_name(state: dict) -> str | None:
-    """Best-effort objective name from a few known state shapes."""
-    for candidate in (
-        state.get("position"),
-        state.get("job_settings"),
-        state.get("hardware"),
-    ):
-        if not isinstance(candidate, dict):
-            continue
-        objective = candidate.get("objective")
-        if isinstance(objective, dict) and objective.get("name"):
-            return str(objective["name"])
-        hardware = candidate.get("hardware")
-        if isinstance(hardware, dict):
-            objective = hardware.get("objective")
-            if isinstance(objective, dict) and objective.get("name"):
-                return str(objective["name"])
-    return None
-
-
-def _ascii(text: str) -> str:
-    """Force 7-bit ASCII (TIFF tag 270 requirement); escape the rest."""
-    return text.encode("ascii", "backslashreplace").decode("ascii")
+def _json(value) -> str:
+    return json.dumps(value, ensure_ascii=True, default=str, sort_keys=True)
 
 
 def _channel_attrs(channel: ChannelMetadata) -> dict[str, str]:

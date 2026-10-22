@@ -302,8 +302,39 @@ class TestTheStore:
         assert transforms["translation"]["translation"][2:] == pytest.approx(
             [50.0, 2000.0 + first_centre, 1000.0 + first_centre]
         )
-        # The viewer builds the coarser levels itself from this one.
-        assert multiscale["type"] == "mean"
+        # One level, at full resolution: no downsampling to name, and it says so.
+        assert "type" not in multiscale
+        assert "one level" in multiscale["metadata"]["description"]
+
+    def test_it_says_which_store_agreement_it_follows(self, hires, tmp_path):
+        """ZMART-controller docs/the_store, version 1."""
+        root, _ = hires
+
+        saved = save_as_zarr(root, tmp_path, "HiRes", placement=at(0.0, 0.0, {0: 0.0}))
+
+        assert attributes(saved.image_paths[PlaneIndex(0, 0, 0)])["zmart"] == {"store": "1"}
+
+    def test_a_single_plane_says_its_z_scale_is_a_placeholder(self, hires, tmp_path):
+        root, _ = hires
+
+        saved = save_as_zarr(root, tmp_path, "HiRes", placement=at(0.0, 0.0, {0: 0.0}))
+
+        multiscale = attributes(saved.image_paths[PlaneIndex(0, 0, 0)])["ome"]["multiscales"][0]
+        assert "placeholder" in multiscale["metadata"]["description"]
+
+    def test_it_says_how_to_show_it(self, hires, tmp_path):
+        root, _ = hires
+
+        saved = save_as_zarr(root, tmp_path, "HiRes", placement=at(0.0, 0.0, {0: 0.0}))
+
+        omero = attributes(saved.image_paths[PlaneIndex(0, 0, 0)])["ome"]["omero"]
+        assert omero["rdefs"] == {"defaultT": 0, "defaultZ": 0, "model": "color"}
+        for channel in omero["channels"]:
+            assert (channel["coefficient"], channel["family"], channel["inverted"]) == (
+                1,
+                "linear",
+                False,
+            )
 
     def test_channels_are_named_and_coloured_as_in_las_x(self, hires, tmp_path):
         root, _ = hires
@@ -415,7 +446,7 @@ class TestEveryFileSaysTheCanvasPosition:
             if a.id == plane.annotation_refs[0].id
             for m in a.value.ms
         }
-        assert drives["stage x (µm)"] == pytest.approx(63500.0)
+        assert drives["x/motoric"] == pytest.approx(63500.0)
 
     def test_the_stores_ome_xml_agrees_with_its_translation(self, stack, tmp_path):
         ome_types = pytest.importorskip("ome_types")

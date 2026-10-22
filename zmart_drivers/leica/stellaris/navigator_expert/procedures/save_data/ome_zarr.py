@@ -109,7 +109,7 @@ def write_position_store(
     *,
     orientation: Orientation,
     where: Placement | None = None,
-    state: dict | None = None,
+    notes: canonical.StoreNotes | None = None,
 ) -> Path:
     """Write *exported* as the OME-Zarr image *store*, and return it.
 
@@ -123,7 +123,7 @@ def write_position_store(
             "(save's placement); without it the image would lie at an invented place"
         )
     return write_store(
-        gather(exported, orientation=orientation, where=where), store, state=state
+        gather(exported, orientation=orientation, where=where), store, notes=notes
     )
 
 
@@ -276,8 +276,14 @@ def max_projection(capture: Capture) -> Capture:
     )
 
 
-def write_store(capture: Capture, store: Path, *, state: dict | None = None) -> Path:
-    """Write one gathered capture as the OME-Zarr image *store*, whole, and return it."""
+def write_store(
+    capture: Capture, store: Path, *, notes: canonical.StoreNotes | None = None
+) -> Path:
+    """Write one gathered capture as the OME-Zarr image *store*, whole, and return it.
+
+    Layer 1 of ZMART-controller's store agreement (docs/the_store) in its
+    ``zarr.json``, and layers 2 to 4 (*notes*) in ``OME/METADATA.ome.xml``.
+    """
     import zarr
     from ome_zarr_models.v05.axes import Axis
     from ome_zarr_models.v05.image import Image
@@ -327,7 +333,6 @@ def write_store(capture: Capture, store: Path, *, state: dict | None = None) -> 
         ],
         translations=[capture.translation],
         name=store.name,
-        multiscale_type="mean",
     )
     group = image.to_zarr(zarr.storage.LocalStore(str(writing)), path="")
     group["0"][...] = volume
@@ -341,6 +346,7 @@ def write_store(capture: Capture, store: Path, *, state: dict | None = None) -> 
     # multiscale's metadata); a browser viewer refuses "unit": null, so what
     # is absent is left out, as the specification has it.
     ome = _without_empty(dict(group.attrs["ome"]))
+    ome["multiscales"][0]["metadata"] = {"description": _levels_described(metadata)}
     ome["omero"] = {
         "channels": [
             {
@@ -348,16 +354,21 @@ def write_store(capture: Capture, store: Path, *, state: dict | None = None) -> 
                 "color": _hex(channel.color) if channel.color is not None else "FFFFFF",
                 "window": _window(volume[:, index], deepest),
                 "active": True,
+                "coefficient": 1,
+                "family": "linear",
+                "inverted": False,
             }
             for index, (name, channel) in enumerate(
                 zip(names, metadata.channels, strict=True)
             )
-        ]
+        ],
+        "rdefs": {"defaultT": 0, "defaultZ": metadata.size_z // 2, "model": "color"},
     }
     group.attrs["ome"] = ome
+    group.attrs["zmart"] = {"store": canonical.STORE_VERSION}
     (writing / "OME").mkdir()
     (writing / "OME" / "METADATA.ome.xml").write_bytes(
-        canonical.image_xml(metadata, image_name=store.name, state=state)
+        canonical.image_xml(metadata, image_name=store.name, notes=notes)
     )
     _rename_when_free(writing, store)
     return store
@@ -412,6 +423,14 @@ def _remove_when_free(writing: Path, *, wait_s: float = RENAME_WAIT_S) -> None:
                 log.warning("%s could not be removed: %s", writing, why)
                 return
             time.sleep(0.1)
+
+
+def _levels_described(metadata) -> str:
+    """What the store's levels are, as OME-Zarr's multiscale ``metadata`` says it."""
+    said = "one level, at full resolution: no downsampled levels"
+    if metadata.size_z == 1 and not metadata.physical_size_z_um:
+        said += "; a single plane, so its z scale of 1 is a placeholder, not a measured size"
+    return said
 
 
 def _without_empty(value):

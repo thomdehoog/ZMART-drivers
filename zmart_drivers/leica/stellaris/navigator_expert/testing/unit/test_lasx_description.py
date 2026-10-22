@@ -245,7 +245,9 @@ class TestTheOmeWritten:
         metadata = metadata_of(name)
 
         xml = canonical.image_xml(
-            metadata, image_name="p", state={"software": {"name": "ZMART"}}
+            metadata,
+            image_name="p",
+            notes=canonical.StoreNotes(controller_state={"changeable": {}, "observed": {}}),
         )
         ome = ome_types.from_xml(xml.decode("ascii"), validate=True)
         image = ome.images[0]
@@ -299,13 +301,13 @@ class TestEveryPlaneSaysWhereEachDriveStood:
 
         first = dict(metadata.planes[PlaneIndex(0, 0, 0)].actuators)
         last = dict(metadata.planes[PlaneIndex(0, 16, 0)].actuators)
-        assert first["stage x (µm)"] == pytest.approx(63500.0)
-        assert first["stage y (µm)"] == pytest.approx(41500.0)
+        assert first["x/motoric"] == pytest.approx(63500.0)
+        assert first["y/motoric"] == pytest.approx(41500.0)
         # The galvo made the stack: it moved from plane to plane...
-        assert first["z-galvo (µm)"] == pytest.approx(-19.27566)
-        assert last["z-galvo (µm)"] == pytest.approx(19.27566)
+        assert first["z/z-galvo"] == pytest.approx(-19.27566)
+        assert last["z/z-galvo"] == pytest.approx(19.27566)
         # ...while z-wide stood still.
-        assert first["z-wide (µm)"] == last["z-wide (µm)"] == 0.0
+        assert first["z/z-wide"] == last["z/z-wide"] == 0.0
 
     def test_the_plane_height_is_both_z_drives_together(self):
         metadata = with_z_wide_at(STACK, "0.0009")
@@ -314,7 +316,7 @@ class TestEveryPlaneSaysWhereEachDriveStood:
             metadata.planes[PlaneIndex(0, 0, 0)],
             metadata.planes[PlaneIndex(0, 16, 0)],
         )
-        assert dict(first.actuators)["z-wide (µm)"] == pytest.approx(900.0)
+        assert dict(first.actuators)["z/z-wide"] == pytest.approx(900.0)
         assert first.position_z_um == pytest.approx(900.0 - 19.27566)
         assert last.position_z_um == pytest.approx(900.0 + 19.27566)
 
@@ -323,11 +325,11 @@ class TestEveryPlaneSaysWhereEachDriveStood:
 
         first = dict(metadata.planes[PlaneIndex(0, 0, 0)].actuators)
         last = dict(metadata.planes[PlaneIndex(0, 16, 0)].actuators)
-        assert first["z-wide (µm)"] == pytest.approx(-19.27566)
-        assert last["z-wide (µm)"] == pytest.approx(19.27566)
+        assert first["z/z-wide"] == pytest.approx(-19.27566)
+        assert last["z/z-wide"] == pytest.approx(19.27566)
         assert (
-            first["z-galvo (µm)"]
-            == last["z-galvo (µm)"]
+            first["z/z-galvo"]
+            == last["z/z-galvo"]
             == pytest.approx(19.275422269005238)
         )
 
@@ -345,6 +347,6 @@ class TestEveryPlaneSaysWhereEachDriveStood:
             a for a in ome.structured_annotations.map_annotations if a.id == ref.id
         )
         values = {m.k: m.value for m in drives.value.ms}
-        assert float(values["z-wide (µm)"]) == pytest.approx(1200.0)
-        assert float(values["stage x (µm)"]) == pytest.approx(63500.0)
-        assert "z-galvo (µm)" in values
+        assert float(values["z/z-wide"]) == pytest.approx(1200.0)
+        assert float(values["x/motoric"]) == pytest.approx(63500.0)
+        assert "z/z-galvo" in values

@@ -25,6 +25,7 @@ from ...driver_setup.orientation import Orientation
 from ...primitives.capture import files as _files
 from . import materialize as _materialize
 from . import ome_zarr
+from .ome_canonical import StoreNotes
 from ...primitives.capture.files import (
     DEFAULT_EXPORT_COMPLETION_POLL_INTERVAL_S,
     DEFAULT_EXPORT_COMPLETION_TIMEOUT_S,
@@ -63,7 +64,7 @@ def save(
     naming: Naming,
     *,
     lineage: dict | None = None,
-    state: dict | None = None,
+    notes: StoreNotes | None = None,
     orientation: Orientation | None = None,
     export_completion_timeout_s: float = DEFAULT_EXPORT_COMPLETION_TIMEOUT_S,
     export_completion_poll_interval_s: float = (
@@ -77,8 +78,11 @@ def save(
 
     The capture is collected from LAS X's Data Container cache as a
     writer-agnostic ``ExportedAcquisition``, which this function persists.
-    When *state* is provided, the machine/software state at export time is
-    embedded in each plane's OME-XML. By default, every plane is reoriented
+    *notes* are what the store says besides its pixels and the OME fields
+    (layers 3 and 4 of ZMART-controller's store agreement): the controller
+    state, the capture record, the driver's own facts. The store always
+    says the turn applied to its pixels and holds LAS X's description of
+    the image, byte for byte. By default, every plane is reoriented
     losslessly with this microscope's active orientation as it is written.
     Pass ``Orientation()`` explicitly only when raw camera pixels are required,
     as in the orientation measurement itself. *cache_root* names the Data
@@ -128,7 +132,7 @@ def save(
             Path(output_root),
             naming,
             lineage=lineage,
-            state=state,
+            notes=notes,
             orientation=orientation,
             placement=placement,
         )
@@ -144,7 +148,9 @@ def save(
                 naming,
                 orientation=orientation,
                 placement=placement,
-                state=state,
+                notes=notes,
+                projected_from=next(iter(saved.image_paths.values())),
+                vendor_files=saved.vendor_metadata_paths,
             ),
         )
     return replace(saved, release_target=exported.release_target)
@@ -184,9 +190,14 @@ def _persist_projection(
     *,
     orientation: Orientation,
     placement,
-    state: dict | None,
+    notes: StoreNotes | None,
+    projected_from: Path,
+    vendor_files,
 ) -> tuple[Path, ...]:
-    """The capture's max projection in ``projections``, as an OME-Zarr image."""
+    """The capture's max projection in ``projections``, as an OME-Zarr image.
+
+    Its capture record says which store it was made from, and how.
+    """
     indices = [index for position in exported.positions for index in position.planes]
     where = (
         placement(sorted({index.z for index in indices}))
@@ -197,7 +208,15 @@ def _persist_projection(
         ome_zarr.gather(exported, orientation=orientation, where=where)
     )
     store = projections_dir(output_root) / f"{naming.stem}.ome.zarr"
-    return (ome_zarr.write_store(projected, store, state=state),)
+    record = dict((notes.capture_record if notes else None) or {})
+    record["derived_from"] = {
+        "store": Path(os.path.relpath(projected_from, store)).as_posix(),
+        "operation": "max over z",
+    }
+    told = _the_stores_notes(
+        replace(notes or StoreNotes(), capture_record=record), vendor_files, orientation
+    )
+    return (ome_zarr.write_store(projected, store, notes=told),)
 
 
 def on_the_canvas(metadata, exported: ExportedAcquisition, placement) -> object:
@@ -234,7 +253,7 @@ def _persist_store(
     naming: Naming,
     *,
     lineage: dict | None,
-    state: dict | None,
+    notes: StoreNotes | None,
     orientation: Orientation,
     placement: Callable[[list[int]], Callable[[int], dict]] | None,
 ) -> SavedAcquisition:
@@ -253,8 +272,13 @@ def _persist_store(
             "(save's placement); without it the image would lie at an invented place"
         )
     capture = ome_zarr.gather(exported, orientation=orientation, where=where)
-    ome_zarr.write_store(capture, store, state=state)
-    printed = _print_state(state, output_root, naming)
+    vendor_files = [output_root / record["path"] for record in vendor_records]
+    ome_zarr.write_store(
+        capture,
+        store,
+        notes=_the_stores_notes(notes or StoreNotes(), vendor_files, orientation),
+    )
+    printed = _print_state(notes, output_root, naming)
 
     summary_path = output_root / "summary.json"
     summary = _load_summary(summary_path)
@@ -268,7 +292,7 @@ def _persist_store(
             "source_exporter": exported.source_exporter,
             "canonical_metadata": True,
             "vendor_metadata": vendor_records,
-            "physical_size_um": _physical_size_record(exported.metadata),
+            "physical_size_um": _physical_size_record(exported.metadata, orientation),
             "lineage": lineage,
         },
     )
@@ -286,7 +310,25 @@ def _persist_store(
     )
 
 
-def _print_state(state: dict | None, output_root: Path, naming: Naming) -> Path | None:
+def _the_stores_notes(
+    notes: StoreNotes, vendor_files, orientation: Orientation
+) -> StoreNotes:
+    """*notes* with what every store says: the turn applied to its pixels, and LAS X's description.
+
+    *vendor_files* are this capture's own descriptions, as saved beside it.
+    """
+    return replace(
+        notes,
+        pixels_to_position=orientation.image_to_stage,
+        vendor_descriptions=tuple(
+            Path(path).read_text(encoding="utf-8") for path in vendor_files
+        ),
+    )
+
+
+def _print_state(
+    notes: StoreNotes | None, output_root: Path, naming: Naming
+) -> Path | None:
     """Write one acquisition's state beside its images, once.
 
     The state is already embedded in every plane's OME-XML, but reading it
@@ -296,11 +338,11 @@ def _print_state(state: dict | None, output_root: Path, naming: Naming) -> Path 
     is skipped once it exists rather than repeated per plane.
     """
 
-    if state is None:
+    if notes is None:
         return None
     destination = state_dir(output_root) / build_state_name(naming)
     if not destination.exists():
-        _write_json_atomic(destination, state)
+        _write_json_atomic(destination, notes.as_json())
     return destination
 
 
@@ -386,13 +428,12 @@ def _naming_to_dict(n: Naming) -> dict:
     }
 
 
-def _physical_size_record(metadata) -> dict:
-    return {
-        "x": metadata.physical_size_x_um,
-        "y": metadata.physical_size_y_um,
-        "z": metadata.physical_size_z_um,
-        "unit": "um",
-    }
+def _physical_size_record(metadata, orientation: Orientation) -> dict:
+    """The stored pixel size: x and y swap when the orientation turns the image a quarter."""
+    x, y = metadata.physical_size_x_um, metadata.physical_size_y_um
+    if orientation.swaps_axes:
+        x, y = y, x
+    return {"x": x, "y": y, "z": metadata.physical_size_z_um, "unit": "um"}
 
 
 def _safe_component(value: str) -> str:

@@ -421,9 +421,11 @@ class Reading:
             if moving and origin is not None:
                 drives[moving] = origin + plane * step
             heights = [metres for metres in drives.values() if metres is not None]
-            actuators = [("stage x (µm)", x_um), ("stage y (µm)", y_um)]
+            # Named as get_xyz names them in actuator_readings, <axis>/<actuator>:
+            # the stage's one motor per axis, and LAS X's z drives by their names.
+            actuators = [("x/motoric", x_um), ("y/motoric", y_um)]
             actuators += [
-                (f"{name} (µm)", metres * 1e6 if metres is not None else None)
+                (f"z/{name}", metres * 1e6 if metres is not None else None)
                 for name, metres in sorted(drives.items())
             ]
             for c in range(size_c):
