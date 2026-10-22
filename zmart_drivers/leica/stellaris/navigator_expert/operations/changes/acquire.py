@@ -47,7 +47,6 @@ ACQUIRE = CommandProfile(
     poll_timeout=None,
     start_timeout=15.0,
     heartbeat_interval=30.0,
-    skip_reply_check=True,
     send_without_receipt=True,
 )
 

@@ -515,305 +515,8 @@ class TestConfirmAndFire(unittest.TestCase):
 # =============================================================================
 
 
-class TestRetryBackoff(unittest.TestCase):
-    """Verify retry_backoff and retry_escalate control delay timing.
-
-    These tests call _fire_block directly (not confirm_and_fire) to
-    avoid echo poll sleeps. The error_check_fn is injected directly,
-    bypassing _await_echo_result entirely.
-    """
-
-    def _make_always_transient(self):
-        """Return an error check fn that always reports transient error."""
-        return lambda: {
-            "success": False,
-            "transient": True,
-            "error": "block is being scanned",
-            "logs": [],
-        }
-
-    def _make_always_permanent(self):
-        """Return an error check fn that always reports permanent error."""
-        return lambda: {
-            "success": False,
-            "transient": False,
-            "error": "out of range",
-            "logs": [],
-        }
-
-    def _make_success(self):
-        """Return an error check fn that reports success."""
-        return lambda: {"success": True, "logs": []}
-
-    def test_escalating_backoff_delays(self):
-        """Escalating: first retry immediate, then 1s, 2s, 4s.
-
-        With max_retries=4: 5 attempts total, 4 retries.
-        Attempt 0->1: immediate (no sleep).
-        Attempts 1->2, 2->3, 3->4: sleep with escalation.
-        Last attempt (4) has no retry, so no sleep.
-        """
-        client = make_client()
-        api_obj = make_api_obj()
-        sleep_calls = []
-
-        with (
-            patch(
-                "zmart_drivers.leica.stellaris.navigator_expert.dispatcher.write.time.sleep",
-                # patching dispatch.time.sleep rebinds the STDLIB time.sleep;
-                # leftover daemon threads (confirmation-race legs from earlier
-                # tests) also call it, so record main-thread sleeps only
-                side_effect=lambda s: (
-                    sleep_calls.append(s)
-                    if threading.current_thread() is threading.main_thread()
-                    else None
-                ),
-            ),
-            patch.object(transport_module, "deliver", return_value=True),
-            patch.object(transport_module, "_await_echo_result", return_value=True),
-        ):
-            r = _fire_block(
-                client,
-                api_obj,
-                "Test",
-                error_check_fn=self._make_always_transient(),
-                max_retries=4,
-                retry_backoff=1.0,
-                retry_escalate=True,
-                pre_check_fn=_idle_pre_check,
-            )
-
-        self.assertFalse(r["success"])
-        self.assertEqual(r["attempts"], 5)
-        # attempt 0: no sleep, 1: 1.0, 2: 2.0, 3: 4.0, 4: exhausted (no sleep)
-        self.assertEqual(sleep_calls, [1.0, 2.0, 4.0])
-
-    def test_fixed_backoff_delays(self):
-        """Fixed: first retry immediate, then constant 1s delay."""
-        client = make_client()
-        api_obj = make_api_obj()
-        sleep_calls = []
-
-        with (
-            patch(
-                "zmart_drivers.leica.stellaris.navigator_expert.dispatcher.write.time.sleep",
-                # patching dispatch.time.sleep rebinds the STDLIB time.sleep;
-                # leftover daemon threads (confirmation-race legs from earlier
-                # tests) also call it, so record main-thread sleeps only
-                side_effect=lambda s: (
-                    sleep_calls.append(s)
-                    if threading.current_thread() is threading.main_thread()
-                    else None
-                ),
-            ),
-            patch.object(transport_module, "deliver", return_value=True),
-            patch.object(transport_module, "_await_echo_result", return_value=True),
-        ):
-            r = _fire_block(
-                client,
-                api_obj,
-                "Test",
-                error_check_fn=self._make_always_transient(),
-                max_retries=4,
-                retry_backoff=1.0,
-                retry_escalate=False,
-                pre_check_fn=_idle_pre_check,
-            )
-
-        self.assertFalse(r["success"])
-        # attempt 0: no sleep, 1-3: 1.0 each, 4: exhausted (no sleep)
-        self.assertEqual(sleep_calls, [1.0, 1.0, 1.0])
-
-    def test_no_backoff_no_sleep(self):
-        """Default (retry_backoff=None): no sleep between retries."""
-        client = make_client()
-        api_obj = make_api_obj()
-        sleep_calls = []
-
-        with (
-            patch(
-                "zmart_drivers.leica.stellaris.navigator_expert.dispatcher.write.time.sleep",
-                # patching dispatch.time.sleep rebinds the STDLIB time.sleep;
-                # leftover daemon threads (confirmation-race legs from earlier
-                # tests) also call it, so record main-thread sleeps only
-                side_effect=lambda s: (
-                    sleep_calls.append(s)
-                    if threading.current_thread() is threading.main_thread()
-                    else None
-                ),
-            ),
-            patch.object(transport_module, "deliver", return_value=True),
-            patch.object(transport_module, "_await_echo_result", return_value=True),
-        ):
-            r = _fire_block(
-                client,
-                api_obj,
-                "Test",
-                error_check_fn=self._make_always_transient(),
-                max_retries=3,
-                retry_backoff=None,
-                pre_check_fn=_idle_pre_check,
-            )
-
-        self.assertFalse(r["success"])
-        self.assertEqual(sleep_calls, [])
-
-    def test_first_retry_always_immediate(self):
-        """First retry (attempt 0 -> 1) never sleeps, regardless of settings."""
-        client = make_client()
-        api_obj = make_api_obj()
-        call_count = [0]
-        sleep_calls = []
-
-        def error_check():
-            call_count[0] += 1
-            if call_count[0] == 1:
-                return {
-                    "success": False,
-                    "transient": True,
-                    "error": "busy",
-                    "logs": [],
-                }
-            return {"success": True, "logs": []}
-
-        with (
-            patch(
-                "zmart_drivers.leica.stellaris.navigator_expert.dispatcher.write.time.sleep",
-                # patching dispatch.time.sleep rebinds the STDLIB time.sleep;
-                # leftover daemon threads (confirmation-race legs from earlier
-                # tests) also call it, so record main-thread sleeps only
-                side_effect=lambda s: (
-                    sleep_calls.append(s)
-                    if threading.current_thread() is threading.main_thread()
-                    else None
-                ),
-            ),
-            patch.object(transport_module, "deliver", return_value=True),
-            patch.object(transport_module, "_await_echo_result", return_value=True),
-        ):
-            r = _fire_block(
-                client,
-                api_obj,
-                "Test",
-                error_check_fn=error_check,
-                max_retries=3,
-                retry_backoff=5.0,
-                retry_escalate=True,
-                pre_check_fn=_idle_pre_check,
-            )
-
-        self.assertTrue(r["success"])
-        self.assertEqual(r["attempts"], 2)
-        self.assertEqual(sleep_calls, [], "First retry should be immediate - no sleep")
-
-    def test_backoff_with_custom_base(self):
-        """Custom base delay: 0.5s -> escalating 0s, 0.5s, 1.0s."""
-        client = make_client()
-        api_obj = make_api_obj()
-        sleep_calls = []
-
-        with (
-            patch(
-                "zmart_drivers.leica.stellaris.navigator_expert.dispatcher.write.time.sleep",
-                # patching dispatch.time.sleep rebinds the STDLIB time.sleep;
-                # leftover daemon threads (confirmation-race legs from earlier
-                # tests) also call it, so record main-thread sleeps only
-                side_effect=lambda s: (
-                    sleep_calls.append(s)
-                    if threading.current_thread() is threading.main_thread()
-                    else None
-                ),
-            ),
-            patch.object(transport_module, "deliver", return_value=True),
-            patch.object(transport_module, "_await_echo_result", return_value=True),
-        ):
-            _fire_block(
-                client,
-                api_obj,
-                "Test",
-                error_check_fn=self._make_always_transient(),
-                max_retries=4,
-                retry_backoff=0.5,
-                retry_escalate=True,
-                pre_check_fn=_idle_pre_check,
-            )
-
-        # attempt 0: no sleep, 1: 0.5, 2: 1.0, 3: 2.0, 4: exhausted
-        self.assertEqual(sleep_calls, [0.5, 1.0, 2.0])
-
-    def test_permanent_error_no_backoff_sleep(self):
-        """Permanent errors exit immediately - no backoff sleep."""
-        client = make_client()
-        api_obj = make_api_obj()
-        sleep_calls = []
-
-        with (
-            patch(
-                "zmart_drivers.leica.stellaris.navigator_expert.dispatcher.write.time.sleep",
-                # patching dispatch.time.sleep rebinds the STDLIB time.sleep;
-                # leftover daemon threads (confirmation-race legs from earlier
-                # tests) also call it, so record main-thread sleeps only
-                side_effect=lambda s: (
-                    sleep_calls.append(s)
-                    if threading.current_thread() is threading.main_thread()
-                    else None
-                ),
-            ),
-            patch.object(transport_module, "deliver", return_value=True),
-            patch.object(transport_module, "_await_echo_result", return_value=True),
-        ):
-            r = _fire_block(
-                client,
-                api_obj,
-                "Test",
-                error_check_fn=self._make_always_permanent(),
-                max_retries=4,
-                retry_backoff=1.0,
-                retry_escalate=True,
-                pre_check_fn=_idle_pre_check,
-            )
-
-        self.assertFalse(r["success"])
-        self.assertEqual(r["attempts"], 1)
-        self.assertEqual(sleep_calls, [])
-
-    def test_profile_backoff_passed_through_dispatch(self):
-        """Verify _dispatch passes profile backoff settings to backbone."""
-        client = make_client()
-        api_obj = make_api_obj()
-
-
-        profile = command_profile.CommandProfile(
-            retry_backoff=2.0,
-            retry_escalate=True,
-            max_retries=2,
-        )
-
-        with patch.object(
-            run_change.dispatch,
-            "write",
-            return_value={
-                "success": True,
-                "confirmed": None,
-                "message": "ok",
-                "timing": {},
-                "logs": [],
-            },
-        ) as mock_caf:
-            run_change.dispatch_change(
-                client,
-                api_obj,
-                "Test",
-                profile,
-                command="set_zoom",
-                values={},
-                setup_fn=lambda m: None,
-            )
-
-        mock_caf.assert_called_once()
-        _, kwargs = mock_caf.call_args
-        self.assertEqual(kwargs["profile"].retry_backoff, 2.0)
-        self.assertTrue(kwargs["profile"].retry_escalate)
+class TestDispatchPolicy(unittest.TestCase):
+    """What the changes hand the dispatcher: their confirmation policy and windows."""
 
     def test_profile_confirmation_policy_passed_through_dispatch(self):
         """_dispatch passes the profile's readback retry policy."""
@@ -937,15 +640,12 @@ class TestRetryBackoff(unittest.TestCase):
         self.assertEqual(job_settings.PROFILE.max_confirm_attempts, 4)
         self.assertEqual(job_settings.PROFILE.confirm_poll_s, command_profile.WINDOW_S)
         self.assertTrue(job_settings.PROFILE.refire_on_unconfirmed)
-        self.assertTrue(job_settings.PROFILE.success_on_unconfirmed)
 
         # OBJECTIVE and MOVE_Z used to deviate (single attempt / hard-fail);
         # they now match the uniform posture.
         self.assertEqual(objective_change.OBJECTIVE.max_confirm_attempts, 4)
         self.assertEqual(objective_change.OBJECTIVE.confirm_poll_s, command_profile.WINDOW_S)
-        self.assertTrue(objective_change.OBJECTIVE.success_on_unconfirmed)
         self.assertEqual(stage.MOVE_Z.max_confirm_attempts, 4)
-        self.assertTrue(stage.MOVE_Z.success_on_unconfirmed)
         self.assertTrue(stage.MOVE_XY.refire_on_unconfirmed)
 
         # ACQUIRE is the sole deviation: never re-sends on EITHER axis, but
@@ -953,7 +653,6 @@ class TestRetryBackoff(unittest.TestCase):
         self.assertEqual(acquire_change.ACQUIRE.max_retries, 0)
         self.assertEqual(acquire_change.ACQUIRE.max_confirm_attempts, 1)
         self.assertFalse(acquire_change.ACQUIRE.refire_on_unconfirmed)
-        self.assertTrue(acquire_change.ACQUIRE.success_on_unconfirmed)
         self.assertEqual(acquire_change.ACQUIRE.start_timeout, 15.0)
 
         signature = inspect.signature(acquire_change.confirm_acquire)
@@ -1059,7 +758,7 @@ class TestConfirmation(unittest.TestCase):
         self.assertEqual(r["timing"]["confirm_s"], 0.0)
 
     def test_confirm_always_fails(self):
-        """When confirm_fn always returns failure, result is unconfirmed."""
+        """When confirm_fn always returns failure, the change is a success, unconfirmed."""
         client = make_client()
         api_obj = make_api_obj()
         confirm_fn = MagicMock(return_value={"success": False, "logs": []})
@@ -1072,10 +771,9 @@ class TestConfirmation(unittest.TestCase):
                 max_retries=0,
                 max_confirm_attempts=1,
                 refire_on_unconfirmed=False,
-                success_on_unconfirmed=False,
                 pre_check_fn=_idle_pre_check,
             )
-        self.assertFalse(r["success"])
+        self.assertTrue(r["success"])  # sent and accepted, only not confirmed
         self.assertFalse(r["confirmed"])
         self.assertIn("unconfirmed", r["message"])
 
@@ -1229,7 +927,6 @@ class TestConfirmation(unittest.TestCase):
                 confirm_fn=confirm_fn,
                 max_confirm_attempts=3,
                 refire_on_unconfirmed=False,
-                success_on_unconfirmed=True,
             )
 
         self.assertTrue(r["success"])
@@ -1272,7 +969,6 @@ class TestConfirmation(unittest.TestCase):
                 confirm_fn=confirm_fn,
                 max_confirm_attempts=3,
                 refire_on_unconfirmed=True,
-                success_on_unconfirmed=True,
             )
 
         self.assertTrue(r["success"])

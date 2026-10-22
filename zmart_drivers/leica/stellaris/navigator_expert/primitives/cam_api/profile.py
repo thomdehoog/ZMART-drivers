@@ -67,23 +67,9 @@ class CommandProfile:
         start_timeout: Acquisition-start deadline before the acquire
             confirmation treats the command as failed.
         heartbeat_interval: Status-log cadence during long acquisitions.
-        retry_backoff: Base delay in seconds between transient error retries.
-            None for immediate retry (no delay).
-        retry_escalate: If True, double the delay after each retry
-            (exponential backoff: 0s, base, 2×base, 4×base, ...).
-            If False, use a fixed delay. Ignored when retry_backoff is None.
-        skip_reply_check: If True, skip echo settlement polling after fire.
-            Use for commands where a dedicated confirm_fn (e.g. scan
-            status polling) is the authoritative completion signal and
-            echo waiting is redundant overhead.
-        send_without_receipt: If True, use UpdateAsync instead of UpdateAwaitReceipt.
-            Use for hardware commands (e.g. stage moves, acquisitions)
-            where confirm_fn is the authoritative completion signal.
-        success_on_unconfirmed: If True (the default), return success=True with
-            confirmed=False when all confirmation attempts are exhausted. The
-            command never hard-fails on an unconfirmed readback; only transport
-            failure and an echo error-check rejection return success=False. Set
-            False only for a command that must hard-fail on unconfirmed - none do.
+        send_without_receipt: If True, use UpdateAsync instead of UpdateAwaitReceipt,
+            and wait for no reply. Use for hardware commands (e.g. stage moves,
+            acquisitions) where confirm_fn is the authoritative completion signal.
         transport: How the request is sent to the microscope and how its reply is
             waited for (clear the reply, send, wait for the reply, report an open
             dialog). The dispatcher's engine asks the transport and names no
@@ -104,11 +90,7 @@ class CommandProfile:
     poll_timeout: float | None = None
     start_timeout: float | None = None
     heartbeat_interval: float | None = None
-    retry_backoff: float | None = None
-    retry_escalate: bool = False
-    skip_reply_check: bool = False
     send_without_receipt: bool = False
-    success_on_unconfirmed: bool = True
     # How a request reaches the microscope and how its reply is waited for; see
     # ``transport.py``. Another microscope supplies its own.
     transport: object = _routes.ROUTED

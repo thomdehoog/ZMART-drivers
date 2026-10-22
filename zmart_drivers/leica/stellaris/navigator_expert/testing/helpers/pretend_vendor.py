@@ -132,11 +132,7 @@ class PretendProfile:
     max_retries: int = Waiting.WINDOWS - 1
     max_confirm_attempts: int = Waiting.WINDOWS
     refire_on_unconfirmed: bool = True
-    retry_backoff: float | None = None
-    retry_escalate: bool = False
-    skip_reply_check: bool = False
     send_without_receipt: bool = False
-    success_on_unconfirmed: bool = True
     never_resend: bool = False
     limits_setup_hint: str = "the pretend limits in pretend_vendor.connect"
 

@@ -138,9 +138,6 @@ def fire_block(
     pre_check_fn=None,
     error_check_fn=None,
     max_retries=None,
-    retry_backoff=None,
-    retry_escalate=None,
-    skip_reply_check=None,
     send_without_receipt=None,
 ):
     """Execute the four-step fire pipeline with transient retry.
@@ -170,16 +167,9 @@ def fire_block(
             default check is applied at profile level, not here).
         max_retries: Max retries after the first attempt. Total attempts =
             max_retries + 1.
-        retry_backoff: Base delay in seconds between transient error retries.
-            None for immediate retry. First retry is always immediate;
-            subsequent retries use the backoff delay.
-        retry_escalate: If True, double the delay after each retry
-            (exponential backoff: 0s, base, 2×base, 4×base, ...).
-            If False, use a fixed delay. Ignored when retry_backoff is None.
-        skip_reply_check: If True, skip the check of the microscope's reply entirely (the
-            confirm_fn is then the authoritative completion signal).
         send_without_receipt: If True, send without waiting for the microscope to
-            confirm receipt.
+            confirm receipt, and without checking its reply (the confirmation
+            is then the authoritative completion signal).
 
     Returns:
         {
@@ -193,9 +183,6 @@ def fire_block(
     profile = resolve_profile(
         profile,
         max_retries=max_retries,
-        retry_backoff=retry_backoff,
-        retry_escalate=retry_escalate,
-        skip_reply_check=skip_reply_check,
         send_without_receipt=send_without_receipt,
     )
     transport = profile.transport
@@ -277,11 +264,7 @@ def fire_block(
                         "info", f"{description} | sent through the {carried_by} route"
                     )
                 )
-            if (
-                delivered
-                and not profile.skip_reply_check
-                and not profile.send_without_receipt
-            ):
+            if delivered and not profile.send_without_receipt:
                 if not transport.await_reply(client):
                     # The reply never settled: a rejection arriving after this
                     # window is invisible to the error check below (it reads a
@@ -360,30 +343,13 @@ def fire_block(
         transient = err_result.get("transient", False)
 
         if transient and attempt < profile.max_retries:
-            # Backoff: first retry is immediate, then base × 2^(attempt-1)
-            if profile.retry_backoff is not None and attempt > 0:
-                delay = (
-                    profile.retry_backoff * (2 ** (attempt - 1))
-                    if profile.retry_escalate
-                    else profile.retry_backoff
-                )
-                log.warning(
-                    "%s | Transient error (attempt %d/%d), retrying in %.1fs: %s",
-                    description,
-                    attempts,
-                    profile.max_retries + 1,
-                    delay,
-                    error_msg,
-                )
-                time.sleep(delay)
-            else:
-                log.warning(
-                    "%s | Transient error (attempt %d/%d): %s",
-                    description,
-                    attempts,
-                    profile.max_retries + 1,
-                    error_msg,
-                )
+            log.warning(
+                "%s | Transient error (attempt %d/%d): %s",
+                description,
+                attempts,
+                profile.max_retries + 1,
+                error_msg,
+            )
             continue
 
         # Permanent error, or transient but out of retries
@@ -435,11 +401,7 @@ def confirm_and_fire(
     max_retries=None,
     max_confirm_attempts=None,
     refire_on_unconfirmed=None,
-    retry_backoff=None,
-    retry_escalate=None,
-    skip_reply_check=None,
     send_without_receipt=None,
-    success_on_unconfirmed=None,
 ):
     """Fire a command and optionally confirm the result, with correction.
 
@@ -473,15 +435,10 @@ def confirm_and_fire(
         refire_on_unconfirmed: If True, a failed confirmation sends the
             command again before the next confirmation attempt. If False,
             the command is not fired again; only readback is retried.
-        retry_backoff: Base delay in seconds between transient error
-            retries. None for immediate retry. Passed to ``fire_block``.
-        retry_escalate: If True, use exponential backoff (delay doubles
-            each retry). Passed to ``fire_block``.
-        success_on_unconfirmed: If True, return success=True when all
-            confirmation attempts are exhausted (every profile currently
-            sets True — deliberate, see ``CommandProfile``). This means
-            ``success=True`` alone does NOT prove the setting took
-            effect: callers that need proof must check ``confirmed``.
+
+    A change whose confirmation windows all run out is still a success, with
+    ``confirmed`` False: ``success=True`` alone does NOT prove the setting
+    took effect, so a caller that needs proof checks ``confirmed``.
 
     Returns:
         {
@@ -501,11 +458,7 @@ def confirm_and_fire(
         max_retries=max_retries,
         max_confirm_attempts=max_confirm_attempts,
         refire_on_unconfirmed=refire_on_unconfirmed,
-        retry_backoff=retry_backoff,
-        retry_escalate=retry_escalate,
-        skip_reply_check=skip_reply_check,
         send_without_receipt=send_without_receipt,
-        success_on_unconfirmed=success_on_unconfirmed,
     )
     command_started_at = time.time()
     t_wall_start = time.perf_counter()
@@ -701,7 +654,7 @@ def confirm_and_fire(
     log.warning("%s%s (%.3fs)", msg, dialog_detail, time.perf_counter() - t_wall_start)
     all_logs.append(_make_log_entry("warning", msg))
     return {
-        "success": profile.success_on_unconfirmed,
+        "success": True,
         "confirmed": False,
         "message": f"{description} (readback unconfirmed){dialog_detail}",
         "timing": _make_timing(

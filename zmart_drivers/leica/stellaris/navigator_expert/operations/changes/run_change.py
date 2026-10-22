@@ -14,8 +14,7 @@ Every change follows three phases:
 A change that is refused before it is sent answers ``refused(message)``: the
 same result shape as a sent change, with ``success`` False and nothing sent.
 
-Result contract: with the profiles' ``success_on_unconfirmed=True``
-(deliberate - see ``CommandProfile``), ``result["success"]`` means the change
+Result contract: ``result["success"]`` means the change
 was *accepted*, not that it took effect. A caller that needs proof the change
 landed checks ``result["confirmed"]``.
 

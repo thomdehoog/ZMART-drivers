@@ -67,7 +67,6 @@ class StateReaderProfile:
     # (2026-07-06). selected_job (which job is active) is what the log can
     # see, so its fallback is hybrid.
     jobs_mode: str = "direct"
-    jobs_log_max_age_s: float = 2.0
 
     selected_job_mode: str = "direct"
     selected_job_log_max_age_s: float = 2.0

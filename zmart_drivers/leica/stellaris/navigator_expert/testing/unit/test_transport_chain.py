@@ -139,7 +139,6 @@ def test_the_send_loop_works_through_a_chain_and_reports_the_fallback():
         command_profile.CommandProfile(),
         transport=chain_of(direct, cam),
         error_check_fn=None,
-        skip_reply_check=True,
     )
     request = type("Request", (), {"Model": object()})()
 

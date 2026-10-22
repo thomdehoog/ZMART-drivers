@@ -242,7 +242,6 @@ class TestStateReaders(unittest.TestCase):
     def test_selected_job_log_route_is_independent_from_job_list_route(self):
         reading_settings.STATE_READERS = reading_settings.StateReaderProfile(
             jobs_mode="log",
-            jobs_log_max_age_s=2.0,
             selected_job_mode="log",
             selected_job_log_max_age_s=2.0,
         )
