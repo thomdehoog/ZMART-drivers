@@ -1,7 +1,7 @@
 """The direct reader: LAS X's live state, read from its hardware server.
 
-The third reader beside :mod:`api_reader` (the CAM API) and
-:mod:`log_reader` (LAS X's log). It reads the hardware server's state tree
+The third reader beside ``cam_api/reads.py`` (the CAM API) and
+``log/reads.py`` (LAS X's log). It reads the hardware server's state tree
 (:mod:`state_tree`), which holds LAS X's current state, so it is neither
 late like the CAM API's answers nor waiting for a log line. Its
 functions carry the other readers' names and give answers of the same

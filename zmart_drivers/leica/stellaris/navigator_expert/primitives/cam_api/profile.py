@@ -4,14 +4,14 @@ How long the driver waits on LAS X: the one rule and its four numbers.
 
 Every wait on LAS X follows the same rule, whether it is a reading, the
 confirmation of a command, or the delivery of a message. The dispatcher does
-not know these numbers. This microscope hands them in (``profile.waiting`` for
-a command, ``sources.waiting`` for a reading), so another microscope can wait
-by a rule of its own.
+not know these numbers. This microscope hands them in (``waiting`` of the
+profile ``run()`` is handed, and of its ``WRITING``), so another microscope
+can wait by a rule of its own.
 
 - **Four windows of three seconds** (``WINDOWS`` x ``WINDOW_S``). Within a
-  window the driver watches both sources, the CAM API and the LAS X log, and
-  the first answer that counts as a success wins, from whichever source gives
-  it. Between windows something is sent again: a command is fired again, a
+  window the driver asks the sources the read order allows, one after the
+  other, and the first answer that counts as a success wins. Between windows
+  something is sent again: a command is fired again, a
   read that got no answer is requested again, a message is delivered again.
   After four windows a reading is unknown, a change is unconfirmed, a
   delivery has failed.
@@ -26,13 +26,14 @@ by a rule of its own.
   65 ms answer would only be noticed at 100 ms.
 
 Acquisition is the one command that is never sent again (a second acquire is
-a second acquisition); it keeps its own watch in ``ACQUIRE``. Waits on a
-physical process, such as a file being written, are not waits on LAS X and
-keep their own numbers.
+a second acquisition); it waits for idle as long as it takes and keeps its own
+watch of the scan (``procedures/changes.py``). Waits on a physical process,
+such as a file being written, are not waits on LAS X and keep their own
+numbers.
 
 The numbers are read at call time, so a test can shrink them with monkeypatch.
-The command profiles copy them into their field defaults when they are
-imported.
+The write profile (``direct/profile.py``) copies them into its field defaults
+when it is imported.
 
 Sorting LAS X's trouble into kinds of problem, and deciding what a kind means.
 

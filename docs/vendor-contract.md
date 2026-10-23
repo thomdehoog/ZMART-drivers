@@ -1,150 +1,188 @@
-# The vendor contract: what a microscope hands to the dispatcher
+# The vendor contract: what a new microscope brings
 
-The dispatcher is the shared machinery that runs every reading and every change
-of a ZMART driver: it asks the limits first, waits by one rule, sends again
-when that is safe, and confirms what it sent. It knows no microscope. Each
-microscope's vendor part hands it six things, and this page lists them. The
-dispatcher is today in the Leica driver,
-`zmart_drivers/leica/stellaris/navigator_expert/dispatcher/`, and
-[the driver anatomy](driver-anatomy.md) says where it sits among the other
-parts.
+The dispatcher runs every reading and every write of a ZMART driver. It knows
+no microscope. A new microscope brings its primitive classes, and one profile
+that the dispatcher's `run()` is handed. This page lists exactly what the
+dispatcher asks of them. [The driver anatomy](driver-anatomy.md) says where
+each part sits.
 
-A small, complete example is the pretend vendor in
+The dispatcher is in the Leica driver,
+`zmart_drivers/leica/stellaris/navigator_expert/dispatcher/`. A small,
+complete example is the pretend vendor,
 `navigator_expert/testing/helpers/pretend_vendor.py`: a made-up microscope with
-one stage axis, plugged into the same dispatcher, with tests in
+one stage axis, run through the same dispatcher, with tests in
 `testing/unit/test_pretend_vendor.py`. It imports nothing but the dispatcher.
-The Leica vendor part is the full-size example; where each piece lives there is
-named below.
 
-## 1. A transport
+## What a new microscope brings
 
-How a request reaches the microscope and how its reply is awaited. One object
-with five methods. Leica: `operations/sending/transport.py`.
+One folder in `primitives/` for each way of reaching the vendor software. Each
+holds:
 
-| Method | What it does | Answers |
-|---|---|---|
-| `fill(request, setup_fn)` | Writes the command's values into the request, by calling `setup_fn` with whatever part of the request holds them. | nothing |
-| `clear_reply(client)` | Empties the microscope's reply, so that what is read after the send is the new answer. | nothing |
-| `send(client, request, description, *, asynchronous)` | Sends the request. With `asynchronous`, it does not wait for the microscope to say it received it. | `(delivered, notes)`: whether it arrived, and a list of short texts to keep in the log (for LAS X, what the driver answered to dialog boxes) |
-| `await_reply(client)` | Waits for the microscope to fill in its reply. | `True` if it did, `False` if the time ran out |
-| `dialog_warning_since(started_at, description)` | Says whether a dialog box of the vendor software opened since the command began. Only asked when a command failed or stayed unconfirmed, as a clue. | a text, or `None` |
-
-### More than one way to send
-
-A microscope may be reached more than one way (for LAS X, the CAM API and LAS X's own
-hardware server). Each way is a transport as above. The dispatcher's `TransportChain`
-(`dispatcher/transport_chain.py`) holds an ordered list of them behind the one
-`transport` a profile names, and the vendor decides the order. Leica:
-`operations/sending/routes.py` (`ROUTES`, `WRITE_ROUTES`; the order can be
-set with the environment variable `ZMART_WRITE_ROUTES`).
-
-The rule that keeps a command from being done twice: a route's `send` raises
-`TransportUnavailable` only while **nothing has left yet** (the connection is not
-there, or the route has no form for this command). The chain then tries the next
-route, and the log says so. Anything else, such as a send that went out but was not
-acknowledged, is never a reason to use another route, because the command may already
-have been carried out. A transport that does not need a fallback needs no chain: the
-profile can name it directly.
-
-## 2. Command profiles
-
-How the dispatcher treats one command. A frozen dataclass (the dispatcher
-changes a field with `dataclasses.replace`), with these fields. Leica:
-`CommandProfile` in `operations/sending/command_profile.py`, one beside each change in `operations/changes/`.
-
-| Field | Meaning |
+| File | What it holds |
 |---|---|
-| `transport` | The transport above. |
-| `waiting` | The waiting numbers (part 5). |
-| `max_retries` | How many times a temporary failure is sent again. |
-| `max_confirm_attempts` | How many confirmation windows the change gets. |
-| `refire_on_unconfirmed` | Whether the command is sent again between two windows. |
-| `retry_backoff`, `retry_escalate` | A pause before sending again (seconds, or `None`), and whether it doubles each time. |
-| `skip_reply_check` | Do not wait for the reply; the confirmation is the proof. |
-| `send_without_receipt` | Send without waiting for the microscope to say it received it. |
-| `success_on_unconfirmed` | What an unconfirmed change answers: `True` keeps the workflow going, with the change recorded as unconfirmed. |
-| `never_resend` | The command reaches the microscope once and never again, such as the start of an acquisition. The dispatcher enforces this whatever the other fields say. |
-| `limits_setup_hint` | Optional: where the operator creates the limits files, said when no limits are installed. |
+| `transfer.py` | How a request reaches the vendor software, and how its reply comes back. |
+| `reads.py` | One function per reading this class can answer. |
+| `writes.py` | The writes, as plain data. Only for a class that can write. |
+| `profile.py` | What the dispatcher needs to handle this class. |
 
-The four functions of one change are handed to `door.write` with each call, so
-that they can carry the call's target:
+The Leica driver has three classes:
 
-| Function | Answers |
-|---|---|
-| `setup_fn(part_of_request)` | nothing; it writes the values |
-| `pre_check_fn()` | `{"success": bool, "logs": [...]}`; for example, is the scanner idle |
-| `error_check_fn()` | `{"success": bool, "error": text, "transient": bool, "logs": [...]}` |
-| `confirm_fn()` | `{"success": bool, "logs": [...]}`, plus anything worth showing when it stays unconfirmed |
+| Class | Transfer | Reads | Writes | Profile |
+|---|---|---|---|---|
+| `cam_api/` | The LAS X CAM API | `READS` in `reads.py` | `Write` and its builders in `writes.py` | The waiting rule, `check_reply` |
+| `direct/` | LAS X's hardware server | `READS` in `profile.py`, from `reads.py` | `TRANSLATIONS` in `writes.py`: each CAM request as an element | The read order, what counts, the routes, `WRITING`; the profile handed to `run()` |
+| `log/` | LAS X's log files | `READS` in `profile.py`, from `reads.py` | None | `MAX_AGE_S`: how old an answer may be |
 
-## 3. Reading sources
+## The profile handed to run()
 
-How a reading is answered. One object (Leica: the module
-`operations/readings/sources.py`) with:
+`run(profile, client, primitive, *, max_retries=None, dialogs=None, **asked)`.
+The profile is any object with the names below. Leica:
+`primitives/direct/profile.py`.
+
+### For a reading
 
 | Name | What it is |
 |---|---|
-| `waiting` | The waiting numbers (part 5). |
-| `UnsupportedSource` | The error class for a source a reading does not have. |
-| `spec(datum)` | The vendor's description of one reading, such as `"x"` or `"selected_job"`. The dispatcher does not look inside it. |
-| `mode_for(datum)` | The family the vendor's policy reads this datum from, such as `"direct"`. |
-| `legs(spec, datum, mode)` | The sources that take part, in the order they are asked; or a `Reading` carrying `UnsupportedSource`. |
-| `first_stage(spec, mode, fallback)` | `(watch, rest_mode)`: a source tried alone before the others, or `None`, and the family that answers if it cannot. `watch(succeeded=, deadline=, observed_after=, kwargs=, waiting=)` answers a `Reading` or `None`. |
-| `success(spec, value, about)` | Whether `value` counts as an answer. `about` is what a reading of one item is about (for LAS X, the name of a job), or `None`. |
-| `ask(leg, spec, client, *, until, answer_counts, about, source_kwargs)` | Asks one source, again and again until `answer_counts(reading)` or the moment `until`; answers the last `Reading`. Turns on a shared channel, such as LAS X's CAM API, are kept here. |
+| `waiting` | The waiting numbers: `WINDOWS`, `WINDOW_S`, `POLL_S`, `ANSWER_POLL_S`. |
+| `spec(datum)` | The profile's row for one reading. The dispatcher does not look inside it. |
+| `mode_for(datum)` | The class the reading asks first, such as `"direct"`. |
+| `first_stage(spec, mode, fallback)` | `(watch, rest_mode)`: a class asked alone first, or `None`, and the class that answers when it cannot. `watch(succeeded=, deadline=, observed_after=, kwargs=, waiting_for_change=, about=)` answers a `Reading` or `None`. |
+| `legs(spec, datum, mode)` | The classes that take part, in the order they are asked; or a `Reading` carrying `UnsupportedSource`. |
+| `success(spec, value, about)` | Whether `value` counts as an answer. `about` is what a reading of one item is about (Leica: a job's name), or `None`. |
+| `ask(leg, spec, client, *, until, answer_counts, about, source_kwargs)` | Asks one class, again until `answer_counts(reading)` or the moment `until`; answers the last `Reading`. Turns on a shared channel are kept here. |
+| `UnsupportedSource` | The error class for a class a reading does not have. |
 
-A `Reading` (from `dispatcher/reader.py`) holds the value, the source that gave
-it, when it was seen (`time.time()`), its age, and the error when the source
-could not answer.
+### For a write
 
-## 4. Error sorting
+| Name | What it is |
+|---|---|
+| `limits_setup_hint` | Where the operator creates the limits files; said when no limits are installed. |
+| `make_request(client, write)` | The request that carries `write`. Called only after the limits allowed it. |
+| `check_reply(client, write)` | The reply checked: `{"success", "error", "transient", "logs"}`. `transient` True means sending again is worthwhile. |
+| `WRITING` | How the write loops send. A frozen dataclass (the dispatcher changes it with `dataclasses.replace`), with the fields below. |
 
-The dispatcher never reads an error message. The vendor's `error_check_fn`
-reads the microscope's reply and says two things: whether the command failed,
-and whether the failure is temporary (`"transient": True`), so that sending
-again is worthwhile. Anything the vendor does not recognise should count as
-permanent. Leica: `classify_error` in `operations/sending/error_classification.py`.
+`WRITING`:
 
-## 5. Waiting numbers
-
-Every wait follows one rule: a number of windows of a set length, sending again
-between them where that is safe. Any object with four numbers:
-
-| Name | Leica | Meaning |
+| Field | Meaning | Leica |
 |---|---|---|
-| `WINDOWS` | 4 | how many windows |
-| `WINDOW_S` | 3 | how long one window lasts, in seconds |
-| `POLL_S` | 0.1 | how often a source is looked at again, in seconds |
-| `ANSWER_POLL_S` | 0.01 | how often a reply already asked for is checked, in seconds |
+| `transport` | The transfer the write goes through. | `ROUTED`: direct, then the CAM API |
+| `waiting` | The waiting numbers. | 4 windows of 3 s |
+| `max_retries` | How often a temporary error is sent again. | 3 |
+| `max_confirm_attempts` | How many read-back windows a write gets. | 4 |
+| `refire_on_unconfirmed` | Whether the write is sent again between windows. | True |
+| `send_without_receipt` | Send without waiting for a receipt. | False |
+| `never_resend` | Sent once, never again. | False |
 
-Leica: `connection/waiting.py`.
+A write's own `without_receipt` and `never_resend` are handed to the loops by
+`run()`. The `ready` and `confirm` readings of a write are run by the reading
+part of the same profile.
 
-## 6. Limits
+## A transfer
+
+What `WRITING.transport` must offer:
+
+| Method | What it does | Answers |
+|---|---|---|
+| `fill(request, setup_fn)` | Writes the values into the request, by calling `setup_fn` with the part of the request that holds them. | nothing |
+| `clear_reply(client)` | Empties the reply, so what is read after the send is the new answer. | nothing |
+| `send(client, request, description, *, asynchronous)` | Sends the request. With `asynchronous`, it does not wait for a receipt. | `(delivered, notes)`: whether it arrived, and short texts for the log |
+| `await_reply(client)` | Waits for the reply to be filled in. | `True`, or `False` when the time ran out |
+| `dialog_warning_since(started_at, description)` | Whether a dialog of the vendor software opened since the write began. Asked only when a write failed or stayed unconfirmed. | a text, or `None` |
+
+A transport may say which route carried the last send in `carried_by`; the
+result then names it under `route`.
+
+### More than one route
+
+The dispatcher's `TransportChain` (`dispatcher/write.py`) holds an ordered list
+of transfers behind the one `transport`. The vendor gives the order. A route's
+`send` raises `TransportUnavailable` only while nothing has left yet. The chain
+then tries the next route. A send that went out, answered or not, is never
+handed to another route.
+
+## A write
+
+Plain data, read by its fields. Leica: `Write` in
+`primitives/cam_api/writes.py`.
+
+| Field | Read by | Meaning |
+|---|---|---|
+| `command` | the gate | Its name in the limits. |
+| `values` | the gate | What the limits are shown. |
+| `request` | the profile | The name of the vendor request that carries it. |
+| `fill` | the transfer | `fill(part_of_request)`: writes the values. |
+| `description` | the loops | The label in the log. |
+| `ready` | the loops | An `Expect` waited for before every send, or `None`. |
+| `confirm` | the loops | An `Expect` read back after the send, or `None`. |
+| `without_receipt` | the loops | Sent without a receipt; no reply checked. |
+| `never_resend` | the loops | Sent once, never again. |
+
+The Leica `Write` has two more fields, read by its own profile:
+`accepted_replies` (LAS X replies that mean "already so") and `experiment`
+(what opens the experiment a capture goes into, for the direct route).
+
+An `Expect` names a reading and what it must show:
+
+| Field | Meaning |
+|---|---|
+| `reading` | The reading's name. |
+| `accept` | `accept(value) -> bool`: how close counts. |
+| `about` | What the reading is about, or `None`. |
+| `mode` | The class asked first; `None` takes the profile's. |
+| `fallback` | The class that answers when the first cannot; `None` takes the profile's. |
+| `without_limit` | Optional. Waited for as long as it takes, not the windows. |
+
+## A reading
+
+A reading is a name the profile knows (`spec(datum)`). Its answer is a
+`Reading` (`dispatcher/read.py`):
+
+| Field | Meaning |
+|---|---|
+| `value` | The answer. |
+| `source` | The class that gave it. |
+| `observed_at` | When it was seen (`time.time()`). |
+| `age_s` | How old it was. |
+| `error` | Why there was no answer, or `None`. |
+
+What counts as an answer is declared once per reading, by the profile's
+`success`. A caller narrows it with `accept`. "Not what we hoped for yet" is an
+answer; only a class that cannot answer hands over to the next.
+
+## The dialogs
+
+Optional. When `run()` is handed `dialogs`, the write loops use:
+
+| Name | What it does |
+|---|---|
+| `answer_warnings()` | Answers a dialog it may answer. Raises while one it leaves to the operator is open. |
+| `watching()` | A context manager that answers dialogs while the send runs. |
+| `answered_since(moment)` | What it answered since a `time.monotonic()`, each with a `message`. |
+
+Leica: `procedures/answer_dialogs.py`.
+
+## The limits
 
 An object that answers `check_command(command, values)` by raising
-`LimitViolation` or `LimitsError` (from `dispatcher/limit_errors.py`) when the
-values are not allowed, and by returning when they are. It also answers
-`status()` with a `LimitsStatus` (where the limits came from) and `describe()`
-with that as a dictionary. The driver installs it for each connection when it
-connects, with `gate.install(client, gate.GateState(limits=...))`. Until it is
-installed, every change is refused. Leica: `LeicaLimits` in
-`operations/changes/limit_rules.py`, installed by
-`driver_setup/limits/handshake.py`.
+`LimitViolation` or `LimitsError` (from `dispatcher/limits.py`) when the values
+are not allowed. It also answers `status()` with a `LimitsStatus` and
+`describe()` with that as a dictionary. The driver installs it at connect, with
+`limits.install(client, limits.GateState(limits=...))`. Until then every write
+is refused. Leica: `LeicaLimits` in `driver_setup/limits/limit_rules.py`,
+installed by `driver_setup/limits/handshake.py`.
 
 ## What comes back
 
-`door.read(sources, datum, client, ...)` answers a `Reading`, or `None` when
-nothing counted in time. `door.write(client, request, description, command=,
-values=, profile=, ...)` answers `{"success", "confirmed", "message", "timing",
-"logs"}`: `confirmed` is `True` when the readback showed the change, `False`
-when it never did, and `None` when there was nothing to confirm or the command
-failed before it.
+A reading answers a `Reading`, or `None` when nothing counted in time. A write
+answers `{"success", "confirmed", "message", "timing", "logs", "route"}`.
+`confirmed` is True when the read-back showed the change, False when it never
+did, and None when there was nothing to read back or the write failed first.
 
 ## Not yet shared
 
-Three things a second vendor would still write for itself, though they are
-the same for every microscope: the shape of the command profile (part 2), the
-list of kinds of problem and the rule for each, and the running log. They move
-into the dispatcher when it becomes a package shared by all drivers.
+The list of kinds of error and the rule for each (only a temporary error is
+sent again) are in the Leica driver's `cam_api/profile.py`. A second vendor
+writes its own until they move into the dispatcher.
 
 Author: Thom de Hoog, Center for Microscopy and Image Analysis (ZMB),
 University of Zurich (thom.dehoog@zmb.uzh.ch, thomdehoog@gmail.com)

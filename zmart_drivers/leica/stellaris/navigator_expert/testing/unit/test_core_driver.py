@@ -7,7 +7,7 @@ Uses unittest.mock to simulate the LAS X API client and verify the
 driver's internal logic: error classification, fire/retry flow,
 confirmation polling, timing instrumentation, and set function wiring.
 
-The tests exercise the current dispatch backbone, command profiles,
+The tests exercise the dispatcher's write loops, the write profile,
 confirmation polling, and timing/result envelope contracts.
 
 Usage::

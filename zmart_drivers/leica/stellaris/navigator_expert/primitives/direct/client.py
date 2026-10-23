@@ -10,7 +10,7 @@ a +5 µm move the settings never saw).
 
 This module only reads. It attaches to what LAS X already runs and creates
 nothing; it never writes a property. The only commands sent through it are
-the reads of ``direct_reader``.
+the reads of ``reads.py``.
 """
 
 from __future__ import annotations

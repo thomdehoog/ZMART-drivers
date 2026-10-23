@@ -7,11 +7,11 @@ This module writes the OME data model from what LAS X described; the
 convention writes ZMART's annotations, and LAS X's own goes in its vendor
 layer.
 
-Contract with ``ome.py``: that module owns TIFF tag-270 access
-(:func:`ome.read_tiff_tag_270`) and the validate/patch side; this module
+Contract with ``metadata.py``: that module owns TIFF tag-270 access
+(:func:`metadata.read_tiff_tag_270`) and the validate/patch side; this module
 GENERATES metadata and only ever reads existing OME through that public
 function. The live settings read follows the one rule in
-``primitives/cam_api/waiting.py``, like every other reading.
+``primitives/cam_api/profile.py``, like every other reading.
 
 Read the planes of an exported capture, and write its vendor metadata beside the images.
 """

@@ -1,6 +1,6 @@
 """Permanent adversarial suite for the limits enforcement redesign.
 
-Attacks the commands-layer function-keyed gate (``commands/gate.py``), the
+Attacks the dispatcher's command-keyed gate (``dispatcher/limits.py``), the
 connect-time limits handshake, ProgramData resolution, and the hardcoded
 physical backstop — through every entry point (direct commands, adapter op,
 controller Session).
@@ -615,7 +615,7 @@ def test_reads_work_without_a_handshake_while_mutations_refuse(mock_client):
 
 
 # =============================================================================
-# 6. Bypass attempts — every entry point, refused at the commands layer
+# 6. Bypass attempts — every entry point, refused at the limits gate
 # =============================================================================
 
 
@@ -899,7 +899,7 @@ def test_adapter_bypass_refuses_at_the_commands_layer(clear_stage_limits):
 
 def test_controller_session_bypass_refuses_at_the_commands_layer(clear_stage_limits):
     """Controller entry point (Session -> ops table -> adapter -> commands):
-    an out-of-envelope move still refuses at the commands layer."""
+    an out-of-envelope move still refuses at the limits gate."""
     from unittest.mock import patch
 
     import zmart_controller

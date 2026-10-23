@@ -73,7 +73,7 @@ class StateReaderProfile:
     table of readings (``DATUMS``) and source preference belongs here.
 
     Nothing here says how long to wait or how often to look: that is the one
-    rule in ``cam_api/waiting.py``. A mode says which sources take part; how
+    rule in ``cam_api/profile.py``. A mode says which sources take part; how
     old a log answer may be and still count is ``log/profile.py``'s
     ``MAX_AGE_S``, because each kind of state goes stale at its own pace.
 
@@ -231,7 +231,7 @@ class DatumSpec:
     ``name`` keys the log's ``MAX_AGE_S``. ``success(value, *, job_name)`` says
     when an answer from either source counts; the first answer that does,
     wins. How long to wait is not per datum: it is the one rule in
-    ``cam_api/waiting.py``.
+    ``cam_api/profile.py``.
     """
 
     name: str

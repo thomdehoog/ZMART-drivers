@@ -39,7 +39,7 @@ class NoTranslation(ValueError):
     """The command, or one of its values, has no verified hardware-server form."""
 
 
-#: The driver's own integer fallbacks for enums (``actions/set.py``), by field.
+#: The driver's own integer fallbacks for enums (``cam_api/writes.py``), by field.
 ENUM_INTEGERS = {
     "Units": {1: "eMeter", 3: "eMillimeter", 4: "eMicrons"},
     "MoveXyMode": {2: "eMoveXY"},

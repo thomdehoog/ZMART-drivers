@@ -35,7 +35,7 @@ def make_log_entry(level, msg):
     """Build a timestamped log entry dict.
 
     Every pluggable function in the pipeline accumulates these entries in
-    its ``logs`` list. The backbone collects them into a single ordered
+    its ``logs`` list. The write loops collect them into a single ordered
     trace so the caller has full visibility into what happened.
 
     Args:

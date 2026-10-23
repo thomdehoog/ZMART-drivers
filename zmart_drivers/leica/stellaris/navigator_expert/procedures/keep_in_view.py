@@ -95,7 +95,7 @@ def set_objective(
     the sample point runs after the swap: ``None`` (default) follows the
     session's connect-time calibration policy, ``True`` requires it, and
     ``False`` asks for a bare swap. See
-    :func:`objective_shift.record_before_change`.
+    :func:`record_before_change`.
     """
     recorded = {}
 
@@ -145,7 +145,7 @@ def select_job(client, job_name, *, translations=None, compensate=None):
     controls the calibrated stage move that keeps the sample point
     afterwards. ``None`` (default) follows the session's connect-time
     calibration policy, ``True`` requires it, ``False`` asks for a bare change.
-    See :func:`objective_shift.record_before_change`.
+    See :func:`record_before_change`.
     """
     recorded = {}
 

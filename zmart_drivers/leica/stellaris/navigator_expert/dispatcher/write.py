@@ -14,11 +14,12 @@ This is the first of the two loops of a change. It runs four steps:
    watched for while it runs (:func:`answering`); a dialog they leave to the
    operator stops the send.
 4. **Error check**: read what the microscope answered. A temporary problem is
-   sent again, up to ``max_retries`` times, with an optional pause that can
-   grow. A permanent problem stops the loop at once.
+   sent again, up to ``max_retries`` times. A permanent problem stops the
+   loop at once.
 
 A command that must reach the microscope only once, such as starting an
-acquisition, has ``max_retries`` of 0 in its profile and is never sent again.
+acquisition, is marked ``never_resend`` and is never sent again
+(:func:`resolve_profile`).
 
 The loop is deliberately dumb. It owns the order of the steps, the retry limit
 and the timing. It does not know what a zoom, an objective or a stage is; it
@@ -39,14 +40,13 @@ the command again and re-checks, up to ``max_confirm_attempts`` windows (four
 windows of three seconds by the shared waiting rule).
 
 Changing a setting, or moving to an absolute position, can safely be sent
-again. Starting an acquisition cannot: it would take a second set of data. Its
-profile says ``never_resend``, so it is sent once, and the loop only watches
-whether the scanner is still scanning, for as long as the scan takes.
+again. Starting an acquisition cannot: it would take a second set of data. A
+write marked ``never_resend`` is sent once, not again after an error and not
+again after an unconfirmed window.
 
 When every window is used up without the state being reached, the change is
 reported as sent but unconfirmed, not as failed: the driver did its best and
-records what it could not confirm. A readback that shows a different value is
-a failure.
+records what it could not confirm.
 
 For a change handed to ``dispatch.run()``, the pre-check and the confirmation
 are both readings by the read loop: :func:`wait_ready` waits for one (the

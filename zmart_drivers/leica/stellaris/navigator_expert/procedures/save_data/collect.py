@@ -173,7 +173,7 @@ def pictures_of(root: Path, acq: AcquisitionResult) -> list[tuple[Path, str, str
     with a number too. So the job the description says made the picture
     (``BlockName``) must be *acq*'s job as well.
 
-    A picture LAS X has let go of (``procedures/clear_cache/release.py``) keeps its
+    A picture LAS X has let go of (``procedures/clear_cache/clear.py``) keeps its
     description, rewritten after the release, but not its pixels, and the
     next capture may get its name again ("HiRes009" twice, simulator,
     2026-10-14). So a picture is one only while its pixels are there; one

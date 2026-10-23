@@ -1,6 +1,6 @@
 """The connect-time limits handshake: find the saved limits, check them, hand them to the gate.
 
-The gate in ``dispatcher/gate.py`` only keeps the limits of each connection and
+The gate in ``dispatcher/limits.py`` only keeps the limits of each connection and
 refuses what they do not allow. This file does the part that needs this
 microscope's saved settings: it finds the operator's ``limits.json``, checks it,
 and installs it for the connection. If the file is missing or does not check

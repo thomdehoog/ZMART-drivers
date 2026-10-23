@@ -17,7 +17,7 @@ Each query makes ONE **request** (``_request``):
        deadline, or until the caller stops watching.
 
 A request does not ask again. The read loop (``dispatcher/read.py``) follows
-the one rule in ``waiting.py``: through :func:`_ask_api` at the end of this
+the one rule in ``profile.py``: through :func:`_ask_api` at the end of this
 file, it requests the read again every ``POLL_S`` while an answer does not
 count, and at the next window when a request got no answer. ``READS`` names
 the request each reading of the read loop makes.

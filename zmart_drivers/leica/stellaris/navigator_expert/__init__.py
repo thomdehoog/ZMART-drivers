@@ -9,26 +9,20 @@ Package layout, the anatomy of a ZMART driver (``docs/driver-anatomy.md`` in
 this repository)::
 
     navigator_expert/
-    - driver_api/         the driver used by itself: connect() and the Microscope, taking a
-                          picture, the state saved with it, and the driver's rolling log
-    - zmart_controller_plugin/  what the controller sees: the ZmartControllerPlugin class (zmart_controller_plugin.py),
-                          one method per controller command, each a call of the Microscope,
-                          and what only the controller asks for (info.py, procedure_menu.py)
-    - procedures/         the recipes, one folder each: saving the captures (save_data/),
-                          letting LAS X's cache go (clear_cache/), the stage frame
-                          (absolute_coordinate_system/) and changing the objective
-                          (keep_in_view/)
-    - session/            what the driver remembers about one connection
+    - __init__.py         connect() and Microscope, nothing else
+    - methods.py          what the user calls: connect(), the Microscope, its Session, the
+                          running log
+    - procedures/         chains of steps, one file each, a folder when it needs more: the named
+                          changes and readings, the coordinate system, keep_in_view, acquire,
+                          state, LAS X's dialogs, clear_cache/ and save_data/
+    - dispatcher/         the same in every driver; imports nothing of the driver: dispatch.py
+                          (run()), read.py, write.py, limits.py
+    - primitives/         one folder for each way of reaching LAS X, each with its transfer,
+                          reads, writes and profile: cam_api/, direct/, log/
     - driver_setup/       what is set up once per microscope, one folder per item: limits,
-                          origin, orientation, optical_calibration and
-                          data_location, each with its defaults, loader, measuring code
-                          and notebook; plus the store that finds the saved values
-    - dispatcher/         the machinery that runs a command safely, and names no LAS X
-                          object: the one door (read and write), the reader, the send and
-                          confirm loops and the limits gate
-    - primitives/         the smallest reads and writes, one folder for each way of
-                          reaching LAS X
-    - connection/         opening LAS X, and the waiting numbers
+                          origin, orientation, optical_calibration and data_location
+    - zmart_controller_plugin/  what the controller sees: the ZmartControllerPlugin class, one
+                          method per controller command, each a call of the Microscope
     - testing/            the mock LAS X API, the offline suite, the hardware validators
 
 Author: Thom de Hoog, Center for Microscopy and Image Analysis (ZMB),

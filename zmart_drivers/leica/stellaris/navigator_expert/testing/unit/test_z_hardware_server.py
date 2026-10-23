@@ -290,7 +290,7 @@ class TestCallers:
 
 
 class TestMoveZEndToEnd:
-    """Through the command backbone, against the behavioural mock, which
+    """Through the dispatcher's run(), against the behavioural mock, which
     freezes the stacked drive's zPosition the way LAS X does."""
 
     def test_stack_drive_move_is_confirmed_in_one_attempt(self, server, monkeypatch):

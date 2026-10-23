@@ -48,8 +48,9 @@ read paths.
 
 Dependency direction:
     - Imports: stdlib, the shared ``cam_api/parsing`` helpers.
-    - Imported by: ``readers.router``, dispatch diagnostics, tests, and
-      hardware validators.
+    - Imported by: the class profiles (``log/profile.py``,
+      ``direct/profile.py``), the CAM API's dialog diagnostic, the named
+      readings, tests, and hardware validators.
 
 Where LAS X writes its logs, and how old a log answer may be.
 
@@ -812,7 +813,7 @@ def wait_for_selected_job_log(
     """Poll LAS X logs until *job_name* is selected after *command_started_at*.
 
     Watches one window (``WINDOW_S``) by default, reading the log every
-    ``POLL_S``: the one rule in ``connection/waiting.py``.
+    ``POLL_S``: the one rule in ``cam_api/profile.py``.
 
     This is a log-only experiment helper. It succeeds only when the log can
     map the selected element to the target job name and the selected-element

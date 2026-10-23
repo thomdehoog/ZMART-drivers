@@ -2,7 +2,7 @@
 
 Commands that touch the scope's physical/acquisition state must SEE the
 scanner idle before firing. The wait is an ordinary scanner-status reading
-under the one rule in ``cam_api/waiting.py`` (operator decision, 2026-10-10,
+under the one rule in ``cam_api/profile.py`` (operator decision, 2026-10-10,
 replacing the unbounded wait of 2026-06-11): four windows of ``WINDOW_S``,
 after which the command fails instead of waiting forever. It is fail-closed
 against Unknown status (Unknown is not idle).

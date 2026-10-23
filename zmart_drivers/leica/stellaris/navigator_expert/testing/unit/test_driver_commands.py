@@ -2599,7 +2599,7 @@ class TestLifecycle(unittest.TestCase):
 class TestFunctionLimits(unittest.TestCase):
     """The commands-layer function-keyed gate as seen through the adapter.
 
-    The gate itself lives in ``commands/gate.py`` (and is exhaustively
+    The gate itself lives in ``dispatcher/limits.py`` (and is exhaustively
     attacked in test_limits_adversarial.py); these tests pin the adapter's
     contract on top of it: the adapter does no checking of its own, refusals
     surface as actionable RuntimeErrors, and provenance is reported.
@@ -2661,7 +2661,7 @@ class TestFunctionLimits(unittest.TestCase):
     def test_mutating_ops_refuse_without_a_limits_handshake(self):
         """Fail-closed below the adapter: no gate state means no mutations.
 
-        The refusal comes from the commands layer and surfaces as the ops
+        The refusal comes from the limits gate and surfaces as the ops
         contract's RuntimeError; read-only ops still work. (set_origin fires
         no native command — it captures a reference — so it is deliberately
         not among the refusals.)

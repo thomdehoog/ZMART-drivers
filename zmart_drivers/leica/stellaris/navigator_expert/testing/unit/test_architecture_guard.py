@@ -1,19 +1,24 @@
-"""Guard tests for the driver's layering.
+"""Guard tests for the anatomy of the driver.
 
 The driver is built from the parts of the ZMART driver anatomy
-(``docs/driver-anatomy.md`` in this repository). Two sentences carry the
-safety of the whole driver: every stage move goes through the limits gate,
-and nothing above the actions checks limits or moves the stage itself.
+(``docs/driver-anatomy.md`` in this repository): ``methods.py``,
+``procedures/``, ``dispatcher/``, ``primitives/``, ``driver_setup/`` and
+``zmart_controller_plugin/``. A driver that leaves the anatomy fails these
+tests.
 
-These tests read the driver's source files and fail when a new module
-breaks a rule, so the rule survives as a red test instead of a code-review
-comment. If one of these fails, the fix is almost never to edit this file:
-move the offending call down into ``actions/`` or ``dispatcher/`` instead.
+These tests read the driver's source files and fail when a module breaks a
+rule, so the rule survives as a red test instead of a code-review comment.
+If one of these fails, the fix is almost never to edit this file: move the
+offending code to the part the anatomy gives it.
 
-The last tests record which parts import which (``ALLOWED``). No part imports
-upward against the anatomy: the primitives import only the dispatcher, and the
-dispatcher imports nothing of the driver, so no new upward import can appear
-unnoticed.
+- Every stage move goes through the limits gate: only the stage writes name
+  the native stage moves, and only the rules check the limits.
+- Each part imports only what ``ALLOWED`` lets it: the primitives import only
+  the dispatcher, and the dispatcher imports nothing of the driver.
+- Every file sits where the anatomy puts it: the root holds the parts and
+  nothing else, ``dispatcher/`` holds its four files, ``primitives/`` holds one
+  folder per class, each with its profile, and a folder in ``procedures/`` or
+  ``primitives/`` holds more than one file.
 """
 
 from __future__ import annotations
@@ -29,16 +34,13 @@ DISPATCHER = "dispatcher"
 # The Leica rulebook defines the check functions; the gate in the dispatcher enforces them.
 RULEBOOK = Path("driver_setup/limits/limit_rules.py")
 
-# Source selection is policy, not caller behaviour. The read engine implements
-# the profile-controlled modes; the confirmation modules construct explicit
-# API/log legs that the command policy races. Higher-level code must leave
-# ``mode`` unset and consume the configured reader abstraction.
+# Which source a reading asks is the read order of the direct profile, not the
+# caller's choice. The read loop, the named readings and the profile name the
+# sources; everyone else leaves ``mode`` unset and takes the read order.
 READER_SOURCE_POLICY_MODULES = {
     Path("dispatcher/read.py"),
+    Path("dispatcher/write.py"),
     Path("procedures/readings.py"),
-    Path("dispatcher/read.py"),
-    Path("dispatcher/write.py"),
-    Path("dispatcher/write.py"),
     Path("primitives/direct/profile.py"),
     # Selecting a job asks the API's job list and the log before the change,
     # to know whether it is needed and which sources may confirm it.
@@ -62,7 +64,7 @@ def _driver_sources():
         yield rel, path.read_text(encoding="utf-8")
 
 
-def test_native_stage_motion_fires_only_from_the_actions():
+def test_native_stage_motion_is_named_only_by_the_stage_writes():
     """The native CAM motion functions are the stage's real door.
 
     Only the stage moves in ``primitives/cam_api/writes.py`` may name them: they
@@ -85,7 +87,7 @@ def test_native_stage_motion_fires_only_from_the_actions():
     ]
     assert offenders == [], (
         f"native stage motion referenced outside primitives/cam_api/writes.py: {offenders}; "
-        f"route the move through the move_xy / move_z actions instead"
+        f"route the move through the named changes move_xy / move_z instead"
     )
 
 
@@ -106,7 +108,7 @@ def test_limit_checks_are_called_only_from_the_rules():
     )
 
 
-def test_the_rulebook_lives_in_the_dispatcher():
+def test_the_rulebook_lives_in_driver_setup():
     """``LeicaLimits`` (the compiled limits document) is defined in
     driver_setup/limits/limit_rules.py; the gate only imports it. If the class definition
     moves back into the gate, rulebook and whistle have merged again."""
@@ -117,12 +119,12 @@ def test_the_rulebook_lives_in_the_dispatcher():
 
 
 def test_reader_source_is_selected_only_by_reader_and_confirmation_policy():
-    """Operational callers consume the configured reader policy.
+    """Callers take the read order of the direct profile.
 
-    An adapter, calibration routine, or action that pins
+    A procedure, a calibration routine or a method that pins
     ``api``/``log``/``hybrid`` silently defeats ``StateReaderProfile``.
-    Explicit modes belong only to the read engine and to confirmation-policy
-    code constructing the individual legs of a configured race.
+    Explicit modes belong only to the modules listed in
+    ``READER_SOURCE_POLICY_MODULES``.
     """
     offenders = [
         str(rel)
@@ -131,12 +133,12 @@ def test_reader_source_is_selected_only_by_reader_and_confirmation_policy():
     ]
     assert offenders == [], (
         f"reader source pinned outside policy layer: {offenders}; remove the "
-        "mode override and let StateReaderProfile/capabilities route the datum"
+        "mode override and let the read order of StateReaderProfile choose"
     )
 
 
 def test_low_level_readers_are_called_only_by_reader_and_confirmation_policy():
-    """Operational callers cannot bypass the routed reader API."""
+    """Outside the primitives, a class's reads are reached only through ``dispatcher.run()``."""
     offenders = [
         str(rel)
         for rel, text in _driver_sources()
@@ -165,18 +167,20 @@ def test_the_utils_grab_bag_stays_dissolved():
 # The parts of the anatomy, and what each may import. A part may always import
 # from itself.
 ALLOWED = {
-    # One folder for each way of reaching LAS X.
+    # One folder per class of primitive: its transfer, reads, writes and profile.
     "primitives": {
-        "dispatcher",  # the reading, the dialogs around a delivery, the transport chain
+        "dispatcher",  # the Reading, the dialogs around a delivery, the transport chain
     },
-    # Runs one primitive and knows no microscope.
+    # Runs one primitive; the same in every driver, and knows no microscope.
     "dispatcher": set(),
+    # Chains of steps; most run their primitives through dispatcher.run().
     "procedures": {
         "primitives",
         "dispatcher",
         "driver_setup",
         "__version__",  # the saved state records the driver version
     },
+    # What the operator sets up once: limits, origin, orientation, calibration, data location.
     "driver_setup": {
         "primitives",
         "dispatcher",
@@ -245,8 +249,6 @@ def test_each_part_only_imports_what_the_anatomy_allows():
             )
 
 
-#: The bottom of the vendor part, bottom first: how the driver reaches LAS X, and
-#: one read or write each. Neither imports from anything above it.
 def test_a_reading_never_uses_a_change():
     """A get never calls a set: no class profile (the table of readings among them) imports a procedure, the named changes among them."""
     profiles = sorted((DRIVER_ROOT / "primitives").glob("*/profile.py"))
@@ -309,22 +311,72 @@ def test_run_time_procedures_never_import_the_measuring_code():
     )
 
 
-# --- no loose files -----------------------------------------------------------------
+# --- every file where the anatomy puts it -------------------------------------------
+
+#: The folders of the anatomy, at the driver's root.
+ANATOMY_FOLDERS = {
+    "procedures",
+    "dispatcher",
+    "primitives",
+    "driver_setup",
+    "zmart_controller_plugin",
+    "testing",
+}
+#: The files of the anatomy, at the driver's root.
+ANATOMY_FILES = {"__init__.py", "methods.py", "README.md"}
+#: The dispatcher's files: the same in every driver.
+DISPATCHER_FILES = {"__init__.py", "dispatch.py", "read.py", "write.py", "limits.py"}
+
+
+def _modules(folder: Path) -> list[str]:
+    """The Python files directly in *folder*, without ``__init__.py``."""
+    return sorted(p.name for p in folder.glob("*.py") if p.name != "__init__.py")
+
+
+def _python_folders(folder: Path) -> list[Path]:
+    """The folders under *folder*, itself included, that hold Python files."""
+    return sorted(
+        {p.parent for p in folder.rglob("*.py") if "__pycache__" not in p.parts}
+    )
 
 
 def test_the_driver_keeps_its_files_where_the_anatomy_puts_them():
-    """``primitives/`` holds only one folder for each way of reaching LAS X; the
-    driver's root holds ``__init__.py``, ``methods.py`` and its README."""
-    loose = sorted(p.name for p in (DRIVER_ROOT / "primitives").glob("*.py") if p.name != "__init__.py")
-    assert loose == [], f"primitives/ has loose files {loose}; each belongs in its class's folder"
-    allowed_in_root = {
-        "__init__.py",
-        "README.md",
-        "methods.py",
-    }
+    """The root holds the anatomy's parts and nothing else; ``dispatcher/`` its
+    four files; ``primitives/`` one folder per class, each with its profile;
+    and a folder in ``procedures/`` or ``primitives/`` more than one file."""
     root_files = sorted(
-        p.name
-        for p in DRIVER_ROOT.glob("*")
-        if p.is_file() and p.name not in allowed_in_root
+        p.name for p in DRIVER_ROOT.glob("*") if p.is_file() and p.name not in ANATOMY_FILES
     )
     assert root_files == [], f"the driver's root has loose files {root_files}"
+    root_folders = sorted(
+        p.name
+        for p in DRIVER_ROOT.glob("*")
+        if p.is_dir() and _python_folders(p) and p.name not in ANATOMY_FOLDERS
+    )
+    assert root_folders == [], (
+        f"the driver's root has folders outside the anatomy {root_folders}; "
+        f"the parts are {sorted(ANATOMY_FOLDERS)}"
+    )
+
+    dispatcher = DRIVER_ROOT / "dispatcher"
+    assert _python_folders(dispatcher) == [dispatcher], "dispatcher/ has a subfolder"
+    files = {p.name for p in dispatcher.glob("*.py")}
+    assert files == DISPATCHER_FILES, (
+        f"dispatcher/ holds {sorted(files)}; the anatomy's dispatcher is {sorted(DISPATCHER_FILES)}"
+    )
+
+    primitives = DRIVER_ROOT / "primitives"
+    loose = _modules(primitives)
+    assert loose == [], f"primitives/ has loose files {loose}; each belongs in its class's folder"
+    classes = [p for p in _python_folders(primitives) if p.parent == primitives]
+    assert classes, "primitives/ has no class"
+    without_profile = sorted(p.name for p in classes if not (p / "profile.py").is_file())
+    assert without_profile == [], f"primitive classes without a profile.py: {without_profile}"
+
+    single = sorted(
+        str(folder.relative_to(DRIVER_ROOT))
+        for part in ("procedures", "primitives")
+        for folder in _python_folders(DRIVER_ROOT / part)
+        if folder != DRIVER_ROOT / part and len(_modules(folder)) < 2
+    )
+    assert single == [], f"folders with fewer than two files {single}; a folder only where there is more than one"

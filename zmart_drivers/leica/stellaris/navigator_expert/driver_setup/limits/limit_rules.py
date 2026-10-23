@@ -4,12 +4,12 @@ The limits rulebook.
 Every "is this allowed?" answer in the driver comes from this module:
 stage positions (the envelope and the physical backstop), objective
 slots, and the 21 configurable setter values. Enforcement — the moment
-of refusing — lives in the commands layer (``commands/gate.py`` and the
-command wrappers), which asks this rulebook and obeys. Nothing above the
-commands layer checks limits itself.
+of refusing — is the dispatcher's limits gate (``dispatcher/limits.py``),
+which asks this rulebook through :class:`LeicaLimits` once for every
+change, before anything is sent. Nothing else checks limits itself.
 
-Stage moves are guarded by two independent layers, both checked in
-Phase A of the command wrappers before the backbone fires:
+Stage moves are guarded by two independent layers, both asked by the
+gate before anything is sent:
 
 1. **Session envelope** — the machine-local limits file, applied via
    ``set_stage_limits()`` / ``apply_stage_limits_from_config()`` (the
@@ -21,15 +21,14 @@ Phase A of the command wrappers before the backbone fires:
 
 The mutable module-level envelope is intentional: limits are set once at
 session start and shared across all command calls. This assumes ONE
-instrument per process (the same single-writer convention as command
-dispatch, see ``commands/dispatch.py``); a second connect in the same
+instrument per process (the same single-writer convention as the
+dispatcher, ``dispatcher/dispatch.py``); a second connect in the same
 process rebinds the envelope for everyone.
 
 Dependency direction:
     - Imports: stdlib only (no driver imports).
-    - Imported by: ``commands`` (for Phase A limit checks),
-      ``commands.gate`` (backstop containment at the connect handshake),
-      ``limits.config`` (envelope validation), ``__init__`` (re-export).
+    - Imported by: ``handshake.py`` (builds the limits at connect),
+      ``config.py`` (envelope validation), ``measure_limits.py``.
 """
 
 import math

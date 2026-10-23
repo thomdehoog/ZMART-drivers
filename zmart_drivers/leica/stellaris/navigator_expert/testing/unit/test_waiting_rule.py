@@ -413,8 +413,8 @@ def test_commands_deliver_through_the_one_helper():
     assert transport.deliver is delivery.deliver
 
 
-# Whole folders, plus the change definitions that moved from actions/ to procedures/.
-GUARDED = ("dispatcher", "connection", "primitives")
+# Whole folders, plus the named changes in procedures/.
+GUARDED = ("dispatcher", "primitives")
 GUARDED_FILES = (
     "procedures/keep_in_view.py",
     "procedures/changes.py",
@@ -506,7 +506,7 @@ def _waits_with_their_own_numbers(root):
 
 
 def test_no_wait_on_las_x_has_its_own_number():
-    """How long to wait and how often to look come from connection/waiting.py only.
+    """How long to wait and how often to look come from cam_api/profile.py only.
 
     A literal timeout, retry count, window, poll interval or sleep for waiting
     on LAS X anywhere else is a second rule; the named exceptions above are
