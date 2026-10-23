@@ -92,3 +92,27 @@ def test_the_direct_reader_is_asked_again_while_the_scanner_is_busy(monkeypatch)
     )
 
     assert reading is not None and reading.value == "Idle"
+
+
+def test_a_capture_waits_for_idle_as_long_as_it_takes(monkeypatch):
+    """The capture's idle wait has no limit: busy for longer than the four windows, it waits on."""
+    from types import SimpleNamespace
+
+    from zmart_drivers.leica.stellaris.navigator_expert.dispatcher import write as write_loops
+    from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import writes
+
+    answers = iter([(False, "Busy")] * 6 + [(True, "Idle")])
+    monkeypatch.setattr(write_loops, "watch", lambda *a, **k: next(answers))
+    vendor = SimpleNamespace(waiting=SimpleNamespace(WINDOWS=4, WINDOW_S=3))
+
+    ready = write_loops.wait_ready(vendor, None, writes.acquire("HiRes").ready)
+
+    assert ready()["success"] is True
+
+
+def test_only_the_capture_waits_without_limit():
+    from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import writes
+
+    assert writes.acquire("HiRes").ready.without_limit is True
+    assert writes.move_xy(1.0, 2.0, "um").ready.without_limit is False
+    assert writes.select_job("HiRes").ready.without_limit is False

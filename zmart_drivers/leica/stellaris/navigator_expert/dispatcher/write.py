@@ -143,12 +143,21 @@ def wait_ready(vendor, client, expect):
 
     The reading is waited for over the ``WINDOWS`` windows of the waiting rule;
     a microscope that is still not ready after them fails the check, and
-    nothing is sent.
+    nothing is sent. A reading marked ``without_limit`` is waited for as long
+    as it takes, with a log line after each round of windows.
     """
 
     def ready():
         started = time.perf_counter()
         shown, last = watch(vendor, client, expect)
+        while not shown and getattr(expect, "without_limit", False):
+            log.info(
+                "still waiting for %s after %.0fs (last status: %s)",
+                expect.reading,
+                time.perf_counter() - started,
+                last or "unknown",
+            )
+            shown, last = watch(vendor, client, expect)
         if shown:
             return {"success": True, "logs": []}
         msg = (

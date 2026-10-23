@@ -60,6 +60,7 @@ class Expect:
     about: str | None = None  # the job, for a reading about one job
     mode: str | None = None  # read order; None = the reading's own
     fallback: str | None = None
+    without_limit: bool = False  # waited for as long as it takes, not the four windows
 
 
 @dataclass(frozen=True)
@@ -84,18 +85,20 @@ def is_idle(status) -> bool:
     return "Idle" in status
 
 
-def idle() -> Expect:
+def idle(*, without_limit=False) -> Expect:
     """The scanner idle, read from a source that answers on demand.
 
     The log writes the status only when it changes, so its "idle" can be from
     before; this reading decides whether a change may be sent, so it asks the
-    direct reader, or the API.
+    direct reader, or the API. ``without_limit`` waits for it as long as it
+    takes, instead of the four windows.
     """
     return Expect(
         "scan_status",
         is_idle,
         mode=policy.on_demand_mode("scan_status"),
         fallback=policy.on_demand_fallback(),
+        without_limit=without_limit,
     )
 
 
@@ -331,8 +334,9 @@ def acquire(job_name, *, experiment=None) -> Write:
     """Run the job ``job_name`` once: one picture.
 
     Never sent again, after an error or otherwise: a second send is a second
-    picture. Sent without a receipt, and with nothing read back: whether the
-    scan ran is watched after the send (``procedures/changes.py``).
+    picture. Sent once the scanner is idle, however long that takes. Sent
+    without a receipt, and with nothing read back: whether the scan ran is
+    watched after the send (``procedures/changes.py``).
     ``experiment`` opens the experiment the picture goes into; the direct
     route needs it, and without it the CAM API carries the picture.
     """
@@ -346,7 +350,7 @@ def acquire(job_name, *, experiment=None) -> Write:
         request="PyApiAcquireJob",
         fill=fill,
         description=f"Acquire '{job_name}'",
-        ready=idle(),
+        ready=idle(without_limit=True),
         without_receipt=True,
         never_resend=True,
         experiment=experiment,
