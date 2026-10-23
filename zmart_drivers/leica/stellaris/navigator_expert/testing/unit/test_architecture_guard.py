@@ -68,9 +68,10 @@ def _driver_sources():
 def test_native_stage_motion_fires_only_from_the_actions():
     """The native CAM motion functions are the stage's real door.
 
-    Only the stage moves in ``operations/changes/stage.py`` may touch them: that
-    is where the limit checks run, immediately before the native call. A
-    native-motion reference anywhere else would be a second, unchecked door.
+    Only the stage moves in ``primitives/cam_api/writes.py`` may name them: they
+    are run only through the dispatcher's ``run()``, which asks the limits before
+    the request is made. A native-motion reference anywhere else would be a
+    second, unchecked door.
     """
     offenders = [
         str(rel)
@@ -78,7 +79,7 @@ def test_native_stage_motion_fires_only_from_the_actions():
         if "PyApiMoveHardware" in text
         and rel
         not in (
-            Path("operations/changes/stage.py"),
+            Path("primitives/cam_api/writes.py"),
             # The direct route's table of how each CAM command is written for the hardware
             # server. It sends nothing itself: only the direct transport does, and that is
             # reached through the same change definitions and the same limits gate.
@@ -86,7 +87,7 @@ def test_native_stage_motion_fires_only_from_the_actions():
         )
     ]
     assert offenders == [], (
-        f"native stage motion referenced outside operations/changes/stage.py: {offenders}; "
+        f"native stage motion referenced outside primitives/cam_api/writes.py: {offenders}; "
         f"route the move through the move_xy / move_z actions instead"
     )
 

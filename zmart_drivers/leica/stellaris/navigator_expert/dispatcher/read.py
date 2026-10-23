@@ -41,7 +41,8 @@ This file knows nothing of any one microscope. What the reader asks of the
   ask one source, and again until an answer counts or *until*, and return a
   Reading;
 - ``first_stage(spec, mode, fallback)``: the source tried alone first, if any,
-  and the mode for the rest;
+  and the mode for the rest; it is called with ``succeeded=``, ``deadline=``,
+  ``observed_after=``, ``kwargs=``, ``waiting_for_change=`` and ``about=``;
 - ``UnsupportedSource``: the error class for a missing source.
 
 For LAS X these are in ``primitives/direct/profile.py``, and the
@@ -242,6 +243,7 @@ def wait_for(
             observed_after=observed_after,
             kwargs=source_kwargs or {},
             waiting_for_change=accept is not None or observed_after is not None,
+            about=about,
         )
         if reading is None or reading.error is None:
             return reading

@@ -20,8 +20,12 @@ the same command.
 The order of the routes can be changed without editing code, for a comparison or
 to switch the direct route off: set the environment variable
 ``ZMART_WRITE_ROUTES`` to ``cam`` (the CAM API only), ``direct`` or
-``direct,cam`` (the default). Every command profile sends through
-:data:`ROUTED`, which reads this policy for each command.
+``direct,cam`` (the default). Every change sends through :data:`ROUTED`, which
+reads this policy for each command.
+
+Writes. This module is also what the dispatcher's ``run()`` is handed for a
+change (a ``Write`` from ``cam_api/writes.py``): ``limits_setup_hint``,
+``make_request``, ``check_reply`` and ``WRITING``, how the write loops send.
 
 Author: Thom de Hoog, Center for Microscopy and Image Analysis (ZMB),
 University of Zurich (thom.dehoog@zmb.uzh.ch, thomdehoog@gmail.com).
@@ -37,11 +41,14 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from functools import partial
 
+from ...dispatcher.dispatch import make_log_entry
 from ...dispatcher.read import Reading, counts
 from ...dispatcher.write import TransportChain
+from ...driver_setup.limits.limit_rules import NOTEBOOK_POINTER
 from ..cam_api import derived, waiting
 from ..cam_api import reads as api_reader
 from ..cam_api import transfer as _transport
+from ..cam_api.error_classification import _default_error_check
 from ..log import profile as log_profile
 from ..log import reads as log_reader
 from . import reads as direct_reader
@@ -301,6 +308,51 @@ def mode_for(datum):
     return getattr(profile(), spec(datum).mode_attr)
 
 
+def on_demand_mode(datum):
+    """The direct reader when the policy reads *datum* directly, else the API: the sources that answer on demand.
+
+    For readings a command waits on (whether the scanner is idle, where the
+    stage went), which the log cannot settle: it writes a value only when it
+    changes, so it can still show the state from before. Pair it with
+    :func:`on_demand_fallback`.
+    """
+    return "direct" if mode_for(datum) == "direct" else "api"
+
+
+def on_demand_fallback():
+    """The family that answers a waited-on reading when the direct reader cannot (the profile's ``waiting_fallback``)."""
+    return profile().waiting_fallback
+
+
+def source_arguments(about, source_kwargs):
+    """What the CAM API and the direct reader are asked with: the job a reading is about, and what the caller adds."""
+    return {**({"job_name": about} if about is not None else {}), **(source_kwargs or {})}
+
+
+def z_um_direct(drive, *, mode=None):
+    """Where one z drive truly is (um), from the direct reader; None when it does not answer or fails.
+
+    It is asked in ``direct`` mode (the profile's ``z_mode`` unless
+    *mode* says); None also when the hardware server cannot be reached, so
+    the caller reads the job settings instead.
+    """
+    mode = mode if mode is not None else profile().z_mode
+    if mode != "direct":
+        return None
+    try:
+        return direct_reader.read_z_um(drive)
+    except HardwareServerUnavailable as why:
+        log.debug("%s: %s; the job settings answer", drive, why)
+    except Exception as why:
+        log.warning(
+            "the direct reader failed on %s (%s: %s); the job settings answer",
+            drive,
+            type(why).__name__,
+            why,
+        )
+    return None
+
+
 def max_age_s(spec):
     """How old a log entry may be and still count; None when the datum has no limit."""
     return log_profile.MAX_AGE_S.get(spec.name)
@@ -377,7 +429,11 @@ def ask(leg, spec, client, *, until, answer_counts, about, source_kwargs):
     """
     if leg == "api":
         return api_reader._ask_api(
-            spec, client, source_kwargs, until=until, answer_counts=answer_counts
+            spec,
+            client,
+            source_arguments(about, source_kwargs),
+            until=until,
+            answer_counts=answer_counts,
         )
     return log_reader._ask_log(
         spec, about, max_age_s(spec), until=until, answer_counts=answer_counts
@@ -400,17 +456,20 @@ def first_stage(spec, mode, fallback):
     return partial(watch_direct, spec), fallback
 
 
-def watch_direct(spec, *, succeeded, deadline, observed_after, kwargs, waiting_for_change):
+def watch_direct(
+    spec, *, succeeded, deadline, observed_after, kwargs, waiting_for_change, about=None
+):
     """Ask the direct reader until an answer counts; a carried error at once when it fails.
 
     A caller waiting for a change (*waiting_for_change*: a confirmation's ``accept`` or
     ``observed_after``) is asked again every ``POLL_S`` until *deadline*,
     and gets None when nothing counted in time. Any other caller gets one
     answer: one that does not count is a failure, so the fallback answers
-    at once instead of after the whole wait.
+    at once instead of after the whole wait. *about* is the job a reading
+    is about.
     """
     while True:
-        reading = direct_read(spec, kwargs)
+        reading = direct_read(spec, source_arguments(about, kwargs))
         if reading.error is not None or counts(reading, succeeded, observed_after):
             return reading
         if not waiting_for_change:
@@ -453,5 +512,57 @@ def write_routes():
     return [(name, ROUTES[name]) for name in WRITE_ROUTES]
 
 
-#: The transport every command profile sends through.
+#: The transport every change sends through.
 ROUTED = TransportChain(write_routes)
+
+
+# =============================================================================
+# What the dispatcher's run() asks of LAS X for a change
+# =============================================================================
+
+
+@dataclass(frozen=True)
+class WriteProfile:
+    """How the write loops send a change to LAS X: the fields ``dispatcher/write.py`` reads.
+
+    Every change is sent through :data:`ROUTED` by the one waiting rule:
+    ``WINDOWS`` tries in all after a temporary error, ``WINDOWS`` confirmation
+    windows, and sent again between them. What differs per change (sent
+    without a receipt, never sent again) is on the ``Write`` and handed to the
+    loops by ``run()``.
+    """
+
+    transport: object = ROUTED
+    waiting: object = waiting
+    max_retries: int = waiting.WINDOWS - 1
+    max_confirm_attempts: int = waiting.WINDOWS
+    refire_on_unconfirmed: bool = True
+    send_without_receipt: bool = False
+    never_resend: bool = False
+
+
+#: How every change is sent.
+WRITING = WriteProfile()
+
+#: Where the operator creates the limits files, said when a change is refused
+#: because no limits are installed.
+limits_setup_hint = NOTEBOOK_POINTER
+
+
+def make_request(client, write):
+    """The CAM API request that carries *write*; made only once the limits allow it."""
+    return _transport.request_of(client, write.request)
+
+
+def check_reply(client, write):
+    """LAS X's reply to *write*, checked for an error; a reply the write accepts means "already so".
+
+    Such a reply (resonant scanning already on, say) is not an error: the
+    change is then confirmed by reading it back, like any other.
+    """
+    result = _default_error_check(client)
+    error = (result.get("error") or "").lower()
+    if not result["success"] and any(reply in error for reply in write.accepted_replies):
+        msg = f"{write.description} | LAS X answered {result['error']!r}: already so; the readback confirms it"
+        return {"success": True, "error": None, "transient": None, "logs": [make_log_entry("info", msg)]}
+    return result

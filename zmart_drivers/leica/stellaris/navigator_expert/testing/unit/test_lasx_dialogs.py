@@ -26,7 +26,7 @@ import pytest
 
 from zmart_drivers.leica.stellaris.navigator_expert.procedures import answer_dialogs
 from zmart_drivers.leica.stellaris.navigator_expert.operations.changes import acquire as acquire_change
-from zmart_drivers.leica.stellaris.navigator_expert.operations.changes import job_settings
+from zmart_drivers.leica.stellaris.navigator_expert.procedures import changes
 
 SHOWN = (
     "2026-10-14 09:49:33.502 0007  Info DbTracer 'MessageBox Warning : "
@@ -264,7 +264,7 @@ class TestCommands:
             ),
         )
         before = client._jobs["HiRes"]["zoom"]["current"]
-        result = job_settings.change(client, "zoom", "HiRes", value=5.0)
+        result = changes.change(client, "zoom", "HiRes", value=5.0)
         assert result["success"] is False
         assert "Please keep minimum distance of 8nm." in result["message"]
         assert client._jobs["HiRes"]["zoom"]["current"] == before
@@ -276,7 +276,7 @@ class TestCommands:
         show(lasx_log)
         dialog = StandInDialog(lasx_log)
         use(monkeypatch, StandInWindows([dialog]))
-        result = job_settings.change(client, "zoom", "HiRes", value=5.0)
+        result = changes.change(client, "zoom", "HiRes", value=5.0)
         assert (result["success"], result["confirmed"]) == (True, True)
         assert dialog.pressed == ["ButtonMessageOk"]
         assert any(

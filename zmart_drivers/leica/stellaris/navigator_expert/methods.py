@@ -76,7 +76,8 @@ from .procedures.save_data import save_waiting as save_step
 from .procedures.save_data.naming import run_hash
 from .primitives.cam_api import client as lasx_client
 from .procedures import readings
-from .operations.changes import job_settings
+from .primitives.cam_api import writes
+from .procedures import changes
 from .procedures import answer_dialogs
 import logging
 from dataclasses import dataclass, field
@@ -240,16 +241,16 @@ class Microscope:
     def change_setting(self, name: str, job: str | None = None, **arguments: Any) -> dict:
         """Change the setting *name* of *job* (the selected job when None), and read it back.
 
-        *name* is one of the job's settings (``job_settings.SETTINGS``), such as ``"zoom"`` or
+        *name* is one of the job's settings (``writes.SETTINGS``), such as ``"zoom"`` or
         ``"laser_intensity"``; the keywords are what that setting takes, such
         as ``value=2.0``. The limits are asked first. Answers the change's
         result, with ``confirmed`` True when the readback showed the new
         value; a change that was never seen is recorded and does not raise.
         """
         self.handle.require_open()
-        job_settings.arguments_of(name, job or "", arguments)  # a wrong name or argument raises here
+        writes.arguments_of(name, job or "", arguments)  # a wrong name or argument raises here
         job = job or self.handle.selected_job_name()
-        result = job_settings.change(self.handle.client, name, job, **arguments)
+        result = changes.change(self.handle.client, name, job, **arguments)
         return checked(self.handle, result, f"change_setting({name!r}, job={job!r})")
 
     def change_objective(self, slot: int | None = None, name: str | None = None, magnification: float | None = None) -> dict:

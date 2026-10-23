@@ -34,7 +34,7 @@ from zmart_drivers.leica.stellaris.navigator_expert.operations.changes import ac
 from zmart_drivers.leica.stellaris.navigator_expert.procedures.save_data import save as saving
 from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import parsing
 from zmart_drivers.leica.stellaris.navigator_expert.procedures import readings as readers
-from zmart_drivers.leica.stellaris.navigator_expert.operations.changes import stage
+from zmart_drivers.leica.stellaris.navigator_expert.procedures import changes
 
 from .. import orientation as _orientation
 from ...procedures.save_data.naming import Naming, run_hash
@@ -181,7 +181,7 @@ def move_xy_and_verify(
     settle_s: float = 0.5,
     tolerance_um: float = 0.5,
 ) -> None:
-    result = stage.move_xy(client, x_um, y_um, unit="um", tolerance=tolerance_um)
+    result = changes.move_xy(client, x_um, y_um, unit="um", tolerance=tolerance_um)
     if not result or not result.get("success"):
         raise RuntimeError(f"move_xy failed: {result}")
     if settle_s > 0:
@@ -203,7 +203,7 @@ def move_zwide_and_verify(
     *,
     tolerance_um: float = 1.0,
 ) -> None:
-    result = stage.move_z(
+    result = changes.move_z(
         client, job_name, z_um, unit="um", z_mode="zwide", tolerance=tolerance_um
     )
     if not result or not result.get("success"):

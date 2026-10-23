@@ -42,7 +42,7 @@ from zmart_drivers.leica.stellaris.navigator_expert.procedures import absolute_c
 from zmart_drivers.leica.stellaris.navigator_expert.zmart_controller_plugin import procedure_menu as _procedure_menu
 
 from zmart_drivers.leica.stellaris.navigator_expert.methods import Session
-from zmart_drivers.leica.stellaris.navigator_expert.operations.changes import stage
+from zmart_drivers.leica.stellaris.navigator_expert.procedures import changes
 
 
 class SimScope:
@@ -110,8 +110,8 @@ def _running(sim: SimScope):
         }
 
     with (
-        patch.object(stage, "move_xy", fake_arrive),
-        patch.object(stage, "move_z", fake_move_z),
+        patch.object(changes, "move_xy", fake_arrive),
+        patch.object(changes, "move_z", fake_move_z),
         patch.object(
             _readers,
             "get_xy",
@@ -297,8 +297,8 @@ def test_swap_compensation_keeps_the_viewed_point():
         patch.object(
             readers, "read_zwide_um", side_effect=lambda c, j, **k: sim.z_wide
         ),
-        patch.object(stage, "move_xy", fake_move_xy),
-        patch.object(stage, "move_z", fake_move_z),
+        patch.object(changes, "move_xy", fake_move_xy),
+        patch.object(changes, "move_z", fake_move_z),
     ):
         viewed_before = sim.viewed_point()
         before = shift.record_before_change(client, translations=dict(TRUE_T))
@@ -351,7 +351,7 @@ def test_zero_z_galvo_refused_first_leg_moves_nothing():
     def refusing_move_z(client, job, z, unit="um", z_mode="galvo", **_k):
         return {"success": False, "message": "z_wide_um outside range"}
 
-    with _running(sim), patch.object(stage, "move_z", refusing_move_z):
+    with _running(sim), patch.object(changes, "move_z", refusing_move_z):
         with pytest.raises(RuntimeError, match="zero_z_galvo"):
             _procedure_menu.run_procedure(h, {"name": "zero_z_galvo"})
     assert sim.state() == before

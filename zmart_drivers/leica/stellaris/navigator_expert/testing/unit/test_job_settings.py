@@ -3,8 +3,8 @@
 For every setting, a readback holding the new value where that setting's
 ``read`` looks confirms the change, and one holding another value does not.
 The zoom, the image format and the z-stack, whose readbacks are particular,
-have their own cases. Offline: ``confirming.readback`` is replaced, so no
-microscope is asked.
+have their own cases. Each is the setting's check (``writes.setting_shows``),
+asked with one readback: no microscope is asked.
 
 Author: Thom de Hoog, Center for Microscopy and Image Analysis (ZMB),
 University of Zurich (thom.dehoog@zmb.uzh.ch, thomdehoog@gmail.com).
@@ -12,8 +12,8 @@ University of Zurich (thom.dehoog@zmb.uzh.ch, thomdehoog@gmail.com).
 
 import pytest
 
-from zmart_drivers.leica.stellaris.navigator_expert.operations.changes import confirming
-from zmart_drivers.leica.stellaris.navigator_expert.operations.changes import job_settings
+from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import writes
+from zmart_drivers.leica.stellaris.navigator_expert.procedures import changes
 
 # Per setting: the arguments besides its value, the value asked for, a value
 # read back that matches it (within the setting's tolerance) and one that
@@ -174,9 +174,14 @@ SAMPLES = {
 }
 
 
-def answering(settings):
-    """A readback that always answers ``settings``."""
-    return lambda client, job_name, **window: settings
+def shows(name, settings, **given):
+    """Whether the change of *name* with *given* counts *settings* as showing it.
+
+    *settings* holds what the setting reads; the keys every job's settings
+    carry are added.
+    """
+    readback = {"zoom": {"current": None}, "scanSpeed": {"value": None, "isResonant": False}, "activeSettings": [], **settings}
+    return writes.change(name, "JOB", **given).confirm.accept(readback)
 
 
 def arguments(name, sample, value):
@@ -184,44 +189,35 @@ def arguments(name, sample, value):
     if name == "image_format":
         given["format_str"] = value
     else:
-        given[job_settings.SETTINGS[name].value] = value
+        given[writes.SETTINGS[name].value] = value
     return given
 
 
 def test_every_setting_has_a_sample():
-    assert set(SAMPLES) | {"z_stack_definition"} == set(job_settings.SETTINGS)
+    assert set(SAMPLES) | {"z_stack_definition"} == set(writes.SETTINGS)
 
 
 def test_each_setting_names_the_argument_that_holds_its_value():
-    for setting in job_settings.SETTINGS.values():
+    for setting in writes.SETTINGS.values():
         assert setting.value in setting.takes or setting.normalize is not None, setting.name
 
 
 @pytest.mark.parametrize("name", sorted(SAMPLES))
-def test_a_readback_with_the_new_value_confirms(name, monkeypatch):
+def test_a_readback_with_the_new_value_confirms(name):
     sample = SAMPLES[name]
-    monkeypatch.setattr(confirming, "readback", answering(sample["ch"](sample["match"])))
 
-    result = job_settings.confirm(object(), name, "JOB", poll_window=1.0, **arguments(name, sample, sample["target"]))
-
-    assert result == {"success": True, "logs": []}
+    assert shows(name, sample["ch"](sample["match"]), **arguments(name, sample, sample["target"])) is True
 
 
 @pytest.mark.parametrize("name", sorted(SAMPLES))
-def test_a_readback_with_another_value_does_not_confirm(name, monkeypatch):
+def test_a_readback_with_another_value_does_not_confirm(name):
     sample = SAMPLES[name]
-    monkeypatch.setattr(confirming, "readback", answering(sample["ch"](sample["miss"])))
 
-    result = job_settings.confirm(object(), name, "JOB", poll_window=0.02, **arguments(name, sample, sample["target"]))
-
-    assert result["success"] is False
-    (entry,) = result["logs"]
-    assert entry["level"] == "warning"
-    assert "not seen" in entry["msg"]
+    assert shows(name, sample["ch"](sample["miss"]), **arguments(name, sample, sample["target"])) is False
 
 
 def test_the_tolerances():
-    tolerances = {name: setting.tolerance for name, setting in job_settings.SETTINGS.items() if setting.tolerance}
+    tolerances = {name: setting.tolerance for name, setting in writes.SETTINGS.items() if setting.tolerance}
     assert tolerances == {
         "zoom": 0.1,
         "scan_field_rotation": 0.5,
@@ -235,12 +231,10 @@ def test_the_tolerances():
     }
 
 
-def test_a_readback_without_the_value_yet_is_looked_at_again_until_the_window_ends(monkeypatch):
-    monkeypatch.setattr(confirming, "readback", answering({"wrong": "shape"}))
-
-    result = job_settings.confirm(object(), "scan_speed", "JOB", value=600, poll_window=0.02)
-
-    assert result["success"] is False
+def test_a_readback_without_the_value_yet_does_not_confirm():
+    # The reading then looks again, until its window ends.
+    assert writes.change("scan_speed", "JOB", value=600).confirm.accept({"wrong": "shape"}) is False
+    assert shows("pinhole_airy", {"activeSettings": []}, setting_index=0, value=1.0) is False
 
 
 @pytest.mark.parametrize(
@@ -251,19 +245,16 @@ def test_a_readback_without_the_value_yet_is_looked_at_again_until_the_window_en
         (10.0, -10.0, 10.5, -10.5, 3.0),  # a descending stack keeps its direction
     ],
 )
-def test_a_z_stack_counts_as_asked_or_as_las_x_snaps_it_to_its_step(begin, end, read_begin, read_end, step, monkeypatch):
+def test_a_z_stack_counts_as_asked_or_as_las_x_snaps_it_to_its_step(begin, end, read_begin, read_end, step):
     stack = {"stack": {"begin": read_begin, "end": read_end, "stepSize": step}}
-    monkeypatch.setattr(confirming, "readback", answering(stack))
 
-    result = job_settings.confirm(object(), "z_stack_definition", "JOB", begin_um=begin, end_um=end, poll_window=0.5)
-
-    assert result["success"] is True
+    assert shows("z_stack_definition", stack, begin_um=begin, end_um=end) is True
 
 
 def test_a_wrong_setting_or_argument_is_refused_before_anything_is_sent():
     with pytest.raises(ValueError, match="no setting"):
-        job_settings.change(object(), "brightness", "JOB", value=1)
+        changes.change(object(), "brightness", "JOB", value=1)
     with pytest.raises(ValueError, match="unknown"):
-        job_settings.change(object(), "zoom", "JOB", value=2.0, colour="red")
+        changes.change(object(), "zoom", "JOB", value=2.0, colour="red")
     with pytest.raises(ValueError, match="missing"):
-        job_settings.change(object(), "detector_gain", "JOB", value=700)
+        changes.change(object(), "detector_gain", "JOB", value=700)

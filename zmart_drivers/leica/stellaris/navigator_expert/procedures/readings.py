@@ -21,9 +21,7 @@ from ..dispatcher.read import (
     derive as _derive,
     plain_or_diagnostic as _plain_or_diagnostic,
 )  # noqa: F401
-from ..primitives.direct.client import HardwareServerUnavailable
 from ..primitives.cam_api import reads as api_reader
-from ..primitives.direct import reads as direct_reader
 from ..primitives.log import reads as log_reader
 from ..primitives.cam_api import derived
 from ..primitives.direct import profile as direct_profile
@@ -37,22 +35,6 @@ def wait_for(datum, client, **keywords):
     return _door.read(direct_profile, datum, client, **keywords)
 
 
-def on_demand_fallback():
-    """The family that answers a waited-on reading when the direct reader cannot (the profile's ``waiting_fallback``)."""
-    return direct_profile.STATE_READERS.waiting_fallback
-
-
-def on_demand_mode(datum):
-    """The direct reader when the policy reads *datum* directly, else the API: the sources that answer on demand.
-
-    For readings a command waits on (whether the scanner is idle, where the
-    stage went), which the log cannot settle: it writes a value only when it
-    changes, so it can still show the state from before. Pair it with
-    :func:`on_demand_fallback`.
-    """
-    return "direct" if direct_profile.mode_for(datum) == "direct" else "api"
-
-
 def _routed(
     datum,
     client,
@@ -64,7 +46,6 @@ def _routed(
     job_name=None,
     fallback=None,
 ):
-    api_kwargs = {} if job_name is None else {"job_name": job_name}
     fallback = direct_profile.STATE_READERS.reading_fallback if fallback is None else fallback
     reading = wait_for(
         datum,
@@ -73,7 +54,6 @@ def _routed(
         about=job_name,
         mode=mode,
         deadline=deadline,
-        source_kwargs=api_kwargs,
         fallback=fallback,
     )
     return _plain_or_diagnostic(reading, diagnostics)
@@ -148,30 +128,6 @@ def get_xy(
     )
 
 
-def z_um_direct(drive, *, mode=None):
-    """Where one z drive truly is (um), from the direct reader; None when it does not answer or fails.
-
-    It is asked in ``direct`` mode (the profile's ``z_mode`` unless
-    *mode* says); None also when the hardware server cannot be reached, so
-    the caller reads the job settings instead.
-    """
-    mode = mode if mode is not None else direct_profile.STATE_READERS.z_mode
-    if mode != "direct":
-        return None
-    try:
-        return direct_reader.read_z_um(drive)
-    except HardwareServerUnavailable as why:
-        log.debug("%s: %s; the job settings answer", drive, why)
-    except Exception as why:
-        log.warning(
-            "the direct reader failed on %s (%s: %s); the job settings answer",
-            drive,
-            type(why).__name__,
-            why,
-        )
-    return None
-
-
 def z_um_from(settings, drive, *, client, job_name, mode=None):
     """Where *drive* is (um), from *job_name*'s *settings*; see ``derived.z_um_from_settings``.
 
@@ -186,7 +142,7 @@ def z_um_from(settings, drive, *, client, job_name, mode=None):
 def read_z_um(client, job_name, drive, *, mode=None):
     """Where one z drive is (um), *drive* ``"z-galvo"`` or ``"z-wide"``; None when unreadable.
 
-    From the direct reader (:func:`z_um_direct`); otherwise from
+    From the direct reader (``direct_profile.z_um_direct``); otherwise from
     *job_name*'s settings: it waits for settings that carry ``zPosition``
     and returns None only when none arrive within the rule's four windows.
     Readable but incomplete settings raise: ``derived.z_um_from_settings``
@@ -194,7 +150,7 @@ def read_z_um(client, job_name, drive, *, mode=None):
     normalization can raise ``ValueError`` on a schema mismatch — unlike the
     routed readers, which never raise.
     """
-    direct = z_um_direct(drive, mode=mode)
+    direct = direct_profile.z_um_direct(drive, mode=mode)
     if direct is not None:
         return direct
     settings = get_job_settings(

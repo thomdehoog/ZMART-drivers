@@ -1,24 +1,33 @@
 {
   "detector_gain": {
     "dispatch": {
+      "accepted_replies": [],
       "confirm": {
-        "function": "confirmed",
-        "keywords": {
-          "a": {
-            "beam_route": "HyD1",
-            "job_name": "J",
-            "setting_index": 0,
-            "value": 55.0
-          },
-          "setting": "detector_gain",
-          "tolerance": null
-        }
+        "about": "J",
+        "accept": {
+          "check": "setting_shows",
+          "holds": {
+            "a": {
+              "beam_route": "HyD1",
+              "job_name": "J",
+              "setting_index": 0,
+              "value": 55.0
+            },
+            "setting": "detector_gain",
+            "target": 55.0,
+            "tolerance": 1.0
+          }
+        },
+        "fallback": null,
+        "mode": null,
+        "reading": "job_settings"
       },
       "description": "Setting[0].Detector[HyD1].Gain -> 55.0",
-      "error_check": null,
       "max_retries": null,
-      "profile": "job_settings.PROFILE",
+      "never_resend": false,
+      "ready": null,
       "request": "PyApiSetDetectorGainByJobName",
+      "without_receipt": false,
       "writes": [
         [
           "JobName",
@@ -51,25 +60,34 @@
   },
   "filter_wheel_slot": {
     "dispatch": {
+      "accepted_replies": [],
       "confirm": {
-        "function": "confirmed",
-        "keywords": {
-          "a": {
-            "beam_route": "R1",
-            "filter_wheel_type": 2,
-            "job_name": "J",
-            "setting_index": 0,
-            "slot_index": 3
-          },
-          "setting": "filter_wheel_slot",
-          "tolerance": null
-        }
+        "about": "J",
+        "accept": {
+          "check": "setting_shows",
+          "holds": {
+            "a": {
+              "beam_route": "R1",
+              "filter_wheel_type": 2,
+              "job_name": "J",
+              "setting_index": 0,
+              "slot_index": 3
+            },
+            "setting": "filter_wheel_slot",
+            "target": 3,
+            "tolerance": null
+          }
+        },
+        "fallback": null,
+        "mode": null,
+        "reading": "job_settings"
       },
       "description": "FilterWheel[R1] slot -> 3",
-      "error_check": null,
       "max_retries": null,
-      "profile": "job_settings.PROFILE",
+      "never_resend": false,
+      "ready": null,
       "request": "PyApiSetFilterWheelSlotByJobName",
+      "without_receipt": false,
       "writes": [
         [
           "JobName",
@@ -106,25 +124,34 @@
   },
   "filter_wheel_spectrum": {
     "dispatch": {
+      "accepted_replies": [],
       "confirm": {
-        "function": "confirmed",
-        "keywords": {
-          "a": {
-            "beam_route": "R1",
-            "filter_wheel_type": 2,
-            "job_name": "J",
-            "position": 520.0,
-            "setting_index": 0
-          },
-          "setting": "filter_wheel_spectrum",
-          "tolerance": 1.0
-        }
+        "about": "J",
+        "accept": {
+          "check": "setting_shows",
+          "holds": {
+            "a": {
+              "beam_route": "R1",
+              "filter_wheel_type": 2,
+              "job_name": "J",
+              "position": 520.0,
+              "setting_index": 0
+            },
+            "setting": "filter_wheel_spectrum",
+            "target": 520.0,
+            "tolerance": 1.0
+          }
+        },
+        "fallback": null,
+        "mode": null,
+        "reading": "job_settings"
       },
       "description": "FilterWheel[R1] spectrum -> 520.0",
-      "error_check": null,
       "max_retries": null,
-      "profile": "job_settings.PROFILE",
+      "never_resend": false,
+      "ready": null,
       "request": "PyApiSetFilterWheelSpectrumPositionByJobName",
+      "without_receipt": false,
       "writes": [
         [
           "JobName",
@@ -161,23 +188,32 @@
   },
   "frame_accumulation": {
     "dispatch": {
+      "accepted_replies": [],
       "confirm": {
-        "function": "confirmed",
-        "keywords": {
-          "a": {
-            "job_name": "J",
-            "setting_index": 1,
-            "value": 3
-          },
-          "setting": "frame_accumulation",
-          "tolerance": null
-        }
+        "about": "J",
+        "accept": {
+          "check": "setting_shows",
+          "holds": {
+            "a": {
+              "job_name": "J",
+              "setting_index": 1,
+              "value": 3
+            },
+            "setting": "frame_accumulation",
+            "target": 3,
+            "tolerance": null
+          }
+        },
+        "fallback": null,
+        "mode": null,
+        "reading": "job_settings"
       },
       "description": "Setting[1].FrameAccumulation -> 3",
-      "error_check": null,
       "max_retries": null,
-      "profile": "job_settings.PROFILE",
+      "never_resend": false,
+      "ready": null,
       "request": "PyApiSetFrameAccumulationByJobName",
+      "without_receipt": false,
       "writes": [
         [
           "JobName",
@@ -206,23 +242,32 @@
   },
   "frame_average": {
     "dispatch": {
+      "accepted_replies": [],
       "confirm": {
-        "function": "confirmed",
-        "keywords": {
-          "a": {
-            "job_name": "J",
-            "setting_index": 1,
-            "value": 2
-          },
-          "setting": "frame_average",
-          "tolerance": null
-        }
+        "about": "J",
+        "accept": {
+          "check": "setting_shows",
+          "holds": {
+            "a": {
+              "job_name": "J",
+              "setting_index": 1,
+              "value": 2
+            },
+            "setting": "frame_average",
+            "target": 2,
+            "tolerance": null
+          }
+        },
+        "fallback": null,
+        "mode": null,
+        "reading": "job_settings"
       },
       "description": "Setting[1].FrameAverage -> 2",
-      "error_check": null,
       "max_retries": null,
-      "profile": "job_settings.PROFILE",
+      "never_resend": false,
+      "ready": null,
       "request": "PyApiSetFrameAverageByJobName",
+      "without_receipt": false,
       "writes": [
         [
           "JobName",
@@ -251,25 +296,34 @@
   },
   "image_format_text": {
     "dispatch": {
+      "accepted_replies": [],
       "confirm": {
-        "function": "confirmed",
-        "keywords": {
-          "a": {
-            "format": "512 x 512",
-            "format_str": "512 x 512",
-            "h": 512,
-            "job_name": "J",
-            "w": 512
-          },
-          "setting": "image_format",
-          "tolerance": null
-        }
+        "about": "J",
+        "accept": {
+          "check": "setting_shows",
+          "holds": {
+            "a": {
+              "format": "512 x 512",
+              "format_str": "512 x 512",
+              "h": 512,
+              "job_name": "J",
+              "w": 512
+            },
+            "setting": "image_format",
+            "target": "512 x 512",
+            "tolerance": null
+          }
+        },
+        "fallback": null,
+        "mode": null,
+        "reading": "job_settings"
       },
       "description": "Format -> 512 x 512",
-      "error_check": null,
       "max_retries": null,
-      "profile": "job_settings.PROFILE",
+      "never_resend": false,
+      "ready": null,
       "request": "PyApiSetImageSizeByJobName",
+      "without_receipt": false,
       "writes": [
         [
           "JobName",
@@ -302,28 +356,37 @@
   },
   "image_format_tuple": {
     "dispatch": {
+      "accepted_replies": [],
       "confirm": {
-        "function": "confirmed",
-        "keywords": {
-          "a": {
-            "format": "256 x 128",
-            "format_str": [
-              256,
-              128
-            ],
-            "h": 128,
-            "job_name": "J",
-            "w": 256
-          },
-          "setting": "image_format",
-          "tolerance": null
-        }
+        "about": "J",
+        "accept": {
+          "check": "setting_shows",
+          "holds": {
+            "a": {
+              "format": "256 x 128",
+              "format_str": [
+                256,
+                128
+              ],
+              "h": 128,
+              "job_name": "J",
+              "w": 256
+            },
+            "setting": "image_format",
+            "target": "256 x 128",
+            "tolerance": null
+          }
+        },
+        "fallback": null,
+        "mode": null,
+        "reading": "job_settings"
       },
       "description": "Format -> 256 x 128",
-      "error_check": null,
       "max_retries": null,
-      "profile": "job_settings.PROFILE",
+      "never_resend": false,
+      "ready": null,
       "request": "PyApiSetImageSizeByJobName",
+      "without_receipt": false,
       "writes": [
         [
           "JobName",
@@ -356,25 +419,34 @@
   },
   "laser_intensity": {
     "dispatch": {
+      "accepted_replies": [],
       "confirm": {
-        "function": "confirmed",
-        "keywords": {
-          "a": {
-            "beam_route": "R1",
-            "job_name": "J",
-            "line_index": 2,
-            "setting_index": 0,
-            "value": 0.25
-          },
-          "setting": "laser_intensity",
-          "tolerance": null
-        }
+        "about": "J",
+        "accept": {
+          "check": "setting_shows",
+          "holds": {
+            "a": {
+              "beam_route": "R1",
+              "job_name": "J",
+              "line_index": 2,
+              "setting_index": 0,
+              "value": 0.25
+            },
+            "setting": "laser_intensity",
+            "target": 0.25,
+            "tolerance": 0.005
+          }
+        },
+        "fallback": null,
+        "mode": null,
+        "reading": "job_settings"
       },
       "description": "Setting[0].Laser[R1][2] -> 0.25",
-      "error_check": null,
       "max_retries": null,
-      "profile": "job_settings.PROFILE",
+      "never_resend": false,
+      "ready": null,
       "request": "PyApiSetLaserIntensityByJobName",
+      "without_receipt": false,
       "writes": [
         [
           "JobName",
@@ -415,25 +487,34 @@
   },
   "laser_shutter_closed": {
     "dispatch": {
+      "accepted_replies": [],
       "confirm": {
-        "function": "confirmed",
-        "keywords": {
-          "a": {
-            "activate": false,
-            "beam_route": "R1",
-            "job_name": "J",
-            "setting_index": 0,
-            "state": "Closed"
-          },
-          "setting": "laser_shutter",
-          "tolerance": null
-        }
+        "about": "J",
+        "accept": {
+          "check": "setting_shows",
+          "holds": {
+            "a": {
+              "activate": false,
+              "beam_route": "R1",
+              "job_name": "J",
+              "setting_index": 0,
+              "state": "Closed"
+            },
+            "setting": "laser_shutter",
+            "target": false,
+            "tolerance": null
+          }
+        },
+        "fallback": null,
+        "mode": null,
+        "reading": "job_settings"
       },
       "description": "Setting[0].Shutter[R1] -> Closed",
-      "error_check": null,
       "max_retries": null,
-      "profile": "job_settings.PROFILE",
+      "never_resend": false,
+      "ready": null,
       "request": "PyApiSetLaserShutterByJobName",
+      "without_receipt": false,
       "writes": [
         [
           "JobName",
@@ -466,25 +547,34 @@
   },
   "laser_shutter_open": {
     "dispatch": {
+      "accepted_replies": [],
       "confirm": {
-        "function": "confirmed",
-        "keywords": {
-          "a": {
-            "activate": true,
-            "beam_route": "R1",
-            "job_name": "J",
-            "setting_index": 0,
-            "state": "Open"
-          },
-          "setting": "laser_shutter",
-          "tolerance": null
-        }
+        "about": "J",
+        "accept": {
+          "check": "setting_shows",
+          "holds": {
+            "a": {
+              "activate": true,
+              "beam_route": "R1",
+              "job_name": "J",
+              "setting_index": 0,
+              "state": "Open"
+            },
+            "setting": "laser_shutter",
+            "target": true,
+            "tolerance": null
+          }
+        },
+        "fallback": null,
+        "mode": null,
+        "reading": "job_settings"
       },
       "description": "Setting[0].Shutter[R1] -> Open",
-      "error_check": null,
       "max_retries": null,
-      "profile": "job_settings.PROFILE",
+      "never_resend": false,
+      "ready": null,
       "request": "PyApiSetLaserShutterByJobName",
+      "without_receipt": false,
       "writes": [
         [
           "JobName",
@@ -517,23 +607,32 @@
   },
   "line_accumulation": {
     "dispatch": {
+      "accepted_replies": [],
       "confirm": {
-        "function": "confirmed",
-        "keywords": {
-          "a": {
-            "job_name": "J",
-            "setting_index": 0,
-            "value": 4
-          },
-          "setting": "line_accumulation",
-          "tolerance": null
-        }
+        "about": "J",
+        "accept": {
+          "check": "setting_shows",
+          "holds": {
+            "a": {
+              "job_name": "J",
+              "setting_index": 0,
+              "value": 4
+            },
+            "setting": "line_accumulation",
+            "target": 4,
+            "tolerance": null
+          }
+        },
+        "fallback": null,
+        "mode": null,
+        "reading": "job_settings"
       },
       "description": "Setting[0].LineAccumulation -> 4",
-      "error_check": null,
       "max_retries": null,
-      "profile": "job_settings.PROFILE",
+      "never_resend": false,
+      "ready": null,
       "request": "PyApiSetLineAccumulationByJobName",
+      "without_receipt": false,
       "writes": [
         [
           "JobName",
@@ -562,23 +661,32 @@
   },
   "line_average": {
     "dispatch": {
+      "accepted_replies": [],
       "confirm": {
-        "function": "confirmed",
-        "keywords": {
-          "a": {
-            "job_name": "J",
-            "setting_index": 0,
-            "value": 2
-          },
-          "setting": "line_average",
-          "tolerance": null
-        }
+        "about": "J",
+        "accept": {
+          "check": "setting_shows",
+          "holds": {
+            "a": {
+              "job_name": "J",
+              "setting_index": 0,
+              "value": 2
+            },
+            "setting": "line_average",
+            "target": 2,
+            "tolerance": null
+          }
+        },
+        "fallback": null,
+        "mode": null,
+        "reading": "job_settings"
       },
       "description": "Setting[0].LineAverage -> 2",
-      "error_check": null,
       "max_retries": null,
-      "profile": "job_settings.PROFILE",
+      "never_resend": false,
+      "ready": null,
       "request": "PyApiSetLineAverageByJobName",
+      "without_receipt": false,
       "writes": [
         [
           "JobName",
@@ -607,23 +715,32 @@
   },
   "pinhole_airy": {
     "dispatch": {
+      "accepted_replies": [],
       "confirm": {
-        "function": "confirmed",
-        "keywords": {
-          "a": {
-            "job_name": "J",
-            "setting_index": 0,
-            "value": 1.0
-          },
-          "setting": "pinhole_airy",
-          "tolerance": 0.05
-        }
+        "about": "J",
+        "accept": {
+          "check": "setting_shows",
+          "holds": {
+            "a": {
+              "job_name": "J",
+              "setting_index": 0,
+              "value": 1.0
+            },
+            "setting": "pinhole_airy",
+            "target": 1.0,
+            "tolerance": 0.05
+          }
+        },
+        "fallback": null,
+        "mode": null,
+        "reading": "job_settings"
       },
       "description": "Setting[0].PinholeAiry -> 1.0",
-      "error_check": null,
       "max_retries": null,
-      "profile": "job_settings.PROFILE",
+      "never_resend": false,
+      "ready": null,
       "request": "PyApiSetPinholeAUByJobName",
+      "without_receipt": false,
       "writes": [
         [
           "JobName",
@@ -652,22 +769,31 @@
   },
   "scan_field_rotation": {
     "dispatch": {
+      "accepted_replies": [],
       "confirm": {
-        "function": "confirmed",
-        "keywords": {
-          "a": {
-            "angle": 12.5,
-            "job_name": "J"
-          },
-          "setting": "scan_field_rotation",
-          "tolerance": 0.2
-        }
+        "about": "J",
+        "accept": {
+          "check": "setting_shows",
+          "holds": {
+            "a": {
+              "angle": 12.5,
+              "job_name": "J"
+            },
+            "setting": "scan_field_rotation",
+            "target": 12.5,
+            "tolerance": 0.2
+          }
+        },
+        "fallback": null,
+        "mode": null,
+        "reading": "job_settings"
       },
       "description": "Rotation -> 12.5",
-      "error_check": null,
       "max_retries": null,
-      "profile": "job_settings.PROFILE",
+      "never_resend": false,
+      "ready": null,
       "request": "PyApiSetScanFieldRotationByJobName",
+      "without_receipt": false,
       "writes": [
         [
           "JobName",
@@ -692,22 +818,31 @@
   },
   "scan_mode": {
     "dispatch": {
+      "accepted_replies": [],
       "confirm": {
-        "function": "confirmed",
-        "keywords": {
-          "a": {
-            "job_name": "J",
-            "mode": "xyz"
-          },
-          "setting": "scan_mode",
-          "tolerance": null
-        }
+        "about": "J",
+        "accept": {
+          "check": "setting_shows",
+          "holds": {
+            "a": {
+              "job_name": "J",
+              "mode": "xyz"
+            },
+            "setting": "scan_mode",
+            "target": "xyz",
+            "tolerance": null
+          }
+        },
+        "fallback": null,
+        "mode": null,
+        "reading": "job_settings"
       },
       "description": "ScanMode -> xyz",
-      "error_check": null,
       "max_retries": null,
-      "profile": "job_settings.PROFILE",
+      "never_resend": false,
+      "ready": null,
       "request": "PyApiSetScanModeByJobName",
+      "without_receipt": false,
       "writes": [
         [
           "JobName",
@@ -732,30 +867,33 @@
   },
   "scan_resonant_on": {
     "dispatch": {
+      "accepted_replies": [
+        "desired state does not differ from the current state"
+      ],
       "confirm": {
-        "function": "confirmed",
-        "keywords": {
-          "a": {
-            "enable": true,
-            "job_name": "J"
-          },
-          "setting": "scan_resonant",
-          "tolerance": null
-        }
+        "about": "J",
+        "accept": {
+          "check": "setting_shows",
+          "holds": {
+            "a": {
+              "enable": true,
+              "job_name": "J"
+            },
+            "setting": "scan_resonant",
+            "target": true,
+            "tolerance": null
+          }
+        },
+        "fallback": null,
+        "mode": null,
+        "reading": "job_settings"
       },
       "description": "Resonant -> True",
-      "error_check": {
-        "function": "resonant_error_check",
-        "keywords": {
-          "arguments": {
-            "enable": true,
-            "job_name": "J"
-          }
-        }
-      },
       "max_retries": null,
-      "profile": "job_settings.PROFILE",
+      "never_resend": false,
+      "ready": null,
       "request": "PyApiSetScannerToResonantByJobName",
+      "without_receipt": false,
       "writes": [
         [
           "JobName",
@@ -780,22 +918,31 @@
   },
   "scan_speed": {
     "dispatch": {
+      "accepted_replies": [],
       "confirm": {
-        "function": "confirmed",
-        "keywords": {
-          "a": {
-            "job_name": "J",
-            "value": 400
-          },
-          "setting": "scan_speed",
-          "tolerance": null
-        }
+        "about": "J",
+        "accept": {
+          "check": "setting_shows",
+          "holds": {
+            "a": {
+              "job_name": "J",
+              "value": 400
+            },
+            "setting": "scan_speed",
+            "target": 400,
+            "tolerance": null
+          }
+        },
+        "fallback": null,
+        "mode": null,
+        "reading": "job_settings"
       },
       "description": "ScanSpeed -> 400",
-      "error_check": null,
       "max_retries": null,
-      "profile": "job_settings.PROFILE",
+      "never_resend": false,
+      "ready": null,
       "request": "PyApiSetScanSpeedByJobName",
+      "without_receipt": false,
       "writes": [
         [
           "JobName",
@@ -828,22 +975,31 @@
   },
   "sequential_frame": {
     "dispatch": {
+      "accepted_replies": [],
       "confirm": {
-        "function": "confirmed",
-        "keywords": {
-          "a": {
-            "job_name": "J",
-            "mode": "Frame"
-          },
-          "setting": "sequential_mode",
-          "tolerance": null
-        }
+        "about": "J",
+        "accept": {
+          "check": "setting_shows",
+          "holds": {
+            "a": {
+              "job_name": "J",
+              "mode": "Frame"
+            },
+            "setting": "sequential_mode",
+            "target": "Frame",
+            "tolerance": null
+          }
+        },
+        "fallback": null,
+        "mode": null,
+        "reading": "job_settings"
       },
       "description": "SequentialMode -> Frame",
-      "error_check": null,
       "max_retries": null,
-      "profile": "job_settings.PROFILE",
+      "never_resend": false,
+      "ready": null,
       "request": "PyApiSetSequentialModeByJobName",
+      "without_receipt": false,
       "writes": [
         [
           "JobName",
@@ -876,25 +1032,34 @@
   },
   "z_stack_definition_both": {
     "dispatch": {
+      "accepted_replies": [],
       "confirm": {
-        "function": "confirmed",
-        "keywords": {
-          "a": {
-            "begin_um": -5.0,
-            "end_um": 5.0,
-            "job_name": "J",
-            "old_begin_um": null,
-            "old_end_um": null
-          },
-          "setting": "z_stack_definition",
-          "tolerance": null
-        }
+        "about": "J",
+        "accept": {
+          "check": "setting_shows",
+          "holds": {
+            "a": {
+              "begin_um": -5.0,
+              "end_um": 5.0,
+              "job_name": "J",
+              "old_begin_um": null,
+              "old_end_um": null
+            },
+            "setting": "z_stack_definition",
+            "target": -5.0,
+            "tolerance": 1.0
+          }
+        },
+        "fallback": null,
+        "mode": null,
+        "reading": "job_settings"
       },
       "description": "Z-stack def: begin=-5.0, end=5.0",
-      "error_check": null,
       "max_retries": null,
-      "profile": "job_settings.PROFILE",
+      "never_resend": false,
+      "ready": null,
       "request": "PyApiSetZStackDefinitionByJobName",
+      "without_receipt": false,
       "writes": [
         [
           "JobName",
@@ -934,25 +1099,34 @@
   },
   "z_stack_definition_reset": {
     "dispatch": {
+      "accepted_replies": [],
       "confirm": {
-        "function": "confirmed",
-        "keywords": {
-          "a": {
-            "begin_um": null,
-            "end_um": null,
-            "job_name": "J",
-            "old_begin_um": 1,
-            "old_end_um": 1
-          },
-          "setting": "z_stack_definition",
-          "tolerance": null
-        }
+        "about": "J",
+        "accept": {
+          "check": "setting_shows",
+          "holds": {
+            "a": {
+              "begin_um": null,
+              "end_um": null,
+              "job_name": "J",
+              "old_begin_um": 1,
+              "old_end_um": 1
+            },
+            "setting": "z_stack_definition",
+            "target": null,
+            "tolerance": 1.0
+          }
+        },
+        "fallback": null,
+        "mode": null,
+        "reading": "job_settings"
       },
       "description": "Z-stack def: begin=None, end=None",
-      "error_check": null,
       "max_retries": null,
-      "profile": "job_settings.PROFILE",
+      "never_resend": false,
+      "ready": null,
       "request": "PyApiSetZStackDefinitionByJobName",
+      "without_receipt": false,
       "writes": [
         [
           "JobName",
@@ -989,25 +1163,34 @@
   },
   "z_stack_definition_zero_begin": {
     "dispatch": {
+      "accepted_replies": [],
       "confirm": {
-        "function": "confirmed",
-        "keywords": {
-          "a": {
-            "begin_um": 0.0,
-            "end_um": null,
-            "job_name": "J",
-            "old_begin_um": null,
-            "old_end_um": null
-          },
-          "setting": "z_stack_definition",
-          "tolerance": null
-        }
+        "about": "J",
+        "accept": {
+          "check": "setting_shows",
+          "holds": {
+            "a": {
+              "begin_um": 0.0,
+              "end_um": null,
+              "job_name": "J",
+              "old_begin_um": null,
+              "old_end_um": null
+            },
+            "setting": "z_stack_definition",
+            "target": 0.0,
+            "tolerance": 1.0
+          }
+        },
+        "fallback": null,
+        "mode": null,
+        "reading": "job_settings"
       },
       "description": "Z-stack def: begin=0.0, end=None",
-      "error_check": null,
       "max_retries": null,
-      "profile": "job_settings.PROFILE",
+      "never_resend": false,
+      "ready": null,
       "request": "PyApiSetZStackDefinitionByJobName",
+      "without_receipt": false,
       "writes": [
         [
           "JobName",
@@ -1046,22 +1229,31 @@
   },
   "z_stack_size": {
     "dispatch": {
+      "accepted_replies": [],
       "confirm": {
-        "function": "confirmed",
-        "keywords": {
-          "a": {
-            "job_name": "J",
-            "size_um": 20.0
-          },
-          "setting": "z_stack_size",
-          "tolerance": null
-        }
+        "about": "J",
+        "accept": {
+          "check": "setting_shows",
+          "holds": {
+            "a": {
+              "job_name": "J",
+              "size_um": 20.0
+            },
+            "setting": "z_stack_size",
+            "target": 20.0,
+            "tolerance": 1.5
+          }
+        },
+        "fallback": null,
+        "mode": null,
+        "reading": "job_settings"
       },
       "description": "Z-stack size -> 20.0 um",
-      "error_check": null,
       "max_retries": null,
-      "profile": "job_settings.PROFILE",
+      "never_resend": false,
+      "ready": null,
       "request": "PyApiSetZStackSizeByJobName",
+      "without_receipt": false,
       "writes": [
         [
           "JobName",
@@ -1086,22 +1278,31 @@
   },
   "z_stack_step_size": {
     "dispatch": {
+      "accepted_replies": [],
       "confirm": {
-        "function": "confirmed",
-        "keywords": {
-          "a": {
-            "job_name": "J",
-            "step_size_um": 0.5
-          },
-          "setting": "z_stack_step_size",
-          "tolerance": null
-        }
+        "about": "J",
+        "accept": {
+          "check": "setting_shows",
+          "holds": {
+            "a": {
+              "job_name": "J",
+              "step_size_um": 0.5
+            },
+            "setting": "z_stack_step_size",
+            "target": 0.5,
+            "tolerance": 0.5
+          }
+        },
+        "fallback": null,
+        "mode": null,
+        "reading": "job_settings"
       },
       "description": "Z-stack step -> 0.5 um",
-      "error_check": null,
       "max_retries": null,
-      "profile": "job_settings.PROFILE",
+      "never_resend": false,
+      "ready": null,
       "request": "PyApiCommandSetZStackStepSizeByJobName",
+      "without_receipt": false,
       "writes": [
         [
           "JobName",
@@ -1126,22 +1327,31 @@
   },
   "zoom": {
     "dispatch": {
+      "accepted_replies": [],
       "confirm": {
-        "function": "confirmed",
-        "keywords": {
-          "a": {
-            "job_name": "J",
-            "value": 1.5
-          },
-          "setting": "zoom",
-          "tolerance": null
-        }
+        "about": "J",
+        "accept": {
+          "check": "setting_shows",
+          "holds": {
+            "a": {
+              "job_name": "J",
+              "value": 1.5
+            },
+            "setting": "zoom",
+            "target": 1.5,
+            "tolerance": 0.1
+          }
+        },
+        "fallback": null,
+        "mode": null,
+        "reading": "job_settings"
       },
       "description": "Zoom -> 1.5",
-      "error_check": null,
       "max_retries": null,
-      "profile": "job_settings.PROFILE",
+      "never_resend": false,
+      "ready": null,
       "request": "PyApiSetZoomByJobName",
+      "without_receipt": false,
       "writes": [
         [
           "JobName",
@@ -1166,22 +1376,31 @@
   },
   "zoom_with_overrides": {
     "dispatch": {
+      "accepted_replies": [],
       "confirm": {
-        "function": "confirmed",
-        "keywords": {
-          "a": {
-            "job_name": "J",
-            "value": 1.5
-          },
-          "setting": "zoom",
-          "tolerance": 0.01
-        }
+        "about": "J",
+        "accept": {
+          "check": "setting_shows",
+          "holds": {
+            "a": {
+              "job_name": "J",
+              "value": 1.5
+            },
+            "setting": "zoom",
+            "target": 1.5,
+            "tolerance": 0.01
+          }
+        },
+        "fallback": null,
+        "mode": null,
+        "reading": "job_settings"
       },
       "description": "Zoom -> 1.5",
-      "error_check": null,
       "max_retries": 2,
-      "profile": "job_settings.PROFILE",
+      "never_resend": false,
+      "ready": null,
       "request": "PyApiSetZoomByJobName",
+      "without_receipt": false,
       "writes": [
         [
           "JobName",

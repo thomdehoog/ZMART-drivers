@@ -34,7 +34,7 @@ from zmart_drivers.leica.stellaris.navigator_expert.primitives.direct import (
 from zmart_drivers.leica.stellaris.navigator_expert.primitives.direct import client as hardware_server
 from zmart_drivers.leica.stellaris.navigator_expert.operations.changes import acquire as acquire_change
 from zmart_drivers.leica.stellaris.navigator_expert.operations.changes import select_job as select_job_change
-from zmart_drivers.leica.stellaris.navigator_expert.operations.changes import stage
+from zmart_drivers.leica.stellaris.navigator_expert.procedures import changes
 
 #: The jobs' block and element ids as on the simulator (2026-10-13).
 JOBS = {"AF Job": (156, 1), "Overview": (154, 2), "HiRes": (152, 3)}
@@ -152,7 +152,7 @@ class TestSuccessChecks:
     """move_xy, move_z and select_job confirm from the direct reader."""
 
     def test_move_xy(self, client, tree):
-        result = stage.move_xy(client, 50025.0, 30000.0)
+        result = changes.move_xy(client, 50025.0, 30000.0)
         assert (result["success"], result["confirmed"]) == (True, True)
         assert readers.get_xy(client)["x_um"] == pytest.approx(50025.0)
 
@@ -163,7 +163,7 @@ class TestSuccessChecks:
             "sections": 21,
             "mode": "z-galvo",
         }
-        result = stage.move_z(client, "HiRes", 12.0, z_mode="galvo")
+        result = changes.move_z(client, "HiRes", 12.0, z_mode="galvo")
         assert (
             result["success"],
             result["confirmed"],

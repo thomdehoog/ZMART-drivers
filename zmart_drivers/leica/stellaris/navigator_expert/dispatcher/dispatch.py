@@ -1,7 +1,10 @@
 """The one door to the dispatcher: read a value, or change one, safely.
 
 The rest of the driver calls the dispatcher here and never needs to know which
-of its two engines does the work:
+of its two engines does the work. :func:`run` is the one entry: a reading by
+its name, or a change as plain data (for LAS X, a ``Write`` from
+``primitives/cam_api/writes.py``). :func:`read` and :func:`write` are the older
+two doors, used by the changes not yet ported to :func:`run`:
 
 - :func:`read` waits for an answer to a question about the microscope. It asks
   the sources one after the other (``reader.py``) and is safe to repeat: the
@@ -86,6 +89,75 @@ def make_timing(
     }
 
 
+def refused(message, *, logged=False, **extra):
+    """The result of a change that was not sent: ``success`` False, with the reason.
+
+    The same shape as a sent change's result. ``logged`` also puts the reason
+    in the result's log. ``extra`` adds the keys a change's answer always
+    carries, such as ``position=None``.
+    """
+    return {
+        "success": False,
+        "confirmed": None,
+        "message": message,
+        "timing": make_timing(total_s=0.0, attempts=0),
+        "logs": [make_log_entry("error", message)] if logged else [],
+        **extra,
+    }
+
+
+def run(profile, client, primitive, *, max_retries=None, **asked):
+    """Run one primitive: a reading (its name) or a change (a write); the one entry to the dispatcher.
+
+    A reading waits by the one rule (:func:`read.wait_for`, with *asked*:
+    ``accept``, ``about``, ``mode``, ``deadline`` and the others). A change
+    first asks the limits gate, once, before anything is made or sent: a
+    refused change never touches the client. Then the request is made and the
+    write loops run (:func:`write.confirm_and_fire`): wait until the
+    microscope is ready, send, check the reply, read back, send again where
+    that is safe. The result says, under ``route``, which way the change went
+    (None when nothing was sent).
+
+    Everything of the microscope comes from *profile*: for a reading, its
+    sources (``spec``, ``legs``, ``ask``, ``waiting``, ...); for a change,
+    ``limits_setup_hint``, ``make_request(client, write)``,
+    ``check_reply(client, write)`` and ``WRITING``, how the write loops send.
+    A change is read by its fields: ``command`` and ``values`` (for the
+    limits), ``description``, ``fill`` (writes the request), ``ready`` and
+    ``confirm`` (readings to wait for: ``reading``, ``accept``, ``about``,
+    ``mode``, ``fallback``), ``without_receipt`` and ``never_resend``.
+    ``max_retries`` overrides how often a change is sent again after a
+    temporary error.
+    """
+    from . import limits as gate, read as reader, write as writer
+
+    if isinstance(primitive, str):
+        return reader.wait_for(profile, primitive, client, **asked)
+
+    change = primitive
+    message = gate.check_refusal(client, change.command, change.values, profile.limits_setup_hint)
+    if message is not None:
+        return refused(message, logged=True)
+    request = profile.make_request(client, change)
+    sending = profile.WRITING
+    result = writer.confirm_and_fire(
+        client,
+        request,
+        change.description,
+        profile=sending,
+        setup_fn=change.fill,
+        pre_check_fn=writer.wait_ready(profile, client, change.ready) if change.ready else None,
+        # Sent without a receipt, the reply is blank: there is nothing to check.
+        error_check_fn=None if change.without_receipt else (lambda: profile.check_reply(client, change)),
+        confirm_fn=writer.read_back(profile, client, change.confirm) if change.confirm else None,
+        never_resend=change.never_resend,
+        max_retries=max_retries,
+        send_without_receipt=change.without_receipt,
+    )
+    result["route"] = getattr(sending.transport, "carried_by", None)
+    return result
+
+
 def read(vendor, datum, client, **keywords):
     """Wait for a reading of *datum* from the microscope's sources; see :func:`reader.wait_for`."""
     from . import read as reader
@@ -110,13 +182,7 @@ def write(client, request, description, *, command, values, make_request=None, *
     hint = getattr(keywords.get("profile"), "limits_setup_hint", None)
     message = gate.check_refusal(client, command, values, hint)
     if message is not None:
-        return {
-            "success": False,
-            "confirmed": None,
-            "message": message,
-            "timing": make_timing(total_s=0.0, attempts=0),
-            "logs": [make_log_entry("error", message)],
-        }
+        return refused(message, logged=True)
     if make_request is not None:
         request = make_request()
     result = confirm_loop.confirm_and_fire(client, request, description, **keywords)

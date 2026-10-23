@@ -197,7 +197,7 @@ from zmart_drivers.leica.stellaris.navigator_expert.driver_setup.origin import (
 from zmart_drivers.leica.stellaris.navigator_expert.operations.changes import acquire as acquire_change
 from zmart_drivers.leica.stellaris.navigator_expert.driver_setup.limits import limit_rules
 from zmart_drivers.leica.stellaris.navigator_expert.procedures.save_data import save_waiting as save_settings
-from zmart_drivers.leica.stellaris.navigator_expert.operations.changes import stage
+from zmart_drivers.leica.stellaris.navigator_expert.procedures import changes
 
 
 def _acquire_and_save(handle, **given):
@@ -572,10 +572,10 @@ class TestFrame(unittest.TestCase):
         stack_on_galvo = {**_settings(z_wide_um=32.0), "stack": {"mode": "z-galvo"}}
         with (
             patch.object(
-                stage, "move_xy", return_value={"success": True, "confirmed": True}
+                changes, "move_xy", return_value={"success": True, "confirmed": True}
             ),
             patch.object(
-                stage, "move_z", return_value={"success": True, "confirmed": True}
+                changes, "move_z", return_value={"success": True, "confirmed": True}
             ),
             patches[0],
             patch.object(_readers, "get_job_settings", return_value=stack_on_galvo),
@@ -600,9 +600,9 @@ class TestFrame(unittest.TestCase):
         patches = _patch_position(z_wide_um=32.0, z_galvo_um=3.0)
         with (
             patch.object(
-                stage, "move_xy", return_value={"success": True, "confirmed": True}
+                changes, "move_xy", return_value={"success": True, "confirmed": True}
             ),
-            patch.object(stage, "move_z", fake_move_z),
+            patch.object(changes, "move_z", fake_move_z),
             patches[0],
             patches[1],
             patches[2],
@@ -626,8 +626,8 @@ class TestFrame(unittest.TestCase):
         # current hardware: z-wide at 32, z-galvo parked at 0
         patches = _patch_position(z_wide_um=32.0, z_galvo_um=0.0)
         with (
-            patch.object(stage, "move_xy", fake_move_xy),
-            patch.object(stage, "move_z", fake_move_z),
+            patch.object(changes, "move_xy", fake_move_xy),
+            patch.object(changes, "move_z", fake_move_z),
             patches[0],
             patches[1],
             patches[2],
@@ -663,11 +663,11 @@ class TestFrame(unittest.TestCase):
         patches = _patch_position(z_wide_um=25.0, z_galvo_um=4.0)
         with (
             patch.object(
-                stage,
+                changes,
                 "move_xy",
                 return_value={"success": True, "confirmed": True},
             ),
-            patch.object(stage, "move_z", fake_move_z),
+            patch.object(changes, "move_z", fake_move_z),
             patches[0],
             patches[1],
             patches[2],
@@ -684,12 +684,12 @@ class TestFrame(unittest.TestCase):
         patches = _patch_position()
         with (
             patch.object(
-                stage,
+                changes,
                 "move_xy",
                 return_value={"success": True, "confirmed": True},
             ),
             patch.object(
-                stage,
+                changes,
                 "move_z",
                 return_value={
                     "success": True,
@@ -714,12 +714,12 @@ class TestFrame(unittest.TestCase):
         patches = _patch_position()
         with (
             patch.object(
-                stage,
+                changes,
                 "move_xy",
                 return_value={"success": True, "confirmed": True},
             ),
             patch.object(
-                stage,
+                changes,
                 "move_z",
                 return_value={
                     "success": False,
@@ -2153,8 +2153,8 @@ class TestObjectiveCompensation(unittest.TestCase):
 
         patches = _patch_position(z_wide_um=40.0, z_galvo_um=0.0, slot=2)
         with (
-            patch.object(stage, "move_xy", fake_xy),
-            patch.object(stage, "move_z", fake_z),
+            patch.object(changes, "move_xy", fake_xy),
+            patch.object(changes, "move_z", fake_z),
             patches[0],
             patches[1],
             patches[2],
@@ -2201,8 +2201,8 @@ class TestObjectiveCompensation(unittest.TestCase):
             slot=2,
         )
         with (
-            patch.object(stage, "move_xy", fake_xy),
-            patch.object(stage, "move_z", fake_z),
+            patch.object(changes, "move_xy", fake_xy),
+            patch.object(changes, "move_z", fake_z),
             patches[0],
             patches[1],
             patches[2],
@@ -2231,11 +2231,11 @@ class TestObjectiveCompensation(unittest.TestCase):
         patches = _patch_position(z_wide_um=40.0, z_galvo_um=0.0, slot=2)
         with (
             patch.object(
-                stage,
+                changes,
                 "move_xy",
                 return_value={"success": True, "confirmed": True},
             ),
-            patch.object(stage, "move_z", fake_z),
+            patch.object(changes, "move_z", fake_z),
             patches[0],
             patches[1],
             patches[2],
@@ -2258,7 +2258,7 @@ class TestObjectiveCompensation(unittest.TestCase):
         )
         patches = _patch_position(z_wide_um=40.0, z_galvo_um=0.0, slot=2)
         with (
-            patch.object(stage, "move_xy") as xy,
+            patch.object(changes, "move_xy") as xy,
             patches[0],
             patches[1],
             patches[2],
@@ -2283,8 +2283,8 @@ class TestObjectiveCompensation(unittest.TestCase):
             return {"success": True, "confirmed": True}
 
         with (
-            patch.object(stage, "move_xy", fake_xy),
-            patch.object(stage, "move_z", fake_z),
+            patch.object(changes, "move_xy", fake_xy),
+            patch.object(changes, "move_z", fake_z),
             patch.object(
                 _readers,
                 "get_xy",
@@ -2322,7 +2322,7 @@ class TestObjectiveCompensation(unittest.TestCase):
         h = _handle(origin=_origin(objective={"name": "10x", "slotIndex": 1}))
         patches = _patch_position(slot=2)
         with (
-            patch.object(stage, "move_xy") as xy,
+            patch.object(changes, "move_xy") as xy,
             patches[0],
             patches[1],
             patches[2],
@@ -2365,7 +2365,7 @@ class TestObjectiveCompensation(unittest.TestCase):
         )
         patches = _patch_position(z_wide_um=0.0, z_galvo_um=0.0, slot=3)
         with (
-            patch.object(stage, "move_xy") as xy,
+            patch.object(changes, "move_xy") as xy,
             patches[0],
             patches[1],
             patches[2],
@@ -2563,12 +2563,12 @@ class TestLifecycle(unittest.TestCase):
             patches[2],
             patches[3],
             patch.object(
-                stage,
+                changes,
                 "move_xy",
                 return_value={"success": True, "confirmed": True},
             ),
             patch.object(
-                stage,
+                changes,
                 "move_z",
                 return_value={"success": True, "confirmed": True},
             ),
@@ -2628,7 +2628,7 @@ class TestFunctionLimits(unittest.TestCase):
         h = _handle(gate_constraints={"x_um": {"min": 0, "max": 500}})
         patches = _patch_position(x_um=0.0, y_um=0.0)
         with (
-            patch.object(stage, "move_z") as mz,
+            patch.object(changes, "move_z") as mz,
             patches[0],
             patches[1],
             patches[2],
@@ -2649,7 +2649,7 @@ class TestFunctionLimits(unittest.TestCase):
         )
         patches = _patch_position(z_wide_um=0.0, z_galvo_um=0.0)
         with (
-            patch.object(stage, "move_xy") as xy,
+            patch.object(changes, "move_xy") as xy,
             patches[0],
             patches[1],
             patches[2],

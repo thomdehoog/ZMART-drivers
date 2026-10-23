@@ -18,9 +18,10 @@ import zmart_drivers.leica.stellaris.navigator_expert.procedures.readings as rea
 from zmart_drivers.leica.stellaris.navigator_expert.procedures import keep_in_view as shift
 
 from zmart_drivers.leica.stellaris.navigator_expert.procedures import keep_in_view as cmds_comp
+from zmart_drivers.leica.stellaris.navigator_expert.dispatcher import dispatch
 from zmart_drivers.leica.stellaris.navigator_expert.operations.changes import run_change
 from zmart_drivers.leica.stellaris.navigator_expert.operations.changes import select_job as select_job_change
-from zmart_drivers.leica.stellaris.navigator_expert.operations.changes import stage
+from zmart_drivers.leica.stellaris.navigator_expert.procedures import changes
 
 TRANSLATIONS = {1: (0.0, 0.0, 0.0), 2: (10.0, -6.0, 3.0)}
 
@@ -65,12 +66,12 @@ def _rig(monkeypatch, *, slot):
 def _moves(monkeypatch):
     moves = []
     monkeypatch.setattr(
-        stage,
+        changes,
         "move_xy",
         lambda c, x, y, unit="um", **k: moves.append(("xy", x, y)) or {"success": True},
     )
     monkeypatch.setattr(
-        stage,
+        changes,
         "move_z",
         lambda c, job, z, unit="um", z_mode="galvo", **k: (
             moves.append(("z", job, z, z_mode)) or {"success": True}
@@ -185,12 +186,12 @@ def test_select_job_records_before_the_switch_and_compensates_after(
 
     monkeypatch.setattr(run_change, "dispatch_change", fake_dispatch)
     monkeypatch.setattr(
-        stage,
+        changes,
         "move_xy",
         lambda c, x, y, unit="um", **k: order.append(("xy", x, y)) or {"success": True},
     )
     monkeypatch.setattr(
-        stage,
+        changes,
         "move_z",
         lambda c, job, z, unit="um", z_mode="galvo", **k: (
             order.append(("z", job, z, z_mode)) or {"success": True}
@@ -256,19 +257,19 @@ def test_set_objective_records_before_and_compensates_with_the_commanded_slot(
         lambda c, **k: order.append("read_xy") or {"x_um": 1000.0, "y_um": 2000.0},
     )
     monkeypatch.setattr(
-        run_change,
-        "dispatch_change",
+        dispatch,
+        "run",
         lambda *a, **k: (
             order.append("dispatch") or {"success": True, "confirmed": True}
         ),
     )
     monkeypatch.setattr(
-        stage,
+        changes,
         "move_xy",
         lambda c, x, y, unit="um", **k: order.append(("xy", x, y)) or {"success": True},
     )
     monkeypatch.setattr(
-        stage,
+        changes,
         "move_z",
         lambda c, job, z, unit="um", z_mode="galvo", **k: (
             order.append(("z", job, z, z_mode)) or {"success": True}

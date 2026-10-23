@@ -23,6 +23,7 @@ from ...procedures import readings as readers
 from ...primitives.cam_api.profile import CommandProfile
 from ...primitives.cam_api.error_classification import _check_api_error, _is_transient_error
 from ...primitives.cam_api.prechecks import check_idle
+from ...primitives.direct import profile as policy
 from . import confirming, run_change
 
 log = logging.getLogger(__name__)
@@ -158,8 +159,8 @@ def confirm_acquire(
         status = confirming.reading_value_after(
             readers.get_scan_status(
                 client,
-                mode=readers.on_demand_mode("scan_status"),
-                fallback=readers.on_demand_fallback(),
+                mode=policy.on_demand_mode("scan_status"),
+                fallback=policy.on_demand_fallback(),
                 diagnostics=True,
                 deadline=time.monotonic() + poll_interval,
             ),

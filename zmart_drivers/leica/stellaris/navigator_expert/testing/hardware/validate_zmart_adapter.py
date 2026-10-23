@@ -66,7 +66,7 @@ import zmart_controller
 from zmart_drivers.leica.stellaris.navigator_expert.primitives.direct import profile as reading_settings
 
 # Readback tolerances: match the driver's own confirmation gates
-# (confirm_move_xy default 20 um, confirm_move_z default 1.0 um).
+# (writes.XY_TOLERANCE_UM 20 um, writes.Z_TOLERANCE_UM 1.0 um).
 XY_TOL_UM = 20.0
 Z_TOL_UM = 1.0
 

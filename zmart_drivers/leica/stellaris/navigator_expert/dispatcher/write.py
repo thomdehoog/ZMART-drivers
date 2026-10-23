@@ -45,6 +45,11 @@ reported as sent but unconfirmed, not as failed: the driver did its best and
 records what it could not confirm. A readback that shows a different value is
 a failure.
 
+For a change handed to ``dispatch.run()``, the pre-check and the confirmation
+are both readings by the read loop: :func:`wait_ready` waits for one (the
+scanner idle) over the rule's windows before every send, and :func:`read_back`
+watches one for a single window, starting when it is asked.
+
 Several ways of sending one command, tried in order.
 
 A microscope may be reached more than one way: through its vendor interface,
@@ -70,7 +75,9 @@ University of Zurich (thom.dehoog@zmb.uzh.ch, thomdehoog@gmail.com).
 from __future__ import annotations
 
 import logging
+import reprlib
 import time
+from . import read as reader
 from .dispatch import make_log_entry as _make_log_entry
 from .dispatch import make_timing as _make_timing
 
@@ -79,7 +86,10 @@ log = logging.getLogger(__name__)
 
 
 def confirmation_detail(result):
-    """Return compact non-log readback details from a confirmation result."""
+    """Return compact non-log readback details from a confirmation result.
+
+    A long value (a job's whole settings) is cut short, so the message stays one line.
+    """
     if not isinstance(result, dict):
         return ""
     details = {
@@ -87,7 +97,95 @@ def confirmation_detail(result):
     }
     if not details:
         return ""
-    return f"; last_confirmation={details!r}"
+    return f"; last_confirmation={reprlib.repr(details)}"
+
+
+# =============================================================================
+# Waiting for a reading: before a send, and to confirm one
+# =============================================================================
+
+
+def watch(vendor, client, expect, **window):
+    """One wait for the reading *expect* names until its ``accept`` holds; ``(reading, last value seen)``.
+
+    *vendor* is the microscope's sources (what :func:`read.wait_for` is
+    handed); *expect* names the reading (``reading``), what it is about
+    (``about``), the read order (``mode``, ``fallback``) and what it must show
+    (``accept``). The last value seen is the last answer that counted as a
+    reading but did not show what was expected, for the message.
+    """
+    seen = {}
+
+    def accept(value):
+        seen["value"] = value
+        return expect.accept(value)
+
+    reading = reader.wait_for(
+        vendor,
+        expect.reading,
+        client,
+        accept=accept,
+        about=expect.about,
+        mode=expect.mode,
+        fallback=expect.fallback,
+        **window,
+    )
+    shown = reading is not None and reading.error is None
+    return shown, seen.get("value")
+
+
+def wait_ready(vendor, client, expect):
+    """A pre-check for :func:`confirm_and_fire`: wait for *expect* (the scanner idle) by the one rule.
+
+    The reading is waited for over the ``WINDOWS`` windows of the waiting rule;
+    a microscope that is still not ready after them fails the check, and
+    nothing is sent.
+    """
+
+    def ready():
+        started = time.perf_counter()
+        shown, last = watch(vendor, client, expect)
+        if shown:
+            return {"success": True, "logs": []}
+        msg = (
+            f"{expect.reading} not ready after {time.perf_counter() - started:.1f}s "
+            f"({vendor.waiting.WINDOWS} windows of {vendor.waiting.WINDOW_S}s, "
+            f"last status: {last or 'unknown'})"
+        )
+        log.warning(msg)
+        return {"success": False, "logs": [_make_log_entry("warning", msg)]}
+
+    return ready
+
+
+def read_back(vendor, client, expect):
+    """A confirmation for :func:`confirm_and_fire`: one window of *expect*'s reading, starting now.
+
+    Only answers seen after the window began count, so a reading from before
+    the change cannot confirm it. The confirm loop runs the windows and sends
+    the change again between them. Answers ``{"success", "logs"}``, and the
+    last value read under ``last_value`` when the change did not show.
+    """
+
+    def confirm():
+        started = time.monotonic()
+        shown, last = watch(
+            vendor,
+            client,
+            expect,
+            observed_after=time.time(),
+            deadline=started + vendor.waiting.WINDOW_S,
+        )
+        if shown:
+            return {"success": True, "logs": []}
+        msg = (
+            f"{expect.reading} did not show the change within "
+            f"{time.monotonic() - started:.1f}s (last read {reprlib.repr(last)})"
+        )
+        log.warning(msg)
+        return {"success": False, "logs": [_make_log_entry("warning", msg)], "last_value": last}
+
+    return confirm
 
 
 def append_dialog_warning(transport, logs, command_started_at, description):
@@ -110,11 +208,12 @@ SENT_ONCE = {
 def resolve_profile(profile, **overrides):
     """Apply explicit overrides to a command's profile; the microscope hands the profile in.
 
-    A profile that says ``never_resend``, such as the start of an acquisition,
-    is sent once whatever a caller or the profile itself asks for: not again
-    after a temporary error, and not again after an unconfirmed window.
-    Sending it twice would do the work twice. The rule is the dispatcher's, so
-    it holds for every microscope's profiles.
+    A profile that says ``never_resend``, or a command handed in with
+    ``never_resend=True``, such as the start of an acquisition, is sent once
+    whatever a caller or the profile itself asks for: not again after a
+    temporary error, and not again after an unconfirmed window. Sending it
+    twice would do the work twice. The rule is the dispatcher's, so it holds
+    for every microscope's profiles.
     """
     from dataclasses import replace
 
@@ -123,7 +222,7 @@ def resolve_profile(profile, **overrides):
             "a command profile must be handed in: the dispatcher has no default of its own"
         )
     changes = {name: value for name, value in overrides.items() if value is not None}
-    if getattr(profile, "never_resend", False):
+    if changes.get("never_resend") or getattr(profile, "never_resend", False):
         changes.update(SENT_ONCE)
     return replace(profile, **changes) if changes else profile
 
@@ -402,6 +501,7 @@ def confirm_and_fire(
     max_confirm_attempts=None,
     refire_on_unconfirmed=None,
     send_without_receipt=None,
+    never_resend=None,
 ):
     """Fire a command and optionally confirm the result, with correction.
 
@@ -435,6 +535,8 @@ def confirm_and_fire(
         refire_on_unconfirmed: If True, a failed confirmation sends the
             command again before the next confirmation attempt. If False,
             the command is not fired again; only readback is retried.
+        never_resend: True for a command that must reach the microscope at
+            most once; see :func:`resolve_profile`.
 
     A change whose confirmation windows all run out is still a success, with
     ``confirmed`` False: ``success=True`` alone does NOT prove the setting
@@ -459,6 +561,7 @@ def confirm_and_fire(
         max_confirm_attempts=max_confirm_attempts,
         refire_on_unconfirmed=refire_on_unconfirmed,
         send_without_receipt=send_without_receipt,
+        never_resend=never_resend,
     )
     command_started_at = time.time()
     t_wall_start = time.perf_counter()

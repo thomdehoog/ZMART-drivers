@@ -24,7 +24,7 @@ the request each reading of the read loop makes.
 
 Using ``UpdateAwaitReceipt`` on ``PyApiCommand`` is cheap (1-4 ms) and
 prevents requests from being silently dropped when sent in rapid
-succession (e.g. during ``confirm_move_xy``).
+succession (e.g. while a stage move is read back).
 
 ``get_lasx_settings`` is the exception: it reads the Navigator Expert
 XML configuration file directly from disk (no API round-trip).

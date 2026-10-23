@@ -1,4 +1,8 @@
-"""One change, the same way for every change: through the dispatcher, which asks the limits.
+"""One change through the dispatcher's older door, ``write``: selecting a job and acquiring.
+
+The job settings, the objective and the stage are run through the
+dispatcher's ``run()`` (``procedures/changes.py``); the two changes left here
+move there next.
 
 Every change follows three phases:
 
@@ -11,8 +15,8 @@ Every change follows three phases:
     **Phase C** - add what the caller needs to the result (``move_xy`` adds
         the target position).
 
-A change that is refused before it is sent answers ``refused(message)``: the
-same result shape as a sent change, with ``success`` False and nothing sent.
+A change that is refused before it is sent answers ``dispatch.refused(message)``:
+the same result shape as a sent change, with ``success`` False and nothing sent.
 
 Result contract: ``result["success"]`` means the change
 was *accepted*, not that it took effect. A caller that needs proof the change
@@ -31,22 +35,6 @@ from ...primitives.cam_api.transfer import request_of
 from .confirming import race_confirmations
 
 log = logging.getLogger(__name__)
-
-
-def refused(message, *, logged=False, **extra):
-    """The result of a change that was not sent: ``success`` False, with the reason.
-
-    ``logged`` also puts the reason in the result's log. ``extra`` adds the
-    keys a change's answer always carries, such as ``position=None``.
-    """
-    return {
-        "success": False,
-        "confirmed": None,
-        "message": message,
-        "timing": dispatch.make_timing(total_s=0.0, attempts=0),
-        "logs": [dispatch.make_log_entry("error", message)] if logged else [],
-        **extra,
-    }
 
 
 def binds(fn, name):

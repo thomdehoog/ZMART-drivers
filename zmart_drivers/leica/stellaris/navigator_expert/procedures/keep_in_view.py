@@ -20,7 +20,7 @@ The correction is made only when the change was accepted. When the correction
 cannot be made, the command answers ``success: False`` and names the step, so
 a picture is never taken at a position that no longer points at the sample.
 
-Each one wraps the bare change of the same name, ``operations/changes/objective.py``'s
+Each one wraps the bare change of the same name, ``procedures/changes.py``'s
 ``set_objective`` and ``operations/changes/select_job.py``'s ``select_job``, which
 change the lens or the job and nothing else. Use those
 when the stage should not be corrected.
@@ -67,9 +67,9 @@ University of Zurich (thom.dehoog@zmb.uzh.ch, thomdehoog@gmail.com).
 from __future__ import annotations
 
 import logging
-from ..operations.changes import objective as _objective
-from ..operations.changes import run_change
+from ..dispatcher import dispatch
 from ..operations.changes import select_job as _select_job
+from . import changes
 from typing import Any
 
 
@@ -112,13 +112,13 @@ def set_objective(
                 client, job_name, translations=translations, compensate=compensate
             )
         except Exception as exc:  # noqa: BLE001 -- fail closed before the change fires
-            return run_change.refused(
+            return dispatch.refused(
                 "refusing the objective change: could not record the "
                 f"pre-change position for objective compensation: {exc}"
             )
         return None
 
-    result = _objective.set_objective(
+    result = changes.set_objective(
         client,
         job_name,
         hw_info,
@@ -165,7 +165,7 @@ def select_job(client, job_name, *, translations=None, compensate=None):
                 compensate=compensate,
             )
         except Exception as exc:  # noqa: BLE001 -- fail closed before the change fires
-            return run_change.refused(
+            return dispatch.refused(
                 "refusing the job change: could not record the pre-change "
                 f"position for objective compensation: {exc}"
             )
@@ -328,9 +328,7 @@ def compensate_after_change(
             # The moves go through the ordinary gated wrappers, so the
             # compensated targets are checked against the machine limits
             # exactly like any other motion; a refusal fails the change.
-            from ..operations.changes import stage as _commands
-
-            xy_result = _commands.move_xy(
+            xy_result = changes.move_xy(
                 client, before["x_um"] + delta[0], before["y_um"] + delta[1], unit="um"
             )
             if not xy_result.get("success") or xy_result.get("confirmed") is False:
@@ -338,7 +336,7 @@ def compensate_after_change(
                     f"the compensating XY move after the objective change "
                     f"failed: {xy_result.get('message', xy_result)}"
                 )
-            z_result = _commands.move_z(
+            z_result = changes.move_z(
                 client,
                 job_name,
                 before["z_wide_um"] + delta[2],

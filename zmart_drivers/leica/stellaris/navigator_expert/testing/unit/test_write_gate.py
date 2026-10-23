@@ -35,26 +35,23 @@ def test_write_refuses_a_client_with_no_limits_and_sends_nothing():
 
 
 def test_every_change_hands_its_name_and_values_to_the_dispatcher():
-    """Each call to ``dispatch_change`` says which command it is and what it sets."""
+    """Each change says which command it is and what it sets: every ``Write`` the
+    CAM API's writes build, and each call to ``dispatch_change`` of the changes
+    still on the older door."""
     sources = [
-        DRIVER_ROOT / "operations" / "changes" / f"{name}.py"
-        for name in ("stage", "objective", "select_job", "acquire", "job_settings")
-    ] + [
-        DRIVER_ROOT
-        / "procedures"
-        / "keep_in_view.py",
-    ]
+        DRIVER_ROOT / "operations" / "changes" / f"{name}.py" for name in ("select_job", "acquire")
+    ] + [DRIVER_ROOT / "primitives" / "cam_api" / "writes.py"]
     calls = 0
     for path in sources:
         for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
             if not isinstance(node, ast.Call):
                 continue
             name = getattr(node.func, "id", getattr(node.func, "attr", None))
-            if name == "dispatch_change":
+            if name in ("dispatch_change", "Write"):
                 calls += 1
                 keywords = {k.arg for k in node.keywords}
                 assert {"command", "values"} <= keywords, (
-                    f"{path.name} line {node.lineno}: dispatch_change needs command= and values="
+                    f"{path.name} line {node.lineno}: {name} needs command= and values="
                 )
     assert calls >= 6
 
@@ -84,7 +81,7 @@ def test_a_change_asks_the_limits_once(monkeypatch):
     from mock_lasx_api import MockLasxClient
 
     from zmart_drivers.leica.stellaris.navigator_expert.dispatcher import limits as gate
-    from zmart_drivers.leica.stellaris.navigator_expert.operations.changes import stage
+    from zmart_drivers.leica.stellaris.navigator_expert.procedures import changes
 
     asked = []
     real = gate.check_refusal
@@ -92,7 +89,7 @@ def test_a_change_asks_the_limits_once(monkeypatch):
     client = MockLasxClient(latency=0.0)
     install_permissive_limits(client, wide_stage=True)
     try:
-        result = stage.move_xy(client, 100.0, 200.0)
+        result = changes.move_xy(client, 100.0, 200.0)
     finally:
         gate.uninstall(client)
 
@@ -105,12 +102,12 @@ def test_a_refused_stage_move_keeps_its_shape():
     from limits_fixtures import install_permissive_limits
 
     from zmart_drivers.leica.stellaris.navigator_expert.dispatcher import limits as gate
-    from zmart_drivers.leica.stellaris.navigator_expert.operations.changes import stage
+    from zmart_drivers.leica.stellaris.navigator_expert.procedures import changes
 
     client = SimpleNamespace(PyApiMoveHardwareXY=SimpleNamespace())  # sending would touch it
     install_permissive_limits(client, wide_stage=True)
     try:
-        result = stage.move_xy(client, 500_000.0, 10.0)
+        result = changes.move_xy(client, 500_000.0, 10.0)
     finally:
         gate.uninstall(client)
 

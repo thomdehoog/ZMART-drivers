@@ -18,7 +18,6 @@ import math
 import time
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import patch
 
 import pytest
 from z_readback_settings import raw_settings
@@ -30,11 +29,10 @@ from zmart_drivers.leica.stellaris.navigator_expert.primitives.direct.client imp
     HardwareServerUnavailable,
     read_hardware_z_um,
 )
-from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api.parsing import make_changeable_copy
 from zmart_drivers.leica.stellaris.navigator_expert.procedures import absolute_coordinate_system as _frame
 from zmart_drivers.leica.stellaris.navigator_expert.procedures import readings as _readers
-from zmart_drivers.leica.stellaris.navigator_expert.operations.changes import confirming
-from zmart_drivers.leica.stellaris.navigator_expert.operations.changes import stage
+from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import writes
+from zmart_drivers.leica.stellaris.navigator_expert.procedures import changes
 
 
 #: What the simulator's hardware server answered on 2026-10-12, at rest.
@@ -253,25 +251,17 @@ class TestFreeDrive:
 
 
 class TestCallers:
-    def test_confirm_move_z_confirms_where_the_drive_is(self, server, monkeypatch):
+    def test_a_z_move_is_confirmed_where_the_drive_is(self, server, monkeypatch):
         server.Hardware.ZPosZGalvo = 50e-6
-        ch = make_changeable_copy(raw_settings(galvo_um=-0.01, stack_on="z-galvo"))
-        with patch.object(confirming, "readback", return_value=ch):
-            result = stage.confirm_move_z(
-                object(), job_name="J", z_mode="galvo", target_um=50.0, poll_window=1.0
-            )
-        assert result["success"] is True
+        settings = raw_settings(galvo_um=-0.01, stack_on="z-galvo")
+        assert writes.z_within("z-galvo", 50.0, 1.0)(settings) is True
 
-    def test_confirm_move_z_does_not_confirm_a_drive_that_stayed(
+    def test_a_z_move_is_not_confirmed_on_a_drive_that_stayed(
         self, server, monkeypatch
     ):
         server.Hardware.ZPosZGalvo = 0.0
-        ch = make_changeable_copy(raw_settings(galvo_um=-0.01, stack_on="z-galvo"))
-        with patch.object(confirming, "readback", return_value=ch):
-            result = stage.confirm_move_z(
-                object(), job_name="J", z_mode="galvo", target_um=50.0, poll_window=0.3
-            )
-        assert result["success"] is False
+        settings = raw_settings(galvo_um=-0.01, stack_on="z-galvo")
+        assert writes.z_within("z-galvo", 50.0, 1.0)(settings) is False
 
     def test_adapter_snapshot_reads_the_stacked_drive_from_the_server(
         self, server, monkeypatch
@@ -308,7 +298,7 @@ class TestMoveZEndToEnd:
         install_permissive_limits(client, wide_stage=True)
         server.Hardware.ZPosZGalvo = 12e-6
         t0 = time.perf_counter()
-        result = stage.move_z(client, "HiRes", 12.0, z_mode="galvo")
+        result = changes.move_z(client, "HiRes", 12.0, z_mode="galvo")
         assert (
             result["success"],
             result["confirmed"],

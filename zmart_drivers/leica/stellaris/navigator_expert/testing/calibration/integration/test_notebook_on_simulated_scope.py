@@ -56,7 +56,7 @@ from zmart_drivers.leica.stellaris.navigator_expert.procedures import readings a
 
 from zmart_drivers.leica.stellaris.navigator_expert.procedures.save_data import product
 from zmart_drivers.leica.stellaris.navigator_expert.operations.changes import acquire as acquire_change
-from zmart_drivers.leica.stellaris.navigator_expert.operations.changes import stage
+from zmart_drivers.leica.stellaris.navigator_expert.procedures import changes
 
 NOTEBOOK_PATH = (
     Path(wf_obj.__file__).parents[2]
@@ -198,8 +198,8 @@ def _install_simulator(monkeypatch, machine) -> SimulatedScope:
             sim.zwide = float(z)
         return {"success": True, "confirmed": True}
 
-    monkeypatch.setattr(stage, "move_xy", _move_xy)
-    monkeypatch.setattr(stage, "move_z", _move_z)
+    monkeypatch.setattr(changes, "move_xy", _move_xy)
+    monkeypatch.setattr(changes, "move_z", _move_z)
     monkeypatch.setattr(
         readers, "read_zwide_um", lambda client, job_name, **kw: float(sim.zwide)
     )

@@ -22,6 +22,7 @@ import time
 from ...procedures import readings as _readers
 from ...dispatcher.dispatch import make_log_entry as _make_log_entry
 from . import waiting
+from ..direct import profile as policy
 
 log = logging.getLogger(__name__)
 
@@ -47,8 +48,8 @@ def check_idle(client):
     t0 = time.perf_counter()
     reading = _readers.get_scan_status(
         client,
-        mode=_readers.on_demand_mode("scan_status"),
-        fallback=_readers.on_demand_fallback(),
+        mode=policy.on_demand_mode("scan_status"),
+        fallback=policy.on_demand_fallback(),
         diagnostics=True,
         accept=lambda s: "Idle" in s,
     )

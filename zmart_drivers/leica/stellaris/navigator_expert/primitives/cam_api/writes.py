@@ -1,9 +1,15 @@
-"""The settings of a LAS X job that the driver can change, one entry for each.
+"""The changes LAS X can be asked for through the CAM API, as plain data the dispatcher runs.
 
-Changing a setting always goes the same way: show the new value to the limits
-gate, fill in a LAS X request, send it, and read the job's settings back until
-the new value shows. What differs from one setting to the next is a handful of
-facts, and this file keeps them in one place, as a table:
+A change is one :class:`Write`: its name and values for the limits, the LAS X
+request that carries it and how that request is filled in, the label in the
+log, and what belongs to this change alone: what to wait for before it is sent
+(:class:`Expect` the scanner idle), which reading shows that it took effect and
+how close counts, whether it is sent without a receipt, which LAS X replies
+mean "already so", and whether it may never be sent again. The dispatcher's
+``run()`` does the rest. Nothing here calls LAS X or the dispatcher.
+
+The builders: :func:`move_xy`, :func:`move_z`, :func:`set_objective` and
+:func:`change` for the settings of a job, which are one table (``SETTINGS``):
 
 - ``name``: what a person calls it (``"zoom"``); the limits gate knows it as
   ``set_<name>``;
@@ -17,7 +23,9 @@ facts, and this file keeps them in one place, as a table:
   ``tolerance``: how close it must come (None: exactly);
 - ``describe``: the label in the log.
 
-``change`` changes any of them, and ``confirm`` reads one back.
+The checks that say how close counts (:func:`within_xy`, :func:`z_within`,
+:func:`slot_is`, :func:`setting_shows`, :func:`is_idle`) each take one reading's
+value and answer True or False, so each can be tested alone.
 
 Author: Thom de Hoog, Center for Microscopy and Image Analysis (ZMB),
 University of Zurich (thom.dehoog@zmb.uzh.ch, thomdehoog@gmail.com).
@@ -27,28 +35,253 @@ from __future__ import annotations
 
 import logging
 import math
-import time
 from collections.abc import Callable
 from dataclasses import dataclass
-from functools import partial
 from typing import Any
 
-from ...primitives.cam_api import waiting
-from ...dispatcher.dispatch import make_log_entry
-from ...primitives.cam_api.parsing import parse_format
-from ...primitives.cam_api.profile import CommandProfile
-from ...primitives.cam_api.error_classification import _check_api_error, classify_error, sends_again
-from . import confirming, run_change
+from ..direct import profile as policy
+from .derived import z_um_from_settings
+from .parsing import make_changeable_copy, parse_format
 
 log = logging.getLogger(__name__)
 
-#: Every setting is sent and confirmed the same way: four windows, sent again
-#: between them, and unconfirmed is reported, never a failure.
-PROFILE = CommandProfile()
+
+# =============================================================================
+# A write, and what it waits for
+# =============================================================================
+
+
+@dataclass(frozen=True)
+class Expect:
+    """A reading, and what it must show."""
+
+    reading: str  # "xy", "job_settings", "selected_job", "scan_status"
+    accept: Callable[[object], bool]  # how close counts
+    about: str | None = None  # the job, for a reading about one job
+    mode: str | None = None  # read order; None = the reading's own
+    fallback: str | None = None
+
+
+@dataclass(frozen=True)
+class Write:
+    """One change: its request, its limits, and what belongs to it alone."""
+
+    command: str  # its name in the limits (MUTATING_COMMANDS)
+    values: dict  # what the limits gate is shown
+    request: str  # e.g. "PyApiMoveHardwareXY"
+    fill: Callable  # fill(model): writes the fields, reads LAS X's enums from the model
+    description: str
+    ready: Expect | None = None  # waited for before every send (scanner idle)
+    confirm: Expect | None = None  # read back, one window at a time
+    without_receipt: bool = False  # UpdateAsync, no reply checked
+    accepted_replies: tuple = ()  # LAS X replies that mean "already so"
+    never_resend: bool = False
+
+
+def is_idle(status) -> bool:
+    """The scanner status says idle."""
+    return "Idle" in status
+
+
+def idle() -> Expect:
+    """The scanner idle, read from a source that answers on demand.
+
+    The log writes the status only when it changes, so its "idle" can be from
+    before; this reading decides whether a change may be sent, so it asks the
+    direct reader, or the API.
+    """
+    return Expect(
+        "scan_status",
+        is_idle,
+        mode=policy.on_demand_mode("scan_status"),
+        fallback=policy.on_demand_fallback(),
+    )
+
+
+# =============================================================================
+# The stage
+# =============================================================================
+
+#: In micrometres, per unit a position can be given in.
+UM_PER_UNIT = {"um": 1, "mm": 1000, "m": 1e6}
+
+#: LAS X's names for the units, and their numbers when the enum cannot be read.
+UNIT_ENUM = {"um": "eMicrons", "mm": "eMillimeter", "m": "eMeter"}
+UNIT_NUMBER = {"um": 4, "mm": 3, "m": 1}
+
+#: The z drives, by the name a move takes, as LAS X and the readers name them.
+Z_DRIVE_ENUM = {"galvo": "eUseGalvo", "zwide": "eUseZWide"}
+Z_DRIVE_KEY = {"galvo": "z-galvo", "zwide": "z-wide"}
+
+#: How close a move must come, in micrometres, unless the caller says.
+XY_TOLERANCE_UM = 20.0
+Z_TOLERANCE_UM = 1.0
+
+
+def unit_enum(model_value, unit):
+    """LAS X's enum member for ``unit``, or its number when the enum cannot be read."""
+    try:
+        return getattr(type(model_value), UNIT_ENUM[unit])
+    except Exception:
+        log.warning("Units enum resolution failed, using int fallback: %d", UNIT_NUMBER[unit])
+        return UNIT_NUMBER[unit]
+
+
+def within_xy(x_um, y_um, tolerance):
+    """A stage position within ``tolerance`` micrometres of ``(x_um, y_um)`` on both axes."""
+
+    def check(position) -> bool:
+        try:
+            return abs(position["x_um"] - x_um) < tolerance and abs(position["y_um"] - y_um) < tolerance
+        except (KeyError, TypeError):
+            return False
+
+    return check
+
+
+def z_within(drive, target_um, tolerance):
+    """Job settings read while the z ``drive`` (``"z-galvo"``, ``"z-wide"``) is within ``tolerance`` of the target.
+
+    Where the drive is comes from the direct reader first, where it truly is;
+    else from the job's settings, which know they do not refresh for the drive
+    carrying the job's z-stack and read that one from LAS X's hardware server
+    (``z_um_from_settings``). When neither answers, the check is not met.
+    """
+
+    def check(settings) -> bool:
+        try:
+            z_um = policy.z_um_direct(drive)
+            if z_um is None:
+                z_um = z_um_from_settings(settings, drive, direct=policy.STATE_READERS.z_mode == "direct")
+            return abs(z_um - target_um) < tolerance
+        except (KeyError, TypeError, RuntimeError, ValueError):
+            return False
+
+    return check
+
+
+def move_xy(x, y, unit, *, tolerance=None) -> Write:
+    """Move the XY stage to an absolute position, in ``unit`` ('um', 'mm' or 'm').
+
+    Sent without waiting for a receipt, so there is no reply to check; the
+    readback is the proof. An unconfirmed absolute move is sent again (it is
+    the same move) after waiting for idle. ``tolerance`` in micrometres,
+    ``XY_TOLERANCE_UM`` when None.
+    """
+    x_um, y_um = x * UM_PER_UNIT[unit], y * UM_PER_UNIT[unit]
+    tolerance = XY_TOLERANCE_UM if tolerance is None else tolerance
+
+    def fill(m):
+        try:
+            mode_val = type(m.MoveXyMode).eMoveXY
+        except Exception:
+            mode_val = 2  # eMoveXY=2 (NOT 0 which is eDontMove!)
+            log.warning("MoveXyMode enum resolution failed, using int fallback: %d", mode_val)
+        m.Units = unit_enum(m.Units, unit)
+        m.RelativePosition = False
+        m.XPosition = x
+        m.YPosition = y
+        m.MoveXyMode = mode_val
+
+    return Write(
+        command="move_xy",
+        values={"x_um": x_um, "y_um": y_um},
+        request="PyApiMoveHardwareXY",
+        fill=fill,
+        description=f"MoveXY -> ({x}, {y}) {unit}",
+        ready=idle(),
+        confirm=Expect(
+            "xy",
+            within_xy(x_um, y_um, tolerance),
+            mode=policy.on_demand_mode("xy"),
+            fallback=policy.on_demand_fallback(),
+        ),
+        without_receipt=True,
+    )
+
+
+def move_z(job_name, z, unit, z_mode, *, tolerance=None) -> Write:
+    """Move a z drive, ``galvo`` or ``zwide``, of ``job_name`` to an absolute position.
+
+    ``tolerance`` in micrometres, ``Z_TOLERANCE_UM`` when None.
+    """
+    z_um = z * UM_PER_UNIT[unit]
+    tolerance = Z_TOLERANCE_UM if tolerance is None else tolerance
+
+    def fill(m):
+        try:
+            z_use_val = getattr(type(m.ZUseMode), Z_DRIVE_ENUM[z_mode])
+        except Exception:
+            z_use_val = Z_DRIVE_ENUM[z_mode]
+            log.warning("ZUseMode enum resolution failed for '%s'", z_use_val)
+        m.Units = unit_enum(m.Units, unit)
+        m.JobName = job_name
+        m.RelativePosition = False
+        m.ZPosition = z
+        m.ZUseMode = z_use_val
+
+    return Write(
+        command="move_z",
+        values={f"z_{'galvo' if z_mode == 'galvo' else 'wide'}_um": z_um},
+        request="PyApiMoveZByJobName",
+        fill=fill,
+        description=f"Z -> {z} {unit} ({z_mode})",
+        ready=idle(),
+        confirm=Expect(
+            "job_settings",
+            z_within(Z_DRIVE_KEY[z_mode], z_um, tolerance),
+            about=job_name,
+        ),
+    )
+
+
+# =============================================================================
+# The objective
+# =============================================================================
+
+
+def slot_is(slot):
+    """Job settings whose objective is the one in ``slot``."""
+
+    def check(settings) -> bool:
+        try:
+            return settings["objective"]["slotIndex"] == slot
+        except (KeyError, TypeError):
+            return False
+
+    return check
+
+
+def set_objective(job_name, slot, name) -> Write:
+    """Change the objective of ``job_name`` to the one in ``slot`` (called ``name``), without moving the stage.
+
+    Four confirmation windows, sent again between them; a slow turret is
+    absorbed by the wait for idle before each send.
+    """
+
+    def fill(m):
+        m.JobName = job_name
+        m.ObjectiveSlotIndex = slot
+
+    return Write(
+        command="set_objective",
+        values={"job_name": job_name, "objective_slot": slot},
+        request="PyApiSetObjectiveSlotByJobName",
+        fill=fill,
+        description=f"Objective -> {name} (slot {slot})",
+        ready=idle(),
+        confirm=Expect("job_settings", slot_is(slot), about=job_name),
+    )
+
+
+# =============================================================================
+# The settings of a job, one table
+# =============================================================================
 
 #: What reading a value out of the job's settings may raise while LAS X has
-#: not written it yet; the confirmation then looks again.
-NOT_THERE_YET = (KeyError, TypeError, IndexError, StopIteration)
+#: not written it yet (ValueError: settings without the keys every job's
+#: settings carry); the check then answers no, and the reading looks again.
+NOT_THERE_YET = (KeyError, TypeError, IndexError, StopIteration, ValueError)
 
 
 @dataclass(frozen=True)
@@ -69,7 +302,7 @@ class Setting:
     normalize: Callable[[dict], dict] | None = None
     validate: Callable[[dict], str | None] | None = None
     matches: Callable[[dict, dict, float | None], bool] | None = None
-    error_check: Callable[[dict], Callable] | None = None
+    accepted_replies: tuple[str, ...] = ()
 
     @property
     def command(self) -> str:
@@ -192,35 +425,9 @@ SCAN_FIELD_ROTATION = Setting(
 )
 
 # --- resonant scanning: LAS X answers "no change" when it is already in that state -----
+# That answer is accepted as "already so"; the readback then confirms it.
 
 RESONANT_NO_CHANGE = "desired state does not differ from the current state"
-
-
-def resonant_error_check(client, *, arguments):
-    """Accept LAS X's resonant "no change" answer, but only when the readback agrees."""
-    logs = []
-    err = _check_api_error(client)
-    if err is None:
-        return {"success": True, "error": None, "transient": None, "logs": logs}
-
-    error_msg = err.get("error", "")
-    details = err.get("details", {})
-    if RESONANT_NO_CHANGE in error_msg.lower():
-        confirmed = confirm(client, "scan_resonant", arguments)
-        logs.extend(confirmed.get("logs", []))
-        if confirmed.get("success"):
-            msg = f"Resonant -> {arguments['enable']} already matched; accepting LAS X no-change response"
-            logs.append(make_log_entry("info", msg))
-            return {"success": True, "error": None, "transient": None, "logs": logs}
-
-    kind = classify_error(error_msg)
-    transient = sends_again(kind)
-    log_msg = f"API error: {error_msg}"
-    if details:
-        log_msg += f" | details: {details}"
-    logs.append(make_log_entry("warning" if transient else "error", log_msg))
-    return {"success": False, "error": error_msg, "kind": kind, "transient": transient, "logs": logs}
-
 
 SCAN_RESONANT = Setting(
     name="scan_resonant",
@@ -230,7 +437,7 @@ SCAN_RESONANT = Setting(
     value="enable",
     read=at("scanSpeed", "isResonant"),
     describe="Resonant -> {enable}",
-    error_check=lambda a: partial(resonant_error_check, arguments=a),
+    accepted_replies=(RESONANT_NO_CHANGE,),
 )
 
 # --- sequential mode: a word from a short list, written as a .NET enum ----------------
@@ -510,7 +717,7 @@ SETTINGS = {
 }
 
 
-# --- changing a setting, and reading it back ---------------------------------------------
+# --- changing a setting -------------------------------------------------------------------
 
 
 def arguments_of(name: str, job_name: str, given: dict) -> tuple[Setting, dict]:
@@ -526,78 +733,46 @@ def arguments_of(name: str, job_name: str, given: dict) -> tuple[Setting, dict]:
     return setting, setting.normalize(a) if setting.normalize else a
 
 
-def change(client, name: str, job_name: str, *, max_retries=None, tolerance=None, **given) -> dict:
-    """Change the setting ``name`` of the job, and read it back.
+def setting_shows(setting: Setting, a: dict, tolerance=None):
+    """Job settings in which ``setting`` shows its new value from the arguments ``a``.
 
-    The keywords are what the setting takes (``SETTINGS[name].takes``), such as
-    ``value=2.0`` for the zoom. The limits gate is shown the new value first,
-    and nothing is sent if it refuses. ``tolerance`` overrides how close the
-    readback must come.
+    ``tolerance`` overrides the setting's own (None: the setting's).
     """
-    setting, a = arguments_of(name, job_name, given)
-    gated_values = setting.gate(a) if setting.gate else {"job_name": job_name, "value": a[setting.value]}
-    problem = setting.validate(a) if setting.validate else None
-    if problem is not None:
-        return run_change.refused(problem)
-
-    return run_change.dispatch_change(
-        client,
-        setting.request,
-        setting.describe.format(**a),
-        PROFILE,
-        command=setting.command,
-        values=gated_values,
-        setup_fn=lambda model: setting.write(model, a),
-        confirm_fn=partial(confirmed, setting=setting, a=a, tolerance=tolerance),
-        error_check_fn=setting.error_check(a) if setting.error_check else None,
-        max_retries=max_retries,
-    )
-
-
-def confirm(client, name: str, job_name_or_arguments, *, tolerance=None, poll_window=None, **given) -> dict:
-    """Read the job's settings back until the setting ``name`` shows its new value.
-
-    Give the job and the setting's arguments as for ``change``, or the full
-    arguments as one dict. One window long (``poll_window``, ``WINDOW_S`` by
-    the rule). Answers ``{"success": bool, "logs": [...]}``.
-    """
-    if isinstance(job_name_or_arguments, dict):
-        setting, a = SETTINGS[name], job_name_or_arguments
-    else:
-        setting, a = arguments_of(name, job_name_or_arguments, given)
-    return confirmed(client, setting=setting, a=a, tolerance=tolerance, poll_window=poll_window)
-
-
-def confirmed(client, *, setting: Setting, a: dict, tolerance=None, poll_window=None) -> dict:
-    """One confirmation window for ``setting``, with arguments ``a``."""
     tolerance = setting.tolerance if tolerance is None else tolerance
     target = a[setting.value]
-    poll_window = waiting.WINDOW_S if poll_window is None else poll_window
-    started = time.monotonic()
-    deadline = started + poll_window
-    last = None
 
-    while time.monotonic() < deadline:
-        settings = confirming.readback(client, a["job_name"], deadline=deadline)
-        if settings is not None:
-            try:
-                last = setting.read(settings, a)
-                if setting.matches is not None:
-                    shows = setting.matches(settings, a, tolerance)
-                elif tolerance is None:
-                    shows = last == target
-                else:
-                    shows = abs(last - target) < tolerance
-                if shows:
-                    return {"success": True, "logs": []}
-                log.debug("%s confirm: target=%s actual=%s", setting.name, target, last)
-            except NOT_THERE_YET:
-                pass
-        time.sleep(waiting.POLL_S)
+    def check(settings) -> bool:
+        try:
+            ch = make_changeable_copy(settings)
+            if setting.matches is not None:
+                return bool(setting.matches(ch, a, tolerance))
+            actual = setting.read(ch, a)
+            if tolerance is None:
+                return actual == target
+            return abs(actual - target) < tolerance
+        except NOT_THERE_YET:
+            return False
 
-    msg = (
-        f"{setting.describe.format(**a)} not seen after {time.monotonic() - started:.1f}s "
-        f"(last read {last!r})"
+    return check
+
+
+def change(name: str, job_name: str, *, tolerance=None, **given) -> Write | str:
+    """The change of the setting ``name`` of the job; or the reason it cannot be sent.
+
+    The keywords are what the setting takes (``SETTINGS[name].takes``), such as
+    ``value=2.0`` for the zoom; a wrong name or argument raises ValueError.
+    ``tolerance`` overrides how close the readback must come.
+    """
+    setting, a = arguments_of(name, job_name, given)
+    problem = setting.validate(a) if setting.validate else None
+    if problem is not None:
+        return problem
+    return Write(
+        command=setting.command,
+        values=setting.gate(a) if setting.gate else {"job_name": job_name, "value": a[setting.value]},
+        request=setting.request,
+        fill=lambda model: setting.write(model, a),
+        description=setting.describe.format(**a),
+        confirm=Expect("job_settings", setting_shows(setting, a, tolerance), about=job_name),
+        accepted_replies=setting.accepted_replies,
     )
-    log.warning(msg)
-    return {"success": False, "logs": [make_log_entry("warning", msg)]}

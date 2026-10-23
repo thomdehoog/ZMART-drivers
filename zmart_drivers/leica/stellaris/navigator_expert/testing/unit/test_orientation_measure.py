@@ -41,7 +41,7 @@ from zmart_drivers.leica.stellaris.navigator_expert.procedures import readings a
 
 from zmart_drivers.leica.stellaris.navigator_expert.procedures.save_data import product
 from zmart_drivers.leica.stellaris.navigator_expert.operations.changes import acquire as acquire_change
-from zmart_drivers.leica.stellaris.navigator_expert.operations.changes import stage
+from zmart_drivers.leica.stellaris.navigator_expert.procedures import changes
 
 
 @pytest.fixture
@@ -133,7 +133,7 @@ def _patch(
 
     monkeypatch.setattr(readers, "get_xy", _get_xy)
     monkeypatch.setattr(readers, "get_xy", _get_xy)
-    monkeypatch.setattr(stage, "move_xy", _move_xy)
+    monkeypatch.setattr(changes, "move_xy", _move_xy)
     monkeypatch.setattr(
         readers,
         "get_job_settings",

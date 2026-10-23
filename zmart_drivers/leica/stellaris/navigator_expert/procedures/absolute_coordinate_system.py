@@ -59,7 +59,7 @@ import logging
 from ..dispatcher import limits as _gate
 from . import readings as _readers
 from ..primitives.cam_api.derived import stack_drive as _stack_drive
-from ..operations.changes import stage as _commands
+from . import changes
 
 
 log = logging.getLogger(__name__)
@@ -247,7 +247,7 @@ def zero_z_galvo(handle) -> dict:
     if offset == 0.0:
         return {"transferred_um": 0.0}
     for z_mode, target in (("zwide", snap["z_wide_um"] + offset), ("galvo", 0.0)):
-        result = _commands.move_z(
+        result = changes.move_z(
             handle.client, snap["job"], target, unit="um", z_mode=z_mode
         )
         if not result.get("success"):
@@ -315,14 +315,14 @@ def set_xyz(
     # Every leg below is limit-checked inside the command it fires — the
     # frame code carries no checks of its own. A refused leg raises here with
     # an actionable message; legs that already ran stay where they arrived.
-    arrived = _commands.move_xy(handle.client, abs_x, abs_y, unit="um")
+    arrived = changes.move_xy(handle.client, abs_x, abs_y, unit="um")
     if not arrived.get("success"):
         raise RuntimeError(f"move_xy failed: {arrived}")
     if not arrived.get("confirmed"):
         handle.note_unconfirmed(f"set_xyz: xy to ({x}, {y})", arrived)
 
     for z_mode, target in z_targets:
-        z_result = _commands.move_z(
+        z_result = changes.move_z(
             handle.client,
             snap["job"],
             target,
