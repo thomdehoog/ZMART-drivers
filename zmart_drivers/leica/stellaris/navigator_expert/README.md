@@ -10,12 +10,13 @@ notebooks keep the thin 1–3-line invocation style used across the ZMART driver
 
 - **Author:** Thom de Hoog (ZMB, University of Zurich) · thom.dehoog@zmb.uzh.ch · thomdehoog@gmail.com
 - **License:** see the repository root [`LICENSE`](../../../../LICENSE).
-- **Status:** **Beta (`0.7.0b5`).** Version 0.7 reads LAS X's state and sends its changes to LAS X's
+- **Status:** **Beta (`0.7.0b6`).** Version 0.7 reads LAS X's state and sends its changes to LAS X's
   hardware server first, and falls back to the CAM API when the hardware server cannot take a
   command (see [Routes](#routes-direct-first-the-cam-api-behind-it)). Taking a picture, saving it and
-  letting LAS X go of its cache are three separate steps. It has been tested on the LAS X
-  simulator and on the STELLARIS: on 21 October 2026 the quick hardware acceptance passed with every
-  change sent through the direct route and no fallback
+  letting LAS X go of its cache are three separate steps. 0.7.0b6 passed the quick hardware
+  acceptance on the LAS X simulator on 23 October 2026. 0.7.0b5 was tested on the LAS X simulator and
+  on the STELLARIS: on 21 October 2026 the quick hardware acceptance passed with every change sent
+  through the direct route and no fallback
   ([`docs/leica/SCOPE_RUN_2026-10-21_DIRECT_WRITERS.md`](../../../../docs/leica/SCOPE_RUN_2026-10-21_DIRECT_WRITERS.md)).
   The hardware CI has since been widened to the lasers, the filter wheels, the z-stack and the
   objective; that wider run has not yet been made on a microscope. Known limits are listed below.
