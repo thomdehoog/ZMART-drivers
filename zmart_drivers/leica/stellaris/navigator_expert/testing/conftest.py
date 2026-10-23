@@ -154,7 +154,7 @@ def fast_timing_windows(monkeypatch):
     wait. Shipped values are unchanged; a test that needs a specific window
     patches it itself (``test_waiting_rule``).
     """
-    from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import waiting
+    from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import profile as waiting
     from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import transfer as transport
 
     monkeypatch.setattr(waiting, "WINDOW_S", 0.25)

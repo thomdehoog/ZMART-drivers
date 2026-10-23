@@ -50,7 +50,7 @@ import queue
 import re
 import threading
 from xml.sax.saxutils import quoteattr
-from ..cam_api import waiting
+from ..cam_api import profile as waiting
 from .writes import Fields
 
 

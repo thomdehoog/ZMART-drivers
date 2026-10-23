@@ -18,7 +18,7 @@ from types import SimpleNamespace
 import pytest
 
 from zmart_drivers.leica.stellaris.navigator_expert.primitives.direct import client as hardware_server
-from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import waiting
+from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import profile as waiting
 from zmart_drivers.leica.stellaris.navigator_expert.primitives.direct import transfer as send_command
 from zmart_drivers.leica.stellaris.navigator_expert.primitives.direct import writes as translations
 from zmart_drivers.leica.stellaris.navigator_expert.primitives.direct.writes import (

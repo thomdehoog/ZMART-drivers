@@ -78,7 +78,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from ..cam_api import derived
 from collections.abc import Callable
-from ..cam_api import waiting
+from ..cam_api import profile as waiting
 from ...dispatcher.read import Reading
 
 

@@ -28,7 +28,7 @@ from unittest.mock import MagicMock, PropertyMock, patch
 
 from zmart_drivers.leica.stellaris.navigator_expert.dispatcher import dispatch as door
 from zmart_drivers.leica.stellaris.navigator_expert.procedures import keep_in_view as compensated_changes
-from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import error_classification
+from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import profile as error_classification
 from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import parsing
 
 from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import client as session
@@ -40,7 +40,7 @@ from zmart_drivers.leica.stellaris.navigator_expert.dispatcher import (
     write as send_loop,
 )
 from zmart_drivers.leica.stellaris.navigator_expert.procedures import readings as readers
-from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import error_classification as errors
+from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import profile as errors
 
 from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import transfer as transport_module
 from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import writes

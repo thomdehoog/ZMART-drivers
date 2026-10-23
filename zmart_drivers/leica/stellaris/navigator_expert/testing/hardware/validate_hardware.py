@@ -959,7 +959,7 @@ def phase_job_selection(
             v.skip("job selection: round-trip", "no jobs returned")
             return
 
-        from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import waiting
+        from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import profile as waiting
 
         names = selectable_job_names(jobs)
         # The job to come back to is read the way the driver reads it, not

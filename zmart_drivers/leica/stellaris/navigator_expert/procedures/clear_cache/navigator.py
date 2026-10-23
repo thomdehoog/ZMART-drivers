@@ -40,7 +40,7 @@ import threading
 import time
 
 from ..answer_dialogs import WindowsUnavailable, automation
-from ...primitives.cam_api import waiting
+from ...primitives.cam_api import profile as waiting
 
 log = logging.getLogger(__name__)
 

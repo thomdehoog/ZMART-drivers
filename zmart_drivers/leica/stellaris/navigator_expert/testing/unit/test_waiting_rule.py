@@ -27,7 +27,7 @@ from zmart_drivers.leica.stellaris.navigator_expert.procedures import keep_in_vi
 from zmart_drivers.leica.stellaris.navigator_expert.dispatcher import write
 from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import reads as api_engine
 from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import writes
-from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import waiting
+from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import profile as waiting
 from zmart_drivers.leica.stellaris.navigator_expert.procedures import readings as readers
 from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import transfer as delivery
 from zmart_drivers.leica.stellaris.navigator_expert.primitives.direct import profile as reading_settings
@@ -450,7 +450,7 @@ EXCEPTIONS = {
     ("procedures/save_data/collect.py", "timeout"),
     ("procedures/save_data/collect.py", "poll_interval"),
     # The rule itself.
-    ("primitives/cam_api/waiting.py", "WINDOW_S"),
+    ("primitives/cam_api/profile.py", "WINDOW_S"),
 }
 
 

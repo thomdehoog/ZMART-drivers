@@ -31,7 +31,7 @@ import threading
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from ..primitives.cam_api import waiting
+from ..primitives.cam_api import profile as waiting
 
 
 log = logging.getLogger(__name__)

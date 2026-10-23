@@ -35,7 +35,7 @@ import sys
 import time
 from pathlib import Path
 
-from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import waiting
+from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import profile as waiting
 from zmart_drivers.leica.stellaris.navigator_expert.procedures import answer_dialogs
 from zmart_drivers.leica.stellaris.navigator_expert.procedures.clear_cache import navigator
 

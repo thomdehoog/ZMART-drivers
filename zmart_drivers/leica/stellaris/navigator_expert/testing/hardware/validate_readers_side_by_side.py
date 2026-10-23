@@ -58,7 +58,7 @@ from zmart_drivers.leica.stellaris.navigator_expert.primitives.direct import pro
 from zmart_drivers.leica.stellaris.navigator_expert.primitives.log import reads as log_settings
 
 from zmart_drivers.leica.stellaris.navigator_expert.procedures import readings as readers
-from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import waiting
+from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import profile as waiting
 from zmart_drivers.leica.stellaris.navigator_expert.primitives.log import reads as L
 from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api.parsing import (
     make_changeable_copy,

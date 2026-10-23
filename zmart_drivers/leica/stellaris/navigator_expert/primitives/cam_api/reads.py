@@ -48,7 +48,7 @@ import xml.etree.ElementTree as ET
 from ...dispatcher.read import Reading
 from . import derived
 from .transfer import deliver
-from . import waiting
+from . import profile as waiting
 
 log = logging.getLogger(__name__)
 

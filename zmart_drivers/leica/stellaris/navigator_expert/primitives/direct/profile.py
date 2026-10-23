@@ -41,14 +41,13 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from functools import partial
 
-from ...dispatcher.dispatch import make_log_entry
 from ...dispatcher.read import Reading, counts
 from ...dispatcher.write import TransportChain
 from ...driver_setup.limits.limit_rules import NOTEBOOK_POINTER
-from ..cam_api import derived, waiting
+from ..cam_api import derived, profile as waiting
+from ..cam_api.profile import check_reply  # noqa: F401 -- what the write loops ask this profile for
 from ..cam_api import reads as api_reader
 from ..cam_api import transfer as _transport
-from ..cam_api.error_classification import _default_error_check
 from ..log import profile as log_profile
 from ..log import reads as log_reader
 from . import reads as direct_reader
@@ -546,17 +545,3 @@ limits_setup_hint = NOTEBOOK_POINTER
 def make_request(client, write):
     """The CAM API request that carries *write*; made only once the limits allow it."""
     return _transport.request_of(client, write.request)
-
-
-def check_reply(client, write):
-    """LAS X's reply to *write*, checked for an error; a reply the write accepts means "already so".
-
-    Such a reply (resonant scanning already on, say) is not an error: the
-    change is then confirmed by reading it back, like any other.
-    """
-    result = _default_error_check(client)
-    error = (result.get("error") or "").lower()
-    if not result["success"] and any(reply in error for reply in write.accepted_replies):
-        msg = f"{write.description} | LAS X answered {result['error']!r}: already so; the readback confirms it"
-        return {"success": True, "error": None, "transient": None, "logs": [make_log_entry("info", msg)]}
-    return result

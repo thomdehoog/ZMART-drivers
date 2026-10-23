@@ -48,7 +48,7 @@ import logging
 import time
 from ...procedures import answer_dialogs
 from ..log import reads as _log_reader
-from . import waiting
+from . import profile as waiting
 
 
 log = logging.getLogger(__name__)

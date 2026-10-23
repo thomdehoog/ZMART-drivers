@@ -20,7 +20,7 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Any
 
-from ..primitives.cam_api import waiting
+from ..primitives.cam_api import profile as waiting
 from ..primitives.cam_api.parsing import saved_z_um
 from ..primitives.cam_api.transfer import deliver
 

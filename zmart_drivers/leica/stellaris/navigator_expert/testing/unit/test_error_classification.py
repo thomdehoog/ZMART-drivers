@@ -6,7 +6,7 @@ University of Zurich (thom.dehoog@zmb.uzh.ch, thomdehoog@gmail.com).
 
 import pytest
 
-from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api.error_classification import (
+from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api.profile import (
     Kind,
     classify_error,
     sends_again,

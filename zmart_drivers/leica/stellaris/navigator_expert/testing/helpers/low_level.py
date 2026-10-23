@@ -27,7 +27,7 @@ from zmart_drivers.leica.stellaris.navigator_expert.procedures.save_data.save im
 from zmart_drivers.leica.stellaris.navigator_expert.procedures.save_data.product import SavedAcquisition
 from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api.client import connect_python_client
 
-from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api.error_classification import (
+from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api.profile import (
     _check_api_error,
     _default_error_check,
     _is_transient_error,

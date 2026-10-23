@@ -32,7 +32,7 @@ from ..dispatcher import dispatch
 from ..dispatcher import write as write_loops
 from ..dispatcher.dispatch import make_log_entry
 from ..primitives.cam_api import writes
-from ..primitives.cam_api.error_classification import _check_api_error, _is_transient_error
+from ..primitives.cam_api.profile import _check_api_error, _is_transient_error
 from ..primitives.cam_api.parsing import _hw_get
 from ..primitives.direct import profile as direct_profile
 from ..primitives.direct import reads as direct_reader
