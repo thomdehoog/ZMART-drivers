@@ -11,23 +11,20 @@ from pathlib import Path
 from types import SimpleNamespace
 
 from zmart_drivers.leica.stellaris.navigator_expert.dispatcher import dispatch as dispatcher
+from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import writes
 
 DRIVER_ROOT = Path(__file__).resolve().parents[2]
 
 
 def test_write_refuses_a_client_with_no_limits_and_sends_nothing():
-    api_obj = SimpleNamespace()  # touching it in any way would raise an error
     client = object()  # never shook hands with the gate
 
-    result = dispatcher.write(
-        client,
-        api_obj,
-        "Move",
-        command="move_xy",
-        values={"x_um": 0.0, "y_um": 0.0},
-        profile=None,
-        setup_fn=None,
-    )
+    def make_request(client, write):
+        raise AssertionError("a refused change must never make its request")
+
+    vendor = SimpleNamespace(limits_setup_hint="the limits notebook", make_request=make_request, WRITING=None)
+
+    result = dispatcher.run(vendor, client, writes.move_xy(0.0, 0.0, "um"))
 
     assert result["success"] is False
     assert "refused" in result["message"]
@@ -36,18 +33,15 @@ def test_write_refuses_a_client_with_no_limits_and_sends_nothing():
 
 def test_every_change_hands_its_name_and_values_to_the_dispatcher():
     """Each change says which command it is and what it sets: every ``Write`` the
-    CAM API's writes build, and each call to ``dispatch_change`` of the changes
-    still on the older door."""
-    sources = [
-        DRIVER_ROOT / "operations" / "changes" / f"{name}.py" for name in ("select_job", "acquire")
-    ] + [DRIVER_ROOT / "primitives" / "cam_api" / "writes.py"]
+    CAM API's writes build."""
+    sources = [DRIVER_ROOT / "primitives" / "cam_api" / "writes.py"]
     calls = 0
     for path in sources:
         for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
             if not isinstance(node, ast.Call):
                 continue
             name = getattr(node.func, "id", getattr(node.func, "attr", None))
-            if name in ("dispatch_change", "Write"):
+            if name == "Write":
                 calls += 1
                 keywords = {k.arg for k in node.keywords}
                 assert {"command", "values"} <= keywords, (

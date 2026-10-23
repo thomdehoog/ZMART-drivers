@@ -95,10 +95,10 @@ def _go_offline(args: argparse.Namespace) -> None:
     _adapter().connect_python_client = lambda **_kw: MockLasxClient(
         latency=args.mock_latency
     )
-    # The mock has no LAS X log stream, so a job selection can only be
-    # confirmed through the API.
+    # The mock has no LAS X log stream, so when the direct reader cannot
+    # answer, a job selection can only be confirmed through the API.
     reading_settings.STATE_READERS = replace(
-        reading_settings.STATE_READERS, selected_job_confirm_source="api"
+        reading_settings.STATE_READERS, selected_job_confirm_fallback="api"
     )
 
 

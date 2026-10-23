@@ -12,8 +12,6 @@ from zmart_drivers.leica.stellaris.navigator_expert.dispatcher.write import (
     TransportUnavailable,
 )
 from zmart_drivers.leica.stellaris.navigator_expert.primitives.direct import profile as routes
-from zmart_drivers.leica.stellaris.navigator_expert.operations.changes import acquire as acquire_change
-from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import profile as command_profile
 
 
 
@@ -135,11 +133,7 @@ def test_the_send_loop_works_through_a_chain_and_reports_the_fallback():
     direct, cam = FakeRoute("direct", unavailable="down"), FakeRoute("cam")
     from dataclasses import replace
 
-    profile = replace(
-        command_profile.CommandProfile(),
-        transport=chain_of(direct, cam),
-        error_check_fn=None,
-    )
+    profile = replace(routes.WRITING, transport=chain_of(direct, cam))
     request = type("Request", (), {"Model": object()})()
 
     result = write.fire_block(
@@ -180,5 +174,4 @@ def test_a_route_name_that_does_not_exist_is_refused_with_the_names_that_do(
 
 
 def test_every_command_profile_sends_through_the_vendor_routes():
-    assert command_profile.CommandProfile().transport is routes.ROUTED
-    assert acquire_change.ACQUIRE.transport is routes.ROUTED
+    assert routes.WRITING.transport is routes.ROUTED

@@ -45,7 +45,7 @@ except Exception:  # noqa: BLE001 -- best-effort provenance
 
 from .save_data.naming import free_stem
 from . import readings as _readers
-from ..operations.changes import acquire as acquire_change
+from . import changes
 from .absolute_coordinate_system import get_xyz
 from .state import get_state
 
@@ -222,7 +222,7 @@ def acquire(
             "last reported (changed in LAS X?); the capture is placed from the "
             "fresh reading",
         )
-    acq = acquire_change.take_picture(handle.client, job)
+    acq = changes.take_picture(handle.client, job)
 
     label = (
         position_label if position_label is not None else _next_position_label(handle)

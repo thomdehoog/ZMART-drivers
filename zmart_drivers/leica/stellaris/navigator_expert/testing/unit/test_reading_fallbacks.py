@@ -11,12 +11,11 @@ University of Zurich (thom.dehoog@zmb.uzh.ch, thomdehoog@gmail.com).
 
 import pytest
 
-from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import prechecks
+from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import writes
 
 from zmart_drivers.leica.stellaris.navigator_expert.primitives.direct import profile as read
 from zmart_drivers.leica.stellaris.navigator_expert.procedures import readings as readers
 from zmart_drivers.leica.stellaris.navigator_expert.primitives.direct import profile as reading_settings
-from zmart_drivers.leica.stellaris.navigator_expert.operations.changes import select_job as select_job_change
 
 
 @pytest.fixture
@@ -70,18 +69,10 @@ def test_a_caller_can_still_name_its_own_fallback(use_profile, monkeypatch):
     assert asked["fallback"] == "api"
 
 
-def test_the_idle_check_falls_back_to_the_waiting_family(use_profile, monkeypatch):
+def test_the_idle_check_falls_back_to_the_waiting_family(use_profile):
     use_profile(waiting_fallback="hybrid")
-    asked = {}
 
-    def fake_scan_status(client, **kw):
-        asked.update(kw)
-
-    monkeypatch.setattr(prechecks._readers, "get_scan_status", fake_scan_status)
-
-    prechecks.check_idle(object())
-
-    assert asked["fallback"] == "hybrid"
+    assert writes.idle().fallback == "hybrid"
 
 
 def test_the_first_stage_names_the_profiles_family_when_none_is_given(use_profile):
@@ -97,16 +88,11 @@ def test_the_first_stage_names_the_profiles_family_when_none_is_given(use_profil
 def test_job_confirmation_falls_back_as_the_profile_says(use_profile):
     use_profile(
         selected_job_mode="direct",
-        selected_job_confirm_source="direct",
         selected_job_confirm_fallback="api",
     )
 
-    api_confirm, log_leg, budget_s = select_job_change.select_job_confirm_legs(
-        "Overview", command_started_at=0.0
-    )
+    confirm = writes.select_job("Overview").confirm
 
-    assert api_confirm is not None
-    assert (
-        log_leg is None
-    )  # the api alone takes the direct reader's place, with no log race
-    assert budget_s is None
+    # The direct reader first (the reading's own order), the api alone in its place.
+    assert (confirm.reading, confirm.mode, confirm.fallback) == ("selected_job", None, "api")
+    assert read.mode_for("selected_job") == "direct"

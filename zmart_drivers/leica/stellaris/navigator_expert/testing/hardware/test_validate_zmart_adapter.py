@@ -35,7 +35,7 @@ from zmart_drivers.leica.stellaris.navigator_expert.driver_setup import (
 from zmart_drivers.leica.stellaris.navigator_expert.procedures.save_data import (
     save as _save,
 )
-from zmart_drivers.leica.stellaris.navigator_expert.operations.changes import acquire as acquire_change
+from zmart_drivers.leica.stellaris.navigator_expert.procedures import changes
 from zmart_drivers.leica.stellaris.navigator_expert.primitives.direct import profile as reading_settings
 
 
@@ -253,7 +253,7 @@ def test_acquire_through_the_controller_seam(tmp_path):
             return SimpleNamespace(image_paths={}, xml_paths={}, naming=naming)
 
         with (
-            patch.object(acquire_change, "take_picture", fake_capture),
+            patch.object(changes, "take_picture", fake_capture),
             patch.object(_save, "save", fake_save),
         ):
             record = session.acquire(position_label="1")

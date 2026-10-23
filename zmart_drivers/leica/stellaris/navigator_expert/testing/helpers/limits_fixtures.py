@@ -29,7 +29,7 @@ from zmart_drivers.leica.stellaris.navigator_expert.dispatcher import limits as 
 from zmart_drivers.leica.stellaris.navigator_expert.driver_setup.limits import limit_rules
 
 # The bundled conservative default envelope. The absolute X/Y backstop
-# (operations/changes/limit_rules.py) extends down to coordinate zero, so measured limits may
+# (driver_setup/limits/limit_rules.py) extends down to coordinate zero, so measured limits may
 # sit below the 1000 um default margin.
 DEFAULT_STAGE_UM = {
     "x": [1000.0, 130000.0],

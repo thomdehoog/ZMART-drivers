@@ -22,7 +22,7 @@ import inspect
 import threading
 import time
 import unittest
-from functools import partial
+from dataclasses import replace
 from types import SimpleNamespace
 from unittest.mock import MagicMock, PropertyMock, patch
 
@@ -35,24 +35,17 @@ from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import cl
 
 from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import client as lasx_client
 
-from zmart_drivers.leica.stellaris.navigator_expert.procedures import keep_in_view as commands_comp
 from zmart_drivers.leica.stellaris.navigator_expert.dispatcher import (
     write as dispatch,
     write as send_loop,
 )
-from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import prechecks
 from zmart_drivers.leica.stellaris.navigator_expert.procedures import readings as readers
 from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import error_classification as errors
 
 from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import transfer as transport_module
-from zmart_drivers.leica.stellaris.navigator_expert.operations.changes import acquire as acquire_change
-from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import profile as command_profile
-from zmart_drivers.leica.stellaris.navigator_expert.operations.changes import confirming
 from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import writes
 from zmart_drivers.leica.stellaris.navigator_expert.driver_setup.limits import limit_rules
 from zmart_drivers.leica.stellaris.navigator_expert.primitives.direct import profile as reading_settings
-from zmart_drivers.leica.stellaris.navigator_expert.operations.changes import run_change
-from zmart_drivers.leica.stellaris.navigator_expert.operations.changes import select_job as select_job_change
 from zmart_drivers.leica.stellaris.navigator_expert.procedures import changes
 
 # =============================================================================
@@ -289,13 +282,13 @@ class TestDefaultErrorCheck(unittest.TestCase):
 
 def _fire_block(*args, **keywords):
     """Run the send step with this microscope's default command profile."""
-    keywords.setdefault("profile", command_profile.CommandProfile())
+    keywords.setdefault("profile", reading_settings.WRITING)
     return send_loop.fire_block(*args, **keywords)
 
 
 def _fire(*args, **keywords):
     """Run the engine with this microscope's default command profile, which the engine no longer supplies itself."""
-    keywords.setdefault("profile", command_profile.CommandProfile())
+    keywords.setdefault("profile", reading_settings.WRITING)
     return dispatch.confirm_and_fire(*args, **keywords)
 
 
@@ -518,125 +511,11 @@ class TestConfirmAndFire(unittest.TestCase):
 class TestDispatchPolicy(unittest.TestCase):
     """What the changes hand the dispatcher: their confirmation policy and windows."""
 
-    def test_profile_confirmation_policy_passed_through_dispatch(self):
-        """_dispatch passes the profile's readback retry policy."""
-        client = make_client()
-        api_obj = make_api_obj()
-
-
-        profile = command_profile.CommandProfile(
-            refire_on_unconfirmed=False,
-        )
-
-        with patch.object(
-            run_change.dispatch,
-            "write",
-            return_value={
-                "success": True,
-                "confirmed": None,
-                "message": "ok",
-                "timing": {},
-                "logs": [],
-            },
-        ) as mock_caf:
-            run_change.dispatch_change(
-                client,
-                api_obj,
-                "Test",
-                profile,
-                command="set_zoom",
-                values={},
-                setup_fn=lambda m: None,
-            )
-
-        _, kwargs = mock_caf.call_args
-        self.assertFalse(kwargs["profile"].refire_on_unconfirmed)
-
-    def test_dispatch_injects_profile_confirm_poll_when_unbound(self):
-        """Simple setting confirmations get their poll window from the profile."""
-        client = make_client()
-        api_obj = make_api_obj()
-        seen = {}
-
-        def confirm(client, *, poll_window=None):
-            seen["client"] = client
-            seen["poll_window"] = poll_window
-            return {"success": True, "logs": []}
-
-        profile = command_profile.CommandProfile(confirm_poll_s=5.0)
-
-        with patch.object(
-            run_change.dispatch,
-            "write",
-            return_value={
-                "success": True,
-                "confirmed": True,
-                "message": "ok",
-                "timing": {},
-                "logs": [],
-            },
-        ) as mock_caf:
-            run_change.dispatch_change(
-                client,
-                api_obj,
-                "Test",
-                profile,
-                command="set_zoom",
-                values={},
-                setup_fn=lambda m: None,
-                confirm_fn=confirm,
-            )
-
-        confirm_callable = mock_caf.call_args.kwargs["confirm_fn"]
-        confirm_callable()
-        self.assertIs(seen["client"], client)
-        self.assertEqual(seen["poll_window"], 5.0)
-
-    def test_dispatch_preserves_wrapper_bound_confirm_poll(self):
-        """Wrapper-bound poll windows win over the generic profile poll window."""
-        client = make_client()
-        api_obj = make_api_obj()
-        seen = {}
-
-        def confirm(client, *, poll_window=None):
-            seen["client"] = client
-            seen["poll_window"] = poll_window
-            return {"success": True, "logs": []}
-
-        profile = command_profile.CommandProfile(confirm_poll_s=5.0)
-
-        with patch.object(
-            run_change.dispatch,
-            "write",
-            return_value={
-                "success": True,
-                "confirmed": True,
-                "message": "ok",
-                "timing": {},
-                "logs": [],
-            },
-        ) as mock_caf:
-            run_change.dispatch_change(
-                client,
-                api_obj,
-                "Test",
-                profile,
-                command="set_zoom",
-                values={},
-                setup_fn=lambda m: None,
-                confirm_fn=partial(confirm, poll_window=12.0),
-            )
-
-        confirm_callable = mock_caf.call_args.kwargs["confirm_fn"]
-        confirm_callable()
-        self.assertIs(seen["client"], client)
-        self.assertEqual(seen["poll_window"], 12.0)
-
     def test_default_setting_and_acquire_profiles_encode_retry_policy(self):
         """Uniform posture; acquisition is the one command that never re-sends."""
-        # The settings, the objective and the stage are sent by the one write
-        # profile: four windows, three sends again after a temporary error,
-        # re-fire between windows, unconfirmed-not-fail. None is never-resend.
+        # Every change is sent by the one write profile: four windows, three
+        # sends again after a temporary error, re-fire between windows,
+        # unconfirmed-not-fail. Only the acquisition is never-resend.
         writing = reading_settings.WRITING
         self.assertEqual(writing.max_confirm_attempts, 4)
         self.assertEqual(writing.max_retries, 3)
@@ -647,79 +526,46 @@ class TestDispatchPolicy(unittest.TestCase):
             writes.set_objective("J", 1, "10x"),
             writes.move_z("J", 0.0, "um", "galvo"),
             writes.move_xy(0.0, 0.0, "um"),
+            writes.select_job("J"),
         ):
             self.assertFalse(change.never_resend, change.command)
-        # The XY move alone is sent without a receipt; its readback is the proof.
+        # The XY move and the acquisition are sent without a receipt; the XY
+        # move's readback is the proof.
         self.assertTrue(writes.move_xy(0.0, 0.0, "um").without_receipt)
         self.assertFalse(writes.move_z("J", 0.0, "um", "galvo").without_receipt)
+        self.assertFalse(writes.select_job("J").without_receipt)
 
-        # ACQUIRE is the sole deviation: never re-sends on EITHER axis, but
-        # still returns unconfirmed rather than hard-failing.
-        self.assertEqual(acquire_change.ACQUIRE.max_retries, 0)
-        self.assertEqual(acquire_change.ACQUIRE.max_confirm_attempts, 1)
-        self.assertFalse(acquire_change.ACQUIRE.refire_on_unconfirmed)
-        self.assertEqual(acquire_change.ACQUIRE.start_timeout, 15.0)
+        # The acquisition is the sole deviation: never sent again, and nothing
+        # read back: its scan is watched after the send (confirm_acquire).
+        acquire = writes.acquire("J")
+        self.assertTrue(acquire.never_resend)
+        self.assertTrue(acquire.without_receipt)
+        self.assertIsNone(acquire.confirm)
+        self.assertEqual(acquire.ready.reading, "scan_status")
 
-        signature = inspect.signature(acquire_change.confirm_acquire)
-        self.assertEqual(
-            signature.parameters["start_timeout"].default,
-            acquire_change.ACQUIRE.start_timeout,
-        )
-        self.assertEqual(
-            signature.parameters["heartbeat_interval"].default,
-            acquire_change.ACQUIRE.heartbeat_interval,
-        )
-        self.assertEqual(
-            signature.parameters["poll_interval"].default,
-            acquire_change.ACQUIRE.poll_interval,
-        )
+        signature = inspect.signature(changes.confirm_acquire)
+        self.assertEqual(signature.parameters["start_timeout"].default, 15.0)
+        self.assertEqual(signature.parameters["heartbeat_interval"].default, 30.0)
+        self.assertEqual(signature.parameters["poll_interval"].default, 0.1)
+        self.assertIsNone(signature.parameters["timeout"].default)
 
-        # select_job is the uniform 4x3, not an outlier: no bespoke poll_timeout;
-        # the per-attempt window is the shared confirm_poll_s (CONFIRM_POLL_S),
-        # over max_confirm_attempts attempts, re-fire between.
-        self.assertIsNone(select_job_change.SELECT_JOB.poll_timeout)
-        self.assertEqual(select_job_change.SELECT_JOB.confirm_poll_s, command_profile.WINDOW_S)
-        self.assertEqual(select_job_change.SELECT_JOB.max_confirm_attempts, 4)
+        # select_job is the uniform 4x3, not an outlier: one window of the
+        # selected_job reading at a time, four of them, re-fire between.
+        self.assertEqual(writes.select_job("J").confirm.reading, "selected_job")
 
 
-class TestCommandProfileGuard(unittest.TestCase):
-    """__post_init__ rejects field combinations the dispatcher cannot honour."""
+class TestWriteProfileGuard(unittest.TestCase):
+    """The sending profile and the sent-once rule are coherent."""
 
-    def test_async_requires_no_error_check(self):
-        # Async fire blanks the echo, so a live echo-based error check would
-        # report a meaningless success.
-        with self.assertRaises(ValueError):
-            command_profile.CommandProfile(
-                send_without_receipt=True
-            )  # error_check_fn defaults live
-
-    def test_async_with_null_error_check_is_allowed(self):
-        p = command_profile.CommandProfile(send_without_receipt=True, error_check_fn=None)
-        self.assertTrue(p.send_without_receipt)
-        self.assertIsNone(p.error_check_fn)
-
-    def test_single_confirm_attempt_forbids_refire(self):
+    def test_the_one_write_profile_can_send_again_between_windows(self):
         # One window has no 'next attempt' for a re-fire to precede.
-        with self.assertRaises(ValueError):
-            command_profile.CommandProfile(max_confirm_attempts=1)  # refire defaults True
-
-    def test_single_confirm_attempt_without_refire_is_allowed(self):
-        p = command_profile.CommandProfile(max_confirm_attempts=1, refire_on_unconfirmed=False)
-        self.assertEqual(p.max_confirm_attempts, 1)
-        self.assertFalse(p.refire_on_unconfirmed)
-
-    def test_every_shipped_profile_is_coherent(self):
-        # Importing profiles constructs every module-level profile; the guard
-        # must reject none of them. Assert they are all built and typed.
-        shipped = [
-            acquire_change.ACQUIRE,
-            select_job_change.SELECT_JOB,
-        ]
-        for p in shipped:
-            self.assertIsInstance(p, command_profile.CommandProfile)
-        # The one write profile can re-fire: it has windows after the first.
         writing = reading_settings.WRITING
         self.assertTrue(writing.max_confirm_attempts > 1 or not writing.refire_on_unconfirmed)
+
+    def test_sent_once_has_one_window_and_no_send_again(self):
+        once = send_loop.resolve_profile(reading_settings.WRITING, never_resend=True)
+        self.assertEqual((once.max_retries, once.max_confirm_attempts), (0, 1))
+        self.assertFalse(once.refire_on_unconfirmed)
 
 
 # =============================================================================
@@ -1913,73 +1759,45 @@ class TestSequentialModeGuard(unittest.TestCase):
 
 
 class TestReadback(unittest.TestCase):
+    """One read-back window of a job's settings (``write.read_back``): only answers seen after the change count."""
+
+    SETTINGS = {
+        "jobName": "HiRes",
+        "objective": {"slotIndex": 3},
+        "imageSize": "100.0 um x 100.0 um",
+        "zoom": {"current": 5.0},
+    }
+
+    def _read_back(self, value, *, observed_at, since=10.0):
+        def ask(leg, spec, client, *, until, answer_counts, about, source_kwargs):
+            return readers.Reading(value=value, source=leg, observed_at=observed_at, age_s=0.0)
+
+        expect = writes.Expect("job_settings", lambda s: s["zoom"]["current"] == 5.0, about="HiRes", mode="log")
+        with patch.object(reading_settings, "ask", ask):
+            return send_loop.read_back(reading_settings, None, expect, since=since)()
+
     def test_success(self):
-        settings = {
-            "zoom": {"current": 5.0},
-            "scanSpeed": {"value": 600, "isResonant": False},
-            "scanMode": "xyz",
-            "sequentialMode": "Frame",
-            "scanFieldRotation": {"value": 0.0},
-            "format": "512 x 512",
-            "objective": {"name": "Obj", "magnification": 63},
-            "activeSettings": [],
-        }
-        with patch.object(readers, "get_job_settings", return_value=settings):
-            ch = confirming.readback(None, "HiRes", deadline=time.monotonic() + 1.0)
-        self.assertIsNotNone(ch)
-        self.assertEqual(ch["zoom"]["current"], 5.0)
+        self.assertTrue(self._read_back(self.SETTINGS, observed_at=time.time() + 1.0, since=None)["success"])
 
     def test_failure(self):
-        with patch.object(readers, "get_job_settings", return_value=None):
-            self.assertIsNone(
-                confirming.readback(None, "HiRes", deadline=time.monotonic() + 1.0)
-            )
+        result = self._read_back(None, observed_at=time.time() + 1.0, since=None)
+        self.assertFalse(result["success"])
+        self.assertIsNone(result["last_value"])
 
     def test_rejects_reading_from_before_command(self):
-        reading = readers.Reading(
-            value={
-                "zPosition": {"z-wide": {"position": 100.0}},
-                "zoom": {"current": 1.0},
-                "scanSpeed": {"value": 400, "isResonant": False},
-                "activeSettings": [],
-            },
-            source="log",
-            observed_at=10.0,
-            age_s=0.0,
-        )
-        with patch.object(readers, "get_job_settings", return_value=reading):
-            self.assertIsNone(
-                confirming.readback(
-                    None, "HiRes", deadline=time.monotonic() + 1.0, observed_after=10.0
-                )
-            )
+        self.assertFalse(self._read_back(self.SETTINGS, observed_at=10.0)["success"])
 
     def test_accepts_reading_from_after_command(self):
-        reading = readers.Reading(
-            value={
-                "zPosition": {"z-wide": {"position": 100.0}},
-                "zoom": {"current": 1.0},
-                "scanSpeed": {"value": 400, "isResonant": False},
-                "activeSettings": [],
-            },
-            source="log",
-            observed_at=10.1,
-            age_s=0.0,
-        )
-        with patch.object(readers, "get_job_settings", return_value=reading):
-            result = confirming.readback(
-                None, "HiRes", deadline=time.monotonic() + 1.0, observed_after=10.0
-            )
-        self.assertEqual(result["zPosition"]["z-wide"], 100.0)
+        self.assertTrue(self._read_back(self.SETTINGS, observed_at=10.1)["success"])
 
 
 # =============================================================================
-# 17. check_idle (replaces pre_check_timeout tests)
+# 17. Waiting for the scanner idle before a change (write.wait_ready)
 # =============================================================================
 
 
 class TestCheckIdle(unittest.TestCase):
-    """check_idle is an ordinary scanner-status reading under the one rule."""
+    """The idle wait is an ordinary scanner-status reading under the one rule."""
 
     def setUp(self):
         self._prior = reading_settings.STATE_READERS
@@ -1992,18 +1810,21 @@ class TestCheckIdle(unittest.TestCase):
         remaining = list(values)
         return lambda client: remaining.pop(0) if len(remaining) > 1 else remaining[0]
 
+    def _check_idle(self):
+        return send_loop.wait_ready(reading_settings, None, writes.idle())()
+
     def test_idle_returns_immediately(self):
         with patch.object(
             readers.api_reader, "get_scan_status", return_value="eScanIdle"
         ):
-            result = prechecks.check_idle(None)
+            result = self._check_idle()
         self.assertTrue(result["success"])
         self.assertIsInstance(result["logs"], list)
 
     def test_unknown_is_not_idle(self):
         statuses = self._statuses("Unknown", "Unknown", "eScanIdle")
         with patch.object(readers.api_reader, "get_scan_status", side_effect=statuses):
-            result = prechecks.check_idle(None)
+            result = self._check_idle()
         self.assertTrue(result["success"])
 
     def test_waits_until_idle(self):
@@ -2011,16 +1832,16 @@ class TestCheckIdle(unittest.TestCase):
             "eScanRunning", "eScanRunning", "eScanRunning", "eScanIdle"
         )
         with patch.object(readers.api_reader, "get_scan_status", side_effect=statuses):
-            result = prechecks.check_idle(None)
+            result = self._check_idle()
         self.assertTrue(result["success"])
 
     def test_busy_through_four_windows_fails(self):
         with patch.object(
             readers.api_reader, "get_scan_status", return_value="eScanRunning"
         ):
-            result = prechecks.check_idle(None)
+            result = self._check_idle()
         self.assertFalse(result["success"])
-        self.assertTrue(any("not idle" in e["msg"] for e in result["logs"]))
+        self.assertTrue(any("not ready" in e["msg"] for e in result["logs"]))
 
 
 # =============================================================================
@@ -2148,7 +1969,7 @@ class TestUnclassifiedErrorLogging(unittest.TestCase):
 
 
 # =============================================================================
-# 19. confirm_acquire and confirm_select_job
+# 19. acquire, confirm_acquire and select_job
 # =============================================================================
 
 
@@ -2181,11 +2002,7 @@ class TestDispatchCheckExceptions(unittest.TestCase):
             fake_client,
             api_obj,
             "TestCmd",
-            profile=command_profile.CommandProfile(
-                error_check_fn=None,
-                send_without_receipt=True,
-                max_retries=0,
-            ),
+            profile=replace(reading_settings.WRITING, send_without_receipt=True, max_retries=0),
             setup_fn=None,
             pre_check_fn=None,
             error_check_fn=lambda: (_ for _ in ()).throw(
@@ -2228,18 +2045,54 @@ class TestQuantisedSizesDirection(unittest.TestCase):
         self.assertEqual([round(s, 6) for s in writes.quantised_sizes(20.0, 3.0)], [18.0, 21.0])
 
 
+def status(value):
+    """A scanner status read after the watch began; None: no answer."""
+    if value is None:
+        return None
+    return readers.Reading(value=value, source="api", observed_at=time.time() + 1.0, age_s=0.0)
+
+
 class TestConfirmAcquire(unittest.TestCase):
     def test_idle_without_scanning_returns_failure(self):
-        """Always idle, never saw scanning -> failure (start_timeout)."""
+        """Always idle and no new picture -> the scan never started."""
         with (
-            patch.object(readers, "get_scan_status", return_value="eScanIdle"),
-            patch.object(acquire_change, "_check_api_error", return_value=None),
+            patch.object(readers, "get_scan_status", return_value=status("eScanIdle")),
+            patch.object(changes, "_check_api_error", return_value=None),
+            patch.object(changes.state_tree, "last_image_id", return_value=10),
             patch("time.sleep"),
         ):
-            result = acquire_change.confirm_acquire(
-                None, start_timeout=0.0, timeout=1.0, poll_interval=0.001
+            result = changes.confirm_acquire(
+                None, image_before=10, start_timeout=0.0, timeout=1.0, poll_interval=0.001
             )
         self.assertFalse(result["success"])
+        self.assertIs(result["started"], False)
+
+    def test_a_scan_too_quick_to_see_ran_when_its_picture_arrived(self):
+        """Never seen running, but LAS X made a new picture: the scan ran."""
+        with (
+            patch.object(readers, "get_scan_status", return_value=status("eScanIdle")),
+            patch.object(changes, "_check_api_error", return_value=None),
+            patch.object(changes.state_tree, "last_image_id", return_value=11),
+            patch("time.sleep"),
+        ):
+            result = changes.confirm_acquire(
+                None, image_before=10, start_timeout=0.0, timeout=1.0, poll_interval=0.001
+            )
+        self.assertTrue(result["success"])
+        self.assertIs(result["started"], True)
+
+    def test_without_the_picture_number_an_unseen_scan_is_unknown(self):
+        """No picture number to compare: not seen running is not proof it never ran."""
+        with (
+            patch.object(readers, "get_scan_status", return_value=status("eScanIdle")),
+            patch.object(changes, "_check_api_error", return_value=None),
+            patch("time.sleep"),
+        ):
+            result = changes.confirm_acquire(
+                None, image_before=None, start_timeout=0.0, timeout=1.0, poll_interval=0.001
+            )
+        self.assertFalse(result["success"])
+        self.assertIsNone(result["started"])
 
     def test_scanning_then_idle(self):
         """Non-idle then idle -> success (saw scanning)."""
@@ -2247,16 +2100,30 @@ class TestConfirmAcquire(unittest.TestCase):
 
         def mock_status(client, **_kwargs):
             call_count[0] += 1
-            return "eScanStarted" if call_count[0] <= 2 else "eScanIdle"
+            return status("eScanStarted" if call_count[0] <= 2 else "eScanIdle")
 
         with (
             patch.object(readers, "get_scan_status", side_effect=mock_status),
             patch("time.sleep"),
         ):
-            result = acquire_change.confirm_acquire(
+            result = changes.confirm_acquire(
                 None, timeout=5.0, poll_interval=0.001
             )
         self.assertTrue(result["success"])
+        self.assertTrue(result["started"])
+
+    def test_a_status_from_before_the_watch_is_not_evidence(self):
+        """Only readings taken after the watch began count."""
+        old = readers.Reading(value="eScanRunning", source="api", observed_at=1.0, age_s=0.0)
+        with (
+            patch.object(readers, "get_scan_status", return_value=old),
+            patch.object(changes, "_check_api_error", return_value=None),
+            patch("time.sleep"),
+        ):
+            result = changes.confirm_acquire(
+                None, start_timeout=0.0, timeout=1.0, poll_interval=0.001
+            )
+        self.assertFalse(result["started"])
 
     def test_failed_status_read_is_not_evidence_of_scanning(self):
         """A failed read (None) then idle forever -> failure, not success.
@@ -2269,14 +2136,14 @@ class TestConfirmAcquire(unittest.TestCase):
 
         def mock_status(client, **_kwargs):
             call_count[0] += 1
-            return None if call_count[0] == 1 else "eScanIdle"
+            return status(None if call_count[0] == 1 else "eScanIdle")
 
         with (
             patch.object(readers, "get_scan_status", side_effect=mock_status),
-            patch.object(acquire_change, "_check_api_error", return_value=None),
+            patch.object(changes, "_check_api_error", return_value=None),
             patch("time.sleep"),
         ):
-            result = acquire_change.confirm_acquire(
+            result = changes.confirm_acquire(
                 None, start_timeout=0.0, timeout=1.0, poll_interval=0.001
             )
         self.assertFalse(result["success"])
@@ -2287,14 +2154,14 @@ class TestConfirmAcquire(unittest.TestCase):
 
         def mock_status(client, **_kwargs):
             call_count[0] += 1
-            return "Unknown" if call_count[0] == 1 else "eScanIdle"
+            return status("Unknown" if call_count[0] == 1 else "eScanIdle")
 
         with (
             patch.object(readers, "get_scan_status", side_effect=mock_status),
-            patch.object(acquire_change, "_check_api_error", return_value=None),
+            patch.object(changes, "_check_api_error", return_value=None),
             patch("time.sleep"),
         ):
-            result = acquire_change.confirm_acquire(
+            result = changes.confirm_acquire(
                 None, start_timeout=0.0, timeout=1.0, poll_interval=0.001
             )
         self.assertFalse(result["success"])
@@ -2306,62 +2173,124 @@ class TestConfirmAcquire(unittest.TestCase):
         )
 
         def mock_status(client, **_kwargs):
-            return next(statuses, "eScanIdle")
+            return status(next(statuses, "eScanIdle"))
 
         with (
             patch.object(readers, "get_scan_status", side_effect=mock_status),
             patch("time.sleep"),
         ):
-            result = acquire_change.confirm_acquire(
+            result = changes.confirm_acquire(
                 None, timeout=5.0, poll_interval=0.001
             )
         self.assertTrue(result["success"])
 
-
-class TestConfirmSelectJob(unittest.TestCase):
-    def test_selected_after_settle(self):
-        """Job is selected on first poll -> success."""
-        jobs = [{"Name": "HiRes", "IsSelected": True}]
-        with patch.object(readers, "get_jobs", return_value=jobs), patch("time.sleep"):
-            result = select_job_change.confirm_select_job(
-                None, job_name="HiRes", timeout=1.0
-            )
-        self.assertTrue(result["success"])
-
-    def test_timeout_returns_failure(self):
-        """Job never becomes selected -> failure."""
-        jobs = [{"Name": "Other", "IsSelected": True}]
-        with patch.object(readers, "get_jobs", return_value=jobs), patch("time.sleep"):
-            result = select_job_change.confirm_select_job(
-                None, job_name="HiRes", timeout=0.01
-            )
-        self.assertFalse(result["success"])
-
-    def test_api_confirm_leg_never_touches_log_wait(self):
-        jobs = [{"Name": "HiRes", "IsSelected": True}]
+    def test_a_permanent_error_before_the_scan_starts_ends_the_watch(self):
         with (
-            patch.object(
-                select_job_change.log_wait, "wait_for_selected_job_log"
-            ) as log_wait_mock,
-            patch.object(readers, "get_jobs", return_value=jobs),
+            patch.object(readers, "get_scan_status", return_value=status("eScanIdle")),
+            patch.object(changes, "_check_api_error", return_value={"error": "out of range"}),
             patch("time.sleep"),
         ):
-            result = select_job_change.confirm_select_job(
-                None, job_name="HiRes", timeout=1.0, command_started_at=100.0
-            )
+            result = changes.confirm_acquire(None, start_timeout=10.0, timeout=10.0, poll_interval=0.001)
+        self.assertFalse(result["success"])
+        self.assertFalse(result["started"])
+        self.assertTrue(any("permanent" in e["msg"] for e in result["logs"]))
 
-        self.assertTrue(result["success"])
-        log_wait_mock.assert_not_called()
+    def test_a_scan_that_runs_past_the_watch_has_started(self):
+        with (
+            patch.object(readers, "get_scan_status", return_value=status("eScanRunning")),
+            patch("time.sleep"),
+        ):
+            result = changes.confirm_acquire(None, timeout=0.05, poll_interval=0.001)
+        self.assertFalse(result["success"])
+        self.assertTrue(result["started"])
 
-    # Log-source and hybrid confirmation behavior is covered by
-    # testing/unit/test_select_job_confirm.py against the one policy point
-    # (confirm_select_job.select_job_confirm_legs).
 
-    def test_select_job_early_exit_pins_api_mode(self):
+class TestAcquire(unittest.TestCase):
+    """``acquire``: sent once through ``run()``, then the scan is watched."""
+
+    def setUp(self):
+        self.client = make_client()
+        self.api_obj = make_api_obj()
+        self.client.PyApiAcquireJob = self.api_obj
+
+    def _acquire(self, watched, **options):
+        with patch.object(changes, "confirm_acquire", return_value=watched) as watch:
+            result = changes.acquire(self.client, "HiRes", **options)
+        return result, watch
+
+    def test_a_capture_that_ran_is_confirmed(self):
+        result, _ = self._acquire({"success": True, "started": True, "logs": []})
+        self.assertEqual((result["success"], result["confirmed"]), (True, True))
+        self.assertEqual(result["timing"]["confirm_attempts"], 1)
+        self.assertEqual(self.api_obj.UpdateAsync.call_count, 1)
+
+    def test_a_capture_whose_start_is_unknown_is_unconfirmed_not_failed(self):
+        result, _ = self._acquire({"success": False, "started": None, "logs": []})
+        self.assertEqual((result["success"], result["confirmed"]), (True, False))
+
+    def test_a_capture_whose_scan_never_starts_fails(self):
+        result, _ = self._acquire({"success": False, "started": False, "logs": []})
+        self.assertFalse(result["success"])
+        self.assertFalse(result["confirmed"])
+        self.assertIn("the scan never started", result["message"])
+        self.assertEqual(self.api_obj.UpdateAsync.call_count, 1)  # never sent again
+
+    def test_take_picture_raises_when_the_scan_never_starts(self):
+        with (
+            patch.object(changes, "confirm_acquire", return_value={"success": False, "started": False, "logs": []}),
+            self.assertRaisesRegex(RuntimeError, "acquire failed"),
+        ):
+            changes.take_picture(self.client, "HiRes")
+        self.assertEqual(self.api_obj.UpdateAsync.call_count, 1)
+
+    def test_a_scan_seen_running_but_not_finishing_is_unconfirmed_not_failed(self):
+        result, _ = self._acquire({"success": False, "started": True, "logs": []})
+        self.assertEqual((result["success"], result["confirmed"]), (True, False))
+        self.assertIn("(readback unconfirmed)", result["message"])
+        self.assertEqual(self.api_obj.UpdateAsync.call_count, 1)
+
+    def test_an_unconfirmed_capture_names_the_dialog_in_the_way(self):
+        with patch.object(
+            reading_settings.WRITING.transport, "dialog_warning_since", return_value="LAS X shows 'Stage error'"
+        ):
+            result, _ = self._acquire({"success": False, "started": False, "logs": []})
+        self.assertIn("dialog=", result["message"])
+        self.assertIn("Stage error", result["message"])
+
+    def test_the_watch_gets_only_the_numbers_given(self):
+        _, watch = self._acquire({"success": True, "started": True, "logs": []}, poll_timeout=5.0, start_timeout=2.0)
+        # and the number of LAS X's last picture, None here: no hardware server answers
+        self.assertEqual(watch.call_args.kwargs, {"image_before": None, "timeout": 5.0, "start_timeout": 2.0})
+
+    def test_a_capture_that_was_not_sent_is_not_watched(self):
+        self.api_obj.UpdateAsync.side_effect = RuntimeError("COM error")
+        result, watch = self._acquire({"success": True, "started": True, "logs": []})
+        self.assertFalse(result["success"])
+        watch.assert_not_called()
+        self.assertEqual(self.api_obj.UpdateAsync.call_count, 1)
+
+
+class TestConfirmSelectJob(unittest.TestCase):
+    # The read order of the confirmation is covered by
+    # testing/unit/test_select_job_confirm.py.
+
+    def _select(self, profile, **patches):
         client = make_client()
         client.PyApiSelectJobByName = make_api_obj()
+        dispatched = {"success": True, "confirmed": True, "message": "sent", "logs": []}
+        with (
+            patch.object(reading_settings, "STATE_READERS", profile),
+            patch.object(changes.dispatch, "run", return_value=dispatched) as run,
+            contextlib.ExitStack() as stack,
+        ):
+            for target, name, kwargs in patches.get("more", []):
+                stack.enter_context(patch.object(target, name, **kwargs))
+            result = changes.select_job(client, "Overview")
+        return result, dispatched, run
+
+    def test_select_job_early_exit_pins_api_mode(self):
         profile = reading_settings.StateReaderProfile(
-            selected_job_confirm_source="api",
+            selected_job_confirm_fallback="api",
         )
         calls = []
 
@@ -2376,48 +2305,34 @@ class TestConfirmSelectJob(unittest.TestCase):
                 {"Name": "Overview", "IsSelected": False},
             ]
 
-        dispatched = {"success": True, "confirmed": True, "message": "sent"}
-        with (
-            patch.object(reading_settings, "STATE_READERS", profile),
-            patch.object(readers, "get_jobs", side_effect=fake_get_jobs),
-            patch.object(
-                run_change, "dispatch_change", return_value=dispatched
-            ) as dispatch_mock,
-        ):
-            result = commands_comp.select_job(client, "Overview")
+        result, dispatched, run = self._select(
+            profile, more=[(readers, "get_jobs", {"side_effect": fake_get_jobs})]
+        )
 
         self.assertEqual(result, dispatched)
         self.assertEqual(calls[0]["mode"], "api")
-        dispatch_mock.assert_called_once()
+        run.assert_called_once()
 
     def test_select_job_log_confirmation_does_not_api_early_exit(self):
-        client = make_client()
-        client.PyApiSelectJobByName = make_api_obj()
         profile = reading_settings.StateReaderProfile(
-            selected_job_confirm_source="log",
+            selected_job_confirm_fallback="log",
         )
-        dispatched = {"success": True, "confirmed": True, "message": "sent"}
-        with (
-            patch.object(reading_settings, "STATE_READERS", profile),
-            patch.object(
-                select_job_change, "selected_job_from_log", return_value=None
-            ),
-            patch.object(readers, "get_jobs") as get_jobs,
-            patch.object(
-                run_change, "dispatch_change", return_value=dispatched
-            ) as dispatch_mock,
-        ):
-            result = commands_comp.select_job(client, "Overview")
+        get_jobs = MagicMock()
+        result, dispatched, run = self._select(
+            profile,
+            more=[
+                (changes, "selected_job_from_log", {"return_value": None}),
+                (readers, "get_jobs", {"new": get_jobs}),
+            ],
+        )
 
         self.assertEqual(result, dispatched)
         get_jobs.assert_not_called()
-        dispatch_mock.assert_called_once()
+        run.assert_called_once()
 
     def test_select_job_primes_log_cluster_when_profile_enables_it(self):
-        client = make_client()
-        client.PyApiSelectJobByName = make_api_obj()
         profile = reading_settings.StateReaderProfile(
-            selected_job_confirm_source="log",
+            selected_job_confirm_fallback="log",
             selected_job_log_prime_cluster=True,
         )
         jobs = [
@@ -2427,58 +2342,38 @@ class TestConfirmSelectJob(unittest.TestCase):
         ]
         primed = []
 
-        def fake_api_jobs(client, profile):
-            return jobs, "ok"
-
         def fake_settings(client, job_name, **kwargs):
             primed.append((job_name, kwargs.get("mode")))
             return {"jobName": job_name}
 
-        dispatched = {"success": True, "confirmed": True, "message": "sent"}
-        with (
-            patch.object(reading_settings, "STATE_READERS", profile),
-            patch.object(
-                select_job_change, "selected_job_from_log", return_value=None
-            ),
-            patch.object(
-                select_job_change, "api_jobs", side_effect=fake_api_jobs
-            ),
-            patch.object(
-                select_job_change.readers,
-                "get_job_settings",
-                side_effect=fake_settings,
-            ),
-            patch.object(
-                run_change, "dispatch_change", return_value=dispatched
-            ) as dispatch_mock,
-        ):
-            result = commands_comp.select_job(client, "Overview")
+        result, dispatched, run = self._select(
+            profile,
+            more=[
+                (changes, "selected_job_from_log", {"return_value": None}),
+                (changes, "api_jobs", {"return_value": (jobs, "ok")}),
+                (changes.readers, "get_job_settings", {"side_effect": fake_settings}),
+            ],
+        )
 
         self.assertEqual(result, dispatched)
         self.assertEqual(
             primed, [("AF Job", "api"), ("Overview", "api"), ("HiRes", "api")]
         )
-        self.assertIsNone(dispatch_mock.call_args.kwargs["confirm_fn"])
-        log_leg = dispatch_mock.call_args.kwargs["log_confirm_fn"]
-        self.assertIsNotNone(log_leg)
-        self.assertIsInstance(log_leg.args[1], float)
+        confirm = run.call_args.args[2].confirm
+        self.assertEqual((confirm.reading, confirm.mode, confirm.fallback), ("selected_job", "direct", "log"))
 
 
-class TestHybridSelectJobApiLegEndToEnd(unittest.TestCase):
-    """CF-01 regression: the hybrid race's api leg must actually reach the
-    CAM client through the routed readers while the race is running.
+class TestSelectJobEndToEnd(unittest.TestCase):
+    """``select_job`` through the real dispatcher and read loop; only the raw
+    CAM reader is faked, and the hardware server cannot be reached.
 
-    Wires ``commands_comp.select_job`` through the real dispatch backbone and
-    the real reader router — only the raw CAM reader and the log poll are
-    faked. Before the fix, the race held the client's in-flight claim for
-    the api leg's entire duration, so the leg's own routed ``get_jobs``
-    reads were refused for their full timeout: the raw reader was never
-    called inside the race and hybrid select_job was log-only in practice.
+    The API's job list confirms a switch it saw happen (its answer from before
+    the change named another job). It never confirms the A->B->A restore,
+    where it named the target before the change: then only the log may, and a
+    silent log leaves the change unconfirmed.
     """
 
-    def test_api_leg_confirms_when_log_has_no_evidence(self):
-        from zmart_drivers.leica.stellaris.navigator_expert.primitives.log import reads as log_reader
-
+    def _client(self, after_fire):
         client = make_client()
         api_obj = make_api_obj()
         client.PyApiSelectJobByName = api_obj
@@ -2491,58 +2386,48 @@ class TestHybridSelectJobApiLegEndToEnd(unittest.TestCase):
             return True
 
         api_obj.UpdateAwaitReceipt = MagicMock(side_effect=fire)
-
         raw_reads_after_fire = []
 
         def raw_get_jobs(c, **kwargs):
             if fired.is_set():
                 raw_reads_after_fire.append(1)
-                return [
-                    {"Name": "Overview", "IsSelected": False},
-                    {"Name": "HiRes", "IsSelected": True},
-                ]
+                return after_fire
             return [
                 {"Name": "Overview", "IsSelected": True},
                 {"Name": "HiRes", "IsSelected": False},
             ]
 
-        silent_log = log_reader.LogPollResult(
-            success=False,
-            value=None,
-            matched_at=None,
-            elapsed_s=0.05,
-            attempts=1,
-            reason="timeout",
-            diagnostics={"last_reason": "timeout"},
-        )
-        profile = reading_settings.StateReaderProfile(selected_job_confirm_source="hybrid")
+        return client, raw_get_jobs, raw_reads_after_fire
+
+    def _select_job(self, job_name, after_fire):
+        client, raw_get_jobs, raw_reads_after_fire = self._client(after_fire)
+        profile = reading_settings.StateReaderProfile(selected_job_confirm_fallback="hybrid")
         with (
             patch.object(reading_settings, "STATE_READERS", profile),
             patch.object(readers.api_reader, "get_jobs", side_effect=raw_get_jobs),
-            patch.object(
-                select_job_change, "selected_job_from_log", return_value=None
-            ),
-            patch.object(
-                select_job_change.log_wait,
-                "wait_for_selected_job_log",
-                return_value=silent_log,
-            ),
+            patch.object(changes, "selected_job_from_log", return_value=None),
         ):
-            result = commands_comp.select_job(client, "HiRes")
+            result = changes.select_job(client, job_name)
+        return result, raw_reads_after_fire
 
+    def test_the_api_confirms_a_switch_it_saw_happen(self):
+        result, raw_reads_after_fire = self._select_job(
+            "HiRes", [{"Name": "Overview", "IsSelected": False}, {"Name": "HiRes", "IsSelected": True}]
+        )
         self.assertTrue(result["success"])
         self.assertTrue(
             result.get("confirmed"),
-            "hybrid select_job did not confirm although the API could "
-            "witness the transition (api leg starved inside the race?)",
+            "hybrid select_job did not confirm although the API could witness the transition",
         )
-        self.assertGreater(
-            len(raw_reads_after_fire),
-            0,
-            "the api leg's routed reads never reached the raw CAM reader",
+        self.assertGreater(len(raw_reads_after_fire), 0, "the API was never asked after the change")
+
+    def test_a_stale_api_naming_the_target_before_the_change_never_confirms_it(self):
+        result, raw_reads_after_fire = self._select_job(
+            "Overview", [{"Name": "Overview", "IsSelected": True}, {"Name": "HiRes", "IsSelected": False}]
         )
-        messages = [entry["msg"] for entry in result["logs"]]
-        self.assertTrue(any("confirmed by api leg" in m for m in messages))
+        self.assertTrue(result["success"])
+        self.assertFalse(result["confirmed"])
+        self.assertEqual(raw_reads_after_fire, [], "the API was asked although it cannot witness this change")
 
 
 # =============================================================================

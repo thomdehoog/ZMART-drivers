@@ -23,8 +23,6 @@ this repository)::
                           origin, orientation, optical_calibration and
                           data_location, each with its defaults, loader, measuring code
                           and notebook; plus the store that finds the saved values
-    - operations/         what the STELLARIS does: changes/ (each change with its
-                          confirmation), readings/ and sending/ (how a command reaches LAS X)
     - dispatcher/         the machinery that runs a command safely, and names no LAS X
                           object: the one door (read and write), the reader, the send and
                           confirm loops and the limits gate

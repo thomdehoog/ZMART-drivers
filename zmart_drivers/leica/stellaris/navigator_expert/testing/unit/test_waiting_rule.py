@@ -24,7 +24,9 @@ import pytest
 from zmart_drivers.leica.stellaris.navigator_expert.primitives.direct import profile as capabilities
 from zmart_drivers.leica.stellaris.navigator_expert.procedures import keep_in_view as objective_shift
 
-from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import prechecks
+from zmart_drivers.leica.stellaris.navigator_expert.dispatcher import write
+from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import reads as api_engine
+from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import writes
 from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import waiting
 from zmart_drivers.leica.stellaris.navigator_expert.procedures import readings as readers
 from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import transfer as delivery
@@ -269,7 +271,7 @@ def test_the_idle_check_asks_the_api_even_in_a_log_only_run():
     with patch.object(
         readers.api_reader, "get_scan_status", return_value="eScanIdle"
     ) as api:
-        assert prechecks.check_idle(new_client())["success"] is True
+        assert write.wait_ready(reading_settings, new_client(), writes.idle())()["success"] is True
     api.assert_called()
 
 
@@ -278,7 +280,7 @@ def test_the_idle_check_fails_after_four_windows_of_a_busy_scanner():
         readers.api_reader, "get_scan_status", return_value="eScanRunning"
     ):
         t0 = time.monotonic()
-        result = prechecks.check_idle(new_client())
+        result = write.wait_ready(reading_settings, new_client(), writes.idle())()
         elapsed = time.monotonic() - t0
     assert result["success"] is False
     assert 4 * WINDOW_S <= elapsed < 4 * WINDOW_S + 1.0
@@ -319,6 +321,71 @@ def test_a_job_switch_keeps_its_objective_while_the_api_is_busy():
     assert outcome["objective_changed"] is False
 
 
+def test_a_routed_api_read_waits_while_another_holds_the_client():
+    """One request at a time per connection: while another holds the client's
+    turn, a routed read does not reach the CAM API; once the turn is handed
+    back, it asks and answers, instead of having given up."""
+    client = new_client()
+    key = api_engine._client_api_key(client)
+    assert api_engine._API_TURNS.take(
+        key, until=time.monotonic() + 1.0, stop=threading.Event(), poll_s=0.01
+    )
+    raw_calls = []
+    raw_calls_while_held = []
+
+    def raw_get_jobs(c, **_kwargs):
+        raw_calls.append(c)
+        return [{"Name": "HiRes", "IsSelected": True}]
+
+    def give_back_later():
+        time.sleep(0.2)
+        raw_calls_while_held.extend(raw_calls)
+        api_engine._API_TURNS.give_back(key)
+
+    try:
+        with patch.object(readers.api_reader, "get_jobs", side_effect=raw_get_jobs):
+            threading.Thread(target=give_back_later, daemon=True).start()
+            jobs = readers.get_jobs(client, mode="api")
+    finally:
+        api_engine._API_TURNS.give_back(key)
+
+    assert raw_calls_while_held == []
+    assert jobs == [{"Name": "HiRes", "IsSelected": True}]
+    assert raw_calls == [client]
+
+
+def test_a_read_that_outlasts_its_window_leaves_no_turn_behind():
+    """A reading that gives up on a CAM call that hangs hands the turn back
+    when the call finally returns, so the next reading asks and answers."""
+    client = new_client()
+    key = api_engine._client_api_key(client)
+    release = threading.Event()
+    raw_calls = []
+
+    def raw_get_jobs(c, **_kwargs):
+        raw_calls.append(c)
+        if len(raw_calls) == 1:
+            release.wait(5.0)  # the slow CAM read the first reading gives up on
+        return [{"Name": "HiRes", "IsSelected": True}]
+
+    try:
+        with patch.object(readers.api_reader, "get_jobs", side_effect=raw_get_jobs):
+            first = readers.get_jobs(client, mode="api", deadline=time.monotonic() + 0.2)
+            assert first is None
+
+            release.set()  # the hung CAM read finally returns
+            deadline = time.monotonic() + 2.0
+            while key in api_engine._API_TURNS._busy and time.monotonic() < deadline:
+                time.sleep(0.01)
+            assert key not in api_engine._API_TURNS._busy
+
+            second = readers.get_jobs(client, mode="api")
+    finally:
+        release.set()
+
+    assert second == [{"Name": "HiRes", "IsSelected": True}]
+
+
 def test_delivery_is_four_tries_of_one_window_without_a_pause():
     api_obj = MagicMock()
     api_obj.UpdateAwaitReceipt.return_value = False
@@ -347,10 +414,10 @@ def test_commands_deliver_through_the_one_helper():
 
 
 # Whole folders, plus the change definitions that moved from actions/ to procedures/.
-GUARDED = ("dispatcher", "connection", "primitives", "operations")
+GUARDED = ("dispatcher", "connection", "primitives")
 GUARDED_FILES = (
     "procedures/keep_in_view.py",
-    "procedures/keep_in_view.py",
+    "procedures/changes.py",
 )
 WAIT_NAME = re.compile(
     r"(timeout|poll_interval|max_retries|max_confirm_attempts|grace|deadline|window_s|retry_delay)",
@@ -358,15 +425,10 @@ WAIT_NAME = re.compile(
 )
 #: The waits that stay outside the rule, by decision, as (file, name).
 EXCEPTIONS = {
-    # Acquisition is never sent again and watches one acquisition (ACQUIRE).
-    ("operations/changes/acquire.py", "start_timeout"),
-    ("operations/changes/acquire.py", "poll_interval"),
-    ("operations/changes/acquire.py", "max_retries"),
-    ("operations/changes/acquire.py", "max_confirm_attempts"),
-    ("primitives/cam_api/profile.py", "max_retries"),
-    ("primitives/cam_api/profile.py", "max_confirm_attempts"),
-    ("primitives/cam_api/profile.py", "poll_interval"),
-    ("primitives/cam_api/profile.py", "start_timeout"),
+    # Acquisition is never sent again; watching its scan run is not a
+    # read-back, and has its own numbers (confirm_acquire).
+    ("procedures/changes.py", "start_timeout"),
+    ("procedures/changes.py", "poll_interval"),
     # LAS X filling in the error report after a command stays at 1 s.
     (
         "primitives/cam_api/transfer.py",

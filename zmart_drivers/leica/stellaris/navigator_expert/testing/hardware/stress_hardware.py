@@ -1127,12 +1127,12 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.mock:
         # The Python mock has no LAS X log stream, so log evidence cannot
-        # exist; pin selected-job confirmation to the api leg.
+        # exist; when the direct reader cannot answer, the API confirms a job change.
         from dataclasses import replace  # noqa: PLC0415
 
 
         reading_settings.STATE_READERS = replace(
-            reading_settings.STATE_READERS, selected_job_confirm_source="api"
+            reading_settings.STATE_READERS, selected_job_confirm_fallback="api"
         )
         log.info(
             "mock backend: selected-job confirmation pinned to api (no log stream exists)"

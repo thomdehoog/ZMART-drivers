@@ -3,23 +3,21 @@
 The rest of the driver calls the dispatcher here and never needs to know which
 of its two engines does the work. :func:`run` is the one entry: a reading by
 its name, or a change as plain data (for LAS X, a ``Write`` from
-``primitives/cam_api/writes.py``). :func:`read` and :func:`write` are the older
-two doors, used by the changes not yet ported to :func:`run`:
+``primitives/cam_api/writes.py``).
 
-- :func:`read` waits for an answer to a question about the microscope. It asks
-  the sources one after the other (``reader.py``) and is safe to repeat: the
+- A reading waits for an answer to a question about the microscope. It asks
+  the sources one after the other (``read.py``) and is safe to repeat: the
   reader asks again, never the hardware.
-- :func:`write` changes something on the microscope: it sends the command,
-  checks for an error (``send_loop.py``), reads the value back until it matches, and
-  sends again where that is safe (``confirm_loop.py``). It first asks the limits gate
-  (``gate.py``) and sends nothing if the limits refuse. Changing a setting or moving to an
-  absolute position can be repeated. The one command that must never be sent
-  again is starting an acquisition, which says so in its profile
-  (``never_resend``).
+- A change first asks the limits gate (``limits.py``) and sends nothing if the
+  limits refuse. Then the write loops (``write.py``) send it, check for an
+  error, read the value back until it matches, and send again where that is
+  safe. Changing a setting or moving to an absolute position can be repeated.
+  The one change that must never be sent again is starting an acquisition,
+  which says so (``never_resend``).
 
-The confirm loop uses the reader to confirm a change, so the two share one
+The write loops confirm a change through the read loop, so the two share one
 waiting rule. This file knows nothing of any one microscope: the microscope's
-own sources, command profiles, error sorting and waiting numbers are handed in.
+own sources, how it sends, its error sorting and waiting numbers are handed in.
 
 Author: Thom de Hoog, Center for Microscopy and Image Analysis (ZMB),
 University of Zurich (thom.dehoog@zmb.uzh.ch, thomdehoog@gmail.com).
@@ -140,6 +138,8 @@ def run(profile, client, primitive, *, max_retries=None, **asked):
         return refused(message, logged=True)
     request = profile.make_request(client, change)
     sending = profile.WRITING
+    # Answers seen from now on can confirm the change; see write.read_back.
+    handed_over = time.time()
     result = writer.confirm_and_fire(
         client,
         request,
@@ -149,7 +149,7 @@ def run(profile, client, primitive, *, max_retries=None, **asked):
         pre_check_fn=writer.wait_ready(profile, client, change.ready) if change.ready else None,
         # Sent without a receipt, the reply is blank: there is nothing to check.
         error_check_fn=None if change.without_receipt else (lambda: profile.check_reply(client, change)),
-        confirm_fn=writer.read_back(profile, client, change.confirm) if change.confirm else None,
+        confirm_fn=writer.read_back(profile, client, change.confirm, since=handed_over) if change.confirm else None,
         never_resend=change.never_resend,
         max_retries=max_retries,
         send_without_receipt=change.without_receipt,
@@ -157,39 +157,3 @@ def run(profile, client, primitive, *, max_retries=None, **asked):
     result["route"] = getattr(sending.transport, "carried_by", None)
     return result
 
-
-def read(vendor, datum, client, **keywords):
-    """Wait for a reading of *datum* from the microscope's sources; see :func:`reader.wait_for`."""
-    from . import read as reader
-
-    return reader.wait_for(vendor, datum, client, **keywords)
-
-
-def write(client, request, description, *, command, values, make_request=None, **keywords):
-    """Send a change, check it, and confirm it; see :func:`confirm_loop.confirm_and_fire`.
-
-    ``command`` is the name of the change and ``values`` is what it would set.
-    Before anything is sent, the limits gate is asked whether this connection's
-    limits allow it. If not, nothing is sent and the answer is a refused result
-    with the reason. Because the check sits here, no change can reach the
-    microscope without passing it, whichever recipe asked. ``make_request``,
-    when given, makes the request only once the limits allow the change, so a
-    refused change never touches the client. The result also says, under
-    ``route``, which way the command went.
-    """
-    from . import write as confirm_loop, limits as gate
-
-    hint = getattr(keywords.get("profile"), "limits_setup_hint", None)
-    message = gate.check_refusal(client, command, values, hint)
-    if message is not None:
-        return refused(message, logged=True)
-    if make_request is not None:
-        request = make_request()
-    result = confirm_loop.confirm_and_fire(client, request, description, **keywords)
-
-    # Which way the command went, when the transport keeps several ("direct", "cam"):
-    # None when nothing was sent.
-    result["route"] = getattr(
-        getattr(keywords.get("profile"), "transport", None), "carried_by", None
-    )
-    return result

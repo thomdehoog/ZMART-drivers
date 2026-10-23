@@ -39,7 +39,7 @@ def _offline(monkeypatch, tmp_path):
     monkeypatch.setattr(
         reading_settings,
         "STATE_READERS",
-        replace(reading_settings.STATE_READERS, selected_job_confirm_source="api"),
+        replace(reading_settings.STATE_READERS, selected_job_confirm_fallback="api"),
     )
     hermetic_mock_machine_root()
     monkeypatch.setattr(

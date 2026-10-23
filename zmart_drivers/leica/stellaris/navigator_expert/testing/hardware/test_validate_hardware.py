@@ -259,14 +259,15 @@ def test_the_direct_reader_route_can_be_chosen(caplog):
 
 
 def test_the_direct_route_keeps_the_drivers_own_job_confirmation():
-    """Job selection is confirmed by api, log or hybrid; on the direct route the driver's default stays."""
+    """A job change is confirmed by the direct reader first; on the direct route the driver's fallback stays."""
     prior = reading_settings.STATE_READERS
     try:
         args = validate_hardware.parse_args(["--state-reader-mode", "direct"])
         log = validate_hardware.logging.getLogger("t")
         validate_hardware._apply_state_reader_mode(args.state_reader_mode, log)
         validate_hardware._apply_log_select_confirmation(args, log)
-        assert reading_settings.STATE_READERS.selected_job_confirm_source == "direct"
+        assert reading_settings.STATE_READERS.selected_job_mode == "direct"
+        assert reading_settings.STATE_READERS.selected_job_confirm_fallback == "hybrid"
         assert reading_settings.STATE_READERS.xy_mode == "direct"
     finally:
         reading_settings.STATE_READERS = prior

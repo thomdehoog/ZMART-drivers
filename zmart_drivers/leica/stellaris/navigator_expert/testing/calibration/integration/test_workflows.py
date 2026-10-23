@@ -51,7 +51,6 @@ from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import pa
 from zmart_drivers.leica.stellaris.navigator_expert.procedures import readings as readers
 
 from zmart_drivers.leica.stellaris.navigator_expert.procedures.save_data import product
-from zmart_drivers.leica.stellaris.navigator_expert.operations.changes import acquire as acquire_change
 from zmart_drivers.leica.stellaris.navigator_expert.procedures import changes
 
 # ---------------------------------------------------------------------
@@ -95,7 +94,7 @@ def test_calibration_capture_explicitly_passes_active_orientation(
     received = {}
 
     monkeypatch.setattr(cm._orientation, "rig_orientation", lambda: expected)
-    monkeypatch.setattr(acquire_change, "take_picture", lambda client, job: acquisition)
+    monkeypatch.setattr(changes, "take_picture", lambda client, job: acquisition)
 
     def _save(client, result, output_root, naming, *, orientation, **_settings):
         received["orientation"] = orientation
@@ -1109,7 +1108,7 @@ def _patch_objective_driver(
                 image = img_template.copy()
         return _saved_manifest(output_root, naming, image)
 
-    monkeypatch.setattr(acquire_change, "take_picture", _acquire)
+    monkeypatch.setattr(changes, "take_picture", _acquire)
     monkeypatch.setattr(saving, "save", _save)
 
     def _acquire_frame(client, job, **kw):

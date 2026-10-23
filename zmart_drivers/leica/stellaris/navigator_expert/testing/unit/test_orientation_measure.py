@@ -40,7 +40,6 @@ from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import pa
 from zmart_drivers.leica.stellaris.navigator_expert.procedures import readings as readers
 
 from zmart_drivers.leica.stellaris.navigator_expert.procedures.save_data import product
-from zmart_drivers.leica.stellaris.navigator_expert.operations.changes import acquire as acquire_change
 from zmart_drivers.leica.stellaris.navigator_expert.procedures import changes
 
 
@@ -170,7 +169,7 @@ def _patch(
             image = _translate_without_wrap(image, dx_px, dy_px)
         return _saved_manifest(output_root, naming, image)
 
-    monkeypatch.setattr(acquire_change, "take_picture", _acquire)
+    monkeypatch.setattr(changes, "take_picture", _acquire)
     monkeypatch.setattr(saving, "save", _save)
     return pos
 
@@ -708,7 +707,7 @@ def test_validation_stays_in_run_and_reloads_saved_image(tmp_path, monkeypatch):
     acquired = object()
     expected_image = np.arange(12, dtype=np.uint16).reshape(3, 4)
 
-    monkeypatch.setattr(acquire_change, "take_picture", lambda client, job: acquired)
+    monkeypatch.setattr(changes, "take_picture", lambda client, job: acquired)
 
     def _save(client, acquisition, output_root, naming, *, orientation):
         assert client is session.client

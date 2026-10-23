@@ -80,7 +80,7 @@ def check_envelope_within_backstop(stage_um):
             raise RuntimeError(
                 f"stage limits for axis {axis!r} = [{lo}, {hi}] reach outside the "
                 f"physical backstop [{backstop_lo}, {backstop_hi}] "
-                f"(operations/changes/limit_rules.py STAGE_BACKSTOP_UM); refusing the envelope — "
+                f"(driver_setup/limits/limit_rules.py STAGE_BACKSTOP_UM); refusing the envelope — "
                 f"a file wider than the machine's physical travel cannot be trusted"
             )
 

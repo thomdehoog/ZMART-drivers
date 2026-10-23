@@ -172,11 +172,11 @@ def _connect_session(
         adapter.connect_python_client = lambda **_kw: MockLasxClient(
             latency=args.mock_latency
         )
-        # The mock has no LAS X log stream, so the default select-job
-        # confirmation race would only ever time out waiting on log evidence
-        # (same pinning as validate_hardware --mock).
+        # The mock has no LAS X log stream, so behind the direct reader only
+        # the API can confirm a job change (same pinning as
+        # validate_hardware --mock).
         reading_settings.STATE_READERS = replace(
-            reading_settings.STATE_READERS, selected_job_confirm_source="api"
+            reading_settings.STATE_READERS, selected_job_confirm_fallback="api"
         )
 
     return _ReportingSession(zmart_controller.ZmartController(driver, inst))

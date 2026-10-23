@@ -42,15 +42,14 @@ READER_SOURCE_POLICY_MODULES = {
     Path("dispatcher/write.py"),
     Path("dispatcher/write.py"),
     Path("primitives/direct/profile.py"),
-    Path("operations/changes/confirming.py"),
-    Path("operations/changes/select_job.py"),
+    # Selecting a job asks the API's job list and the log before the change,
+    # to know whether it is needed and which sources may confirm it.
+    Path("procedures/changes.py"),
     # Calibration geometry is saved for good, so it is read from the API
     # and never from a log entry that may be stale (review finding M4).
     Path("driver_setup/optical_calibration/calibration_common.py"),
     # The stage limits are saved for good too: the corners are read from the API.
     Path("driver_setup/limits/measure_limits.py"),
-    # Whether a command may fire is the API's to decide: the idle check.
-    Path("primitives/cam_api/prechecks.py"),
 }
 EXPLICIT_READER_MODE = re.compile(r"\bmode\s*=\s*['\"](?:api|log|hybrid)['\"]")
 LOW_LEVEL_READER_CALL = re.compile(r"(?<!\w)_?(?:api_reader|log_reader)\.")
@@ -143,13 +142,13 @@ def test_low_level_readers_are_called_only_by_reader_and_confirmation_policy():
     offenders = [
         str(rel)
         for rel, text in _driver_sources()
-        if rel.parts[0] not in ("primitives", "operations")
+        if rel.parts[0] != "primitives"
         and rel not in READER_SOURCE_POLICY_MODULES
         and LOW_LEVEL_READER_CALL.search(text)
     ]
     assert offenders == [], (
         f"low-level reader called outside policy layer: {offenders}; route the "
-        "read through dispatcher.read instead"
+        "read through dispatcher.run instead"
     )
 
 
@@ -167,29 +166,25 @@ def test_the_utils_grab_bag_stays_dissolved():
 
 # The parts of the anatomy, and what each may import. A part may always import
 # from itself. Entries marked ``# upward`` run against the anatomy and are removed
-# in steps 4 to 6 of the layout plan; ``operations`` is a part only until those
-# steps fold it in.
+# in step 6 of the layout plan.
 ALLOWED = {
     # One folder for each way of reaching LAS X.
     "primitives": {
         "dispatcher",  # the reading, the log entry helper, the transport chain
-        "procedures",  # upward: the dialog check, opening the experiment, the idle check
+        "procedures",  # upward: the dialog check, opening the experiment, the saved experiment
         "driver_setup",  # upward: the notebook pointer of the limits
     },
     # Runs one primitive and knows no microscope.
     "dispatcher": set(),
-    "operations": {"primitives", "dispatcher", "procedures", "driver_setup"},
     "procedures": {
         "primitives",
         "dispatcher",
-        "operations",
         "driver_setup",
         "__version__",  # the saved state records the driver version
     },
     "driver_setup": {
         "primitives",
         "dispatcher",
-        "operations",
         # The measuring code of an item takes pictures and moves the stage, so it
         # uses the procedures. Run-time procedures never import that measuring
         # code (see the test below): they read the saved values only.
@@ -199,7 +194,6 @@ ALLOWED = {
     "methods": {
         "primitives",
         "dispatcher",
-        "operations",
         "procedures",
         "driver_setup",
     },
@@ -259,15 +253,18 @@ def test_each_part_only_imports_what_the_anatomy_allows():
 #: The bottom of the vendor part, bottom first: how the driver reaches LAS X, and
 #: one read or write each. Neither imports from anything above it.
 def test_a_reading_never_uses_a_change():
-    """A get never calls a set: the table of readings, primitives/direct/profile.py, must not import a change."""
-    readings = DRIVER_ROOT / "primitives" / "direct" / "profile.py"
-    tree = ast.parse(readings.read_text(encoding="utf-8"))
-    for node in ast.walk(tree):
-        if isinstance(node, ast.ImportFrom):
-            names = [node.module or "", *(a.name for a in node.names)]
-            assert "changes" not in names, (
-                "primitives/direct/profile.py imports a change"
-            )
+    """A get never calls a set: no class profile (the table of readings among them) imports the named changes."""
+    profiles = sorted((DRIVER_ROOT / "primitives").glob("*/profile.py"))
+    assert DRIVER_ROOT / "primitives" / "direct" / "profile.py" in profiles
+    for path in profiles:
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ImportFrom):
+                module = node.module or ""
+                names = [module, *(a.name for a in node.names)]
+                assert "changes" not in names and not module.endswith("procedures.changes"), (
+                    f"{path.relative_to(DRIVER_ROOT)} imports the named changes"
+                )
 
 
 def test_nothing_but_the_tests_imports_from_testing():

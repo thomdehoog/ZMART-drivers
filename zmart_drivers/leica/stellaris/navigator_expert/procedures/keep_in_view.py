@@ -21,7 +21,7 @@ cannot be made, the command answers ``success: False`` and names the step, so
 a picture is never taken at a position that no longer points at the sample.
 
 Each one wraps the bare change of the same name, ``procedures/changes.py``'s
-``set_objective`` and ``operations/changes/select_job.py``'s ``select_job``, which
+``set_objective`` and ``select_job``, which
 change the lens or the job and nothing else. Use those
 when the stage should not be corrected.
 
@@ -68,7 +68,6 @@ from __future__ import annotations
 
 import logging
 from ..dispatcher import dispatch
-from ..operations.changes import select_job as _select_job
 from . import changes
 from typing import Any
 
@@ -171,7 +170,7 @@ def select_job(client, job_name, *, translations=None, compensate=None):
             )
         return None
 
-    result = _select_job.select_job(client, job_name, before_fire=record_position)
+    result = changes.select_job(client, job_name, before_fire=record_position)
     before = recorded.get("before")
     if before is not None and result.get("success"):
         result = merge_into_result(

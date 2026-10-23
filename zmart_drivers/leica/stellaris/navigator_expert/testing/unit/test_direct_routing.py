@@ -25,15 +25,14 @@ from state_tree_stand_in import StandInNodes, answer_json_read
 from zmart_drivers.leica.stellaris.navigator_expert.primitives.direct import profile as capabilities
 
 from zmart_drivers.leica.stellaris.navigator_expert.procedures import keep_in_view as commands_comp
-from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import prechecks
+from zmart_drivers.leica.stellaris.navigator_expert.dispatcher import write
+from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import writes
 from zmart_drivers.leica.stellaris.navigator_expert.procedures import readings as readers
 from zmart_drivers.leica.stellaris.navigator_expert.primitives.direct import (
     reads as direct_reader,
     state_tree,
 )
 from zmart_drivers.leica.stellaris.navigator_expert.primitives.direct import client as hardware_server
-from zmart_drivers.leica.stellaris.navigator_expert.operations.changes import acquire as acquire_change
-from zmart_drivers.leica.stellaris.navigator_expert.operations.changes import select_job as select_job_change
 from zmart_drivers.leica.stellaris.navigator_expert.procedures import changes
 
 #: The jobs' block and element ids as on the simulator (2026-10-13).
@@ -275,7 +274,7 @@ class TestDirectByDefault:
             "get_scan_status",
             lambda c: asked.append(c) or "eScanIdle",
         )
-        assert prechecks.check_idle(client)["success"] is True
+        assert write.wait_ready(capabilities, client, writes.idle())()["success"] is True
         assert asked == []
 
     def test_the_end_of_a_capture_is_watched_through_the_direct_reader(
@@ -295,7 +294,7 @@ class TestDirectByDefault:
             return reading
 
         monkeypatch.setattr(readers, "get_scan_status", watched)
-        result = acquire_change.confirm_acquire(
+        result = changes.confirm_acquire(
             client, start_timeout=5.0, timeout=10.0, poll_interval=0.001
         )
         assert result["success"] is True
@@ -317,9 +316,9 @@ class TestDirectByDefault:
 
         monkeypatch.setattr(readers, "get_jobs", jobs)
         monkeypatch.setattr(
-            select_job_change,
+            changes,
             "selected_job_from_log",
-            lambda _profile: "Overview",
+            lambda: "Overview",
         )
         result = commands_comp.select_job(client, "Overview")
         assert (result["success"], client._selected_job) == (True, "Overview")
@@ -330,7 +329,7 @@ class TestDirectByDefault:
         monkeypatch.setattr(
             readers.log_reader, "parse_log", lambda: pytest.fail("the log was asked")
         )
-        assert prechecks.check_idle(client)["success"] is True
+        assert write.wait_ready(capabilities, client, writes.idle())()["success"] is True
 
     def test_the_selected_job_check_falls_back_on_an_unexpected_error(
         self, client, tree, monkeypatch

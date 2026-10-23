@@ -19,11 +19,21 @@ from zmart_drivers.leica.stellaris.navigator_expert.procedures import keep_in_vi
 
 from zmart_drivers.leica.stellaris.navigator_expert.procedures import keep_in_view as cmds_comp
 from zmart_drivers.leica.stellaris.navigator_expert.dispatcher import dispatch
-from zmart_drivers.leica.stellaris.navigator_expert.operations.changes import run_change
-from zmart_drivers.leica.stellaris.navigator_expert.operations.changes import select_job as select_job_change
 from zmart_drivers.leica.stellaris.navigator_expert.procedures import changes
 
 TRANSLATIONS = {1: (0.0, 0.0, 0.0), 2: (10.0, -6.0, 3.0)}
+
+
+def changes_only(fake):
+    """The dispatcher's ``run()`` with its changes handed to *fake*; its readings still run."""
+    real = dispatch.run
+
+    def run(profile, client, primitive, **kwargs):
+        if isinstance(primitive, str):
+            return real(profile, client, primitive, **kwargs)
+        return fake(profile, client, primitive, **kwargs)
+
+    return run
 
 
 @pytest.fixture
@@ -168,15 +178,12 @@ def test_select_job_records_before_the_switch_and_compensates_after(
         lambda c, **k: order.append("read_xy") or {"x_um": 1000.0, "y_um": 2000.0},
     )
     monkeypatch.setattr(
-        select_job_change,
+        changes,
         "prepare_select_job",
         lambda c, job: (
             None,
             {"api_baseline_name": "Overview", "api_said_selected": False},
         ),
-    )
-    monkeypatch.setattr(
-        select_job_change, "select_job_confirm_legs", lambda *a, **k: (None, None, 0.0)
     )
 
     def fake_dispatch(*a, **k):
@@ -184,7 +191,7 @@ def test_select_job_records_before_the_switch_and_compensates_after(
         slot["value"] = 2  # the new job carries the other objective
         return {"success": True, "confirmed": True, "logs": []}
 
-    monkeypatch.setattr(run_change, "dispatch_change", fake_dispatch)
+    monkeypatch.setattr(changes.dispatch, "run", changes_only(fake_dispatch))
     monkeypatch.setattr(
         changes,
         "move_xy",
@@ -223,7 +230,7 @@ def test_select_job_on_an_unarmed_client_behaves_as_before(client, monkeypatch):
 
     monkeypatch.setattr(readers, "get_xy", _explode)
     monkeypatch.setattr(
-        select_job_change,
+        changes,
         "prepare_select_job",
         lambda c, job: (
             None,
@@ -231,12 +238,9 @@ def test_select_job_on_an_unarmed_client_behaves_as_before(client, monkeypatch):
         ),
     )
     monkeypatch.setattr(
-        select_job_change, "select_job_confirm_legs", lambda *a, **k: (None, None, 0.0)
-    )
-    monkeypatch.setattr(
-        run_change,
-        "dispatch_change",
-        lambda *a, **k: {"success": True, "confirmed": True, "logs": []},
+        changes.dispatch,
+        "run",
+        changes_only(lambda *a, **k: {"success": True, "confirmed": True, "logs": []}),
     )
 
     result = cmds_comp.select_job(client, "HiRes", translations=client.translations)

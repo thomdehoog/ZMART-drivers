@@ -22,8 +22,8 @@ sys.modules["zmart_controller"] = None
 sys.path.insert(0, r"{repo}")
 import zmart_drivers.leica.stellaris.navigator_expert as navigator_expert
 from zmart_drivers.leica.stellaris.navigator_expert.methods import Microscope
-from zmart_drivers.leica.stellaris.navigator_expert.operations.changes import acquire
-assert navigator_expert.connect is not None and Microscope is not None and acquire.take_picture is not None
+from zmart_drivers.leica.stellaris.navigator_expert.procedures import changes
+assert navigator_expert.connect is not None and Microscope is not None and changes.take_picture is not None
 print("loaded-without-the-controller")
 """
 

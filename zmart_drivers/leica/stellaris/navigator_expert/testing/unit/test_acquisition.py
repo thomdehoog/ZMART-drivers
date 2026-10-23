@@ -46,7 +46,7 @@ from zmart_drivers.leica.stellaris.navigator_expert.procedures.save_data import 
 )
 
 from zmart_drivers.leica.stellaris.navigator_expert.procedures.clear_cache import clear
-from zmart_drivers.leica.stellaris.navigator_expert.operations.changes import acquire as acquire_change
+from zmart_drivers.leica.stellaris.navigator_expert.procedures import changes
 
 
 @pytest.fixture(autouse=True)
@@ -216,11 +216,11 @@ def _store_xml(store: Path) -> str:
 class TestAcquire:
     def test_acquire_returns_save_agnostic_token(self):
         with patch.object(
-            acquire_change,
+            changes,
             "acquire",
             return_value={"success": True, "receipt": "ok"},
         ) as command:
-            result = acquire_change.take_picture("client", "HiRes")
+            result = changes.take_picture("client", "HiRes")
 
         command.assert_called_once_with("client", "HiRes")
         assert isinstance(result, product.AcquisitionResult)
@@ -231,18 +231,18 @@ class TestAcquire:
     def test_acquire_raises_on_command_failure(self):
         with (
             patch.object(
-                acquire_change,
+                changes,
                 "acquire",
                 return_value={"success": False, "error": "blocked"},
             ),
             pytest.raises(RuntimeError, match="acquire failed"),
         ):
-            acquire_change.take_picture("client", "HiRes")
+            changes.take_picture("client", "HiRes")
 
     def test_acquire_has_no_file_or_save_side_effects(self):
         with (
             patch.object(
-                acquire_change,
+                changes,
                 "acquire",
                 return_value={"success": True},
             ),
@@ -251,7 +251,7 @@ class TestAcquire:
                 "_persist_store",
             ) as persist,
         ):
-            acquire_change.take_picture("client", "HiRes")
+            changes.take_picture("client", "HiRes")
 
         persist.assert_not_called()
 
@@ -370,7 +370,7 @@ class TestSave:
         tmp_path,
         naming,
     ):
-        with patch.object(acquire_change, "acquire") as command:
+        with patch.object(changes, "acquire") as command:
             _save(successful_acq, tmp_path / "run_000001", naming)
         command.assert_not_called()
 

@@ -26,14 +26,12 @@ class TestValidateHardwareCli(unittest.TestCase):
     def _restore(self):
         reading_settings.STATE_READERS = self._profile
 
-    def test_log_tuning_flags_preserve_current_confirm_source(self):
+    def test_log_tuning_flags_preserve_current_confirm_fallback(self):
         reading_settings.STATE_READERS = reading_settings.StateReaderProfile(
-            selected_job_confirm_source="hybrid",
+            selected_job_confirm_fallback="log",
         )
         validator = _load_validator()
         args = SimpleNamespace(
-            select_job_confirm_source=None,
-            enable_log_select_confirm=False,
             mock=False,
             state_reader_mode=None,
             log_select_cluster_max_age_s=4.0,
@@ -44,8 +42,30 @@ class TestValidateHardwareCli(unittest.TestCase):
             args, logging.getLogger("validate-hardware-test")
         )
 
-        self.assertEqual(reading_settings.STATE_READERS.selected_job_confirm_source, "hybrid")
+        self.assertEqual(reading_settings.STATE_READERS.selected_job_confirm_fallback, "log")
         self.assertEqual(reading_settings.STATE_READERS.selected_job_log_cluster_max_age_s, 4.0)
+
+    def test_the_mock_confirms_a_job_change_through_the_api_behind_the_direct_reader(self):
+        validator = _load_validator()
+        args = SimpleNamespace(
+            mock=True,
+            state_reader_mode=None,
+            log_select_cluster_max_age_s=None,
+            prime_log_select_cluster=False,
+        )
+
+        validator._apply_log_select_confirmation(
+            args, logging.getLogger("validate-hardware-test")
+        )
+
+        self.assertEqual(reading_settings.STATE_READERS.selected_job_mode, "direct")
+        self.assertEqual(reading_settings.STATE_READERS.selected_job_confirm_fallback, "api")
+
+    def test_the_confirmation_source_is_no_longer_an_option(self):
+        validator = _load_validator()
+
+        with self.assertRaises(SystemExit):
+            validator.parse_args(["--select-job-confirm-source", "log"])
 
 
 if __name__ == "__main__":

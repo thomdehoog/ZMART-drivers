@@ -833,13 +833,13 @@ def main(argv=None):
     if args.log_path:
         log_settings.LOG_READER = log_settings.LogReaderProfile(lcs_log_path=args.log_path)
     if args.mock:
-        # The mock backend has no LAS X log stream, so the default hybrid
-        # select-job confirmation race would only ever time out on the log leg
-        # (same pinning as validate_hardware --mock).
+        # The mock backend has no LAS X log stream, so behind the direct
+        # reader only the API can confirm a job change (same pinning as
+        # validate_hardware --mock).
         from dataclasses import replace  # noqa: PLC0415
 
         reading_settings.STATE_READERS = replace(
-            reading_settings.STATE_READERS, selected_job_confirm_source="api"
+            reading_settings.STATE_READERS, selected_job_confirm_fallback="api"
         )
 
     report = RunReport(

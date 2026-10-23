@@ -30,8 +30,7 @@ Outputs:
 Usage:
   python validate_hardware.py --yes                        # LAS X (sim or live)
   python validate_hardware.py --yes --state-reader-mode hybrid
-  python validate_hardware.py --yes --select-job-confirm-source log
-  python validate_hardware.py --yes --select-job-confirm-source log --prime-log-select-cluster
+  python validate_hardware.py --yes --state-reader-mode log --prime-log-select-cluster
   python validate_hardware.py --yes --allow-xy             # + 10-position XY pattern
   python validate_hardware.py --yes --allow-xy --allow-acquire
   python validate_hardware.py --output results.jsonl       # capture structured
@@ -1759,18 +1758,6 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="override all profile-routed passive state readers",
     )
     p.add_argument(
-        "--select-job-confirm-source",
-        choices=["api", "log", "hybrid"],
-        help="override selected-job confirmation source; when "
-        "omitted, --state-reader-mode implies it",
-    )
-    p.add_argument(
-        "--enable-log-select-confirm",
-        dest="enable_log_select_confirm",
-        action="store_true",
-        help="deprecated alias for --select-job-confirm-source log",
-    )
-    p.add_argument(
         "--prime-log-select-cluster",
         action="store_true",
         help="query all job settings before select_job so LAS X "
@@ -1861,50 +1848,32 @@ def _apply_state_reader_mode(mode: str | None, log: logging.Logger) -> None:
 def _apply_log_select_confirmation(
     args: argparse.Namespace, log: logging.Logger
 ) -> None:
-    """Apply validator-only opt-in settings for production select confirmation."""
-    source = args.select_job_confirm_source
-    if args.enable_log_select_confirm:
-        source = "log"
-    if source is None and args.mock:
-        # The Python mock has no LAS X log stream, so log evidence cannot
-        # exist and a hybrid race would only ever time out on no-ops.
-        source = "api"
+    """Apply validator-only settings for confirming a job change.
+
+    A job change is confirmed by the ``selected_job`` reading in its read
+    order, which ``--state-reader-mode`` sets with the others. The Python mock
+    has no LAS X log stream, so behind the direct reader only the API can
+    confirm there. The log options prime the job cluster and set its age.
+    """
+    updates = {}
+    if args.mock:
+        updates["selected_job_confirm_fallback"] = "api"
         log.info(
-            "select-job confirmation source pinned to api for --mock "
+            "select-job confirmation fallback pinned to api for --mock "
             "(the mock backend has no log stream)"
         )
-    elif source is None and args.state_reader_mode in ("api", "log", "hybrid"):
-        # A validator run that advertises a reader mode must not silently
-        # grade select_job with a different confirmation source. Job
-        # selection has no direct confirmation: on the direct route it keeps
-        # the driver's own (the profile's).
-        source = args.state_reader_mode
-        log.info(
-            "select-job confirmation source implied by --state-reader-mode: %s", source
-        )
-    if not (
-        source is not None
-        or args.log_select_cluster_max_age_s is not None
-        or args.prime_log_select_cluster
-    ):
-        return
-
-    updates = {
-        "selected_job_confirm_source": (
-            source
-            if source is not None
-            else reading_settings.STATE_READERS.selected_job_confirm_source
-        ),
-        "selected_job_log_prime_cluster": args.prime_log_select_cluster,
-    }
+    if args.prime_log_select_cluster:
+        updates["selected_job_log_prime_cluster"] = True
     if args.log_select_cluster_max_age_s is not None:
         updates["selected_job_log_cluster_max_age_s"] = (
             args.log_select_cluster_max_age_s
         )
+    if not updates:
+        return
     reading_settings.STATE_READERS = replace(reading_settings.STATE_READERS, **updates)
     log.info(
-        "select-job confirmation source=%s prime_cluster=%s cluster_max_age=%s",
-        reading_settings.STATE_READERS.selected_job_confirm_source,
+        "select-job confirmation fallback=%s prime_cluster=%s cluster_max_age=%s",
+        reading_settings.STATE_READERS.selected_job_confirm_fallback,
         reading_settings.STATE_READERS.selected_job_log_prime_cluster,
         reading_settings.STATE_READERS.selected_job_log_cluster_max_age_s,
     )

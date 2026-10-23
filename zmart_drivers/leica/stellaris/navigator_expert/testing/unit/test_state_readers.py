@@ -15,7 +15,8 @@ from zmart_drivers.leica.stellaris.navigator_expert.procedures import readings a
 from zmart_drivers.leica.stellaris.navigator_expert.primitives.direct import profile as reading_settings
 from zmart_drivers.leica.stellaris.navigator_expert.primitives.log import profile as log_profile
 from zmart_drivers.leica.stellaris.navigator_expert.primitives.log import reads as log_reader
-from zmart_drivers.leica.stellaris.navigator_expert.operations.changes import select_job as select_job_change
+from zmart_drivers.leica.stellaris.navigator_expert.dispatcher import write
+from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import writes
 
 
 class TestStateReaders(unittest.TestCase):
@@ -264,60 +265,32 @@ class TestStateReaders(unittest.TestCase):
 
     def test_confirmation_rejects_pre_command_reading(self):
         old = readers.Reading(
-            value=[{"Name": "Overview", "IsSelected": True}],
+            value={"Name": "Overview"},
             source="log",
             observed_at=time.time() - 10.0,
             age_s=10.0,
         )
         fresh = readers.Reading(
-            value=[{"Name": "Overview", "IsSelected": True}],
+            value={"Name": "Overview"},
             source="log",
             observed_at=time.time() + 1.0,
             age_s=0.0,
         )
-        with (
-            patch.object(
-                select_job_change.readers,
-                "get_jobs",
-                side_effect=[old, fresh],
-            ),
-            patch("time.sleep"),
-        ):
-            result = select_job_change.confirm_select_job(
-                object(),
-                job_name="Overview",
-                timeout=1.0,
-            )
+        seen = []
+
+        def ask(leg, spec, client, *, until, answer_counts, about, source_kwargs):
+            # The log read again until an answer counts: first the old line, then a fresh one.
+            for reading in (old, fresh):
+                seen.append(answer_counts(reading))
+                if seen[-1]:
+                    return reading
+            return reading
+
+        confirm = writes.select_job("Overview", fallback="log").confirm
+        with patch.object(reading_settings, "ask", ask):
+            result = write.read_back(reading_settings, object(), confirm, since=time.time())()
         self.assertTrue(result["success"])
-
-    def test_confirm_select_job_pins_api_mode(self):
-        reading_settings.STATE_READERS = reading_settings.StateReaderProfile(jobs_mode="hybrid")
-        calls = []
-
-        def fake_get_jobs(client, **kwargs):
-            calls.append(kwargs)
-            return readers.Reading(
-                value=[{"Name": "Overview", "IsSelected": True}],
-                source="api",
-                observed_at=time.time() + 1.0,
-                age_s=0.0,
-            )
-
-        with (
-            patch.object(
-                select_job_change.readers, "get_jobs", side_effect=fake_get_jobs
-            ),
-            patch("time.sleep"),
-        ):
-            result = select_job_change.confirm_select_job(
-                object(),
-                job_name="Overview",
-                timeout=1.0,
-            )
-
-        self.assertTrue(result["success"])
-        self.assertEqual(calls[0]["mode"], "api")
-        self.assertTrue(calls[0]["diagnostics"])
+        self.assertEqual(seen[:2], [False, True])
 
     def test_get_lasx_settings_returns_consumed_sections_only(self):
         xml = """<Root>

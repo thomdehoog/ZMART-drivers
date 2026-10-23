@@ -18,12 +18,12 @@ CHILD_SCRIPT = """
 import sys
 # Mimic an example-script entry point: only the repository root on sys.path.
 sys.path.insert(0, r"{repo}")
-from zmart_drivers.leica.stellaris.navigator_expert.operations.changes import acquire
+from zmart_drivers.leica.stellaris.navigator_expert.procedures import changes
 from zmart_drivers.leica.stellaris.navigator_expert.procedures.save_data.product import AcquisitionResult
 from zmart_drivers.leica.stellaris.navigator_expert.procedures.save_data import save as saving
 from zmart_drivers.leica.stellaris.navigator_expert.procedures.save_data.product import SavedAcquisition
 from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import client
-assert acquire.take_picture is not None
+assert changes.take_picture is not None
 assert saving.save is not None
 assert AcquisitionResult is not None
 assert SavedAcquisition is not None

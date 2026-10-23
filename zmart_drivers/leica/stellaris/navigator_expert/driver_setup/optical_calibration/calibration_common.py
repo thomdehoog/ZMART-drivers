@@ -30,7 +30,6 @@ from typing import Any
 
 import numpy as np
 
-from zmart_drivers.leica.stellaris.navigator_expert.operations.changes import acquire as acquire_change
 from zmart_drivers.leica.stellaris.navigator_expert.procedures.save_data import save as saving
 from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import parsing
 from zmart_drivers.leica.stellaris.navigator_expert.procedures import readings as readers
@@ -346,7 +345,7 @@ def _capture_for_calibration(
         orientation = _orientation.rig_orientation()
     position_label = f"{len(session.exported_files):06d}"
     naming = Naming(stem=f"{folder}_{run_hash()}_{position_label}")
-    acq = acquire_change.take_picture(session.client, session.job_name)
+    acq = changes.take_picture(session.client, session.job_name)
     return saving.save(
         session.client,
         acq,

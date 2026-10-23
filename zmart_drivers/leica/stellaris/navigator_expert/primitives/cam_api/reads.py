@@ -33,10 +33,8 @@ These functions do NOT modify microscope state.
 
 Dependency direction:
     - Imports: derived readers, stdlib (json, logging, os, time, xml).
-    - Imported by: ``prechecks`` (scan status polling), ``confirmations``
-      (readback via ``get_job_settings`` and ``get_xy``),
-      ``commands`` (early-exit checks, post-processing readbacks),
-      ``__init__`` (re-export).
+    - Imported by: ``direct/profile.py``, the table of readings, which the
+      read loop asks (the idle wait and the read-back of a change included).
 """
 
 import json

@@ -45,7 +45,6 @@ from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import pa
 from zmart_drivers.leica.stellaris.navigator_expert.procedures import readings as readers
 
 from zmart_drivers.leica.stellaris.navigator_expert.procedures.save_data import product
-from zmart_drivers.leica.stellaris.navigator_expert.operations.changes import acquire as acquire_change
 from zmart_drivers.leica.stellaris.navigator_expert.procedures import changes
 
 PIXEL_UM = 0.5
@@ -186,7 +185,7 @@ def _patch(
         },
     )
     monkeypatch.setattr(
-        acquire_change,
+        changes,
         "take_picture",
         lambda c, job, **k: SimpleNamespace(job=job, command_result={"ok": True}),
     )

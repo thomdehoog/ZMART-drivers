@@ -8,8 +8,9 @@ how close counts, whether it is sent without a receipt, which LAS X replies
 mean "already so", and whether it may never be sent again. The dispatcher's
 ``run()`` does the rest. Nothing here calls LAS X or the dispatcher.
 
-The builders: :func:`move_xy`, :func:`move_z`, :func:`set_objective` and
-:func:`change` for the settings of a job, which are one table (``SETTINGS``):
+The builders: :func:`move_xy`, :func:`move_z`, :func:`set_objective`,
+:func:`select_job`, :func:`acquire`, and :func:`change` for the settings of a
+job, which are one table (``SETTINGS``):
 
 - ``name``: what a person calls it (``"zoom"``); the limits gate knows it as
   ``set_<name>``;
@@ -24,7 +25,7 @@ The builders: :func:`move_xy`, :func:`move_z`, :func:`set_objective` and
 - ``describe``: the label in the log.
 
 The checks that say how close counts (:func:`within_xy`, :func:`z_within`,
-:func:`slot_is`, :func:`setting_shows`, :func:`is_idle`) each take one reading's
+:func:`slot_is`, :func:`job_named`, :func:`setting_shows`, :func:`is_idle`) each take one reading's
 value and answer True or False, so each can be tested alone.
 
 Author: Thom de Hoog, Center for Microscopy and Image Analysis (ZMB),
@@ -271,6 +272,75 @@ def set_objective(job_name, slot, name) -> Write:
         description=f"Objective -> {name} (slot {slot})",
         ready=idle(),
         confirm=Expect("job_settings", slot_is(slot), about=job_name),
+    )
+
+
+# =============================================================================
+# The job, and taking a picture
+# =============================================================================
+
+
+def job_named(job_name):
+    """A selected job called ``job_name``."""
+
+    def check(selected) -> bool:
+        try:
+            return selected["Name"] == job_name
+        except (KeyError, TypeError):
+            return False
+
+    return check
+
+
+def select_job(job_name, *, mode=None, fallback=None) -> Write:
+    """Select the job ``job_name``, without moving the stage.
+
+    Confirmed by the ``selected_job`` reading in its read order: ``mode``
+    first (None: the reading's own, the direct reader, LAS X's live
+    selection); when it cannot answer, ``fallback`` (None: the profile's
+    ``selected_job_confirm_fallback``, ``hybrid``: the CAM API's job list,
+    then the log). Four windows, sent again between them, like every change.
+    """
+
+    def fill(m):
+        m.JobName = job_name
+
+    return Write(
+        command="select_job",
+        values={"job_name": job_name},
+        request="PyApiSelectJobByName",
+        fill=fill,
+        description=f"SelectJob '{job_name}'",
+        ready=idle(),
+        confirm=Expect(
+            "selected_job",
+            job_named(job_name),
+            mode=mode,
+            fallback=policy.STATE_READERS.selected_job_confirm_fallback if fallback is None else fallback,
+        ),
+    )
+
+
+def acquire(job_name) -> Write:
+    """Run the job ``job_name`` once: one picture.
+
+    Never sent again, after an error or otherwise: a second send is a second
+    picture. Sent without a receipt, and with nothing read back: whether the
+    scan ran is watched after the send (``procedures/changes.py``).
+    """
+
+    def fill(m):
+        m.JobName = job_name
+
+    return Write(
+        command="acquire",
+        values={"job_name": job_name},
+        request="PyApiAcquireJob",
+        fill=fill,
+        description=f"Acquire '{job_name}'",
+        ready=idle(),
+        without_receipt=True,
+        never_resend=True,
     )
 
 

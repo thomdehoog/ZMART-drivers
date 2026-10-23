@@ -15,7 +15,8 @@ so a test can check that a command meant to be sent once is sent once.
 The vendor part follows the same order as the Leica one: a transport, the
 waiting numbers, a command profile, the sources a reading can ask, a limits
 object, and the error check. ``connect``, ``read_x``, ``move_x`` and
-``start_scan`` are the few commands built from them. It is modelled on the
+``start_scan`` are the few commands built from them, each through the
+dispatcher's one entry, ``run()``. It is modelled on the
 ZMART Controller's mock driver, which pretends to be a whole microscope; this
 one pretends just enough to drive the dispatcher.
 
@@ -146,7 +147,7 @@ class PretendDatum:
 
 
 class PretendSources:
-    """The sources a reading can ask. The pretend microscope has one, ``stage``."""
+    """The sources a reading can ask (the pretend microscope has one, ``stage``), and how a change is sent."""
 
     waiting = Waiting
 
@@ -184,6 +185,17 @@ class PretendSources:
             if answer_counts(reading) or time.monotonic() >= until:
                 return reading
             time.sleep(Waiting.POLL_S)
+
+    # What the dispatcher's ``run()`` asks of a vendor for a change.
+
+    WRITING = PretendProfile()
+    limits_setup_hint = "the pretend limits in pretend_vendor.connect"
+
+    def make_request(self, client, write):
+        return {"command": write.request}
+
+    def check_reply(self, client, write):
+        return error_check(client)
 
 
 SOURCES = PretendSources()
@@ -233,48 +245,70 @@ def connect() -> PretendMicroscope:
     return scope
 
 
+@dataclass(frozen=True)
+class PretendExpect:
+    """A reading, and what it must show."""
+
+    reading: str
+    accept: Callable[[Any], bool]
+    about: Any = None
+    mode: str | None = None
+    fallback: str | None = None
+
+
+@dataclass(frozen=True)
+class PretendWrite:
+    """One change, as plain data: the fields the dispatcher's ``run()`` reads."""
+
+    command: str
+    values: dict
+    request: str
+    fill: Callable[[dict], None] | None
+    description: str
+    ready: PretendExpect | None = None
+    confirm: PretendExpect | None = None
+    without_receipt: bool = False
+    never_resend: bool = False
+
+
 def read_x(client, **keywords):
-    """Read where the stage is, through the dispatcher's reader; a Reading comes back."""
-    return door.read(SOURCES, "x", client, **keywords)
+    """Read where the stage is, through the dispatcher's one entry; a Reading comes back."""
+    return door.run(SOURCES, client, "x", **keywords)
 
 
 def move_x(client, x_um, *, tolerance_um=0.5):
-    """Move the stage to *x_um* and confirm it arrived, through the dispatcher's door."""
-
-    def confirm():
-        sent_at = time.time()
-        reading = read_x(
-            client,
-            accept=lambda value: abs(value - x_um) <= tolerance_um,
-            observed_after=sent_at,
-            deadline=time.monotonic() + Waiting.WINDOW_S,
-        )
-        arrived = reading is not None and reading.error is None
-        return {"success": arrived, "logs": [], "x_um": reading and reading.value}
-
-    return door.write(
+    """Move the stage to *x_um* and confirm it arrived, through the dispatcher's one entry."""
+    return door.run(
+        SOURCES,
         client,
-        {"command": "move_x"},
-        f"move x to {x_um} um",
-        command="move_x",
-        values={"x_um": x_um},
-        profile=PretendProfile(),
-        setup_fn=lambda request: request.update(x_um=x_um),
-        error_check_fn=lambda: error_check(client),
-        confirm_fn=confirm,
+        PretendWrite(
+            command="move_x",
+            values={"x_um": x_um},
+            request="move_x",
+            fill=lambda request: request.update(x_um=x_um),
+            description=f"move x to {x_um} um",
+            confirm=PretendExpect("x", lambda value: abs(value - x_um) <= tolerance_um),
+        ),
     )
 
 
 def start_scan(client, **asked):
-    """Start a scan: a command that must reach the microscope once, and never again."""
-    return door.write(
+    """Start a scan: a command that must reach the microscope once, and never again.
+
+    Its confirmation never shows, so the profile would send it again between
+    its windows, if the dispatcher let it.
+    """
+    return door.run(
+        SOURCES,
         client,
-        {"command": "start_scan"},
-        "start a scan",
-        command="start_scan",
-        values={},
-        profile=PretendProfile(never_resend=True),
-        error_check_fn=lambda: error_check(client),
-        confirm_fn=lambda: {"success": False, "logs": []},
+        PretendWrite(
+            command="start_scan",
+            values={},
+            request="start_scan",
+            fill=None,
+            description="start a scan",
+            confirm=PretendExpect("x", lambda value: False),
+            never_resend=True,
+        ),
         **asked,
     )

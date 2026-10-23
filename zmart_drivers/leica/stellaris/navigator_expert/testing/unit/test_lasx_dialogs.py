@@ -25,7 +25,6 @@ from types import SimpleNamespace
 import pytest
 
 from zmart_drivers.leica.stellaris.navigator_expert.procedures import answer_dialogs
-from zmart_drivers.leica.stellaris.navigator_expert.operations.changes import acquire as acquire_change
 from zmart_drivers.leica.stellaris.navigator_expert.procedures import changes
 
 SHOWN = (
@@ -299,7 +298,7 @@ class TestCommands:
                 ]
             ),
         )
-        result = acquire_change.acquire(client, "HiRes")
+        result = changes.acquire(client, "HiRes")
         assert result["success"] is False
         assert "8nm" in result["message"]
 

@@ -61,7 +61,6 @@ from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import cl
 from zmart_drivers.leica.stellaris.navigator_expert.methods import DEFAULT_CONNECTION, Microscope
 from zmart_drivers.leica.stellaris.navigator_expert.zmart_controller_plugin.zmart_controller_plugin import ZmartControllerPlugin
 from zmart_drivers.leica.stellaris.navigator_expert.procedures import absolute_coordinate_system as _frame
-from zmart_drivers.leica.stellaris.navigator_expert.operations.changes import acquire as acquire_change
 from zmart_drivers.leica.stellaris.navigator_expert.procedures import changes
 from zmart_drivers.leica.stellaris.navigator_expert.driver_setup.limits import limit_rules
 from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import writes
@@ -612,7 +611,7 @@ def test_reads_work_without_a_handshake_while_mutations_refuse(mock_client):
     assert readers.ping(mock_client)
     jobs = readers.get_jobs(mock_client, mode="api")
     assert jobs
-    _assert_refused(acquire_change.acquire(mock_client, jobs[0]["Name"]))
+    _assert_refused(changes.acquire(mock_client, jobs[0]["Name"]))
 
 
 # =============================================================================
@@ -663,7 +662,7 @@ _WRAPPER_CALLS = {
     "set_filter_wheel_spectrum": lambda c: changes.change(c, "filter_wheel_spectrum", "Overview", setting_index=0, beam_route="40;3", filter_wheel_type=1, position=500.0),
     "move_xy": lambda c: changes.move_xy(c, 50000, 50000, unit="um"),
     "move_z": lambda c: changes.move_z(c, "J", 0.0, unit="um", z_mode="galvo"),
-    "acquire": lambda c: acquire_change.acquire(c, "J"),
+    "acquire": lambda c: changes.acquire(c, "J"),
     "select_job": lambda c: commands_mod_comp.select_job(c, "Overview"),
 }
 
@@ -979,41 +978,17 @@ def test_generated_machine_payload_matches_the_vocabulary():
 
 
 def test_every_dispatching_wrapper_declares_and_calls_the_gate():
-    """AST sweep over the changes: a public function that reaches the fire path
-    (``dispatch_change``, the dispatcher's ``write`` or a raw
-    ``UpdateAwaitReceipt``/``UpdateAsync``), or builds a ``Write`` the
-    dispatcher's ``run()`` sends, must (a) be declared in ``MUTATING_COMMANDS``
-    and (b) hand the dispatcher ITS OWN name, which the dispatcher shows the
-    gate before anything is sent, so a new change cannot ship ungated. The job
-    settings are one builder, which hands over each entry's own command name."""
-    files = [
-        DRIVER_ROOT / "operations" / "changes" / f"{name}.py"
-        for name in ("select_job", "acquire")
-    ] + [DRIVER_ROOT / "procedures" / "keep_in_view.py"]
-    fire_names = {"dispatch_change", "write"}
-    fire_attrs = {"UpdateAwaitReceipt", "UpdateAsync", "dispatch_change"}
+    """AST sweep over the changes: every ``Write`` the dispatcher's ``run()``
+    sends must (a) be declared in ``MUTATING_COMMANDS`` and (b) hand the
+    dispatcher ITS OWN name, which the dispatcher shows the gate before
+    anything is sent, so a new change cannot ship ungated. No procedure that
+    changes the microscope reaches the raw send (``UpdateAwaitReceipt`` /
+    ``UpdateAsync``) itself. The job settings are one builder, which hands over
+    each entry's own command name."""
     checked = []
-    for path in files:
-        for node in ast.parse(path.read_text(encoding="utf-8")).body:
-            if not isinstance(node, ast.FunctionDef) or node.name.startswith("_"):
-                continue
-            referenced = {n.id for n in ast.walk(node) if isinstance(n, ast.Name)}
-            referenced_attrs = {n.attr for n in ast.walk(node) if isinstance(n, ast.Attribute)}
-            if not (referenced & fire_names) and not (referenced_attrs & fire_attrs):
-                continue
-            assert node.name in limit_rules.MUTATING_COMMANDS, (
-                f"{node.name} dispatches to the fire path but has no MUTATING_COMMANDS entry"
-            )
-            gate_literals = {
-                keyword.value.value
-                for call in ast.walk(node)
-                if isinstance(call, ast.Call)
-                and getattr(call.func, "attr", None) == "dispatch_change"
-                for keyword in call.keywords
-                if keyword.arg == "command" and isinstance(keyword.value, ast.Constant)
-            }
-            assert node.name in gate_literals, f"{node.name} never hands the dispatcher its own name"
-            checked.append(node.name)
+    for path in (DRIVER_ROOT / "procedures" / "keep_in_view.py", DRIVER_ROOT / "procedures" / "changes.py"):
+        attrs = {n.attr for n in ast.walk(ast.parse(path.read_text(encoding="utf-8"))) if isinstance(n, ast.Attribute)}
+        assert not attrs & {"UpdateAwaitReceipt", "UpdateAsync"}, f"{path.name} sends to LAS X past the dispatcher"
 
     # Every Write the CAM API's writes build names its own builder as its command ...
     writes_tree = ast.parse((DRIVER_ROOT / "primitives" / "cam_api" / "writes.py").read_text(encoding="utf-8"))

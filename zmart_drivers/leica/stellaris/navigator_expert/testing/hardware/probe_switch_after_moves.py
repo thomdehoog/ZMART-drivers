@@ -38,9 +38,7 @@ _REPO_ROOT = Path(__file__).resolve().parents[6]
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
-from zmart_drivers.leica.stellaris.navigator_expert.operations.changes import (
-    select_job as _confirm_select_job,
-)
+from zmart_drivers.leica.stellaris.navigator_expert.procedures import changes as _changes
 from zmart_drivers.leica.stellaris.navigator_expert.procedures import keep_in_view as _objective_shift
 from zmart_drivers.leica.stellaris.navigator_expert.dispatcher import limits as _gate  # noqa: E402
 from zmart_drivers.leica.stellaris.navigator_expert.procedures import readings as _readers  # noqa: E402
@@ -104,8 +102,8 @@ def _time_slow_calls() -> None:
 
     watch(_log_reader, "parse_log")
     watch(_gate, "check_refusal")
-    watch(_confirm_select_job, "prepare_select_job")
-    watch(_confirm_select_job, "selected_job_from_log")
+    watch(_changes, "prepare_select_job")
+    watch(_changes, "selected_job_from_log")
     watch(_objective_shift, "record_before_change")
 
 

@@ -54,8 +54,7 @@ from zmart_drivers.leica.stellaris.navigator_expert.procedures.readings import p
 from zmart_drivers.leica.stellaris.navigator_expert.procedures.readings import read_zwide_um
 
 
-from zmart_drivers.leica.stellaris.navigator_expert.operations.changes.acquire import take_picture
-from zmart_drivers.leica.stellaris.navigator_expert.operations.changes.confirming import readback
+from zmart_drivers.leica.stellaris.navigator_expert.procedures.changes import take_picture
 from zmart_drivers.leica.stellaris.navigator_expert.procedures.changes import change as change_setting
 from zmart_drivers.leica.stellaris.navigator_expert.procedures.changes import move_xy, move_z
 from zmart_drivers.leica.stellaris.navigator_expert.driver_setup.limits.limit_rules import (

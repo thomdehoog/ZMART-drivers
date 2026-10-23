@@ -1,7 +1,8 @@
 """The named readings of a LAS X session: where the stage is, which job is selected, and so on.
 
-Each function asks the read loop in ``dispatcher/read.py`` for one row of
-the table of readings in ``primitives/direct/profile.py`` and hands back a plain value, or, with
+Each function hands the name of one row of the table of readings in
+``primitives/direct/profile.py`` to the dispatcher's ``run()``, which runs the
+read loop (``dispatcher/read.py``), and hands back a plain value, or, with
 ``diagnostics=True``, a :class:`~...dispatcher.read.Reading` that also says
 which source answered and how old the answer was. A reading that cannot be
 had comes back as None; the readers here do not raise, except where a
@@ -31,8 +32,11 @@ log = logging.getLogger(__name__)
 
 
 def wait_for(datum, client, **keywords):
-    """Wait for a reading of *datum*, asking LAS X's sources; see :func:`dispatcher.dispatcher.read`."""
-    return _door.read(direct_profile, datum, client, **keywords)
+    """Wait for a reading of *datum*, asking LAS X's sources: the dispatcher's ``run()`` with the reading's name.
+
+    Every named reading below comes through here.
+    """
+    return _door.run(direct_profile, client, datum, **keywords)
 
 
 def _routed(

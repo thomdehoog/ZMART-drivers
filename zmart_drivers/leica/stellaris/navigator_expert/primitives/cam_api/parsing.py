@@ -9,8 +9,8 @@ wrappers, and acquisition — all the places LAS X text arrives.
 job-settings JSON from ``get_job_settings`` into a flat, navigable dict
 (validated required keys; ``_beamRoute``/``_lineIndex``/``_index`` markers so
 detectors, lasers, and filter wheels can be located without re-parsing; the
-``stack``/``zPosition``/``time`` sections when present). The confirm
-confirmations in ``operations/changes/`` read their readback through it.
+``stack``/``zPosition``/``time`` sections when present). The checks of
+the changes in ``cam_api/writes.py`` read their readback through it.
 """
 
 import re

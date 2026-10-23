@@ -55,7 +55,6 @@ from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import pa
 from zmart_drivers.leica.stellaris.navigator_expert.procedures import readings as readers
 
 from zmart_drivers.leica.stellaris.navigator_expert.procedures.save_data import product
-from zmart_drivers.leica.stellaris.navigator_expert.operations.changes import acquire as acquire_change
 from zmart_drivers.leica.stellaris.navigator_expert.procedures import changes
 
 NOTEBOOK_PATH = (
@@ -233,7 +232,7 @@ def _install_simulator(monkeypatch, machine) -> SimulatedScope:
             read_plane=lambda index: tifffile.imread(image_paths[index]),
         )
 
-    monkeypatch.setattr(acquire_change, "take_picture", _acquire)
+    monkeypatch.setattr(changes, "take_picture", _acquire)
     monkeypatch.setattr(saving, "save", _save)
     return sim
 

@@ -35,7 +35,7 @@ def scope(monkeypatch, tmp_path):
     monkeypatch.setattr(
         reading_settings,
         "STATE_READERS",
-        replace(reading_settings.STATE_READERS, selected_job_confirm_source="api"),
+        replace(reading_settings.STATE_READERS, selected_job_confirm_fallback="api"),
     )
     hermetic_mock_machine_root()
     monkeypatch.setattr(lasx_client, "connect_python_client", lambda **_kw: MockLasxClient(latency=0.0))
@@ -53,7 +53,7 @@ def test_the_package_offers_only_the_microscope():
     offered = {name for name in vars(navigator_expert) if not name.startswith("__")} - {"methods"}
 
     assert sorted(navigator_expert.__all__) == ["Microscope", "__version__", "connect"]
-    assert offered <= {"Microscope", "connect"} | {"dispatcher", "driver_setup", "procedures", "primitives", "operations", "zmart_controller_plugin", "testing"}
+    assert offered <= {"Microscope", "connect"} | {"dispatcher", "driver_setup", "procedures", "primitives", "zmart_controller_plugin", "testing"}
 
 
 def test_the_running_log_gets_the_messages_of_every_part_of_the_driver(scope):

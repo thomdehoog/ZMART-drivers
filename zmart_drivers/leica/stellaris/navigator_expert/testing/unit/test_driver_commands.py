@@ -194,7 +194,6 @@ def tearDownModule():
 from zmart_drivers.leica.stellaris.navigator_expert.driver_setup.origin import (
     set_origin as _set_origin,
 )
-from zmart_drivers.leica.stellaris.navigator_expert.operations.changes import acquire as acquire_change
 from zmart_drivers.leica.stellaris.navigator_expert.driver_setup.limits import limit_rules
 from zmart_drivers.leica.stellaris.navigator_expert.procedures.save_data import save_waiting as save_settings
 from zmart_drivers.leica.stellaris.navigator_expert.procedures import changes
@@ -895,7 +894,7 @@ class TestAcquire(unittest.TestCase):
                 patch.object(
                     _commands_comp, "select_job", lambda c, j, **k: {"success": True}
                 ),
-                patch.object(acquire_change, "take_picture", lambda c, j, **k: _a_capture(j)),
+                patch.object(changes, "take_picture", lambda c, j, **k: _a_capture(j)),
                 patch.object(_save, "save", fake_save),
                 patch.object(_log, "write", fake_log),
                 *patches,
@@ -1001,7 +1000,7 @@ class TestAcquire(unittest.TestCase):
         with (
             patch.object(_readers, "get_jobs", return_value=self._jobs()),
             patch.object(_readers, "get_hardware_info", return_value={}),
-            patch.object(acquire_change, "take_picture", fake_capture),
+            patch.object(changes, "take_picture", fake_capture),
             patch.object(_save, "save", fake_save),
             patches[0],
             patches[1],
@@ -1090,7 +1089,7 @@ class TestAcquire(unittest.TestCase):
                     _commands_comp, "select_job", lambda *a, **k: {"success": True}
                 ),
                 patch.object(
-                    acquire_change,
+                    changes,
                     "take_picture",
                     lambda client, job, **k: _a_capture(job),
                 ),
@@ -1717,7 +1716,7 @@ class TestAcquire(unittest.TestCase):
                     lambda client, job, **k: {"success": True},
                 ),
                 patch.object(
-                    acquire_change,
+                    changes,
                     "take_picture",
                     lambda client, job, **k: _a_capture(job),
                 ),
@@ -1752,7 +1751,7 @@ class TestAcquire(unittest.TestCase):
             patch.object(_readers, "get_jobs", return_value=self._jobs()),
             patch.object(_readers, "get_hardware_info", return_value={}),
             patch.object(_commands_comp, "select_job", return_value={"success": True}),
-            patch.object(acquire_change, "take_picture", lambda client, job, **k: _a_capture(job)),
+            patch.object(changes, "take_picture", lambda client, job, **k: _a_capture(job)),
             patch.object(_save, "save", fake_save),
             patches[0],
             patches[1],
@@ -1854,7 +1853,7 @@ class TestAcquire(unittest.TestCase):
             patch.object(_readers, "get_jobs", return_value=self._jobs()),
             patch.object(_commands_comp, "select_job", return_value={"success": True}),
             patch.object(
-                acquire_change,
+                changes,
                 "take_picture",
                 side_effect=lambda client, job, **k: (
                     calls.append("capture") or _a_capture(job)

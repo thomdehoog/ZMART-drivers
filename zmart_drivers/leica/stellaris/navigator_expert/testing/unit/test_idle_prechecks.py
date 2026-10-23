@@ -2,7 +2,7 @@
 
 Commands that touch the scope's physical/acquisition state must SEE the
 scanner idle before firing. The wait is an ordinary scanner-status reading
-under the one rule in ``dispatcher.timing`` (operator decision, 2026-10-10,
+under the one rule in ``cam_api/waiting.py`` (operator decision, 2026-10-10,
 replacing the unbounded wait of 2026-06-11): four windows of ``WINDOW_S``,
 after which the command fails instead of waiting forever. It is fail-closed
 against Unknown status (Unknown is not idle).
@@ -11,24 +11,17 @@ against Unknown status (Unknown is not idle).
 import unittest
 from unittest.mock import patch
 
-from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import prechecks
 from zmart_drivers.leica.stellaris.navigator_expert.primitives.direct import profile as reading_settings
 from zmart_drivers.leica.stellaris.navigator_expert.dispatcher import write
 from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import writes
-from zmart_drivers.leica.stellaris.navigator_expert.operations.changes import select_job as select_job_change
-from zmart_drivers.leica.stellaris.navigator_expert.operations.changes import acquire as acquire_change
 
-#: The changes still on the dispatcher's older door, with a profile each.
-IDLE_GUARDED = {
-    "SELECT_JOB": select_job_change.SELECT_JOB,
-    "ACQUIRE": acquire_change.ACQUIRE,
-}
-
-#: The changes run through ``run()``: each waits for the scanner idle (its ``ready``).
+#: The changes that touch the stage, the lens or the scan: each waits for the scanner idle (its ``ready``).
 IDLE_WRITES = {
     "move_xy": writes.move_xy(0.0, 0.0, "um"),
     "move_z": writes.move_z("J", 0.0, "um", "galvo"),
     "set_objective": writes.set_objective("J", 1, "10x"),
+    "select_job": writes.select_job("J"),
+    "acquire": writes.acquire("J"),
 }
 
 
@@ -45,9 +38,6 @@ class TestIdlePrecheckPolicy(unittest.TestCase):
         return lambda client: remaining.pop(0) if len(remaining) > 1 else remaining[0]
 
     def test_physical_commands_see_idle_before_firing(self):
-        for name, profile in IDLE_GUARDED.items():
-            with self.subTest(profile=name):
-                self.assertIs(profile.pre_check_fn, prechecks.check_idle)
         for name, change in IDLE_WRITES.items():
             with self.subTest(write=name):
                 self.assertEqual(change.ready.reading, "scan_status")
@@ -69,30 +59,12 @@ class TestIdlePrecheckPolicy(unittest.TestCase):
         self.assertFalse(result["success"])
         self.assertIn("last status: eScanRunning", result["logs"][0]["msg"])
 
-    def test_check_idle_waits_through_a_busy_phase_within_the_windows(self):
-        statuses = self._statuses(["eScanRunning"] * 10 + ["eScanIdle"])
-        with patch.object(
-            prechecks._readers.api_reader, "get_scan_status", side_effect=statuses
-        ):
-            result = prechecks.check_idle(object())
-        self.assertTrue(result["success"])
-
-    def test_check_idle_unknown_is_not_idle(self):
+    def test_wait_ready_unknown_is_not_idle(self):
         statuses = self._statuses(["Unknown", "Unknown", "eScanIdle"])
-        with patch.object(
-            prechecks._readers.api_reader, "get_scan_status", side_effect=statuses
-        ):
-            result = prechecks.check_idle(object())
+        with patch.object(reading_settings.api_reader, "get_scan_status", side_effect=statuses) as asked:
+            result = write.wait_ready(reading_settings, object(), writes.idle())()
         self.assertTrue(result["success"])  # waited through Unknown, not past it
-
-    def test_check_idle_fails_when_busy_through_all_four_windows(self):
-        with patch.object(
-            prechecks._readers.api_reader,
-            "get_scan_status",
-            return_value="eScanRunning",
-        ):
-            result = prechecks.check_idle(object())
-        self.assertFalse(result["success"])
+        self.assertEqual(asked.call_count, 3)
 
 
 if __name__ == "__main__":

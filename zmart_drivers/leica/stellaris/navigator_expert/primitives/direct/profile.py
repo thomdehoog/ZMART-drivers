@@ -104,8 +104,11 @@ class StateReaderProfile:
     # so it can still show the state from before the command.
     waiting_fallback: str = "api"
     # Confirming a job change: when the direct reader cannot answer, this
-    # takes its place. Hybrid races the API against the log (see
-    # ``selected_job_confirm_source`` below).
+    # takes its place. Hybrid asks the API's job list, then the log's
+    # ``CurrentBlock`` event. The API's list can be stale on the real scope
+    # (15 s and more, the wrong job), so a job change whose pre-change API
+    # answer is missing, or already the target, is confirmed by the log alone
+    # (``procedures/changes.py``, ``select_job``).
     selected_job_confirm_fallback: str = "hybrid"
 
     xy_mode: str = "direct"
@@ -120,20 +123,11 @@ class StateReaderProfile:
     jobs_mode: str = "direct"
 
     selected_job_mode: str = "direct"
-    # Selected-job confirmation source: "direct" | "api" | "log" | "hybrid".
-    # direct: the direct reader alone confirms (LAS X's live selection); only
-    # when it cannot answer does hybrid take its place.
-    # hybrid races the api leg (transition-admissible: a stale API readback
-    # cannot witness a transition to a target it already read pre-command)
-    # against the log leg (post-command CurrentBlock event). The race runs for
-    # one window (``waiting.WINDOW_S``), and the dispatcher runs four of them
-    # with the command fired again between: the one 4x3 rule.
-    # The api confirm is measured-wrong on the real scope (stale 15 s+, wrong
-    # job) and log-only is insufficient on the simulator; hybrid fits both
-    # without environment detection, so it is the fallback behind the direct
-    # reader, which is the default.
-    selected_job_confirm_source: str = "direct"
+    # Before a job change confirmed through the log, ask the API for every
+    # job's settings, so that LAS X writes the whole job cluster to the log.
     selected_job_log_prime_cluster: bool = False
+    # How old the log's selected job may be when it decides that the job is
+    # already selected; None: the log's own (``log/profile.py``).
     selected_job_log_cluster_max_age_s: float | None = None
 
     # Where a z drive is: "direct", the hardware server; any other mode, the job

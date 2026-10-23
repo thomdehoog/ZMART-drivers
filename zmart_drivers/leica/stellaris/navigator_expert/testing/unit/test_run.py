@@ -1,9 +1,9 @@
 """The dispatcher's one entry, ``run()``: a reading by its name, or a change as plain data.
 
-The pretend vendor (``testing/helpers/pretend_vendor.py``) is handed in with
-the four things ``run()`` asks of a vendor for a change (``limits_setup_hint``,
-``make_request``, ``check_reply``, ``WRITING``), and its changes are plain
-records with the fields of a write. So these tests also show that ``run()``
+The pretend vendor (``testing/helpers/pretend_vendor.py``) is handed in: it
+has the four things ``run()`` asks of a vendor for a change
+(``limits_setup_hint``, ``make_request``, ``check_reply``, ``WRITING``), and
+its changes are plain records with the fields of a write. So these tests also show that ``run()``
 needs nothing of LAS X: how a change waits until the microscope is ready, how
 it is read back one window at a time and sent again between windows, and that
 a change that may never be sent again is sent once.
@@ -22,20 +22,14 @@ from zmart_drivers.leica.stellaris.navigator_expert.dispatcher import limits as 
 
 
 class PretendRun(pretend_vendor.PretendSources):
-    """The pretend vendor's sources, with what ``run()`` asks of a vendor for a change."""
-
-    WRITING = pretend_vendor.PretendProfile()
-    limits_setup_hint = "the pretend limits in pretend_vendor.connect"
+    """The pretend vendor, counting the replies it checks."""
 
     def __init__(self):
         self.replies_checked = 0
 
-    def make_request(self, client, write):
-        return {"command": write.request}
-
     def check_reply(self, client, write):
         self.replies_checked += 1
-        return pretend_vendor.error_check(client)
+        return super().check_reply(client, write)
 
 
 def expect(accept):

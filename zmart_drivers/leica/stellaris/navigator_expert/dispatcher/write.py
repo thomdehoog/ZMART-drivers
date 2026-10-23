@@ -158,13 +158,16 @@ def wait_ready(vendor, client, expect):
     return ready
 
 
-def read_back(vendor, client, expect):
+def read_back(vendor, client, expect, *, since=None):
     """A confirmation for :func:`confirm_and_fire`: one window of *expect*'s reading, starting now.
 
-    Only answers seen after the window began count, so a reading from before
-    the change cannot confirm it. The confirm loop runs the windows and sends
-    the change again between them. Answers ``{"success", "logs"}``, and the
-    last value read under ``last_value`` when the change did not show.
+    Only answers seen after *since* (a ``time.time()``; None: when the window
+    began) count, so a reading from before the change cannot confirm it.
+    ``run()`` passes the moment the change was handed to the write loops: a
+    source that dates its answer by the event (the log) may have written it
+    while the change was still being sent. The confirm loop runs the windows
+    and sends the change again between them. Answers ``{"success", "logs"}``,
+    and the last value read under ``last_value`` when the change did not show.
     """
 
     def confirm():
@@ -173,7 +176,7 @@ def read_back(vendor, client, expect):
             vendor,
             client,
             expect,
-            observed_after=time.time(),
+            observed_after=time.time() if since is None else since,
             deadline=started + vendor.waiting.WINDOW_S,
         )
         if shown:

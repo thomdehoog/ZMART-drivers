@@ -35,7 +35,7 @@ from typing import Any
 import numpy as np
 
 from zmart_drivers.leica.stellaris.navigator_expert.driver_setup.limits import handshake
-from zmart_drivers.leica.stellaris.navigator_expert.operations.changes import acquire as acquire_change
+from zmart_drivers.leica.stellaris.navigator_expert.procedures import changes
 from zmart_drivers.leica.stellaris.navigator_expert.procedures.save_data import save as saving
 from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import client as lasx_client
 from zmart_drivers.leica.stellaris.navigator_expert.procedures import readings as readers
@@ -816,7 +816,7 @@ def acquire_validation_image(
         shutil.rmtree(output_root)
     output_root.mkdir()
 
-    acquisition = acquire_change.take_picture(session.client, session.job_name)
+    acquisition = changes.take_picture(session.client, session.job_name)
     saved = saving.save(
         session.client,
         acquisition,

@@ -69,7 +69,8 @@ def test_a_command_marked_never_resend_is_sent_once_whatever_the_caller_asks(sco
 
 
 def test_a_command_marked_never_resend_is_not_sent_again_when_unconfirmed(scope):
-    result = pretend_vendor.start_scan(scope, max_confirm_attempts=3)
+    # The profile asks for two windows with a send again between them.
+    result = pretend_vendor.start_scan(scope)
 
     assert result["confirmed"] is False
     assert len(scope.received) == 1
