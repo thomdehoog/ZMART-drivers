@@ -18,7 +18,7 @@ from typing import Any
 
 from ...dispatcher import limits as _gate
 from . import limit_rules as _rules
-from .limit_rules import NOTEBOOK_POINTER
+from ...primitives.direct.profile import limits_setup_hint
 from .. import store as _machine
 from . import config as _limits_config
 
@@ -74,7 +74,7 @@ def _install_default_limits(client: Any, machine: Any, reason: str) -> _gate.Gat
         "still bounds every move. Publish measured limits with %s.",
         reason,
         state.limits.describe(),
-        NOTEBOOK_POINTER,
+        limits_setup_hint,
     )
     return state
 
@@ -156,7 +156,7 @@ def connect_handshake(
             error = (
                 f"limits handshake failed and the bundled defaults are unusable "
                 f"({default_exc}); machine file error: {exc} — every mutating command "
-                f"refuses until the limits files validate (see {NOTEBOOK_POINTER})."
+                f"refuses until the limits files validate (see {limits_setup_hint})."
             )
             log.error("%s", error)
             state = _gate.GateState(limits=None, stage_cfg=None, error=error)

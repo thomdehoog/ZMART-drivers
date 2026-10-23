@@ -41,8 +41,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from ..direct import profile as policy
-from .derived import z_um_from_settings
-from .parsing import make_changeable_copy, parse_format
+from .parsing import make_changeable_copy, parse_format, z_um_from_settings
 
 log = logging.getLogger(__name__)
 
@@ -77,6 +76,7 @@ class Write:
     without_receipt: bool = False  # UpdateAsync, no reply checked
     accepted_replies: tuple = ()  # LAS X replies that mean "already so"
     never_resend: bool = False
+    experiment: Callable | None = None  # opens the experiment a capture goes into, for the direct route
 
 
 def is_idle(status) -> bool:
@@ -140,20 +140,23 @@ def within_xy(x_um, y_um, tolerance):
     return check
 
 
-def z_within(drive, target_um, tolerance):
+def z_within(drive, target_um, tolerance, *, saved=None):
     """Job settings read while the z ``drive`` (``"z-galvo"``, ``"z-wide"``) is within ``tolerance`` of the target.
 
     Where the drive is comes from the direct reader first, where it truly is;
     else from the job's settings, which know they do not refresh for the drive
-    carrying the job's z-stack and read that one from LAS X's hardware server
-    (``z_um_from_settings``). When neither answers, the check is not met.
+    carrying the job's z-stack and read that one from LAS X's hardware server,
+    or, when it cannot be reached, from the experiment LAS X saves (*saved*,
+    see ``z_um_from_settings``). When none answers, the check is not met.
     """
 
     def check(settings) -> bool:
         try:
             z_um = policy.z_um_direct(drive)
             if z_um is None:
-                z_um = z_um_from_settings(settings, drive, direct=policy.STATE_READERS.z_mode == "direct")
+                z_um = z_um_from_settings(
+                    settings, drive, saved=saved, direct=policy.STATE_READERS.z_mode == "direct"
+                )
             return abs(z_um - target_um) < tolerance
         except (KeyError, TypeError, RuntimeError, ValueError):
             return False
@@ -201,10 +204,13 @@ def move_xy(x, y, unit, *, tolerance=None) -> Write:
     )
 
 
-def move_z(job_name, z, unit, z_mode, *, tolerance=None) -> Write:
+def move_z(job_name, z, unit, z_mode, *, tolerance=None, saved=None) -> Write:
     """Move a z drive, ``galvo`` or ``zwide``, of ``job_name`` to an absolute position.
 
-    ``tolerance`` in micrometres, ``Z_TOLERANCE_UM`` when None.
+    ``tolerance`` in micrometres, ``Z_TOLERANCE_UM`` when None. ``saved``
+    reads the drive from the experiment LAS X saves (:func:`z_within`), for
+    the drive carrying the job's z-stack when the hardware server cannot be
+    reached; without it that drive is not confirmed then.
     """
     z_um = z * UM_PER_UNIT[unit]
     tolerance = Z_TOLERANCE_UM if tolerance is None else tolerance
@@ -230,7 +236,7 @@ def move_z(job_name, z, unit, z_mode, *, tolerance=None) -> Write:
         ready=idle(),
         confirm=Expect(
             "job_settings",
-            z_within(Z_DRIVE_KEY[z_mode], z_um, tolerance),
+            z_within(Z_DRIVE_KEY[z_mode], z_um, tolerance, saved=saved),
             about=job_name,
         ),
     )
@@ -321,12 +327,14 @@ def select_job(job_name, *, mode=None, fallback=None) -> Write:
     )
 
 
-def acquire(job_name) -> Write:
+def acquire(job_name, *, experiment=None) -> Write:
     """Run the job ``job_name`` once: one picture.
 
     Never sent again, after an error or otherwise: a second send is a second
     picture. Sent without a receipt, and with nothing read back: whether the
     scan ran is watched after the send (``procedures/changes.py``).
+    ``experiment`` opens the experiment the picture goes into; the direct
+    route needs it, and without it the CAM API carries the picture.
     """
 
     def fill(m):
@@ -341,6 +349,7 @@ def acquire(job_name) -> Write:
         ready=idle(),
         without_receipt=True,
         never_resend=True,
+        experiment=experiment,
     )
 
 

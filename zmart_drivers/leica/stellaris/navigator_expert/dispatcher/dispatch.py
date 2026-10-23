@@ -17,7 +17,8 @@ its name, or a change as plain data (for LAS X, a ``Write`` from
 
 The write loops confirm a change through the read loop, so the two share one
 waiting rule. This file knows nothing of any one microscope: the microscope's
-own sources, how it sends, its error sorting and waiting numbers are handed in.
+own sources, how it sends, its dialogs, its error sorting and waiting numbers
+are handed in.
 
 Author: Thom de Hoog, Center for Microscopy and Image Analysis (ZMB),
 University of Zurich (thom.dehoog@zmb.uzh.ch, thomdehoog@gmail.com).
@@ -104,7 +105,7 @@ def refused(message, *, logged=False, **extra):
     }
 
 
-def run(profile, client, primitive, *, max_retries=None, **asked):
+def run(profile, client, primitive, *, max_retries=None, dialogs=None, **asked):
     """Run one primitive: a reading (its name) or a change (a write); the one entry to the dispatcher.
 
     A reading waits by the one rule (:func:`read.wait_for`, with *asked*:
@@ -125,7 +126,9 @@ def run(profile, client, primitive, *, max_retries=None, **asked):
     ``confirm`` (readings to wait for: ``reading``, ``accept``, ``about``,
     ``mode``, ``fallback``), ``without_receipt`` and ``never_resend``.
     ``max_retries`` overrides how often a change is sent again after a
-    temporary error.
+    temporary error. ``dialogs`` are the microscope's dialogs, answered
+    before every send of a change and watched for while it runs
+    (:func:`write.answering`); None looks at none.
     """
     from . import limits as gate, read as reader, write as writer
 
@@ -153,6 +156,7 @@ def run(profile, client, primitive, *, max_retries=None, **asked):
         never_resend=change.never_resend,
         max_retries=max_retries,
         send_without_receipt=change.without_receipt,
+        dialogs=dialogs,
     )
     result["route"] = getattr(sending.transport, "carried_by", None)
     return result

@@ -58,7 +58,7 @@ from __future__ import annotations
 import logging
 from ..dispatcher import limits as _gate
 from . import readings as _readers
-from ..primitives.cam_api.derived import stack_drive as _stack_drive
+from ..primitives.cam_api.parsing import stack_drive as _stack_drive
 from . import changes
 
 

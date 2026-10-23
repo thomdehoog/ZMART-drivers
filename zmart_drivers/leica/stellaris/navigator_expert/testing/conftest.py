@@ -115,10 +115,10 @@ def _no_lasx_window(tmp_path, monkeypatch):
             "no Windows UI Automation in the test suite"
         )
 
-    from zmart_drivers.leica.stellaris.navigator_expert.procedures import saved_experiment
+    from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import reads as api_reader
 
     monkeypatch.setattr(answer_dialogs, "LASX_LOG", tmp_path / "no LAS X.log")
-    monkeypatch.setattr(saved_experiment, "FOLDER", str(tmp_path / "ScanningTemplates"))
+    monkeypatch.setattr(api_reader, "SAVED_EXPERIMENT_FOLDER", str(tmp_path / "ScanningTemplates"))
     monkeypatch.setattr(answer_dialogs, "lasx_windows", no_windows)
     monkeypatch.setattr(navigator, "automation", no_automation)
     navigator.forget()

@@ -390,8 +390,6 @@ MUTATING_COMMANDS = {
     "acquire": "acquire",
 }
 
-NOTEBOOK_POINTER = "driver_setup/limits/notebooks/set_limits.ipynb"
-
 
 def build_limits(stage_cfg, *, source, path, is_fallback):
     """Check a loaded limits file against the physical backstop, apply it, and compile it.

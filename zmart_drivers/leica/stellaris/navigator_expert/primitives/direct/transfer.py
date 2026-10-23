@@ -1,7 +1,7 @@
 """Sending a change straight to LAS X's hardware server: the direct route, and the element it sends.
 
 The same commands the CAM API ends in, sent as the XML elements LAS X logs for them
-(``primitives/direct/translations.py``). A change the driver makes is first written
+(``primitives/direct/writes.py``). A change the driver makes is first written
 into the CAM API's request object, as always; this transport then turns the fields
 into the element and sends it, and puts LAS X's answer where the driver's error
 checks read the CAM API's.
@@ -14,9 +14,14 @@ command on: LAS X may already have carried it out.
 One element sent to LAS X's hardware server, and the answer that comes back.
 
 A command is the XML element the CAM API itself ends in, for example
-``<Scanner Command="SetZoom" Zoom="1.5" BlockId="152"/>`` (``translations.py``).
+``<Scanner Command="SetZoom" Zoom="1.5" BlockId="152"/>`` (``writes.py``).
 It goes to the hardware server with ``SendCommand2``, from a thread of its own
-because the server answers only once a dialog the command caused is closed.
+because the server answers only once a dialog the command caused is closed; the
+write loop answers LAS X's dialogs around the send (``dispatcher/write.py``).
+
+An acquire names the experiment its image goes into. The change hands in what
+opens it (``Write.experiment``, carried on the request); the route asks it only
+when it builds the acquire's element, after the limits and the wait for idle.
 LAS X answers ``<Result Error="0"/>`` accepted, ``Error="1"`` refused with its
 reason inside, ``Error="2"`` accepted with the value adjusted.
 
@@ -28,23 +33,13 @@ University of Zurich (thom.dehoog@zmb.uzh.ch, thomdehoog@gmail.com).
 
 from __future__ import annotations
 
-import json
 import logging
-import os
 import time
-from pathlib import Path
 from ...dispatcher.write import TransportUnavailable
 from . import client as hardware_server
 from .client import HardwareServerUnavailable
-from ...procedures.clear_cache.data_container import (
-    experiment_is_open,
-    experiment_of,
-    new_experiment,
-    open_experiments,
-)
-from .state_tree import last_image_id, job_sequence
+from .state_tree import job_sequence
 from .writes import ENUM_FIELDS, TRANSLATIONS, NoTranslation
-from ...procedures import answer_dialogs
 from ..cam_api import transfer as _cam
 import queue
 import re
@@ -56,60 +51,13 @@ from .writes import Fields
 
 log = logging.getLogger(__name__)
 
-#: The name the direct route gives a project it makes, followed by its number.
-NEW_PROJECT = "ZMART_Experiment"
-
-
-def remembered_experiment_file() -> Path:
-    """Where the direct route writes down the last experiment it found, for the next start of the driver.
-
-    Under the Windows user's own profile (``%LOCALAPPDATA%\\ZMART``), as LAS X's
-    Data Container belongs to that user too.
-    """
-    root = os.environ.get("LOCALAPPDATA") or str(Path.home() / "AppData" / "Local")
-    return Path(root) / "ZMART" / "leica-stellaris-direct-route.json"
-
-
-def read_remembered_experiment() -> int | None:
-    """The experiment written down by an earlier run; None when there is none or it cannot be read."""
-    try:
-        number = json.loads(remembered_experiment_file().read_text(encoding="utf-8"))[
-            "experiment"
-        ]
-    except (OSError, ValueError, KeyError, TypeError):
-        return None
-    return number if isinstance(number, int) and not isinstance(number, bool) else None
-
-
-def write_remembered_experiment(number: int) -> None:
-    """Write down *number*; a file that cannot be written only costs the next start its memory."""
-    file = remembered_experiment_file()
-    try:
-        file.parent.mkdir(parents=True, exist_ok=True)
-        file.write_text(json.dumps({"experiment": number}), encoding="utf-8")
-    except OSError:
-        pass
-
-
-def new_project_name(open_projects: dict[int, str]) -> str:
-    """``ZMART_Experiment<N>``, N one above the highest such name among *open_projects* (1 for the first)."""
-    numbers = [
-        int(name[len(NEW_PROJECT) :])
-        for name in open_projects.values()
-        if name.startswith(NEW_PROJECT) and name[len(NEW_PROJECT) :].isdigit()
-    ]
-    return f"{NEW_PROJECT}{max(numbers, default=0) + 1}"
-
-
-#: The name the direct route gives a project it makes, followed by its number.
-
 
 class DirectTransport:
     """The direct route, as the send loop asks for a transport."""
 
     def __init__(self):
         self.enum_types = {}
-        # The Data Container experiment the last acquire's image went into: see images_experiment_id.
+        # What opens the experiment of the request being sent: see images_experiment_id.
         self.experiment = None
 
     # --- what the send loop asks of a transport -------------------------------------
@@ -130,6 +78,7 @@ class DirectTransport:
         refusal is not an error here: it goes into the reply, as the CAM API's does.
         """
         name = getattr(request, "name", None)
+        self.experiment = getattr(request, "experiment", None)
         translation = TRANSLATIONS.get(name)
         if translation is None:
             raise TransportUnavailable(f"{name} has no direct translation")
@@ -147,10 +96,9 @@ class DirectTransport:
         except (NoTranslation, HardwareServerUnavailable) as why:
             raise TransportUnavailable(str(why)) from why
 
-        fired_at = time.monotonic()
         answer = send(xml)
         self.answered(client, answer)
-        return True, [note.message for note in answer_dialogs.answered_since(fired_at)]
+        return True, []
 
     def await_reply(self, client):
         """LAS X's answer came with the send, so there is nothing more to wait for."""
@@ -206,59 +154,18 @@ class DirectTransport:
     def images_experiment_id(self) -> int:
         """The Data Container experiment, LAS X's project, an acquire's image goes into.
 
-        LAS X's window names it from its project tree, which only the window has;
-        the direct route chooses it from the Data Container, and only ever a project
-        open in LAS X. A project deleted in LAS X's window stays in the Data
-        Container, closed, with its images, and an image sent into it is seen
-        nowhere (STELLARIS, 2026-10-15: image 2135 into deleted project 698). In
-        this order:
-
-        1. The project of the last image LAS X made.
-        2. The project remembered from an earlier acquire, kept on this connection
-           and in a file (:func:`remembered_experiment_file`), because the last
-           image is often gone by the next acquire.
-        3. The newest project open in LAS X.
-        4. With none open, a new project, ``ZMART_Experiment<N>``, as LAS X makes
-           one itself when it captures with no project open.
-
-        Anything the Data Container cannot answer refuses the acquire; nothing is
-        sent then, and the CAM API carries it.
+        The request carries what opens it (``Write.experiment``, for LAS X
+        ``procedures/clear_cache/data_container.experiment_for_capture``); it is
+        asked here, as the element is built. When the request carries none, or
+        it fails, the acquire is refused: nothing is sent, and the CAM API
+        carries it.
         """
+        if self.experiment is None:
+            raise NoTranslation("the acquire names no experiment to open for its image")
         try:
-            last = last_image_id()
-        except HardwareServerUnavailable as why:
-            raise NoTranslation(
-                f"no last image from LAS X's state tree: {why}"
-            ) from why
-        try:
-            chosen = self.open_project_for(last)
-        except Exception as why:  # noqa: BLE001 -- any Data Container failure refuses, nothing is sent
-            raise NoTranslation(
-                f"LAS X's Data Container did not give a project for the image: {why}"
-            ) from why
-        if chosen != self.experiment:
-            write_remembered_experiment(chosen)
-        self.experiment = chosen
-        return chosen
-
-    def open_project_for(self, last: int) -> int:
-        """The project chosen by the order in :meth:`images_experiment_id`, for last image *last* (0: none)."""
-        try:
-            found = experiment_of(last) if last else None
-        except Exception:  # noqa: BLE001 -- the last image was removed, as the driver does after saving
-            found = None
-        remembered = (
-            self.experiment
-            if self.experiment is not None
-            else read_remembered_experiment()
-        )
-        for candidate in (found, remembered):
-            if candidate is not None and experiment_is_open(candidate):
-                return candidate
-        projects = open_experiments()
-        if projects:
-            return max(projects)
-        return new_experiment(new_project_name(projects))
+            return self.experiment()
+        except Exception as why:  # noqa: BLE001 -- any failure refuses, nothing is sent
+            raise NoTranslation(str(why)) from why
 
     def answered(self, client, answer):
         """Record LAS X's answer in the reply, as the CAM API records its own."""
@@ -347,13 +254,11 @@ senders_lock = threading.Lock()
 def send(xml: str) -> str:
     """Send one element to the hardware server; return LAS X's answer. Never sent twice.
 
-    While the answer is awaited, a LAS X warning that asks only for OK is
-    answered; any other dialog ends the wait with
-    ``lasx_dialogs.DialogOpen``, its text, and a server that neither answers
-    nor shows a dialog within the rule's four windows with
-    ``HardwareServerUnavailable``. Either way the element stays with LAS X,
-    which may still apply it once the operator answers; the next element
-    goes through a new sender.
+    A server that does not answer within the rule's four windows (a dialog
+    the element caused waits for the operator) ends the wait with
+    ``HardwareServerUnavailable``. The element stays with LAS X, which may
+    still apply it once the operator answers; the next element goes through
+    a new sender.
     """
     with senders_lock:
         if senders["current"] is None:
@@ -363,16 +268,11 @@ def send(xml: str) -> str:
     sender.waiting.put((xml, outcome, done))
     deadline = time.monotonic() + waiting.WINDOWS * waiting.WINDOW_S
     while not done.wait(waiting.POLL_S):
-        try:
-            answer_dialogs.answer_warnings()
-        except answer_dialogs.DialogOpen:
-            abandon(sender)
-            raise
         if time.monotonic() >= deadline:
             abandon(sender)
             raise hardware_server.HardwareServerUnavailable(
                 f"the hardware server did not answer {xml[:120]} within "
-                f"{waiting.WINDOWS} windows of {waiting.WINDOW_S}s, and LAS X shows no dialog"
+                f"{waiting.WINDOWS} windows of {waiting.WINDOW_S}s"
             )
     if "error" in outcome:
         raise outcome["error"]

@@ -47,7 +47,7 @@ Parameters live in ``LOG_READER`` - no hardcoded values in the
 read paths.
 
 Dependency direction:
-    - Imports: stdlib, shared ``derived`` helpers.
+    - Imports: stdlib, the shared ``cam_api/parsing`` helpers.
     - Imported by: ``readers.router``, dispatch diagnostics, tests, and
       hardware validators.
 
@@ -76,7 +76,7 @@ import time
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
 from datetime import datetime
-from ..cam_api import derived
+from ..cam_api import parsing
 from collections.abc import Callable
 from ..cam_api import profile as waiting
 from ...dispatcher.read import Reading
@@ -385,7 +385,7 @@ def parse_files(lcs_path=None, msgbox_path=None, now=None, lines=None):
                     j is not None
                     and j.get("jobName") is not None
                     and j.get("id") is not None
-                    and derived.settings_geometry_ready(j)
+                    and parsing.settings_geometry_ready(j)
                 ):
                     snap.atl_by_block[str(j["id"])] = (j, ts)
                 continue
@@ -708,11 +708,11 @@ def get_selected_job(snapshot=None, *, max_age_s=None):
     current = _current_block_selected(s, max_age_s=max_age_s)
     if current is not None:
         return current
-    return derived.selected_job(get_jobs(s, max_age_s=max_age_s))
+    return parsing.selected_job(get_jobs(s, max_age_s=max_age_s))
 
 
 def get_job_by_name(job_name, snapshot=None, *, max_age_s=None):
-    return derived.job_by_name(
+    return parsing.job_by_name(
         get_jobs(snapshot, max_age_s=max_age_s),
         job_name,
     )
@@ -752,13 +752,13 @@ def get_pending_dialog(snapshot=None):
 
 
 def get_fov(job_name, snapshot=None, *, max_age_s=None):
-    return derived.fov_from_settings(
+    return parsing.fov_from_settings(
         get_job_settings(job_name, snapshot, max_age_s=max_age_s)
     )
 
 
 def get_base_fov(job_name, snapshot=None, *, max_age_s=None):
-    return derived.base_fov_from_settings(
+    return parsing.base_fov_from_settings(
         get_job_settings(job_name, snapshot, max_age_s=max_age_s)
     )
 
@@ -769,7 +769,7 @@ def read_zwide_um(job_name, snapshot=None, *, max_age_s=None):
     settings = get_job_settings(job_name, snapshot, max_age_s=max_age_s)
     if not settings:
         raise RuntimeError(f"log_reader: no fresh settings for '{job_name}'")
-    return derived.zwide_um_from_settings(settings)
+    return parsing.zwide_um_from_settings(settings)
 
 
 @dataclass(frozen=True)

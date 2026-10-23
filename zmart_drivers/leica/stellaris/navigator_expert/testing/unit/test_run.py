@@ -5,13 +5,16 @@ has the four things ``run()`` asks of a vendor for a change
 (``limits_setup_hint``, ``make_request``, ``check_reply``, ``WRITING``), and
 its changes are plain records with the fields of a write. So these tests also show that ``run()``
 needs nothing of LAS X: how a change waits until the microscope is ready, how
-it is read back one window at a time and sent again between windows, and that
-a change that may never be sent again is sent once.
+it is read back one window at a time and sent again between windows, that
+a change that may never be sent again is sent once, and how the dialogs it is
+handed are answered around every send.
 
 Author: Thom de Hoog, Center for Microscopy and Image Analysis (ZMB),
 University of Zurich (thom.dehoog@zmb.uzh.ch, thomdehoog@gmail.com).
 """
 
+import contextlib
+import time
 from types import SimpleNamespace
 
 import pretend_vendor
@@ -159,3 +162,75 @@ def test_a_busy_reply_is_sent_again(scope, vendor):
 
     assert result["confirmed"] is True
     assert len(scope.received) == 2
+
+
+class PretendDialogs:
+    """The pretend microscope's dialogs, as ``run()`` is handed them: a warning OK answers, or one left open.
+
+    It notes how many requests the microscope had received when it answered,
+    and how many arrived while it watched.
+    """
+
+    def __init__(self, scope, *, warning=None, left_open=None, opens_while_sending=None):
+        self.scope = scope
+        self.warning, self.left_open, self.opens_while_sending = warning, left_open, opens_while_sending
+        self.history, self.answered_after, self.sent_while_watching = [], [], 0
+
+    def answer_warnings(self):
+        if self.scope.received and self.opens_while_sending:
+            self.left_open = self.opens_while_sending  # the request made LAS X show it
+        if self.left_open:
+            raise RuntimeError(f"dialog open, left for the operator: {self.left_open}")
+        if self.warning:
+            self.answered_after.append(len(self.scope.received))
+            self.history.append((time.monotonic(), SimpleNamespace(message=f"answered {self.warning!r} with OK")))
+            self.warning = None
+
+    @contextlib.contextmanager
+    def watching(self):
+        before = len(self.scope.received)
+        yield
+        self.sent_while_watching += len(self.scope.received) - before
+
+    def answered_since(self, moment):
+        return [note for at, note in self.history if at >= moment]
+
+
+def test_a_change_handed_dialogs_answers_a_warning_before_it_is_sent(scope, vendor):
+    dialogs = PretendDialogs(scope, warning="Please keep minimum distance")
+
+    result = dispatch.run(vendor, scope, move_x(250.0), dialogs=dialogs)
+
+    assert (result["success"], result["confirmed"]) == (True, True)
+    assert dialogs.answered_after == [0]  # answered before anything was sent
+    assert dialogs.sent_while_watching == 1  # and watched for while it was
+    answered = [e for e in result["logs"] if "with OK" in e["msg"]]
+    assert [e["level"] for e in answered] == ["warning"]
+
+
+def test_a_dialog_left_for_the_operator_stops_the_send(scope, vendor):
+    dialogs = PretendDialogs(scope, left_open="Turn the turret by hand")
+
+    result = dispatch.run(vendor, scope, move_x(250.0), dialogs=dialogs)
+
+    assert result["success"] is False
+    assert result["message"] == (
+        "move x to 250.0 um | Fire exception: dialog open, left for the operator: Turn the turret by hand"
+    )
+    assert scope.received == []
+
+
+def test_a_send_that_fails_while_a_dialog_is_in_the_way_fails_for_the_dialog(scope, vendor, monkeypatch):
+    dialogs = PretendDialogs(scope, opens_while_sending="Turn the turret by hand")
+
+    def no_answer(client, request, description, *, asynchronous):
+        client.take(request)
+        raise TimeoutError("the microscope did not answer")
+
+    monkeypatch.setattr(vendor.WRITING.transport, "send", no_answer)
+
+    result = dispatch.run(vendor, scope, move_x(250.0), dialogs=dialogs)
+
+    assert result["success"] is False
+    assert "Fire exception: dialog open, left for the operator: Turn the turret by hand" in result["message"]
+    assert len(scope.received) == 1

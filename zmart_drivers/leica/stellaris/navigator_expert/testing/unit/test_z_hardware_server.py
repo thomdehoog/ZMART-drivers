@@ -16,14 +16,15 @@ the tests here hand in a stand-in server instead.
 
 import math
 import time
+from functools import partial
 from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 from z_readback_settings import raw_settings
 
-from zmart_drivers.leica.stellaris.navigator_expert.procedures import saved_experiment
-from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api.derived import z_um_from_settings
+from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import reads as api_reader
+from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api.parsing import z_um_from_settings
 from zmart_drivers.leica.stellaris.navigator_expert.primitives.direct import client as hardware_server
 from zmart_drivers.leica.stellaris.navigator_expert.primitives.direct.client import (
     HardwareServerUnavailable,
@@ -58,12 +59,17 @@ class SavingClient:
             def UpdateAwaitReceipt(self, _window_s):
                 client.saved.append(self.Model.ExperimentName)
                 if client.writes:
-                    folder = Path(saved_experiment.FOLDER)
+                    folder = Path(api_reader.SAVED_EXPERIMENT_FOLDER)
                     folder.mkdir(parents=True, exist_ok=True)
-                    (folder / (saved_experiment.NAME + ".lrp")).write_bytes(SAVED_LRP.read_bytes())
+                    (folder / (api_reader.SAVED_EXPERIMENT_NAME + ".lrp")).write_bytes(SAVED_LRP.read_bytes())
                 return True
 
         self.PyApiSaveExperiment = Save()
+
+
+def saved(client, job_name):
+    """The saved experiment of *job_name*, read through *client*, as the driver hands it to the z readers."""
+    return partial(api_reader.read_saved_z_um, client, job_name)
 
 
 class StandInHardware:
@@ -159,14 +165,14 @@ class TestStackedDrive:
         server.Hardware.ZPosZGalvo = 15e-6
         settings = raw_settings(galvo_um=-0.01, stack_on="z-galvo")
         assert z_um_from_settings(
-            settings, "z-galvo", client=object(), job_name="AF Job 01"
+            settings, "z-galvo", saved=saved(object(), "AF Job 01")
         ) == pytest.approx(15.0)
 
     def test_the_stacked_z_wide_too(self, server, monkeypatch):
         server.Hardware.ZPosZDrive = 5.0095e-3
         settings = raw_settings(wide_um=4999.5, stack_on="z-wide")
         assert z_um_from_settings(
-            settings, "z-wide", client=object(), job_name="AF Job 01"
+            settings, "z-wide", saved=saved(object(), "AF Job 01")
         ) == pytest.approx(5009.5)
 
     def test_needs_no_client_when_the_server_answers(self, server):
@@ -179,26 +185,26 @@ class TestStackedDrive:
         settings = raw_settings(galvo_um=-0.01, stack_on="z-galvo")
         lasx = SavingClient()
 
-        z = z_um_from_settings(settings, "z-galvo", client=lasx, job_name="HiRes")
+        z = z_um_from_settings(settings, "z-galvo", saved=saved(lasx, "HiRes"))
 
         assert z == pytest.approx(SIMULATOR_GALVO_M * 1e6)
-        assert lasx.saved == [saved_experiment.NAME + ".xml"]
+        assert lasx.saved == [api_reader.SAVED_EXPERIMENT_NAME + ".xml"]
 
     def test_refuses_when_neither_the_server_nor_a_saved_experiment_answers(self):
         settings = raw_settings(galvo_um=-0.01, stack_on="z-galvo")
         with pytest.raises(RuntimeError, match="hardware server could not be reached.*saved experiment"):
-            z_um_from_settings(settings, "z-galvo", client=SavingClient(writes=False), job_name="HiRes")
+            z_um_from_settings(settings, "z-galvo", saved=saved(SavingClient(writes=False), "HiRes"))
 
     def test_a_saved_experiment_that_holds_the_other_drive_is_refused(self):
         # The simulator's jobs hold their ZPosition for z-galvo; z-wide carries this stack.
         settings = raw_settings(wide_um=4999.5, stack_on="z-wide")
         with pytest.raises(RuntimeError, match="z-galvo, not for 'z-wide'"):
-            z_um_from_settings(settings, "z-wide", client=SavingClient(), job_name="HiRes")
+            z_um_from_settings(settings, "z-wide", saved=saved(SavingClient(), "HiRes"))
 
     def test_a_job_the_saved_experiment_does_not_hold_is_refused(self):
         settings = raw_settings(stack_on="z-galvo")
         with pytest.raises(RuntimeError, match="no job 'Elsewhere'"):
-            z_um_from_settings(settings, "z-galvo", client=SavingClient(), job_name="Elsewhere")
+            z_um_from_settings(settings, "z-galvo", saved=saved(SavingClient(), "Elsewhere"))
 
     def test_without_the_direct_reader_the_saved_experiment_answers_and_the_server_is_not_asked(
         self, monkeypatch
@@ -209,7 +215,7 @@ class TestStackedDrive:
         hardware_server.forget_connection()
         settings = raw_settings(galvo_um=-0.01, stack_on="z-galvo")
 
-        z = z_um_from_settings(settings, "z-galvo", client=SavingClient(), job_name="HiRes", direct=False)
+        z = z_um_from_settings(settings, "z-galvo", saved=saved(SavingClient(), "HiRes"), direct=False)
 
         assert z == pytest.approx(SIMULATOR_GALVO_M * 1e6)
 
@@ -242,7 +248,7 @@ class TestFreeDrive:
         hardware_server.forget_connection()
         settings = raw_settings(galvo_um=15.0, wide_um=7.0, stack_on="z-wide")
         assert (
-            z_um_from_settings(settings, "z-galvo", client=object(), job_name="J")
+            z_um_from_settings(settings, "z-galvo", saved=saved(object(), "J"))
             == 15.0
         )
         assert (
@@ -309,3 +315,43 @@ class TestMoveZEndToEnd:
             1,
         )
         assert time.perf_counter() - t0 < 3.0
+
+    def test_without_the_hardware_server_the_stack_drive_move_is_confirmed_from_the_saved_experiment(self):
+        """Neither the direct reader nor the hardware server answers (the suite's conftest), so the
+        saved experiment confirms the drive whose job settings LAS X does not refresh."""
+        from limits_fixtures import install_permissive_limits
+        from mock_lasx_api import MockLasxClient
+
+        client = MockLasxClient()
+        for job in client._jobs.values():
+            if job.get("stack"):
+                job["stack"]["mode"] = "z-galvo"
+        install_permissive_limits(client, wide_stage=True)
+        saves = []
+
+        class Save:
+            """LAS X saving the experiment: HiRes's ZPosition is where the galvo is now."""
+
+            Model = SimpleNamespace(ExperimentName=None)
+
+            def UpdateAwaitReceipt(self, _window_s):
+                saves.append(self.Model.ExperimentName)
+                galvo_m = client._hardware_z_um["z-galvo"] * 1e-6
+                folder = Path(api_reader.SAVED_EXPERIMENT_FOLDER)
+                folder.mkdir(parents=True, exist_ok=True)
+                (folder / (api_reader.SAVED_EXPERIMENT_NAME + ".lrp")).write_text(
+                    "<Experiment><LDM_Block_Sequence_Block>"
+                    '<LDM_Block_Sequential BlockName="HiRes"><LDM_Block_Sequential_Master>'
+                    f'<ATLConfocalSettingDefinition ZUseModeName="z-galvo" ZPosition="{galvo_m!r}"/>'
+                    "</LDM_Block_Sequential_Master></LDM_Block_Sequential>"
+                    "</LDM_Block_Sequence_Block></Experiment>",
+                    encoding="utf-8",
+                )
+                return True
+
+        client.PyApiSaveExperiment = Save()
+
+        result = changes.move_z(client, "HiRes", 12.0, z_mode="galvo")
+
+        assert (result["success"], result["confirmed"]) == (True, True)
+        assert saves  # the read-back read the saved experiment

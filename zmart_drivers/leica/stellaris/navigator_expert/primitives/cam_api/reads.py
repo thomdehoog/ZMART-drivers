@@ -29,10 +29,15 @@ succession (e.g. while a stage move is read back).
 ``get_lasx_settings`` is the exception: it reads the Navigator Expert
 XML configuration file directly from disk (no API round-trip).
 
+``read_saved_z_um`` reads where a z drive is from the experiment LAS X saves:
+it asks LAS X to save it (``PyApiSaveExperiment``), then parses the file. The
+save changes nothing on the sample, so it is a read, not a change through the
+limits.
+
 These functions do NOT modify microscope state.
 
 Dependency direction:
-    - Imports: derived readers, stdlib (json, logging, os, time, xml).
+    - Imports: ``parsing``, stdlib (json, logging, os, time, xml).
     - Imported by: ``direct/profile.py``, the table of readings, which the
       read loop asks (the idle wait and the read-back of a change included).
 """
@@ -45,8 +50,11 @@ import threading
 import time
 import xml.etree.ElementTree as ET
 
+from pathlib import Path
+
 from ...dispatcher.read import Reading
-from . import derived
+from ...dispatcher.write import answering
+from . import parsing
 from .transfer import deliver
 from . import profile as waiting
 
@@ -71,11 +79,17 @@ def get_scan_status(client):
 # =============================================================================
 
 
-def ping(client):
-    """Lightweight connection check. Returns True if LAS X responds."""
+def ping(client, *, dialogs=None):
+    """Lightweight connection check. Returns True if LAS X responds.
+
+    *dialogs* are LAS X's dialogs, answered around the ping as the write loop
+    answers them around a send (``dispatcher.write.answering``); a dialog
+    left for the operator leaves the ping unsent, and the status answers.
+    """
     try:
-        if deliver(client.PyApiPing, label="ping"):
-            return True
+        with answering(dialogs):
+            if deliver(client.PyApiPing, label="ping"):
+                return True
         # Transport failure: try fallback
     except Exception:
         pass
@@ -308,7 +322,7 @@ def get_job_by_name(client, job_name, **kwargs):
     Convenience wrapper around get_jobs(). All keyword arguments are
     forwarded to get_jobs().
     """
-    return derived.job_by_name(get_jobs(client, **kwargs), job_name)
+    return parsing.job_by_name(get_jobs(client, **kwargs), job_name)
 
 
 def get_selected_job(client, **kwargs):
@@ -317,7 +331,7 @@ def get_selected_job(client, **kwargs):
     Convenience wrapper around get_jobs(). All keyword arguments are
     forwarded to get_jobs().
     """
-    return derived.selected_job(get_jobs(client, **kwargs))
+    return parsing.selected_job(get_jobs(client, **kwargs))
 
 
 def get_fov(client, job_name, **kwargs):
@@ -337,7 +351,7 @@ def get_fov(client, job_name, **kwargs):
     if not settings:
         log.error("get_fov: no settings for job '%s'", job_name)
         return None
-    value = derived.fov_from_settings(settings)
+    value = parsing.fov_from_settings(settings)
     if value is None:
         log.error("get_fov: cannot parse FOV for '%s'", job_name)
     return value
@@ -362,10 +376,70 @@ def get_base_fov(client, job_name, **kwargs):
     if not settings:
         log.error("get_base_fov: no settings for job '%s'", job_name)
         return None
-    value = derived.base_fov_from_settings(settings)
+    value = parsing.base_fov_from_settings(settings)
     if value is None:
         log.error("get_base_fov: cannot parse FOV for '%s'", job_name)
     return value
+
+
+# =============================================================================
+# The saved experiment
+# =============================================================================
+
+#: Navigator Expert's ScanningTemplates folder, where it saves an experiment.
+SAVED_EXPERIMENT_FOLDER = os.path.join(
+    os.getenv("APPDATA", ""),
+    "Leica Microsystems",
+    "LAS X",
+    "MatrixScreener6",
+    "User_0",
+    "ScanningTemplates",
+)
+
+#: The name the driver saves under, overwritten at every save.
+SAVED_EXPERIMENT_NAME = "{ScanningTemplate}_ZMART_z"
+
+
+def read_saved_z_um(client, job_name, drive, *, dialogs=None):
+    """Save the experiment and answer *job_name*'s ``ZPosition`` for *drive* (µm).
+
+    For the drive that carries a job's z-stack, LAS X stops refreshing the job
+    settings' ``zPosition``; the hardware server knows where the drive is.
+    When it cannot be reached, the experiment is the other place LAS X keeps
+    it: ``PyApiSaveExperiment`` makes Navigator Expert write the experiment
+    (``.lrp``) into its ScanningTemplates folder, and each job's ``ZPosition``
+    is in it (:func:`parsing.saved_z_um`). One save, under one name the driver
+    keeps for this, took 0.1 to 0.5 s on the simulator (2026-10-21). Nothing
+    is ever loaded from it.
+
+    The save is delivered as every request is (``transfer.deliver``), with
+    LAS X's *dialogs* answered around it (``dispatcher.write.answering``), and
+    the file counts once it is newer than before the save and has stopped
+    growing, looked at every ``POLL_S`` for one window (``WINDOW_S``). Raises
+    ``RuntimeError`` when LAS X does not take the save, a dialog is left
+    open, or no new file appears; a file from before the save is never read.
+    """
+    lrp = Path(SAVED_EXPERIMENT_FOLDER) / f"{SAVED_EXPERIMENT_NAME}.lrp"
+    before = lrp.stat().st_mtime_ns if lrp.is_file() else 0
+    client.PyApiSaveExperiment.Model.ExperimentName = f"{SAVED_EXPERIMENT_NAME}.xml"
+    with answering(dialogs):
+        taken = deliver(client.PyApiSaveExperiment, label="SaveExperiment (for the stacked z drive)")
+    if not taken:
+        raise RuntimeError("LAS X did not take the experiment save")
+
+    deadline = time.monotonic() + waiting.WINDOW_S
+    size = None
+    while time.monotonic() < deadline:
+        try:
+            state = lrp.stat()
+            fresh = state.st_mtime_ns > before
+            if fresh and state.st_size and state.st_size == size:
+                return parsing.saved_z_um(lrp.read_text(encoding="utf-8"), job_name, drive)
+            size = state.st_size if fresh else None
+        except (OSError, ET.ParseError):
+            size = None  # not there yet, or still being written
+        time.sleep(waiting.POLL_S)
+    raise RuntimeError(f"no saved experiment appeared in {SAVED_EXPERIMENT_FOLDER} within {waiting.WINDOW_S:g} s")
 
 
 # =============================================================================

@@ -9,7 +9,10 @@ This is the first of the two loops of a change. It runs four steps:
    ``primitives/direct/profile.py``, which may hold more than
    one way of sending, tried in order); this file only asks
    it to fill in the request, clear the reply, send, wait for the reply and
-   report an open dialog.
+   report an open dialog. When the microscope's dialogs are handed in
+   (``dialogs``), the ones they answer are answered before the send and
+   watched for while it runs (:func:`answering`); a dialog they leave to the
+   operator stops the send.
 4. **Error check**: read what the microscope answered. A temporary problem is
    sent again, up to ``max_retries`` times, with an optional pause that can
    grow. A permanent problem stops the loop at once.
@@ -74,6 +77,7 @@ University of Zurich (thom.dehoog@zmb.uzh.ch, thomdehoog@gmail.com).
 
 from __future__ import annotations
 
+import contextlib
 import logging
 import reprlib
 import time
@@ -191,6 +195,36 @@ def read_back(vendor, client, expect, *, since=None):
     return confirm
 
 
+@contextlib.contextmanager
+def answering(dialogs):
+    """Around a send: the dialogs *dialogs* answers are answered first, and watched for while it runs.
+
+    *dialogs* is the microscope's own (for LAS X, ``procedures/answer_dialogs.py``):
+    ``answer_warnings()`` answers a dialog it may answer and raises, so that
+    nothing is sent, while one it leaves to the operator is open;
+    ``watching()`` answers them while the block runs; ``answered_since(moment)``
+    lists what it answered since a ``time.monotonic()``, each with its
+    ``message``. With None, nothing is answered.
+    """
+    if dialogs is None:
+        yield
+        return
+    dialogs.answer_warnings()
+    with dialogs.watching():
+        yield
+
+
+def left_open(dialogs):
+    """The error of a dialog *dialogs* leaves to the operator, open now; None when none is (or without dialogs)."""
+    if dialogs is None:
+        return None
+    try:
+        dialogs.answer_warnings()
+    except Exception as why:  # noqa: BLE001 -- the microscope's own error for the open dialog
+        return why
+    return None
+
+
 def append_dialog_warning(transport, logs, command_started_at, description):
     msg = transport.dialog_warning_since(command_started_at, description)
     if msg is None:
@@ -241,6 +275,7 @@ def fire_block(
     error_check_fn=None,
     max_retries=None,
     send_without_receipt=None,
+    dialogs=None,
 ):
     """Execute the four-step fire pipeline with transient retry.
 
@@ -272,6 +307,11 @@ def fire_block(
         send_without_receipt: If True, send without waiting for the microscope to
             confirm receipt, and without checking its reply (the confirmation
             is then the authoritative completion signal).
+        dialogs: The microscope's dialogs (see :func:`answering`), answered
+            before every send and watched for while it runs; what they
+            answered goes into the logs. A dialog they leave to the operator
+            fails the send, before it, or when the send itself fails. None:
+            no dialog is looked at.
 
     Returns:
         {
@@ -352,11 +392,19 @@ def fire_block(
 
         # --- Step 3: Fire + await the reply ---
         t0 = time.perf_counter()
+        fired_at = time.monotonic()
         try:
             transport.clear_reply(client)
-            delivered, answered = transport.send(
-                client, request, description, asynchronous=profile.send_without_receipt
-            )
+            with answering(dialogs):
+                try:
+                    delivered, answered = transport.send(
+                        client, request, description, asynchronous=profile.send_without_receipt
+                    )
+                except Exception as failed:
+                    # A send that fails while a dialog is in the way fails for the dialog.
+                    raise left_open(dialogs) or failed
+            if dialogs is not None:
+                answered = [*answered, *(note.message for note in dialogs.answered_since(fired_at))]
             for message in answered:
                 all_logs.append(_make_log_entry("warning", message))
             carried_by = getattr(transport, "carried_by", None)
@@ -505,6 +553,7 @@ def confirm_and_fire(
     refire_on_unconfirmed=None,
     send_without_receipt=None,
     never_resend=None,
+    dialogs=None,
 ):
     """Fire a command and optionally confirm the result, with correction.
 
@@ -540,6 +589,8 @@ def confirm_and_fire(
             the command is not fired again; only readback is retried.
         never_resend: True for a command that must reach the microscope at
             most once; see :func:`resolve_profile`.
+        dialogs: The microscope's dialogs, handed to every send
+            (:func:`fire_block`).
 
     A change whose confirmation windows all run out is still a success, with
     ``confirmed`` False: ``success=True`` alone does NOT prove the setting
@@ -582,6 +633,7 @@ def confirm_and_fire(
         setup_fn=setup_fn,
         pre_check_fn=pre_check_fn,
         error_check_fn=error_check_fn,
+        dialogs=dialogs,
     )
     all_logs.extend(fb["logs"])
     total_attempts += fb["attempts"]
@@ -717,6 +769,7 @@ def confirm_and_fire(
                 setup_fn=setup_fn,
                 pre_check_fn=None,  # Already waited for idle above
                 error_check_fn=error_check_fn,
+                dialogs=dialogs,
             )
             all_logs.extend(fb["logs"])
             total_attempts += fb["attempts"]

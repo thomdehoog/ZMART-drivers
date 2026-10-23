@@ -2,16 +2,21 @@
 
 Each one checks its arguments, builds its change as plain data
 (``primitives/cam_api/writes.py``) and hands it to the dispatcher's ``run()``,
-which asks the limits once, sends it, and reads it back. Then it adds what the
-caller needs to the result (``move_xy`` adds the target position). A change
-refused before anything was sent answers the same shape, with ``success``
-False.
+which asks the limits once, sends it, and reads it back. Each hands ``run()``
+LAS X's dialogs (``answer_dialogs.py``), answered around every send. Then it
+adds what the caller needs to the result (``move_xy`` adds the target
+position). A change refused before anything was sent answers the same shape,
+with ``success`` False.
 
 ``select_job`` first finds out which job is selected, so that nothing is sent
 when the target already is, and which read order confirms the change.
 ``acquire`` sends the capture once, then watches the scan run
-(:func:`confirm_acquire`); ``take_picture`` is what the rest of the driver
-calls.
+(:func:`confirm_acquire`); it hands the write what opens the experiment the
+picture goes into (``clear_cache/data_container.experiment_for_capture``),
+which the direct route asks for. ``take_picture`` is what the rest of the
+driver calls. ``move_z`` hands its read-back the saved experiment, which
+confirms the drive carrying the job's z-stack when the hardware server cannot
+be reached.
 
 Result contract: ``result["success"]`` means the change was *accepted*, not
 that it took effect. A caller that needs proof the change landed checks
@@ -40,7 +45,9 @@ from ..primitives.direct import state_tree
 from ..primitives.direct.client import HardwareServerUnavailable
 from ..primitives.log import reads as log_reader
 from ..primitives.log.profile import MAX_AGE_S
+from . import answer_dialogs
 from . import readings as readers
+from .clear_cache.data_container import experiment_for_capture
 from .save_data.product import AcquisitionResult
 
 log = logging.getLogger(__name__)
@@ -65,7 +72,7 @@ def move_xy(client, x, y, unit="um", *, max_retries=None, tolerance=None):
         change = writes.move_xy(x, y, unit, tolerance=tolerance)
     except TypeError as e:
         return dispatch.refused(str(e), position=None)
-    result = dispatch.run(direct_profile, client, change, max_retries=max_retries)
+    result = dispatch.run(direct_profile, client, change, max_retries=max_retries, dialogs=answer_dialogs)
     x_um, y_um = change.values["x_um"], change.values["y_um"]
     sent = result["timing"].get("attempts", 0) > 0
     result["position"] = {"x": x_um * 1e-6, "y": y_um * 1e-6, "x_um": x_um, "y_um": y_um} if sent else None
@@ -88,10 +95,10 @@ def move_z(client, job_name, z, unit="um", z_mode="galvo", *, max_retries=None, 
     if unit not in writes.UM_PER_UNIT:
         return dispatch.refused(f"unknown unit {unit!r}. Use: {list(writes.UM_PER_UNIT)}")
     try:
-        change = writes.move_z(job_name, z, unit, z_mode, tolerance=tolerance)
+        change = writes.move_z(job_name, z, unit, z_mode, tolerance=tolerance, saved=readers.saved_z(client, job_name))
     except TypeError as e:
         return dispatch.refused(str(e))
-    return dispatch.run(direct_profile, client, change, max_retries=max_retries)
+    return dispatch.run(direct_profile, client, change, max_retries=max_retries, dialogs=answer_dialogs)
 
 
 def objective_by_slot(hw_info: dict | None) -> dict[int, dict[str, Any]]:
@@ -161,7 +168,13 @@ def set_objective(
         if refusal:
             refusal.setdefault("timing", dispatch.make_timing(total_s=0.0, attempts=0))
             return refusal
-    return dispatch.run(direct_profile, client, writes.set_objective(job_name, slot, target_name), max_retries=max_retries)
+    return dispatch.run(
+        direct_profile,
+        client,
+        writes.set_objective(job_name, slot, target_name),
+        max_retries=max_retries,
+        dialogs=answer_dialogs,
+    )
 
 
 def change(client, name: str, job_name: str, *, max_retries=None, tolerance=None, **given) -> dict:
@@ -176,7 +189,7 @@ def change(client, name: str, job_name: str, *, max_retries=None, tolerance=None
     write = writes.change(name, job_name, tolerance=tolerance, **given)
     if isinstance(write, str):
         return dispatch.refused(write)
-    return dispatch.run(direct_profile, client, write, max_retries=max_retries)
+    return dispatch.run(direct_profile, client, write, max_retries=max_retries, dialogs=answer_dialogs)
 
 
 # =============================================================================
@@ -209,7 +222,7 @@ def select_job(client, job_name, *, before_fire=None):
         mode=admissible(profile.selected_job_mode, context, job_name),
         fallback=admissible(profile.selected_job_confirm_fallback, context, job_name),
     )
-    result = dispatch.run(direct_profile, client, change)
+    result = dispatch.run(direct_profile, client, change, dialogs=answer_dialogs)
     if context["api_said_selected"]:
         result.setdefault("logs", []).append(
             make_log_entry(
@@ -424,10 +437,10 @@ def acquire(client, job_name, poll_interval=None, poll_timeout=None, heartbeat_i
         )
         if value is not None
     }
-    change = writes.acquire(job_name)
+    change = writes.acquire(job_name, experiment=experiment_for_capture)
     image_before = picture_number()
     handed_over = time.time()
-    result = dispatch.run(direct_profile, client, change)
+    result = dispatch.run(direct_profile, client, change, dialogs=answer_dialogs)
     if not result["success"]:
         return result
 

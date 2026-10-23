@@ -15,6 +15,7 @@ University of Zurich (thom.dehoog@zmb.uzh.ch, thomdehoog@gmail.com).
 from __future__ import annotations
 
 import logging
+from functools import partial
 
 from ..dispatcher import dispatch as _door
 from ..dispatcher.read import (
@@ -24,9 +25,10 @@ from ..dispatcher.read import (
 )  # noqa: F401
 from ..primitives.cam_api import reads as api_reader
 from ..primitives.log import reads as log_reader
-from ..primitives.cam_api import derived
+from ..primitives.cam_api import parsing
 from ..primitives.direct import profile as direct_profile
-from ..primitives.cam_api.derived import stack_drive, stack_slices_um  # noqa: F401  re-exported, as the readers package did
+from ..primitives.cam_api.parsing import stack_drive, stack_slices_um  # noqa: F401  re-exported, as the readers package did
+from . import answer_dialogs
 
 log = logging.getLogger(__name__)
 
@@ -89,7 +91,8 @@ def get_scan_status(
 
 
 def ping(client):
-    return api_reader.ping(client)
+    """Whether LAS X answers; its dialogs are answered around the ping, as around every send."""
+    return api_reader.ping(client, dialogs=answer_dialogs)
 
 
 def get_job_settings(
@@ -132,15 +135,25 @@ def get_xy(
     )
 
 
+def saved_z(client, job_name):
+    """How *job_name*'s z drives are read from the experiment LAS X saves: ``saved_z(client, job)(drive)`` in um.
+
+    What ``parsing.z_um_from_settings`` and the read-back of a z move are
+    handed for the drive carrying the job's z-stack; LAS X's dialogs are
+    answered around the save.
+    """
+    return partial(api_reader.read_saved_z_um, client, job_name, dialogs=answer_dialogs)
+
+
 def z_um_from(settings, drive, *, client, job_name, mode=None):
-    """Where *drive* is (um), from *job_name*'s *settings*; see ``derived.z_um_from_settings``.
+    """Where *drive* is (um), from *job_name*'s *settings*; see ``parsing.z_um_from_settings``.
 
     The drive carrying the job's z-stack is read from the hardware server
     when the direct reader is used (the profile's ``z_mode``, unless *mode*
     says), else from the experiment LAS X saves.
     """
     mode = mode if mode is not None else direct_profile.STATE_READERS.z_mode
-    return derived.z_um_from_settings(settings, drive, client=client, job_name=job_name, direct=mode == "direct")
+    return parsing.z_um_from_settings(settings, drive, saved=saved_z(client, job_name), direct=mode == "direct")
 
 
 def read_z_um(client, job_name, drive, *, mode=None):
@@ -149,7 +162,7 @@ def read_z_um(client, job_name, drive, *, mode=None):
     From the direct reader (``direct_profile.z_um_direct``); otherwise from
     *job_name*'s settings: it waits for settings that carry ``zPosition``
     and returns None only when none arrive within the rule's four windows.
-    Readable but incomplete settings raise: ``derived.z_um_from_settings``
+    Readable but incomplete settings raise: ``parsing.z_um_from_settings``
     raises ``RuntimeError`` when the drive is missing, and its settings
     normalization can raise ``ValueError`` on a schema mismatch — unlike the
     routed readers, which never raise.
@@ -190,7 +203,7 @@ def get_job_by_name(client, job_name, *, mode=None, diagnostics=False, deadline=
     value = (
         None
         if jobs_reading is None
-        else derived.job_by_name(jobs_reading.value, job_name)
+        else parsing.job_by_name(jobs_reading.value, job_name)
     )
     reading = _derive(jobs_reading, value)
     return _plain_or_diagnostic(reading, diagnostics)
@@ -223,7 +236,7 @@ def get_fov(client, job_name, *, mode=None, diagnostics=False, deadline=None):
     value = (
         None
         if settings_reading is None
-        else derived.fov_from_settings(settings_reading.value)
+        else parsing.fov_from_settings(settings_reading.value)
     )
     reading = _derive(settings_reading, value)
     return _plain_or_diagnostic(reading, diagnostics)
@@ -236,7 +249,7 @@ def get_base_fov(client, job_name, *, mode=None, diagnostics=False, deadline=Non
     value = (
         None
         if settings_reading is None
-        else derived.base_fov_from_settings(settings_reading.value)
+        else parsing.base_fov_from_settings(settings_reading.value)
     )
     reading = _derive(settings_reading, value)
     return _plain_or_diagnostic(reading, diagnostics)

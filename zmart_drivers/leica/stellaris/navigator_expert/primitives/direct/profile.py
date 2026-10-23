@@ -43,8 +43,7 @@ from functools import partial
 
 from ...dispatcher.read import Reading, counts
 from ...dispatcher.write import TransportChain
-from ...driver_setup.limits.limit_rules import NOTEBOOK_POINTER
-from ..cam_api import derived, profile as waiting
+from ..cam_api import parsing, profile as waiting
 from ..cam_api.profile import check_reply  # noqa: F401 -- what the write loops ask this profile for
 from ..cam_api import reads as api_reader
 from ..cam_api import transfer as _transport
@@ -131,7 +130,7 @@ class StateReaderProfile:
 
     # Where a z drive is: "direct", the hardware server; any other mode, the job
     # settings, and for the drive carrying the job's z-stack, whose settings
-    # value is stale, the experiment LAS X saves (``derived.z_um_from_settings``).
+    # value is stale, the experiment LAS X saves (``parsing.z_um_from_settings``).
     z_mode: str = "direct"
 
     hardware_info_mode: str = "direct"
@@ -215,7 +214,7 @@ def job_settings_complete(value, *, job_name=None) -> bool:
     objective = value.get("objective")
     if not isinstance(objective, dict) or objective.get("slotIndex") is None:
         return False
-    return derived.settings_geometry_ready(value)
+    return parsing.settings_geometry_ready(value)
 
 
 # =============================================================================
@@ -538,10 +537,10 @@ class WriteProfile:
 WRITING = WriteProfile()
 
 #: Where the operator creates the limits files, said when a change is refused
-#: because no limits are installed.
-limits_setup_hint = NOTEBOOK_POINTER
+#: because no limits are installed (and by ``driver_setup/limits``).
+limits_setup_hint = "driver_setup/limits/notebooks/set_limits.ipynb"
 
 
 def make_request(client, write):
-    """The CAM API request that carries *write*; made only once the limits allow it."""
-    return _transport.request_of(client, write.request)
+    """The CAM API request that carries *write*, with what opens a capture's experiment; made only once the limits allow it."""
+    return _transport.request_of(client, write.request, write.experiment)

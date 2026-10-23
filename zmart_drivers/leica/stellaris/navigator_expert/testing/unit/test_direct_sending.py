@@ -1,10 +1,10 @@
 """The direct writers, offline: an element built, sent to the hardware server, and waited for.
 
 The other direct-route tests stand in for the whole send. These stand in one
-level lower, for LAS X's hardware server object and its dialog check, so the
-driver's own sending runs: the sender thread, the wait by the rule, what happens
-when LAS X never answers or shows a dialog, and that an element is never sent
-twice. They also check how a CAM value becomes the text and the enum names the
+level lower, for LAS X's hardware server object, so the driver's own sending
+runs: the sender thread, the wait by the rule, what happens when LAS X never
+answers (a dialog the element caused is answered by the write loop, around the
+send: ``test_run.py``), and that an element is never sent twice. They also check how a CAM value becomes the text and the enum names the
 hardware server takes. Before these, those paths ran only at the microscope or
 the simulator.
 
@@ -25,7 +25,6 @@ from zmart_drivers.leica.stellaris.navigator_expert.primitives.direct.writes imp
     Fields,
     NoTranslation,
 )
-from zmart_drivers.leica.stellaris.navigator_expert.procedures import answer_dialogs
 
 
 class Server:
@@ -48,12 +47,11 @@ class Server:
 
 @pytest.fixture
 def server(monkeypatch):
-    """A stand-in server, short waiting numbers, and no LAS X window to look at."""
+    """A stand-in server and short waiting numbers."""
     server = Server()
     forgotten = []
     monkeypatch.setattr(hardware_server, "connected_server", lambda: server)
     monkeypatch.setattr(hardware_server, "forget_connection", lambda: forgotten.append(1))
-    monkeypatch.setattr(answer_dialogs, "answer_warnings", lambda: None)
     monkeypatch.setattr(waiting, "WINDOWS", 2)
     monkeypatch.setattr(waiting, "WINDOW_S", 0.1)
     monkeypatch.setattr(waiting, "POLL_S", 0.01)
@@ -114,23 +112,6 @@ def test_after_a_server_that_never_answered_the_next_element_goes_through_a_new_
 
     assert answer == '<Result Error="0"/>'
     assert "<b/>" in server.received
-
-
-def test_an_open_dialog_ends_the_wait_with_its_text(server, monkeypatch):
-    server.hold = threading.Event()
-
-    turret = SimpleNamespace(caption="LAS X", text="Turn the turret manually", at="12:00:00")
-
-    def a_dialog():
-        raise answer_dialogs.DialogOpen(turret, "it asks for more than OK")
-
-    monkeypatch.setattr(answer_dialogs, "answer_warnings", a_dialog)
-
-    with pytest.raises(answer_dialogs.DialogOpen, match="turret"):
-        send_command.send("<a/>")
-
-    assert server.received == ["<a/>"]
-    assert send_command.senders["current"] is None
 
 
 # --- LAS X's answer -------------------------------------------------------------------

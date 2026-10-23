@@ -17,9 +17,12 @@ Acquire (2026-10-14) names the job's block id and the Data Container
 experiment the image goes into, ``CurrentDCObjectID``. LAS X's window takes
 the experiment from its project tree (``GUILogic.GetSystemTargetDCObjectID``
 -> ``ExpTreeSubjectNode``), which is not in the hardware server's state tree;
-the route takes the experiment of the last image LAS X made instead (the
-state tree's ``Acquire/ScanUpdate/LastDCImageID``, its parent experiment from
-the Data Container), which on the simulator was the id the CAM API sent.
+the acquire hands in what opens one instead (``Write.experiment``, asked
+through the route's ``images_experiment_id``): for LAS X the experiment of
+the last image LAS X made (the state tree's
+``Acquire/ScanUpdate/LastDCImageID``, its parent experiment from the Data
+Container), which on the simulator was the id the CAM API sent
+(``procedures/clear_cache/data_container.experiment_for_capture``).
 
 A CAM command missing here has no direct translation; the route then reports that nothing was sent, and the CAM API carries it.
 Enum values without a seen translation are refused the same way.

@@ -396,14 +396,14 @@ class TestApiModeCappedWorker(unittest.TestCase):
 
 class TestDerivedZoom(unittest.TestCase):
     def test_sub_unity_zoom_is_not_clamped(self):
-        from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import derived
+        from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import parsing
 
         settings = {
             "imageSize": "100.0 um x 100.0 um",
             "format": "512 x 512",
             "zoom": {"current": 0.75},
         }
-        fov = derived.base_fov_from_settings(settings)
+        fov = parsing.base_fov_from_settings(settings)
         self.assertIsNotNone(fov)
         self.assertAlmostEqual(fov[0], 100.0e-6 * 0.75)
 

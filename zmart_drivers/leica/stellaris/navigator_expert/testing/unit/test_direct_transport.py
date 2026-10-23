@@ -4,7 +4,10 @@ LAS X is stood in for here: the hardware server is a function that returns the a
 LAS X would write, and the state tree gives job ids. What is checked is what the driver
 does with a command: the element it builds, how LAS X's three kinds of answer end up in
 the reply the driver's error check reads, and the two rules that keep a command from
-being done twice.
+being done twice. An acquire names the experiment its image goes into: the
+change hands in what opens it, and the direct route asks it only once the
+limits allowed the acquire and the scanner was idle; the Data Container's
+choice of experiment is ``procedures/clear_cache/data_container.py``'s.
 
 Author: Thom de Hoog, Center for Microscopy and Image Analysis (ZMB),
 University of Zurich (thom.dehoog@zmb.uzh.ch, thomdehoog@gmail.com).
@@ -13,11 +16,18 @@ University of Zurich (thom.dehoog@zmb.uzh.ch, thomdehoog@gmail.com).
 from types import SimpleNamespace
 
 import pytest
+from limits_fixtures import install_permissive_limits
+from mock_lasx_api import MockLasxClient
 
+from zmart_drivers.leica.stellaris.navigator_expert.dispatcher import dispatch
+from zmart_drivers.leica.stellaris.navigator_expert.dispatcher import limits as gate
+from zmart_drivers.leica.stellaris.navigator_expert.dispatcher import write as write_loops
 from zmart_drivers.leica.stellaris.navigator_expert.dispatcher.write import (
     TransportChain,
     TransportUnavailable,
 )
+from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import writes
+from zmart_drivers.leica.stellaris.navigator_expert.primitives.direct import profile as direct_profile
 from zmart_drivers.leica.stellaris.navigator_expert.primitives.direct import client as hardware_server
 from zmart_drivers.leica.stellaris.navigator_expert.primitives.direct import transfer as direct_transfer
 from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api.transfer import Request
@@ -26,6 +36,8 @@ from zmart_drivers.leica.stellaris.navigator_expert.primitives.direct.state_tree
     Job,
     JobSequence,
 )
+from zmart_drivers.leica.stellaris.navigator_expert.procedures import answer_dialogs, changes
+from zmart_drivers.leica.stellaris.navigator_expert.procedures.clear_cache import data_container
 
 ACCEPTED = '<Result Error="0"/>'
 REFUSED = '<Result Error="1">Zoom 100 is above the maximum of 48</Result>'
@@ -236,6 +248,117 @@ def test_the_element_builder_names_a_value_with_no_known_form():
         send_command.element_xml(None, request.Model, object(), {})
 
 
+def acquire_request(experiment):
+    """An acquire of HiRes, carrying what opens its experiment (``Write.experiment``)."""
+    return Request(
+        "PyApiAcquireJob",
+        SimpleNamespace(Model=SimpleNamespace(JobName="HiRes")),
+        experiment,
+    )
+
+
+def test_an_acquire_goes_into_the_experiment_its_write_opens(hardware, client):
+    request = acquire_request(lambda: 84)
+    route = direct_transfer.DirectTransport()
+    route.fill(request, lambda model: None)
+
+    route.send(client, request, "Acquire", asynchronous=True)
+
+    assert hardware.sent == ['<ATL CurrentDCObjectID="84" Command="ATL_Block_RunBlock" Attribute="152"/>']
+
+
+@pytest.mark.parametrize("experiment", [None, "fails"])
+def test_an_acquire_without_an_experiment_sends_nothing_and_the_cam_api_carries_it(
+    hardware, client, experiment
+):
+    def fails():
+        raise RuntimeError("LAS X's Data Container did not give a project for the image: gone")
+
+    cam = CamRoute()
+    chain = chain_with(direct_transfer.DirectTransport(), cam)
+    request = acquire_request(fails if experiment == "fails" else None)
+    chain.fill(request, lambda model: None)
+
+    chain.send(client, request, "Acquire", asynchronous=True)
+
+    assert hardware.sent == []
+    assert cam.sent == ["Acquire"]
+
+
+@pytest.fixture
+def capture(hardware, monkeypatch):
+    """What a capture asks for, in order: ``limits``, ``idle`` (the wait before the send), ``experiment``."""
+    asked = []
+    check_refusal = gate.check_refusal
+    wait_ready = write_loops.wait_ready
+
+    def limits(*arguments):
+        asked.append("limits")
+        return check_refusal(*arguments)
+
+    def idle(*arguments):
+        ready = wait_ready(*arguments)
+
+        def waited():
+            asked.append("idle")
+            return ready()
+
+        return waited
+
+    def experiment():
+        asked.append("experiment")
+        return 84
+
+    monkeypatch.setattr(gate, "check_refusal", limits)
+    monkeypatch.setattr(write_loops, "wait_ready", idle)
+    monkeypatch.setattr(direct_profile, "WRITE_ROUTES", ("direct", "cam"))  # the suite's own is the CAM API alone
+    return SimpleNamespace(asked=asked, experiment=experiment, hardware=hardware)
+
+
+def test_a_direct_capture_opens_its_experiment_after_the_limits_and_the_wait_for_idle(capture):
+    client = install_permissive_limits(MockLasxClient())
+
+    result = dispatch.run(direct_profile, client, writes.acquire("HiRes", experiment=capture.experiment))
+
+    assert result["success"] is True and result["route"] == "direct"
+    assert capture.asked == ["limits", "idle", "experiment"]
+    assert 'CurrentDCObjectID="84"' in capture.hardware.sent[0]
+
+
+def test_a_capture_the_limits_refuse_opens_no_experiment(capture):
+    result = dispatch.run(direct_profile, MockLasxClient(), writes.acquire("HiRes", experiment=capture.experiment))
+
+    assert result["success"] is False
+    assert capture.asked == ["limits"]
+    assert capture.hardware.sent == []
+
+
+def test_a_capture_the_cam_api_carries_opens_no_experiment(capture, monkeypatch):
+    monkeypatch.setattr(direct_profile, "WRITE_ROUTES", ("cam",))
+    client = install_permissive_limits(MockLasxClient())
+
+    result = dispatch.run(direct_profile, client, writes.acquire("HiRes", experiment=capture.experiment))
+
+    assert result["success"] is True and result["route"] == "cam"
+    assert capture.asked == ["limits", "idle"]
+    assert capture.hardware.sent == []
+
+
+def test_a_capture_hands_its_write_the_experiment_and_las_xs_dialogs(monkeypatch):
+    handed = {}
+
+    def run(profile, client, write, **keywords):
+        handed.update(write=write, **keywords)
+        return dispatch.refused("stopped here")
+
+    monkeypatch.setattr(dispatch, "run", run)
+
+    changes.acquire(object(), "HiRes")
+
+    assert handed["write"].experiment is data_container.experiment_for_capture
+    assert handed["dialogs"] is answer_dialogs
+
+
 class Projects:
     """The Data Container as an acquire sees it: which projects are open, and which one an image is in."""
 
@@ -244,14 +367,15 @@ class Projects:
         self.image_in = {}
         self.made = []
         monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
+        monkeypatch.setitem(data_container.remembered, "experiment", None)
         monkeypatch.setattr(
-            direct_transfer, "open_experiments", lambda: dict(self.open)
+            data_container, "open_experiments", lambda: dict(self.open)
         )
         monkeypatch.setattr(
-            direct_transfer, "experiment_is_open", lambda number: number in self.open
+            data_container, "experiment_is_open", lambda number: number in self.open
         )
         monkeypatch.setattr(
-            direct_transfer, "experiment_of", lambda image: self.image_in[image]
+            data_container, "experiment_of", lambda image: self.image_in[image]
         )
 
         def new_experiment(name):
@@ -259,7 +383,7 @@ class Projects:
             self.open[900 + len(self.made)] = name
             return 900 + len(self.made)
 
-        monkeypatch.setattr(direct_transfer, "new_experiment", new_experiment)
+        monkeypatch.setattr(data_container, "new_experiment", new_experiment)
 
 
 @pytest.fixture
@@ -271,15 +395,14 @@ def test_an_acquire_goes_into_the_project_of_the_last_image(projects):
     projects.open = {84: "Project", 90: "Other"}
     projects.image_in = {5148: 84}
 
-    assert direct_transfer.DirectTransport().open_project_for(5148) == 84
+    assert data_container.open_project_for(5148) == 84
 
 
 def test_when_the_last_image_is_gone_the_remembered_project_is_used(projects):
     projects.open = {84: "Project", 90: "Other"}
-    transport = direct_transfer.DirectTransport()
-    transport.experiment = 84
+    data_container.remembered["experiment"] = 84
 
-    assert transport.open_project_for(0) == 84
+    assert data_container.open_project_for(0) == 84
 
 
 def test_a_project_deleted_in_las_x_is_never_used_even_when_the_last_image_names_it(
@@ -289,19 +412,19 @@ def test_a_project_deleted_in_las_x_is_never_used_even_when_the_last_image_names
     projects.open = {90: "Open one"}
     projects.image_in = {2135: 698}
 
-    assert direct_transfer.DirectTransport().open_project_for(2135) == 90
+    assert data_container.open_project_for(2135) == 90
 
 
 def test_with_no_remembered_project_the_newest_open_one_is_used(projects):
     projects.open = {84: "Project", 90: "Other"}
 
-    assert direct_transfer.DirectTransport().open_project_for(0) == 90
+    assert data_container.open_project_for(0) == 90
 
 
 def test_with_no_project_open_a_new_one_is_made_and_numbered_after_the_open_ones(
     projects,
 ):
-    chosen = direct_transfer.DirectTransport().open_project_for(0)
+    chosen = data_container.open_project_for(0)
 
     assert projects.made == ["ZMART_Experiment1"]
     assert chosen == 901
@@ -309,7 +432,7 @@ def test_with_no_project_open_a_new_one_is_made_and_numbered_after_the_open_ones
 
 def test_a_new_project_is_numbered_one_above_the_open_ones(projects):
     assert (
-        direct_transfer.new_project_name({1: "ZMART_Experiment3", 2: "Project"})
+        data_container.new_project_name({1: "ZMART_Experiment3", 2: "Project"})
         == "ZMART_Experiment4"
     )
 
@@ -317,8 +440,8 @@ def test_a_new_project_is_numbered_one_above_the_open_ones(projects):
 def test_the_chosen_project_is_written_down_for_the_next_start(projects, monkeypatch):
     projects.open = {84: "Project"}
     projects.image_in = {5148: 84}
-    monkeypatch.setattr(direct_transfer, "last_image_id", lambda: 5148)
+    monkeypatch.setattr(data_container, "last_image_id", lambda: 5148)
 
-    direct_transfer.DirectTransport().images_experiment_id()
+    data_container.experiment_for_capture()
 
-    assert direct_transfer.read_remembered_experiment() == 84
+    assert data_container.read_remembered_experiment() == 84

@@ -843,7 +843,7 @@ def get_light_sources() -> list[dict]:
 
 
 def get_base_fov() -> tuple[float, float]:
-    """The field of view at zoom 1, in metres: :func:`get_fov` times the zoom, as ``derived.base_fov_from_settings``."""
+    """The field of view at zoom 1, in metres: :func:`get_fov` times the zoom, as ``parsing.base_fov_from_settings``."""
     found = settings(
         "the field of view at zoom 1",
         {

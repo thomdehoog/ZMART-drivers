@@ -4,9 +4,9 @@ Every change the driver makes is a LAS X request that is filled in and sent. LAS
 answers in two steps: first it says that it received the request, then, a moment
 later, it fills in a reply (an error text and a result code) that tells whether
 the request worked. How to clear that reply before a send, how to send and wait for
-the receipt, how to wait for the reply to be filled in, and how to find out whether
-a LAS X dialog box is open and in the way are all things that only LAS X does this
-way. They live here, and the dispatcher's engine asks for them through the
+the receipt, how to wait for the reply to be filled in, and how to find out from
+the log whether a LAS X dialog box was left open are all things that only LAS X
+does this way. They live here, and the dispatcher's engine asks for them through the
 ``transport`` of the command's profile. Another microscope supplies a transport of
 its own and leaves the engine as it is.
 
@@ -17,19 +17,18 @@ call, until LAS X answers "received" or its timeout passes. "Received" only
 means LAS X got the message; whether the setting, move or job switch then
 happened is the confirmation's business.
 
-Delivery follows the one rule in ``primitives/cam_api/waiting.py``: ``WINDOWS`` tries of
+Delivery follows the one rule in ``primitives/cam_api/profile.py``: ``WINDOWS`` tries of
 ``WINDOW_S`` each. There is no pause between tries, because each try already
 waits a full window for the answer.
 
 Acquisition never comes through here: a second acquire is a second
 acquisition, so it is sent once with ``UpdateAsync``.
 
-Before a message goes out, a LAS X warning that asks only for OK is answered,
-and a message is not sent while another dialog is open
-(``lasx_dialogs.DialogOpen``): LAS X's hardware server waits for every open
-dialog, and a message sent into it waits too. While the message is out, a
-watcher answers an OK-only warning it causes, which a message sent straight to
-the hardware server would otherwise wait for without end.
+LAS X's dialogs are not looked at here. LAS X's hardware server waits for every
+open dialog, and a message sent into it waits too, so the write loop answers
+them around every send (``dispatcher/write.py``, handed
+``procedures/answer_dialogs.py``), and a caller that delivers a message itself
+(the ping, saving the experiment) hands them in the same way.
 
 A CAM API request object that knows its own name.
 
@@ -46,7 +45,6 @@ from __future__ import annotations
 
 import logging
 import time
-from ...procedures import answer_dialogs
 from ..log import reads as _log_reader
 from . import profile as waiting
 
@@ -125,19 +123,13 @@ class LasxTransport:
         """Send the request. Returns ``(arrived, answered)``.
 
         ``arrived`` is whether LAS X confirmed receiving it (a request sent
-        without waiting counts as arrived). ``answered`` lists what the driver
-        said to LAS X dialog boxes that opened while it was sending.
+        without waiting counts as arrived). ``answered`` is empty: LAS X's
+        dialogs are answered by the write loop around the send.
         """
-        fired_at = time.monotonic()
         if asynchronous:
-            answer_dialogs.answer_warnings()
-            with answer_dialogs.watching():
-                api_obj.UpdateAsync()
-            arrived = True
-        else:
-            arrived = deliver(api_obj, label=label)
-        answered = [note.message for note in answer_dialogs.answered_since(fired_at)]
-        return arrived, answered
+            api_obj.UpdateAsync()
+            return True, []
+        return deliver(api_obj, label=label), []
 
     def await_reply(self, client):
         """Wait for LAS X to fill in its reply. True if it did, False if time ran out."""
@@ -167,29 +159,33 @@ LASX = LasxTransport()
 def deliver(api_obj, *, label="message"):
     """Deliver *api_obj*'s message; True once LAS X says "received", else False.
 
-    Raises ``lasx_dialogs.DialogOpen``, with nothing sent, while a LAS X dialog
-    the driver does not answer is open.
+    LAS X's dialogs are the caller's: the write loop answers them around a
+    send, and a caller outside it wraps the delivery in
+    ``dispatcher.write.answering``.
     """
-    answer_dialogs.answer_warnings()
-    with answer_dialogs.watching():
-        for attempt in range(1, waiting.WINDOWS + 1):
-            if api_obj.UpdateAwaitReceipt(waiting.WINDOW_S):
-                return True
-            log.warning("%s not received (try %d/%d)", label, attempt, waiting.WINDOWS)
+    for attempt in range(1, waiting.WINDOWS + 1):
+        if api_obj.UpdateAwaitReceipt(waiting.WINDOW_S):
+            return True
+        log.warning("%s not received (try %d/%d)", label, attempt, waiting.WINDOWS)
     return False
 
 
 class Request:
-    """A CAM request object together with its name, such as ``"PyApiSetZoomByJobName"``."""
+    """A CAM request object together with its name, such as ``"PyApiSetZoomByJobName"``.
 
-    def __init__(self, name, cam_object):
+    ``experiment`` is what opens the LAS X experiment a capture goes into
+    (``Write.experiment``), for the direct route; None for every other request.
+    """
+
+    def __init__(self, name, cam_object, experiment=None):
         self.name = name
         self.cam_object = cam_object
+        self.experiment = experiment
 
     def __getattr__(self, attribute):
         return getattr(self.cam_object, attribute)
 
 
-def request_of(client, name):
-    """The CAM client's request object called *name*, wrapped with its name."""
-    return Request(name, getattr(client, name))
+def request_of(client, name, experiment=None):
+    """The CAM client's request object called *name*, wrapped with its name (and *experiment*, see :class:`Request`)."""
+    return Request(name, getattr(client, name), experiment)

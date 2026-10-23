@@ -10,12 +10,10 @@ breaks a rule, so the rule survives as a red test instead of a code-review
 comment. If one of these fails, the fix is almost never to edit this file:
 move the offending call down into ``actions/`` or ``dispatcher/`` instead.
 
-The last test records which parts import which. Today the Leica driver still
-has imports that run upward against the anatomy (the vendor interface reading
-the tuning, the limits item asking the rulebook). They are listed in ``ALLOWED`` so that the move that
-put every file in its part stays honest about them, and so that no new
-upward import can appear unnoticed. Each entry marked ``# upward`` is one to
-remove, in a change of its own.
+The last tests record which parts import which (``ALLOWED``). No part imports
+upward against the anatomy: the primitives import only the dispatcher, and the
+dispatcher imports nothing of the driver, so no new upward import can appear
+unnoticed.
 """
 
 from __future__ import annotations
@@ -165,14 +163,11 @@ def test_the_utils_grab_bag_stays_dissolved():
 # --- the parts, and which may import which ----------------------------------------
 
 # The parts of the anatomy, and what each may import. A part may always import
-# from itself. Entries marked ``# upward`` run against the anatomy and are removed
-# in step 6 of the layout plan.
+# from itself.
 ALLOWED = {
     # One folder for each way of reaching LAS X.
     "primitives": {
-        "dispatcher",  # the reading, the log entry helper, the transport chain
-        "procedures",  # upward: the dialog check, opening the experiment, the saved experiment
-        "driver_setup",  # upward: the notebook pointer of the limits
+        "dispatcher",  # the reading, the dialogs around a delivery, the transport chain
     },
     # Runs one primitive and knows no microscope.
     "dispatcher": set(),
@@ -253,18 +248,13 @@ def test_each_part_only_imports_what_the_anatomy_allows():
 #: The bottom of the vendor part, bottom first: how the driver reaches LAS X, and
 #: one read or write each. Neither imports from anything above it.
 def test_a_reading_never_uses_a_change():
-    """A get never calls a set: no class profile (the table of readings among them) imports the named changes."""
+    """A get never calls a set: no class profile (the table of readings among them) imports a procedure, the named changes among them."""
     profiles = sorted((DRIVER_ROOT / "primitives").glob("*/profile.py"))
     assert DRIVER_ROOT / "primitives" / "direct" / "profile.py" in profiles
     for path in profiles:
-        tree = ast.parse(path.read_text(encoding="utf-8"))
-        for node in ast.walk(tree):
-            if isinstance(node, ast.ImportFrom):
-                module = node.module or ""
-                names = [module, *(a.name for a in node.names)]
-                assert "changes" not in names and not module.endswith("procedures.changes"), (
-                    f"{path.relative_to(DRIVER_ROOT)} imports the named changes"
-                )
+        assert "procedures" not in _imported_parts(path, "primitives"), (
+            f"{path.relative_to(DRIVER_ROOT)} imports a procedure"
+        )
 
 
 def test_nothing_but_the_tests_imports_from_testing():
