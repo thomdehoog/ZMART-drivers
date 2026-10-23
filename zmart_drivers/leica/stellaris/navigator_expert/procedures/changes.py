@@ -41,7 +41,6 @@ from ..primitives.cam_api.profile import _check_api_error, _is_transient_error
 from ..primitives.cam_api.parsing import _hw_get
 from ..primitives.direct import profile as direct_profile
 from ..primitives.direct import reads as direct_reader
-from ..primitives.direct import state_tree
 from ..primitives.direct.client import HardwareServerUnavailable
 from ..primitives.log import reads as log_reader
 from ..primitives.log.profile import MAX_AGE_S
@@ -438,14 +437,13 @@ def acquire(client, job_name, poll_interval=None, poll_timeout=None, heartbeat_i
         if value is not None
     }
     change = writes.acquire(job_name, experiment=experiment_for_capture)
-    image_before = picture_number()
     handed_over = time.time()
     result = dispatch.run(direct_profile, client, change, dialogs=answer_dialogs)
     if not result["success"]:
         return result
 
     t0 = time.perf_counter()
-    watched = confirm_acquire(client, image_before=image_before, **watching)
+    watched = confirm_acquire(client, **watching)
     watch_s = time.perf_counter() - t0
     result["logs"].extend(watched["logs"])
     result["timing"].update(confirm_s=watch_s, total_s=result["timing"]["total_s"] + watch_s, confirm_attempts=1)
@@ -455,16 +453,11 @@ def acquire(client, job_name, poll_interval=None, poll_timeout=None, heartbeat_i
     dialog = write_loops.append_dialog_warning(
         direct_profile.WRITING.transport, result["logs"], handed_over, change.description
     )
-    if watched["started"] is False:
+    if not watched["started"]:
         result["success"] = False
         result["message"] = f"{change.description} | the scan never started{dialog}"
         return result
-    msg = (
-        f"{change.description} | UNCONFIRMED: the scan started, but was not seen to finish"
-        if watched["started"]
-        else f"{change.description} | UNCONFIRMED: the scan was not seen, and without the "
-        "hardware server it is not known whether it ran"
-    )
+    msg = f"{change.description} | UNCONFIRMED: the scan started, but was not seen to finish"
     log.warning(msg)
     result["logs"].append(make_log_entry("warning", msg))
     result["message"] = f"{change.description} (readback unconfirmed){dialog}"
@@ -481,16 +474,8 @@ def take_picture(client: Any, job: str, **acquire_options) -> AcquisitionResult:
     return AcquisitionResult(job=job, started_at=started_at, finished_at=finished_at, command_result=result)
 
 
-def picture_number():
-    """The number of the last picture LAS X made, from the hardware server; None when it cannot be read."""
-    try:
-        return state_tree.last_image_id()
-    except Exception:  # noqa: BLE001 -- unknown is an answer: the watch then cannot tell
-        return None
-
-
 def confirm_acquire(
-    client, *, image_before=None, start_timeout=15.0, heartbeat_interval=30.0, timeout=None, poll_interval=0.1
+    client, *, start_timeout=15.0, heartbeat_interval=30.0, timeout=None, poll_interval=0.1
 ):
     """Watch the scan status until the acquisition has run; reads only, never sends.
 
@@ -502,11 +487,8 @@ def confirm_acquire(
     and when it fails, the API alone, never the log, which writes the status
     only when it changes. Only readings taken after the watch began count.
 
-    A scan shorter than one polling gap can start and finish unseen. A new
-    picture in LAS X (its number differs from *image_before*) shows that it
-    ran. So the scan never started only when the status never left idle and
-    the picture number did not change; without the number (*image_before*
-    None, or the hardware server not answering) whether it ran is unknown.
+    The scan must be seen scanning once: a scan never seen scanning within
+    *start_timeout* did not start, and the capture fails.
 
     Args:
         client: The connected LAS X API client.
@@ -516,9 +498,8 @@ def confirm_acquire(
         poll_interval: Seconds between scan-status reads.
 
     Returns:
-        ``{"success": bool, "started": bool | None, "logs": [...]}``;
-        ``started`` is True when the scan was seen running or made a new
-        picture, False when it certainly did not start, None when unknown.
+        ``{"success": bool, "started": bool, "logs": [...]}``; ``started``
+        says whether the scan was seen scanning.
     """
     logs = []
     observed_after = time.time()
@@ -555,9 +536,6 @@ def confirm_acquire(
         else:
             consecutive_idle += 1
 
-        if not saw_scanning and image_before is not None and picture_number() not in (None, image_before):
-            saw_scanning = True  # finished between two status reads: its picture is there
-
         if not saw_scanning:
             err = _check_api_error(client)
             if err is not None:
@@ -577,8 +555,7 @@ def confirm_acquire(
                 )
                 log.warning(msg)
                 logs.append(make_log_entry("warning", msg))
-                known = image_before is not None and picture_number() is not None
-                return {"success": False, "started": False if known else None, "logs": logs}
+                return watched(False)
 
         now = time.perf_counter()
         if now - last_heartbeat > heartbeat_interval:

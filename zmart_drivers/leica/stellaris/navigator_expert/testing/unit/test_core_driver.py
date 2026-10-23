@@ -2054,45 +2054,17 @@ def status(value):
 
 class TestConfirmAcquire(unittest.TestCase):
     def test_idle_without_scanning_returns_failure(self):
-        """Always idle and no new picture -> the scan never started."""
+        """Always idle, never seen scanning -> the scan never started."""
         with (
             patch.object(readers, "get_scan_status", return_value=status("eScanIdle")),
             patch.object(changes, "_check_api_error", return_value=None),
-            patch.object(changes.state_tree, "last_image_id", return_value=10),
             patch("time.sleep"),
         ):
             result = changes.confirm_acquire(
-                None, image_before=10, start_timeout=0.0, timeout=1.0, poll_interval=0.001
+                None, start_timeout=0.0, timeout=1.0, poll_interval=0.001
             )
         self.assertFalse(result["success"])
-        self.assertIs(result["started"], False)
-
-    def test_a_scan_too_quick_to_see_ran_when_its_picture_arrived(self):
-        """Never seen running, but LAS X made a new picture: the scan ran."""
-        with (
-            patch.object(readers, "get_scan_status", return_value=status("eScanIdle")),
-            patch.object(changes, "_check_api_error", return_value=None),
-            patch.object(changes.state_tree, "last_image_id", return_value=11),
-            patch("time.sleep"),
-        ):
-            result = changes.confirm_acquire(
-                None, image_before=10, start_timeout=0.0, timeout=1.0, poll_interval=0.001
-            )
-        self.assertTrue(result["success"])
-        self.assertIs(result["started"], True)
-
-    def test_without_the_picture_number_an_unseen_scan_is_unknown(self):
-        """No picture number to compare: not seen running is not proof it never ran."""
-        with (
-            patch.object(readers, "get_scan_status", return_value=status("eScanIdle")),
-            patch.object(changes, "_check_api_error", return_value=None),
-            patch("time.sleep"),
-        ):
-            result = changes.confirm_acquire(
-                None, image_before=None, start_timeout=0.0, timeout=1.0, poll_interval=0.001
-            )
-        self.assertFalse(result["success"])
-        self.assertIsNone(result["started"])
+        self.assertFalse(result["started"])
 
     def test_scanning_then_idle(self):
         """Non-idle then idle -> success (saw scanning)."""
@@ -2224,10 +2196,6 @@ class TestAcquire(unittest.TestCase):
         self.assertEqual(result["timing"]["confirm_attempts"], 1)
         self.assertEqual(self.api_obj.UpdateAsync.call_count, 1)
 
-    def test_a_capture_whose_start_is_unknown_is_unconfirmed_not_failed(self):
-        result, _ = self._acquire({"success": False, "started": None, "logs": []})
-        self.assertEqual((result["success"], result["confirmed"]), (True, False))
-
     def test_a_capture_whose_scan_never_starts_fails(self):
         result, _ = self._acquire({"success": False, "started": False, "logs": []})
         self.assertFalse(result["success"])
@@ -2259,8 +2227,7 @@ class TestAcquire(unittest.TestCase):
 
     def test_the_watch_gets_only_the_numbers_given(self):
         _, watch = self._acquire({"success": True, "started": True, "logs": []}, poll_timeout=5.0, start_timeout=2.0)
-        # and the number of LAS X's last picture, None here: no hardware server answers
-        self.assertEqual(watch.call_args.kwargs, {"image_before": None, "timeout": 5.0, "start_timeout": 2.0})
+        self.assertEqual(watch.call_args.kwargs, {"timeout": 5.0, "start_timeout": 2.0})
 
     def test_a_capture_that_was_not_sent_is_not_watched(self):
         self.api_obj.UpdateAsync.side_effect = RuntimeError("COM error")
