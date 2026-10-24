@@ -1,8 +1,9 @@
 """At the microscope: many captures, each cleared from LAS X's cache; does the cache stay flat?
 
-Selects one LAS X job and captures it again and again through the ZMART
-Controller, as a workflow does. After every capture it runs the driver's
-``clear_cache`` procedure, so that LAS X lets go of the picture once it is
+Selects one LAS X job and captures it again and again through the driver's
+``Microscope``, the way a workflow does (``acquire()``, then ``save()``). It
+needs only the driver, not the ZMART Controller. After every capture it runs
+the driver's ``clear_cache()``, so that LAS X lets go of the picture once it is
 saved, and the Navigator canvas, which holds the capture's hidden copy
 (``TileScan <n>``), is cleared. It measures LAS X's cache (the
 ``V2LMSDC_*`` files in LAS X's cache folder) before, every ten captures and
@@ -67,7 +68,9 @@ class Cache:
         self.root, self.names = root, {}
 
     def name_of(self, number: str) -> str:
-        from zmart_drivers.leica.stellaris.navigator_expert.procedures.save_data import collect as container
+        from zmart_drivers.leica.stellaris.navigator_expert.procedures.save_data import (
+            collect as container,
+        )
 
         if number not in self.names:
             description = next(self.root.glob(f"V2LMSDC_OBJ{number}_*.tmp"), None)
@@ -148,11 +151,13 @@ def main() -> int:
     )
     asked = parser.parse_args()
 
-    from zmart_controller import ZmartController
-
-    from zmart_drivers.leica.stellaris.navigator_expert.zmart_controller_plugin.zmart_controller_plugin import ZmartControllerPlugin as driver
-    from zmart_drivers.leica.stellaris.navigator_expert.procedures.clear_cache import clear as lasx_cache_release
-    from zmart_drivers.leica.stellaris.navigator_expert.procedures.save_data import collect as container
+    from zmart_drivers.leica.stellaris import navigator_expert
+    from zmart_drivers.leica.stellaris.navigator_expert.procedures.clear_cache import (
+        clear as lasx_cache_release,
+    )
+    from zmart_drivers.leica.stellaris.navigator_expert.procedures.save_data import (
+        collect as container,
+    )
     from zmart_drivers.leica.stellaris.navigator_expert.procedures.save_data import (
         save_waiting as _saving,
     )
@@ -170,20 +175,18 @@ def main() -> int:
     }
 
     _saving.IMAGE_SAVE = replace(_saving.IMAGE_SAVE, projection="none")
-    session = ZmartController(
-        driver, {"output_root": asked.save_to} if asked.save_to else {}
+    scope = navigator_expert.connect(
+        **({"output_root": asked.save_to} if asked.save_to else {})
     )
     try:
-        chosen = (
-            session.set_state({"changeable": {"job": asked.job}})
-            if asked.job
-            else {"success": True}
-        )
-        report["job"] = session.get_state()["output"]["changeable"].get("job")
-        if not chosen["success"]:
-            raise SystemExit(f"the job was not selected: {chosen['output']}")
-        here = session.get_xyz()["output"]
-        session.set_xyz(*(float(here[axis]["position"]) for axis in "xyz"))
+        if asked.job:
+            try:
+                scope.select_job(asked.job)
+            except (RuntimeError, ValueError) as why:
+                raise SystemExit(f"the job was not selected: {why}") from None
+        report["job"] = scope.jobs()["selected"]
+        here = scope.position()
+        scope.move_to(*(float(here[axis]["position"]) for axis in "xyz"))
         start = report["cache before, MB"] = cache.measure()
         print(
             f"before: {start['total']:.1f} MB, of which hidden copies {start['hidden']:.1f} MB",
@@ -191,18 +194,23 @@ def main() -> int:
         )
         began, failed = time.perf_counter(), 0
         for i in range(1, asked.captures + 1):
-            answer = session.acquire(position_label=f"t{i:04d}")
-            if not answer["success"]:
+            try:
+                taken = scope.acquire(f"t{i:04d}")
+                scope.save(taken["position_label"])
+            except Exception as why:  # noqa: BLE001 -- counted and reported, not raised
                 failed += 1
-                report["errors"].append(f"capture {i}: {answer['output']}"[:300])
+                report["errors"].append(f"capture {i}: {why}"[:300])
             else:
                 # The picture is saved; now have LAS X let go of it. A picture it
-                # would not let go of fails the procedure, naming it.
-                cleared = session.run_procedure({"name": "clear_cache"})
-                if not cleared["success"]:
+                # would not let go of is named under "failed".
+                try:
+                    cleared = scope.clear_cache()
+                except Exception as why:  # noqa: BLE001 -- counted and reported, not raised
+                    cleared = {"failed": str(why)}
+                if cleared.get("failed"):
                     failed += 1
                     report["errors"].append(
-                        f"clear_cache after {i}: {cleared['output']}"[:300]
+                        f"clear_cache after {i}: left {cleared['failed']}"[:300]
                     )
             if i % 10 == 0 or i == asked.captures:
                 step = {
@@ -221,7 +229,7 @@ def main() -> int:
                     flush=True,
                 )
     finally:
-        session.disconnect()
+        scope.close()
 
     end = report["cache after, MB"] = cache.measure()
     done = report["progress"][-1]["captures"] if report["progress"] else 0

@@ -21,6 +21,13 @@ for _p in (_HERE, _HELPERS, _REPO_ROOT):
     if str(_p) not in sys.path:
         sys.path.insert(0, str(_p))
 
+import pytest
+
+# These tests check the driver inside the ZMART Controller. On a computer without
+# the controller they are skipped, because the driver is also used by itself.
+pytest.importorskip("zmart_controller", reason="the ZMART Controller is not installed")
+pytestmark = pytest.mark.controller
+
 import validate_installed_driver
 
 from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import client as adapter

@@ -14,6 +14,10 @@ python testing/run_ci.py --hardware
 
 # Live, 15 to 30 minutes: the quick set plus the reader diagnostics
 python testing/run_ci.py --hardware --full
+
+# Either one, on a computer that must have the ZMART Controller: its layer
+# fails, rather than shows SKIP, when the controller is missing
+python testing/run_ci.py --hardware --controller
 ```
 
 The validators do not know whether LAS X is in simulator mode or driving
@@ -22,29 +26,24 @@ simulator first, then the same command on the microscope. All green on the
 simulator, then all green on the scope, is the definition of production
 ready.
 
-**`--hardware`, the quick acceptance**, runs in order:
+**`--hardware`, the quick acceptance**, runs in two layers, like the offline
+suite. The driver layer needs only the driver, because the driver is also
+used by itself. The controller layer checks the driver inside the ZMART
+Controller; it runs when the controller is installed and shows as `SKIP` when
+it is not. Add `--controller` to make a missing controller a failure.
+
+The driver layer, in order:
 
 1. **The limits self-check**, against the in-process mock, in this install,
    before LAS X is touched. If it fails the run hard-aborts and no hardware
    validator runs, so a broken limits gate can never reach the stage.
-   Then **the stage goes to the CI baseline** (below), wherever it stood.
-2. **The installed driver** (`validate_installed_driver.py`): the path an
-   experiment takes. It registers this folder with the controller
-   (`register_driver`), connects by name (`connect("stellaris")`), lets the
-   controller's own `validate_driver` check every `get_*` answer, asks every
-   command, proves that the limits gate refuses a far move before anything
-   moves, makes one small move and back, and takes one acquisition that the
-   controller's `check_acquire_answer` accepts. Its report ends with the
-   **acceptance checklist**, one line per point, which `run_ci` prints in
-   its summary.
-3. **The adapter round-trip** (`validate_zmart_adapter.py`): first the
-   four-axis CI baseline, then `set_origin` and `set_xyz`, the state
-   round-trip, and an acquire saved from LAS X's cache.
-4. **The end-to-end validator in the direct reader route**
+   Then **the stage goes to the CI baseline** (below), wherever it stood,
+   through the driver alone (`ci_baseline.py`).
+2. **The end-to-end validator in the direct reader route**
    (`validate_hardware.py`): every reversible setting, the XY pattern, the
    z-galvo round-trip, and an acquire. Direct is the driver's default
    reader route, so this step is fatal.
-5. **The setup wizard** (`check_setup_wizard.py`): the wizard's steps, made
+3. **The setup wizard** (`check_setup_wizard.py`): the wizard's steps, made
    through its own web calls exactly as its page makes them. It first copies
    this microscope's settings folder to a throwaway folder and points the
    driver there, so everything the wizard saves goes into the copy; at the
@@ -55,20 +54,21 @@ ready.
    the objective, so a refusal that says why also passes, and the report
    notes it. The objective calibration is not checked: it needs a person to
    change the objective.
-6. **The buttons the driver presses** (`check_buttons.py`): no capture, no
+4. **The buttons the driver presses** (`check_buttons.py`): no capture, no
    move. It presses Navigator Expert's Jobs so the canvas goes, checks that
    the driver brings it back with Experiment (and leaves a shown canvas
    alone), presses the canvas's Clear, and checks that LAS X shows no dialog,
-   in its log or on screen. It ends with the canvas shown, which steps 7 and
-   8 need. Whether Clear had an effect is measured in step 8.
-7. **Saving from LAS X's cache** (`check_cache_route.py`): one capture of
-   the job selected in LAS X (or `--job`) saved as one OME-Zarr store and
-   checked: valid OME-Zarr and OME, a projection beside a stack, a log
-   beside the data. The driver does not use AutoSave, so it does not
+   in its log or on screen. It ends with the canvas shown, which steps 5 and
+   6 need. Whether Clear had an effect is measured in step 6.
+5. **Saving from LAS X's cache** (`check_cache_route.py`): one capture of
+   the job selected in LAS X (or `--job`), taken with the driver's
+   `acquire()` and saved with `save()` as one OME-Zarr store, then checked:
+   valid OME-Zarr and OME, a projection beside a stack, a log beside the
+   data. The driver does not use AutoSave, so it does not
    matter whether AutoSave is on. Metadata the OME schema refuses is
    reported as a failed check.
-8. **Clearing LAS X's cache** (`check_cache_release.py`): ten captures,
-   each saved and then cleared with the `clear_cache` procedure, the
+6. **Clearing LAS X's cache** (`check_cache_release.py`): ten captures,
+   each saved and then cleared with the driver's `clear_cache()`, the
    Navigator canvas cleared after each. It fails when a capture fails, when
    a Clear press does not go through, or when the hidden copies in LAS X's
    cache grew over the run (a press that frees nothing). The procedure
@@ -78,8 +78,23 @@ ready.
    simulator on 21 October 2026: every canvas cleared, and the hidden copies
    did not grow.)
 
-The captures of steps 7 and 8 go under the reports folder, so the run needs
+The captures of steps 5 and 6 go under the reports folder, so the run needs
 no data location.
+
+The controller layer, after the driver layer:
+
+7. **The installed driver** (`validate_installed_driver.py`): the path an
+   experiment takes. It registers this folder with the controller
+   (`register_driver`), connects by name (`connect("stellaris")`), lets the
+   controller's own `validate_driver` check every `get_*` answer, asks every
+   command, proves that the limits gate refuses a far move before anything
+   moves, makes one small move and back, and takes one acquisition that the
+   controller's `check_acquire_answer` accepts. Its report ends with the
+   **acceptance checklist**, one line per point, which `run_ci` prints in
+   its summary.
+8. **The adapter round-trip** (`validate_zmart_adapter.py`): the
+   four-axis CI baseline again, then `set_origin` and `set_xyz`, the state
+   round-trip, and an acquire saved from LAS X's cache.
 
 **`--hardware --full`** adds the readers and the diagnostics, once per
 release or after a change to the readers:

@@ -16,6 +16,8 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
+import pytest
+
 from limits_fixtures import (
     DEFAULT_STAGE_UM,
     install_permissive_limits,
@@ -210,6 +212,7 @@ class TestRegistration(unittest.TestCase):
     def test_connection_profile_does_not_select_operator_calibration(self):
         self.assertNotIn("calibration_name", DEFAULT_CONNECTION)
 
+    @pytest.mark.controller
     def test_the_driver_class_holds_every_command(self):
         from zmart_controller.zmart_controller import COMMANDS
 
@@ -227,6 +230,7 @@ class TestRegistration(unittest.TestCase):
             re.search(r"^(from|import) zmart_controller", source, re.MULTILINE)
         )
 
+    @pytest.mark.controller
     def test_set_origin_is_a_driver_step_not_a_controller_op(self):
         """The origin is driver configuration: the controller cannot set it."""
         from zmart_controller.zmart_controller import COMMANDS
@@ -1052,6 +1056,7 @@ class TestAcquire(unittest.TestCase):
             ],
         )
 
+    @pytest.mark.controller
     def test_files_lists_every_file_the_acquisition_saved(self):
         """The images, the state printed beside them and the vendor's metadata, under one name.
 
@@ -2541,6 +2546,7 @@ class TestLifecycle(unittest.TestCase):
         state = _gate.state_for(h.client)
         self.assertTrue(state.ok)
 
+    @pytest.mark.controller
     def test_full_controller_session_flow(self):
         """End to end through a real zmart_controller Session (real handshake)."""
         import os

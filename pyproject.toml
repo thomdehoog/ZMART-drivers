@@ -52,10 +52,11 @@ leica = [
 controller = [
     "zmart-controller @ git+https://github.com/ZMB-UZH/ZMART-controller@v0.4.0rc7",
 ]
-# What the offline test suite needs on top of the driver's own extra; the
-# plug-in's tests run it in the controller.
+# What the offline test suite needs on top of the driver's own extra. It does
+# not bring the controller, so the suite also runs as it does where the driver
+# is used by itself; add the controller extra for the tests of the driver
+# inside the controller: pip install -e ".[leica,controller,test]".
 test = [
-    "zmart-controller @ git+https://github.com/ZMB-UZH/ZMART-controller@v0.4.0rc7",
     "pytest>=8",
     "pytest-cov>=5",
     "ruff>=0.6",

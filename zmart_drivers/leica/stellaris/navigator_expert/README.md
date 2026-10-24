@@ -192,5 +192,6 @@ and `LogReaderProfile` in `primitives/log/reads.py`. Override them there, not at
 - The notes, plans and reviews written while building the driver, and the runs on the microscope:
   [`docs/leica/`](../../../../docs/leica/).
 - The tests: `python zmart_drivers/leica/stellaris/navigator_expert/testing/run_ci.py` runs the offline
-  suite from the repository root; the checks at the microscope are in
+  suite from the repository root, in two layers: the driver on its own, and the driver inside the
+  ZMART Controller when that is installed. The checks at the microscope are in
   [`testing/hardware/README.md`](testing/hardware/README.md).
