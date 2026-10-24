@@ -37,7 +37,7 @@ class WizardServer:
     def url(self) -> str:
         return f"http://127.0.0.1:{self._http.server_address[1]}/"
 
-    def start(self) -> "WizardServer":
+    def start(self) -> WizardServer:
         self._thread.start()
         return self
 
@@ -76,15 +76,23 @@ class WizardServer:
                 if path == "/api/steps":
                     return self._json(server.wizard.outline())
                 if path.startswith("/files/"):
-                    picture = server._pictures.get(path[len("/files/"):])
+                    picture = server._pictures.get(path[len("/files/") :])
                     if picture is None or not picture.is_file():
                         return self._send(404, b"not found", "text/plain")
-                    return self._send(200, picture.read_bytes(), mimetypes.guess_type(picture.name)[0] or "image/png")
+                    return self._send(
+                        200,
+                        picture.read_bytes(),
+                        mimetypes.guess_type(picture.name)[0] or "image/png",
+                    )
                 relative = "index.html" if path == "/" else path.lstrip("/")
                 target = (PAGE / relative).resolve()
                 if PAGE.resolve() not in target.parents or not target.is_file():
                     return self._send(404, b"not found", "text/plain")
-                self._send(200, target.read_bytes(), mimetypes.guess_type(target.name)[0] or "application/octet-stream")
+                self._send(
+                    200,
+                    target.read_bytes(),
+                    mimetypes.guess_type(target.name)[0] or "application/octet-stream",
+                )
 
             def do_POST(self):
                 parts = self.path.strip("/").split("/")
@@ -94,7 +102,9 @@ class WizardServer:
                 try:
                     values = json.loads(self.rfile.read(length) or b"{}")
                 except ValueError:
-                    return self._json({"ok": False, "error": "The request was not understood."}, 400)
+                    return self._json(
+                        {"ok": False, "error": "The request was not understood."}, 400
+                    )
                 answer = server.wizard.call(parts[1], parts[2], values)
                 if answer["ok"]:
                     answer["result"] = server._publish_pictures(answer["result"])

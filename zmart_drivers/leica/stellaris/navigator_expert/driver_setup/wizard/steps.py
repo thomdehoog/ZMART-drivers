@@ -15,6 +15,7 @@ from __future__ import annotations
 import json
 import tempfile
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 
 from .framework import Step, StepError, Wizard
@@ -40,6 +41,25 @@ def _record_file(name: str, content: dict) -> Path:
     path = folder / f"{name}.json"
     path.write_text(json.dumps(content, indent=2, default=str) + "\n", encoding="utf-8")
     return path
+
+
+def _saved_on(snapshot: Path) -> str:
+    """The time in a saved folder's name, in words: "Saved on 1 October 2026 at 14:05 (UTC)"."""
+    try:
+        moment = datetime.strptime(snapshot.name[:16], "%Y-%m-%dT%H-%M").replace(
+            tzinfo=timezone.utc
+        )
+    except ValueError:
+        return f"Saved in {snapshot.name}"
+    return f"Saved on {moment.day} {moment:%B %Y} at {moment:%H:%M} (UTC)"
+
+
+def _read_json(path: Path) -> dict | None:
+    """A saved settings file, or None when it is missing or cannot be read."""
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
 
 
 def _number(values: dict, key: str, label: str) -> float:
@@ -80,7 +100,10 @@ class LeicaSteps:
         from ..data_location import data_location
 
         folder = data_location(_machine())
-        return {"done": folder is not None, "note": f"Saved under {folder}" if folder else None}
+        return {
+            "done": folder is not None,
+            "note": f"Saved under {folder}" if folder else None,
+        }
 
     def data_location_check(self, values):
         from ..data_location import check
@@ -92,7 +115,9 @@ class LeicaSteps:
         from ..data_location import set_data_location
 
         try:
-            path = set_data_location(values.get("folder", "").strip(), machine=_machine())
+            path = set_data_location(
+                values.get("folder", "").strip(), machine=_machine()
+            )
         except ValueError as why:
             raise StepError(str(why)) from None
         return {"saved_to": str(path)}
@@ -101,18 +126,28 @@ class LeicaSteps:
 
     def limits_status(self):
         latest = _machine().latest_snapshot("limits")
-        return {"done": latest is not None, "note": f"Latest saved: {latest.name}" if latest else None}
+        return {
+            "done": latest is not None,
+            "note": _saved_on(latest) if latest else None,
+        }
 
     def limits_corner(self, values):
         from ..limits.measure_limits import CornerRecorder
 
         if self._corners is None:
             self._corners = CornerRecorder(self.client())
-        number = int(_number(values, "corner", "the corner"))
-        return {"corner": number, "position": self._corners.record(number)}
+        number = _number(values, "corner", "the corner")
+        if number not in (1, 2, 3, 4):
+            raise StepError("The corner must be 1, 2, 3 or 4.")
+        try:
+            position = self._corners.record(int(number))
+        except RuntimeError as why:
+            raise StepError(str(why)) from None
+        return {"corner": int(number), "position": position}
 
     def limits_save(self, values):
         from ..limits.config import adopt_limits, validate_limits
+        from ..limits.limit_rules import SETTER_LIMIT_KEYS
 
         if self._corners is None:
             raise StepError("Record the four corners first.")
@@ -125,13 +160,18 @@ class LeicaSteps:
             "y_um": {"range": [1000, 100000]},
             **_OTHER_LIMITS,
             "objective_slot": [],
+            # Every setting the driver can limit is listed, each left free, as
+            # in the limits notebook; they can be narrowed later in limits.json.
+            **{name: [] for name in SETTER_LIMIT_KEYS},
         }
         limits.update(spanned["limits"])
         try:
             checked = validate_limits(limits)
         except (RuntimeError, ValueError) as why:
             raise StepError(str(why)) from None
-        record = _record_file("set_limits_wizard_record", {"corners_um": spanned["points_um"]})
+        record = _record_file(
+            "set_limits_wizard_record", {"corners_um": spanned["points_um"]}
+        )
         published = adopt_limits(checked, notebook_paths=[record])
         return {
             "x_um": checked["x_um"]["range"],
@@ -142,15 +182,21 @@ class LeicaSteps:
     # -- step 3: the image orientation -------------------------------------
 
     def orientation_status(self):
+        # The driver fills in an unmeasured default orientation the first time
+        # it connects, so a saved file alone does not mean this step was done.
         latest = _machine().latest_snapshot("orientation")
-        return {"done": latest is not None, "note": f"Latest saved: {latest.name}" if latest else None}
+        saved = _read_json(latest / "orientation.json") if latest else None
+        done = bool(saved and saved.get("measured"))
+        return {"done": done, "note": _saved_on(latest) if done else None}
 
     def orientation_measure(self, values):
         from ..orientation import measure_orientation as mo
 
         if self._orientation is None or self._orientation.adopted:
             self._orientation = mo.start_session(
-                stage_move_um=_number({"v": values.get("move_um", 40)}, "v", "the stage move")
+                stage_move_um=_number(
+                    {"v": values.get("move_um", 40)}, "v", "the stage move"
+                )
             )
         session = mo.measure(self._orientation)
         diagnostic = session.paths.reports_dir / mo.DIAGNOSTIC_NAME
@@ -167,15 +213,23 @@ class LeicaSteps:
         }
 
     def orientation_check(self, values):
-        from PIL import Image
-        from ..orientation import measure_orientation as mo
         import numpy as np
+        from PIL import Image
+
+        from ..orientation import measure_orientation as mo
 
         if self._orientation is None:
             raise StepError("Measure the orientation first.")
-        image, path = mo.acquire_validation_image(self._orientation)
-        preview_path = path.parent / "orientation_validation_preview.jpg"
-        shown = Image.fromarray(np.rint(mo._normalise_for_display(image) * 255).astype(np.uint8), "L")
+        image, _saved = mo.acquire_validation_image(self._orientation)
+        # The check picture itself is saved as OME-Zarr under validation/; the
+        # small preview the page shows goes beside the run's other reports, so
+        # it never lands inside that image store.
+        preview_path = (
+            self._orientation.paths.reports_dir / "orientation_validation_preview.jpg"
+        )
+        shown = Image.fromarray(
+            np.rint(mo._normalise_for_display(image) * 255).astype(np.uint8), "L"
+        )
         shown.thumbnail((720, 720))
         shown.save(preview_path, quality=78)
         return {"image": str(preview_path)}
@@ -187,7 +241,10 @@ class LeicaSteps:
             raise StepError("Measure the orientation first.")
         record = _record_file(
             "set_orientation_wizard_record",
-            {"orientation": self._orientation.d4_label, "mirrored": self._orientation.is_mirrored},
+            {
+                "orientation": self._orientation.d4_label,
+                "mirrored": self._orientation.is_mirrored,
+            },
         )
         try:
             adopted = mo.adopt_orientation(self._orientation, record)
@@ -198,8 +255,29 @@ class LeicaSteps:
     # -- step 4: the objective calibration ---------------------------------
 
     def calibration_status(self):
+        # Likewise, the driver fills in an empty calibration (no objectives) the
+        # first time it connects; the step is done once a pair has been measured.
         latest = _machine().latest_snapshot("calibration")
-        return {"done": latest is not None, "note": f"Latest saved: {latest.name}" if latest else None}
+        files = (
+            [
+                latest / "calibration.json",
+                *latest.glob("calibrations/*/calibration.json"),
+            ]
+            if latest
+            else []
+        )
+        measured = {
+            slot
+            for path in files
+            for slot in ((_read_json(path) or {}).get("objectives") or {})
+        }
+        done = len(measured) >= 2
+        return {
+            "done": done,
+            "note": f"Objectives in slots {', '.join(sorted(measured))}"
+            if done
+            else None,
+        }
 
     def calibration_start(self, values):
         from ..optical_calibration import calibrate_objective_pair as cop
@@ -210,7 +288,9 @@ class LeicaSteps:
         self._pair = cop.start_session(
             acquisition_name=name,
             session_id=time.strftime("%Y-%m-%d_calibration_%H%M%S"),
-            reference_slot=int(_number(values, "reference_slot", "the reference objective's slot")),
+            reference_slot=int(
+                _number(values, "reference_slot", "the reference objective's slot")
+            ),
         )
         return {"pair": name}
 
@@ -237,7 +317,9 @@ class LeicaSteps:
             "part": which,
             "focus_z_ref_um": p.focus_z_ref_um,
             "translation_z_um": p.translation_z_um,
-            "translation_xy_um": list(p.translation_xy_um) if p.translation_xy_um else None,
+            "translation_xy_um": list(p.translation_xy_um)
+            if p.translation_xy_um
+            else None,
             "summary": outcome if isinstance(outcome, dict) else None,
         }
 
@@ -307,7 +389,11 @@ def leica_wizard() -> Wizard:
                 "Image orientation",
                 "Find out how the camera image is turned compared with the stage, so that "
                 "moving the stage right moves the picture the way you expect.",
-                {"measure": s.orientation_measure, "check": s.orientation_check, "save": s.orientation_save},
+                {
+                    "measure": s.orientation_measure,
+                    "check": s.orientation_check,
+                    "save": s.orientation_save,
+                },
                 s.orientation_status,
             ),
             Step(
@@ -315,7 +401,11 @@ def leica_wizard() -> Wizard:
                 "Objective calibration",
                 "Measure how far the sample shifts when you change from one objective to "
                 "another, so the software can keep the same spot in view.",
-                {"start": s.calibration_start, "measure": s.calibration_measure, "save": s.calibration_save},
+                {
+                    "start": s.calibration_start,
+                    "measure": s.calibration_measure,
+                    "save": s.calibration_save,
+                },
                 s.calibration_status,
             ),
             Step(

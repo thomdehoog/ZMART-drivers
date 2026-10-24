@@ -62,7 +62,8 @@ const limits: StepView = (ctx) => {
     async (b) => {
       const r = await ctx.run("save", {}, b);
       if (r) {
-        ctx.say(`Saved. X may travel ${JSON.stringify(r.x_um)} µm and Y ${JSON.stringify(r.y_um)} µm.`);
+        const [x, y] = [r.x_um as number[], r.y_um as number[]];
+        ctx.say(`Saved. The stage may travel in X from ${fmt(x[0])} to ${fmt(x[1])} µm, and in Y from ${fmt(y[0])} to ${fmt(y[1])} µm.`);
         ctx.finish();
       }
     },
@@ -174,7 +175,7 @@ const origin: StepView = (ctx) =>
   h(
     "div",
     {},
-    h("p", {}, "Drive the stage to the spot that should count as (0, 0, 0) and focus on it, then press the button. The wizard remembers this spot, the focus and the objective that is in place."),
+    h("p", {}, "When the stage stands on that spot and the sample is in focus, press the button. The wizard remembers the spot, the focus and the objective that is in place, so that every later session starts from the same zero point."),
     button("Set the zero point here", async (b) => {
       const r = await ctx.run("set", {}, b);
       if (r) {

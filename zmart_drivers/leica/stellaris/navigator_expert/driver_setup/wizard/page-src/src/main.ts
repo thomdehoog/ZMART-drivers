@@ -37,8 +37,19 @@ function drawPanel() {
   const message = h("p", { class: "message", role: "status" });
   const picture = h("img", { class: "picture", alt: "", hidden: "" });
 
+  /** Move the step's one message (and its picture) to just after the group *btn* sits in. */
+  const placeBeside = (btn: HTMLElement) => {
+    const group = btn.closest(".part, .row, .actions") ?? btn;
+    if (group.classList.contains("part")) group.append(message);
+    else group.after(message);
+    if (!picture.hidden) message.after(picture);
+  };
+
   const ctx: Context = {
     async run(action, values, btn) {
+      // The answer is shown beside the button that was pressed, so it is in
+      // view even at the bottom of a long step.
+      if (btn) placeBeside(btn);
       message.className = "message";
       message.textContent = "Working…";
       if (btn) btn.disabled = true;
@@ -49,6 +60,7 @@ function drawPanel() {
       } catch (why) {
         message.className = "message error";
         message.textContent = (why as Error).message;
+        message.scrollIntoView({ block: "nearest" });
         return null;
       } finally {
         if (btn) btn.disabled = false;
@@ -62,7 +74,11 @@ function drawPanel() {
     },
     show(image) {
       picture.hidden = !image;
-      if (image) picture.src = image;
+      if (image) {
+        picture.src = image;
+        message.after(picture);
+        picture.addEventListener("load", () => picture.scrollIntoView({ block: "nearest" }), { once: true });
+      }
     },
     say(text) {
       message.className = "message ok";

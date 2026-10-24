@@ -16,7 +16,6 @@ from __future__ import annotations
 import threading
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any
 
 Action = Callable[[dict], dict]
 
@@ -58,10 +57,18 @@ class Wizard:
         for step in self.steps:
             try:
                 status = step.status()
-            except Exception as why:  # a status that cannot be read is shown, not fatal
-                status = {"done": False, "note": f"Could not read what is set up: {why}"}
+            except Exception as why:  # noqa: BLE001 -- a status that cannot be read is shown, not fatal
+                status = {
+                    "done": False,
+                    "note": f"Could not read what is set up: {why}",
+                }
             out.append(
-                {"id": step.id, "title": step.title, "purpose": step.purpose, "status": status}
+                {
+                    "id": step.id,
+                    "title": step.title,
+                    "purpose": step.purpose,
+                    "status": status,
+                }
             )
         return {"title": self.title, "steps": out}
 
@@ -69,7 +76,10 @@ class Wizard:
         """Run one action. Answers ``{"ok": True, "result": ...}`` or ``{"ok": False, "error": ...}``."""
         step = self._by_id.get(step_id)
         if step is None or action not in step.actions:
-            return {"ok": False, "error": f"There is no '{action}' in step '{step_id}'."}
+            return {
+                "ok": False,
+                "error": f"There is no '{action}' in step '{step_id}'.",
+            }
         if not self._busy.acquire(blocking=False):
             return {
                 "ok": False,
@@ -80,7 +90,7 @@ class Wizard:
             return {"ok": True, "result": step.actions[action](dict(values or {}))}
         except StepError as why:
             return {"ok": False, "error": str(why)}
-        except Exception as why:
+        except Exception as why:  # noqa: BLE001 -- the operator gets a sentence, never a crash
             return {"ok": False, "error": f"{type(why).__name__}: {why}"}
         finally:
             self._busy.release()
