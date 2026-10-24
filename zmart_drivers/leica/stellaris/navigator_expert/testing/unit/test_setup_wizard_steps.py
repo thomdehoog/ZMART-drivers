@@ -139,11 +139,15 @@ def test_connect_saves_the_data_folder_and_lists_what_it_found(lasx, data_folder
 
 @pytest.mark.parametrize(
     "folder, reason",
-    [("relative/folder", "full path"), ("/no/such/folder", "does not exist")],
+    # The missing folder is made under the test's own folder, so it is a full
+    # path on every system: on Windows "/no/such/folder" has no drive and is
+    # refused as "not a full path" instead.
+    [("relative/folder", "full path"), ("{tmp}/no/such/folder", "does not exist")],
 )
 def test_a_data_folder_that_cannot_hold_pictures_stops_connect_with_the_reason(
-    lasx, folder, reason
+    lasx, tmp_path, folder, reason
 ):
+    folder = folder.replace("{tmp}", str(tmp_path))
     wizard = steps.leica_wizard()
 
     answer = wizard.call("connect", "connect", {"data_folder": folder})
