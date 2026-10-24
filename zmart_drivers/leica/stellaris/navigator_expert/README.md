@@ -7,9 +7,10 @@ what the microscope really did.
 
 - **Author:** Thom de Hoog (ZMB, University of Zurich) · thom.dehoog@zmb.uzh.ch · thomdehoog@gmail.com
 - **License:** see the repository root [`LICENSE`](../../../../LICENSE).
-- **Status:** **Beta (`0.7.0b7`).** 0.7.0b7 adds the [setup wizard](driver_setup/wizard/README.md); it is
-  tested offline and not yet on the LAS X simulator or a STELLARIS. The driver itself is unchanged from
-  0.7.0b6, which passed the quick hardware acceptance on the LAS X simulator on 23 October 2026; 0.7.0b5
+- **Status:** **Beta (`0.7.0b8`).** 0.7.0b7 added the [setup wizard](driver_setup/wizard/README.md);
+  0.7.0b8 adds a check of it to the hardware CI and splits the CI into the driver on its own and the
+  driver inside the ZMART Controller. Both are tested offline and not yet on the LAS X simulator or a
+  STELLARIS. The driver itself is unchanged from 0.7.0b6, which passed the quick hardware acceptance on the LAS X simulator on 23 October 2026; 0.7.0b5
   passed it on the STELLARIS on 21 October 2026. Before the driver is used unattended, the findings in
   [`docs/leica/RELEASE_CANDIDATE_REVIEW.md`](../../../../docs/leica/RELEASE_CANDIDATE_REVIEW.md) need to be fixed.
 - **Known limits of this beta:**

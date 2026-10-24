@@ -29,7 +29,7 @@ Author: Thom de Hoog, Center for Microscopy and Image Analysis (ZMB),
 University of Zurich (thom.dehoog@zmb.uzh.ch, thomdehoog@gmail.com).
 """
 
-__version__ = "0.7.0b7"
+__version__ = "0.7.0b8"
 
 __all__ = ["__version__", "connect", "Microscope"]
 
