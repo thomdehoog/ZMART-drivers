@@ -196,7 +196,7 @@ def test_every_call_of_the_microscope_and_every_setting_is_in_the_readme():
     from pathlib import Path
 
     readme = (Path(methods.__file__).resolve().parent / "README.md").read_text(encoding="utf-8")
-    section = readme[readme.index("## 4. Using the driver by itself") : readme.index("## 5.")]
+    section = readme[readme.index("## The calls") : readme.index("## Setting up the driver")]
     calls = [name for name, _ in inspect.getmembers(navigator_expert.Microscope) if not name.startswith("_")]
 
     assert [name for name in calls if not re.search(rf"`{name}[`(]", section)] == []
