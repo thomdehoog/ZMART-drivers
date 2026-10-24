@@ -255,7 +255,7 @@ def test_the_idle_check_asks_the_api_even_in_a_log_only_run():
     The log writes the scanner status only when it changes, so its "idle"
     goes stale half a second after a scan ends, and the check waited forever.
     Whether a command may fire is decided by the API alone, which answers on
-    demand (the rule for command-gating reads, in docs/leica/navigator_expert-internals.md).
+    demand (docs/leica/architecture.md: the log never decides whether a change is sent).
     """
     reading_settings.STATE_READERS = reading_settings.StateReaderProfile(
         **{

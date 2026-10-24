@@ -123,8 +123,3 @@ All of them live in `C:\ProgramData\zmart-microscopy\leica\stellaris_y42h93\navi
 | controller plugin | `methods.py`, procedures, setup, dispatcher |
 
 `testing/unit/test_architecture_guard.py` holds this table and fails on any import against it.
-
-## 12. More detail
-
-The full notes on each of these, written while building the driver, are in
-[`navigator_expert-internals.md`](navigator_expert-internals.md).
