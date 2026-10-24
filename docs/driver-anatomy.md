@@ -26,7 +26,8 @@ What a new microscope brings to the shared dispatcher is on one page:
   primitives/                one folder per class of primitive, nothing else
       <class>/               its transfer, its reads, its writes and one profile
   driver_setup/              what the operator sets up once: limits, origin,
-                             orientation, optical calibration, data location
+                             orientation, optical calibration, data location;
+                             and wizard/, the window that walks through them
   zmart_controller_plugin/   the ZMART Controller's view of methods.py
   testing/                   the stand-in for the vendor software and the tests
   README.md
@@ -264,6 +265,26 @@ the repository. A malformed file is refused, not guessed at. The run-time
 procedures read the saved values through the loader; they never import the
 measuring code.
 
+Beside the items, a driver may have a setup wizard, `driver_setup/wizard/`:
+one window that walks the operator through the items in order, as their
+notebooks do, so a microscope can be set up without opening a notebook. It is
+not an item of its own. It holds no measuring code: like a notebook, it only
+calls the items' code.
+
+| Path | What it holds |
+|---|---|
+| `wizard/framework.py` | Steps and the actions the page may call. Knows no microscope. |
+| `wizard/steps.py` | This driver's steps, written against the items' own code. |
+| `wizard/server.py`, `wizard/launcher.py` | The local web server (this computer only) and the window that shows the page. |
+| `wizard/page/` | The built page (HTML, CSS, JavaScript). It ships with the driver, so running the wizard needs only Python. |
+| `wizard/page-src/` | The page's source, for changing it; built into `page/` with Node and Vite. Never needed to run the wizard. |
+
+The wizard connects to the microscope the way a user does, through
+`methods.connect()`, and shows the driver's version among what it found. So it
+is the one part of `driver_setup/` that may import `methods.py` and
+`__version__`, and nothing else beyond what `driver_setup/` may import. The
+items themselves never import it.
+
 ## zmart_controller_plugin
 
 The controller's view of `methods.py`. It holds:
@@ -292,7 +313,8 @@ testing/
 
 The driver never imports from `testing/`. The import guard fails when:
 
-- a part imports a part it may not (the table `ALLOWED`);
+- a part imports a part it may not (the table `ALLOWED`; `driver_setup/wizard/`
+  may also import `methods.py` and `__version__`);
 - the driver's root holds a folder or file that is not in the tree above;
 - `dispatcher/` holds anything but its four files;
 - `primitives/` holds a loose file, or a class without a profile;
@@ -346,7 +368,8 @@ navigator_expert/
                                  state_tree.py, profile.py
       log/                       reads.py, profile.py
   driver_setup/                  limits/ (with limit_rules.py), origin/, orientation/,
-                                 optical_calibration/, data_location/, store.py
+                                 optical_calibration/, data_location/, store.py,
+                                 wizard/ (the ZMART driver configuration workflow)
   zmart_controller_plugin/
   testing/
 ```

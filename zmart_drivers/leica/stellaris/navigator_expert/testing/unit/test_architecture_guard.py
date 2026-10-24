@@ -399,3 +399,20 @@ def test_the_driver_keeps_its_files_where_the_anatomy_puts_them():
     assert single == [], (
         f"folders with fewer than two files {single}; a folder only where there is more than one"
     )
+
+
+def test_nothing_in_the_driver_imports_the_setup_wizard():
+    """The wizard calls the setup items; no item, procedure or method calls it back."""
+    for rel, text in _driver_sources():
+        if WIZARD in rel.parents or rel.parts[0] == "testing":
+            continue
+        for node in ast.walk(ast.parse(text)):
+            if isinstance(node, ast.ImportFrom):
+                names = [node.module or "", *(a.name for a in node.names)]
+            elif isinstance(node, ast.Import):
+                names = [a.name for a in node.names]
+            else:
+                continue
+            assert not any(
+                n == "wizard" or n.endswith(".wizard") or ".wizard." in n for n in names
+            ), str(rel)
