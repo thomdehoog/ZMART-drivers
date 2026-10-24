@@ -160,6 +160,20 @@ def test_the_quick_hardware_run_is_the_acceptance(monkeypatch, tmp_path):
         "hardware: the buttons the driver presses (Jobs, Experiment, Clear) and LAS X's dialogs"
     ) < order.index("hardware: saving from LAS X's cache (one capture, checked)")
 
+    # The setup wizard runs after the end-to-end validator and before the buttons,
+    # and fails the run.
+    wizard = _command_for(captured, "check_setup_wizard.py")
+    assert f"--report-dir={tmp_path}" in wizard
+    wizard_step = "hardware: the setup wizard (into a copy of the settings)"
+    assert fatal_by_name[wizard_step] is True
+    assert (
+        order.index("hardware: end-to-end validator [direct reader]")
+        < order.index(wizard_step)
+        < order.index(
+            "hardware: the buttons the driver presses (Jobs, Experiment, Clear) and LAS X's dialogs"
+        )
+    )
+
     assert not _commands_for(captured, "probe_four_readers.py")
     assert not _commands_for(captured, "validate_readers_side_by_side.py")
     assert not _commands_for(captured, "benchmark_readers.py")

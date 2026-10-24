@@ -7,7 +7,7 @@ microscope PC)::
 
     python run_ci.py             # MOCK/OFFLINE (default): lint + offline tests + coverage
     python run_ci.py --mock      # explicit spelling of the default
-    python run_ci.py --hardware         # LIVE: the quick acceptance: driver, moves, buttons, saving, the cache
+    python run_ci.py --hardware         # LIVE: the quick acceptance: driver, moves, wizard, buttons, saving, the cache
     python run_ci.py --hardware --full  # LIVE: plus the direct/api/log readers, the probe, parity, every route
 
 Design goals (matching the suite's standard):
@@ -392,6 +392,20 @@ def main(argv: list[str] | None = None) -> int:
         # data location.
         (REPORT_DIR / "captures").mkdir(parents=True, exist_ok=True)
         hardware_steps += [
+            # The setup wizard, walked over its own web calls like its page:
+            # Connect, the limits, the origin and the orientation (a 40 um
+            # move and back). It saves into a copy of this microscope's
+            # settings folder and fails if the real one changed. The objective
+            # calibration needs a person to change objectives, so it is left out.
+            (
+                "hardware: the setup wizard (into a copy of the settings)",
+                [
+                    sys.executable,
+                    str(hw / "check_setup_wizard.py"),
+                    f"--report-dir={REPORT_DIR}",
+                ],
+                True,
+            ),
             # The two buttons the driver presses through Windows UI Automation
             # (Experiment, which shows the Navigator canvas, and Clear), with
             # the canvas left on purpose first; and no LAS X dialog open. It
@@ -467,6 +481,9 @@ def main(argv: list[str] | None = None) -> int:
         )
         print(
             "    hardware_validate_{direct,api,log,hybrid}.jsonl  end-to-end checks; direct is the fatal production route"
+        )
+        print(
+            "    check_setup_wizard.json  the setup wizard's steps, saved into a copy of the settings"
         )
         print(
             "    check_buttons.json  the buttons the driver presses, and LAS X's dialogs"

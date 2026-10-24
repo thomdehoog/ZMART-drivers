@@ -44,19 +44,30 @@ ready.
    (`validate_hardware.py`): every reversible setting, the XY pattern, the
    z-galvo round-trip, and an acquire. Direct is the driver's default
    reader route, so this step is fatal.
-5. **The buttons the driver presses** (`check_buttons.py`): no capture, no
+5. **The setup wizard** (`check_setup_wizard.py`): the wizard's steps, made
+   through its own web calls exactly as its page makes them. It first copies
+   this microscope's settings folder to a throwaway folder and points the
+   driver there, so everything the wizard saves goes into the copy; at the
+   end it checks that the real folder is unchanged. It connects, reads the
+   limits and one corner and saves them again unchanged, reads and saves
+   the origin, and measures the orientation (a 40 µm move along X and Y, and
+   back). Whether the orientation is accepted depends on the field under
+   the objective, so a refusal that says why also passes, and the report
+   notes it. The objective calibration is not checked: it needs a person to
+   change the objective.
+6. **The buttons the driver presses** (`check_buttons.py`): no capture, no
    move. It presses Navigator Expert's Jobs so the canvas goes, checks that
    the driver brings it back with Experiment (and leaves a shown canvas
    alone), presses the canvas's Clear, and checks that LAS X shows no dialog,
-   in its log or on screen. It ends with the canvas shown, which steps 6 and
-   7 need. Whether Clear had an effect is measured in step 7.
-6. **Saving from LAS X's cache** (`check_cache_route.py`): one capture of
+   in its log or on screen. It ends with the canvas shown, which steps 7 and
+   8 need. Whether Clear had an effect is measured in step 8.
+7. **Saving from LAS X's cache** (`check_cache_route.py`): one capture of
    the job selected in LAS X (or `--job`) saved as one OME-Zarr store and
    checked: valid OME-Zarr and OME, a projection beside a stack, a log
    beside the data. The driver does not use AutoSave, so it does not
    matter whether AutoSave is on. Metadata the OME schema refuses is
    reported as a failed check.
-7. **Clearing LAS X's cache** (`check_cache_release.py`): ten captures,
+8. **Clearing LAS X's cache** (`check_cache_release.py`): ten captures,
    each saved and then cleared with the `clear_cache` procedure, the
    Navigator canvas cleared after each. It fails when a capture fails, when
    a Clear press does not go through, or when the hidden copies in LAS X's
@@ -67,7 +78,7 @@ ready.
    simulator on 21 October 2026: every canvas cleared, and the hidden copies
    did not grow.)
 
-The captures of steps 6 and 7 go under the reports folder, so the run needs
+The captures of steps 7 and 8 go under the reports folder, so the run needs
 no data location.
 
 **`--hardware --full`** adds the readers and the diagnostics, once per
