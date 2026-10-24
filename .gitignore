@@ -21,3 +21,6 @@ zmart_drivers/leica/stellaris/navigator_expert/testing/hardware/*.jsonl
 zmart_drivers/leica/stellaris/navigator_expert/limits/current.json
 hardware_run_report_*.md
 driver_log_*.log
+
+# Build tools of a page (npm install); never committed.
+node_modules/
