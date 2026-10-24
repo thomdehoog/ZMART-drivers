@@ -41,7 +41,7 @@ microscope, is described in [the anatomy of a ZMART driver](docs/driver-anatomy.
 
 | Microscope | Vendor interface | Driver | Status |
 |---|---|---|---|
-| Leica STELLARIS | LAS X: its hardware server first, the Python (CAM) API behind it | [`zmart_drivers/leica/stellaris/navigator_expert/`](zmart_drivers/leica/stellaris/navigator_expert/README.md) | **Beta `0.7.0b6`.** Tested on the LAS X simulator; 0.7.0b5 also on a STELLARIS. Laid out as [the anatomy of a ZMART driver](docs/driver-anatomy.md) describes. |
+| Leica STELLARIS | LAS X: its hardware server first, the Python (CAM) API behind it | [`zmart_drivers/leica/stellaris/navigator_expert/`](zmart_drivers/leica/stellaris/navigator_expert/README.md) | **Beta `0.7.0b7`.** 0.7.0b6 tested on the LAS X simulator, 0.7.0b5 also on a STELLARIS; 0.7.0b7 adds the setup wizard, tested offline. Laid out as [the anatomy of a ZMART driver](docs/driver-anatomy.md) describes. |
 
 This beta holds only the Leica driver. The Nikon, ZEISS, mesoSPIM and Evident drivers are in
 the repository's history.

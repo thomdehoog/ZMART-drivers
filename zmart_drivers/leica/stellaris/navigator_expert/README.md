@@ -10,7 +10,11 @@ notebooks keep the thin 1–3-line invocation style used across the ZMART driver
 
 - **Author:** Thom de Hoog (ZMB, University of Zurich) · thom.dehoog@zmb.uzh.ch · thomdehoog@gmail.com
 - **License:** see the repository root [`LICENSE`](../../../../LICENSE).
-- **Status:** **Beta (`0.7.0b6`).** Version 0.7 reads LAS X's state and sends its changes to LAS X's
+- **Status:** **Beta (`0.7.0b7`).** 0.7.0b7 adds the setup wizard
+  ([`driver_setup/wizard/`](driver_setup/wizard/README.md)): the one-time setup of the microscope in a
+  window, step by step, instead of in the notebooks. It is tested offline, on the driver's stand-ins and in a
+  browser, and has not yet been run on the LAS X simulator or a STELLARIS; the driver itself is unchanged
+  from 0.7.0b6. Version 0.7 reads LAS X's state and sends its changes to LAS X's
   hardware server first, and falls back to the CAM API when the hardware server cannot take a
   command (see [Routes](#routes-direct-first-the-cam-api-behind-it)). Taking a picture, saving it and
   letting LAS X go of its cache are three separate steps. 0.7.0b6 passed the quick hardware

@@ -400,7 +400,7 @@ def _pretend(tmp_path, *, done=(), saved=None, overrides=None, sent=None):
         return {
             "connected": True,
             "checks": [
-                ["driver", "navigator_expert 0.7.0b6"],
+                ["driver", "navigator_expert 0.7.0b7"],
                 ["settings folder", r"C:\ProgramData\zmart-microscopy"],
             ],
         }
