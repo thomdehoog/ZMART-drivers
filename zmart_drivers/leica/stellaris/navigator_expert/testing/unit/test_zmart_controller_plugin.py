@@ -13,6 +13,13 @@ import os
 from dataclasses import replace
 from pathlib import Path
 
+import pytest
+
+# These tests check the driver inside the ZMART Controller. On a computer without
+# the controller they are skipped, because the driver is also used by itself.
+pytest.importorskip("zmart_controller", reason="the ZMART Controller is not installed")
+pytestmark = pytest.mark.controller
+
 import zmart_controller
 from limits_fixtures import hermetic_mock_machine_root
 from mock_lasx_api import MockLasxClient

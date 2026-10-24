@@ -105,12 +105,18 @@ The driver carries its own offline test suite, which runs without a microscope o
 software. Install the test extra, then run it from the root folder of this repository:
 
 ```bash
-pip install -e ".[leica,test]"
+pip install -e ".[leica,test]"                # the driver on its own
+pip install -e ".[leica,controller,test]"     # also with the ZMART Controller
 python zmart_drivers/leica/stellaris/navigator_expert/testing/run_ci.py
 ```
 
-The continuous-integration workflow in `.github/workflows/` runs it on Linux and Windows, with
-Python 3.11 and 3.12.
+The suite has two layers. The first checks the driver on its own, which is how many people use
+it. The second checks the driver inside the ZMART Controller; it runs when the controller is
+installed and is shown as `SKIP` when it is not. Add `--controller` to make a missing
+controller a failure instead, on a computer that is meant to have it.
+
+The continuous-integration workflow in `.github/workflows/` runs both layers on Linux and
+Windows, with Python 3.11 and 3.12, and the driver alone on both systems as well.
 
 ## Author
 

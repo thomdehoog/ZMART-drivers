@@ -27,6 +27,11 @@ for _p in (_HERE, _HELPERS, _REPO_ROOT):
     if str(_p) not in sys.path:
         sys.path.insert(0, str(_p))
 
+# These tests check the driver inside the ZMART Controller. On a computer without
+# the controller they are skipped, because the driver is also used by itself.
+pytest.importorskip("zmart_controller", reason="the ZMART Controller is not installed")
+pytestmark = pytest.mark.controller
+
 import validate_zmart_adapter
 from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import client as adapter
 from zmart_drivers.leica.stellaris.navigator_expert.driver_setup import (
@@ -67,26 +72,6 @@ def test_within_envelope_helper():
     assert validate_zmart_adapter._within(10.0, 0.0, 10.0)
     assert not validate_zmart_adapter._within(-0.1, 0.0, 10.0)
     assert not validate_zmart_adapter._within(10.1, 0.0, 10.0)
-
-
-def test_hardware_ci_default_is_the_four_measured_coordinates():
-    assert validate_zmart_adapter.CI_DEFAULT_POSITION_UM == {
-        "x_um": 63_500.0,
-        "y_um": 41_500.0,
-        "z_wide_um": 0.0,
-        "z_galvo_um": 0.0,
-    }
-    limits = {
-        "x_min": 1_000.0,
-        "x_max": 130_000.0,
-        "y_min": 1_000.0,
-        "y_max": 100_000.0,
-        "z_wide_min": 0.0,
-        "z_wide_max": 8_000.0,
-        "z_galvo_min": -250.0,
-        "z_galvo_max": 250.0,
-    }
-    assert validate_zmart_adapter._ci_default_position_error(limits) is None
 
 
 def test_hardware_ci_rejects_a_negative_zwide_excursion():

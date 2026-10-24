@@ -1,5 +1,6 @@
 """Shared pytest setup and immutable test-data accessors."""
 
+import importlib.util
 import sys
 from pathlib import Path
 
@@ -58,6 +59,23 @@ def pytest_report_header(config):
         return header_lines()
     except Exception as exc:  # pragma: no cover - diagnostics must not fail a run
         return [f"navigator_expert context: diagnostics unavailable ({exc!r})"]
+
+
+def pytest_collection_modifyitems(config, items):
+    """Skip the tests marked ``controller`` when the ZMART Controller is not installed.
+
+    The driver is also used by itself, without the controller, so its tests
+    must pass on such a computer. The tests that check the driver inside the
+    controller are then skipped, with the reason, rather than failing.
+    run_ci.py runs them as a layer of their own, and ``--controller`` there
+    makes a missing controller a failure.
+    """
+    if importlib.util.find_spec("zmart_controller") is not None:
+        return
+    skip = pytest.mark.skip(reason="the ZMART Controller is not installed")
+    for item in items:
+        if item.get_closest_marker("controller"):
+            item.add_marker(skip)
 
 
 @pytest.fixture(autouse=True)

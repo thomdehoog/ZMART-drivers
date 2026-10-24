@@ -2,9 +2,14 @@
 #
 # This file is intentionally thin. What the suite runs is defined beside the
 # driver itself (its run_ci.py and pytest.ini); this workflow only installs the
-# repository with the driver's extras and starts the suite. Installing the
-# repository also installs the ZMART Controller, from its own repository
-# (ZMB-UZH/ZMART-controller), because the driver plugs into it.
+# repository with the driver's extras and starts the suite.
+#
+# Two kinds of job, because the driver is also used by itself:
+#   - with the ZMART Controller (installed from ZMB-UZH/ZMART-controller):
+#     both layers, and --controller makes sure the controller layer ran;
+#   - "alone": the driver without the controller, so a dependency on the
+#     controller that slips into the driver is caught. Its controller layer
+#     shows as SKIP.
 #
 # The suite needs no microscope and no vendor software.
 name: drivers-offline
@@ -21,7 +26,7 @@ defaults:
 
 jobs:
   offline:
-    name: ${{ matrix.driver }} (${{ matrix.os }}, py${{ matrix.python-version }})
+    name: ${{ matrix.driver }}${{ matrix.install == 'alone' && ' alone' || '' }} (${{ matrix.os }}, py${{ matrix.python-version }})
     runs-on: ${{ matrix.os }}
     env:
       MPLBACKEND: Agg # headless matplotlib for the Leica calibration plot tests
@@ -31,8 +36,24 @@ jobs:
         os: [ubuntu-latest, windows-latest]
         python-version: ["3.11", "3.12"]
         driver: [leica]
+        # An entry below with another install value cannot merge into these
+        # jobs, so GitHub adds it as a job of its own.
+        install: [with-controller]
         include:
+          - install: with-controller
+            extras: leica,controller,test
+            run: python zmart_drivers/leica/stellaris/navigator_expert/testing/run_ci.py --controller
+          # The driver by itself, without the controller, once per system.
           - driver: leica
+            install: alone
+            os: ubuntu-latest
+            python-version: "3.12"
+            extras: leica,test
+            run: python zmart_drivers/leica/stellaris/navigator_expert/testing/run_ci.py
+          - driver: leica
+            install: alone
+            os: windows-latest
+            python-version: "3.12"
             extras: leica,test
             run: python zmart_drivers/leica/stellaris/navigator_expert/testing/run_ci.py
     steps:
@@ -44,7 +65,7 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
-      - name: Install the drivers, the ZMART Controller and the test dependencies
+      - name: Install the drivers, the test dependencies and (unless alone) the ZMART Controller
         run: |
           python -m pip install --upgrade pip
           python -m pip install -e ".[${{ matrix.extras }}]"
@@ -56,6 +77,6 @@ jobs:
         if: always() # keep reports even when tests fail -- that's when they matter most
         uses: actions/upload-artifact@v4
         with:
-          name: reports-${{ matrix.driver }}-${{ matrix.os }}-py${{ matrix.python-version }}
+          name: reports-${{ matrix.driver }}${{ matrix.install == 'alone' && '-alone' || '' }}-${{ matrix.os }}-py${{ matrix.python-version }}
           path: zmart_drivers/**/testing/report/
           if-no-files-found: ignore

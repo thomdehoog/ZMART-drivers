@@ -39,11 +39,15 @@ def test_coverage_keeps_its_data_file_with_the_reports():
     assert run_ci.build_env()["COVERAGE_FILE"] == str(run_ci.REPORT_DIR / ".coverage")
 
 
-def _capture_steps(run_ci, monkeypatch, tmp_path, argv, folders=None):
+def _capture_steps(
+    run_ci, monkeypatch, tmp_path, argv, folders=None, *, controller=True, exit_code=0
+):
     """Run run_ci with every step replaced; return (name, command, fatal) per step.
 
     *folders*, when given, is filled with the folder each step runs in.
+    *controller* says whether the ZMART Controller counts as installed.
     """
+    monkeypatch.setattr(run_ci, "controller_installed", lambda: controller)
     captured: list[tuple[str, list[str], bool]] = []
     folders = {} if folders is None else folders
 
@@ -69,7 +73,7 @@ def _capture_steps(run_ci, monkeypatch, tmp_path, argv, folders=None):
         }
 
     monkeypatch.setattr(run_ci, "run_step", fake_run_step)
-    assert run_ci.main(argv) == 0
+    assert run_ci.main(argv) == exit_code
     return captured
 
 
@@ -160,6 +164,20 @@ def test_the_quick_hardware_run_is_the_acceptance(monkeypatch, tmp_path):
         "hardware: the buttons the driver presses (Jobs, Experiment, Clear) and LAS X's dialogs"
     ) < order.index("hardware: saving from LAS X's cache (one capture, checked)")
 
+    # The setup wizard runs after the end-to-end validator and before the buttons,
+    # and fails the run.
+    wizard = _command_for(captured, "check_setup_wizard.py")
+    assert f"--report-dir={tmp_path}" in wizard
+    wizard_step = "hardware: the setup wizard (into a copy of the settings)"
+    assert fatal_by_name[wizard_step] is True
+    assert (
+        order.index("hardware: end-to-end validator [direct reader]")
+        < order.index(wizard_step)
+        < order.index(
+            "hardware: the buttons the driver presses (Jobs, Experiment, Clear) and LAS X's dialogs"
+        )
+    )
+
     assert not _commands_for(captured, "probe_four_readers.py")
     assert not _commands_for(captured, "validate_readers_side_by_side.py")
     assert not _commands_for(captured, "benchmark_readers.py")
@@ -176,8 +194,8 @@ def test_the_stage_goes_to_the_ci_baseline_before_any_step_moves_it(
     ]
     first_name, first_cmd = hardware[0]
     assert first_name == "hardware: the stage to the CI baseline"
-    assert any(part.endswith("validate_zmart_adapter.py") for part in first_cmd)
-    assert "--enforce-ci-default-position" in first_cmd
+    # Through the driver alone, so it also runs without the ZMART Controller.
+    assert any(part.endswith("ci_baseline.py") for part in first_cmd)
     assert not [part for part in first_cmd if part.startswith("--allow-")]
 
 
@@ -242,3 +260,100 @@ def _command_for(
     matches = _commands_for(captured, script_name)
     assert len(matches) == 1
     return matches[0]
+
+
+CONTROLLER_HARDWARE = (
+    "hardware: installed driver (register folder, connect by name)",
+    "hardware: zmart adapter (move/state/acquire)",
+)
+
+
+def _summary(tmp_path):
+    import json
+
+    return json.loads((tmp_path / "ci_summary.json").read_text(encoding="utf-8"))
+
+
+def test_the_controller_layer_runs_after_the_driver_layer(monkeypatch, tmp_path):
+    run_ci = _load_run_ci()
+    captured = _capture_steps(run_ci, monkeypatch, tmp_path, ["--hardware"])
+    order = [name for name, _cmd, _fatal in captured]
+    last_driver_step = order.index(
+        "hardware: letting go of LAS X's cache (10 captures, the canvas cleared)"
+    )
+    assert all(order.index(name) > last_driver_step for name in CONTROLLER_HARDWARE)
+
+
+def test_without_the_controller_its_layer_is_skipped_and_the_run_passes(
+    monkeypatch, tmp_path
+):
+    run_ci = _load_run_ci()
+    captured = _capture_steps(
+        run_ci, monkeypatch, tmp_path, ["--hardware"], controller=False
+    )
+    ran = [name for name, _cmd, _fatal in captured]
+    assert not set(CONTROLLER_HARDWARE) & set(ran)
+    # The driver layer is all there, and moves nothing through the controller.
+    for script in (
+        "ci_baseline.py",
+        "validate_hardware.py",
+        "check_setup_wizard.py",
+        "check_buttons.py",
+        "check_cache_route.py",
+        "check_cache_release.py",
+    ):
+        assert _commands_for(captured, script), script
+    skipped = {s["name"]: s for s in _summary(tmp_path)["steps"] if s.get("skipped")}
+    assert set(skipped) == set(CONTROLLER_HARDWARE)
+    assert _summary(tmp_path)["passed"] is True
+
+
+def test_controller_asks_for_the_layer_and_fails_without_it(monkeypatch, tmp_path):
+    run_ci = _load_run_ci()
+    _capture_steps(
+        run_ci,
+        monkeypatch,
+        tmp_path,
+        ["--hardware", "--controller"],
+        controller=False,
+        exit_code=1,
+    )
+    assert set(_summary(tmp_path)["fatal_failures"]) == set(CONTROLLER_HARDWARE)
+
+
+def _marks(cmd: list[str]) -> str:
+    """The marks a pytest command selects: what follows its last ``-m`` (the first is ``-m pytest``)."""
+    return cmd[len(cmd) - cmd[::-1].index("-m")]
+
+
+def test_the_offline_suite_runs_in_two_layers(monkeypatch, tmp_path):
+    run_ci = _load_run_ci()
+    captured = _capture_steps(run_ci, monkeypatch, tmp_path, [])
+    tests = [(name, cmd) for name, cmd, _fatal in captured if name.startswith("tests:")]
+    (driver_name, driver_cmd), (controller_name, controller_cmd) = tests
+    assert driver_name.startswith("tests: the driver, offline")
+    assert _marks(driver_cmd) == "not hardware and not controller"
+    assert controller_name.startswith("tests: the driver in the ZMART Controller")
+    assert _marks(controller_cmd) == "controller and not hardware"
+    assert "--cov-append" not in driver_cmd
+    if any(part.startswith("--cov=") for part in controller_cmd):
+        assert "--cov-append" in controller_cmd  # one coverage report for both layers
+
+
+def test_without_the_controller_the_offline_suite_skips_its_layer(
+    monkeypatch, tmp_path
+):
+    run_ci = _load_run_ci()
+    captured = _capture_steps(run_ci, monkeypatch, tmp_path, [], controller=False)
+    assert [name for name, _cmd, _fatal in captured if name.startswith("tests:")] == [
+        next(
+            name
+            for name, _c, _f in captured
+            if name.startswith("tests: the driver, offline")
+        )
+    ]
+    assert any(
+        s.get("skipped")
+        and s["name"].startswith("tests: the driver in the ZMART Controller")
+        for s in _summary(tmp_path)["steps"]
+    )

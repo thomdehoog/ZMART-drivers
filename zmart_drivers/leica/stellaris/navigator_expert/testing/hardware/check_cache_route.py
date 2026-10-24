@@ -1,7 +1,8 @@
 """At the microscope: one capture saved from LAS X's cache, checked, and its metadata shown.
 
-Selects one LAS X job and captures it through the ZMART Controller, as a
-workflow does. For this run only, the driver's profile (``IMAGE_SAVE``)
+Selects one LAS X job and captures it through the driver's ``Microscope``,
+the way a workflow does: ``acquire()``, then ``save()``. It needs only the
+driver, not the ZMART Controller. For this run only, the driver's profile (``IMAGE_SAVE``)
 reads the pictures from LAS X's cache and saves one OME-Zarr store; the
 capture stays in LAS X's cache. Then it checks and reports:
 
@@ -60,9 +61,8 @@ def main() -> int:
     asked = parser.parse_args()
 
     import zarr
-    from zmart_controller import ZmartController
 
-    from zmart_drivers.leica.stellaris.navigator_expert.zmart_controller_plugin.zmart_controller_plugin import ZmartControllerPlugin as driver
+    from zmart_drivers.leica.stellaris import navigator_expert
 
     report: dict = {
         "job": asked.job,
@@ -71,38 +71,36 @@ def main() -> int:
         "metadata": {},
     }
     checks = report["checks"]
-    session = ZmartController(
-        driver, {"output_root": asked.save_to} if asked.save_to else {}
+    scope = navigator_expert.connect(
+        **({"output_root": asked.save_to} if asked.save_to else {})
     )
     try:
-        chosen = (
-            session.set_state({"changeable": {"job": asked.job}})
-            if asked.job
-            else {"success": True}
-        )
-        report["job"] = session.get_state()["output"]["changeable"].get("job")
-        if not chosen["success"]:
-            report["error"] = f"the job was not selected: {chosen['output']}"
-            return _finish(report, Path(asked.report_dir))
-        state = session.get_state()["output"]
+        if asked.job:
+            try:
+                scope.select_job(asked.job)
+            except (RuntimeError, ValueError) as why:
+                report["error"] = f"the job was not selected: {why}"
+                return _finish(report, Path(asked.report_dir))
+        state = scope.state()
+        report["job"] = state["changeable"].get("job")
         report["system"] = {
             k: v
             for k, v in (state.get("observed") or {}).items()
             if k in ("serial_number", "system_type", "stand")
         }
-        here = session.get_xyz()["output"]
-        session.set_xyz(*(float(here[axis]["position"]) for axis in "xyz"))
+        here = scope.position()
+        scope.move_to(*(float(here[axis]["position"]) for axis in "xyz"))
 
         started = time.perf_counter()
-        answer = session.acquire(
-            position_label=re.sub(r"[^A-Za-z0-9_-]", "-", asked.label)
-        )
-        report["acquire_s"] = round(time.perf_counter() - started, 2)
-        checks["captured and saved"] = bool(answer["success"])
-        if not answer["success"]:
-            report["error"] = str(answer["output"])
+        try:
+            taken = scope.acquire(re.sub(r"[^A-Za-z0-9_-]", "-", asked.label))
+            (record,) = scope.save(taken["position_label"])
+        except Exception as why:  # noqa: BLE001 -- reported, not raised
+            checks["captured and saved"] = False
+            report["error"] = str(why)
             return _finish(report, Path(asked.report_dir))
-        record = answer["output"]
+        report["acquire_s"] = round(time.perf_counter() - started, 2)
+        checks["captured and saved"] = True
         stores = sorted({plane["path"] for plane in record["planes"]})
         checks["one store for the capture"] = len(stores) == 1 and stores[0].endswith(
             ".ome.zarr"
@@ -132,8 +130,7 @@ def main() -> int:
 
         report["laser power, as LAS X writes it"] = _laser_power(record)
 
-        # The controller answers only with the files and the planes. What the
-        # driver did, and what it projected, is in the files it lists: the
+        # The saved record lists the files and the planes. What the driver did, and what it projected, is in the files it lists: the
         # capture's log and the projections folder beside the data.
         logs = [Path(p) for p in record["files"] if p.endswith(".log.json")]
         projections = [
@@ -155,7 +152,7 @@ def main() -> int:
             report["unconfirmed"] = entry.get("unconfirmed")
         return _finish(report, Path(asked.report_dir))
     finally:
-        session.disconnect()
+        scope.close()
 
 
 def _read_ome(text: str, checks: dict):
@@ -274,7 +271,9 @@ def _described(ome) -> dict:
 
 def _laser_power(record: dict) -> list[dict]:
     """Each laser's power fields, from the capture's own setting in LAS X's description."""
-    from zmart_drivers.leica.stellaris.navigator_expert.procedures.save_data.metadata import image_of
+    from zmart_drivers.leica.stellaris.navigator_expert.procedures.save_data.metadata import (
+        image_of,
+    )
 
     description = next(
         (Path(p) for p in record["files"] if p.endswith(".lasx-description.xml")),

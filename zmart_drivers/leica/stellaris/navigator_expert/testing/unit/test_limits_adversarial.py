@@ -897,6 +897,7 @@ def test_adapter_bypass_refuses_at_the_commands_layer(clear_stage_limits):
             _frame.set_xyz(handle, 0.0, 0.0, 0.0)
 
 
+@pytest.mark.controller
 def test_controller_session_bypass_refuses_at_the_commands_layer(clear_stage_limits):
     """Controller entry point (Session -> ops table -> adapter -> commands):
     an out-of-envelope move still refuses at the limits gate."""

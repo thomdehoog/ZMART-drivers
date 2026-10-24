@@ -62,6 +62,12 @@ for _p in (str(_HERE.parent), str(_REPO_ROOT), str(_HELPERS)):
         sys.path.insert(0, _p)
 
 import validate_hardware as vh  # reuse Record/Validator/sink/logging
+from ci_baseline import (  # the CI baseline needs only the driver; it lives there
+    _raw_readings,
+    _selected_job,
+    _within,
+    phase_ci_default_position,
+)
 import zmart_controller
 from zmart_drivers.leica.stellaris.navigator_expert.primitives.direct import profile as reading_settings
 
@@ -70,15 +76,6 @@ from zmart_drivers.leica.stellaris.navigator_expert.primitives.direct import pro
 XY_TOL_UM = 20.0
 Z_TOL_UM = 1.0
 
-# Hardware CI always starts its mutating phases from this measured, known-safe
-# rig position. Keep the raw drives separate: controller frame-Z is their sum,
-# but the safety baseline is a four-coordinate hardware contract.
-CI_DEFAULT_POSITION_UM = {
-    "x_um": 63_500.0,
-    "y_um": 41_500.0,
-    "z_wide_um": 0.0,
-    "z_galvo_um": 0.0,
-}
 
 
 # --- setup ------------------------------------------------------------------
@@ -180,27 +177,6 @@ def _connect_session(
         )
 
     return _ReportingSession(zmart_controller.ZmartController(driver, inst))
-
-
-def _raw_readings(xyz: dict) -> dict:
-    """The four motor readings of a ``get_xyz`` answer, as the stage reports them.
-
-    ``get_xyz`` lists every motor of each axis under ``actuator_readings`` with its
-    own reading, untouched by the origin. The hardware checks below compare
-    those readings with the targets handed to the driver's own ``move_xy``
-    and ``move_z``, so this gathers them under the driver's names.
-    """
-    return {
-        "x_um": xyz["x"]["actuator_readings"]["motoric"],
-        "y_um": xyz["y"]["actuator_readings"]["motoric"],
-        "z_wide_um": xyz["z"]["actuator_readings"]["z-wide"],
-        "z_galvo_um": xyz["z"]["actuator_readings"]["z-galvo"],
-    }
-
-
-def _selected_job(sess: Any) -> str | None:
-    """The LAS X job selected now, which the driver's own z commands address."""
-    return sess.get_state()["changeable"].get("job")
 
 
 def _confirm_live_write(args: argparse.Namespace) -> bool:
@@ -337,116 +313,12 @@ def phase_readonly(v: vh.Validator, sess: Any, args: argparse.Namespace) -> None
             )
 
 
-def _within(value: float, lo: float, hi: float) -> bool:
-    return lo <= value <= hi
-
-
 def _nonnegative_finite_float(raw: str) -> float:
     """Argparse type for a Z-wide excursion that can never point below zero."""
     value = float(raw)
     if not math.isfinite(value) or value < 0.0:
         raise argparse.ArgumentTypeError("must be a finite value >= 0")
     return value
-
-
-def _ci_default_position_error(limits: dict) -> str | None:
-    """Return why the fixed four-axis CI baseline cannot be commanded safely."""
-    if CI_DEFAULT_POSITION_UM["z_wide_um"] < 0.0:
-        return "Z-wide CI target must never be negative"
-    for axis in ("x", "y", "z_wide", "z_galvo"):
-        target = CI_DEFAULT_POSITION_UM[f"{axis}_um"]
-        lo, hi = limits.get(f"{axis}_min"), limits.get(f"{axis}_max")
-        if lo is None or hi is None:
-            return f"{axis} limits are not configured"
-        if not _within(target, float(lo), float(hi)):
-            return f"{axis} target {target} um outside [{lo}, {hi}]"
-    return None
-
-
-def phase_ci_default_position(v: vh.Validator, sess: Any, drv: Any) -> bool:
-    """Move to and verify the four-coordinate hardware-CI baseline.
-
-    All targets are preflighted before the first command. Z-wide is commanded
-    directly to 0 um (never through frame-focus arithmetic), so a non-zero
-    z-galvo cannot turn the Z-wide target negative.
-    """
-    with v.phase("hardware-CI default position"):
-        before = v.callable(
-            "ci default: read start", lambda: _raw_readings(sess.get_xyz())
-        )
-        limits = v.callable("ci default: read limits", drv.get_stage_limits)
-        if not before or not limits:
-            return False
-        error = _ci_default_position_error(limits)
-        if error:
-            v.fail("ci default: preflight", error, context=dict(CI_DEFAULT_POSITION_UM))
-            return False
-        if not v.compare(
-            "ci default: Z-wide target is non-negative",
-            CI_DEFAULT_POSITION_UM["z_wide_um"] >= 0.0,
-            True,
-        ):
-            return False
-
-        job = v.callable("ci default: selected job", lambda: _selected_job(sess))
-        if not job:
-            v.fail("ci default: selected job", "no selected job for the Z commands")
-            return False
-
-        x_um = CI_DEFAULT_POSITION_UM["x_um"]
-        y_um = CI_DEFAULT_POSITION_UM["y_um"]
-        z_wide_um = CI_DEFAULT_POSITION_UM["z_wide_um"]
-        z_galvo_um = CI_DEFAULT_POSITION_UM["z_galvo_um"]
-        commands = (
-            v.command(
-                "ci default: move XY",
-                lambda: drv.move_xy(sess.plugin.microscope.client, x_um, y_um, unit="um"),
-                context={"target_x_um": x_um, "target_y_um": y_um},
-            ),
-            v.command(
-                "ci default: move Z-wide",
-                lambda: drv.move_z(
-                    sess.plugin.microscope.client, job, z_wide_um, unit="um", z_mode="zwide"
-                ),
-                context={"target_z_wide_um": z_wide_um, "non_negative": True},
-            ),
-            v.command(
-                "ci default: move Z-galvo",
-                lambda: drv.move_z(
-                    sess.plugin.microscope.client, job, z_galvo_um, unit="um", z_mode="galvo"
-                ),
-                context={"target_z_galvo_um": z_galvo_um},
-            ),
-        )
-        if any(not result or not result.get("success") for result in commands):
-            return False
-
-        after = v.callable(
-            "ci default: readback", lambda: _raw_readings(sess.get_xyz())
-        )
-        if not after:
-            return False
-        checks = [
-            v.compare(
-                "ci default: X readback", after.get("x_um"), x_um, tolerance=XY_TOL_UM
-            ),
-            v.compare(
-                "ci default: Y readback", after.get("y_um"), y_um, tolerance=XY_TOL_UM
-            ),
-            v.compare(
-                "ci default: Z-wide readback",
-                after.get("z_wide_um"),
-                z_wide_um,
-                tolerance=Z_TOL_UM,
-            ),
-            v.compare(
-                "ci default: Z-galvo readback",
-                after.get("z_galvo_um"),
-                z_galvo_um,
-                tolerance=Z_TOL_UM,
-            ),
-        ]
-        return all(checks)
 
 
 def _restore(

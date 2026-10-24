@@ -7,8 +7,15 @@ microscope PC)::
 
     python run_ci.py             # MOCK/OFFLINE (default): lint + offline tests + coverage
     python run_ci.py --mock      # explicit spelling of the default
-    python run_ci.py --hardware         # LIVE: the quick acceptance: driver, moves, buttons, saving, the cache
+    python run_ci.py --hardware         # LIVE: the quick acceptance: driver, moves, wizard, buttons, saving, the cache
     python run_ci.py --hardware --full  # LIVE: plus the direct/api/log readers, the probe, parity, every route
+    python run_ci.py --controller       # also require the ZMART Controller layer (with any of the above)
+
+Two layers. The driver layer needs only the driver, because the driver is
+also used by itself. The controller layer checks the driver inside the ZMART
+Controller; it runs when the controller is installed, and is shown as SKIP
+when it is not. ``--controller`` turns that SKIP into a failure, for a
+computer that is meant to have the controller.
 
 Design goals (matching the suite's standard):
 
@@ -66,6 +73,31 @@ def build_env() -> dict:
     # the reports, so a run started in the driver leaves no file there.
     env["COVERAGE_FILE"] = str(REPORT_DIR / ".coverage")
     return env
+
+
+def controller_installed() -> bool:
+    """Whether the ZMART Controller can be imported here, which its layer needs."""
+    return importlib.util.find_spec("zmart_controller") is not None
+
+
+def controller_missing(name: str, *, required: bool) -> dict:
+    """The record of a controller step that could not run: a SKIP, or a failure when *required*."""
+    reason = "the ZMART Controller is not installed"
+    if required:
+        reason += ' (--controller asks for it: pip install -e ".[leica,controller]")'
+    print(f"\n{_rule('-')}")
+    print(f"{'STEP' if required else 'SKIP'}: {name}")
+    print(f"  {reason}", flush=True)
+    return {
+        "name": name,
+        "ok": not required,
+        "fatal": required,
+        "skipped": not required,
+        "returncode": None,
+        "seconds": 0.0,
+        "error": reason,
+        "command": [],
+    }
 
 
 def _rule(char: str = "=") -> str:
@@ -136,6 +168,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         default=None,
         help="with --hardware: the LAS X job the cache checks capture (default: the one selected in LAS X)",
     )
+    parser.add_argument(
+        "--controller",
+        action="store_true",
+        help="require the ZMART Controller layer: fail, rather than skip it, when the controller is not installed",
+    )
     args = parser.parse_args(argv)
     if args.full and not args.hardware:
         parser.error("--full goes with --hardware")
@@ -200,36 +237,65 @@ def main(argv: list[str] | None = None) -> int:
     # --- mock/offline suite + coverage (fatal) -------------------------------
     # The portable gate: no microscope, no LAS X, so it runs everywhere.
     # Excludes @pytest.mark.hardware; the mock-backed validator/stress tests run
-    # here (they are not marked hardware).
+    # here (they are not marked hardware). Two layers: the driver by itself,
+    # then the tests marked ``controller``, which check it inside the ZMART
+    # Controller; their coverage is added to the driver layer's.
     if run_mock:
-        pytest_cmd = [
-            sys.executable,
-            "-m",
-            "pytest",
-            *[str(p) for p in TEST_PATHS],
-            "-m",
-            "not hardware",
-            # Absolute path: pytest resolves a relative --junit-xml against the
-            # cwd, so pin it to the report dir regardless of launch dir.
-            f"--junit-xml={REPORT_DIR / 'junit.xml'}",
-        ]
-        if cov_available:
-            pytest_cmd += [
-                "--cov=zmart_drivers.leica.stellaris.navigator_expert",
-                f"--cov-config={DRIVER_ROOT / 'testing' / '.coveragerc'}",
-                "--cov-report=term-missing:skip-covered",
-                f"--cov-report=xml:{REPORT_DIR / 'coverage.xml'}",
-                f"--cov-report=html:{REPORT_DIR / 'htmlcov'}",
+
+        def pytest_cmd(marks: str, junit: str, *, append: bool) -> list[str]:
+            cmd = [
+                sys.executable,
+                "-m",
+                "pytest",
+                *[str(p) for p in TEST_PATHS],
+                "-m",
+                marks,
+                # Absolute path: pytest resolves a relative --junit-xml against the
+                # cwd, so pin it to the report dir regardless of launch dir.
+                f"--junit-xml={REPORT_DIR / junit}",
             ]
-        else:
+            if cov_available:
+                cmd += [
+                    "--cov=zmart_drivers.leica.stellaris.navigator_expert",
+                    f"--cov-config={DRIVER_ROOT / 'testing' / '.coveragerc'}",
+                    *(["--cov-append"] if append else []),
+                    "--cov-report=term-missing:skip-covered",
+                    f"--cov-report=xml:{REPORT_DIR / 'coverage.xml'}",
+                    f"--cov-report=html:{REPORT_DIR / 'htmlcov'}",
+                ]
+            return cmd
+
+        if not cov_available:
             print(
                 "\n  (pytest-cov not installed -- running without coverage; `pip install pytest-cov` to enable)"
             )
-
-        label = "tests: offline suite"
-        if cov_available:
-            label += " + coverage"
-        steps.append(run_step(label, pytest_cmd, env, fatal=True))
+        coverage = " + coverage" if cov_available else ""
+        steps.append(
+            run_step(
+                f"tests: the driver, offline{coverage}",
+                pytest_cmd(
+                    "not hardware and not controller", "junit.xml", append=False
+                ),
+                env,
+                fatal=True,
+            )
+        )
+        name = f"tests: the driver in the ZMART Controller, offline{coverage}"
+        if controller_installed():
+            steps.append(
+                run_step(
+                    name,
+                    pytest_cmd(
+                        "controller and not hardware",
+                        "junit_controller.xml",
+                        append=True,
+                    ),
+                    env,
+                    fatal=True,
+                )
+            )
+        else:
+            steps.append(controller_missing(name, required=args.controller))
 
     # --- live LAS X validators (fatal) ---------------------------------------
     # --hardware is the canonical bench run: it connects to live LAS X, proves
@@ -279,20 +345,25 @@ def main(argv: list[str] | None = None) -> int:
         hardware_steps = [
             # Every later step starts from the four-axis baseline, wherever the
             # stage stood: after a stage initialisation it stands at 0, 0,
-            # outside its limits (simulator, 2026-10-15). The adapter validator
-            # with no --allow-* flag moves there and does nothing else.
+            # outside its limits (simulator, 2026-10-15). It moves there
+            # through the driver alone and does nothing else.
             (
                 "hardware: the stage to the CI baseline",
                 [
                     sys.executable,
-                    str(hw / "validate_zmart_adapter.py"),
+                    str(hw / "ci_baseline.py"),
                     "--yes",
-                    "--enforce-ci-default-position",
                     f"--output={REPORT_DIR / 'ci_baseline.jsonl'}",
                     f"--report-dir={REPORT_DIR}",
                 ],
                 True,
             ),
+        ]
+        # The controller layer: the driver as an experiment through the ZMART
+        # Controller reaches it, registered and connected by name, and the
+        # controller's adapter round-trip. It runs after the driver layer,
+        # when the controller is installed.
+        controller_steps = [
             (
                 "hardware: installed driver (register folder, connect by name)",
                 [
@@ -392,6 +463,20 @@ def main(argv: list[str] | None = None) -> int:
         # data location.
         (REPORT_DIR / "captures").mkdir(parents=True, exist_ok=True)
         hardware_steps += [
+            # The setup wizard, walked over its own web calls like its page:
+            # Connect, the limits, the origin and the orientation (a 40 um
+            # move and back). It saves into a copy of this microscope's
+            # settings folder and fails if the real one changed. The objective
+            # calibration needs a person to change objectives, so it is left out.
+            (
+                "hardware: the setup wizard (into a copy of the settings)",
+                [
+                    sys.executable,
+                    str(hw / "check_setup_wizard.py"),
+                    f"--report-dir={REPORT_DIR}",
+                ],
+                True,
+            ),
             # The two buttons the driver presses through Windows UI Automation
             # (Experiment, which shows the Navigator canvas, and Clear), with
             # the canvas left on purpose first; and no LAS X dialog open. It
@@ -439,6 +524,11 @@ def main(argv: list[str] | None = None) -> int:
         # there and not in the driver (seen on the simulator, 2026-10-21).
         for name, cmd, fatal in hardware_steps:
             steps.append(run_step(name, cmd, env, fatal=fatal, cwd=REPORT_DIR))
+        for name, cmd, fatal in controller_steps:
+            if controller_installed():
+                steps.append(run_step(name, cmd, env, fatal=fatal, cwd=REPORT_DIR))
+            else:
+                steps.append(controller_missing(name, required=args.controller))
 
     # --- summary -------------------------------------------------------------
     total_elapsed = time.perf_counter() - overall_start
@@ -449,7 +539,13 @@ def main(argv: list[str] | None = None) -> int:
     print("CI SUMMARY")
     print(_rule())
     for step in steps:
-        flag = "OK  " if step["ok"] else ("FAIL" if step["fatal"] else "WARN")
+        flag = (
+            "SKIP"
+            if step.get("skipped")
+            else "OK  "
+            if step["ok"]
+            else ("FAIL" if step["fatal"] else "WARN")
+        )
         print(f"  [{flag}]  {step['name']:<34}  {step['seconds']:>6.1f}s")
     print(f"\n  total: {total_elapsed:.1f}s")
     print(f"  reports written to: {REPORT_DIR}")
@@ -457,16 +553,27 @@ def main(argv: list[str] | None = None) -> int:
         "    env.json          environment context for this run (read this first on a remote failure)"
     )
     if run_mock:
-        print("    junit.xml         machine-readable offline test results")
+        print(
+            "    junit.xml         machine-readable offline test results (the driver)"
+        )
+        if controller_installed():
+            print(
+                "    junit_controller.xml  the same, for the driver in the ZMART Controller"
+            )
         if cov_available:
             print("    coverage.xml      coverage for CI tooling")
             print("    htmlcov/index.html  browsable coverage report")
     if run_hardware:
-        print(
-            "    installed_driver_validate.jsonl  the driver as installed and connected by name"
-        )
+        print("    ci_baseline.jsonl  the stage moved to the CI baseline")
+        if controller_installed():
+            print(
+                "    installed_driver_validate.jsonl  the driver as installed and connected by name (controller layer)"
+            )
         print(
             "    hardware_validate_{direct,api,log,hybrid}.jsonl  end-to-end checks; direct is the fatal production route"
+        )
+        print(
+            "    check_setup_wizard.json  the setup wizard's steps, saved into a copy of the settings"
         )
         print(
             "    check_buttons.json  the buttons the driver presses, and LAS X's dialogs"
