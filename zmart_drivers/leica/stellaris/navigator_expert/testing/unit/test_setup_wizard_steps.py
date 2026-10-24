@@ -68,7 +68,7 @@ def test_the_wizard_lists_five_steps_in_the_setup_order(lasx):
     # When a step was done is said in words, not as the folder's raw name.
     assert (
         outline["steps"][1]["status"]["note"]
-        == "Saved on 1 January 2026 at 00:00 (UTC)"
+        == "Saved on 1 January 2026 at 00:00 (UTC)."
     )
 
 
@@ -498,3 +498,60 @@ def test_calibration_steps_out_of_order_are_refused_in_words(simulated_scope):
         wizard.call("calibration", "save")["error"]
         == "Finish all four measurements first."
     )
+
+
+def test_each_status_says_when_it_was_saved_and_calibration_needs_the_orientation(
+    lasx, tmp_path
+):
+    wizard = steps.leica_wizard()
+    folder = tmp_path / "data"
+    folder.mkdir()
+    wizard.call("data_location", "save", {"folder": str(folder)})
+
+    outline = {s["id"]: s for s in wizard.outline()["steps"]}
+
+    assert outline["limits"]["status"]["saved_at"] == "2026-01-01T00:00:00+00:00"
+    assert outline["data_location"]["status"]["saved_at"].endswith("+00:00")
+    assert (
+        outline["data_location"]["status"]["note"]
+        == f"Pictures are saved under {folder.resolve()}."
+    )
+    # Not done means no time: nothing to compare against.
+    assert outline["origin"]["status"] == {
+        "done": False,
+        "note": None,
+        "saved_at": None,
+    }
+    assert outline["calibration"]["needs"] == ["orientation"]
+    assert all(
+        outline[i]["needs"] == []
+        for i in ("data_location", "limits", "orientation", "origin")
+    )
+
+
+def test_an_orientation_saved_after_the_calibration_is_seen_as_newer(
+    orientation_scope, tmp_path, monkeypatch
+):
+    """The page turns the calibration orange from these two times; here they are checked to be right."""
+    from datetime import datetime, timezone
+
+    machine = orientation_scope
+    machine.publish_snapshot(
+        datetime(2026, 3, 1, tzinfo=timezone.utc),
+        calibration={
+            "objectives": {
+                "1": {"translation_um": [0, 0, 0]},
+                "2": {"translation_um": [1, 2, 3]},
+            },
+            "schema_version": 13,
+        },
+    )
+    wizard = steps.leica_wizard()
+    wizard.call("orientation", "measure", {"move_um": 30})
+    wizard.call("orientation", "check")
+    assert wizard.call("orientation", "save")["ok"]
+
+    outline = {s["id"]: s["status"] for s in wizard.outline()["steps"]}
+
+    assert outline["calibration"]["done"] and outline["orientation"]["done"]
+    assert outline["orientation"]["saved_at"] > outline["calibration"]["saved_at"]

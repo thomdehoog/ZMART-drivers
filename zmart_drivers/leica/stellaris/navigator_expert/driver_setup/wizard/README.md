@@ -1,9 +1,14 @@
 # Setup wizard for the Leica STELLARIS 5
 
 A guided way to do the one-time setup of this microscope (driver version 0.7.0b6). It looks
-like the ZMART Interface (the steps are numbered on the left, the chosen step is on the
-right), but it stands on its own: it talks to the driver directly, and needs neither the
-ZMART Interface, the ZMART Controller, ZMART Analysis nor ZMART Viewer.
+like the ZMART Interface (0.1.0rc5) without its top row: the rail of numbered steps on the
+left, and beside it the chosen step's boxes, each a small heading over a white card. There
+is no workflow chooser, no canvas and no side column.
+
+It stands on its own: it talks to the driver directly, and needs neither the ZMART
+Interface, the ZMART Controller, ZMART Analysis nor ZMART Viewer. Its look is a copy of the
+interface's, kept in `page-src/src/style.css`; when the interface changes its look, change
+it there too.
 
 ```bash
 python -m zmart_drivers.leica.stellaris.navigator_expert.driver_setup.wizard
@@ -22,9 +27,14 @@ to open the page in your web browser instead.
 | 4. Objective calibration | The shift between a reference and a target objective. | `calibrate_objective_pair.ipynb` |
 | 5. Zero point | The stage spot that counts as (0, 0, 0). | `Microscope.set_origin` |
 
-A step opens once the ones before it are done. A step that is already set up on this
-computer shows as done, with when it was saved, and can always be opened again to replace
-it. The driver fills in an unmeasured orientation and an empty calibration the first time it
+The rail follows the interface's rules. A step opens once every step before it is done.
+Its number badge is blue where you stand, green once done, and orange, with a small
+"review" tag, when a step it was measured on was saved again after it: the objective
+calibration turns orange when the image orientation is measured again, because its X/Y
+offsets were measured in the old orientation. Do that step again to make it green. A step
+already set up on this computer says when it was saved, and can be done again to replace
+it. While the microscope works, a sentence at the foot of the rail says what it is doing,
+and what each button came to is written beside it: in green, or in red with the reason. The driver fills in an unmeasured orientation and an empty calibration the first time it
 connects; those do not count as done, so a new microscope shows those steps as still to do.
 
 Where a notebook is saved as the record of a measurement, the wizard saves a small `.json`

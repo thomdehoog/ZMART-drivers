@@ -2,13 +2,18 @@
 
 export interface StepStatus {
   done: boolean;
+  /** A sentence about what is set up on this computer. */
   note?: string | null;
+  /** When it was saved, as an ISO time; used to see what has changed since. */
+  saved_at?: string | null;
 }
 
 export interface StepInfo {
   id: string;
   title: string;
   purpose: string;
+  /** The earlier steps this one was measured on top of. */
+  needs: string[];
   status: StepStatus;
 }
 

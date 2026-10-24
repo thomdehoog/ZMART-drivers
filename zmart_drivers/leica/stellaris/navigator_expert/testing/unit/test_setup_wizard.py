@@ -283,7 +283,7 @@ def test_the_wizard_opens_in_a_pywebview_window_showing_the_page(monkeypatch, tm
 
     assert made["title"] == "Test"
     assert made["url"].startswith("http://127.0.0.1:")
-    assert b'id="rail"' in made["page"]
+    assert b'class="rail"' in made["page"] and b'id="steps"' in made["page"]
 
 
 def test_closing_the_window_stops_the_server(monkeypatch, tmp_path):

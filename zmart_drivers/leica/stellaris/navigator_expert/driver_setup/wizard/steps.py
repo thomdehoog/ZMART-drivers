@@ -43,6 +43,26 @@ def _record_file(name: str, content: dict) -> Path:
     return path
 
 
+def _status(done: bool, snapshot: Path | None, note: str | None = None) -> dict:
+    """A step's status: done or not, a sentence about it, and when it was saved."""
+    if not done or snapshot is None:
+        return {"done": done, "note": note if done else None, "saved_at": None}
+    return {
+        "done": True,
+        "note": note or f"{_saved_on(snapshot)}.",
+        "saved_at": _saved_at(snapshot),
+    }
+
+
+def _saved_at(snapshot: Path) -> str | None:
+    """The time in a saved folder's name, as an ISO time the page can compare."""
+    try:
+        moment = datetime.strptime(snapshot.name[:26], "%Y-%m-%dT%H-%M-%S-%f")
+    except ValueError:
+        return None
+    return moment.replace(tzinfo=timezone.utc).isoformat()
+
+
 def _saved_on(snapshot: Path) -> str:
     """The time in a saved folder's name, in words: "Saved on 1 October 2026 at 14:05 (UTC)"."""
     try:
@@ -100,10 +120,10 @@ class LeicaSteps:
         from ..data_location import data_location
 
         folder = data_location(_machine())
-        return {
-            "done": folder is not None,
-            "note": f"Saved under {folder}" if folder else None,
-        }
+        latest = _machine().latest_snapshot("data_location")
+        return _status(
+            folder is not None, latest, f"Pictures are saved under {folder}."
+        )
 
     def data_location_check(self, values):
         from ..data_location import check
@@ -126,10 +146,7 @@ class LeicaSteps:
 
     def limits_status(self):
         latest = _machine().latest_snapshot("limits")
-        return {
-            "done": latest is not None,
-            "note": _saved_on(latest) if latest else None,
-        }
+        return _status(latest is not None, latest)
 
     def limits_corner(self, values):
         from ..limits.measure_limits import CornerRecorder
@@ -187,7 +204,7 @@ class LeicaSteps:
         latest = _machine().latest_snapshot("orientation")
         saved = _read_json(latest / "orientation.json") if latest else None
         done = bool(saved and saved.get("measured"))
-        return {"done": done, "note": _saved_on(latest) if done else None}
+        return _status(done, latest)
 
     def orientation_measure(self, values):
         from ..orientation import measure_orientation as mo
@@ -272,12 +289,14 @@ class LeicaSteps:
             for slot in ((_read_json(path) or {}).get("objectives") or {})
         }
         done = len(measured) >= 2
-        return {
-            "done": done,
-            "note": f"Objectives in slots {', '.join(sorted(measured))}"
+        slots = ", ".join(sorted(measured))
+        return _status(
+            done,
+            latest,
+            f"{_saved_on(latest)}, for the objectives in slots {slots}."
             if done
             else None,
-        }
+        )
 
     def calibration_start(self, values):
         from ..optical_calibration import calibrate_objective_pair as cop
@@ -346,7 +365,7 @@ class LeicaSteps:
 
     def origin_status(self):
         record = _machine().read_origin()
-        return {"done": record is not None, "note": None}
+        return _status(record is not None, _machine().latest_snapshot("origin"))
 
     def origin_set(self, values):
         from ...methods import connect
@@ -407,6 +426,9 @@ def leica_wizard() -> Wizard:
                     "save": s.calibration_save,
                 },
                 s.calibration_status,
+                # The X/Y offsets are measured in the image's axes; a new
+                # orientation changes what those offsets mean.
+                needs=("orientation",),
             ),
             Step(
                 "origin",

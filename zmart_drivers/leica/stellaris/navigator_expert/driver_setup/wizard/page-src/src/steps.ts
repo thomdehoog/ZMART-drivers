@@ -1,189 +1,236 @@
 /**
- * What each step shows on the right-hand side.
+ * What each step shows in its boxes.
  *
- * A step is a function that draws itself and talks to the driver through
- * `ctx.run`. Every sentence here is for a microscopist who is setting the
- * microscope up for the first time, so each says what to do and why.
+ * A step is a function that builds its boxes with the helpers in `Context`
+ * and talks to the driver through `ctx.press`. Every sentence here is for a
+ * microscopist setting the microscope up for the first time, so each says
+ * what to do and why.
  */
 
 import type { Result } from "./api";
 import { h } from "./dom";
 
-export interface Context {
-  /** Run one of the step's actions. Shows the busy state and any error for you. */
-  run(action: string, values?: object, button?: HTMLButtonElement): Promise<Result | null>;
-  /** Say that the step is finished, with an optional note under its name. */
-  finish(note?: string): void;
-  /** Show a picture the driver saved, under the step's text. */
-  show(image: string | null | undefined): void;
-  /** Show a short message in the step's result area. */
-  say(text: string): void;
+/** How one button behaves. */
+export interface Press {
+  /** The sentence at the foot of the rail while the microscope works. */
+  busy: string;
+  /** The values sent with the action, read when the button is pressed. */
+  values?: () => object;
+  /** What the action came to, said beside the button in green. */
+  said?: (r: Result) => string | null;
+  /** Anything else to do with the answer. */
+  then?: (r: Result) => void;
+  /** Whether the button may be pressed now; asked again after every action. */
+  enabled?: () => boolean;
 }
 
-export type StepView = (ctx: Context) => HTMLElement;
+export interface Context {
+  /** A button and the sentence beside it, in one row. */
+  press(label: string, action: string, how: Press): HTMLElement;
+  /** A box: a heading over a white card holding *children*. */
+  group(title: string, ...children: (Node | null)[]): HTMLElement;
+  /** A sentence inside a box; *warn* writes it in the warning ink. */
+  note(text: string, warn?: boolean): HTMLElement;
+  /** A label and its field, on one row. */
+  field(label: string, input: HTMLInputElement, hint?: string): HTMLElement;
+  /** An empty picture, shown once given a source. */
+  picture(): HTMLImageElement;
+  /** Ask every button again whether it may be pressed. */
+  refreshPresses(): void;
+  /** Say that the step is finished: its badge turns green and the next step opens. */
+  finish(): Promise<void>;
+}
 
-const button = (label: string, onclick: (b: HTMLButtonElement) => void, kind = "") => {
-  const b = h("button", { class: `press ${kind}`, type: "button" }, label);
-  b.addEventListener("click", () => onclick(b));
-  return b;
-};
-
-const field = (label: string, input: HTMLElement, hint = "") =>
-  h("label", { class: "field" }, h("span", { class: "label" }, label), input, hint && h("span", { class: "hint" }, hint));
+export type StepView = (ctx: Context) => HTMLElement[];
 
 const fmt = (n: unknown) => (typeof n === "number" ? n.toFixed(1) : String(n));
+const input = (props: Record<string, unknown>) => h("input", props) as HTMLInputElement;
+const show = (img: HTMLImageElement, src: unknown) => {
+  if (typeof src !== "string") return;
+  img.src = src;
+  img.hidden = false;
+};
 
 // 1 ---------------------------------------------------------------------------
 const dataLocation: StepView = (ctx) => {
-  const folder = h("input", { type: "text", value: "D:\\ZMART-data", size: 40 });
-  return h(
-    "div",
-    {},
-    field("Folder", folder, "A full path to a folder that already exists, such as D:\\ZMART-data."),
-    button(
-      "Check and save",
-      async (b) => {
-        const r = await ctx.run("save", { folder: folder.value }, b);
-        if (r) {
-          ctx.say("Saved. Every run of this microscope will go under this folder.");
-          ctx.finish(String(folder.value));
-        }
-      },
-      "primary",
+  const folder = input({ type: "text", value: "D:\\ZMART-data", spellcheck: "false" });
+  return [
+    ctx.group(
+      "Choose the folder",
+      ctx.field("Folder", folder, "A full path to a folder that already exists, such as D:\\ZMART-data."),
+      ctx.press("Check and save", "save", {
+        busy: "Checking the folder…",
+        values: () => ({ folder: folder.value }),
+        said: () => "Saved. Every run of this microscope will go under this folder.",
+        then: () => ctx.finish(),
+      }),
     ),
-  );
+  ];
 };
 
 // 2 ---------------------------------------------------------------------------
 const limits: StepView = (ctx) => {
   const recorded = new Set<number>();
-  const save = button(
-    "Save the limits",
-    async (b) => {
-      const r = await ctx.run("save", {}, b);
-      if (r) {
-        const [x, y] = [r.x_um as number[], r.y_um as number[]];
-        ctx.say(`Saved. The stage may travel in X from ${fmt(x[0])} to ${fmt(x[1])} µm, and in Y from ${fmt(y[0])} to ${fmt(y[1])} µm.`);
-        ctx.finish();
-      }
-    },
-    "primary",
+  const corners = [1, 2, 3, 4].map((n) =>
+    ctx.press(`Record corner ${n}`, "corner", {
+      busy: `Reading where the stage stands, for corner ${n}…`,
+      values: () => ({ corner: n }),
+      said: (r) => {
+        const p = r.position as { x_um: number; y_um: number };
+        return `X ${fmt(p.x_um)} µm, Y ${fmt(p.y_um)} µm`;
+      },
+      then: () => {
+        recorded.add(n);
+        ctx.refreshPresses();
+      },
+    }),
   );
-  save.disabled = true;
-  const rows = [1, 2, 3, 4].map((n) => {
-    const where = h("span", { class: "where" }, "not recorded yet");
-    const b = button(`Record corner ${n}`, async (btn) => {
-      const r = await ctx.run("corner", { corner: n }, btn);
-      if (!r) return;
-      const p = r.position as { x_um: number; y_um: number };
-      where.textContent = `X ${fmt(p.x_um)} µm, Y ${fmt(p.y_um)} µm`;
-      recorded.add(n);
-      save.disabled = recorded.size < 4;
-    });
-    return h("div", { class: "row" }, b, where);
-  });
-  return h(
-    "div",
-    {},
-    h("p", {}, "Use the joystick, or LAS X, to drive the stage to a corner of the area it may safely reach, then press that corner's button. Do this for all four corners, in any order."),
-    ...rows,
-    h("div", { class: "actions" }, save),
-  );
+  return [
+    ctx.group(
+      "Record the four corners",
+      ctx.note("Use the joystick, or LAS X, to drive the stage to a corner of the area it may safely reach, then press that corner's button. Do this for all four corners, in any order. Recording a corner again replaces it."),
+      ...corners,
+    ),
+    ctx.group(
+      "Save",
+      ctx.press("Save the limits", "save", {
+        busy: "Checking and saving the limits…",
+        enabled: () => recorded.size === 4,
+        said: (r) => {
+          const [x, y] = [r.x_um as number[], r.y_um as number[]];
+          return `Saved. The stage may travel in X from ${fmt(x[0])} to ${fmt(x[1])} µm, and in Y from ${fmt(y[0])} to ${fmt(y[1])} µm.`;
+        },
+        then: () => ctx.finish(),
+      }),
+    ),
+  ];
 };
 
 // 3 ---------------------------------------------------------------------------
 const orientation: StepView = (ctx) => {
-  const move = h("input", { type: "number", value: 40, min: 1 });
-  const save = button("Save the orientation", async (b) => {
-    if (await ctx.run("save", {}, b)) {
-      ctx.say("Saved.");
-      ctx.finish();
-    }
-  }, "primary");
-  save.disabled = true;
-  const check = button("Take a check picture", async (b) => {
-    const r = await ctx.run("check", {}, b);
-    if (r) {
-      ctx.show(r.image);
-      ctx.say("Does this picture follow the stage? If it does, save the orientation.");
-      save.disabled = false;
-    }
-  });
-  check.disabled = true;
-  return h(
-    "div",
-    {},
-    h("p", {}, "In LAS X, select the Navigator Expert job and put a field with clearly recognisable structure under the objective. The wizard takes three pictures, at the starting spot and after a small move in X and in Y, and works out how the image is turned."),
-    field("Size of the stage move (µm)", move),
-    button("Measure the orientation", async (b) => {
-      const r = await ctx.run("measure", { move_um: Number(move.value) }, b);
-      if (r) {
-        ctx.show(r.image);
-        ctx.say(`Found: ${r.label}${r.mirrored ? " (the image is also mirrored)" : ""}.`);
-        check.disabled = false;
-      }
-    }, "primary"),
-    h("div", { class: "actions" }, check, save),
-  );
+  const move = input({ type: "number", value: 40, min: 1 });
+  let measured = false;
+  let checked = false;
+  const found = ctx.picture();
+  const check = ctx.picture();
+  return [
+    ctx.group(
+      "Measure",
+      ctx.note("In LAS X, select the Navigator Expert job and put a field with clearly recognisable structure under the objective. The wizard takes three pictures, at the starting spot and after a small move in X and in Y, and works out how the image is turned."),
+      ctx.field("Stage move (µm)", move, "How far the stage moves between the pictures."),
+      ctx.press("Measure the orientation", "measure", {
+        busy: "Taking three pictures and comparing them…",
+        values: () => ({ move_um: Number(move.value) }),
+        said: (r) => `Found: ${r.label}${r.mirrored ? " (the image is also mirrored)" : ""}.`,
+        then: (r) => {
+          measured = true;
+          checked = false;
+          show(found, r.image);
+          ctx.refreshPresses();
+        },
+      }),
+      found,
+    ),
+    ctx.group(
+      "Check",
+      ctx.note("One more picture, taken with the orientation just measured. It should follow the stage: moving the stage right moves the picture right."),
+      ctx.press("Take a check picture", "check", {
+        busy: "Taking the check picture…",
+        enabled: () => measured,
+        said: () => "Does this picture follow the stage? If it does, save the orientation.",
+        then: (r) => {
+          checked = true;
+          show(check, r.image);
+          ctx.refreshPresses();
+        },
+      }),
+      check,
+    ),
+    ctx.group(
+      "Save",
+      ctx.press("Save the orientation", "save", {
+        busy: "Saving the orientation…",
+        enabled: () => measured && checked,
+        said: () => "Saved.",
+        then: () => ctx.finish(),
+      }),
+    ),
+  ];
 };
 
 // 4 ---------------------------------------------------------------------------
 const PARTS: [string, string, string][] = [
-  ["focus_reference", "1. Reference focus", "With the reference objective, focus using Z-wide and keep the Z-galvo at 0. In LAS X turn Set Focus off and set up a manual z-stack that clearly brackets the sharp plane (for example 80 µm in 1 µm steps)."],
-  ["focus_target", "2. Target focus", "Switch only to the target objective. Match the reference pixel size, and do not change the job, Z-wide or the Z-galvo."],
-  ["xy_reference", "3. Reference position", "Switch back to the reference objective and remove the z-stack. Keep the Z-galvo at 0 and use the same job and pixel size."],
-  ["xy_target", "4. Target position", "Switch to the target objective again. Do not move the motorised X/Y, and match the reference pixel size exactly."],
+  ["focus_reference", "Reference focus", "With the reference objective, focus using Z-wide and keep the Z-galvo at 0. In LAS X turn Set Focus off and set up a manual z-stack that clearly brackets the sharp plane (for example 80 µm in 1 µm steps)."],
+  ["focus_target", "Target focus", "Switch only to the target objective. Match the reference pixel size, and do not change the job, Z-wide or the Z-galvo."],
+  ["xy_reference", "Reference position", "Switch back to the reference objective and remove the z-stack. Keep the Z-galvo at 0 and use the same job and pixel size."],
+  ["xy_target", "Target position", "Switch to the target objective again. Do not move the motorised X/Y, and match the reference pixel size exactly."],
 ];
 
 const calibration: StepView = (ctx) => {
-  const name = h("input", { type: "text", value: "10x-20x" });
-  const slot = h("input", { type: "number", value: 1, min: 1 });
-  const save = button("Save the calibration", async (b) => {
-    if (await ctx.run("save", {}, b)) {
-      ctx.say("Saved. To calibrate another pair, reload this step.");
-      ctx.finish();
-    }
-  }, "primary");
-  save.disabled = true;
-  const measure = h("div", { class: "measure", hidden: "" });
-  PARTS.forEach(([part, title, text], i) => {
-    const b = button(`Measure: ${title.slice(3)}`, async (btn) => {
-      const r = await ctx.run("measure", { part }, btn);
-      if (!r) return;
-      ctx.say(`${title.slice(3)} done.`);
-      if (i === PARTS.length - 1) save.disabled = false;
-    });
-    measure.append(h("div", { class: "part" }, h("h3", {}, title), h("p", {}, text), b));
+  const name = input({ type: "text", value: "10x-20x", spellcheck: "false" });
+  const slot = input({ type: "number", value: 1, min: 1 });
+  let started = false;
+  const measuredParts = new Set<string>();
+  const parts = PARTS.map(([part, title, text], i) => {
+    const box = ctx.group(
+      `${i + 1}. ${title}`,
+      ctx.note(text),
+      ctx.press(`Measure: ${title}`, "measure", {
+        busy: `Measuring the ${title.toLowerCase()}…`,
+        enabled: () => started,
+        values: () => ({ part }),
+        said: () => `${title} done.`,
+        then: () => {
+          measuredParts.add(part);
+          ctx.refreshPresses();
+        },
+      }),
+    );
+    box.hidden = true;
+    return box;
   });
-  return h(
-    "div",
-    {},
-    h("p", {}, "This step measures one pair of objectives: a reference objective and a target. Complete the limits and orientation steps first. In LAS X, select the job you will use and keep it for the whole run; between measurements you change only the objective."),
-    field("Name of the pair", name, "For example 10x-20x."),
-    field("Reference objective (turret slot)", slot, "The objective every other one is measured against. Keep it the same for every pair."),
-    button("Start", async (b) => {
-      const r = await ctx.run("start", { pair_name: name.value, reference_slot: Number(slot.value) }, b);
-      if (r) measure.hidden = false;
-    }, "primary"),
-    measure,
-    h("div", { class: "actions" }, save),
-  );
+  return [
+    ctx.group(
+      "The pair",
+      ctx.note("This step measures one pair of objectives: a reference objective and a target. In LAS X, select the job you will use and keep it for the whole run; between measurements you change only the objective."),
+      ctx.field("Name of the pair", name, "For example 10x-20x."),
+      ctx.field("Reference slot", slot, "The turret slot of the objective every other one is measured against. Keep it the same for every pair."),
+      ctx.press("Start", "start", {
+        busy: "Starting the calibration…",
+        values: () => ({ pair_name: name.value, reference_slot: Number(slot.value) }),
+        said: () => "Started. Measure the four parts below, in order.",
+        then: () => {
+          started = true;
+          for (const p of parts) p.hidden = false;
+          ctx.refreshPresses();
+        },
+      }),
+    ),
+    ...parts,
+    ctx.group(
+      "Save",
+      ctx.press("Save the calibration", "save", {
+        busy: "Saving the calibration…",
+        enabled: () => measuredParts.has("xy_target"),
+        said: () => "Saved. To calibrate another pair, open this step again.",
+        then: () => ctx.finish(),
+      }),
+    ),
+  ];
 };
 
 // 5 ---------------------------------------------------------------------------
-const origin: StepView = (ctx) =>
-  h(
-    "div",
-    {},
-    h("p", {}, "When the stage stands on that spot and the sample is in focus, press the button. The wizard remembers the spot, the focus and the objective that is in place, so that every later session starts from the same zero point."),
-    button("Set the zero point here", async (b) => {
-      const r = await ctx.run("set", {}, b);
-      if (r) {
-        ctx.say("The zero point is saved. The setup is complete.");
-        ctx.finish();
-      }
-    }, "primary"),
-  );
+const origin: StepView = (ctx) => [
+  ctx.group(
+    "Set the zero point",
+    ctx.note("When the stage stands on that spot and the sample is in focus, press the button. The wizard remembers the spot, the focus and the objective that is in place, so that every later session starts from the same zero point."),
+    ctx.press("Set the zero point here", "set", {
+      busy: "Reading where the stage and the focus stand…",
+      said: () => "The zero point is saved. The setup is complete.",
+      then: () => ctx.finish(),
+    }),
+  ),
+];
 
 export const VIEWS: Record<string, StepView> = {
   data_location: dataLocation,

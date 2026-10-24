@@ -28,9 +28,16 @@ class StepError(Exception):
 class Step:
     """One numbered step in the wizard.
 
-    ``status`` is asked for when the page opens, and answers what is already
-    set up on this computer, so a microscope that was set up before shows its
-    steps as done instead of starting from nothing.
+    ``status`` is asked for when the page opens and after every finished
+    step. It answers what is already set up on this computer (``done``), a
+    sentence about it (``note``), and when it was saved (``saved_at``, an
+    ISO time), so a microscope that was set up before shows its steps as done
+    instead of starting from nothing.
+
+    ``needs`` names the earlier steps this one was measured on top of. When one
+    of those is saved again after this step, this step's badge on the page
+    turns orange, as in the ZMART Interface: it was done, but under settings
+    that have changed since, and should be looked at again.
     """
 
     id: str
@@ -38,6 +45,7 @@ class Step:
     purpose: str
     actions: dict[str, Action] = field(default_factory=dict)
     status: Callable[[], dict] = lambda: {"done": False}
+    needs: tuple[str, ...] = ()
 
 
 class Wizard:
@@ -67,6 +75,7 @@ class Wizard:
                     "id": step.id,
                     "title": step.title,
                     "purpose": step.purpose,
+                    "needs": list(step.needs),
                     "status": status,
                 }
             )
