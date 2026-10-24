@@ -417,6 +417,14 @@ def test_the_built_page_is_shipped_and_up_to_date_with_its_source():
     script = "".join(
         p.read_text(encoding="utf-8") for p in (PAGE / "assets").glob("*.js")
     )
-    source = (WIZARD_DIR / "page-src" / "src" / "steps.ts").read_text(encoding="utf-8")
-    for sentence in re.findall(r'"([A-Z][^"]{40,})"', source):
+    sources = sorted((WIZARD_DIR / "page-src" / "src").rglob("*.ts"))
+    sentences = [
+        sentence
+        for path in sources
+        for sentence in re.findall(
+            r'"([A-Z][^"`$]{40,})"', path.read_text(encoding="utf-8")
+        )
+    ]
+    assert len(sentences) >= 5
+    for sentence in sentences:
         assert sentence in script, f"the built page lacks: {sentence[:60]}..."

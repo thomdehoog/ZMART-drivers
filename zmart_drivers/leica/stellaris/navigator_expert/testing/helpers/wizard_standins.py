@@ -85,7 +85,7 @@ def install_orientation(mp, programdata: Path, *, trusted: bool = True):
     mp.setattr(store, "MACHINE", machine)
     om._patch(mp)
     votes = (
-        [om._trusted(0.0, 30.0), om._trusted(-30.0, 0.0)]
+        [om._trusted(0.0, 40.0), om._trusted(-40.0, 0.0)]
         if trusted
         else [om._untrusted()] * 2
     )

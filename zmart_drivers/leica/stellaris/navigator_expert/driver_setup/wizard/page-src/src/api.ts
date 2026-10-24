@@ -22,8 +22,8 @@ export interface Outline {
   steps: StepInfo[];
 }
 
-/** An action's answer: a few named values, and sometimes `image`, the address of a picture to show. */
-export type Result = Record<string, unknown> & { image?: string | null };
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type Result = Record<string, any>;
 
 /** Fetch the steps and what is already set up. */
 export async function loadOutline(): Promise<Outline> {

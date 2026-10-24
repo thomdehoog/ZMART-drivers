@@ -89,7 +89,7 @@ body {
   border-right: 1px solid var(--line);
   background: var(--surface-2);
   display: grid;
-  grid-template-rows: 1fr auto;
+  grid-template-rows: 1fr;
   min-height: 0;
 }
 
@@ -146,32 +146,25 @@ body {
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 
-/* The status bar: one quiet sentence at the foot of the rail, there only
-   while the microscope is working. */
-.status-bar {
-  border-top: 1px solid var(--line);
-  padding: 10px 14px;
-  font-size: 12px;
-  letter-spacing: 0.02em;
-  color: #1e40af;
-  overflow-wrap: break-word;
-}
-@media (prefers-color-scheme: dark) { .status-bar { color: var(--accent-deep); } }
 
-/* ---- the stage: the chosen step's boxes ---- */
-.stage {
-  min-width: 0; min-height: 0; overflow-y: auto;
+/* ---- the stage: the step's column of cells ----
+   From the ZMART driver configuration workflow's own panel
+   (application/workflows/zmart_driver_configuration/panel/setup-panel.js in
+   ZMART Microscopy): the channel beside the canvas, given the whole window.
+   The same grey ground, the same white boxes on it, read down from the top
+   left rather than centred, because it is a form and forms start at the left. */
+.stage { min-width: 0; min-height: 0; overflow: hidden; display: grid; }
+.setup-notebook {
+  min-height: 0; overflow-y: auto;
   background: var(--surface-2);
+  padding: 12px 14px 40px;
 }
-.channel {
-  padding: 16px 18px 24px; max-width: 760px;
-  display: flex; flex-direction: column; gap: var(--box-gap);
-}
+/* Held to a reading measure: a label at one edge of a wide screen and its
+   field at the other is a form people mis-read. */
+.setup-column { max-width: 46rem; display: flex; flex-direction: column; gap: 14px; }
 
-/* A box of controls: a heading naming what it is for, above a white card.
-   The heading belongs to what is under it. */
+/* A cell: a heading naming what it is for, above a white card. */
 .side-group { display: flex; flex-direction: column; gap: 5px; }
-.side-group[hidden] { display: none; }
 .side-group-title {
   font-size: 11px; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase;
   color: var(--ink); padding-left: 2px;
@@ -181,57 +174,106 @@ body {
   padding: 12px 14px; border: 1px solid var(--line); border-radius: 10px;
   background: var(--screen);
 }
-/* A sentence that explains, inside a box. */
-.side-note { margin: 0; font-size: 13px; color: var(--ink-2); line-height: 1.5; }
-/* A sentence that warns: in the warning ink. */
-.side-note.warn { color: var(--warn-ink); }
+.side-note { margin: 0; padding: 0; font-size: 12px; color: var(--ink-3); line-height: 1.4; }
 
-/* A label and its field to a row, the labels one column. */
-.field { display: grid; grid-template-columns: 150px 1fr; align-items: center; gap: 12px; }
-.field > span { font-size: 13px; color: var(--ink-2); }
-.field input {
+/* A row of the form: what it is on the left, the fields on the right. */
+.setup-row { display: flex; align-items: center; gap: 8px; }
+.setup-row > label { flex: 1 1 auto; font-size: 13px; }
+.setup-row input, .setup-row select { flex: 0 0 auto; }
+.setup-left { justify-content: flex-start; }
+/* What came back from the instrument, as pairs. */
+.setup-readout { display: grid; grid-template-columns: auto 1fr; gap: 3px 12px; margin: 0; font-size: 13px; }
+.setup-readout dt { color: var(--ink-3); }
+.setup-readout dd { margin: 0; font-variant-numeric: tabular-nums; }
+.setup-note { font-size: 12px; line-height: 1.4; margin: 0; }
+.setup-note.ok { color: #1f7a3a; }
+.setup-note.bad { color: #b3261e; }
+.setup-row > .setup-note { color: var(--ink-2); font-variant-numeric: tabular-nums; }
+@media (prefers-color-scheme: dark) {
+  .setup-note.ok { color: var(--good); }
+  .setup-note.bad { color: var(--bad); }
+}
+.setup-publish { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+/* The measurement's own picture, as wide as the card. */
+.setup-picture { display: block; width: 100%; margin: 4px 0 0; border: 1px solid var(--line); border-radius: 6px; background: #fff; }
+/* A field looks the way the session card's fields look. */
+.setup-field, .setup-kind {
   font: inherit; font-size: 13px; color: var(--ink);
   background: var(--surface-2); border: 1px solid var(--line-strong);
-  border-radius: 7px; height: var(--control); padding: 0 9px; width: 100%;
-  font-family: var(--mono);
+  border-radius: 7px; height: var(--control); padding: 0 9px;
+  width: 240px;
 }
-.field input:focus { outline: none; border-color: var(--accent); }
-.field .hint { grid-column: 2; margin-top: -6px; font-size: 12px; color: var(--ink-3); }
+.setup-field:focus, .setup-kind:focus { outline: none; }
+.setup-field:disabled, .setup-kind:disabled { opacity: .45; }
+.setup-number { width: 120px; }
+.setup-wide { width: 380px; }
+/* As in the old workflow, the kind of a limit is as wide as any other field. */
+.setup-kind { width: 240px; }
+/* The Connect card, as the interface draws it: the labels in one narrow
+   column, each field filling the rest of its row. */
+.setup-card-row { display: grid; grid-template-columns: 110px 1fr; align-items: center; gap: 12px; }
+.setup-card-row > label { font-size: 13px; color: var(--ink); }
+.setup-card-row > .setup-field { width: 100%; }
+/* A limit's row: its tick first, then its name, then its fields. */
+.setup-limit > input[type="checkbox"] { flex: 0 0 auto; margin: 0 2px 0 0; }
+.setup-limit > label { flex: 1 1 auto; }
+.setup-source { color: var(--ink); }
+/* The presets, one per row: the pair, its offset, its state. */
+.setup-sets { display: flex; flex-direction: column; gap: 4px; }
+.setup-set { display: grid; grid-template-columns: 1fr auto auto; gap: 12px; align-items: baseline;
+             font: inherit; font-size: 13px; color: var(--ink); text-align: left; cursor: pointer;
+             background: var(--surface-2); border: 1px solid var(--line); border-radius: 7px; padding: 6px 10px; }
+.setup-set:hover { border-color: var(--line-strong); }
+.setup-set.chosen { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.setup-set b { font-weight: 600; }
+.setup-set-pair { font-variant-numeric: tabular-nums; }
+.setup-set-state { color: var(--ink-3); font-size: 12px; }
+/* A part of a card: a tinted sub-box with a numbered heading. */
+.setup-part { display: flex; flex-direction: column; gap: 10px;
+              background: var(--surface-2); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; }
+.setup-part-title { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: var(--ink); }
+.setup-part-number { display: inline-flex; align-items: center; justify-content: center;
+                     width: 20px; height: 20px; border-radius: 50%; font-size: 11px; font-weight: 700; color: #fff; background: var(--accent); }
+/* The reference row: label, dropdown and Reset in a row on the left. */
+.setup-reference { justify-content: flex-start; }
+.setup-reference > label { flex: 0 0 auto; }
+.setup-reference > button { margin-left: 4px; }
+/* The chosen preset's X, Y and Z: three plain tiles, read at one glance. */
+.setup-xyz { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.setup-xyz-tile { display: flex; flex-direction: column; gap: 2px; align-items: flex-start;
+                  background: var(--screen); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; }
+.setup-xyz-axis { font-size: 11px; font-weight: 700; letter-spacing: 0.07em; color: var(--ink-3); }
+.setup-xyz-value { font-size: 22px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--ink); line-height: 1.2; }
+.setup-xyz-unit { font-size: 12px; color: var(--ink-3); }
+.setup-xyz-tile.default .setup-xyz-value { color: var(--ink-3); }
 
-/* A step's press and what it came to, in one quiet row. */
-.side-act { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.action-hint { font-size: 12.5px; color: var(--ink-3); font-family: var(--mono); }
-.action-hint.ok { color: var(--good); }
-.action-hint.bad { color: var(--bad); font-family: var(--sans); }
-.side-act .action-hint { flex: 1; min-width: 0; }
+/* ---- the Connect card's lamp, its checks and its Disconnect, as in the interface ---- */
+.setup-connected { display: flex; align-items: center; justify-content: space-between; }
+.session-state { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: var(--ink); }
+.session-state .lamp {
+  width: 9px; height: 9px; border-radius: 50%; background: var(--good);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--good) 22%, transparent);
+}
+.check-list { display: flex; flex-direction: column; gap: 1px; }
+.check-row { display: grid; grid-template-columns: 18px minmax(150px, auto) 1fr; align-items: baseline; gap: 10px; padding: 5px 0; font-size: 12.5px; }
+.check-mark { color: var(--good); font-weight: 700; justify-self: center; }
+.check-name { color: var(--ink-2); }
+.check-value { font-family: var(--mono); font-size: 12px; color: var(--ink-3); text-align: right; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 
 /* Blue on white, like every other button on the page. */
 button.run {
-  align-self: flex-start; font: inherit; font-size: 13px; font-weight: 600;
+  font: inherit; font-size: 13px; font-weight: 600;
   color: var(--accent-deep); background: var(--screen);
   border: 1px solid var(--line-strong); border-radius: 7px;
-  height: var(--control); padding: 0 14px; cursor: pointer; flex: none;
+  height: var(--control); padding: 0 14px; cursor: pointer; flex: none; align-self: flex-start;
 }
+.setup-row > button.run, .setup-publish > button.run { align-self: auto; }
 button.run:hover:enabled { border-color: var(--accent); color: var(--accent); }
 button.run:disabled { opacity: 0.4; cursor: default; }
-/* A press whose action is under way turns: a ring at its right. */
-button.run.running::after {
-  content: ""; display: inline-block; width: 12px; height: 12px; margin-left: 8px;
-  vertical-align: -2px; border-radius: 50%;
-  border: 2px solid currentColor; border-right-color: transparent;
-  animation: spin 0.9s linear infinite;
-}
-
-/* A label and its value to a row, as the interface lists a scan. */
-.readings {
-  display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; align-items: baseline;
-  font-family: var(--mono); font-size: 12px; font-variant-numeric: tabular-nums;
-}
-.readings .k { color: var(--ink-3); }
-.readings .v { color: var(--ink); }
-
-/* Pictures are shown at a readable size, however small the file is. */
-.picture { display: block; width: min(100%, 640px); border: 1px solid var(--line); border-radius: 3px; background: #000; }
+button.run.danger { color: var(--bad); background: var(--screen); }
+button.run.danger:hover:enabled { border-color: var(--bad); color: var(--bad); }
+/* While one press is out with the microscope, the others wait. */
+body.busy button.run:not(:disabled), body.busy .step, body.busy .setup-set { pointer-events: none; }
 
 :where(button, input, [tabindex]):focus-visible {
   outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px;
@@ -245,8 +287,9 @@ button.run.running::after {
   .screen { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
   .rail { border-right: none; border-bottom: 1px solid var(--line); }
   .steps { max-height: 200px; }
-  .field { grid-template-columns: 1fr; gap: 4px; }
-  .field .hint { grid-column: 1; margin-top: 0; }
+  .setup-row { flex-wrap: wrap; }
+  .setup-field, .setup-wide { width: 100%; }
+  .setup-xyz { grid-template-columns: 1fr; }
 }
 
 [hidden] { display: none !important; }

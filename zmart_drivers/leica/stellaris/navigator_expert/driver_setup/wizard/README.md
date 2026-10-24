@@ -1,14 +1,15 @@
 # Setup wizard for the Leica STELLARIS 5
 
-A guided way to do the one-time setup of this microscope (driver version 0.7.0b6). It looks
-like the ZMART Interface (0.1.0rc5) without its top row: the rail of numbered steps on the
-left, and beside it the chosen step's boxes, each a small heading over a white card. There
+A guided way to do the one-time setup of this microscope (driver version 0.7.0b6). It is the
+**ZMART driver configuration** workflow that the ZMART Microscopy operator page used to have,
+now living with the driver: the same five steps, the same cells and the same wording. It
+looks like the ZMART Interface without its top row: the rail of numbered steps on the left,
+and beside it the chosen step's column of cells, a notebook read from top to bottom. There
 is no workflow chooser, no canvas and no side column.
 
 It stands on its own: it talks to the driver directly, and needs neither the ZMART
-Interface, the ZMART Controller, ZMART Analysis nor ZMART Viewer. Its look is a copy of the
-interface's, kept in `page-src/src/style.css`; when the interface changes its look, change
-it there too.
+Interface, the ZMART Controller, ZMART Analysis nor ZMART Viewer. Its look is a copy, kept
+in `page-src/src/style.css`; when the interface changes its look, change it there too.
 
 ```bash
 python -m zmart_drivers.leica.stellaris.navigator_expert.driver_setup.wizard
@@ -19,29 +20,37 @@ to open the page in your web browser instead.
 
 ## The five steps
 
-| Step | What it sets | The notebook it replaces |
+| Step | What happens | What it replaces |
 |---|---|---|
-| 1. Data location | The folder every run is saved under. | `set_data_location.ipynb` |
-| 2. Travel limits | How far the stage may safely travel, from four recorded corners. | `set_limits.ipynb` |
-| 3. Image orientation | How the camera image is turned compared with the stage. | `set_orientation.ipynb` |
-| 4. Objective calibration | The shift between a reference and a target objective. | `calibrate_objective_pair.ipynb` |
-| 5. Zero point | The stage spot that counts as (0, 0, 0). | `Microscope.set_origin` |
+| 1. Connect | Connects to LAS X and confirms the folder this microscope saves its pictures in. | `set_data_location.ipynb` |
+| 2. Define limits | Every entry of the limits file, ticked or not, and the four corners of the safe area imported from the stage; then Save and adopt. | `set_limits.ipynb` |
+| 3. Define coordinate system origin | Read every drive where the stage stands; Save and adopt makes it (0, 0, 0). | `Microscope.set_origin` |
+| 4. Image-to-stage calibration | Start: three pictures and eight candidates. A check picture, then Save and adopt. | `set_orientation.ipynb` |
+| 5. Objective calibration | Choose the reference objective; each other objective is a preset. Measure a preset's focus and X/Y, see its offset as three tiles, then Save and adopt. | `calibrate_objective_pair.ipynb` |
 
-The rail follows the interface's rules. A step opens once every step before it is done.
-Its number badge is blue where you stand, green once done, and orange, with a small
-"review" tag, when a step it was measured on was saved again after it: the objective
-calibration turns orange when the image orientation is measured again, because its X/Y
-offsets were measured in the old orientation. Do that step again to make it green. A step
-already set up on this computer says when it was saved, and can be done again to replace
-it. While the microscope works, a sentence at the foot of the rail says what it is doing,
-and what each button came to is written beside it: in green, or in red with the reason. The driver fills in an unmeasured orientation and an empty calibration the first time it
-connects; those do not count as done, so a new microscope shows those steps as still to do.
+**Two folders.** The settings (limits, origin, orientation, calibration) are always saved in
+this computer's configuration folder, `C:\ProgramData\zmart-microscopy\leica\stellaris_y42h93\navigator_expert\`,
+in dated folders; the newest is what the driver loads when it connects. That folder is not
+chosen; Connect shows it among its checks. The pictures go to the data folder, which is the
+one field on the Connect card: a folder on a local disk, suggested as `D:\ZMART-data` (or
+`C:\ZMART-data` when there is no `D:`), and saved when you press Connect.
+
+The rail follows the interface's rules. A setup always starts with Connect, and a step opens
+once every step before it is done. Its number badge is blue where you stand, green once done,
+and orange, with a small "review" tag, when a step it was measured on was saved again after
+it: the objective calibration turns orange when the image orientation is measured again,
+because its X/Y offsets were measured in the old orientation. Do that step again to make it
+green. The driver fills in an unmeasured orientation and an empty calibration the first time
+it connects; those do not count as done, so a new microscope shows those steps as still to do.
+
+While a button works it says so ("measuring…") and the other buttons wait. What it came to
+is written underneath it, in green, or in red with the reason. Walking away from a step and
+back shows what it read and measured in this window.
 
 Where a notebook is saved as the record of a measurement, the wizard saves a small `.json`
-record in the same place, so a later reader can see how the numbers came about.
-
-The steps use the same driver code as the notebooks, so they keep the same safety checks.
-The notebooks still work.
+record in the same place, so a later reader can see how the numbers came about. The steps
+use the same driver code as the notebooks, so they keep the same safety checks; the
+notebooks still work.
 
 ## Changing the page
 
@@ -61,7 +70,7 @@ npm run build    # rewrites ../page; commit the result
 
 `framework.py` knows nothing about Leica. A driver supplies a list of `Step`s (a title, a
 sentence of purpose, and the actions the page can call) and reuses the server and launcher.
-The page's step views are in `page-src/src/steps.ts`.
+The page's step views are in `page-src/src/steps/`, built from the cells in `page-src/src/cells.ts`.
 
 ## How it is tested
 
@@ -73,8 +82,8 @@ Three test files in `testing/unit/` cover the wizard without a microscope:
   known offsets, which the wizard has to recover). It checks what is saved, that the next
   connection uses it, and that every mistake is answered with a sentence.
 - `test_setup_wizard_page.py` opens the built page in Chromium (Playwright) and clicks
-  through the whole setup as an operator would, then checks the page's own rules: locked
-  steps, errors shown beside the button, a busy button, a narrow window and a dark screen.
+  through the whole setup as an operator would, then checks the page's own rules: the
+  rail's colours and locks, each step's cells, a busy button, a narrow window and a dark screen.
   Set `ZMART_WIZARD_SCREENSHOTS` to a folder to keep screenshots of the run.
 - `test_setup_wizard.py` covers the server (it hands out only the page and the pictures the
   driver named), the window (pywebview is replaced by a stand-in; the server always stops

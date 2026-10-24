@@ -1,10 +1,11 @@
 """A setup wizard for the Leica STELLARIS 5, run once per microscope.
 
-The wizard walks through the same five steps as the setup notebooks (where the
-data is saved, the safe travel limits, the image orientation, the objective
-calibration and the zero point), with the steps listed on the left and the
-current step on the right, as in the ZMART Interface. It talks to the driver
-directly, so the ZMART Interface and the ZMART Controller are not needed.
+The wizard is the ZMART driver configuration workflow of the ZMART Microscopy
+operator page, now living with the driver: Connect, Define limits, Define
+coordinate system origin, Image-to-stage calibration and Objective
+calibration. The steps are listed on the left and the chosen step's cells on
+the right, as in the ZMART Interface without its top row. It talks to the
+driver directly, so no other part of ZMART is needed.
 
 Start it with::
 
@@ -16,7 +17,7 @@ The parts, in the order a reader will want them:
   steps, and each step offers named actions the page can call. Another driver
   can reuse it by supplying its own steps.
 - ``steps``: the five Leica steps, written against the driver's own setup
-  procedures.
+  code, through one connection that Connect opens.
 - ``server``: the local web server that serves the page and carries the calls.
 - ``launcher``: opens the page in a pywebview window, or in the browser.
 - ``page/``: the page itself (plain HTML, CSS and JavaScript, nothing to build).
