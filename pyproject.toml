@@ -41,6 +41,8 @@ leica = [
     "matplotlib>=3.7",
     "pillow>=10",
     "ipython>=8",
+    # The setup wizard's window.
+    "pywebview>=5",
     "pythonnet>=3; sys_platform == 'win32'",
     "pywin32>=306; sys_platform == 'win32'",
     "comtypes>=1.4; sys_platform == 'win32'",
@@ -89,6 +91,9 @@ include-package-data = false
     "defaults/*.json",
     "notebooks/*.ipynb",
     "notebooks/bootstrap.py",
+    # The setup wizard's built page (plain HTML, CSS and JavaScript).
+    "page/index.html",
+    "page/assets/*",
 ]
 
 [tool.ruff.lint.isort]

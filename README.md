@@ -50,7 +50,7 @@ The driver works by itself, from a notebook or a script, and it plugs into the Z
 Controller. Its README says how to do both. Before the first experiment, a few things are set
 up once on the microscope: the travel limits, the image orientation, the objective calibration
 and the zero point of the coordinates. The notebooks for them are in the driver's
-`driver_setup/` folder. What is set up is saved in the computer's configuration folder,
+`driver_setup/` folder, and a [setup wizard](zmart_drivers/leica/stellaris/navigator_expert/driver_setup/wizard/README.md) walks through the same steps in a window: `python -m zmart_drivers.leica.stellaris.navigator_expert.driver_setup.wizard`. What is set up is saved in the computer's configuration folder,
 `C:\ProgramData\zmart-microscopy` on Windows, and loaded every time the driver connects.
 
 ## Try it yourself
