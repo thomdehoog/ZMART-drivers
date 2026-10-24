@@ -57,7 +57,8 @@ def _status(done: bool, snapshot: Path | None, note: str | None = None) -> dict:
 def _saved_at(snapshot: Path) -> str | None:
     """The time in a saved folder's name, as an ISO time the page can compare."""
     try:
-        moment = datetime.strptime(snapshot.name[:26], "%Y-%m-%dT%H-%M-%S-%f")
+        # The folder's name is a UTC time without the zone written in it.
+        moment = datetime.strptime(snapshot.name[:26], "%Y-%m-%dT%H-%M-%S-%f")  # noqa: DTZ007
     except ValueError:
         return None
     return moment.replace(tzinfo=timezone.utc).isoformat()

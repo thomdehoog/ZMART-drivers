@@ -27,8 +27,8 @@ University of Zurich (thom.dehoog@zmb.uzh.ch, thomdehoog@gmail.com).
 from __future__ import annotations
 
 import json
-import re
 import os
+import re
 import threading
 from pathlib import Path
 
