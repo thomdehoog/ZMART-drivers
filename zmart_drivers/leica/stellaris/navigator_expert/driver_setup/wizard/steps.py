@@ -124,7 +124,7 @@ class LeicaSteps:
         self._origin = None
         self._orientation = None
         self._pairs: dict[tuple[int, int], object] = {}
-        self._calibration_run = time.strftime("%Y-%m-%d_wizard_%H%M%S")
+        self._calibration_run = time.strftime("%Y-%m-%d_%H%M%S")
 
     # -- Connect ------------------------------------------------------------
 

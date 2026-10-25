@@ -251,6 +251,33 @@ class TestOneCopy:
         with pytest.raises(PermissionError):
             save_as_zarr(root, tmp_path, "HiRes", placement=at(0.0, 0.0, {0: 0.0}))
 
+    def test_the_store_is_written_under_a_short_hidden_name(
+        self, hires, tmp_path, monkeypatch
+    ):
+        """The temporary name does not repeat the store's: its chunks lie deep, and Windows stops at 260 characters.
+
+        Seen on the STELLARIS, 2026-10-25: an objective calibration's projection
+        failed at 263 characters, 40 of them the store's name said twice.
+        """
+        from zmart_drivers.leica.stellaris.navigator_expert.procedures.save_data import (
+            ome_zarr,
+        )
+
+        root, _ = hires
+        real_replace, renamed = ome_zarr.os.replace, []
+
+        def watched(src, dst):
+            if Path(dst).name.endswith(".ome.zarr"):
+                renamed.append(Path(src).name)
+            return real_replace(src, dst)
+
+        monkeypatch.setattr(ome_zarr.os, "replace", watched)
+        save_as_zarr(root, tmp_path, "HiRes", placement=at(0.0, 0.0, {0: 0.0}))
+
+        assert len(renamed) == 1
+        assert renamed[0].startswith(".") and renamed[0].endswith(".writing")
+        assert "high-res" not in renamed[0] and len(renamed[0]) == len(".12345678.writing")
+
 
 class TestTheStore:
     def test_it_is_a_valid_ome_zarr_0_5_image(self, hires, tmp_path):

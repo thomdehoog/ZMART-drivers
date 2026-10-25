@@ -297,7 +297,10 @@ def write_store(
         channel.name or f"channel {channel.index}" for channel in metadata.channels
     ]
 
-    writing = store.with_name(f".{store.name}.{uuid.uuid4().hex[:8]}.writing")
+    # Short, and hidden by its dot: the store's chunks lie several folders
+    # deeper, and Windows refuses a path longer than 260 characters where long
+    # paths are not enabled; repeating the store's name here cost 40 of them.
+    writing = store.with_name(f".{uuid.uuid4().hex[:8]}.writing")
     store.parent.mkdir(parents=True, exist_ok=True)
     spec = ArraySpec.from_array(
         volume,

@@ -52,8 +52,8 @@ def save_waiting(handle, label: str | None = None) -> list[dict]:
             handle.client,
             pending,
             orientation=_loaded_orientation(handle),
-            where_the_planes_are=lambda plane_z, p=pending: _where_the_planes_are(
-                handle, p.at, p.job, plane_z
+            where_the_planes_are=lambda plane_z, p=pending: place_planes(
+                handle.client, p.at, p.job, plane_z
             ),
         )
         handle.unsaved.remove(pending)
@@ -242,11 +242,13 @@ def _loaded_orientation(handle):
     return _orientation.rig_orientation()
 
 
-def _where_the_planes_are(handle, at: dict, job: str, plane_z: list[int]):
+def place_planes(client, at: dict, job: str, plane_z: list[int]):
     """Answer, per plane number in z, where on the sample it was captured.
 
-    In the frame :func:`set_xyz` takes, so a position handed back can be
-    handed straight back in. A saved file cannot say this and neither can the
+    In the frame *at* is in: the frame :func:`set_xyz` takes for a capture of
+    the workflow, so a position handed back can be handed straight back in,
+    and the stage's own readings for a capture of the driver's setup, which
+    runs before there is an origin. A saved file cannot say this and neither can the
     drive alone: each slice is the frame the drive was sent to, displaced by
     how far the slice sits from where the stack's own drive stood when the
     drive arrived -- z-wide for a z-wide stack, the galvo for a z-galvo one.
@@ -254,9 +256,10 @@ def _where_the_planes_are(handle, at: dict, job: str, plane_z: list[int]):
     the planes in z, not against the files. Nothing is assumed about where in
     its stack the drive stands. A stack whose settings do not place its
     slices is refused: every plane says where it is, and a guessed height is
-    worse than none. *at* is where the stage stood, as :func:`get_xyz` read it.
+    worse than none. *at* is where the stage stood: ``x``, ``y`` and ``z`` (the
+    focus), and the two z drives ``z_wide_um`` and ``z_galvo_um``.
     """
-    settings = _readers.get_job_settings(handle.client, job) or {}
+    settings = _readers.get_job_settings(client, job) or {}
     numbers = sorted(set(plane_z))
     slices = _readers.stack_slices_um(settings, len(numbers))
     standing = {"z-wide": at.get("z_wide_um"), "z-galvo": at.get("z_galvo_um")}.get(

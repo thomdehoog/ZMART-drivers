@@ -138,6 +138,12 @@ def _patch(
         "get_job_settings",
         lambda *a, **k: {"objective": {"slotIndex": 1, "name": "10x"}},
     )
+    # A single plane: z-wide at 30 um, the galvo at rest.
+    monkeypatch.setattr(
+        readers,
+        "z_um_from",
+        lambda settings, drive, **k: {"z-wide": 30.0, "z-galvo": 0.0}[drive],
+    )
     monkeypatch.setattr(
         parsing,
         "parse_tile_geometry",
@@ -159,6 +165,9 @@ def _patch(
         return SimpleNamespace(job=job, command_result={"success": True})
 
     def _save(client, acq, output_root, naming, **kw):
+        # Every setup capture says where it was taken; save refuses one that does not.
+        where = kw["placement"]([0])(0)
+        assert where == {"x_um": pos["x"], "y_um": pos["y"], "z_um": 30.0}
         image = template.copy()
         if image_to_stage is not None:
             stage_delta = np.array([pos["x"] - home_xy[0], pos["y"] - home_xy[1]])
@@ -708,11 +717,16 @@ def test_validation_stays_in_run_and_reloads_saved_image(tmp_path, monkeypatch):
     expected_image = np.arange(12, dtype=np.uint16).reshape(3, 4)
 
     monkeypatch.setattr(changes, "take_picture", lambda client, job: acquired)
+    stood = {"x": 1000.0, "y": 2000.0, "z": 30.0, "z_wide_um": 30.0, "z_galvo_um": 0.0}
+    monkeypatch.setattr(wf, "stage_now", lambda client, job: stood)
+    monkeypatch.setattr(readers, "get_job_settings", lambda *a, **k: {})
 
-    def _save(client, acquisition, output_root, naming, *, orientation):
+    def _save(client, acquisition, output_root, naming, *, orientation, placement):
         assert client is session.client
         assert acquisition is acquired
         assert orientation == expected_orientation
+        # The capture is placed where the stage stood when it was taken.
+        assert placement([0])(0) == {"x_um": 1000.0, "y_um": 2000.0, "z_um": 30.0}
         image_path = Path(output_root) / build_image_name(naming)
         image_path.parent.mkdir(parents=True, exist_ok=True)
         tifffile.imwrite(image_path, expected_image)
