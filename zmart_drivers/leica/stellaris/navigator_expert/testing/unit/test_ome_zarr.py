@@ -28,6 +28,30 @@ from zmart_drivers.leica.stellaris.navigator_expert.procedures.save_data import 
     save as saving,
 )
 from zmart_drivers.leica.stellaris.navigator_expert.procedures.save_data import product
+from zmart_drivers.leica.stellaris.navigator_expert.procedures.save_data import ome_zarr
+
+
+class TestHalving:
+    """The viewer's own reducer: a 2x2 mean, an odd edge repeated, integers rounded half to even."""
+
+    def test_two_by_two_mean_rounded_half_to_even(self):
+        values = np.array([[[1, 2], [3, 4]], [[0, 1], [0, 2]]], dtype=np.uint16)  # means 2.5 and 0.75
+
+        np.testing.assert_array_equal(ome_zarr.halve_xy(values), [[[2]], [[1]]])
+
+    def test_an_odd_edge_is_repeated(self):
+        values = np.array([[10, 20, 30]], dtype=np.uint8)
+
+        np.testing.assert_array_equal(ome_zarr.halve_xy(values), [[15, 30]])
+
+    @pytest.mark.parametrize(
+        "frame, shapes", [(64, [64, 32]), (512, [512, 256, 128]), (1024, [1024, 512, 256, 128])]
+    )
+    def test_down_to_one_chunk_and_always_one_coarser_level(self, frame, shapes):
+        levels = ome_zarr.mean_pyramid(np.zeros((1, 1, 2, frame, frame), dtype=np.uint16))
+
+        assert [level.shape[-1] for level in levels] == shapes
+        assert all(level.shape[:3] == (1, 1, 2) for level in levels)  # z, c, t are not reduced
 
 DATA = Path(__file__).resolve().parents[1] / "data" / "lasx_description"
 PID = "669c"
@@ -314,7 +338,7 @@ class TestTheStore:
             "multiscales"
         ][0]
         assert [a["name"] for a in multiscale["axes"]] == ["t", "c", "z", "y", "x"]
-        [level] = multiscale["datasets"]
+        level = multiscale["datasets"][0]
         transforms = {t["type"]: t for t in level["coordinateTransformations"]}
         assert transforms["scale"]["scale"][3:] == pytest.approx(
             [2.2705078125, 2.2705078125]
@@ -327,9 +351,31 @@ class TestTheStore:
         assert transforms["translation"]["translation"][2:] == pytest.approx(
             [50.0, 2000.0 + first_centre, 1000.0 + first_centre]
         )
-        # One level, at full resolution: no downsampling to name, and it says so.
-        assert "type" not in multiscale
-        assert "one level" in multiscale["metadata"]["description"]
+        # A mean pyramid below it, and it says so.
+        assert multiscale["type"] == "mean"
+        assert "3 levels" in multiscale["metadata"]["description"]
+
+    def test_below_full_resolution_a_mean_pyramid_down_to_one_chunk(self, hires, tmp_path):
+        """512 x 512 halves to 256 and to 128, one chunk; each coarser voxel's centre is its block's."""
+        root, pixels = hires
+
+        saved = save_as_zarr(root, tmp_path, "HiRes", placement=at(1000.0, 2000.0, {0: 50.0}))
+
+        store = saved.image_paths[PlaneIndex(0, 0, 0)]
+        group = zarr.open_group(str(store), mode="r")
+        assert [group[str(i)].shape for i in range(3)] == [
+            (1, 2, 1, 512, 512), (1, 2, 1, 256, 256), (1, 2, 1, 128, 128)
+        ]
+        np.testing.assert_array_equal(group["1"][0, 0, 0], ome_zarr.halve_xy(pixels[0]))
+        datasets = attributes(store)["ome"]["multiscales"][0]["datasets"]
+        pixel = 2.2705078125
+        first = {t["type"]: t for t in datasets[0]["coordinateTransformations"]}
+        second = {t["type"]: t for t in datasets[1]["coordinateTransformations"]}
+        assert second["scale"]["scale"][3:] == pytest.approx([2 * pixel, 2 * pixel])
+        assert second["scale"]["scale"][2] == first["scale"]["scale"][2]  # z is not reduced
+        assert second["translation"]["translation"][3:] == pytest.approx(
+            [y + pixel / 2 for y in first["translation"]["translation"][3:]]
+        )
 
     def test_it_follows_the_metadata_convention(self, hires, tmp_path):
         """Everything the convention asks of a store, as check_store reads it."""

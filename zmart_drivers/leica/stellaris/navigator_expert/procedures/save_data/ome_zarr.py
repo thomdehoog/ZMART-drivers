@@ -16,11 +16,11 @@ is built) and written by zarr-python (Zarr v3). It holds:
 - the whole capture's OME-XML (OME 2016-06: instrument, channels, the time
   and drive positions of every plane) at ``OME/METADATA.ome.xml``.
 
-Only the full-resolution level is written. Coarser copies for looking at
-the image zoomed out are the viewer's to build, from this one level, the
-way it builds the live picture of a whole run; the store says its pyramid
-is a mean pyramid (``type: "mean"``), which the viewer asks of every store
-it takes, and which a single level trivially is.
+Below the full-resolution level, coarser levels for looking at the image
+zoomed out: each halves y and x by the mean of 2x2 voxels, by the ZMART
+Viewer's own rule, down until a level fits one chunk. The store says so
+(``type: "mean"``): the viewer bakes only stores that do, and builds the
+picture of a whole run from them.
 
 The store is written under a temporary name beside its place and renamed
 into it whole, so a reader watching the folder sees either nothing or the
@@ -302,20 +302,38 @@ def write_store(
     # paths are not enabled; repeating the store's name here cost 40 of them.
     writing = store.with_name(f".{uuid.uuid4().hex[:8]}.writing")
     store.parent.mkdir(parents=True, exist_ok=True)
-    spec = ArraySpec.from_array(
-        volume,
-        chunk_grid={
-            "name": "regular",
-            "configuration": {"chunk_shape": [1, 1, 1, min(PIECE, ny), min(PIECE, nx)]},
-        },
-        dimension_names=list(AXES),
-        # Said outright: newer zarr refuses a multi-byte array whose byte
-        # order is left to a default.
-        codecs=[{"name": "bytes", "configuration": {"endian": "little"}}],
-    )
+    levels = mean_pyramid(volume)
+    specs = [
+        ArraySpec.from_array(
+            level,
+            chunk_grid={
+                "name": "regular",
+                "configuration": {
+                    "chunk_shape": [
+                        1, 1, 1, min(PIECE, level.shape[-2]), min(PIECE, level.shape[-1])
+                    ]
+                },
+            },
+            dimension_names=list(AXES),
+            # Said outright: newer zarr refuses a multi-byte array whose byte
+            # order is left to a default.
+            codecs=[{"name": "bytes", "configuration": {"endian": "little"}}],
+        )
+        for level in levels
+    ]
+    # Each coarser voxel is the mean of a 2x2 block, so its centre lies half
+    # a finer voxel in from the block's first: x and y step on by that.
+    scales, translations = [], []
+    step_y, step_x = metadata.physical_size_y_um, metadata.physical_size_x_um
+    t, c, z, y, x = capture.translation
+    for _ in levels:
+        scales.append([1.0, 1.0, metadata.physical_size_z_um or 1.0, step_y, step_x])
+        translations.append([t, c, z, y, x])
+        y, x = y + step_y / 2, x + step_x / 2
+        step_y, step_x = step_y * 2, step_x * 2
     image = Image.new(
-        array_specs=[spec],
-        paths=["0"],
+        array_specs=specs,
+        paths=[str(index) for index in range(len(levels))],
         axes=[
             Axis(name="t", type="time", unit="second"),
             Axis(name="c", type="channel"),
@@ -323,16 +341,8 @@ def write_store(
             Axis(name="y", type="space", unit="micrometer"),
             Axis(name="x", type="space", unit="micrometer"),
         ],
-        scales=[
-            [
-                1.0,
-                1.0,
-                metadata.physical_size_z_um or 1.0,
-                metadata.physical_size_y_um,
-                metadata.physical_size_x_um,
-            ]
-        ],
-        translations=[capture.translation],
+        scales=scales,
+        translations=translations,
         name=store.name,
     )
     group = image.to_zarr(zarr.storage.LocalStore(str(writing)), path="")
@@ -346,8 +356,14 @@ def write_store(
     # The models write an absent value as null (a channel axis's unit, a
     # multiscale's metadata); a browser viewer refuses "unit": null, so what
     # is absent is left out, as the specification has it.
+    for index, level in enumerate(levels[1:], start=1):
+        group[str(index)][...] = level
     ome = _without_empty(dict(group.attrs["ome"]))
-    ome["multiscales"][0]["metadata"] = {"description": _levels_described(metadata)}
+    # The viewer bakes only stores that say their pyramid is a mean one.
+    ome["multiscales"][0]["type"] = "mean"
+    ome["multiscales"][0]["metadata"] = {
+        "description": _levels_described(metadata, len(levels))
+    }
     ome["omero"] = {
         "channels": [
             {
@@ -426,9 +442,43 @@ def _remove_when_free(writing: Path, *, wait_s: float = RENAME_WAIT_S) -> None:
             time.sleep(0.1)
 
 
-def _levels_described(metadata) -> str:
+def mean_pyramid(volume: np.ndarray) -> list[np.ndarray]:
+    """*volume* (t, c, z, y, x) and its coarser levels, each halving y and x by a 2x2 mean.
+
+    Down until a level fits one chunk (:data:`PIECE`), and always at least
+    one coarser level. z, c and t are never reduced.
+    """
+    levels = [volume]
+    while len(levels) < 2 or max(levels[-1].shape[-2:]) > PIECE:
+        if min(levels[-1].shape[-2:]) <= 1:
+            break
+        levels.append(halve_xy(levels[-1]))
+    return levels
+
+
+def halve_xy(values: np.ndarray) -> np.ndarray:
+    """One level coarser: the mean of each 2x2 block in y and x.
+
+    The ZMART Viewer's own reducer, so the viewer can use these levels as
+    its own: an odd last row or column is repeated, the mean is taken in
+    float64, and integers are rounded half to even into their own type.
+    """
+    h, w = values.shape[-2:]
+    even = np.pad(
+        values, [(0, 0)] * (values.ndim - 2) + [(0, h % 2), (0, w % 2)], mode="edge"
+    )
+    blocks = even.reshape(*values.shape[:-2], (h + 1) // 2, 2, (w + 1) // 2, 2)
+    mean = blocks.mean(axis=(-3, -1), dtype="float64")
+    return (np.rint(mean) if values.dtype.kind in "iu" else mean).astype(values.dtype)
+
+
+def _levels_described(metadata, count: int) -> str:
     """What the store's levels are, as OME-Zarr's multiscale ``metadata`` says it."""
-    said = "one level, at full resolution: no downsampled levels"
+    said = (
+        f"{count} levels: full resolution, then each halving y and x by the mean of "
+        "2x2 voxels (an odd edge repeated, integers rounded half to even); "
+        "z, c and t are not reduced"
+    )
     if metadata.size_z == 1 and not metadata.physical_size_z_um:
         said += "; a single plane, so its z scale of 1 is a placeholder, not a measured size"
     return said
