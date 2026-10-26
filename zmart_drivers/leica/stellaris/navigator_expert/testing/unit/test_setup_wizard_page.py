@@ -673,7 +673,9 @@ def test_while_one_button_works_it_says_so_and_nothing_else_can_be_pressed(
 def test_the_cells_are_a_heading_over_a_white_card(window, tmp_path):
     win = window(_pretend(tmp_path))
 
-    assert win.cells() == ["Connect to the microscope"]
+    win.cell("Driver configuration").wait_for()
+    # What reaches the microscope, then how the driver works with it, each in a box of its own.
+    assert win.cells() == ["Connect to the microscope", "Driver configuration"]
     style = win.page.evaluate(
         """() => { const t = getComputedStyle(document.querySelector('.side-group-title'));
                    const b = getComputedStyle(document.querySelector('.side-group-body'));

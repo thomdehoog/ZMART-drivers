@@ -15,14 +15,22 @@ import { cardRow, cell, choice, field, note, press } from "../cells";
 import { h } from "../dom";
 import { once, type View } from "./index";
 
-/** The words that can be typed, in the order the card shows them, with the label of each. */
-const TYPED: [key: string, label: string, type: string][] = [
+type Typed = [key: string, label: string, type: string];
+
+/** The words that reach the microscope, typed under its microscope and API. */
+const REACHING: Typed[] = [
   ["host", "Host", "text"],
   ["client", "Client", "text"],
   ["password", "Password", "password"],
+];
+
+/** The words that say how the driver works with it, in a box of their own. */
+const WORKING: Typed[] = [
   ["config", "Config", "text"],
   ["output_root", "Output folder", "text"],
 ];
+
+const TYPED = [...REACHING, ...WORKING];
 
 export const connect: View = (host, ctx) => {
   const s = ctx.state;
@@ -37,17 +45,23 @@ export const connect: View = (host, ctx) => {
   // What is typed is kept while the step is shown; the password is never filled in.
   s.typed ??= Object.fromEntries(TYPED.map(([key]) => [key, key === "password" ? "" : card[key] ?? ""]));
 
-  const { box, body } = cell("Connect to the microscope");
-  const microscope = choice([[card.microscope, card.microscope]], card.microscope, "Microscope");
-  const api = choice([[card.api_type, card.api_type]], card.api_type, "API");
-  microscope.disabled = api.disabled = true;
-  body.append(cardRow("Microscope", microscope), cardRow("API", api));
-  for (const [key, label, type] of TYPED) {
+  const typedRow = ([key, label, type]: Typed) => {
     const input = field({ type, value: s.typed[key], spellcheck: "false", autocomplete: "off", "aria-label": label });
     input.disabled = connected;
     input.addEventListener("input", () => { s.typed[key] = input.value; });
-    body.append(cardRow(label, input));
-  }
+    return cardRow(label, input);
+  };
+
+  const reach = cell("Connect to the microscope");
+  const microscope = choice([[card.microscope, card.microscope]], card.microscope, "Microscope");
+  const api = choice([[card.api_type, card.api_type]], card.api_type, "API");
+  microscope.disabled = api.disabled = true;
+  reach.body.append(cardRow("Microscope", microscope), cardRow("API", api), ...REACHING.map(typedRow));
+  host.append(reach.box);
+
+  /* The button acts on both boxes, so it stands at the end of the second. */
+  const { box, body } = cell("Driver configuration");
+  body.append(...WORKING.map(typedRow));
   if (!connected) {
     body.append(note(card.output_root_saved
       ? "The output folder is where this microscope saves its pictures. Change it only if it should move."
