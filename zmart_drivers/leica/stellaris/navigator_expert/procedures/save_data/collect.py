@@ -127,6 +127,7 @@ def collect_lasx_data_container(
         raise RuntimeError(
             f"LAS X's cache has the description of {name} but not its pixels {pixels}"
         )
+    _collected.add(_picture_key(root, path))
     # The description is the record of the capture itself, exact and from
     # the moment it was taken, so nothing is taken over from the job's
     # settings (which round the pixel size to two decimals).
@@ -185,6 +186,11 @@ def pictures_of(root: Path, acq: AcquisitionResult) -> list[tuple[Path, str, str
     Its pixels were not: the pixel file is written during the scan and left
     alone. So a picture is new when its pixels were written since the
     capture began; the description's time only narrows the search.
+
+    And a picture this driver collected already is never new again: two
+    quick captures of one job (overview tiles 2.6 s apart, STELLARIS,
+    2026-10-26) put the first one's pixels inside the allowance for a
+    clock's coarseness, and the second capture saw two new pictures.
     """
     own_name = re.compile(re.escape(acq.job) + r"\d+")
     since = acq.started_at - MTIME_SKEW_ALLOWANCE_S
@@ -214,10 +220,23 @@ def pictures_of(root: Path, acq: AcquisitionResult) -> list[tuple[Path, str, str
         try:
             if (root / f"V2LMSDC_MMF{number}_0_{pid}.tmp").stat().st_mtime < since:
                 continue
+            if _picture_key(root, path) in _collected:
+                continue
         except OSError:
             continue
         found.append((path, name, xml))
     return found
+
+
+#: The pictures collected so far, by :func:`_picture_key`.
+_collected: set[tuple[str, str, int]] = set()
+
+
+def _picture_key(root: Path, description: Path) -> tuple[str, str, int]:
+    """A picture, told apart from one LAS X writes later into the same files: its pixels' write time."""
+    number, pid = DESCRIPTION.fullmatch(description.name).groups()
+    pixels = root / f"V2LMSDC_MMF{number}_0_{pid}.tmp"
+    return str(root), description.name, pixels.stat().st_mtime_ns
 
 
 def read_records(data: bytes) -> list[bytes]:
