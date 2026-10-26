@@ -2,9 +2,13 @@
   "name": "stellaris",
   "connection": {
     "microscope": "stellaris-y42h93",
+    "api_type": "LAS X CAM API - Navigator Expert",
+    "host": "localhost",
     "client": "PythonClient",
-    "api_delay_ms": null,
+    "password": null,
+    "config": null,
     "output_root": null,
+    "api_delay_ms": null,
     "load_limits": true,
     "load_calibration": true,
     "load_origin": true

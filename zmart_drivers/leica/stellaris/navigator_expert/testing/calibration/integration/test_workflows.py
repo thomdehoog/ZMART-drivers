@@ -95,9 +95,13 @@ def test_calibration_capture_explicitly_passes_active_orientation(
 
     monkeypatch.setattr(cm._orientation, "rig_orientation", lambda: expected)
     monkeypatch.setattr(changes, "take_picture", lambda client, job: acquisition)
+    stood = {"x": 1000.0, "y": 2000.0, "z": 30.0, "z_wide_um": 30.0, "z_galvo_um": 0.0}
+    monkeypatch.setattr(cm, "stage_now", lambda client, job: stood)
+    monkeypatch.setattr(readers, "get_job_settings", lambda *a, **k: {})
 
-    def _save(client, result, output_root, naming, *, orientation, **_settings):
+    def _save(client, result, output_root, naming, *, orientation, placement, **_settings):
         received["orientation"] = orientation
+        received["placement"] = placement
         return saved
 
     monkeypatch.setattr(saving, "save", _save)
@@ -105,11 +109,13 @@ def test_calibration_capture_explicitly_passes_active_orientation(
     result = cm._capture_for_calibration(
         session,
         name="reference",
-        folder="calibration-frame",
+        folder="frame",
     )
 
     assert result is saved
     assert received["orientation"] == expected
+    # The save refuses a capture without a placement: it is placed where the stage stood.
+    assert received["placement"]([0])(0) == {"x_um": 1000.0, "y_um": 2000.0, "z_um": 30.0}
 
 
 def test_make_session_paths_creates_layout(sessions_root):
@@ -1033,6 +1039,12 @@ def _patch_objective_driver(
     monkeypatch.setattr(changes, "move_z", _move_z)
     monkeypatch.setattr(readers, "read_zwide_um", _read_zwide_um)
     monkeypatch.setattr(readers, "read_zwide_um", _read_zwide_um)
+    # Where each capture is placed: the same z-wide, the galvo at rest.
+    monkeypatch.setattr(
+        readers,
+        "z_um_from",
+        lambda settings, drive, **kw: {"z-wide": float(state["zwide"]), "z-galvo": 0.0}[drive],
+    )
 
     def _get_job_settings(client, job_name, **kw):
         return {
@@ -1078,7 +1090,7 @@ def _patch_objective_driver(
         return SimpleNamespace(job=job, command_result={"success": True})
 
     def _save(client, acq, output_root, naming, **kw):
-        if naming.stem.startswith("calibration-stack_"):
+        if naming.stem.startswith("stack_"):
             idx = stack_count["n"]
             stack_count["n"] += 1
             if idx < len(stack_effects) and stack_effects[idx] is not None:
@@ -2018,14 +2030,14 @@ def test_objective_pair_target_xy_acquire_at_post_switch_xy(
     _seed_snapshot(machine)
 
     # Track the stage XY at the moment every frame save is requested
-    # (only ref_xy and target_xy use calibration-frame; the z-stacks
-    # use calibration-stack and are not relevant here).
+    # (only ref_xy and target_xy use frame; the z-stacks
+    # use stack and are not relevant here).
     acquire_positions: list[tuple[float, float]] = []
 
     real_save = saving.save
 
     def _tracking_save(client, acq, output_root, naming, **kw):
-        if naming.stem.startswith("calibration-frame_"):
+        if naming.stem.startswith("frame_"):
             acquire_positions.append((state["x"], state["y"]))
         return real_save(client, acq, output_root, naming, **kw)
 

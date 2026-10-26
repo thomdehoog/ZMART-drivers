@@ -1,7 +1,12 @@
 """Machine-local resolution of this microscope's coordinate-system config.
 
+The settings live in a config: a folder of its own under the microscope API
+root, named by when it was made (``config_20261026_1915``), chosen when
+connecting, and holding the tree below. With no config in use, the tree
+sits in the API root itself, as before configs had folders.
+
 Each subsystem owns an independent, append-only timestamp tree under the
-microscope API root::
+microscope API root (or the config in use)::
 
     <programdata_root>/<vendor>/<microscope_id>/<api>/
         limits/<datetime>/
@@ -134,6 +139,32 @@ def is_snapshot_name(name: str) -> bool:
     return bool(_SNAPSHOT_RE.match(name))
 
 
+# A config is a folder of its own beside the subsystem folders, named by when
+# it was made: ``config_20261026_1915`` (a second one that minute: ``-2``).
+_CONFIGURATION_RE = re.compile(r"^config_\d{8}_\d{4}(-\d+)?$")
+
+#: The config this process reads and saves its settings in; None, the API's folder itself.
+_in_use: str | None = None
+
+
+def is_configuration_name(name: str) -> bool:
+    """True if *name* is a config folder's name."""
+    return bool(_CONFIGURATION_RE.match(str(name)))
+
+
+def use_configuration(name: str | None) -> None:
+    """Read and save the settings in config *name* from now on; None, in the API's folder."""
+    global _in_use
+    if name is not None and not is_configuration_name(name):
+        raise ValueError(f"{name!r} is not a config's name (config_YYYYMMDD_HHMM)")
+    _in_use = name
+
+
+def configuration_in_use() -> str | None:
+    """The config the settings are read and saved in, or None for the API's folder."""
+    return _in_use
+
+
 def _write_json(path: Path, payload: dict) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8") as fh:
@@ -190,8 +221,32 @@ class MachineProfile:
         env = os.environ.get(PROGRAMDATA_ROOT_ENV)
         return Path(env) if env else DEFAULT_PROGRAMDATA_ROOT
 
-    def snapshot_root(self) -> Path:
+    def api_root(self) -> Path:
+        """The microscope API's folder, which holds its configs."""
         return self.root() / self.vendor / self.microscope_id / self.api
+
+    def snapshot_root(self) -> Path:
+        """Where the settings are read and saved: the config in use, else the API's folder."""
+        return self.api_root() / _in_use if _in_use else self.api_root()
+
+    def configurations(self) -> list[str]:
+        """The configs kept on this computer, by folder name, the most recent first."""
+        root = self.api_root()
+        if not root.is_dir():
+            return []
+        return sorted(
+            (p.name for p in root.iterdir() if p.is_dir() and is_configuration_name(p.name)),
+            reverse=True,
+        )
+
+    def new_configuration_name(self, moment: datetime | None = None) -> str:
+        """The folder name a config made now gets: ``config_YYYYMMDD_HHMM``, one not yet taken."""
+        local = (moment or datetime.now()).strftime("%Y%m%d_%H%M")
+        name, n = f"config_{local}", 1
+        while (self.api_root() / name).exists():
+            n += 1
+            name = f"config_{local}-{n}"
+        return name
 
     def ensure_layout(self) -> Path:
         """Create the API root and its subsystem directories if absent."""

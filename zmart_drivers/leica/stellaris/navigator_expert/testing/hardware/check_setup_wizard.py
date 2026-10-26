@@ -161,7 +161,7 @@ def run_checks(workspace: Path) -> dict:
 
         def connects():
             found = dict(
-                page.call("connect", "connect", {"data_folder": str(data_folder)})[
+                page.call("connect", "connect", {"output_root": str(data_folder)})[
                     "checks"
                 ]
             )

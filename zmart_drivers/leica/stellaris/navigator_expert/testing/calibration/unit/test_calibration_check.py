@@ -172,6 +172,10 @@ def _patch(
     monkeypatch.setattr(changes, "move_xy", move_xy)
     monkeypatch.setattr(changes, "move_z", move_z)
     monkeypatch.setattr(readers, "read_zwide_um", lambda c, job, **k: rig["z"])
+    # Where each capture is placed: the same z-wide, the galvo at rest.
+    monkeypatch.setattr(
+        readers, "z_um_from", lambda s, drive, **k: {"z-wide": rig["z"], "z-galvo": 0.0}[drive]
+    )
     monkeypatch.setattr(readers, "get_selected_job", lambda c, **k: {"Name": JOB})
     monkeypatch.setattr(readers, "get_job_settings", job_settings)
     monkeypatch.setattr(

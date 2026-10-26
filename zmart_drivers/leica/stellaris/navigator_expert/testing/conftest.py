@@ -42,6 +42,10 @@ def _hermetic_machine_root(tmp_path_factory, monkeypatch):
     """
     root = tmp_path_factory.mktemp("zmart_microscopy_root")
     monkeypatch.setenv("ZMART_MICROSCOPY_ROOT", str(root))
+    # And no config in use: one chosen in another test would move this test's settings.
+    from zmart_drivers.leica.stellaris.navigator_expert.driver_setup import store
+
+    monkeypatch.setattr(store, "_in_use", None)
 
 
 def pytest_report_header(config):

@@ -65,7 +65,11 @@ from ..optical_calibration.calibration_common import (
     now_iso,
     read_job_geometry,
     read_selected_job_name,
+    stage_now,
     write_json_atomic,
+)
+from zmart_drivers.leica.stellaris.navigator_expert.procedures.save_data.save_waiting import (
+    place_planes,
 )
 
 KIND = "orientation"
@@ -816,6 +820,7 @@ def acquire_validation_image(
         shutil.rmtree(output_root)
     output_root.mkdir()
 
+    at = stage_now(session.client, session.job_name)
     acquisition = changes.take_picture(session.client, session.job_name)
     saved = saving.save(
         session.client,
@@ -823,6 +828,9 @@ def acquire_validation_image(
         output_root,
         Naming(stem=f"orientation-validation_{run_hash()}_validation"),
         orientation=session.orientation,
+        placement=lambda plane_z: place_planes(
+            session.client, at, session.job_name, plane_z
+        ),
     )
     if len(saved.image_paths) != 1:
         raise ValueError(

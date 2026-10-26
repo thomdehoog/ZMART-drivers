@@ -202,6 +202,12 @@ def _install_simulator(monkeypatch, machine) -> SimulatedScope:
     monkeypatch.setattr(
         readers, "read_zwide_um", lambda client, job_name, **kw: float(sim.zwide)
     )
+    # Where each capture is placed: the same z-wide, the galvo at rest.
+    monkeypatch.setattr(
+        readers,
+        "z_um_from",
+        lambda settings, drive, **kw: {"z-wide": float(sim.zwide), "z-galvo": 0.0}[drive],
+    )
 
     # Acquisition: render real pixels from the scene, write real TIFFs, and
     # let the real load/fit/register code consume them.
@@ -212,7 +218,7 @@ def _install_simulator(monkeypatch, machine) -> SimulatedScope:
         output_root = Path(output_root)
         output_root.mkdir(parents=True, exist_ok=True)
         image_paths = {}
-        if naming.stem.startswith("calibration-stack_"):
+        if naming.stem.startswith("stack_"):
             positions = np.linspace(
                 float(sim.stack["begin"]),
                 float(sim.stack["end"]),

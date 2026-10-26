@@ -80,6 +80,12 @@ function renderStage(keepScroll = false) {
       step.status.done = false;
       renderRail();
     },
+    async reload() {
+      finished.clear();
+      for (const id of Object.keys(memory)) if (id !== step.id) delete memory[id];
+      outline = await loadOutline();
+      renderRail();
+    },
     isStale: () => isStale(step),
     changedUnder: () =>
       step.needs.filter((id) => (byId(id)?.status.saved_at ?? "") > (step.status.saved_at ?? "")).map((id) => byId(id)!.title),

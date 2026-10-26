@@ -286,6 +286,21 @@ class TestFindingThePicture:
 
         assert exported.relative_path == f"V2LMSDC_MMF10133_0_{PID}.tmp"
 
+    def test_a_picture_collected_already_is_not_new_for_the_next_quick_capture(self, cache):
+        """Overview tiles 2.6 s apart: the first one's pixels fell inside the clock allowance (STELLARIS, 2026-10-26)."""
+        two_channel_12_bit(cache, number=3547, name="Overview004")
+        first = container.collect_lasx_data_container(
+            None, acquisition_of("Overview"), cache_root=cache
+        )
+        two_channel_12_bit(cache, number=3559, name="Overview005")
+
+        second = container.collect_lasx_data_container(
+            None, acquisition_of("Overview"), cache_root=cache
+        )
+
+        assert first.relative_path == f"V2LMSDC_MMF3547_0_{PID}.tmp"
+        assert second.relative_path == f"V2LMSDC_MMF3559_0_{PID}.tmp"
+
     def test_two_new_pictures_of_the_job_are_refused_not_guessed(self, cache):
         two_channel_12_bit(cache, number=746, name="HiRes002")
         two_channel_12_bit(cache, number=790, name="HiRes003")

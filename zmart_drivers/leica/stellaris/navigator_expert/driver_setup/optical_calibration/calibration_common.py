@@ -13,7 +13,7 @@ Owns:
 Path-base convention (used by every workflow's save / save_and_visualize):
 
 - Report image paths stay acquisition-relative (for example,
-  ``"data/reference/calibration-frame/<plane>.ome.tiff"``).
+  ``"data/reference/frame/<plane>.ome.tiff"``).
 - Summary dicts returned to the notebook and adoption return paths use
   absolute strings; ``sessions_root`` lives outside the package tree so
   there is no meaningful package-relative form.
@@ -37,6 +37,7 @@ from zmart_drivers.leica.stellaris.navigator_expert.procedures import changes
 
 from .. import orientation as _orientation
 from ...procedures.save_data.naming import Naming, run_hash
+from ...procedures.save_data.save_waiting import place_planes
 
 # matplotlib is imported lazily inside the plot helpers so test imports
 # (and headless environments) do not pull in a display backend on import.
@@ -277,7 +278,9 @@ def acquire_frame_to(
     saved = _capture_for_calibration(
         session,
         name=name,
-        folder="calibration-frame",
+        # Short: the session already lies in the calibration folder, and its
+        # stores' chunks lie deep (Windows stops at 260 characters).
+        folder="frame",
         orientation=orientation,
     )
     img = _single_plane_image(saved, context=name)
@@ -312,7 +315,7 @@ def acquire_stack_to(
     saved = _capture_for_calibration(
         session,
         name=dirname,
-        folder="calibration-stack",
+        folder="stack",
         orientation=orientation,
     )
     arr = _stack_from_saved_planes(saved, context=dirname)
@@ -345,6 +348,7 @@ def _capture_for_calibration(
         orientation = _orientation.rig_orientation()
     position_label = f"{len(session.exported_files):06d}"
     naming = Naming(stem=f"{folder}_{run_hash()}_{position_label}")
+    at = stage_now(session.client, session.job_name)
     acq = changes.take_picture(session.client, session.job_name)
     return saving.save(
         session.client,
@@ -352,7 +356,34 @@ def _capture_for_calibration(
         session.paths.data_dir / name,
         naming,
         orientation=orientation,
+        placement=lambda plane_z: place_planes(
+            session.client, at, session.job_name, plane_z
+        ),
     )
+
+
+def stage_now(client: Any, job_name: str) -> dict:
+    """Where the stage stands, in its own readings: ``x``, ``y``, ``z`` and the two z drives.
+
+    The setup runs before there is an origin, so its captures are placed by
+    the stage's own numbers; ``z`` is the focus, the sum of the two z drives.
+    Read just before a capture, so the save can say where it was taken.
+    """
+    xy = readers.get_xy(client) or {}
+    if ("x_um" not in xy) or ("y_um" not in xy):
+        raise RuntimeError(f"get_xy returned no readback: {xy}")
+    settings = readers.get_job_settings(client, job_name) or {}
+    if not settings:
+        raise RuntimeError(f"could not read job settings for {job_name!r}")
+    z_wide = readers.z_um_from(settings, "z-wide", client=client, job_name=job_name)
+    z_galvo = readers.z_um_from(settings, "z-galvo", client=client, job_name=job_name)
+    return {
+        "x": float(xy["x_um"]),
+        "y": float(xy["y_um"]),
+        "z": z_wide + z_galvo,
+        "z_wide_um": z_wide,
+        "z_galvo_um": z_galvo,
+    }
 
 
 def _single_plane_image(saved: Any, *, context: str) -> np.ndarray:
