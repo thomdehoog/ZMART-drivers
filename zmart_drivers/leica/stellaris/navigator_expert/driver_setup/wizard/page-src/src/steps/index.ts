@@ -19,6 +19,8 @@ export interface Ctx {
   finish(): Promise<void>;
   /** Say that the step is no longer done (Connect, after Disconnect). */
   unfinish(): void;
+  /** Another config was chosen: forget every other step's work in this window and read the rail again. */
+  reload(): Promise<void>;
   /** Whether a step this one was measured on was saved again after it. */
   isStale(): boolean;
   /** The titles of the steps saved again after this one. */

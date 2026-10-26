@@ -3,12 +3,11 @@
  *
  * The same card the ZMART Interface starts with: the ZMART Controller's seven
  * connection words. The microscope and its API belong to this driver and are
- * only shown; host, client, password, configuration and the output folder
- * (where this microscope saves its pictures) can be typed, filled as the driver
- * connects. A word the driver does not need is simply not used by it. The
- * settings themselves (limits, orientation, calibration, origin) always live
- * in this computer's configuration folder, C:\ProgramData\zmart-microscopy,
- * so that is shown among the checks rather than asked for.
+ * only shown; host, client and password can be typed, filled as the driver
+ * connects. Below them, the config and its output folder (where this
+ * microscope saves its pictures). A config is a folder of settings (limits,
+ * origin, orientation, calibration) on this computer, named by when it was
+ * made: a new one, or one kept here, chosen from the most recent down.
  */
 
 import { cardRow, cell, choice, field, note, press } from "../cells";
@@ -27,9 +26,9 @@ const REACHING: Typed[] = [
 /** The output folder, typed under the config in a box of their own. */
 const FOLDER: Typed = ["output_root", "Output folder", "text"];
 
-const TYPED: Typed[] = [...REACHING, ["config", "Config", "text"], FOLDER];
+const TYPED: Typed[] = [...REACHING, FOLDER];
 
-/** The Config drop-down's choice that makes a new configuration, named in a field below it. */
+/** The Config drop-down's choice that makes a new config, named by when it is made. */
 const NEW_CONFIG = "\u0000new";
 
 export const connect: View = (host, ctx) => {
@@ -44,6 +43,8 @@ export const connect: View = (host, ctx) => {
   const connected = Boolean(card.connected);
   // What is typed is kept while the step is shown; the password is never filled in.
   s.typed ??= Object.fromEntries(TYPED.map(([key]) => [key, key === "password" ? "" : card[key] ?? ""]));
+  // Another config was chosen: its output folder, the rest as typed.
+  if (s.refill) { s.typed.output_root = card.output_root ?? ""; s.refill = false; }
 
   const typedRow = ([key, label, type]: Typed) => {
     const input = field({ type, value: s.typed[key], spellcheck: "false", autocomplete: "off", "aria-label": label });
@@ -61,29 +62,31 @@ export const connect: View = (host, ctx) => {
 
   /* The button acts on both boxes, so it stands at the end of the second. */
   const { box, body } = cell("Driver configuration");
-  /* The config is chosen: a new one first, named in the field that appears
-     for it, then the previous ones -- this microscope's current setup and
-     every one the driver keeps by name. */
+  /* The config: a new one first, then every config folder kept on this
+     computer, the most recent first. Choosing one opens it, and the rail
+     shows what is done in it; a new one has nothing done, and its folder is
+     made on Connect. */
   const configs: string[] = card.configs ?? [];
-  s.configChoice ??= !s.typed.config ? "" : configs.includes(s.typed.config) ? s.typed.config : NEW_CONFIG;
+  const isNew = Boolean(card.config) && !configs.includes(card.config);
   const config = choice(
-    [[NEW_CONFIG, "New config…"], ["", "Current setup"], ...configs.map((name): [string, string] => [name, name])],
-    s.configChoice, "Config",
+    [[NEW_CONFIG, "New config…"], ...configs.map((name): [string, string] => [name, name])],
+    isNew || !card.config ? NEW_CONFIG : card.config, "Config",
   );
   config.disabled = connected;
-  config.addEventListener("change", () => {
-    s.configChoice = config.value;
-    s.typed.config = config.value === NEW_CONFIG ? "" : config.value;
+  config.addEventListener("change", async () => {
+    s.failed = null;
+    try {
+      await ctx.call("choose", { config: config.value === NEW_CONFIG ? "" : config.value });
+      // Read the card again for that config: the output folder it saved, if it saved one.
+      delete s.card;
+      delete s["card:asked"];
+      s.refill = true;
+      await ctx.reload();
+    } catch (why) { s.failed = (why as Error).message; }
     ctx.refresh();
   });
   body.append(cardRow("Config", config));
-  if (s.configChoice === NEW_CONFIG) {
-    const name = field({ type: "text", value: s.typed.config, spellcheck: "false", autocomplete: "off",
-      "aria-label": "New config name", placeholder: "a name for the new config" });
-    name.disabled = connected;
-    name.addEventListener("input", () => { s.typed.config = name.value; });
-    body.append(cardRow("Name", name));
-  }
+  if (isNew && !connected) body.append(note(`A new config, ${card.config}, is made when you connect.`));
   body.append(typedRow(FOLDER));
   if (!connected) {
     body.append(note(card.output_root_saved

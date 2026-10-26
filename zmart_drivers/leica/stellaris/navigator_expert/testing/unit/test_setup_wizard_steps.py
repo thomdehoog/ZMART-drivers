@@ -40,6 +40,7 @@ from wizard_standins import (
     install_orientation,
 )
 
+from zmart_drivers.leica.stellaris.navigator_expert import methods
 from zmart_drivers.leica.stellaris.navigator_expert.driver_setup import store
 from zmart_drivers.leica.stellaris.navigator_expert.driver_setup.wizard import steps
 from zmart_drivers.leica.stellaris.navigator_expert.primitives.cam_api import (
@@ -218,20 +219,105 @@ def test_the_session_keeps_no_password(lasx):
         scope.close()
 
 
-@pytest.mark.parametrize(
-    "typed, reason",
-    [({"host": "192.168.1.20"}, "answers on this computer only"), ({"config": "Sep 7"}, "named configurations")],
-)
-def test_a_connection_the_driver_cannot_honour_is_refused_before_anything_is_saved(
-    lasx, data_folder, typed, reason
-):
+def test_a_connection_the_driver_cannot_honour_is_refused_before_anything_is_saved(lasx, data_folder):
+    wizard = steps.leica_wizard()
+    wizard.call("connect", "choose", {"config": ""})
+
+    answer = wizard.call("connect", "connect", {"output_root": str(data_folder), "host": "192.168.1.20"})
+
+    assert answer["ok"] is False and "answers on this computer only" in answer["error"]
+    assert store.MACHINE.latest_snapshot("data_location") is None
+    assert store.MACHINE.configurations() == []  # the new config was not made either
+    assert not status(wizard, "connect")["done"]
+
+
+# --- configs ---------------------------------------------------------------------------------
+
+
+def make_config(name: str, output_root: Path) -> None:
+    """A config kept on this computer, with its output folder saved in it."""
+    store.use_configuration(name)
+    store.MACHINE.write_data_location({"folder": str(output_root)})
+    store.use_configuration(None)
+
+
+def test_the_card_lists_the_configs_kept_here_most_recent_first_and_opens_on_the_newest(data_folder):
+    make_config("config_20260907_0714", data_folder)
+    make_config("config_20261026_1915", data_folder)
+    (store.MACHINE.api_root() / "limits").mkdir(parents=True, exist_ok=True)  # not a config
+
+    card = steps.leica_wizard().call("connect", "card")["result"]
+
+    assert card["configs"] == ["config_20261026_1915", "config_20260907_0714"]
+    assert card["config"] == "config_20261026_1915"
+    assert card["output_root"] == str(data_folder)
+
+
+def test_a_new_config_has_nothing_done_and_is_made_on_connect(lasx, data_folder, tmp_path):
+    make_config("config_20260907_0714", tmp_path)
     wizard = steps.leica_wizard()
 
-    answer = wizard.call("connect", "connect", {"output_root": str(data_folder), **typed})
+    chosen = wizard.call("connect", "choose", {"config": ""})
+    name = chosen["result"]["config"]
 
-    assert answer["ok"] is False and reason in answer["error"]
-    assert store.MACHINE.latest_snapshot("data_location") is None
-    assert not status(wizard, "connect")["done"]
+    assert chosen["ok"] and store.is_configuration_name(name)
+    assert not (store.MACHINE.api_root() / name).exists()  # nothing made before Connect
+    assert not status(wizard, "limits")["done"]
+    # The new config is offered the most recent config's output folder.
+    assert wizard.call("connect", "card")["result"]["output_root"] == str(tmp_path)
+
+    assert wizard.call("connect", "connect", {"output_root": str(data_folder)})["ok"]
+    assert store.MACHINE.configurations() == [name, "config_20260907_0714"]
+    assert store.MACHINE.snapshot_root() == store.MACHINE.api_root() / name
+    assert wizard.call("connect", "card")["result"]["output_root"] == str(data_folder)
+
+
+def test_choosing_a_kept_config_shows_what_is_done_in_it(connected, data_folder):
+    connected.call("connect", "disconnect")
+    made = connected.call("connect", "choose", {"config": ""})["result"]["config"]
+    assert connected.call("connect", "connect", {"output_root": str(data_folder)})["ok"]
+    doc = connected.call("limits", "document")["result"]["document"]
+    assert connected.call("limits", "publish", {"document": doc})["ok"]
+    connected.call("connect", "disconnect")
+
+    assert connected.call("connect", "choose", {"config": ""})["result"]["config"] != made
+    assert not status(connected, "limits")["done"]
+    assert connected.call("connect", "choose", {"config": made})["result"]["config"] == made
+    assert status(connected, "limits")["done"]
+
+
+def test_the_driver_connects_to_the_most_recent_config_when_none_is_named(lasx, data_folder):
+    make_config("config_20260907_0714", data_folder)
+    make_config("config_20261026_1915", data_folder)
+
+    assert methods.checked_connection({})["config"] == "config_20261026_1915"
+    assert methods.checked_connection({"config": "config_20260907_0714"})["config"] == "config_20260907_0714"
+    with pytest.raises(ValueError, match="not kept on this computer"):
+        methods.checked_connection({"config": "config_20990101_0000"})
+    scope = methods.connect(config="config_20260907_0714")
+    try:
+        assert scope.handle.connection["config"] == "config_20260907_0714"
+        assert store.MACHINE.snapshot_root() == store.MACHINE.api_root() / "config_20260907_0714"
+    finally:
+        scope.close()
+
+
+def test_without_any_config_the_settings_stay_where_they_were():
+    assert methods.checked_connection({})["config"] is None
+    assert store.MACHINE.snapshot_root() == store.MACHINE.api_root()
+
+
+@pytest.mark.parametrize("name", ["Sep 7", "config_20990101_0000", "../limits"])
+def test_a_config_not_kept_here_is_refused(name):
+    answer = steps.leica_wizard().call("connect", "choose", {"config": name})
+
+    assert answer["ok"] is False and "no config" in answer["error"]
+
+
+def test_another_config_is_chosen_only_when_disconnected(connected):
+    answer = connected.call("connect", "choose", {"config": ""})
+
+    assert answer["ok"] is False and "Disconnect first" in answer["error"]
 
 
 def test_disconnect_closes_the_connection_and_connect_is_to_do_again(connected):

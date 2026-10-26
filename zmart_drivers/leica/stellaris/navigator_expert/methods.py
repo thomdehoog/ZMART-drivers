@@ -66,7 +66,7 @@ from .driver_setup.optical_calibration.model import load_objective_calibration
 from .driver_setup.orientation import load_rig_orientation
 from .driver_setup.origin import saved_origin
 from .driver_setup.origin import set_origin as origin_step
-from .driver_setup.store import MACHINE
+from .driver_setup.store import MACHINE, use_configuration
 from .procedures import absolute_coordinate_system
 from .procedures import acquire as acquire_step
 from .procedures.clear_cache import clear as clear_step
@@ -96,8 +96,8 @@ DRIVER_PACKAGE = __package__
 #: ``api_type`` how LAS X is reached; neither is needed to connect. ``host`` is
 #: where LAS X runs: its CAM API answers on this computer only, so any other
 #: host is refused. ``client`` is the name the CAM API knows this program by.
-#: LAS X asks no ``password``. ``config`` will name the saved configuration to
-#: work with; until the driver keeps named configurations it must stay empty.
+#: LAS X asks no ``password``. ``config`` names the config to work with, a
+#: ``config_YYYYMMDD_HHMM`` folder kept on this computer; empty, the most recent.
 #: ``output_root`` is where a capture is saved when it is not told a folder.
 #: Then the driver's own: ``api_delay_ms`` feeds the LAS X connection.
 #: ``load_limits`` and ``load_calibration`` load this microscope's limits and
@@ -130,20 +130,18 @@ def connect(**connection: Any) -> Microscope:
 
 
 def named_configurations() -> list[str]:
-    """The named configurations this driver keeps, by name: none yet.
-
-    Until it keeps them, a connection works with this microscope's current
-    setup, which is what an empty ``config`` means.
-    """
-    return []
+    """The configs kept on this computer, by folder name, the most recent first."""
+    return MACHINE.configurations()
 
 
 def checked_connection(connection: dict[str, Any] | None) -> dict[str, Any]:
     """*connection* over :data:`DEFAULT_CONNECTION`, refused before LAS X is touched when it cannot be honoured.
 
-    A field left empty takes the default. A host that is not this computer
-    and a configuration name are refused rather than ignored, so a connection
-    never silently goes somewhere other than what was typed.
+    A field left empty takes the default. An empty ``config`` is the most
+    recent config kept on this computer (none when there is none). A host
+    that is not this computer and a config that is not kept here are refused
+    rather than ignored, so a connection never silently goes somewhere other
+    than what was typed.
     """
     import socket
 
@@ -155,11 +153,19 @@ def checked_connection(connection: dict[str, Any] | None) -> dict[str, Any]:
             f"host {host!r}: LAS X's CAM API answers on this computer only; "
             f"leave host empty or use localhost"
         )
-    if connection["config"] is not None and connection["config"] not in named_configurations():
-        raise ValueError(
-            f"config {connection['config']!r}: this driver does not keep named configurations "
-            "yet; leave config empty to work with this microscope's current setup"
-        )
+    kept = named_configurations()
+    if connection["config"] is None:
+        connection["config"] = kept[0] if kept else None
+    else:
+        connection["config"] = str(connection["config"]).strip()
+        if connection["config"] not in kept:
+            raise ValueError(
+                f"config {connection['config']!r} is not kept on this computer; "
+                f"choose one of {kept} or leave config empty for the most recent"
+                if kept else
+                f"config {connection['config']!r}: no configs are kept on this computer yet; "
+                "leave config empty"
+            )
     return connection
 
 
@@ -181,6 +187,8 @@ class Microscope:
         move somewhere other than intended.
         """
         connection = checked_connection(connection)
+        # Every setting below is read from, and saved in, the chosen config.
+        use_configuration(connection["config"])
         origin = saved_origin.load_saved_origin() if connection["load_origin"] else None
         location = saved_data_location()
         MACHINE.ensure_layout()

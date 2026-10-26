@@ -19,6 +19,7 @@ place, so a later reader can still see how the numbers came about.
 from __future__ import annotations
 
 import json
+import shutil
 import tempfile
 import time
 from datetime import datetime, timezone
@@ -127,6 +128,8 @@ class LeicaSteps:
         self._orientation = None
         self._pairs: dict[tuple[int, int], object] = {}
         self._calibration_run = time.strftime("%Y-%m-%d_%H%M%S")
+        # The wizard opens on the most recent config; the steps' green follows the one chosen.
+        self._use(None)
 
     # -- Connect ------------------------------------------------------------
 
@@ -160,8 +163,42 @@ class LeicaSteps:
     def connect_status(self):
         return {"done": self._scope is not None, "note": None, "saved_at": None}
 
+    def _use(self, name: str | None) -> str | None:
+        """Work in config *name* from now on: the steps read and save there. None, the most recent."""
+        from ..store import use_configuration
+
+        kept = _machine().configurations()
+        if name is None:
+            name = kept[0] if kept else None
+        use_configuration(name)
+        self._config = name
+        return name
+
+    def _previous_data_folder(self) -> str:
+        """The output folder a config without one is offered: the most recent config's, else a suggestion."""
+        root = _machine().api_root()
+        for name in _machine().configurations():
+            saved = sorted((root / name / "data_location").glob("*/data_location.json"))
+            record = _read_json(saved[-1]) if saved else None
+            if isinstance(record, dict) and record.get("folder"):
+                return str(record["folder"])
+        return _suggested_data_folder()
+
+    def connect_choose(self, values):
+        """Choose the config, before connecting: a kept one by name, or (empty) a new one.
+
+        A new config is named now and made on Connect; until then nothing is
+        saved in it, so no step is done in it.
+        """
+        name = str(values.get("config") or "").strip()
+        if self._scope is not None:
+            raise StepError("Disconnect first to choose another config.")
+        if name and name not in _machine().configurations():
+            raise StepError(f"There is no config {name!r} on this computer.")
+        return {"config": self._use(name or _machine().new_configuration_name())}
+
     def connect_card(self, values):
-        from ...methods import DEFAULT_CONNECTION, named_configurations
+        from ...methods import DEFAULT_CONNECTION
         from ..data_location import data_location
 
         saved = data_location(_machine())
@@ -172,10 +209,10 @@ class LeicaSteps:
             "api_type": DEFAULT_CONNECTION["api_type"],
             "host": self._connection.get("host") or DEFAULT_CONNECTION["host"],
             "client": self._connection.get("client") or DEFAULT_CONNECTION["client"],
-            "config": self._connection.get("config") or "",
-            # What the Config drop-down offers beside the current setup.
-            "configs": named_configurations(),
-            "output_root": str(saved) if saved else _suggested_data_folder(),
+            # The config in use, and the ones kept here, most recent first.
+            "config": self._config or "",
+            "configs": _machine().configurations(),
+            "output_root": str(saved) if saved else self._previous_data_folder(),
             "output_root_saved": saved is not None,
             "connected": self._scope is not None,
             "checks": self._checks() if self._scope is not None else [],
@@ -186,21 +223,30 @@ class LeicaSteps:
         from ..data_location import data_location, set_data_location
 
         # Kept for connecting again; the password only for as long as the wizard runs.
+        # The config is the one chosen above the card (connect_choose).
         self._connection = {
             key: str(values.get(key) or "").strip() or None
-            for key in ("host", "client", "password", "config")
+            for key in ("host", "client", "password")
         }
+        self._connection["config"] = self._config
         # A connection that will be refused saves nothing, not even the folder.
         try:
-            checked_connection(self._connection)
+            checked_connection({**self._connection, "config": None})
         except ValueError as why:
             raise StepError(str(why)) from None
+        # A new config is made now: its folder, then its output folder in it.
+        made = None
+        if self._config is not None and self._config not in _machine().configurations():
+            made = _machine().api_root() / self._config
+            made.mkdir(parents=True)
         folder = str(values.get("output_root", "")).strip()
         saved = data_location(_machine())
         if not saved or Path(folder) != Path(saved):
             try:
                 set_data_location(folder, machine=_machine())
             except ValueError as why:
+                if made is not None:
+                    shutil.rmtree(made, ignore_errors=True)
                 raise StepError(f"The output folder cannot be used: {why}") from None
         if self._scope is None:
             self._scope = self._open()
@@ -665,6 +711,7 @@ def leica_wizard() -> Wizard:
                 "Connect to LAS X and confirm the folder this microscope saves its pictures in.",
                 {
                     "card": s.connect_card,
+                    "choose": s.connect_choose,
                     "connect": s.connect_connect,
                     "disconnect": s.connect_disconnect,
                 },
