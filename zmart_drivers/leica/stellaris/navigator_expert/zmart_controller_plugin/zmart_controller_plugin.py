@@ -41,7 +41,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from ..methods import Microscope
+from ..methods import Microscope, named_configurations
 from . import info
 from . import procedure_menu
 
@@ -58,6 +58,15 @@ class ZmartControllerPlugin:
     def __init__(self, connection: dict[str, Any] | None = None) -> None:
         """Connect: open LAS X and load this microscope's configuration (see ``Microscope``)."""
         self.microscope = Microscope(connection)
+
+    @staticmethod
+    def configurations() -> list[str]:
+        """The configs kept on this computer, the most recent first: what ``config`` may name.
+
+        Asked before connecting, so a client can offer them to choose from.
+        New configs are made in the setup wizard.
+        """
+        return named_configurations()
 
     def disconnect(self) -> None:
         """Close the session; every later command is refused. A second call does nothing."""
