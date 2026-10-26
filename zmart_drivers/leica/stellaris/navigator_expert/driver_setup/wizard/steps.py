@@ -161,7 +161,7 @@ class LeicaSteps:
         return {"done": self._scope is not None, "note": None, "saved_at": None}
 
     def connect_card(self, values):
-        from ...methods import DEFAULT_CONNECTION
+        from ...methods import DEFAULT_CONNECTION, named_configurations
         from ..data_location import data_location
 
         saved = data_location(_machine())
@@ -173,6 +173,8 @@ class LeicaSteps:
             "host": self._connection.get("host") or DEFAULT_CONNECTION["host"],
             "client": self._connection.get("client") or DEFAULT_CONNECTION["client"],
             "config": self._connection.get("config") or "",
+            # What the Config drop-down offers beside the current setup.
+            "configs": named_configurations(),
             "output_root": str(saved) if saved else _suggested_data_folder(),
             "output_root_saved": saved is not None,
             "connected": self._scope is not None,

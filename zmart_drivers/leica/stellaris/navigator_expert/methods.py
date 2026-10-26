@@ -129,6 +129,15 @@ def connect(**connection: Any) -> Microscope:
     return Microscope(connection)
 
 
+def named_configurations() -> list[str]:
+    """The named configurations this driver keeps, by name: none yet.
+
+    Until it keeps them, a connection works with this microscope's current
+    setup, which is what an empty ``config`` means.
+    """
+    return []
+
+
 def checked_connection(connection: dict[str, Any] | None) -> dict[str, Any]:
     """*connection* over :data:`DEFAULT_CONNECTION`, refused before LAS X is touched when it cannot be honoured.
 
@@ -146,7 +155,7 @@ def checked_connection(connection: dict[str, Any] | None) -> dict[str, Any]:
             f"host {host!r}: LAS X's CAM API answers on this computer only; "
             f"leave host empty or use localhost"
         )
-    if connection["config"] is not None:
+    if connection["config"] is not None and connection["config"] not in named_configurations():
         raise ValueError(
             f"config {connection['config']!r}: this driver does not keep named configurations "
             "yet; leave config empty to work with this microscope's current setup"

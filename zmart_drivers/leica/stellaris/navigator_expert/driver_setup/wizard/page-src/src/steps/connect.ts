@@ -24,13 +24,13 @@ const REACHING: Typed[] = [
   ["password", "Password", "password"],
 ];
 
-/** The words that say how the driver works with it, in a box of their own. */
-const WORKING: Typed[] = [
-  ["config", "Config", "text"],
-  ["output_root", "Output folder", "text"],
-];
+/** The output folder, typed under the config in a box of their own. */
+const FOLDER: Typed = ["output_root", "Output folder", "text"];
 
-const TYPED = [...REACHING, ...WORKING];
+const TYPED: Typed[] = [...REACHING, ["config", "Config", "text"], FOLDER];
+
+/** The Config drop-down's choice that makes a new configuration, named in a field below it. */
+const NEW_CONFIG = "\u0000new";
 
 export const connect: View = (host, ctx) => {
   const s = ctx.state;
@@ -61,7 +61,30 @@ export const connect: View = (host, ctx) => {
 
   /* The button acts on both boxes, so it stands at the end of the second. */
   const { box, body } = cell("Driver configuration");
-  body.append(...WORKING.map(typedRow));
+  /* The config is chosen: a new one first, named in the field that appears
+     for it, then the previous ones -- this microscope's current setup and
+     every one the driver keeps by name. */
+  const configs: string[] = card.configs ?? [];
+  s.configChoice ??= !s.typed.config ? "" : configs.includes(s.typed.config) ? s.typed.config : NEW_CONFIG;
+  const config = choice(
+    [[NEW_CONFIG, "New config…"], ["", "Current setup"], ...configs.map((name): [string, string] => [name, name])],
+    s.configChoice, "Config",
+  );
+  config.disabled = connected;
+  config.addEventListener("change", () => {
+    s.configChoice = config.value;
+    s.typed.config = config.value === NEW_CONFIG ? "" : config.value;
+    ctx.refresh();
+  });
+  body.append(cardRow("Config", config));
+  if (s.configChoice === NEW_CONFIG) {
+    const name = field({ type: "text", value: s.typed.config, spellcheck: "false", autocomplete: "off",
+      "aria-label": "New config name", placeholder: "a name for the new config" });
+    name.disabled = connected;
+    name.addEventListener("input", () => { s.typed.config = name.value; });
+    body.append(cardRow("Name", name));
+  }
+  body.append(typedRow(FOLDER));
   if (!connected) {
     body.append(note(card.output_root_saved
       ? "The output folder is where this microscope saves its pictures. Change it only if it should move."
