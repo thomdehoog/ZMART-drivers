@@ -7,8 +7,11 @@ what the microscope really did.
 
 - **Author:** Thom de Hoog (ZMB, University of Zurich) · thom.dehoog@zmb.uzh.ch · thomdehoog@gmail.com
 - **License:** see the repository root [`LICENSE`](../../../../LICENSE).
-- **Status:** **Beta (`0.7.0b8`).** 0.7.0b7 added the [setup wizard](driver_setup/wizard/README.md);
-  0.7.0b8 adds a check of it to the hardware CI and splits the CI into the driver on its own and the
+- **Status:** **Beta (`0.7.0b9`).** 0.7.0b9 keeps the settings in configs (`config_YYYYMMDD_HHMM`
+  folders, chosen when connecting), names the controller's seven connection words, writes a mean
+  pyramid into every store, and fixes what the first end-to-end run on the STELLARIS found
+  (26 October 2026). 0.7.0b7 added the [setup wizard](driver_setup/wizard/README.md);
+  0.7.0b8 added a check of it to the hardware CI and splits the CI into the driver on its own and the
   driver inside the ZMART Controller. Both are tested offline and not yet on the LAS X simulator or a
   STELLARIS. The driver itself is unchanged from 0.7.0b6, which passed the quick hardware acceptance on the LAS X simulator on 23 October 2026; 0.7.0b5
   passed it on the STELLARIS on 21 October 2026. Before the driver is used unattended, the findings in

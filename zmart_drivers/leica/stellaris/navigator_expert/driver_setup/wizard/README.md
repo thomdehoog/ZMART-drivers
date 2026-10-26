@@ -1,6 +1,6 @@
 # Setup wizard for the Leica STELLARIS 5
 
-A guided way to do the one-time setup of this microscope (driver version 0.7.0b8). It is the
+A guided way to do the one-time setup of this microscope (driver version 0.7.0b9). It is the
 **ZMART driver configuration** workflow that the ZMART Microscopy operator page used to have,
 now living with the driver: the same five steps, the same cells and the same wording. It
 looks like the ZMART Interface without its top row: the rail of numbered steps on the left,
