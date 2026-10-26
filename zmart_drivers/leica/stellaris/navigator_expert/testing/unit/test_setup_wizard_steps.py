@@ -64,7 +64,7 @@ def data_folder(tmp_path):
 def connected(lasx, data_folder):
     """A wizard that has been through Connect."""
     wizard = steps.leica_wizard()
-    answer = wizard.call("connect", "connect", {"data_folder": str(data_folder)})
+    answer = wizard.call("connect", "connect", {"output_root":str(data_folder)})
     assert answer["ok"], answer
     return wizard
 
@@ -114,18 +114,18 @@ def test_the_card_suggests_a_data_folder_until_one_is_saved(lasx, data_folder):
     wizard = steps.leica_wizard()
 
     card = wizard.call("connect", "card")["result"]
-    assert card["data_folder"] in (r"D:\ZMART-data", r"C:\ZMART-data")
-    assert card["data_folder_saved"] is False and card["connected"] is False
-    wizard.call("connect", "connect", {"data_folder": str(data_folder)})
+    assert card["output_root"] in (r"D:\ZMART-data", r"C:\ZMART-data")
+    assert card["output_root_saved"] is False and card["connected"] is False
+    wizard.call("connect", "connect", {"output_root":str(data_folder)})
     card = wizard.call("connect", "card")["result"]
-    assert card["data_folder"] == str(data_folder.resolve())
-    assert card["data_folder_saved"] is True and card["connected"] is True
+    assert card["output_root"] == str(data_folder.resolve())
+    assert card["output_root_saved"] is True and card["connected"] is True
 
 
 def test_connect_saves_the_data_folder_and_lists_what_it_found(lasx, data_folder):
     wizard = steps.leica_wizard()
 
-    answer = wizard.call("connect", "connect", {"data_folder": str(data_folder)})
+    answer = wizard.call("connect", "connect", {"output_root":str(data_folder)})
 
     assert answer["ok"], answer
     checks = dict(answer["result"]["checks"])
@@ -133,7 +133,7 @@ def test_connect_saves_the_data_folder_and_lists_what_it_found(lasx, data_folder
     assert checks["stage"] == "x 50000 · y 30000 · z-wide 0.0 µm"
     assert checks["objective"].startswith("slot 3 · ")
     assert checks["settings folder"] == str(store.MACHINE.snapshot_root())
-    assert checks["data folder"] == str(data_folder.resolve())
+    assert checks["output folder"] == str(data_folder.resolve())
     assert status(wizard, "connect")["done"]
 
 
@@ -150,10 +150,10 @@ def test_a_data_folder_that_cannot_hold_pictures_stops_connect_with_the_reason(
     folder = folder.replace("{tmp}", str(tmp_path))
     wizard = steps.leica_wizard()
 
-    answer = wizard.call("connect", "connect", {"data_folder": folder})
+    answer = wizard.call("connect", "connect", {"output_root":folder})
 
     assert answer["ok"] is False
-    assert answer["error"].startswith("The data folder cannot be used:")
+    assert answer["error"].startswith("The output folder cannot be used:")
     assert reason in answer["error"]
     assert not status(wizard, "connect")["done"]
 
@@ -165,11 +165,73 @@ def test_lasx_that_does_not_answer_is_reported_as_such(monkeypatch, lasx, data_f
     monkeypatch.setattr(lasx_client, "connect_python_client", unreachable)
 
     answer = steps.leica_wizard().call(
-        "connect", "connect", {"data_folder": str(data_folder)}
+        "connect", "connect", {"output_root":str(data_folder)}
     )
 
     assert answer["ok"] is False
     assert answer["error"].startswith("Could not reach LAS X.")
+
+
+def test_the_card_shows_the_seven_connection_words_as_this_driver_connects(lasx):
+    card = steps.leica_wizard().call("connect", "card")["result"]
+
+    assert {key: card[key] for key in ("microscope", "api_type", "host", "client", "config")} == {
+        "microscope": "stellaris-y42h93",
+        "api_type": "LAS X CAM API - Navigator Expert",
+        "host": "localhost",
+        "client": "PythonClient",
+        "config": "",
+    }
+    assert "password" not in card and "output_root" in card
+
+
+def test_connect_reaches_lasx_as_the_client_typed(
+    monkeypatch, lasx, data_folder
+):
+    stand_in, asked = lasx_client.connect_python_client, []
+
+    def recorded(**kw):
+        asked.append(kw["client_name"])
+        return stand_in(**kw)
+
+    monkeypatch.setattr(lasx_client, "connect_python_client", recorded)
+    wizard = steps.leica_wizard()
+
+    answer = wizard.call(
+        "connect",
+        "connect",
+        {"output_root": str(data_folder), "client": "ZmartWizard", "password": "typed"},
+    )
+
+    assert answer["ok"], answer
+    assert asked == ["ZmartWizard"]
+
+
+def test_the_session_keeps_no_password(lasx):
+    from zmart_drivers.leica.stellaris.navigator_expert import methods
+
+    scope = methods.connect(client="ZmartWizard", password="typed")
+    try:
+        assert scope.handle.connection["client"] == "ZmartWizard"
+        assert "password" not in scope.handle.connection
+    finally:
+        scope.close()
+
+
+@pytest.mark.parametrize(
+    "typed, reason",
+    [({"host": "192.168.1.20"}, "answers on this computer only"), ({"config": "Sep 7"}, "named configurations")],
+)
+def test_a_connection_the_driver_cannot_honour_is_refused_before_anything_is_saved(
+    lasx, data_folder, typed, reason
+):
+    wizard = steps.leica_wizard()
+
+    answer = wizard.call("connect", "connect", {"output_root": str(data_folder), **typed})
+
+    assert answer["ok"] is False and reason in answer["error"]
+    assert store.MACHINE.latest_snapshot("data_location") is None
+    assert not status(wizard, "connect")["done"]
 
 
 def test_disconnect_closes_the_connection_and_connect_is_to_do_again(connected):
@@ -488,7 +550,7 @@ def test_defaults_the_driver_fills_in_on_its_first_connect_do_not_count_as_done(
         limits=json.loads((limits_dir / "limits.json").read_text(encoding="utf-8")),
     )
     wizard = steps.leica_wizard()
-    assert wizard.call("connect", "connect", {"data_folder": str(data_folder)})["ok"]
+    assert wizard.call("connect", "connect", {"output_root":str(data_folder)})["ok"]
     assert (
         fresh.latest_snapshot("orientation") is not None
     )  # the defaults were filled in

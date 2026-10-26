@@ -121,6 +121,8 @@ class LeicaSteps:
 
     def __init__(self):
         self._scope = None
+        # What Connect was given, so that connecting again goes the same way.
+        self._connection: dict = {}
         self._origin = None
         self._orientation = None
         self._pairs: dict[tuple[int, int], object] = {}
@@ -138,7 +140,10 @@ class LeicaSteps:
         from ...methods import connect
 
         try:
-            return connect()
+            return connect(**self._connection)
+        except ValueError as why:
+            # The connection was refused before LAS X was touched: say why as it is.
+            raise StepError(str(why)) from None
         except Exception as why:
             raise StepError(
                 "Could not reach LAS X. Check that LAS X is running with the CAM "
@@ -156,28 +161,45 @@ class LeicaSteps:
         return {"done": self._scope is not None, "note": None, "saved_at": None}
 
     def connect_card(self, values):
+        from ...methods import DEFAULT_CONNECTION
         from ..data_location import data_location
 
         saved = data_location(_machine())
         return {
-            "microscope": "Leica STELLARIS 5 · stellaris_y42h93",
-            "api": "LAS X CAM API · Navigator Expert",
-            "data_folder": str(saved) if saved else _suggested_data_folder(),
-            "data_folder_saved": saved is not None,
+            # The ZMART Controller's seven connection words, filled as this
+            # driver connects; microscope and API belong to the driver.
+            "microscope": DEFAULT_CONNECTION["microscope"],
+            "api_type": DEFAULT_CONNECTION["api_type"],
+            "host": self._connection.get("host") or DEFAULT_CONNECTION["host"],
+            "client": self._connection.get("client") or DEFAULT_CONNECTION["client"],
+            "config": self._connection.get("config") or "",
+            "output_root": str(saved) if saved else _suggested_data_folder(),
+            "output_root_saved": saved is not None,
             "connected": self._scope is not None,
             "checks": self._checks() if self._scope is not None else [],
         }
 
     def connect_connect(self, values):
+        from ...methods import checked_connection
         from ..data_location import data_location, set_data_location
 
-        folder = str(values.get("data_folder", "")).strip()
+        # Kept for connecting again; the password only for as long as the wizard runs.
+        self._connection = {
+            key: str(values.get(key) or "").strip() or None
+            for key in ("host", "client", "password", "config")
+        }
+        # A connection that will be refused saves nothing, not even the folder.
+        try:
+            checked_connection(self._connection)
+        except ValueError as why:
+            raise StepError(str(why)) from None
+        folder = str(values.get("output_root", "")).strip()
         saved = data_location(_machine())
         if not saved or Path(folder) != Path(saved):
             try:
                 set_data_location(folder, machine=_machine())
             except ValueError as why:
-                raise StepError(f"The data folder cannot be used: {why}") from None
+                raise StepError(f"The output folder cannot be used: {why}") from None
         if self._scope is None:
             self._scope = self._open()
         return {"connected": True, "checks": self._checks()}
@@ -208,7 +230,7 @@ class LeicaSteps:
             ],
             ["job", str(snap.get("job") or "")],
             ["settings folder", str(_machine().snapshot_root())],
-            ["data folder", str(data_location(_machine()))],
+            ["output folder", str(data_location(_machine()))],
         ]
 
     # -- Define limits --------------------------------------------------------

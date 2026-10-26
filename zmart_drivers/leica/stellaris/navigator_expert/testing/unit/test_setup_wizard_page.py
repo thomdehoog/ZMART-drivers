@@ -192,11 +192,11 @@ def test_an_operator_sets_up_the_microscope_from_start_to_finish(
         win.cell("Connect to the microscope").wait_for()
         win.shot("connect-card")
 
-        # 1. Connect, with a data folder that cannot hold pictures first.
-        page.get_by_label("Data folder").fill(str(tmp_path / "missing"))
+        # 1. Connect, with an output folder that cannot hold pictures first.
+        page.get_by_label("Output folder").fill(str(tmp_path / "missing"))
         win.press("Connect")
-        win.says("The data folder cannot be used", "bad")
-        page.get_by_label("Data folder").fill(str(data))
+        win.says("The output folder cannot be used", "bad")
+        page.get_by_label("Output folder").fill(str(data))
         win.press("Connect")
         win.cell("Connection checks").wait_for()
         assert page.locator(".session-state", has_text="Connected").is_visible()
@@ -408,10 +408,13 @@ def _pretend(tmp_path, *, done=(), saved=None, overrides=None, sent=None):
     canned = {
         "connect": {
             "card": lambda v: {
-                "microscope": "Leica STELLARIS 5",
-                "api": "LAS X CAM API",
-                "data_folder": r"D:\ZMART-data",
-                "data_folder_saved": False,
+                "microscope": "stellaris-y42h93",
+                "api_type": "LAS X CAM API - Navigator Expert",
+                "host": "localhost",
+                "client": "PythonClient",
+                "config": "",
+                "output_root": r"D:\ZMART-data",
+                "output_root_saved": False,
                 "connected": connected["on"],
                 "checks": [],
             },
@@ -684,17 +687,17 @@ def test_the_cells_are_a_heading_over_a_white_card(window, tmp_path):
         "10px",
         "rgb(248, 250, 252)",
     ]
-    assert win.page.get_by_label("Data folder").input_value() == r"D:\ZMART-data"
+    assert win.page.get_by_label("Output folder").input_value() == r"D:\ZMART-data"
 
 
 def test_a_refusal_is_said_in_red_and_the_button_can_be_pressed_again(window, tmp_path):
     attempts = []
 
     def refuse_once(values):
-        attempts.append(values["data_folder"])
+        attempts.append(values["output_root"])
         if len(attempts) == 1:
             raise StepError(
-                "The data folder cannot be used: D:\\ZMART-data does not exist; make the folder first"
+                "The output folder cannot be used: D:\\ZMART-data does not exist; make the folder first"
             )
         return {"connected": True, "checks": [["driver", "x"]]}
 

@@ -91,28 +91,67 @@ from logging.handlers import RotatingFileHandler
 DRIVER_PACKAGE = __package__
 
 #: The connection settings used for any key the caller leaves out.
-#: ``microscope`` names this instrument. ``client`` and ``api_delay_ms`` feed
-#: the LAS X connection. ``output_root`` is where a capture is saved when it is
-#: not told a folder. ``load_limits`` and ``load_calibration`` load this
-#: microscope's limits and objective calibration at connect; leave both on for
-#: normal work. ``load_origin`` loads the saved zero point of the coordinate
-#: frame; set it to False only to start in plain stage coordinates, for
-#: example to capture a new origin when the saved one is damaged.
-#: ``calibration_name`` (not set by default) picks a named calibration set.
+#: The first seven are the ZMART Controller's connection words, which every
+#: client shows when connecting. ``microscope`` names this instrument and
+#: ``api_type`` how LAS X is reached; neither is needed to connect. ``host`` is
+#: where LAS X runs: its CAM API answers on this computer only, so any other
+#: host is refused. ``client`` is the name the CAM API knows this program by.
+#: LAS X asks no ``password``. ``config`` will name the saved configuration to
+#: work with; until the driver keeps named configurations it must stay empty.
+#: ``output_root`` is where a capture is saved when it is not told a folder.
+#: Then the driver's own: ``api_delay_ms`` feeds the LAS X connection.
+#: ``load_limits`` and ``load_calibration`` load this microscope's limits and
+#: objective calibration at connect; leave both on for normal work.
+#: ``load_origin`` loads the saved zero point of the coordinate frame; set it
+#: to False only to start in plain stage coordinates, for example to capture a
+#: new origin when the saved one is damaged. ``calibration_name`` (not set by
+#: default) picks a named calibration set.
 DEFAULT_CONNECTION = {
     "microscope": "stellaris-y42h93",
+    "api_type": "LAS X CAM API - Navigator Expert",
+    "host": "localhost",
     "client": "PythonClient",
-    "api_delay_ms": None,
+    "password": None,
+    "config": None,
     "output_root": None,
+    "api_delay_ms": None,
     "load_limits": True,
     "load_calibration": True,
     "load_origin": True,
 }
 
+#: The hosts that name this computer, besides its own name.
+THIS_COMPUTER = ("localhost", "127.0.0.1", "::1")
+
 
 def connect(**connection: Any) -> Microscope:
     """Open LAS X and hand back the connected microscope; see :data:`DEFAULT_CONNECTION` for the keys."""
     return Microscope(connection)
+
+
+def checked_connection(connection: dict[str, Any] | None) -> dict[str, Any]:
+    """*connection* over :data:`DEFAULT_CONNECTION`, refused before LAS X is touched when it cannot be honoured.
+
+    A field left empty takes the default. A host that is not this computer
+    and a configuration name are refused rather than ignored, so a connection
+    never silently goes somewhere other than what was typed.
+    """
+    import socket
+
+    given = {key: value for key, value in (connection or {}).items() if value not in (None, "")}
+    connection = {**DEFAULT_CONNECTION, **given}
+    host = str(connection["host"]).strip()
+    if host.lower() not in {*THIS_COMPUTER, socket.gethostname().lower()}:
+        raise ValueError(
+            f"host {host!r}: LAS X's CAM API answers on this computer only; "
+            f"leave host empty or use localhost"
+        )
+    if connection["config"] is not None:
+        raise ValueError(
+            f"config {connection['config']!r}: this driver does not keep named configurations "
+            "yet; leave config empty to work with this microscope's current setup"
+        )
+    return connection
 
 
 class Microscope:
@@ -132,7 +171,7 @@ class Microscope:
         quietly falling back to stage coordinates would put every later
         move somewhere other than intended.
         """
-        connection = {**DEFAULT_CONNECTION, **(connection or {})}
+        connection = checked_connection(connection)
         origin = saved_origin.load_saved_origin() if connection["load_origin"] else None
         location = saved_data_location()
         MACHINE.ensure_layout()
@@ -153,7 +192,8 @@ class Microscope:
         )
         handle = Session(
             client=client,
-            connection=dict(connection),
+            # Without the password: the session's connection reaches saved state and metadata.
+            connection={key: value for key, value in connection.items() if key != "password"},
             hash6=run_hash(),
             translations=translations,
             orientation=orientation,

@@ -1,16 +1,28 @@
 /**
  * Step 1 — Connect.
  *
- * The same card the ZMART Interface starts with: the microscope, its API, and
- * the folder this microscope saves its pictures in. The settings themselves
- * (limits, orientation, calibration, origin) always live in this computer's
- * configuration folder, C:\ProgramData\zmart-microscopy, so that is shown
- * among the checks rather than asked for.
+ * The same card the ZMART Interface starts with: the ZMART Controller's seven
+ * connection words. The microscope and its API belong to this driver and are
+ * only shown; host, client, password, configuration and the output folder
+ * (where this microscope saves its pictures) can be typed, filled as the driver
+ * connects. A word the driver does not need is simply not used by it. The
+ * settings themselves (limits, orientation, calibration, origin) always live
+ * in this computer's configuration folder, C:\ProgramData\zmart-microscopy,
+ * so that is shown among the checks rather than asked for.
  */
 
 import { cardRow, cell, choice, field, note, press } from "../cells";
 import { h } from "../dom";
 import { once, type View } from "./index";
+
+/** The words that can be typed, in the order the card shows them, with the label of each. */
+const TYPED: [key: string, label: string, type: string][] = [
+  ["host", "Host", "text"],
+  ["client", "Client", "text"],
+  ["password", "Password", "password"],
+  ["config", "Config", "text"],
+  ["output_root", "Output folder", "text"],
+];
 
 export const connect: View = (host, ctx) => {
   const s = ctx.state;
@@ -22,20 +34,24 @@ export const connect: View = (host, ctx) => {
   }
   const card = s.card;
   const connected = Boolean(card.connected);
-  s.folder ??= card.data_folder;
+  // What is typed is kept while the step is shown; the password is never filled in.
+  s.typed ??= Object.fromEntries(TYPED.map(([key]) => [key, key === "password" ? "" : card[key] ?? ""]));
 
   const { box, body } = cell("Connect to the microscope");
-  const microscope = choice([["stellaris", card.microscope]], "stellaris", "microscope");
-  const api = choice([["cam", card.api]], "cam", "API");
+  const microscope = choice([[card.microscope, card.microscope]], card.microscope, "Microscope");
+  const api = choice([[card.api_type, card.api_type]], card.api_type, "API");
   microscope.disabled = api.disabled = true;
-  const folder = field({ type: "text", value: s.folder, spellcheck: "false", "aria-label": "Data folder" });
-  folder.disabled = connected;
-  folder.addEventListener("input", () => { s.folder = folder.value; });
-  body.append(cardRow("Microscope", microscope), cardRow("API", api), cardRow("Data folder", folder));
+  body.append(cardRow("Microscope", microscope), cardRow("API", api));
+  for (const [key, label, type] of TYPED) {
+    const input = field({ type, value: s.typed[key], spellcheck: "false", autocomplete: "off", "aria-label": label });
+    input.disabled = connected;
+    input.addEventListener("input", () => { s.typed[key] = input.value; });
+    body.append(cardRow(label, input));
+  }
   if (!connected) {
-    body.append(note(card.data_folder_saved
-      ? "Where this microscope saves its pictures. Change it only if it should move."
-      : "Where this microscope will save its pictures: a folder on a local disk. Connect saves it."));
+    body.append(note(card.output_root_saved
+      ? "The output folder is where this microscope saves its pictures. Change it only if it should move."
+      : "The output folder is where this microscope will save its pictures: a folder on a local disk. Connect saves it."));
   }
   if (s.failed) body.append(note(s.failed, "bad"));
 
@@ -55,7 +71,7 @@ export const connect: View = (host, ctx) => {
     body.append(h("div", { class: "setup-publish" }, press("Connect", async () => {
       s.failed = null;
       try {
-        const r = await ctx.call("connect", { data_folder: s.folder });
+        const r = await ctx.call("connect", { ...s.typed });
         card.connected = true;
         card.checks = r.checks;
         await ctx.finish();
