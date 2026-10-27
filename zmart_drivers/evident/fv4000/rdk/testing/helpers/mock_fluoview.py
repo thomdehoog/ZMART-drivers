@@ -1009,7 +1009,11 @@ class MockFluoview:
                 values = {
                     "AxisStartPosition": pretend.z_positions_um[0],
                     "AxisEndPosition": pretend.z_positions_um[-1],
-                    "AxisStep": pretend.z_positions_um[1] - pretend.z_positions_um[0],
+                    # The manual does not say the step carries a sign (it tells the direction of a
+                    # stack from start and end), so the pretend FLUOVIEW gives only its size.
+                    "AxisStep": abs(
+                        pretend.z_positions_um[1] - pretend.z_positions_um[0]
+                    ),
                     "AxisMaxSize": pretend.size_z,
                 }
             else:

@@ -99,9 +99,19 @@ def read_capture(client, path: str) -> CaptureData:
     z_axis = description.axes.get("ZSTACK")
     z_positions = None
     if z_axis is not None and z_axis.size > 1 and z_axis.start is not None:
-        step = z_axis.step
-        if step is None and z_axis.end is not None:
+        # FLUOVIEW gives the first and last slice as absolute focus positions in micrometres.
+        # The step alone does not say which way the stack went (the manual tells the direction
+        # from start and end), so the slices are spread from start to end whenever both are known.
+        if z_axis.end is not None:
             step = (z_axis.end - z_axis.start) / (z_axis.size - 1)
+        elif z_axis.step is not None:
+            step = z_axis.step
+            log.warning(
+                "%s: FLUOVIEW gave no end for the z-stack, so the slices are placed upwards from its start",
+                path,
+            )
+        else:
+            step = None
         if step is not None:
             z_positions = [z_axis.start + i * step for i in range(z_axis.size)]
     t_axis = description.axes.get("TIMELAPSE")

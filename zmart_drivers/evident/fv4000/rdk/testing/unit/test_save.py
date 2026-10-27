@@ -105,10 +105,16 @@ def test_a_second_capture_of_the_same_label_never_overwrites_the_first(scope, tm
     assert naming.free_stem(tmp_path / "run", "acquisition_A1") == "acquisition_A1_002"
 
 
-def test_a_label_still_waiting_to_be_saved_cannot_be_captured_again(scope, tmp_path):
+def test_a_label_still_waiting_to_be_saved_cannot_be_captured_again(
+    scope, tmp_path, mock
+):
     scope.acquire("A1", output_folder=str(tmp_path / "run"))
+    starts = len([c for c in mock.calls if c[0] == "Protocol.startProtocol"])
     with pytest.raises(ValueError, match="still waiting"):
         scope.acquire("A1", output_folder=str(tmp_path / "run"))
+    assert len([c for c in mock.calls if c[0] == "Protocol.startProtocol"]) == starts, (
+        "refused before any scan"
+    )
     with pytest.raises(ValueError, match="no capture waiting"):
         scope.save("B2")
 
@@ -119,6 +125,7 @@ def test_an_unlabelled_capture_counts_and_the_default_folder_is_under_the_data_l
     first = scope.acquire()
     second = scope.acquire()
     assert (first["position_label"], second["position_label"]) == ("000000", "000001")
+    assert scope.handle.position_counter == 2, "the counter moves only for pictures taken"
     records = scope.save()
     assert all(str(tmp_path / "out" / ".staging") in r["files"][0] for r in records)
 

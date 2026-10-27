@@ -80,12 +80,6 @@ def _with_defaults(handle, settings: dict | None) -> dict:
     return resolved
 
 
-def _next_position_label(handle) -> str:
-    label = f"{handle.position_counter:06d}"
-    handle.position_counter += 1
-    return label
-
-
 def _export_state(handle, *, stem: str, target: str) -> dict:
     """What only the moment of the capture can tell, in the words of the ZMART metadata convention."""
     xyz = try_(lambda: get_xyz(handle)) or {}
@@ -155,15 +149,19 @@ def acquire(
             "the stage position or the objective is not what get_xyz or set_xyz last reported "
             "(changed in FLUOVIEW?); the capture is placed from the fresh reading",
         )
-    acq = changes.take_picture(handle.client)
-
+    # The label is checked before the scan, so a refused label never costs a picture.
     label = (
-        position_label if position_label is not None else _next_position_label(handle)
+        position_label
+        if position_label is not None
+        else f"{handle.position_counter:06d}"
     )
     if any(waiting.label == label for waiting in handle.unsaved):
         raise ValueError(
             f"a capture labelled {label!r} is still waiting to be saved; run save_data first, or choose another label"
         )
+    acq = changes.take_picture(handle.client)
+    if position_label is None:
+        handle.position_counter += 1  # counted only once the picture was taken
     named = Naming(
         stem=free_stem(output_root, Naming(stem=f"{acquisition_type}_{label}").stem)
     )
