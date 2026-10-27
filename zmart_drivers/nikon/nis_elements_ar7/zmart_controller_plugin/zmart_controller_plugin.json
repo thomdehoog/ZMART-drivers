@@ -1,0 +1,15 @@
+{
+  "name": "nikon-nis-elements-ar7",
+  "connection": {
+    "microscope": "nikon-microscope",
+    "api_type": "NIS-Elements AR 7, macro functions through its own Python (the ZMART bridge)",
+    "host": "localhost",
+    "password": null,
+    "config": null,
+    "output_root": null,
+    "port": 54472,
+    "timeout_s": 10.0,
+    "load_limits": true,
+    "load_origin": true
+  }
+}

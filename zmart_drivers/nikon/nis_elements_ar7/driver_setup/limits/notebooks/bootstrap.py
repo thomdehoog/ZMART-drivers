@@ -1,0 +1,9 @@
+"""Put the repository on the import path, so the driver imports by its full name uninstalled."""
+
+import sys
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parents[6]
+
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))

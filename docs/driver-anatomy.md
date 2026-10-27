@@ -453,8 +453,31 @@ Saving it is `save_data`; letting LAS X go of it is `clear_cache`.
 - The direction of a saved stack is checked in the code and the offline
   tests, not yet on a microscope.
 
-The Nikon, ZEISS and mesoSPIM drivers and the controller's mock driver are not
-in this beta. When they come back, they come back in this anatomy.
+## The Nikon driver
+
+The Nikon driver, `zmart_drivers/nikon/nis_elements_ar7/`, is the second
+driver in this anatomy. It reaches NIS-Elements AR 7 one way, so it has one
+class of primitive, `primitives/nis_python/`: a small server, the bridge,
+runs inside NIS's own Python and calls NIS's macro functions on NIS's thread,
+and the driver's client talks to it over a connection on the same computer.
+The dispatcher is the Leica driver's, copied unchanged.
+
+### Where the Nikon driver differs
+
+- The bridge (`primitives/nis_python/server.py`) runs inside NIS, not in the
+  driver's Python, so it imports only the standard library. A macro written by
+  `driver_setup/nis_bridge/` starts it.
+- A capture and its saving are one step: the bridge's `snap` has NIS save the
+  picture as a TIFF, and `procedures/save_data/` converts it to OME-Zarr at
+  once. There is no cache in NIS to clear.
+- There is no objective calibration. Instead, `driver_setup/pixel_size/`
+  records the picture size and pixel size seen for each objective and optical
+  configuration, which `get_state` reports.
+- Most of what NIS 7 does with the microscope switched on is not yet known;
+  `testing/hardware/check_hardware.py` asks it.
+
+The ZEISS and mesoSPIM drivers and the controller's mock driver are not in
+this beta. When they come back, they come back in this anatomy.
 
 ## Open questions
 

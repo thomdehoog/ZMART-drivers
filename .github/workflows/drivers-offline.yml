@@ -35,14 +35,19 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest]
         python-version: ["3.11", "3.12"]
-        driver: [leica]
+        driver: [leica, nikon]
         # An entry below with another install value cannot merge into these
         # jobs, so GitHub adds it as a job of its own.
         install: [with-controller]
         include:
-          - install: with-controller
+          - driver: leica
+            install: with-controller
             extras: leica,controller,test
             run: python zmart_drivers/leica/stellaris/navigator_expert/testing/run_ci.py --controller
+          - driver: nikon
+            install: with-controller
+            extras: nikon,controller,test
+            run: python zmart_drivers/nikon/nis_elements_ar7/testing/run_ci.py --controller
           # The driver by itself, without the controller, once per system.
           - driver: leica
             install: alone
@@ -56,6 +61,18 @@ jobs:
             python-version: "3.12"
             extras: leica,test
             run: python zmart_drivers/leica/stellaris/navigator_expert/testing/run_ci.py
+          - driver: nikon
+            install: alone
+            os: ubuntu-latest
+            python-version: "3.12"
+            extras: nikon,test
+            run: python zmart_drivers/nikon/nis_elements_ar7/testing/run_ci.py
+          - driver: nikon
+            install: alone
+            os: windows-latest
+            python-version: "3.12"
+            extras: nikon,test
+            run: python zmart_drivers/nikon/nis_elements_ar7/testing/run_ci.py
     steps:
       - uses: actions/checkout@v4
         with:

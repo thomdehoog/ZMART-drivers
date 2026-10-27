@@ -1,0 +1,7 @@
+{
+  "x_um": {"range": [-1000000, 1000000]},
+  "y_um": {"range": [-1000000, 1000000]},
+  "z_um": {"range": [-1000000, 1000000]},
+  "objective_position": [],
+  "optical_configuration": []
+}

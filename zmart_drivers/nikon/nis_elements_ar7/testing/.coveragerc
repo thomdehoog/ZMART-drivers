@@ -1,0 +1,17 @@
+# Coverage for the Nikon driver: what the offline suite reaches of the driver's own code.
+#
+# run_ci.py hands this file to pytest-cov. The tests themselves are left out,
+# and so are the parts that run only inside NIS-Elements or on Windows
+# (the bridge's macro calls and its dialog watcher).
+[run]
+branch = True
+omit =
+    */testing/*
+
+[report]
+fail_under = 75
+exclude_also =
+    if __name__ == .__main__.:
+    if TYPE_CHECKING:
+    raise NotImplementedError
+    if sys.platform == "win32":

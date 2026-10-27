@@ -1,9 +1,10 @@
 """ZMART Drivers: the drivers that connect the ZMART Controller to real microscopes.
 
 Each driver lives in its own folder, organised by vendor, then by microscope,
-then by the vendor interface it uses. This beta holds one driver::
+then by the vendor interface it uses. This beta holds two drivers::
 
     zmart_drivers/leica/stellaris/navigator_expert/   Leica STELLARIS, LAS X
+    zmart_drivers/nikon/nis_elements_ar7/             Nikon microscopes, NIS-Elements AR 7 (an alpha)
 
 Importing this package does not import the driver. Use the driver by itself
 with its ``connect()``, or register its folder, which holds
