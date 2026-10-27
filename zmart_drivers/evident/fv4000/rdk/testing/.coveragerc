@@ -1,0 +1,14 @@
+# Coverage configuration for the FV4000 RDK driver, pinned by run_ci.py.
+[run]
+branch = True
+omit =
+    */testing/*
+
+[report]
+# The floor is set under the suite's first measurement (offline, 2026-10-27),
+# so it locks in today's level without flaking.
+fail_under = 60
+exclude_also =
+    if __name__ == .__main__.:
+    if TYPE_CHECKING:
+    raise NotImplementedError

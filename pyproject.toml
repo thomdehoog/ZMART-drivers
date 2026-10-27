@@ -47,8 +47,20 @@ leica = [
     "pywin32>=306; sys_platform == 'win32'",
     "comtypes>=1.4; sys_platform == 'win32'",
 ]
+# The Evident FV4000 driver: it talks to FLUOVIEW over XML-RPC with Python's
+# own standard library, so it needs only what reading a picture back and
+# saving it as OME-Zarr 0.5 takes (numpy, zarr, ome-zarr-models), plus
+# ipython, which its setup notebooks show their steps with. It runs on any
+# computer that can reach FLUOVIEW's computer over the network.
+evident = [
+    "numpy>=1.24",
+    "zarr>=3",
+    "ome-zarr-models>=1.7",
+    "ipython>=8",
+]
 # The ZMART Controller the driver plugs into. It is not on PyPI, so it is
-# installed from its own repository: pip install "zmart-drivers[leica,controller]".
+# installed from its own repository: pip install "zmart-drivers[leica,controller]"
+# (or "zmart-drivers[evident,controller]").
 controller = [
     "zmart-controller @ git+https://github.com/ZMB-UZH/ZMART-controller@v0.4.0rc8",
 ]

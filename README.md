@@ -37,16 +37,17 @@ and the driver plugged into it does the rest:
 How a driver is organised inside, so that the safety behaviour is the same on every
 microscope, is described in [the anatomy of a ZMART driver](docs/driver-anatomy.md).
 
-## The driver in this beta
+## The drivers in this beta
 
 | Microscope | Vendor interface | Driver | Status |
 |---|---|---|---|
 | Leica STELLARIS | LAS X: its hardware server first, the Python (CAM) API behind it | [`zmart_drivers/leica/stellaris/navigator_expert/`](zmart_drivers/leica/stellaris/navigator_expert/README.md) | **Beta `0.7.0b9`.** 0.7.0b9 keeps the settings in configs chosen when connecting, writes a mean pyramid into every store, and fixes what the first end-to-end run on the STELLARIS found. 0.7.0b6 tested on the LAS X simulator, 0.7.0b5 also on a STELLARIS; 0.7.0b7 adds the setup wizard and 0.7.0b8 its hardware check and a CI that also runs without the controller, tested offline. Laid out as [the anatomy of a ZMART driver](docs/driver-anatomy.md) describes. |
+| Evident FLUOVIEW FV4000 | FLUOVIEW's Remote Development Kit (RDK, FV40S-RMTDK): XML-RPC over the network | [`zmart_drivers/evident/fv4000/rdk/`](zmart_drivers/evident/fv4000/rdk/README.md) | **Beta `0.7.0b9`, offline only.** Written from the RDK manual, laid out as the anatomy describes, with the dispatcher shared byte for byte with the Leica driver. Tested against a pretend FLUOVIEW that follows the manual; not yet run on an FV4000. |
 
-This beta holds only the Leica driver. The Nikon, ZEISS, mesoSPIM and Evident drivers are in
-the repository's history.
+This beta holds the Leica driver, tested on a STELLARIS, and the new Evident driver, tested
+offline only. The Nikon, ZEISS and mesoSPIM drivers are in the repository's history.
 
-The driver works by itself, from a notebook or a script, and it plugs into the ZMART
+Each driver works by itself, from a notebook or a script, and it plugs into the ZMART
 Controller. Its README says how to do both. Before the first experiment, a few things are set
 up once on the microscope: the travel limits, the image orientation, the objective calibration
 and the zero point of the coordinates. The notebooks for them are in the driver's
@@ -60,11 +61,12 @@ folder, and install it with the Leica extra. The driver works on its own; add th
 extra to drive it through the ZMART Controller as well.
 
 ```bash
-pip install -e ".[leica]"              # the driver on its own
+pip install -e ".[leica]"              # the Leica driver on its own
 pip install -e ".[leica,controller]"   # with the ZMART Controller
+pip install -e ".[evident]"            # the Evident driver instead, or as well
 ```
 
-The driver runs on the computer that runs LAS X, because it loads Leica's interface into
+The Leica driver runs on the computer that runs LAS X, because it loads Leica's interface into
 Python. Use it by itself:
 
 ```python
@@ -87,7 +89,10 @@ mic.connect("stellaris")
 print(mic.get_info()["output"]["description"])
 ```
 
-From 0.7.0b2 the driver's folder is `leica/stellaris`, one folder for every STELLARIS; which
+The Evident driver is used the same way, from `zmart_drivers.evident.fv4000.rdk` (its `connect()`
+takes the `host` of the FLUOVIEW computer), and registered from `zmart_drivers/evident/fv4000/rdk`.
+
+From 0.7.0b2 the Leica driver's folder is `leica/stellaris`, one folder for every STELLARIS; which
 microscope it is stays in its configuration. A computer that registered the driver from
 `leica/stellaris_y42h93` registers it again from the new folder.
 
@@ -101,13 +106,14 @@ that review are resolved.
 
 ## Testing
 
-The driver carries its own offline test suite, which runs without a microscope or vendor
+Each driver carries its own offline test suite, which runs without a microscope or vendor
 software. Install the test extra, then run it from the root folder of this repository:
 
 ```bash
 pip install -e ".[leica,test]"                # the driver on its own
 pip install -e ".[leica,controller,test]"     # also with the ZMART Controller
 python zmart_drivers/leica/stellaris/navigator_expert/testing/run_ci.py
+python zmart_drivers/evident/fv4000/rdk/testing/run_ci.py     # the Evident driver (extra: evident)
 ```
 
 The suite has two layers. The first checks the driver on its own, which is how many people use
@@ -115,8 +121,8 @@ it. The second checks the driver inside the ZMART Controller; it runs when the c
 installed and is shown as `SKIP` when it is not. Add `--controller` to make a missing
 controller a failure instead, on a computer that is meant to have it.
 
-The continuous-integration workflow in `.github/workflows/` runs both layers on Linux and
-Windows, with Python 3.11 and 3.12, and the driver alone on both systems as well.
+The continuous-integration workflow in `.github/workflows/` runs both layers of each driver on
+Linux and Windows, with Python 3.11 and 3.12, and each driver alone on both systems as well.
 
 ## Author
 

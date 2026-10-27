@@ -453,6 +453,23 @@ Saving it is `save_data`; letting LAS X go of it is `clear_cache`.
 - The direction of a saved stack is checked in the code and the offline
   tests, not yet on a microscope.
 
+## The Evident driver
+
+The Evident FV4000 driver, `zmart_drivers/evident/fv4000/rdk/`, is the second
+driver in this anatomy and the first built against it from the start. It has one
+primitive class, `primitives/rdk/`, which speaks FLUOVIEW's Remote Development
+Kit over XML-RPC, and no second route. Its `dispatcher/` is the Leica driver's,
+byte for byte, and a test keeps it so. Where it differs:
+
+- A sixth setup item, the frame (`driver_setup/frame.py`), is learned from the
+  pictures rather than measured: FLUOVIEW's settings do not report the image
+  size or pixel size the controller asks for.
+- There is no setup wizard; the notebooks do the work.
+- `stop()` and `live()` exist, because the RDK offers them; the open question on
+  stopping below is answered for this driver.
+
+[`docs/evident/architecture.md`](evident/architecture.md) has the tables.
+
 The Nikon, ZEISS and mesoSPIM drivers and the controller's mock driver are not
 in this beta. When they come back, they come back in this anatomy.
 

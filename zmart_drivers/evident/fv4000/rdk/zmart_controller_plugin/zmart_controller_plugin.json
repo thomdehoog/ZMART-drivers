@@ -1,0 +1,17 @@
+{
+  "name": "fv4000",
+  "connection": {
+    "microscope": "fv4000",
+    "api_type": "FLUOVIEW RDK (XML-RPC)",
+    "host": "127.0.0.1",
+    "port": 8080,
+    "password": null,
+    "config": null,
+    "output_root": null,
+    "remote_mode": true,
+    "escape_objective": false,
+    "load_limits": true,
+    "load_calibration": true,
+    "load_origin": true
+  }
+}
