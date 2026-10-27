@@ -143,10 +143,13 @@ def test_load_settings_from_live_and_stop(scope, mock):
     )
     with pytest.raises(RuntimeError):
         scope.load_settings_from("D:/nowhere.oir")
-    assert scope.live(True)["confirmed"] is True and mock.state == "SCANNING"
-    assert scope.live(False)["confirmed"] is True
-    with pytest.raises(RuntimeError, match="failed"):
-        scope.stop()  # nothing runs
+    assert scope.live(True)["confirmed"] is True and mock.state == "RESTING"
+    assert scope.live(False)["confirmed"] is True and mock.state == "IDLING"
+    stopped = (
+        scope.stop()
+    )  # nothing runs: nothing is sent, and the goal is already reached
+    assert stopped["success"] is True and "nothing was running" in stopped["message"]
+    assert not [c for c in mock.calls if c[0] == "Protocol.stopProtocol"]
 
 
 def test_the_state_reports_everything_changeable_and_set_state_applies_it_in_order(

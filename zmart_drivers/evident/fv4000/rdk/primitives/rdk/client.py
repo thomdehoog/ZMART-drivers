@@ -24,7 +24,6 @@ from __future__ import annotations
 
 import http.client
 import logging
-import socket
 import threading
 import time
 import xmlrpc.client
@@ -72,17 +71,51 @@ class RdkAddress:
         return f"http://{self.host}:{self.port}/xmlrpc"
 
 
-class _TimeoutTransport(xmlrpc.client.Transport):
-    """The standard HTTP transport, with a timeout on every connection."""
+class _NotReached(OSError):
+    """The connection to FLUOVIEW could not even be opened, so nothing was sent."""
+
+
+class _OneTryTransport(xmlrpc.client.Transport):
+    """The standard HTTP transport, changed in two ways that matter for a microscope.
+
+    First, every call is sent exactly once. Python's own transport quietly
+    sends a request a second time when the connection is reset during it,
+    which for ``Protocol.startProtocol`` would be a second picture. Here a
+    reset is reported, and the driver's own rules decide whether the call
+    may go again (a capture never does).
+
+    Second, every call opens its own connection, with a timeout, and closes it
+    afterwards. A connection kept open between calls could have been closed by
+    FLUOVIEW in the meantime, and the standard transport's answer to that is
+    the very resend this class removes. The connection is opened before the
+    request is written, so a failure to open it is told apart from a failure
+    after the request went out (:class:`_NotReached`).
+    """
 
     def __init__(self, timeout_s: float):
         super().__init__()
         self._timeout_s = timeout_s
 
     def make_connection(self, host):
-        connection = http.client.HTTPConnection(host, timeout=self._timeout_s)
-        self._connection = host, connection
-        return connection
+        if self._connection and host == self._connection[0]:
+            return self._connection[1]
+        address, self._extra_headers, _x509 = self.get_host_info(host)
+        self._connection = (
+            host,
+            http.client.HTTPConnection(address, timeout=self._timeout_s),
+        )
+        return self._connection[1]
+
+    def request(self, host, handler, request_body, verbose=False):
+        connection = self.make_connection(host)
+        try:
+            try:
+                connection.connect()
+            except OSError as why:
+                raise _NotReached(str(why)) from why
+            return self.single_request(host, handler, request_body, verbose)
+        finally:
+            self.close()
 
 
 class RdkClient:
@@ -106,7 +139,7 @@ class RdkClient:
         self.min_gap_s = min_gap_s
         self._proxy = xmlrpc.client.ServerProxy(
             self.address.url,
-            transport=_TimeoutTransport(timeout_s),
+            transport=_OneTryTransport(timeout_s),
             allow_none=False,
             # Binary answers (the pixels of a picture) come back as plain bytes.
             use_builtin_types=True,
@@ -136,22 +169,18 @@ class RdkClient:
             self._pace()
             try:
                 reply = target(payload) if payload is not None else target()
-            except (ConnectionRefusedError, socket.gaierror, TimeoutError) as why:
+            except _NotReached as why:
+                # Nothing was sent: FLUOVIEW is closed, the RDK is off, or the address is wrong.
                 raise ConnectionLost(
                     f"FLUOVIEW does not answer at {self.address.url} ({why}); check that "
                     "FLUOVIEW is running, that its RDK is switched on, and the address and port"
                 ) from why
-            except (
-                ConnectionResetError,
-                ConnectionAbortedError,
-                http.client.RemoteDisconnected,
-            ) as why:
+            except (OSError, http.client.HTTPException) as why:
+                # The request went out, but its answer never came back whole: a reset (the
+                # manual's error 10054), a dropped connection, or no answer within the timeout.
                 raise CallInterrupted(
-                    f"{method}: the connection to FLUOVIEW broke ({why})"
-                ) from why
-            except OSError as why:
-                raise ConnectionLost(
-                    f"{method}: FLUOVIEW could not be reached ({why})"
+                    f"{method}: the connection to FLUOVIEW broke after the call was sent ({why}); "
+                    "FLUOVIEW may or may not have carried it out, so look at FLUOVIEW before trying again"
                 ) from why
             except xmlrpc.client.ProtocolError as why:
                 raise ConnectionLost(

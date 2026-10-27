@@ -1,5 +1,7 @@
 """Taking a picture: sent once, watched until the scan ran, and never sent again."""
 
+import time
+
 import pytest
 
 from zmart_drivers.evident.fv4000.rdk.procedures import changes
@@ -71,3 +73,23 @@ def test_stop_ends_a_running_scan_and_sees_fluoview_idle(governed_client, mock):
         and result["confirmed"] is True
         and mock.state == "IDLING"
     )
+
+
+def test_a_capture_is_not_sent_and_does_not_hang_when_fluoview_stops_answering(
+    governed_client, mock
+):
+    mock.connected = False
+    started = time.monotonic()
+    result = changes.acquire(governed_client, poll_interval=0.02)
+    assert result["success"] is False and "did not answer" in result["message"]
+    assert time.monotonic() - started < 10, (
+        "the wait gives up after one round of windows"
+    )
+    assert not [c for c in mock.calls if c[0] == "Protocol.startProtocol"]
+
+
+def test_a_stop_after_the_scan_ended_by_itself_is_a_success(governed_client, mock):
+    mock.scan_s = 0.0
+    mock.call("Protocol.startProtocol", {"executionType": "EXECUTION_TYPE_MANUAL_MAIN"})
+    result = changes.stop(governed_client)
+    assert result["success"] is True and result["confirmed"] is True

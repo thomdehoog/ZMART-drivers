@@ -125,7 +125,9 @@ def test_an_unlabelled_capture_counts_and_the_default_folder_is_under_the_data_l
     first = scope.acquire()
     second = scope.acquire()
     assert (first["position_label"], second["position_label"]) == ("000000", "000001")
-    assert scope.handle.position_counter == 2, "the counter moves only for pictures taken"
+    assert scope.handle.position_counter == 2, (
+        "the counter moves only for pictures taken"
+    )
     records = scope.save()
     assert all(str(tmp_path / "out" / ".staging") in r["files"][0] for r in records)
 

@@ -185,6 +185,7 @@ config folder (`config_YYYYMMDD_HHMM`) and chosen when connecting with `connect(
 | The RDK endpoint | `http://<host>:8080/xmlrpc`; the port is set in FLUOVIEW's `cellSens_FV.ini` with `-rdkport` |
 | Time between two calls | at least 20 ms, so FLUOVIEW is never flooded (a flood closes the socket, error 10054) |
 | One call's timeout | 30 s |
+| Connections | one per call, opened and closed again; a call is sent once, never again by the network layer |
 | The pictures FLUOVIEW writes | the folder set in FLUOVIEW; the driver reads them back through the RDK's IDA calls, so they need not be reachable from this computer |
 
 These numbers live in `primitives/rdk/client.py`; the waiting rules in `primitives/rdk/profile.py`.
@@ -202,9 +203,12 @@ Everything below was taken from the manual and is marked in the code. The hardwa
    absolute) and only reads the piezo. How the two add up to the focus, and whether a z-stack is swept
    with the motor or the piezo, is not known from the manual; a stack's plane heights are taken from the
    picture itself.
-3. **The objective slot.** The manual lists the slot of `LSM_MICROSCOPE_OBJECTIVE_LENS_SETTING` as a
-   string but FLUOVIEW answers a number; the driver sends a number (`REVOLVER_INDEX_AS` in
-   `primitives/rdk/writes.py`). If FLUOVIEW refuses it with INVALID_PARAMETERS, switch it to `str`.
+3. **The objective slot.** The manual's set of `LSM_MICROSCOPE_OBJECTIVE_LENS_CURRENT_SETTING` takes the
+   slot as a string, while its get answers a number; the driver sends a string, as the manual says
+   (`REVOLVER_INDEX_AS` in `primitives/rdk/writes.py`). If FLUOVIEW refuses it with
+   INVALID_PARAMETERS, switch it to `int`. The manual does not name the struct the current objective
+   comes back in, nor the list a channel's lasers come back in; the driver looks for them in the reply
+   and in any struct or list inside it.
 4. **`z_type`.** The manual names two keys for the stack method; the driver sends `method` only.
 5. **The time-lapse unit.** The interval is sent in the finest unit the manual lists; check that the
    read-back agrees for an interval in minutes.
@@ -212,6 +216,13 @@ Everything below was taken from the manual and is marked in the code. The hardwa
    positions; confirm with a sample that has an obvious top and bottom.
 7. **The orientation and the pixel size** of a saved picture, with the orientation notebook and a
    stage micrometer.
+8. **The state of a live scan.** The manual allows `Repeat.stop` only in RESTING or WAITING, which
+   suggests a live scan reports RESTING. The driver counts any state but IDLING as the live scan
+   running; check which one FLUOVIEW shows.
+9. **Long moves.** A move is read back for four windows of 3 s, and sent again between windows. An
+   XY move or an objective change that takes longer than about 12 s is reported unconfirmed even if
+   it arrives. Time the longest move across the measured travel; if it comes near 12 s, lengthen the
+   windows in `primitives/rdk/profile.py`.
 
 ## More about the driver
 

@@ -11,7 +11,7 @@ import os
 import platform
 import subprocess
 import sys
-from datetime import UTC, datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 _HERE = Path(__file__).resolve().parent

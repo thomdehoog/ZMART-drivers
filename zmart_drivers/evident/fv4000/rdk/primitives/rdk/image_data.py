@@ -148,11 +148,17 @@ class OpenedImage:
     # --- the description ----------------------------------------------------------------
 
     def property(self, key: str, **additional):
-        """One property of the area (``getProperty``): its ``value``."""
+        """One property of the area (``getProperty``): its ``value``.
+
+        Most properties answer under ``value``; ``ChannelInfo`` answers under
+        ``structValue`` (the manual's getProperty table), so that is read when
+        there is no ``value``.
+        """
         payload = {"areaId": self.area_id, "key": key}
         if additional:
             payload["additional"] = additional
-        return _ida(self.client, "getProperty", **payload).get("value")
+        answer = _ida(self.client, "getProperty", **payload)
+        return answer.get("value", answer.get("structValue"))
 
     def _describe(self) -> ImageDescription:
         channel_ids = [str(c) for c in _as_list(self.property("EnabledChannelIdList"))]
@@ -243,7 +249,16 @@ class OpenedImage:
             axisInfo=axis_info,
         )
         image_id = answer["imageId"]
-        return str(image_id[0]) if isinstance(image_id, list) else str(image_id)
+        if not isinstance(image_id, list):
+            return str(image_id)
+        if not image_id:
+            raise RuntimeError(
+                f"{self.path}: FLUOVIEW gave no image id for channel {channel_id}"
+            )
+        # One id is expected; any others are released at once, so none is left open in FLUOVIEW.
+        for extra in image_id[1:]:
+            self._release_image(str(extra))
+        return str(image_id[0])
 
     def _release_image(self, image_id: str) -> None:
         try:
@@ -256,9 +271,17 @@ class OpenedImage:
     ) -> np.ndarray:
         """The pixels of one plane as a 2-D array (rows, columns), fetched in pieces until FLUOVIEW says it is whole."""
         description = self.description
-        image_id = self._image_id(
-            channel_id, {"TIMELAPSE": t, "ZSTACK": z, "LAMBDA": lam}
-        )
+        asked = {"TIMELAPSE": t, "ZSTACK": z, "LAMBDA": lam}
+        missing = [
+            name
+            for name, index in asked.items()
+            if index and name not in description.axes
+        ]
+        if missing:
+            raise ValueError(
+                f"{self.path} has no {', '.join(missing)} axis, so only index 0 exists there (asked {asked})"
+            )
+        image_id = self._image_id(channel_id, asked)
         try:
             answer = _ida(
                 self.client,
@@ -309,8 +332,16 @@ def _as_list(value) -> list:
         return []
     if isinstance(value, list):
         if len(value) == 1 and isinstance(value[0], list):
-            return value[0]
-        return value
+            value = value[0]
+        # The manual describes some lists as names "separated by comma", so a list may
+        # hold one text with several names in it; each name becomes its own entry.
+        flat = []
+        for entry in value:
+            if isinstance(entry, str) and "," in entry:
+                flat.extend(part.strip() for part in entry.split(",") if part.strip())
+            else:
+                flat.append(entry)
+        return flat
     if isinstance(value, str):
         return [part.strip() for part in value.split(",") if part.strip()]
     return [value]

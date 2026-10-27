@@ -207,11 +207,12 @@ def test_a_matl_group_is_registered_and_its_position_checked_like_a_move(
         governed_client, "matl_xy", group_id=group_id, x_um=9e9, y_um=0.0
     )
     assert refused["success"] is False and "refused" in refused["message"]
+    # FLUOVIEW cannot read the switch back, so the change is confirmed by nothing.
     assert (
         changes.change(governed_client, "matl_enable", group_id=group_id, enable=False)[
             "confirmed"
         ]
-        is True
+        is None
     )
     assert (
         changes.change(governed_client, "matl_delete", group_id=group_id)["success"]
@@ -261,7 +262,7 @@ def test_remote_mode_load_parameter_and_the_live_scan(governed_client, mock):
     assert changes.load_parameter(governed_client, "  ")["success"] is False
     assert (
         changes.repeat_scan(governed_client, True)["confirmed"] is True
-        and mock.state == "SCANNING"
+        and mock.state == "RESTING"
     )
     assert (
         changes.repeat_scan(governed_client, False)["confirmed"] is True
@@ -320,3 +321,36 @@ def test_the_gate_keys_the_limits_by_the_connection(governed_client, client):
     assert gate.state_of(governed_client) is not None
     gate.uninstall(governed_client)
     assert changes.move_z(client, 2500.0)["success"] is False
+
+
+def test_the_objective_and_a_channels_lasers_are_found_in_either_reply_shape():
+    from zmart_drivers.evident.fv4000.rdk.primitives.rdk import reads
+
+    class Replies:
+        def __init__(self, reply):
+            self.reply = reply
+
+        def call(self, method, payload=None):
+            return {"result": "OK", **self.reply}
+
+    flat = Replies({"revolverIndex": 2, "lensName": "60x"})
+    nested = Replies({"value": {"revolverIndex": 2, "lensName": "60x"}})
+    listed = Replies({"value": [{"revolverIndex": 2, "lensName": "60x"}]})
+    for client in (flat, nested, listed):
+        assert reads.get_objective(client) == {"slot": 2, "name": "60x"}
+    entry = {
+        "imagingDeviceMode": "IMAGING",
+        "laserScannerMode": "MAIN",
+        "laserId": "LASER_488",
+    }
+    assert reads.get_channel_laser(Replies({"laser": [entry]}), "CH1") == ["LASER_488"]
+    assert reads.get_channel_laser(Replies({"value": [entry]}), "CH1") == ["LASER_488"]
+
+
+def test_the_objective_slot_is_sent_as_text_as_the_manual_says(governed_client, mock):
+    objectives = readings.get_objectives(governed_client)
+    assert (
+        changes.set_objective(governed_client, objectives, slot=1)["confirmed"] is True
+    )
+    sent = [c[1] for c in mock.calls if c[0] == "Parameter.setParameter"][-1]
+    assert sent["revolverIndex"] == "1"

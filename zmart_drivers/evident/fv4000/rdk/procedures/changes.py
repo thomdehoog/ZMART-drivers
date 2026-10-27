@@ -183,8 +183,31 @@ def repeat_scan(client, start: bool) -> dict:
 
 
 def stop(client, execution_type: str = MANUAL_MAIN) -> dict:
-    """Stop the imaging that is running, and see FLUOVIEW go idle."""
-    return _run(client, writes.stop(execution_type))
+    """Stop the imaging that is running, and see FLUOVIEW go idle.
+
+    FLUOVIEW refuses a stop while it is already idle (the manual's section
+    3.6), so when nothing is running there is nothing to send, and the answer
+    says so with ``success`` True. A scan that ends by itself just as the stop
+    is sent is treated the same way: the goal, an idle FLUOVIEW, is reached.
+    """
+    if readers.read_now("scan_state", client) == "IDLING":
+        return {
+            **dispatch.refused(
+                f"stop ({execution_type}) | nothing was running, so nothing was sent",
+                logged=False,
+            ),
+            "success": True,
+            "confirmed": True,
+        }
+    result = _run(client, writes.stop(execution_type))
+    if not result["success"] and readers.read_now("scan_state", client) == "IDLING":
+        result["success"] = True
+        result["confirmed"] = True
+        result["message"] = (
+            f"stop ({execution_type}) | the scan ended by itself while the stop was being sent"
+        )
+        result["logs"].append(make_log_entry("info", result["message"]))
+    return result
 
 
 # =============================================================================
@@ -194,6 +217,53 @@ def stop(client, execution_type: str = MANUAL_MAIN) -> dict:
 #: How many idle readings in a row prove the scan has finished (one can fall
 #: between two time points of a series, where FLUOVIEW says RESTING).
 ACQUIRE_IDLE_STREAK_REQUIRED = 2
+
+
+def wait_until_idle(client) -> str | None:
+    """Wait until FLUOVIEW is idle, for as long as a scan runs; answers None then, or why not.
+
+    A capture may only start from an idle FLUOVIEW. A scan that is running
+    (or a time lapse resting between time points) is waited for, however long
+    it takes, with a line in the log now and then. But a FLUOVIEW that does
+    not answer at all for a whole round of the waiting rule (``WINDOWS`` of
+    ``WINDOW_S``) is not waited for: the answer is the reason, and the
+    capture is not sent. Without this, a closed FLUOVIEW would keep the
+    capture waiting forever.
+    """
+    waiting = rdk_profile.waiting
+    give_up_after = waiting.WINDOWS * waiting.WINDOW_S
+    started = time.monotonic()
+    unanswered_since = None
+    last_note = started
+    while True:
+        reading = readers.get_scan_state(
+            client, diagnostics=True, deadline=time.monotonic() + waiting.WINDOW_S
+        )
+        answered = (
+            reading is not None and reading.error is None and reading.value is not None
+        )
+        state = reading.value if answered else None
+        now = time.monotonic()
+        if state == "IDLING":
+            return None
+        if state is None:
+            unanswered_since = unanswered_since or now
+            if now - unanswered_since >= give_up_after:
+                why = reading.error if reading is not None else None
+                return (
+                    f"FLUOVIEW did not answer for {now - unanswered_since:.0f}s while the capture "
+                    f"waited for it to be idle ({why or 'no answer'}); nothing was sent"
+                )
+        else:
+            unanswered_since = None
+            if now - last_note >= give_up_after:
+                log.info(
+                    "the capture waits for FLUOVIEW to be idle: %s for %.0fs",
+                    state,
+                    now - started,
+                )
+                last_note = now
+        time.sleep(waiting.POLL_S)
 
 
 def acquire(
@@ -225,6 +295,9 @@ def acquire(
         )
         if value is not None
     }
+    reason = wait_until_idle(client)
+    if reason is not None:
+        return dispatch.refused(reason, logged=True, target=None, planned_s=None)
     change = writes.acquire(execution_type)
     result = _run(client, change)
     reply = client.last_reply or {}

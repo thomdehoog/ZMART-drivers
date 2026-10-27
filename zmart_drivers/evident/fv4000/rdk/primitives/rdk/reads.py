@@ -137,12 +137,31 @@ def get_objectives(client, about=None) -> list[dict]:
     ]
 
 
+def _holding(answer: dict, key: str) -> dict | None:
+    """The dictionary in *answer* that holds *key*: the answer itself, or a struct (or the first of a list of them) inside it."""
+    if key in answer:
+        return answer
+    for value in answer.values():
+        if isinstance(value, list) and value and isinstance(value[0], dict):
+            value = value[0]
+        if isinstance(value, dict) and key in value:
+            return value
+    return None
+
+
 def get_objective(client, about=None) -> dict:
-    """The objective in use: ``{"slot": <revolver index from 0>, "name": <lens name>}``."""
+    """The objective in use: ``{"slot": <revolver index from 0>, "name": <lens name>}``.
+
+    The manual shows the answer as a struct without naming it, so the slot is
+    looked for both in the reply itself and in a struct inside it.
+    """
     answer = get_parameter(client, "LSM_MICROSCOPE_OBJECTIVE_LENS_CURRENT_SETTING")
+    found = _holding(answer, "revolverIndex")
+    if found is None:
+        raise KeyError("revolverIndex")
     return {
-        "slot": int(answer["revolverIndex"]),
-        "name": str(answer.get("lensName", "")),
+        "slot": int(found["revolverIndex"]),
+        "name": str(found.get("lensName", "")),
     }
 
 
@@ -198,10 +217,23 @@ def get_channel_digital_gain(client, about) -> float:
 def get_channel_laser(client, about) -> list[str]:
     """The ids of the lasers assigned to the channel *about*."""
     answer = get_parameter(client, "LSM_CHANNEL_LASER_SETTING", channelId=about)
+    # The manual names the set's list "laser" but leaves the get's list unnamed, so
+    # the lasers are taken from whichever list in the reply holds laserId entries.
+    entries = answer.get("laser")
+    if not isinstance(entries, list):
+        entries = next(
+            (
+                value
+                for value in answer.values()
+                if isinstance(value, list)
+                and any(isinstance(e, dict) and "laserId" in e for e in value)
+            ),
+            [],
+        )
     return [
         str(entry.get("laserId"))
-        for entry in answer.get("laser") or []
-        if entry.get("laserId")
+        for entry in entries
+        if isinstance(entry, dict) and entry.get("laserId")
     ]
 
 
@@ -322,12 +354,6 @@ def get_matl_groups(client, about=None) -> list[dict]:
         {"group_id": str(entry.get("groupId")), "well_id": str(entry.get("wellId", ""))}
         for entry in answer.get("groupList") or []
     ]
-
-
-def get_matl_enabled(client, about) -> bool:
-    return bool(
-        get_parameter(client, "MATL_ROI_ENABLE_SETTING", groupId=about)["enable"]
-    )
 
 
 def get_matl_xy(client, about) -> dict:
@@ -451,7 +477,6 @@ READS = {
     "scanner_type": Read(get_scanner_type, is_text),
     "scanner_mode": Read(get_scanner_mode, is_text),
     "matl_groups": Read(get_matl_groups, is_list),
-    "matl_enabled": Read(get_matl_enabled, is_bool),
     "matl_xy": Read(get_matl_xy, xy_present),
     "matl_z_origin_um": Read(get_matl_z_origin, is_number),
     "brightness_adjustment_enabled": Read(get_brightness_adjustment_enabled, is_bool),

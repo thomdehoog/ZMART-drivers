@@ -36,8 +36,10 @@ checks.
 
 There is no second route. When the RDK cannot answer, a reading is unknown and a change is unconfirmed;
 nothing is tried another way. `RdkClient` (`primitives/rdk/client.py`) makes one call at a time, keeps
-at least 20 ms between calls (the manual warns that a flood of commands closes the socket), and turns a
-lost socket into `ConnectionLost`.
+at least 20 ms between calls (the manual warns that a flood of commands closes the socket), and opens a
+connection of its own for each call. A call is sent exactly once. When the connection cannot be opened,
+FLUOVIEW was never reached (`ConnectionLost`); when it breaks after the call went out, it is not known
+whether FLUOVIEW carried the call out (`CallInterrupted`), and the change's own rule decides.
 
 ## 4. A change, step by step
 
@@ -50,7 +52,8 @@ lost socket into `ConnectionLost`.
 | 5. Answer | The result says whether the change was sent (`success`) and whether it was seen (`confirmed`). |
 
 A capture is the one exception: `Protocol.startProtocol` is sent once and never again, and must be
-seen scanning within 15 s. A scan too quick to be seen counts when the file FLUOVIEW named already
+seen scanning within 15 s. Before it is sent, FLUOVIEW is waited for until idle for as long as a scan
+runs, but not when FLUOVIEW stops answering for a whole round of windows: then nothing is sent. A scan too quick to be seen counts when the file FLUOVIEW named already
 opens.
 
 ## 5. A reading

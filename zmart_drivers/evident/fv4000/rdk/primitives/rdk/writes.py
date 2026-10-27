@@ -92,6 +92,11 @@ def is_idle(state) -> bool:
     return state == "IDLING"
 
 
+def is_busy(state) -> bool:
+    """FLUOVIEW is doing something: scanning, resting between time points, or paused."""
+    return state in ("SCANNING", "RESTING", "WAITING")
+
+
 def idle(*, without_limit: bool = False) -> Expect:
     """FLUOVIEW idle; ``without_limit`` waits for it as long as it takes instead of the four windows."""
     return Expect("scan_state", is_idle, without_limit=without_limit)
@@ -232,10 +237,11 @@ def move_piezo(z_um: float, *, tolerance_um: float | None = None) -> Write:
 # The objective
 # =============================================================================
 
-#: How the nosepiece slot is sent. The manual's table calls it a string and its
-#: get answers an integer; an integer is sent until the microscope says
-#: otherwise (to be checked on an FV4000; change it here if FLUOVIEW refuses).
-REVOLVER_INDEX_AS = int
+#: How the nosepiece slot is sent. The manual's set calls it a string, while
+#: its get answers an integer; it is sent as the manual says, a string such as
+#: "2". To be checked on an FV4000: if FLUOVIEW refuses it with
+#: INVALID_PARAMETERS, change this to ``int``.
+REVOLVER_INDEX_AS = str
 
 
 def set_objective(slot: int, name: str = "") -> Write:
@@ -316,8 +322,11 @@ def repeat_scan(start: bool) -> Write:
             fill=fill,
             description="live scan on",
             ready=idle(),
-            # Repeat scanning shows as SCANNING; the read-back is that.
-            confirm=Expect("scan_state", exactly("SCANNING")),
+            # A live scan is not IDLING any more. Which state it shows is not certain:
+            # the manual's table allows Repeat.stop only in RESTING or WAITING, "during
+            # repeat scan only", which suggests a live scan reports RESTING. So any
+            # state but IDLING counts as the live scan running.
+            confirm=Expect("scan_state", is_busy),
         )
     return Write(
         command="repeat_scan",
@@ -718,9 +727,8 @@ def _rows() -> list[Setting]:
         lambda a: {"groupId": str(a["group_id"]), "enable": bool(a["enable"])},
         lambda a: f"MATL group {a['group_id']} {'on' if a['enable'] else 'off'}",
         value="enable",
-        read="matl_enabled",
-        about="group_id",
-        accept=lambda a: exactly(bool(a["enable"])),
+        # FLUOVIEW cannot read this setting back (the manual's section 3.6 marks its
+        # getParameter n/a), so the change is confirmed by nothing.
     )
     # A group's position is checked against the stage limits like a move,
     # although registering it moves nothing: the scan will go there.

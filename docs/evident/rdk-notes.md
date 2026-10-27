@@ -20,7 +20,15 @@ without the manual at hand. The manual itself is Evident's; it is not part of th
   Most settings and a new protocol are refused with `UNAVAILABLE` while a scan runs, so the driver waits
   for `IDLING` before every change.
 - Troubleshooting: a flood of commands makes FLUOVIEW close the socket (Windows socket error 10054).
-  The driver keeps at least 20 ms between calls and makes one call at a time.
+  The driver keeps at least 20 ms between calls and makes one call at a time. Python's standard
+  XML-RPC transport would quietly send a request again after such a reset, which for a capture would
+  be a second picture; the driver's transport sends every call exactly once, on its own connection,
+  and reports a reset as "it is not known whether FLUOVIEW carried it out".
+- Which call is allowed in which state is the manual's section 3.6. Two entries shape the driver:
+  `Protocol.stopProtocol` is refused while IDLING, so `stop()` sends nothing when nothing runs; and
+  `Repeat.stop` is allowed only in RESTING or WAITING during a live scan, so a live scan is counted as
+  running in any state but IDLING. `MATL_ROI_ENABLE_SETTING` cannot be read back, so that change is
+  confirmed by nothing.
 
 ## Positions and units
 
@@ -31,8 +39,9 @@ without the manual at hand. The manual itself is Evident's; it is not part of th
 - A z-stack is defined against FLUOVIEW's own Z origin (`LSM_Z_COORDINATE_BASE_SETTING`): start, end,
   step, range and slice count in nanometres, plus the method (`LSM_Z_COORDINATE_TYPE_SETTING`).
 - The nosepiece: `LSM_MICROSCOPE_OBJECTIVE_LENS_LIST` names the objectives per slot;
-  `LSM_MICROSCOPE_OBJECTIVE_LENS_SETTING` reads and sets the slot in use. The manual lists the slot as a
-  string while a read answers a number; the driver sends a number until the microscope says otherwise.
+  `LSM_MICROSCOPE_OBJECTIVE_LENS_CURRENT_SETTING` reads and sets the slot in use. The manual's set takes
+  the slot as a string while its get answers a number in an unnamed struct; the driver sends a string
+  and looks for the number both in the reply and in any struct inside it.
 
 ## Settings the driver uses
 
@@ -55,7 +64,7 @@ its destination is not known to the limits before the move.
   `Repeat.setRepeatScan` starts and stops the live scan.
 - `Parameter.loadParameter` with an image path recalls the imaging setup that picture was taken with.
 - Reading a saved image (IDA): `open` the file, `getGroup`, `getArea`, then `getProperty` for
-  `EnabledChannelIdList`, `ChannelInfo`, `Axes`, `AxisStartPosition`, `AxisEndPosition`, `AxisStep`,
+  `EnabledChannelIdList`, `ChannelInfo` (the one property answered under `structValue`), `Axes`, `AxisStartPosition`, `AxisEndPosition`, `AxisStep`,
   `AxisMaxSize` and `PixelLength` (micrometres per pixel), then `getImage` for one channel and position
   and `getImageBody` / `getNextImageBody` for the pixels in pieces (base64 binary), and `release` every
   id in reverse order. The driver does this in `primitives/rdk/image_data.py`. The manual's example

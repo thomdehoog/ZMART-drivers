@@ -142,7 +142,7 @@ def test_a_procedure_answers_the_name_of_what_ran(connection, mock):
         answer = session.run_procedure({"name": "live_view", "on": True})
         assert (
             answer == {"success": True, "output": {"ran": "live_view"}}
-            and mock.state == "SCANNING"
+            and mock.state == "RESTING"
         )
         assert (
             session.run_procedure({"name": "stop_scan"})["success"] is True

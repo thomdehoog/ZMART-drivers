@@ -179,3 +179,114 @@ def test_the_client_keeps_a_gap_between_calls(mock):
     started = time.monotonic()
     paced._pace()
     assert time.monotonic() - started >= 0.04
+
+
+# --- one try per call -------------------------------------------------------------------------
+
+
+class _OneShotServer:
+    """A server that reads each request and then misbehaves: closes the connection, or never answers."""
+
+    def __init__(self, behaviour):
+        import socket
+        import threading
+
+        self.behaviour = behaviour
+        self.requests = 0
+        self.sock = socket.socket()
+        self.sock.bind(("127.0.0.1", 0))
+        self.sock.listen(5)
+        self.port = self.sock.getsockname()[1]
+        self.thread = threading.Thread(target=self._serve, daemon=True)
+        self.thread.start()
+
+    def _serve(self):
+        while True:
+            try:
+                conn, _ = self.sock.accept()
+            except OSError:
+                return
+            with conn:
+                data = conn.recv(65536)
+                if data:
+                    self.requests += 1
+                if self.behaviour == "silent":
+                    time.sleep(1.5)
+
+    def close(self):
+        self.sock.close()
+
+
+@pytest.mark.parametrize("behaviour", ["reset", "silent"])
+def test_a_call_broken_after_it_was_sent_is_sent_once_and_said_to_be_uncertain(
+    behaviour,
+):
+    server = _OneShotServer(behaviour)
+    try:
+        real = rdk_client.RdkClient(
+            "127.0.0.1", server.port, min_gap_s=0.0, timeout_s=0.5
+        )
+        with pytest.raises(
+            rdk_client.CallInterrupted, match="may or may not have carried it out"
+        ):
+            real.call(
+                "Protocol.startProtocol",
+                {"executionType": "EXECUTION_TYPE_MANUAL_MAIN"},
+            )
+        time.sleep(0.2)
+        assert server.requests == 1, (
+            "Python's transport must not send the capture a second time"
+        )
+    finally:
+        server.close()
+
+
+def test_each_call_opens_and_closes_its_own_connection(mock):
+    server, _thread = serve(mock)
+    try:
+        real = rdk_client.RdkClient(
+            "127.0.0.1", server.server_address[1], min_gap_s=0.0
+        )
+        for _ in range(3):
+            assert reads.get_version(real) == MockFluoview.VERSION
+        assert real._proxy("transport")._connection == (None, None)
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_channel_info_is_read_from_struct_value_as_the_manual_says(client, mock):
+    mock.scan_s = 0.0
+    path = mock.call(
+        "Protocol.startProtocol", {"executionType": "EXECUTION_TYPE_MANUAL_MAIN"}
+    )["targetName"][0]["name"]
+    with image_data.OpenedImage(client, path) as image:
+        first = image.description.channels[0]
+        assert (first.name, first.bit_count, first.device_name) == (
+            "CH1",
+            12,
+            "PMT CH1",
+        )
+        with pytest.raises(ValueError, match="no ZSTACK axis"):
+            image.read_plane("CH1", z=3)
+
+
+def test_a_comma_joined_list_is_split_and_extra_image_ids_are_released():
+    assert image_data._as_list(["ZSTACK,TIMELAPSE"]) == ["ZSTACK", "TIMELAPSE"]
+    assert image_data._as_list([["CH1", "CH2"]]) == ["CH1", "CH2"]
+    assert image_data._as_list("CH1, CH2") == ["CH1", "CH2"]
+
+    released = []
+
+    class TwoIds:
+        def call(self, method, payload=None):
+            if method == "IDA.getImage":
+                return {"result": "OK", "imageId": ["image-1", "image-2"]}
+            if method == "IDA.releaseImage":
+                released.append(payload["imageId"])
+            return {"result": "OK"}
+
+    opened = image_data.OpenedImage(TwoIds(), "x.oir")
+    opened.area_id = "area-1"
+    assert opened._image_id("CH1", {}) == "image-1"
+    assert released == ["image-2"]

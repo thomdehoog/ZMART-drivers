@@ -250,11 +250,13 @@ class MockFluoview:
         if self.state != "IDLING":
             return _error("UNAVAILABLE")
         self.repeat_scanning = True
-        self.state = "SCANNING"
+        # The manual's table allows Repeat.stop only in RESTING or WAITING, during a live
+        # scan; the pretend FLUOVIEW therefore shows a live scan as RESTING.
+        self.state = "RESTING"
         return dict(OK)
 
     def _Repeat_stop(self, payload):
-        if not self.repeat_scanning:
+        if not self.repeat_scanning or self.state not in ("RESTING", "WAITING"):
             return _error("UNAVAILABLE")
         self.repeat_scanning = False
         self.state = "IDLING"
@@ -422,10 +424,11 @@ class MockFluoview:
         }
 
     def _set_LSM_MICROSCOPE_OBJECTIVE_LENS_CURRENT_SETTING(self, payload):
-        try:
-            slot = int(payload.get("revolverIndex"))
-        except (TypeError, ValueError):
+        # The manual's set takes the slot as a string.
+        index = payload.get("revolverIndex")
+        if not isinstance(index, str) or not index.isdigit():
             return _error("INVALID_PARAMETERS")
+        slot = int(index)
         if slot not in dict(self.objectives):
             return _error("INVALID_PARAMETERS")
         self.objective_slot = slot
@@ -983,9 +986,10 @@ class MockFluoview:
             channel = additional.get("channelId")
             if channel not in pretend.channels:
                 return _error("INVALID_PARAMETERS")
+            # The manual: ChannelInfo answers under "structValue", not "value".
             return {
                 **OK,
-                "value": [
+                "structValue": [
                     {
                         "deviceName": f"PMT {channel}",
                         "name": channel,
