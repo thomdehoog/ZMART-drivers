@@ -1,0 +1,9 @@
+{
+  "x_um": {"range": [-50000, 50000]},
+  "y_um": {"range": [-30000, 30000]},
+  "z_um": {"range": [0, 9000]},
+  "objective_slot": [],
+  "optical_configuration": [],
+  "exposure_ms": {"range": [0.01, 10000]},
+  "autofocus_range_um": {"range": [1, 500]}
+}

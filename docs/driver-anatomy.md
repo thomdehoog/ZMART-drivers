@@ -7,7 +7,9 @@ this way and the example to read beside the text. A new driver copies its
 layout.
 
 What a new microscope brings to the shared dispatcher is on one page:
-[the vendor contract](vendor-contract.md). The controller's side, the
+[the vendor contract](vendor-contract.md). The Nikon driver,
+`zmart_drivers/nikon/ti2/nis_elements/`, is the second driver in this
+anatomy, and the smaller one to read first. The controller's side, the
 `ZmartControllerPlugin` class, is fixed by the controller's
 [How do I plug in a ZMART-driver](https://github.com/ZMB-UZH/ZMART-controller/blob/main/docs/plug_in_a_driver/README.md).
 
@@ -453,8 +455,70 @@ Saving it is `save_data`; letting LAS X go of it is `clear_cache`.
 - The direction of a saved stack is checked in the code and the offline
   tests, not yet on a microscope.
 
-The Nikon, ZEISS and mesoSPIM drivers and the controller's mock driver are not
-in this beta. When they come back, they come back in this anatomy.
+## The Nikon driver
+
+The Nikon driver, `zmart_drivers/nikon/ti2/nis_elements/`, is the second driver
+built this way, for a Ti2 run by NIS-Elements AR 6.10. It reaches NIS-Elements
+through the [nis-bridge](https://github.com/thomdehoog/nis-useq-aiagent/tree/bridge-hybrid-610/1_nis_bridge):
+a small server that a NIS macro runs inside NIS-Elements' own Python, which
+takes one request at a time over a socket on the same computer and answers it
+once NIS has carried it out.
+
+### Its classes
+
+Both classes travel over the same bridge connection. What tells them apart is
+how the bridge answers inside NIS-Elements, and that decides the pace at which
+each may be asked.
+
+| Class | Transfer | Reads | Writes | Profile |
+|---|---|---|---|---|
+| `dll/` | The bridge; inside NIS, `g5_regprocs.dll`, the C library that exports most of NIS's macro functions | The stage, NIS's own limits, the optical configurations, the nosepiece, the Perfect Focus System, the version | A move, an optical configuration, the objective, the PFS, the focus sweep, a capture (`Write`, in `writes.py`) | The waiting rule; the bridge's reply sorted temporary or permanent; the table of every reading and its class; the profile handed to `run()` |
+| `macro/` | The bridge; inside NIS, a few lines of NIS macro run with `RunMacro`, because NIS 6.10 cannot hand a value back from its Python safely | The camera report, with the exposure | The exposure | Its own pace: asked again every quarter second, since one camera report costs NIS's main thread a tenth of a second |
+
+### The read order
+
+Each reading has one class. There is no fallback: a class that cannot answer
+(the bridge gone, NIS refusing) ends the reading with that error, and the
+session can `reconnect()` once the bridge runs again.
+
+### The bridge's reply
+
+The bridge answers every request before the call returns, so a send carries
+its reply with it, and "without a receipt" makes no difference. The profile
+sorts the reply: a request the bridge dropped because it had not started in
+time is temporary (sending it again is safe); a request still running when
+the driver stopped waiting is not; a wrong request, NIS's refusal, or a lost
+connection is permanent.
+
+### The limits
+
+The envelope in the limits file is cut to what NIS-Elements itself allows,
+read from the instrument at every connect; NIS's limits are also the backstop,
+checked after the envelope on every move. There is nothing to type in for the
+backstop: it comes from the instrument.
+
+### The capture
+
+One picture with the settings as they are (`snap`): NIS captures, saves a TIFF
+in a staging folder, and closes the picture it opened. The capture is sent
+once and never again. `save_data` turns the TIFF into the capture's OME-Zarr
+store, with the note taken at the capture, and removes the TIFF.
+
+### Where the Nikon driver differs
+
+- NIS-Elements cannot report which optical configuration is selected, so
+  selecting one has no read-back; the session remembers what it selected.
+- A change of objective is refused before the nosepiece turns when the
+  calibration does not cover the pair, since the refusal is decided from the
+  two slots alone.
+- The dispatcher is the Leica driver's, byte for byte; the guard test checks
+  it, and the driver's CI lints everything but it.
+- There is no setup wizard; the notebooks are the way.
+- It has not yet been run at NIS-Elements; its offline suite stands a mock
+  NIS-Elements behind the real bridge server.
+
+The ZEISS and mesoSPIM drivers and the controller's mock driver are not in
+this beta. When they come back, they come back in this anatomy.
 
 ## Open questions
 

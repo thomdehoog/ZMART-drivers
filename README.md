@@ -37,34 +37,35 @@ and the driver plugged into it does the rest:
 How a driver is organised inside, so that the safety behaviour is the same on every
 microscope, is described in [the anatomy of a ZMART driver](docs/driver-anatomy.md).
 
-## The driver in this beta
+## The drivers in this beta
 
 | Microscope | Vendor interface | Driver | Status |
 |---|---|---|---|
 | Leica STELLARIS | LAS X: its hardware server first, the Python (CAM) API behind it | [`zmart_drivers/leica/stellaris/navigator_expert/`](zmart_drivers/leica/stellaris/navigator_expert/README.md) | **Beta `0.7.0b9`.** 0.7.0b9 keeps the settings in configs chosen when connecting, writes a mean pyramid into every store, and fixes what the first end-to-end run on the STELLARIS found. 0.7.0b6 tested on the LAS X simulator, 0.7.0b5 also on a STELLARIS; 0.7.0b7 adds the setup wizard and 0.7.0b8 its hardware check and a CI that also runs without the controller, tested offline. Laid out as [the anatomy of a ZMART driver](docs/driver-anatomy.md) describes. |
+| Nikon Ti2 | NIS-Elements AR 6.10, through the [nis-bridge](https://github.com/thomdehoog/nis-useq-aiagent/tree/bridge-hybrid-610/1_nis_bridge): NIS's own DLL for what it exports, a NIS macro for the rest | [`zmart_drivers/nikon/ti2/nis_elements/`](zmart_drivers/nikon/ti2/nis_elements/README.md) | **Beta, tested offline only.** Laid out as the anatomy describes, with a mock NIS-Elements behind the real bridge server for its offline suite. Not yet run at NIS-Elements; the bridge it builds on was validated on the Ti2 simulator. |
 
-This beta holds only the Leica driver. The Nikon, ZEISS, mesoSPIM and Evident drivers are in
-the repository's history.
+The ZEISS, mesoSPIM and Evident drivers are in the repository's history.
 
-The driver works by itself, from a notebook or a script, and it plugs into the ZMART
+Each driver works by itself, from a notebook or a script, and it plugs into the ZMART
 Controller. Its README says how to do both. Before the first experiment, a few things are set
 up once on the microscope: the travel limits, the image orientation, the objective calibration
-and the zero point of the coordinates. The notebooks for them are in the driver's
-`driver_setup/` folder, and a [setup wizard](zmart_drivers/leica/stellaris/navigator_expert/driver_setup/wizard/README.md) walks through the same steps in a window: `python -m zmart_drivers.leica.stellaris.navigator_expert.driver_setup.wizard`. What is set up is saved in the computer's configuration folder,
+and the zero point of the coordinates. The notebooks for them are in each driver's
+`driver_setup/` folder, and for the Leica driver a [setup wizard](zmart_drivers/leica/stellaris/navigator_expert/driver_setup/wizard/README.md) walks through the same steps in a window: `python -m zmart_drivers.leica.stellaris.navigator_expert.driver_setup.wizard`. What is set up is saved in the computer's configuration folder,
 `C:\ProgramData\zmart-microscopy` on Windows, and loaded every time the driver connects.
 
 ## Try it yourself
 
-The driver needs Python 3.11 or newer. Download this repository, open a terminal in its root
-folder, and install it with the Leica extra. The driver works on its own; add the `controller`
+A driver needs Python 3.11 or newer. Download this repository, open a terminal in its root
+folder, and install it with the driver's extra. A driver works on its own; add the `controller`
 extra to drive it through the ZMART Controller as well.
 
 ```bash
-pip install -e ".[leica]"              # the driver on its own
+pip install -e ".[leica]"              # the Leica driver on its own
 pip install -e ".[leica,controller]"   # with the ZMART Controller
+pip install -e ".[nikon]"              # the Nikon driver (its README says how to start the bridge)
 ```
 
-The driver runs on the computer that runs LAS X, because it loads Leica's interface into
+The Leica driver runs on the computer that runs LAS X, because it loads Leica's interface into
 Python. Use it by itself:
 
 ```python
@@ -91,23 +92,31 @@ From 0.7.0b2 the driver's folder is `leica/stellaris`, one folder for every STEL
 microscope it is stays in its configuration. A computer that registered the driver from
 `leica/stellaris_y42h93` registers it again from the new folder.
 
+The Nikon driver is used the same way, from `zmart_drivers.nikon.ti2.nis_elements`
+(`connect()`, `move_to`, `select_channel`, `acquire`, `save`) and registered from
+`zmart_drivers/nikon/ti2/nis_elements`, under the name `nikon-ti2`.
+
 ### Status
 
-This repository is a **beta**. Nothing in it is released yet. The driver has been tested on the
-LAS X simulator and on a STELLARIS. Its
+This repository is a **beta**. Nothing in it is released yet. The Leica driver has been tested
+on the LAS X simulator and on a STELLARIS. Its
 [release candidate review](docs/leica/RELEASE_CANDIDATE_REVIEW.md) lists what must be fixed
 before release. Do not leave the driver running unattended until the high-severity findings in
-that review are resolved.
+that review are resolved. The Nikon driver has been tested offline only; its first run on the
+Ti2 simulator is the next step.
 
 ## Testing
 
-The driver carries its own offline test suite, which runs without a microscope or vendor
+Each driver carries its own offline test suite, which runs without a microscope or vendor
 software. Install the test extra, then run it from the root folder of this repository:
 
 ```bash
-pip install -e ".[leica,test]"                # the driver on its own
+pip install -e ".[leica,test]"                # the Leica driver on its own
 pip install -e ".[leica,controller,test]"     # also with the ZMART Controller
 python zmart_drivers/leica/stellaris/navigator_expert/testing/run_ci.py
+
+pip install -e ".[nikon,test]"                # the Nikon driver, the same way
+python zmart_drivers/nikon/ti2/nis_elements/testing/run_ci.py
 ```
 
 The suite has two layers. The first checks the driver on its own, which is how many people use
@@ -115,8 +124,8 @@ it. The second checks the driver inside the ZMART Controller; it runs when the c
 installed and is shown as `SKIP` when it is not. Add `--controller` to make a missing
 controller a failure instead, on a computer that is meant to have it.
 
-The continuous-integration workflow in `.github/workflows/` runs both layers on Linux and
-Windows, with Python 3.11 and 3.12, and the driver alone on both systems as well.
+The continuous-integration workflow in `.github/workflows/` runs both layers of both drivers on
+Linux and Windows, with Python 3.11 and 3.12, and each driver alone on both systems as well.
 
 ## Author
 

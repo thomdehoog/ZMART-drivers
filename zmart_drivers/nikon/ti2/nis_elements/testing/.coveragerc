@@ -1,0 +1,14 @@
+# Coverage for the Nikon NIS-Elements driver, pinned by run_ci.py.
+[run]
+branch = True
+omit =
+    */testing/*
+    */notebooks/*
+
+[report]
+# The offline suite measured 79% branch coverage (82% with the controller layer) when the driver was first
+# written (2026-10-27); the floor sits below it so it does not flake.
+fail_under = 70
+exclude_also =
+    if __name__ == .__main__.:
+    if TYPE_CHECKING:
