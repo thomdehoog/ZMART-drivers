@@ -93,7 +93,9 @@ def save_pending(pending, *, orientation: Orientation) -> dict:
     )
     ome_zarr.write_store(store, capture, store_notes(p, orientation))
     p.path.unlink(missing_ok=True)
+    # The session's staging folder, and ``.staging`` itself, go once they are empty.
     _remove_if_empty(p.path.parent)
+    _remove_if_empty(p.path.parent.parent)
 
     planes = [
         {

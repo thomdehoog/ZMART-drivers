@@ -125,6 +125,8 @@ def test_an_objective_change_keeps_the_sample_in_view_once_the_pair_is_calibrate
     ]
     assert mock.nosepiece == 2
     assert mock.position == {"x": 1012.5, "y": -503.0, "z": 541.0}
+    # The pixel size measured under the old objective is forgotten.
+    assert scope.handle.pixel_size_um is None
     # Back under the origin's objective the frame reads the same spot.
     scope.set_origin()
     scope.change_objective(1)
@@ -195,6 +197,7 @@ def test_a_capture_is_staged_then_saved_as_an_ome_zarr_store_by_the_convention(
         }
     ]
     assert not Path(taken["staged"]).exists() and scope.handle.unsaved == []
+    assert not (out / ".staging").exists()  # nothing of the staging is left in the run
     attributes = json.loads((store / "zarr.json").read_text())["attributes"]
     assert attributes["zmart"] == convention.zarr_attributes()
     scale = attributes["ome"]["multiscales"][0]["datasets"][0][

@@ -77,6 +77,9 @@ def set_objective(handle, slot: int) -> dict:
     result["compensation"] = None
     if not result.get("success") or recorded.get("unchanged"):
         return result
+    # The pixel size NIS reported at the last capture belonged to the old
+    # objective; the next capture measures it again for the new one.
+    handle.pixel_size_um = None
     delta = recorded.get("delta")
     if delta is None:
         log.warning(
