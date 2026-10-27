@@ -8,7 +8,7 @@ layout.
 
 What a new microscope brings to the shared dispatcher is on one page:
 [the vendor contract](vendor-contract.md). The Nikon driver,
-`zmart_drivers/nikon/ti2/nis_elements/`, is the second driver in this
+`zmart_drivers/nikon/nis_elements_ar610/`, is the second driver in this
 anatomy, and the smaller one to read first. The controller's side, the
 `ZmartControllerPlugin` class, is fixed by the controller's
 [How do I plug in a ZMART-driver](https://github.com/ZMB-UZH/ZMART-controller/blob/main/docs/plug_in_a_driver/README.md).
@@ -457,8 +457,8 @@ Saving it is `save_data`; letting LAS X go of it is `clear_cache`.
 
 ## The Nikon driver
 
-The Nikon driver, `zmart_drivers/nikon/ti2/nis_elements/`, is the second driver
-built this way, for a Ti2 run by NIS-Elements AR 6.10. It reaches NIS-Elements
+The Nikon driver, `zmart_drivers/nikon/nis_elements_ar610/`, is the second driver
+built this way, for a Nikon microscope (a Ti2) run by NIS-Elements AR 6.10. It reaches NIS-Elements
 through the [nis-bridge](https://github.com/thomdehoog/nis-useq-aiagent/tree/bridge-hybrid-610/1_nis_bridge):
 a small server that a NIS macro runs inside NIS-Elements' own Python, which
 takes one request at a time over a socket on the same computer and answers it

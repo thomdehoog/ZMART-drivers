@@ -42,7 +42,7 @@ microscope, is described in [the anatomy of a ZMART driver](docs/driver-anatomy.
 | Microscope | Vendor interface | Driver | Status |
 |---|---|---|---|
 | Leica STELLARIS | LAS X: its hardware server first, the Python (CAM) API behind it | [`zmart_drivers/leica/stellaris/navigator_expert/`](zmart_drivers/leica/stellaris/navigator_expert/README.md) | **Beta `0.7.0b9`.** 0.7.0b9 keeps the settings in configs chosen when connecting, writes a mean pyramid into every store, and fixes what the first end-to-end run on the STELLARIS found. 0.7.0b6 tested on the LAS X simulator, 0.7.0b5 also on a STELLARIS; 0.7.0b7 adds the setup wizard and 0.7.0b8 its hardware check and a CI that also runs without the controller, tested offline. Laid out as [the anatomy of a ZMART driver](docs/driver-anatomy.md) describes. |
-| Nikon Ti2 | NIS-Elements AR 6.10, through the [nis-bridge](https://github.com/thomdehoog/nis-useq-aiagent/tree/bridge-hybrid-610/1_nis_bridge): NIS's own DLL for what it exports, a NIS macro for the rest | [`zmart_drivers/nikon/ti2/nis_elements/`](zmart_drivers/nikon/ti2/nis_elements/README.md) | **Beta, tested offline only.** Laid out as the anatomy describes, with a mock NIS-Elements behind the real bridge server for its offline suite. Not yet run at NIS-Elements; the bridge it builds on was validated on the Ti2 simulator. |
+| Nikon (Ti2) | NIS-Elements AR 6.10, through the [nis-bridge](https://github.com/thomdehoog/nis-useq-aiagent/tree/bridge-hybrid-610/1_nis_bridge): NIS's own DLL for what it exports, a NIS macro for the rest | [`zmart_drivers/nikon/nis_elements_ar610/`](zmart_drivers/nikon/nis_elements_ar610/README.md) | **Beta, tested offline only.** Laid out as the anatomy describes, with a mock NIS-Elements behind the real bridge server for its offline suite. Not yet run at NIS-Elements; the bridge it builds on was validated on the Ti2 simulator. |
 
 The ZEISS, mesoSPIM and Evident drivers are in the repository's history.
 
@@ -62,7 +62,7 @@ extra to drive it through the ZMART Controller as well.
 ```bash
 pip install -e ".[leica]"              # the Leica driver on its own
 pip install -e ".[leica,controller]"   # with the ZMART Controller
-pip install -e ".[nikon]"              # the Nikon driver (its README says how to start the bridge)
+pip install -e ".[nikon-ar610]"              # the Nikon driver (its README says how to start the bridge)
 ```
 
 The Leica driver runs on the computer that runs LAS X, because it loads Leica's interface into
@@ -92,9 +92,9 @@ From 0.7.0b2 the driver's folder is `leica/stellaris`, one folder for every STEL
 microscope it is stays in its configuration. A computer that registered the driver from
 `leica/stellaris_y42h93` registers it again from the new folder.
 
-The Nikon driver is used the same way, from `zmart_drivers.nikon.ti2.nis_elements`
+The Nikon driver is used the same way, from `zmart_drivers.nikon.nis_elements_ar610`
 (`connect()`, `move_to`, `select_channel`, `acquire`, `save`) and registered from
-`zmart_drivers/nikon/ti2/nis_elements`, under the name `nikon-ti2`.
+`zmart_drivers/nikon/nis_elements_ar610`, under the name `nikon-nis-elements-ar610`.
 
 ### Status
 
@@ -115,8 +115,8 @@ pip install -e ".[leica,test]"                # the Leica driver on its own
 pip install -e ".[leica,controller,test]"     # also with the ZMART Controller
 python zmart_drivers/leica/stellaris/navigator_expert/testing/run_ci.py
 
-pip install -e ".[nikon,test]"                # the Nikon driver, the same way
-python zmart_drivers/nikon/ti2/nis_elements/testing/run_ci.py
+pip install -e ".[nikon-ar610,test]"                # the Nikon driver, the same way
+python zmart_drivers/nikon/nis_elements_ar610/testing/run_ci.py
 ```
 
 The suite has two layers. The first checks the driver on its own, which is how many people use

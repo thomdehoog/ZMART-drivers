@@ -4,7 +4,7 @@ Each driver lives in its own folder, organised by vendor, then by microscope,
 then by the vendor interface it uses. This beta holds two drivers::
 
     zmart_drivers/leica/stellaris/navigator_expert/   Leica STELLARIS, LAS X
-    zmart_drivers/nikon/ti2/nis_elements/             Nikon Ti2, NIS-Elements AR 6.10 through the nis-bridge
+    zmart_drivers/nikon/nis_elements_ar610/          Nikon microscopes, NIS-Elements AR 6.10 through the nis-bridge
 
 Importing this package does not import a driver. Use a driver by itself
 with its ``connect()``, or register its folder, which holds

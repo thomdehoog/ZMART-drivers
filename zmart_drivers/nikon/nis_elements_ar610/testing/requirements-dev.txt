@@ -1,0 +1,15 @@
+# What the Nikon driver's offline suite needs, beyond the driver itself.
+# The repository's pyproject.toml extras are the documented way to install
+# (pip install -e ".[nikon-ar610,test]"); this list is for a bare CI runner.
+pytest>=8
+pytest-cov>=5
+ruff>=0.6
+numpy>=1.24
+tifffile>=2024.1
+zarr>=3
+# The bridge's client, and its fake NIS-Elements that the mock builds on.
+nis-bridge @ git+https://github.com/thomdehoog/nis-useq-aiagent@bridge-hybrid-610#subdirectory=1_nis_bridge
+# To check a saved store against the ZMART metadata convention (optional).
+ome-zarr-models>=1.7
+ome-types>=0.5
+lxml>=4.9

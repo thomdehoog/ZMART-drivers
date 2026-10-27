@@ -12,7 +12,7 @@ complete example is the pretend vendor,
 `navigator_expert/testing/helpers/pretend_vendor.py`: a made-up microscope with
 one stage axis, run through the same dispatcher, with tests in
 `testing/unit/test_pretend_vendor.py`. It imports nothing but the dispatcher.
-A real second vendor is the Nikon driver, `zmart_drivers/nikon/ti2/nis_elements/`:
+A real second vendor is the Nikon driver, `zmart_drivers/nikon/nis_elements_ar610/`:
 its `primitives/dll/profile.py` is the profile handed to `run()`, and its two
 classes travel over one bridge connection to NIS-Elements.
 

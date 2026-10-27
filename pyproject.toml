@@ -20,7 +20,7 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Image Acquisition",
 ]
 
-# What a driver needs beyond the controller: pip install -e ".[leica]" or ".[nikon]".
+# What a driver needs beyond the controller: pip install -e ".[leica]" or ".[nikon-ar610]".
 [project.optional-dependencies]
 # The Leica driver: images and their metadata (numpy, tifffile; zarr and
 # OME's ome-zarr-models for saving a capture as OME-Zarr 0.5), the setup
@@ -47,12 +47,12 @@ leica = [
     "pywin32>=306; sys_platform == 'win32'",
     "comtypes>=1.4; sys_platform == 'win32'",
 ]
-# The Nikon driver: the nis-bridge client (and its fake NIS-Elements, which
+# The Nikon driver for NIS-Elements AR 6.10: the nis-bridge client (and its fake NIS-Elements, which
 # the offline mock builds on), from the bridge's own repository; numpy and
 # tifffile to read the pictures NIS-Elements saves; zarr to write a capture
 # as OME-Zarr 0.5. The bridge itself runs inside NIS-Elements on Windows,
 # from a clone of that repository (the driver's README says how).
-nikon = [
+nikon-ar610 = [
     "nis-bridge @ git+https://github.com/thomdehoog/nis-useq-aiagent@bridge-hybrid-610#subdirectory=1_nis_bridge",
     "numpy>=1.24",
     "tifffile>=2024.1",
@@ -68,7 +68,7 @@ controller = [
 # not bring the controller, so the suite also runs as it does where the driver
 # is used by itself; add the controller extra for the tests of the driver
 # inside the controller: pip install -e ".[leica,controller,test]" or
-# ".[nikon,controller,test]". ome-zarr-models checks a saved store against
+# ".[nikon-ar610,controller,test]". ome-zarr-models checks a saved store against
 # the ZMART metadata convention in both drivers' suites.
 test = [
     "pytest>=8",
