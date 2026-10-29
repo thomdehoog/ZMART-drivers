@@ -13,9 +13,6 @@ from zmart_drivers.evident.fv4000.rdk.driver_setup.limits.measure_limits import 
     xy_limits_from_points,
     z_limits_from_ends,
 )
-from zmart_drivers.evident.fv4000.rdk.driver_setup.optical_calibration import (
-    calibrate_objective_pair as pair,
-)
 from zmart_drivers.evident.fv4000.rdk.driver_setup.optical_calibration import model
 from zmart_drivers.evident.fv4000.rdk.driver_setup.orientation import (
     Orientation,
@@ -211,8 +208,8 @@ def test_the_calibration_model_finds_the_reference_and_the_difference_between_tw
     )
     with pytest.raises(RuntimeError, match="calibrate_objective_pair"):
         model.translation_delta_um({0: (0, 0, 0)}, 0, 1)
-    with pytest.raises(ValueError):
-        model.validate_calibration({"schema_version": 12, "objectives": {}})
+    with pytest.raises(model.OldSchemaError):
+        model.prepared_calibration({"schema_version": 3, "objectives": {}})
 
 
 def test_load_objective_calibration_declined_wanted_and_loaded():
@@ -221,6 +218,7 @@ def test_load_objective_calibration_declined_wanted_and_loaded():
         {
             "enabled": False,
             "loaded": False,
+            "name": None,
             "path": None,
             "slots": [],
             "measured_slots": [],
@@ -244,35 +242,6 @@ def test_load_objective_calibration_declined_wanted_and_loaded():
     _machine().calibration_path().write_text("{")
     translations, info = model.load_objective_calibration()
     assert translations == {} and not info["loaded"]
-
-
-def test_an_objective_pair_is_recorded_by_centring_the_same_spot_under_each(
-    scope, mock
-):
-    mock.travel_s = (
-        0.0  # the test moves the pretend stage by hand and reads it back at once
-    )
-    session = pair.start_session(reference_slot=0, session_id="sit-1")
-    mock.objective_slot = 1
-    with pytest.raises(RuntimeError, match="slot 0 was expected"):
-        pair.record_reference(session, scope.handle)
-    mock.objective_slot = 0
-    pair.record_reference(session, scope.handle)
-    with pytest.raises(RuntimeError, match="reference objective"):
-        pair.record_target(session, scope.handle)
-    mock.objective_slot = 2
-    mock._move(x=10_010_000, y=7_994_000, z=2_502_000)
-    recorded = pair.record_target(session, scope.handle)
-    assert recorded["translation_um"] == pytest.approx([10.0, -6.0, 2.0])
-    adopted = pair.adopt_calibration(session, machine=_machine())
-    saved = json.loads(Path(adopted["calibration_path"]).read_text())
-    assert saved["objectives"]["0"]["translation_um"] == [0.0, 0.0, 0.0]
-    assert saved["objectives"]["2"]["translation_um"] == pytest.approx(
-        [10.0, -6.0, 2.0]
-    )
-    assert model.load_objective_calibration()[0][2] == pytest.approx((10.0, -6.0, 2.0))
-    with pytest.raises(ValueError):
-        pair.start_session(reference_slot=-1)
 
 
 # --- the limits measurement -----------------------------------------------------------------

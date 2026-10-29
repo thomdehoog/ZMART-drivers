@@ -37,6 +37,8 @@ from typing import Any
 import numpy as np
 
 from .. import orientation as _orientation
+from ...dispatcher import limits as _gate
+from ...primitives.rdk import client as rdk_client
 from ...procedures import changes
 from ...procedures import readings as readers
 from ...procedures.acquire import PendingCapture
@@ -165,6 +167,32 @@ def assert_geometry_matches(
         raise ValueError(
             f"{context}: pixel size mismatch ({actual.pixel_size_um} vs {expected_pixel_size_um})"
         )
+
+
+# -- The connection ----------------------------------------------------------
+
+
+def connected(client: Any = None) -> Any:
+    """The RDK client to measure with, governed by this microscope's limits.
+
+    A client handed in (the setup wizard's, or a ``Microscope``'s) is used as
+    it is when the limits already govern it. Without one, FLUOVIEW is reached
+    on this computer. Either way the limits are loaded first when needed: a
+    measurement moves the stage through the gated moves, like any session.
+    """
+    from ..limits import handshake
+
+    if client is None:
+        client = rdk_client.connect_client()
+    if _gate.state_of(client) is None:
+        limits_state = handshake.connect_handshake(client)
+        if not limits_state.ok:
+            raise RuntimeError(limits_state.error)
+    if readers.get_version(client) is None:
+        raise RuntimeError(
+            "FLUOVIEW does not answer: check that it is running with its RDK switched on"
+        )
+    return client
 
 
 # -- Moves ---------------------------------------------------------------

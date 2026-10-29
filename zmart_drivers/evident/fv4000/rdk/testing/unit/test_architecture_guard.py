@@ -277,7 +277,12 @@ MEASURING_MODULES = {
     "origin.set_origin",
     "limits.measure_limits",
     "orientation.measure_orientation",
+    "orientation.registration",
     "optical_calibration.calibrate_objective_pair",
+    "optical_calibration.calibration_common",
+    "optical_calibration.check_calibration",
+    "optical_calibration.adopt_calibration",
+    "optical_calibration.focus",
 }
 
 

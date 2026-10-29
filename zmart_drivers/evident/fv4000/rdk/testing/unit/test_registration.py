@@ -107,3 +107,15 @@ def test_pcc_primitive_sign_matches_the_documented_convention():
     # Quality is incidental here (the no-wrap median border depresses the phase
     # residual); this test guards the SIGN, so only require a usable number.
     assert np.isfinite(quality)
+
+
+def test_pictures_without_contrast_are_never_a_trusted_match():
+    """Two blank pictures can make two methods agree on a meaningless shift; they are refused instead."""
+    blank = np.full((128, 128), 70, dtype=np.uint16)
+    textured = (
+        np.random.default_rng(1).integers(0, 4000, size=(128, 128)).astype(np.uint16)
+    )
+    for ref, tgt in ((blank, blank.copy()), (blank, textured), (textured, blank)):
+        vote = register_voting(ref, tgt, 0.5)
+        assert vote["trusted"] is False and vote["confidence"] == 0
+        assert "no contrast" in vote["reason"]

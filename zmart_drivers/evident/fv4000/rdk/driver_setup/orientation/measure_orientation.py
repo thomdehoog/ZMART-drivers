@@ -41,15 +41,12 @@ from typing import Any
 
 import numpy as np
 
-from ...dispatcher import limits as _gate
-from ...primitives.rdk import client as rdk_client
 from ...procedures import changes
 from ...procedures import readings as readers
 from ...procedures.acquire import PendingCapture
 from ...procedures.save_data import ome_zarr
 from ...procedures.save_data import save as saving
 from ...procedures.save_data.naming import Naming, run_hash
-from ..limits import handshake
 from .registration import D4_RESIDUAL_MAX, classify_d4, register_voting
 
 from . import (
@@ -64,6 +61,7 @@ from ..optical_calibration.calibration_common import (
     SessionPaths,
     acquire_frame_to,
     assert_geometry_matches,
+    connected,
     move_xy_and_verify,
     now_iso,
     read_capture_geometry,
@@ -155,27 +153,6 @@ def start_session(
         target_dir=target_dir,
         started_at_s=time.time(),
     )
-
-
-def connected(client: Any = None) -> Any:
-    """The RDK client to measure with, governed by this microscope's limits.
-
-    A client handed in (the setup wizard's, or a ``Microscope``'s) is used as
-    it is when the limits already govern it. Without one, FLUOVIEW is reached
-    on this computer. Either way the limits are loaded first when needed: the
-    measurement moves the stage through the gated moves, like any session.
-    """
-    if client is None:
-        client = rdk_client.connect_client()
-    if _gate.state_of(client) is None:
-        limits_state = handshake.connect_handshake(client)
-        if not limits_state.ok:
-            raise RuntimeError(limits_state.error)
-    if readers.get_version(client) is None:
-        raise RuntimeError(
-            "FLUOVIEW does not answer: check that it is running with its RDK switched on"
-        )
-    return client
 
 
 def _invalidate_orientation_config(session: OrientationSession) -> None:

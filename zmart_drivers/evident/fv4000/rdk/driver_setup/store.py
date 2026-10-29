@@ -302,8 +302,10 @@ class MachineProfile:
         subsystem: str | None = None,
         payload: dict | None = None,
         archive_paths: Iterable[str | Path] = (),
+        notebook_paths: Iterable[str | Path] = (),
         limits: dict | None = None,
         calibration: dict | None = None,
+        calibration_name: str | None = None,
         orientation: dict | None = None,
     ) -> Path:
         """Save one new dated record of one item, whole, and answer its folder.
@@ -312,7 +314,8 @@ class MachineProfile:
         the keyword shortcuts ``limits=``, ``calibration=`` or
         ``orientation=``. A payload of None copies the item's bundled default
         (for seeding). *archive_paths* are files or folders kept beside the
-        record, such as the notebook that measured it. The folder is written
+        record; *notebook_paths* are notebooks that measured it, kept under
+        ``data/notebook`` as the Leica driver keeps them. The folder is written
         under a temporary name and renamed into place whole, so a reader
         never sees a half-written record.
         """
@@ -325,6 +328,10 @@ class MachineProfile:
             )
             if value is not None
         ]
+        if calibration_name is not None:
+            raise ValueError(
+                "named calibration sets are not kept by this driver; leave calibration_name out"
+            )
         if subsystem is None:
             if len(given) != 1:
                 raise ValueError("publish_snapshot takes exactly one item's payload")
@@ -346,6 +353,10 @@ class MachineProfile:
                 _write_json(staging / filename, payload)
             else:
                 shutil.copy2(self.bundled_default_path(filename), staging / filename)
+            for source in notebook_paths:
+                source = Path(source)
+                (staging / "data" / "notebook").mkdir(parents=True, exist_ok=True)
+                shutil.copy2(source, staging / "data" / "notebook" / source.name)
             for source in archive_paths:
                 source = Path(source)
                 destination = staging / source.name
@@ -381,3 +392,20 @@ class MachineProfile:
 
 
 MACHINE = MachineProfile()
+
+_SAFE_NAME = re.compile(r"^[A-Za-z0-9._-]+$")
+
+
+def validate_calibration_name(name: str) -> str:
+    """Check that a measurement's folder name is one plain path segment: letters, numbers, '.', '_' or '-'.
+
+    The name becomes a folder under the calibration's records, so it may not
+    climb out of it (no '/', no '..').
+    """
+    value = str(name).strip()
+    if not value or value in {".", ".."} or not _SAFE_NAME.match(value):
+        raise ValueError(
+            "the name must be one path-safe segment using letters, "
+            f"numbers, '.', '_' or '-', got {name!r}"
+        )
+    return value

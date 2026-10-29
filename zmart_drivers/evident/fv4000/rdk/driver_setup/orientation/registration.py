@@ -216,6 +216,11 @@ VOTING_METHODS: tuple[tuple[str, callable], ...] = (
 # ──────────────────────────────────────────────────────────────────────
 
 
+#: Below this spread of grey levels a picture is taken to show nothing (the
+#: dark noise of a real detector is well above it).
+FEATURELESS_STD = 1e-3
+
+
 def register_voting(
     ref: np.ndarray,
     tgt: np.ndarray,
@@ -236,6 +241,23 @@ def register_voting(
     callers should refuse to act on the consensus when ``trusted`` is
     False rather than acting on a guess.
     """
+    # A picture with no contrast at all (a closed shutter, a laser off, a
+    # saturated field) carries no position. Two such pictures can still make
+    # two methods agree on a meaningless tiny shift, so they are refused here
+    # before any method runs. (Added in this driver; the Leica driver's copy
+    # of this file does not have this check yet.)
+    for label, picture in (("reference", ref), ("target", tgt)):
+        if float(np.std(np.asarray(picture, dtype=np.float64))) < FEATURELESS_STD:
+            return {
+                "dx_um": None,
+                "dy_um": None,
+                "quality": None,
+                "confidence": 0,
+                "trusted": False,
+                "agreeing": [],
+                "per_method": {},
+                "reason": f"the {label} picture has no contrast, so it shows nothing to match",
+            }
     per_method: dict[str, dict] = {}
     valid: list[tuple[str, float, float, float]] = []
     for name, fn in VOTING_METHODS:

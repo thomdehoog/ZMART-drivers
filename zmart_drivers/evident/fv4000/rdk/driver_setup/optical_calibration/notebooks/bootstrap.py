@@ -16,7 +16,6 @@ from zmart_drivers.evident.fv4000.rdk.driver_setup.notebook_support import (
 NOTEBOOK = NotebookCheckpoint(
     NOTEBOOK_PATH,
     required_code=(
-        "objective_pair.record_reference(session, scope.handle)",
-        "objective_pair.record_target(session, scope.handle)",
+        "summary = objective_pair.measure_parcentricity_target_and_save(session)",
     ),
 )
