@@ -1,0 +1,22 @@
+# Coverage configuration for the ZEISS driver.
+#
+# Pinned by run_ci.py via --cov-config (absolute path) so it applies regardless
+# of the working directory CI launches from. Keeps the coverage denominator to
+# *product* code: the test code and the CI runner itself are not under test.
+[run]
+branch = True
+omit =
+    */testing/*
+
+[report]
+# Coverage floor. The offline suite measured 75% branch coverage on 2026-10-29,
+# with the controller layer; the floor sits below it so it locks in that level
+# without flaking. run_ci.py runs without coverage when pytest-cov is missing.
+fail_under = 70
+
+# Lines that are unreachable-by-design or trivial should not count against us.
+exclude_also =
+    if __name__ == .__main__.:
+    if TYPE_CHECKING:
+    raise NotImplementedError
+    @(abc\.)?abstractmethod

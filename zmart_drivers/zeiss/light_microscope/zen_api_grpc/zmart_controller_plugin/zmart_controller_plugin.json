@@ -1,0 +1,20 @@
+{
+  "name": "zeiss-zen",
+  "connection": {
+    "microscope": "zeiss-zen",
+    "api_type": "ZEN API (gRPC), zen_api 2025.10.1, ZEN 3.13",
+    "host": "127.0.0.1",
+    "client": "ZMART",
+    "password": null,
+    "config": null,
+    "output_root": null,
+    "port": 5002,
+    "cert_file": null,
+    "zen_config_ini": null,
+    "zen_images": null,
+    "experiment": null,
+    "load_limits": true,
+    "load_calibration": true,
+    "load_origin": true
+  }
+}

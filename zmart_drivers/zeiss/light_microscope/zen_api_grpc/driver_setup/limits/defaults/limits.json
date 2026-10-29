@@ -1,0 +1,8 @@
+{
+  "x_um": {"range": [0, 100000]},
+  "y_um": {"range": [0, 75000]},
+  "z_um": {"range": [0, 10000]},
+  "objective_position": [],
+  "experiment": [],
+  "set_z_stack": []
+}
