@@ -252,7 +252,8 @@ python zmart_drivers/nikon/nis_elements_ar7/testing/run_ci.py
 **The hardware check, at the microscope.** It runs inside NIS-Elements, in NIS's own Python, and needs
 nothing installed. It calls NIS's functions directly, from the same table the driver uses:
 
-1. Put the ZMART-drivers folder at `C:\ZMART-drivers` (or on the Desktop).
+1. Unzip the ZMART-drivers folder onto the Desktop, into Documents or Downloads, or at `C:\ZMART-drivers`.
+   The macro finds it there, also with the extra folder Windows' "Extract all" adds.
 2. Open `testing\hardware\check_hardware_nis.py` in Notepad. At the top, switch on what may change:
    a group of hardware settings, the stage, the objective, the optical configuration, one picture. Switch
    on one at a time, with someone at the microscope. With everything off, the check only reads.

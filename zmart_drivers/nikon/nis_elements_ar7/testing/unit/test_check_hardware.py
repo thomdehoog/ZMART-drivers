@@ -149,7 +149,12 @@ def test_the_macro_finds_the_script_on_the_desktop_and_runs_it(tmp_path, monkeyp
     ).group(1)
     home = tmp_path / "home"
     (home / "Desktop").mkdir(parents=True)
-    (home / "Desktop" / "ZMART-drivers").symlink_to(REPO_ROOT, target_is_directory=True)
+    # As Windows' "Extract all" leaves it: the unzipped folder inside a folder of the same name.
+    unzipped = home / "Desktop" / "ZMART-drivers-claude-zmart-nikon-nis-7-driver-ocjk5t"
+    unzipped.mkdir()
+    (unzipped / "ZMART-drivers-claude-zmart-nikon-nis-7-driver-ocjk5t").symlink_to(
+        REPO_ROOT, target_is_directory=True
+    )
     monkeypatch.setenv("HOME", str(home))
     monkeypatch.setenv("USERPROFILE", str(home))
     monkeypatch.setenv("ZMART_CHECK_RESULTS", str(tmp_path / "here"))

@@ -42,7 +42,7 @@ REPORT_DIR = TESTING / "report"
 HARDWARE_HOW_TO = """
 The hardware check runs inside NIS-Elements, in NIS's own Python, so it is not started from here.
 At the microscope:
-  1. Copy the ZMART-drivers folder to C:\\ZMART-drivers (or onto the Desktop).
+  1. Unzip the ZMART-drivers folder onto the Desktop (or into Documents, Downloads, or C:\\ZMART-drivers).
   2. Open testing\\hardware\\check_hardware_nis.py in Notepad and switch on, at the top,
      what may change (one group at a time, with someone at the microscope).
   3. In NIS-Elements: Macro > Run Macro From File > testing\\hardware\\check_hardware.mac.
