@@ -2,10 +2,17 @@
 
 A store is a folder: ``zarr.json`` says what the image is (its axes, pixel
 size and position), ``0/`` holds the pixels, and ``OME/METADATA.ome.xml``
-holds the OME data model (the instrument, the channel, where the plane was
-taken) with ZMART's annotations and the vendor's facts in it, as
+holds the OME data model (the instrument with its light sources, filters,
+camera and objective; the channel; where the plane was taken) with ZMART's
+annotations and the vendor's facts in it, as
 ``zmart_drivers/metadata_convention/README.md`` describes. Everything a
-reader in ZMART needs is in those three places.
+reader in ZMART needs is in those places.
+
+Below the full-resolution level ``0/`` are coarser levels ``1/``, ``2/``
+and on, for looking at the image zoomed out: each halves y and x by the mean
+of 2x2 pixels, by the ZMART Viewer's own rule (the same as the Leica
+driver's), down until a level fits one chunk of ``PIECE`` pixels. The store
+says so (``type: "mean"``): the viewer bakes only stores that do.
 
 A capture of this driver is one plane: one channel, one depth, one time
 point. The pixels are already turned to the stage's axes
@@ -31,6 +38,10 @@ OME_NS = convention.OME_NS
 XSI_NS = "http://www.w3.org/2001/XMLSchema-instance"
 SCHEMA_LOCATION = f"{OME_NS} {OME_NS}/ome.xsd"
 MICROMETRE = "µm"
+
+#: The edge of a chunk in y and x, and the size the coarsest level fits in:
+#: what the stores the ZMART Viewer reads use.
+PIECE = 128
 
 
 @dataclass(frozen=True)
@@ -65,6 +76,15 @@ class Capture:
     #: written as the channel's excitation wavelength; with none or several,
     #: OME has no single number for it, so none is written.
     excitation_nm: tuple = ()
+    #: The light sources that were on: ``{"id", "kind", "model", "wavelength_nm"}``
+    #: each, ``kind`` being ``"Laser"`` or ``"GenericExcitationSource"`` (a lamp
+    #: or LED). Written into the instrument; when exactly one was on, the
+    #: channel names it in its light source settings.
+    light_sources: tuple = ()
+    #: The filter cube in place in each turret: ``{"id", "turret", "position", "model"}``
+    #: each. Written into the instrument as filter sets; the channel names the
+    #: one that is not empty, when there is exactly one.
+    filter_sets: tuple = ()
 
 
 def write_store(path: Path, capture: Capture, notes: convention.Notes) -> Path:
@@ -89,6 +109,29 @@ def write_store(path: Path, capture: Capture, notes: convention.Notes) -> Path:
         )
     scale_xy = float(capture.pixel_size_um) if capture.pixel_size_um else 1.0
     height, width = pixels.shape
+    levels = mean_pyramid(pixels)
+    datasets = []
+    # Each coarser pixel is the mean of a 2x2 block, so its centre lies half a
+    # finer pixel in from the block's first: x and y step on by that.
+    step = scale_xy
+    first_y = capture.plane.y_um - (height - 1) / 2 * scale_xy
+    first_x = capture.plane.x_um - (width - 1) / 2 * scale_xy
+    for index in range(len(levels)):
+        datasets.append(
+            {
+                "path": str(index),
+                "coordinateTransformations": [
+                    {"type": "scale", "scale": [1.0, 1.0, 1.0, step, step]},
+                    {
+                        "type": "translation",
+                        # The centre of the level's first pixel, as a position.
+                        "translation": [0.0, 0.0, capture.plane.z_um, first_y, first_x],
+                    },
+                ],
+            }
+        )
+        first_y, first_x = first_y + step / 2, first_x + step / 2
+        step *= 2
     writing = path.with_name(f".{path.name}.{uuid.uuid4().hex[:8]}.writing")
     try:
         group = zarr.open_group(str(writing), mode="w", zarr_format=3)
@@ -99,6 +142,8 @@ def write_store(path: Path, capture: Capture, notes: convention.Notes) -> Path:
                     "multiscales": [
                         {
                             "name": capture.name,
+                            # The viewer bakes only stores that say their pyramid is a mean one.
+                            "type": "mean",
                             "axes": [
                                 {"name": "t", "type": "time", "unit": "second"},
                                 {"name": "c", "type": "channel"},
@@ -106,38 +151,11 @@ def write_store(path: Path, capture: Capture, notes: convention.Notes) -> Path:
                                 {"name": "y", "type": "space", "unit": "micrometer"},
                                 {"name": "x", "type": "space", "unit": "micrometer"},
                             ],
-                            "datasets": [
-                                {
-                                    "path": "0",
-                                    "coordinateTransformations": [
-                                        {
-                                            "type": "scale",
-                                            "scale": [
-                                                1.0,
-                                                1.0,
-                                                1.0,
-                                                scale_xy,
-                                                scale_xy,
-                                            ],
-                                        },
-                                        {
-                                            "type": "translation",
-                                            # The centre of the first voxel, as a position.
-                                            "translation": [
-                                                0.0,
-                                                0.0,
-                                                capture.plane.z_um,
-                                                capture.plane.y_um
-                                                - (height - 1) / 2 * scale_xy,
-                                                capture.plane.x_um
-                                                - (width - 1) / 2 * scale_xy,
-                                            ],
-                                        },
-                                    ],
-                                }
-                            ],
+                            "datasets": datasets,
                             "metadata": {
-                                "levels": "one level, the pixels as captured",
+                                "description": f"{len(levels)} levels: full resolution, then each halving y "
+                                "and x by the mean of 2x2 pixels (an odd edge repeated, integers rounded "
+                                "half to even); z, c and t are not reduced",
                                 "z": "a single plane has no measured z size; its z scale is 1",
                                 "pixel_size": "NIS-Elements' calibration for the objective in use"
                                 if capture.pixel_size_um
@@ -163,15 +181,17 @@ def write_store(path: Path, capture: Capture, notes: convention.Notes) -> Path:
                 "zmart": convention.zarr_attributes(),
             }
         )
-        array = group.create_array(
-            "0",
-            shape=(1, 1, 1, height, width),
-            chunks=(1, 1, 1, height, width),
-            dtype=pixels.dtype,
-            # OME-Zarr 0.5 asks the array to name its dimensions as the axes do.
-            dimension_names=("t", "c", "z", "y", "x"),
-        )
-        array[0, 0, 0] = pixels
+        for index, level in enumerate(levels):
+            rows, columns = level.shape
+            array = group.create_array(
+                str(index),
+                shape=(1, 1, 1, rows, columns),
+                chunks=(1, 1, 1, min(PIECE, rows), min(PIECE, columns)),
+                dtype=level.dtype,
+                # OME-Zarr 0.5 asks the array to name its dimensions as the axes do.
+                dimension_names=("t", "c", "z", "y", "x"),
+            )
+            array[0, 0, 0] = level
         ome_dir = writing / "OME"
         ome_dir.mkdir()
         (ome_dir / "METADATA.ome.xml").write_text(
@@ -202,6 +222,15 @@ def image_xml(capture: Capture, notes: convention.Notes, dtype) -> str:
     ET.SubElement(
         instrument, _tag("Microscope"), {"Manufacturer": "Nikon", "Type": "Inverted"}
     )
+    # The schema orders an instrument's parts: microscope, light sources,
+    # detector, objective, filter sets.
+    for source in capture.light_sources:
+        attributes = {"ID": source["id"], "Model": source.get("model", "")}
+        if source.get("wavelength_nm"):
+            attributes.update(
+                Wavelength=_num(source["wavelength_nm"]), WavelengthUnit="nm"
+            )
+        ET.SubElement(instrument, _tag(source["kind"]), attributes)
     if capture.camera:
         ET.SubElement(
             instrument,
@@ -220,6 +249,12 @@ def image_xml(capture: Capture, notes: convention.Notes, dtype) -> str:
         if magnification:
             attributes["NominalMagnification"] = _num(magnification)
         ET.SubElement(instrument, _tag("Objective"), attributes)
+    for cube in capture.filter_sets:
+        ET.SubElement(
+            instrument,
+            _tag("FilterSet"),
+            {"ID": cube["id"], "Model": cube.get("model") or "(empty)"},
+        )
 
     image = ET.SubElement(root, _tag("Image"), {"ID": "Image:0", "Name": capture.name})
     ET.SubElement(image, _tag("AcquisitionDate")).text = capture.acquired_at.astimezone(
@@ -279,8 +314,18 @@ def image_xml(capture: Capture, notes: convention.Notes, dtype) -> str:
             ),
         },
     )
+    # The schema orders a channel's parts: light source settings, detector
+    # settings, filter set. OME lets a channel name one light source and one
+    # filter set, so each is named only when there is exactly one.
+    if len(capture.light_sources) == 1:
+        ET.SubElement(
+            channel, _tag("LightSourceSettings"), {"ID": capture.light_sources[0]["id"]}
+        )
     if capture.camera:
         ET.SubElement(channel, _tag("DetectorSettings"), {"ID": "Detector:0"})
+    cubes = [cube for cube in capture.filter_sets if cube.get("model")]
+    if len(cubes) == 1:
+        ET.SubElement(channel, _tag("FilterSetRef"), {"ID": cubes[0]["id"]})
     ET.SubElement(pixels, _tag("MetadataOnly"))
     plane_attributes = {
         "TheZ": "0",
@@ -314,6 +359,38 @@ def image_xml(capture: Capture, notes: convention.Notes, dtype) -> str:
     return '<?xml version="1.0" encoding="UTF-8"?>\n' + ET.tostring(
         root, encoding="unicode"
     )
+
+
+def mean_pyramid(pixels) -> list:
+    """*pixels* (y, x) and its coarser levels, each halving y and x by a 2x2 mean.
+
+    Down until a level fits one chunk (``PIECE``), and always at least one
+    coarser level, as the Leica driver's stores have.
+    """
+    levels = [pixels]
+    while len(levels) < 2 or max(levels[-1].shape) > PIECE:
+        if min(levels[-1].shape) <= 1:
+            break
+        levels.append(halve_xy(levels[-1]))
+    return levels
+
+
+def halve_xy(values):
+    """One level coarser: the mean of each 2x2 block in y and x.
+
+    The ZMART Viewer's own reducer, so the viewer can use these levels as its
+    own: an odd last row or column is repeated, the mean is taken in float64,
+    and whole numbers are rounded half to even into their own type.
+    """
+    import numpy as np
+
+    h, w = values.shape[-2:]
+    even = np.pad(
+        values, [(0, 0)] * (values.ndim - 2) + [(0, h % 2), (0, w % 2)], mode="edge"
+    )
+    blocks = even.reshape(*values.shape[:-2], (h + 1) // 2, 2, (w + 1) // 2, 2)
+    mean = blocks.mean(axis=(-3, -1), dtype="float64")
+    return (np.rint(mean) if values.dtype.kind in "iu" else mean).astype(values.dtype)
 
 
 def _window(pixels) -> dict:

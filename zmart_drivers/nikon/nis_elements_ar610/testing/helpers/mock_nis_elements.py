@@ -42,6 +42,10 @@ TEXTURE_SHAPE = (2400, 2400)
 TEXTURE_UM_PER_TEXEL = 1.0
 
 
+#: What the mock writes as the picture's own description, standing in for NIS-Elements'.
+NIS_DESCRIPTION = "<mock NIS-Elements picture description>"
+
+
 class MockNisElements(FakeNisApi):
     """The bridge's fake Ti2, with a stage that travels, a textured sample and ways to misbehave.
 
@@ -165,7 +169,13 @@ class MockNisElements(FakeNisApi):
         if not self.open_images:
             raise NisError("ImageSaveAs: no image is open")
         image = self.frame if self.frame is not None else self.picture()
-        tifffile.imwrite(path, np.asarray(image).astype(np.uint16))
+        # NIS-Elements writes its own description into the picture; the mock writes a short one.
+        tifffile.imwrite(
+            path,
+            np.asarray(image).astype(np.uint16),
+            description=NIS_DESCRIPTION,
+            metadata=None,
+        )
 
 
 @contextmanager

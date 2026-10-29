@@ -163,8 +163,21 @@ nothing.
 The limits file fences the new settings too: `laser_wavelength_nm` (which lines automation may use),
 `laser_power`, `light_voltage`, `pfs_offset` and `piezo_step_um` (one step of the piezo drive).
 
-Each saved picture notes every device's setting with it. When exactly one laser line was on, its
-wavelength is also written as the channel's excitation wavelength in the OME metadata.
+### What a saved store holds
+
+Every capture is one OME-Zarr 0.5 store, written by the ZMART metadata convention in the same four
+layers as the Leica driver's:
+
+1. **OME-Zarr itself** (`zarr.json`): the axes `t c z y x`, the pixel size and where the picture lies
+   on the sample. Below the full-resolution level are coarser ones, each halving the picture by the
+   mean of 2x2 pixels, so the ZMART Viewer can show it zoomed out (`type: "mean"`).
+2. **The OME data model** (`OME/METADATA.ome.xml`): the microscope, the laser lines and lamps that were
+   on, the camera, the objective, the filter cube in each turret, the channel (with its excitation
+   wavelength when one laser line was on) and the plane's position and exposure.
+3. **The driver's state**: the whole `state()` at the capture, every device included, and the
+   capture record, in ZMART's own annotations.
+4. **What only NIS-Elements says**: the driver's NIS facts (versions, the bridge's answer, the
+   devices), and the description NIS-Elements wrote into the picture itself, kept byte for byte.
 
 ## Setting up the driver
 

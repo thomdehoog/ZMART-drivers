@@ -14,6 +14,7 @@ University of Zurich (thom.dehoog@zmb.uzh.ch, thomdehoog@gmail.com).
 from __future__ import annotations
 
 import logging
+import re
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -56,7 +57,18 @@ def save_pending(pending, *, orientation: Orientation) -> dict:
     import tifffile
 
     p = pending
-    pixels = tifffile.imread(p.path)
+    with tifffile.TiffFile(p.path) as picture:
+        pixels = picture.pages[0].asarray()
+        # What NIS-Elements wrote into the picture's own description, kept byte
+        # for byte as the vendor's description, as the Leica driver keeps LAS X's.
+        described = picture.pages[0].tags.get(270)
+        descriptions = (
+            (described.value,)
+            if described is not None
+            and isinstance(described.value, str)
+            and described.value
+            else ()
+        )
     if pixels.ndim != 2:
         raise RuntimeError(
             f"the picture at {p.path} has shape {pixels.shape}; this driver saves monochrome pictures "
@@ -90,10 +102,14 @@ def save_pending(pending, *, orientation: Orientation) -> dict:
         else None,
         acquired_at=datetime.fromtimestamp(p.started_at, tz=UTC),
         excitation_nm=lines_on(p.state),
+        light_sources=light_sources_on(p.state),
+        filter_sets=filter_sets_in_place(p.state),
         position_label=p.label,
         description=f"NIS-Elements snap, optical configuration {p.channel or 'unknown'}",
     )
-    ome_zarr.write_store(store, capture, store_notes(p, orientation))
+    ome_zarr.write_store(
+        store, capture, store_notes(p, orientation, descriptions=descriptions)
+    )
     p.path.unlink(missing_ok=True)
     # The session's staging folder, and ``.staging`` itself, go once they are empty.
     _remove_if_empty(p.path.parent)
@@ -145,7 +161,9 @@ def save_pending(pending, *, orientation: Orientation) -> dict:
     }
 
 
-def store_notes(pending, orientation: Orientation) -> convention.Notes:
+def store_notes(
+    pending, orientation: Orientation, *, descriptions: tuple[str, ...] = ()
+) -> convention.Notes:
     """What the store says about a capture besides its pixels, from the note taken at the capture."""
     p = pending
     record = {
@@ -187,6 +205,53 @@ def store_notes(pending, orientation: Orientation) -> convention.Notes:
         pixels_to_position=orientation.picture_to_stage,
         vendor=VENDOR,
         vendor_facts=vendor,
+        vendor_descriptions=tuple(descriptions),
+    )
+
+
+def _ome_id(*parts) -> str:
+    """An OME ID made of *parts*: OME IDs may hold no spaces, so a space becomes an underscore."""
+    return ":".join(re.sub(r"\s+", "_", str(part)) for part in parts)
+
+
+def light_sources_on(state: dict | None) -> tuple:
+    """The light sources that were on at the capture, as the OME writer takes them: laser lines, then lamps."""
+    changeable = (state or {}).get("changeable") or {}
+    sources = [
+        {
+            "id": _ome_id("LightSource", laser, nm),
+            "kind": "Laser",
+            "model": f"{laser} {nm} nm",
+            "wavelength_nm": int(nm),
+        }
+        for laser, lines in sorted((changeable.get("lasers") or {}).items())
+        for nm, line in sorted(lines.items(), key=lambda item: int(item[0]))
+        if line.get("on")
+    ]
+    sources += [
+        {
+            "id": _ome_id("LightSource", name),
+            "kind": "GenericExcitationSource",
+            "model": name,
+        }
+        for name, light in sorted((changeable.get("lights") or {}).items())
+        if light.get("on")
+    ]
+    return tuple(sources)
+
+
+def filter_sets_in_place(state: dict | None) -> tuple:
+    """The filter cube in place in each turret at the capture, with what NIS-Elements calls it."""
+    filters = ((state or {}).get("observed") or {}).get("filters") or {}
+    return tuple(
+        {
+            "id": _ome_id("FilterSet", turret, changer["position"]),
+            "turret": turret,
+            "position": changer["position"],
+            "model": (changer.get("filters") or {}).get(changer["position"], ""),
+        }
+        for turret, changer in sorted(filters.items())
+        if changer.get("position") is not None
     )
 
 

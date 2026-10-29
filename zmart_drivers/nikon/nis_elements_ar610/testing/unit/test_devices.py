@@ -268,3 +268,52 @@ def test_a_capture_notes_the_laser_line_that_was_on(scope, tmp_path):
         'ExcitationWavelength="475"' in xml and 'ExcitationWavelengthUnit="nm"' in xml
     )
     assert "laser_lines_on_nm" in xml and "Turret-Up" in xml
+
+
+def test_a_store_has_a_mean_pyramid_the_light_path_and_nis_own_description(
+    scope, mock, tmp_path
+):
+    import zarr
+    from mock_nis_elements import NIS_DESCRIPTION
+    from ome_types import from_xml
+
+    from zmart_drivers import metadata_convention as convention
+
+    mock.image_shape = (300, 260)
+    scope.select_channel("FITC")
+    scope.set_laser(475, on=True, power=20)
+    scope.set_filter("Turret-Up", filter_name="GFP")
+    scope.acquire("C3", output_folder=str(tmp_path / "run"))
+    scope.save()
+    (store,) = list((tmp_path / "run" / "data").glob("*.ome.zarr"))
+    assert convention.check_store(store) == []
+
+    # The pyramid: each level halves y and x by a 2x2 mean, down to one chunk.
+    group = zarr.open_group(str(store), mode="r")
+    multiscale = group.attrs["ome"]["multiscales"][0]
+    assert multiscale["type"] == "mean"
+    shapes = [group[d["path"]].shape for d in multiscale["datasets"]]
+    assert shapes == [(1, 1, 1, 300, 260), (1, 1, 1, 150, 130), (1, 1, 1, 75, 65)]
+    full, half = group["0"][0, 0, 0], group["1"][0, 0, 0]
+    assert half[0, 0] == round(full[:2, :2].astype(float).mean())
+    scales = [
+        d["coordinateTransformations"][0]["scale"][-1] for d in multiscale["datasets"]
+    ]
+    assert scales[1] == pytest.approx(2 * scales[0])
+
+    # The light path, as OME has it, and NIS-Elements' own description beside it.
+    ome = from_xml((store / "OME" / "METADATA.ome.xml").read_text(encoding="utf-8"))
+    instrument = ome.instruments[0]
+    (laser,) = instrument.lasers
+    assert laser.wavelength == 475 and laser.model == "SpectraIII 475 nm"
+    assert {f.model for f in instrument.filter_sets} == {"GFP", "(empty)"}
+    channel = ome.images[0].pixels.channels[0]
+    assert channel.light_source_settings.id == laser.id
+    assert channel.filter_set_ref.id == "FilterSet:Turret-Up:2"
+    descriptions = [
+        a.value
+        for a in ome.structured_annotations.comment_annotations
+        if a.namespace == convention.vendor_namespace("nis-elements")
+        or a.id.startswith("Annotation:nis-elements-description")
+    ]
+    assert NIS_DESCRIPTION in descriptions
