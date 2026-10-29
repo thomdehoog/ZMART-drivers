@@ -117,7 +117,8 @@ def measure_orientation(handle: Any, *, move_um: float = MOVE_UM) -> dict:
 
     Needs a loaded experiment and ``pylibCZIrw``. Every move goes through the
     limits as usual. Returns ``{"orientation", "frame", "matrix", "clarity",
-    "document"}``, where ``document`` is ready for :func:`adopt_orientation`.
+    "shifts_px", "document", "planes"}``, where ``document`` is ready for
+    :func:`adopt_orientation` and ``planes`` holds the three snaps as arrays.
     """
     handle.require_open()
     experiment = handle.experiment
@@ -195,6 +196,9 @@ def measure_orientation(handle: Any, *, move_um: float = MOVE_UM) -> dict:
         "clarity": [round(clarity_x, 1), round(clarity_y, 1)],
         "shifts_px": [shift_x, shift_y],
         "document": orientation_config(orientation, frame),
+        # The three snaps themselves (start, after the move along x, after the
+        # move along y), so a notebook or the setup wizard can show them.
+        "planes": [here, along_x, along_y],
     }
 
 

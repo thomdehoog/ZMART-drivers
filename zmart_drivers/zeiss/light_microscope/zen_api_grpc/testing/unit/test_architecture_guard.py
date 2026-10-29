@@ -85,6 +85,13 @@ def _imported_parts(path: Path, part: str) -> set[str]:
     return found - {part}
 
 
+# The setup wizard sits in driver_setup/ but is an operator tool above the driver:
+# it connects to the microscope the way a user does, through methods.connect(),
+# and names the driver's version among what Connect found. It is the only part of
+# driver_setup/ allowed to import methods and the version.
+WIZARD = Path("driver_setup/wizard")
+
+
 def test_each_part_only_imports_what_the_anatomy_allows():
     for part, allowed in ALLOWED.items():
         folder = DRIVER_ROOT / part
@@ -95,6 +102,8 @@ def test_each_part_only_imports_what_the_anatomy_allows():
             if "__pycache__" in path.parts:
                 continue
             used = _imported_parts(path, part)
+            if WIZARD in path.relative_to(DRIVER_ROOT).parents:
+                used -= {"methods", "__version__"}
             assert used <= allowed, (
                 f"{path.relative_to(DRIVER_ROOT)} imports {sorted(used - allowed)}; "
                 f"the anatomy lets {part} import only {sorted(allowed)}"
@@ -195,3 +204,20 @@ def test_nothing_in_the_driver_imports_from_testing():
         assert "testing" not in _imported_parts(DRIVER_ROOT / rel, rel.parts[0]), str(
             rel
         )
+
+
+def test_nothing_in_the_driver_imports_the_setup_wizard():
+    """The wizard calls the setup items; no item, procedure or method calls it back."""
+    for rel, text in _driver_sources():
+        if WIZARD in rel.parents:
+            continue
+        for node in ast.walk(ast.parse(text)):
+            if isinstance(node, ast.ImportFrom):
+                names = [node.module or "", *(a.name for a in node.names)]
+            elif isinstance(node, ast.Import):
+                names = [a.name for a in node.names]
+            else:
+                continue
+            assert not any(
+                n == "wizard" or n.endswith(".wizard") or ".wizard." in n for n in names
+            ), str(rel)

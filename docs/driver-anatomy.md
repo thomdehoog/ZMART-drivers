@@ -465,7 +465,9 @@ architecture guard checks that the copy stays unchanged. It has one class of pri
 
 ZEN answers every call itself and its moves return once they are done, so there is no route chain,
 no dialog watch and no log reader. A capture leaves ZEN's own CZI file, moved into the run's
-folder, with a `.zmart.json` record beside it. The driver's README says the rest.
+folder, with a `.zmart.json` record beside it. Its `driver_setup/wizard/` has the Leica wizard's
+framework, server, launcher and look, with its own five steps; the objective calibration in it is
+done by eye. The driver's README says the rest.
 
 The Nikon and mesoSPIM drivers and the controller's mock driver are not
 in this beta. When they come back, they come back in this anatomy.

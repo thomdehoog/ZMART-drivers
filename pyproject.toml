@@ -52,13 +52,15 @@ leica = [
 # and not on PyPI, so it is installed from there; grpclib, the gRPC transport
 # it uses; pylibCZIrw, ZEISS's reader of the CZI files ZEN writes (the planes
 # of a capture and the orientation setup read them); numpy for the
-# orientation setup, and ipython for the setup notebooks.
+# orientation setup; ipython for the setup notebooks, and pywebview for the
+# setup wizard's window.
 zeiss = [
     "zen_api @ https://raw.githubusercontent.com/zeiss-microscopy/OAD/v2025.10.1/ZEN-API/python_packages/zen_api-2025.10.1/dist/zen_api-2025.10.1-py3-none-any.whl",
     "grpclib>=0.4.7",
     "pylibCZIrw>=4.1",
     "numpy>=1.24",
     "ipython>=8",
+    "pywebview>=5",
 ]
 # The ZMART Controller the driver plugs into. It is not on PyPI, so it is
 # installed from its own repository: pip install "zmart-drivers[leica,controller]".

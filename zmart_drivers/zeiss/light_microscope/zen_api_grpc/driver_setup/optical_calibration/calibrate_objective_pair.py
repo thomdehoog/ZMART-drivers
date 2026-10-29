@@ -104,16 +104,47 @@ def adopt_calibration(
     objective's offset is its translation against the reference. Returns the
     new calibration and where it was saved.
     """
+    return adopt_pairs(
+        [result], calibration_name=calibration_name, machine=machine, moment=moment
+    )
+
+
+def adopt_pairs(
+    results: list[dict],
+    *,
+    fresh: bool = False,
+    calibration_name: str | None = None,
+    machine: Any = None,
+    moment=None,
+) -> dict:
+    """Save several measured pairs at once, as one new snapshot of the calibration.
+
+    Every pair must share one reference objective. Normally that reference
+    must be the calibration's reference already (or the calibration has none
+    yet). With ``fresh=True`` the saved calibration is set aside and a new one
+    is started from these pairs alone: use it to choose a different reference
+    objective, knowing that offsets not measured again are dropped. Returns
+    the new calibration and where it was saved.
+    """
+    if not results:
+        raise ValueError("there is no measured pair to save")
+    references = {int(r["reference"]["position"]) for r in results}
+    if len(references) != 1:
+        raise ValueError(
+            f"the pairs were measured against different reference objectives {sorted(references)}; "
+            "measure every pair against one reference"
+        )
+    reference = references.pop()
     if machine is None:
         from ..store import MACHINE
 
         machine = MACHINE
-    try:
-        config = model.load_calibration(calibration_name=calibration_name)
-    except FileNotFoundError:
-        config = {"schema_version": model.SCHEMA_VERSION, "objectives": {}}
-    reference = int(result["reference"]["position"])
-    other = int(result["other"]["position"])
+    config = {"schema_version": model.SCHEMA_VERSION, "objectives": {}}
+    if not fresh:
+        try:
+            config = model.load_calibration(calibration_name=calibration_name)
+        except FileNotFoundError:
+            pass
     translations = model.translations_of(config)
     if translations:
         if translations.get(reference) != (0.0, 0.0, 0.0):
@@ -123,11 +154,15 @@ def adopt_calibration(
             )
     else:
         config = model.calibration_with(
-            config, reference, result["reference"].get("name"), (0.0, 0.0, 0.0)
+            config, reference, results[0]["reference"].get("name"), (0.0, 0.0, 0.0)
         )
-    config = model.calibration_with(
-        config, other, result["other"].get("name"), result["translation_um"]
-    )
+    for result in results:
+        config = model.calibration_with(
+            config,
+            int(result["other"]["position"]),
+            result["other"].get("name"),
+            result["translation_um"],
+        )
     snapshot = machine.publish_snapshot(
         moment or datetime.now(UTC),
         calibration=config,

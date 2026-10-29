@@ -168,6 +168,15 @@ Once per microscope, before the first experiment, the driver needs five things: 
 go, how far the stage may travel, the point that counts as (0, 0, 0), how the picture is turned
 against the stage (with the pixel size), and how far the sample shifts between objectives.
 
+The easiest way is the **setup wizard**, which walks through all five in a window:
+
+```bash
+python -m zmart_drivers.zeiss.light_microscope.zen_api_grpc.driver_setup.wizard
+```
+
+[Its README](driver_setup/wizard/README.md) describes each step. The notebooks below do the same
+work with the same safety checks, one item at a time:
+
 | What | How |
 |---|---|
 | Data location | `driver_setup/data_location/notebooks/set_data_location.ipynb` |
@@ -245,7 +254,8 @@ zen_api_grpc/
   primitives/gateway/        client.py (the connection and the loop thread), transfer.py,
                              reads.py, writes.py, profile.py
   driver_setup/              limits/, origin/, orientation/, optical_calibration/,
-                             data_location/, store.py
+                             data_location/, store.py, and wizard/, the window that
+                             walks through them
   zmart_controller_plugin/   the ZmartControllerPlugin class, info.py, procedure_menu.py
   testing/                   helpers/ (the stand-in), unit/, hardware/, run_ci.py
 ```
@@ -256,7 +266,9 @@ handed to the dispatcher. How it differs from the Leica driver:
 - **No route chain, no dialogs, no log.** ZEN answers every call itself, so the transfer keeps the
   answer as the reply and the profile sorts ZEN's gRPC status: only `UNAVAILABLE` and its kin (busy,
   timed out) are sent again.
-- **The setup wizard is not here yet.** The setup items have their notebooks.
+- **The objective calibration is done by eye.** The operator centres and focuses one feature under
+  each objective, and the driver reads the positions; the Leica driver matches z-stacks and
+  pictures instead. The setup wizard follows the same way.
 - **The CZI is moved, not converted.** The Leica driver writes OME-Zarr from LAS X's cache; this
   driver keeps ZEN's own file and writes the record beside it.
 
