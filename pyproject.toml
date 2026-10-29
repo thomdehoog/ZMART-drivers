@@ -58,6 +58,9 @@ nikon-ar610 = [
     "tifffile>=2024.1",
     "zarr>=3",
     "ipython>=8",
+    # The setup wizard: its window, and the small check picture it shows.
+    "pywebview>=5",
+    "pillow>=10",
 ]
 # The ZMART Controller the driver plugs into. It is not on PyPI, so it is
 # installed from its own repository: pip install "zmart-drivers[leica,controller]".

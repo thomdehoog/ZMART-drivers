@@ -7,6 +7,9 @@ ruff>=0.6
 numpy>=1.24
 tifffile>=2024.1
 zarr>=3
+pillow>=10
+# To click through the setup wizard's page in Chromium (skipped where no browser starts).
+playwright>=1.40
 # The bridge's client, and its fake NIS-Elements that the mock builds on.
 nis-bridge @ git+https://github.com/thomdehoog/nis-useq-aiagent@6670cfc755950f4d27fe8bd070aaf6ea0b57982c#subdirectory=1_nis_bridge
 # To check a saved store against the ZMART metadata convention (optional).

@@ -170,8 +170,20 @@ wavelength is also written as the channel's excitation wavelength in the OME met
 
 Once per microscope, before the first experiment, the driver needs five things about this microscope:
 where its pictures go, how far the stage may travel, the point that counts as (0, 0, 0), which way the
-camera is turned relative to the stage, and how far the sample shifts between objectives. Each has a
-notebook that only calls the driver's own code:
+camera is turned relative to the stage, and how far the sample shifts between objectives.
+
+**With the setup wizard (recommended).** One window walks you through all five, step by step, and
+saves each where the driver loads it. Start NIS-Elements with the bridge running first, then:
+
+```bash
+python -m zmart_drivers.nikon.nis_elements_ar610.driver_setup.wizard
+```
+
+Its steps are Connect (with the data folder), Define limits, Define coordinate system origin,
+Image-to-stage calibration and Objective calibration. Its [README](driver_setup/wizard/README.md) says
+more about each.
+
+**Or with the notebooks**, one per item, which only call the driver's own code:
 
 | What | Notebook |
 |---|---|
@@ -182,7 +194,7 @@ notebook that only calls the driver's own code:
 | Objective calibration | `driver_setup/optical_calibration/notebooks/calibrate_objective_pair.ipynb` |
 
 Do the limits first: the orientation is measured within them, and the objective calibration needs both.
-This driver has no setup wizard yet; the notebooks are the way.
+The wizard keeps that order for you.
 
 **Where the settings are kept.** On this computer, in
 `C:\ProgramData\zmart-microscopy\nikon\ti2\nis_elements_ar610\`, never in the repository. Each item has its

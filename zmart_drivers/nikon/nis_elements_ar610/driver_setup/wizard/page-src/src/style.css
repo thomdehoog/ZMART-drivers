@@ -1,0 +1,295 @@
+/* The look of the ZMART Interface (0.1.0rc5), copied here so that the driver
+   stands on its own: the colours, the rail of numbered steps, and the boxes of
+   controls. The rules and their reasons come from the interface's
+   framework/window/style.css and workflows/target_acquisition/style.css; when
+   the interface changes its look, change it here too. Only what the wizard
+   uses is kept. */
+
+:root {
+  --bg: #eef2f7;
+  --screen: #ffffff;
+  --surface-2: #f8fafc;
+  --surface-3: #f1f5f9;
+  /* One height for every control: fields and buttons. */
+  --control: 30px;
+  /* How far one box stands from the next. */
+  --box-gap: 16px;
+  --line: #e2e8f0;
+  --line-strong: #cbd5e1;
+  --ink: #0f172a;
+  --ink-2: #475569;
+  --ink-3: #6b7c93;
+  --accent: #0284c7;
+  --accent-deep: #0369a1;
+  --accent-tint: #eff6ff;
+  --accent-line: #dbeafe;
+  --good: #16a34a;
+  --bad: #b91c1c;
+  --warn-bg: #fffbeb;
+  --warn-ink: #c2410c;
+  /* a step to look at again: amber, darker than a warning's orange and never red */
+  --confirm-ink: #d97706;
+  --warn-line: #fde68a;
+  --shadow: 0 1px 2px rgba(15, 23, 42, 0.05), 0 12px 32px rgba(15, 23, 42, 0.07);
+  --mono: ui-monospace, "Cascadia Mono", "Segoe UI Mono", Consolas, monospace;
+  --sans: system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #05080f;
+    --screen: #0b1220;
+    --surface-2: #101b2c;
+    --surface-3: #16233a;
+    --line: #1e2b41;
+    --line-strong: #33415a;
+    --ink: #e6edf6;
+    --ink-2: #9fb0c6;
+    --ink-3: #7d8ea6;
+    --accent: #38bdf8;
+    --accent-deep: #7dd3fc;
+    --accent-tint: #0c1f31;
+    --accent-line: #164e63;
+    --good: #4ade80;
+    --bad: #f87171;
+    --warn-bg: #221a08;
+    --warn-ink: #fb923c;
+    --confirm-ink: #f59e0b;
+    --warn-line: #57430f;
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 16px 40px rgba(0, 0, 0, 0.5);
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 15px;
+  line-height: 1.55;
+}
+
+.wrap { height: 100vh; display: flex; flex-direction: column; }
+
+/* ---- the screen: the rail, and the stage beside it ---- */
+.screen {
+  background: var(--screen);
+  overflow: hidden;
+  display: grid;
+  grid-template-columns: minmax(220px, 320px) 1fr;
+  flex: 1;
+  min-height: 0;
+}
+
+/* ---- the rail ---- */
+.rail {
+  border-right: 1px solid var(--line);
+  background: var(--surface-2);
+  display: grid;
+  grid-template-rows: 1fr;
+  min-height: 0;
+}
+
+.steps { overflow-y: auto; padding: 12px 8px 8px; display: flex; flex-direction: column; gap: 4px; min-height: 0; }
+
+.step {
+  border: 1px solid transparent; border-radius: 9px;
+  background: transparent; padding: 7px 9px;
+  display: flex; flex-direction: column; gap: 2px;
+  cursor: pointer; text-align: left; font: inherit; color: inherit; width: 100%;
+}
+.step:hover { background: var(--surface-3); }
+/* Which step you are standing on is unmistakable at a glance. */
+.step.active {
+  background: var(--accent-tint); border-color: var(--accent);
+  cursor: default;
+}
+/* A finished step says so in its number. Standing on a finished step keeps
+   the blue: where you are is the more immediate fact. */
+.step.done .step-n { background: var(--good); color: #ffffff; }
+/* Done, but under settings that have since changed above it: the badge goes
+   orange and stays so until the step is run again. */
+.step.stale .step-n { background: var(--confirm-ink); color: #ffffff; }
+.step.active .step-n { background: var(--accent); color: #ffffff; }
+/* The word an orange step carries at its right on the rail. */
+.review-tag {
+  margin-left: auto; flex: none; font-size: 11px; font-weight: 600; line-height: 1;
+  color: var(--confirm-ink); border: 1px solid var(--confirm-ink); border-radius: 999px;
+  padding: 3px 8px; pointer-events: none; user-select: none;
+}
+@media (prefers-color-scheme: dark) {
+  .step.done .step-n,
+  .step.active .step-n { color: #04121d; }
+}
+
+.step.active .step-name { font-weight: 700; }
+.step.locked { cursor: not-allowed; }
+.step.locked .step-head { opacity: 0.5; }
+.step-head { display: flex; align-items: center; gap: 8px; }
+.step-n {
+  font-family: var(--mono); font-size: 11px; font-weight: 600;
+  color: var(--ink-3); font-variant-numeric: tabular-nums;
+  min-width: 22px; height: 20px; padding: 0 5px;
+  display: inline-grid; place-items: center; border-radius: 999px;
+  background: var(--surface-3); flex: none;
+}
+.step-name { font-size: 13.5px; font-weight: 600; flex: 1; min-width: 0; }
+.step.active .step-name { color: var(--accent-deep); }
+.step.done .step-name { color: var(--ink-2); font-weight: 550; }
+.spin {
+  width: 11px; height: 11px; border-radius: 50%;
+  border: 2px solid var(--line-strong); border-top-color: var(--accent);
+  animation: spin 0.7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+
+/* ---- the stage: the step's column of cells ----
+   From the ZMART driver configuration workflow's own panel
+   (application/workflows/zmart_driver_configuration/panel/setup-panel.js in
+   ZMART Microscopy): the channel beside the canvas, given the whole window.
+   The same grey ground, the same white boxes on it, read down from the top
+   left rather than centred, because it is a form and forms start at the left. */
+.stage { min-width: 0; min-height: 0; overflow: hidden; display: grid; }
+.setup-notebook {
+  min-height: 0; overflow-y: auto;
+  background: var(--surface-2);
+  padding: 12px 14px 40px;
+}
+/* Held to a reading measure: a label at one edge of a wide screen and its
+   field at the other is a form people mis-read. */
+.setup-column { max-width: 46rem; display: flex; flex-direction: column; gap: 14px; }
+
+/* A cell: a heading naming what it is for, above a white card. */
+.side-group { display: flex; flex-direction: column; gap: 5px; }
+.side-group-title {
+  font-size: 11px; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase;
+  color: var(--ink); padding-left: 2px;
+}
+.side-group-body {
+  display: flex; flex-direction: column; gap: 10px;
+  padding: 12px 14px; border: 1px solid var(--line); border-radius: 10px;
+  background: var(--screen);
+}
+.side-note { margin: 0; padding: 0; font-size: 12px; color: var(--ink-3); line-height: 1.4; }
+
+/* A row of the form: what it is on the left, the fields on the right. */
+.setup-row { display: flex; align-items: center; gap: 8px; }
+.setup-row > label { flex: 1 1 auto; font-size: 13px; }
+.setup-row input, .setup-row select { flex: 0 0 auto; }
+.setup-left { justify-content: flex-start; }
+/* What came back from the instrument, as pairs. */
+.setup-readout { display: grid; grid-template-columns: auto 1fr; gap: 3px 12px; margin: 0; font-size: 13px; }
+.setup-readout dt { color: var(--ink-3); }
+.setup-readout dd { margin: 0; font-variant-numeric: tabular-nums; }
+.setup-note { font-size: 12px; line-height: 1.4; margin: 0; }
+.setup-note.ok { color: #1f7a3a; }
+.setup-note.bad { color: #b3261e; }
+.setup-row > .setup-note { color: var(--ink-2); font-variant-numeric: tabular-nums; }
+@media (prefers-color-scheme: dark) {
+  .setup-note.ok { color: var(--good); }
+  .setup-note.bad { color: var(--bad); }
+}
+.setup-publish { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+/* The measurement's own picture, as wide as the card. */
+.setup-picture { display: block; width: 100%; margin: 4px 0 0; border: 1px solid var(--line); border-radius: 6px; background: #fff; }
+/* A field looks the way the session card's fields look. */
+.setup-field, .setup-kind {
+  font: inherit; font-size: 13px; color: var(--ink);
+  background: var(--surface-2); border: 1px solid var(--line-strong);
+  border-radius: 7px; height: var(--control); padding: 0 9px;
+  width: 240px;
+}
+.setup-field:focus, .setup-kind:focus { outline: none; }
+.setup-field:disabled, .setup-kind:disabled { opacity: .45; }
+.setup-number { width: 120px; }
+.setup-wide { width: 380px; }
+/* As in the old workflow, the kind of a limit is as wide as any other field. */
+.setup-kind { width: 240px; }
+/* The Connect card, as the interface draws it: the labels in one narrow
+   column, each field filling the rest of its row. */
+.setup-card-row { display: grid; grid-template-columns: 110px 1fr; align-items: center; gap: 12px; }
+.setup-card-row > label { font-size: 13px; color: var(--ink); }
+.setup-card-row > .setup-field { width: 100%; }
+/* A limit's row: its tick first, then its name, then its fields. */
+.setup-limit > input[type="checkbox"] { flex: 0 0 auto; margin: 0 2px 0 0; }
+.setup-limit > label { flex: 1 1 auto; }
+.setup-source { color: var(--ink); }
+/* The presets, one per row: the pair, its offset, its state. */
+.setup-sets { display: flex; flex-direction: column; gap: 4px; }
+.setup-set { display: grid; grid-template-columns: 1fr auto auto; gap: 12px; align-items: baseline;
+             font: inherit; font-size: 13px; color: var(--ink); text-align: left; cursor: pointer;
+             background: var(--surface-2); border: 1px solid var(--line); border-radius: 7px; padding: 6px 10px; }
+.setup-set:hover { border-color: var(--line-strong); }
+.setup-set.chosen { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.setup-set b { font-weight: 600; }
+.setup-set-pair { font-variant-numeric: tabular-nums; }
+.setup-set-state { color: var(--ink-3); font-size: 12px; }
+/* A part of a card: a tinted sub-box with a numbered heading. */
+.setup-part { display: flex; flex-direction: column; gap: 10px;
+              background: var(--surface-2); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; }
+.setup-part-title { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: var(--ink); }
+.setup-part-number { display: inline-flex; align-items: center; justify-content: center;
+                     width: 20px; height: 20px; border-radius: 50%; font-size: 11px; font-weight: 700; color: #fff; background: var(--accent); }
+/* The reference row: label, dropdown and Reset in a row on the left. */
+.setup-reference { justify-content: flex-start; }
+.setup-reference > label { flex: 0 0 auto; }
+.setup-reference > button { margin-left: 4px; }
+/* The chosen preset's X, Y and Z: three plain tiles, read at one glance. */
+.setup-xyz { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.setup-xyz-tile { display: flex; flex-direction: column; gap: 2px; align-items: flex-start;
+                  background: var(--screen); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; }
+.setup-xyz-axis { font-size: 11px; font-weight: 700; letter-spacing: 0.07em; color: var(--ink-3); }
+.setup-xyz-value { font-size: 22px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--ink); line-height: 1.2; }
+.setup-xyz-unit { font-size: 12px; color: var(--ink-3); }
+.setup-xyz-tile.default .setup-xyz-value { color: var(--ink-3); }
+
+/* ---- the Connect card's lamp, its checks and its Disconnect, as in the interface ---- */
+.setup-connected { display: flex; align-items: center; justify-content: space-between; }
+.session-state { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: var(--ink); }
+.session-state .lamp {
+  width: 9px; height: 9px; border-radius: 50%; background: var(--good);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--good) 22%, transparent);
+}
+.check-list { display: flex; flex-direction: column; gap: 1px; }
+.check-row { display: grid; grid-template-columns: 18px minmax(150px, auto) 1fr; align-items: baseline; gap: 10px; padding: 5px 0; font-size: 12.5px; }
+.check-mark { color: var(--good); font-weight: 700; justify-self: center; }
+.check-name { color: var(--ink-2); }
+.check-value { font-family: var(--mono); font-size: 12px; color: var(--ink-3); text-align: right; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+
+/* Blue on white, like every other button on the page. */
+button.run {
+  font: inherit; font-size: 13px; font-weight: 600;
+  color: var(--accent-deep); background: var(--screen);
+  border: 1px solid var(--line-strong); border-radius: 7px;
+  height: var(--control); padding: 0 14px; cursor: pointer; flex: none; align-self: flex-start;
+}
+.setup-row > button.run, .setup-publish > button.run { align-self: auto; }
+button.run:hover:enabled { border-color: var(--accent); color: var(--accent); }
+button.run:disabled { opacity: 0.4; cursor: default; }
+button.run.danger { color: var(--bad); background: var(--screen); }
+button.run.danger:hover:enabled { border-color: var(--bad); color: var(--bad); }
+/* While one press is out with the microscope, the others wait. */
+body.busy button.run:not(:disabled), body.busy .step, body.busy .setup-set { pointer-events: none; }
+
+:where(button, input, [tabindex]):focus-visible {
+  outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
+}
+
+@media (max-width: 900px) {
+  .screen { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
+  .rail { border-right: none; border-bottom: 1px solid var(--line); }
+  .steps { max-height: 200px; }
+  .setup-row { flex-wrap: wrap; }
+  .setup-field, .setup-wide { width: 100%; }
+  .setup-xyz { grid-template-columns: 1fr; }
+}
+
+[hidden] { display: none !important; }
