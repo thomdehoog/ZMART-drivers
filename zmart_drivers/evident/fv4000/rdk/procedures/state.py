@@ -31,10 +31,15 @@ SIMPLE_SETTINGS = (
     ("scanner_type", "scanner_type", "scanner_type", "value"),
     ("scanner_mode", "scanner_mode", "scanner_mode", "value"),
     ("z_stack_enabled", "z_stack_enabled", "z_stack_enable", "enable"),
+    # The method comes before the numbers it decides between: START_END uses the start
+    # and the end, RANGE a range around the focus. Without it a saved z-stack would not
+    # re-apply the same way on a FLUOVIEW left in the other method.
+    ("z_stack_method", "z_type", "z_type", "method"),
     ("z_stack_slices", "z_stack_slices", "z_stack_slices", "value"),
     ("z_stack_step_um", "z_stack_step_um", "z_stack_step", "value_um"),
     ("z_stack_start_um", "z_stack_start_um", "z_stack_start", "value_um"),
     ("z_stack_end_um", "z_stack_end_um", "z_stack_end", "value_um"),
+    ("z_stack_range_um", "z_stack_range_um", "z_stack_range", "value_um"),
     ("time_lapse_enabled", "time_lapse_enabled", "time_lapse_enable", "enable"),
     ("time_lapse_repeat", "time_lapse_repeat", "time_lapse_repeat", "value"),
     (
@@ -117,8 +122,6 @@ def get_state(handle) -> dict:
             "objectives": _readers.get_objectives(client) or [],
             "laser_lines": lasers,
             "z_origin_um": _readers.read_now("z_origin", client),
-            "z_type": _readers.read_now("z_type", client),
-            "z_stack_range_um": _readers.read_now("z_stack_range_um", client),
             "z_piezo_um": _readers.read_now("z_piezo", client),
             "image_size_px": image_size_px,
             "pixel_size_um": pixel_size_um,

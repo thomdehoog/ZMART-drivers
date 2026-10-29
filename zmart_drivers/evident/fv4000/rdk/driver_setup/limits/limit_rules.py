@@ -181,23 +181,12 @@ SETTER_LIMIT_KEYS = (
     "set_z_stack_start",
     "set_z_stack_end",
     "set_z_stack_range",
-    "set_z_origin",
     "set_z_type",
     "set_time_lapse_enable",
     "set_time_lapse_repeat",
     "set_time_lapse_interval",
     "set_scanner_type",
     "set_scanner_mode",
-    "set_brightness_adjustment_create",
-    "set_brightness_adjustment_enable",
-    "set_brightness_adjustment_delete_all",
-    "set_matl_create",
-    "set_matl_well_duplicate",
-    "set_matl_delete",
-    "set_matl_enable",
-    "set_matl_area_delete",
-    "set_matl_area_enable",
-    "set_matl_area_z_range",
     "set_load_parameter",
 )
 
@@ -317,10 +306,6 @@ class EvidentLimits:
 #: Every change -> the policy key it is checked under.
 MUTATING_COMMANDS = {
     **{name: name for name in SETTER_LIMIT_KEYS},
-    # A MATL group's position is a place the scan will go: checked like a move.
-    "set_matl_xy": "set_xyz",
-    "set_matl_z": "set_xyz",
-    "set_matl_z_origin": "set_xyz",
     "set_objective": "set_objective",
     # Loading a picture's settings recalls a whole setup at once; the file may name which pictures.
     "load_parameter": "set_load_parameter",

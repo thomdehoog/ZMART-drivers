@@ -8,8 +8,7 @@ being acquired, the live-view canvases). None of them retries, waits or checks
 limits: that is the dispatcher's business, which reaches them through the
 table ``READS`` at the end of this file and ``profile.py``.
 
-A reading *about* one item (one detector channel, one laser, one registered
-MATL group) is given that item's id as ``about``; the others ignore it. A
+A reading *about* one item (one detector channel or one laser) is given that item's id as ``about``; the others ignore it. A
 reading whose answer FLUOVIEW refuses raises :class:`~.parsing.RdkError`, and
 the dispatcher carries that error as "no answer from this source".
 
@@ -25,10 +24,9 @@ from dataclasses import dataclass
 
 from .parsing import nm_to_um, require_ok
 
-#: The one kind of imaging FLUOVIEW's protocol calls take for a normal picture
-#: (XY, XYZ, XYT and so on). MATL (multi-area time lapse) is the other kind.
+#: The kind of imaging FLUOVIEW's protocol calls take for a normal picture
+#: (XY, XYZ, XYT and so on): the imaging set up in FLUOVIEW, run once.
 MANUAL_MAIN = "EXECUTION_TYPE_MANUAL_MAIN"
-MATL = "EXECUTION_TYPE_MATL"
 
 #: FLUOVIEW's four states (the manual's section 3.5).
 STATES = ("IDLING", "SCANNING", "RESTING", "WAITING")
@@ -342,38 +340,6 @@ def get_scanner_mode(client, about=None) -> str:
     return str(get_parameter(client, "LSM_SCANNER_MODE_SETTING")["scannerMode"])
 
 
-# =============================================================================
-# Multi-area time lapse (MATL), brightness adjustment and the live view
-# =============================================================================
-
-
-def get_matl_groups(client, about=None) -> list[dict]:
-    """The registered MATL groups: ``[{"group_id", "well_id"}, ...]``."""
-    answer = get_parameter(client, "MATL_ROI_GET_REGISTERD_LIST")
-    return [
-        {"group_id": str(entry.get("groupId")), "well_id": str(entry.get("wellId", ""))}
-        for entry in answer.get("groupList") or []
-    ]
-
-
-def get_matl_xy(client, about) -> dict:
-    """The XY position of the MATL group *about*, in micrometres."""
-    answer = get_parameter(client, "MATL_ROI_XY_POSITION_SETTING", groupId=about)
-    return {"x_um": nm_to_um(answer["x"]), "y_um": nm_to_um(answer["y"])}
-
-
-def get_matl_z_origin(client, about) -> float:
-    return nm_to_um(
-        get_parameter(client, "MATL_ROI_Z_ORIGIN_SETTING", groupId=about)["zOrigin"]
-    )
-
-
-def get_brightness_adjustment_enabled(client, about=None) -> bool:
-    return bool(
-        get_parameter(client, "LSM_BRIGHTNESS_ADJUSTMENT_ENABLE_SETTING")["enable"]
-    )
-
-
 def get_canvases(client, about=None) -> list[str]:
     """The ids of the live-view canvases (one per shown channel, plus the merge in tile view)."""
     return [
@@ -476,9 +442,5 @@ READS = {
     "time_lapse_interval_s": Read(get_time_lapse_interval, is_number),
     "scanner_type": Read(get_scanner_type, is_text),
     "scanner_mode": Read(get_scanner_mode, is_text),
-    "matl_groups": Read(get_matl_groups, is_list),
-    "matl_xy": Read(get_matl_xy, xy_present),
-    "matl_z_origin_um": Read(get_matl_z_origin, is_number),
-    "brightness_adjustment_enabled": Read(get_brightness_adjustment_enabled, is_bool),
     "canvases": Read(get_canvases, is_list),
 }

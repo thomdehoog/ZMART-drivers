@@ -155,8 +155,6 @@ class MockFluoview:
         self.time_lapse = {"enabled": False, "repeat": 3, "interval": 1, "unit": 0}
         self.scanner_type = "GALVANO"
         self.scanner_mode = "ONEWAY"
-        self.brightness_adjustment = {"enabled": False, "points": 0}
-        self.matl_groups: dict[str, dict] = {}
         self.loaded_parameters: list[str] = []
         # How the scanner is mounted: the picture is the stage-aligned view turned by this.
         self.orientation = (0, False)
@@ -264,7 +262,7 @@ class MockFluoview:
 
     def _Protocol_startProtocol(self, payload):
         kind = payload.get("executionType")
-        if kind not in ("EXECUTION_TYPE_MANUAL_MAIN", "EXECUTION_TYPE_MATL"):
+        if kind != "EXECUTION_TYPE_MANUAL_MAIN":
             return _error("INVALID_PARAMETERS")
         if self.busy_answers > 0:
             self.busy_answers -= 1
@@ -704,124 +702,6 @@ class MockFluoview:
             return _error("INVALID_PARAMETERS")
         self.scanner_mode = payload["scannerMode"]
         return dict(OK)
-
-    # brightness adjustment and MATL
-    def _set_LSM_BRIGHTNESS_ADJUSTMENT_CREATE_OR_UPDATE_SETTING(self, payload):
-        self.brightness_adjustment["points"] += 1
-        return dict(OK)
-
-    def _get_LSM_BRIGHTNESS_ADJUSTMENT_ENABLE_SETTING(self, payload):
-        return {**OK, "enable": self.brightness_adjustment["enabled"]}
-
-    def _set_LSM_BRIGHTNESS_ADJUSTMENT_ENABLE_SETTING(self, payload):
-        self.brightness_adjustment["enabled"] = bool(payload["enable"])
-        return dict(OK)
-
-    def _set_LSM_BRIGHTNESS_ADJUSTMENT_DELETE_ALL_SETTING(self, payload):
-        self.brightness_adjustment["points"] = 0
-        return dict(OK)
-
-    def _set_MATL_ROI_CREATE(self, payload):
-        if (
-            payload.get("acquisitionType") != "LSM_IMAGING"
-            or payload.get("roiType") != "DEFINE_MATRIX"
-        ):
-            return _error("INVALID_PARAMETERS")
-        group_id = f"group-{len(self.matl_groups) + 1}"
-        self.matl_groups[group_id] = {
-            "well": "A01",
-            "enabled": True,
-            "x": self.x_nm(),
-            "y": self.y_nm(),
-            "z": self.z_nm(),
-            "z_origin": self.z_origin_nm,
-            "columns": int(payload["column"]),
-            "rows": int(payload["row"]),
-            "areas": {},
-        }
-        return {**OK, "groupId": group_id}
-
-    def _set_MATL_ROI_WELL_DUPLICATE(self, payload):
-        return dict(OK)
-
-    def _get_MATL_ROI_GET_REGISTERD_LIST(self, payload):
-        return {
-            **OK,
-            "groupList": [
-                {"groupId": gid, "wellId": group["well"]}
-                for gid, group in self.matl_groups.items()
-            ],
-        }
-
-    def _matl(self, payload):
-        return self.matl_groups.get(payload.get("groupId"))
-
-    def _set_MATL_ROI_DELETE(self, payload):
-        if self._matl(payload) is None:
-            return _error("INVALID_PARAMETERS")
-        del self.matl_groups[payload["groupId"]]
-        return dict(OK)
-
-    def _get_MATL_ROI_ENABLE_SETTING(self, payload):
-        group = self._matl(payload)
-        return (
-            {**OK, "enable": group["enabled"]}
-            if group
-            else _error("INVALID_PARAMETERS")
-        )
-
-    def _set_MATL_ROI_ENABLE_SETTING(self, payload):
-        group = self._matl(payload)
-        if group is None:
-            return _error("INVALID_PARAMETERS")
-        group["enabled"] = bool(payload["enable"])
-        return dict(OK)
-
-    def _get_MATL_ROI_XY_POSITION_SETTING(self, payload):
-        group = self._matl(payload)
-        return (
-            {**OK, "x": group["x"], "y": group["y"]}
-            if group
-            else _error("INVALID_PARAMETERS")
-        )
-
-    def _set_MATL_ROI_XY_POSITION_SETTING(self, payload):
-        group = self._matl(payload)
-        if group is None:
-            return _error("INVALID_PARAMETERS")
-        group["x"], group["y"] = int(payload["x"]), int(payload["y"])
-        return dict(OK)
-
-    def _set_MATL_ROI_Z_POSITION_SETTING(self, payload):
-        group = self._matl(payload)
-        if group is None:
-            return _error("INVALID_PARAMETERS")
-        group["z"] = int(payload["z"])
-        return dict(OK)
-
-    def _get_MATL_ROI_Z_ORIGIN_SETTING(self, payload):
-        group = self._matl(payload)
-        return (
-            {**OK, "zOrigin": group["z_origin"]}
-            if group
-            else _error("INVALID_PARAMETERS")
-        )
-
-    def _set_MATL_ROI_Z_ORIGIN_SETTING(self, payload):
-        group = self._matl(payload)
-        if group is None:
-            return _error("INVALID_PARAMETERS")
-        group["z_origin"] = int(payload["zOrigin"])
-        return dict(OK)
-
-    def _set_MATL_ROI_AREA_DELETE_SETTING(self, payload):
-        return dict(OK) if self._matl(payload) else _error("INVALID_PARAMETERS")
-
-    def _set_MATL_ROI_AREA_ENABLE_SETTING(self, payload):
-        return dict(OK) if self._matl(payload) else _error("INVALID_PARAMETERS")
-
-    def _set_MATL_ROI_AREA_Z_RANGE_SETTING(self, payload):
-        return dict(OK) if self._matl(payload) else _error("INVALID_PARAMETERS")
 
     # --- the pretend picture ---------------------------------------------------------------
 

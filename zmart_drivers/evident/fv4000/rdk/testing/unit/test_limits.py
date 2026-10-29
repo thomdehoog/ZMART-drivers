@@ -43,12 +43,8 @@ def test_the_bundled_defaults_name_exactly_the_vocabulary():
 
 
 def test_the_setter_keys_are_every_setting_of_the_writes_plus_load_parameter():
-    stage = {f"set_{name}" for name in writes.STAGE_POLICY_SETTINGS}
-    expected = {f"set_{name}" for name in writes.SETTINGS} - stage | {
-        "set_load_parameter"
-    }
+    expected = {f"set_{name}" for name in writes.SETTINGS} | {"set_load_parameter"}
     assert set(limit_rules.SETTER_LIMIT_KEYS) == expected
-    assert all(command in limit_rules.MUTATING_COMMANDS for command in stage)
 
 
 @pytest.mark.parametrize(

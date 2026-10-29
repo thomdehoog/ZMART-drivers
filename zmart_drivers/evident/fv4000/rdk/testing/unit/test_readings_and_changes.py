@@ -147,7 +147,6 @@ def test_a_laser_power_fluoview_clips_is_recorded_as_unconfirmed(governed_client
         ("z_stack_start", {"value_um": -3.0}, lambda m: m.z_stack["start_nm"] == -3000),
         ("z_stack_end", {"value_um": 3.0}, lambda m: m.z_stack["end_nm"] == 3000),
         ("z_stack_range", {"value_um": 6.0}, lambda m: m.z_stack["range_nm"] == 6000),
-        ("z_origin", {"value_um": 2510.0}, lambda m: m.z_origin_nm == 2_510_000),
         ("z_type", {"method": "RANGE"}, lambda m: m.z_stack["type"] == "RANGE"),
         (
             "time_lapse_enable",
@@ -165,11 +164,6 @@ def test_a_laser_power_fluoview_clips_is_recorded_as_unconfirmed(governed_client
             {"value": "ROUNDTRIP"},
             lambda m: m.scanner_mode == "ROUNDTRIP",
         ),
-        (
-            "brightness_adjustment_enable",
-            {"enable": True},
-            lambda m: m.brightness_adjustment["enabled"] is True,
-        ),
     ],
 )
 def test_every_setting_with_a_read_back_is_applied_and_confirmed(
@@ -178,47 +172,6 @@ def test_every_setting_with_a_read_back_is_applied_and_confirmed(
     result = changes.change(governed_client, name, **arguments)
     assert result["success"] is True and result["confirmed"] is True, result["message"]
     assert check(mock)
-
-
-def test_a_setting_fluoview_cannot_read_back_is_a_success_with_nothing_confirmed(
-    governed_client, mock
-):
-    result = changes.change(governed_client, "brightness_adjustment_create")
-    assert result["success"] is True and result["confirmed"] is None
-    assert mock.brightness_adjustment["points"] == 1
-
-
-def test_a_matl_group_is_registered_and_its_position_checked_like_a_move(
-    governed_client, mock
-):
-    assert (
-        changes.change(governed_client, "matl_create", columns=2, rows=3)["success"]
-        is True
-    )
-    (group_id,) = mock.matl_groups
-    assert (
-        changes.change(
-            governed_client, "matl_xy", group_id=group_id, x_um=10200.0, y_um=8100.0
-        )["confirmed"]
-        is True
-    )
-    assert mock.matl_groups[group_id]["x"] == 10_200_000
-    refused = changes.change(
-        governed_client, "matl_xy", group_id=group_id, x_um=9e9, y_um=0.0
-    )
-    assert refused["success"] is False and "refused" in refused["message"]
-    # FLUOVIEW cannot read the switch back, so the change is confirmed by nothing.
-    assert (
-        changes.change(governed_client, "matl_enable", group_id=group_id, enable=False)[
-            "confirmed"
-        ]
-        is None
-    )
-    assert (
-        changes.change(governed_client, "matl_delete", group_id=group_id)["success"]
-        is True
-    )
-    assert mock.matl_groups == {}
 
 
 def test_the_objective_turns_to_a_slot_or_a_name_and_a_wrong_one_is_refused(

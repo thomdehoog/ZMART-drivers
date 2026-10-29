@@ -1,8 +1,28 @@
 {
-  "x_um": {"range": [-50000, 50000]},
-  "y_um": {"range": [-50000, 50000]},
-  "z_um": {"range": [-5000, 5000]},
-  "z_piezo_um": {"range": [-100, 100]},
+  "x_um": {
+    "range": [
+      -50000,
+      50000
+    ]
+  },
+  "y_um": {
+    "range": [
+      -50000,
+      50000
+    ]
+  },
+  "z_um": {
+    "range": [
+      -5000,
+      5000
+    ]
+  },
+  "z_piezo_um": {
+    "range": [
+      -100,
+      100
+    ]
+  },
   "objective_slot": [],
   "set_channel_enable": [],
   "set_channel_hv": [],
@@ -18,22 +38,11 @@
   "set_z_stack_start": [],
   "set_z_stack_end": [],
   "set_z_stack_range": [],
-  "set_z_origin": [],
   "set_z_type": [],
   "set_time_lapse_enable": [],
   "set_time_lapse_repeat": [],
   "set_time_lapse_interval": [],
   "set_scanner_type": [],
   "set_scanner_mode": [],
-  "set_brightness_adjustment_create": [],
-  "set_brightness_adjustment_enable": [],
-  "set_brightness_adjustment_delete_all": [],
-  "set_matl_create": [],
-  "set_matl_well_duplicate": [],
-  "set_matl_delete": [],
-  "set_matl_enable": [],
-  "set_matl_area_delete": [],
-  "set_matl_area_enable": [],
-  "set_matl_area_z_range": [],
   "set_load_parameter": []
 }

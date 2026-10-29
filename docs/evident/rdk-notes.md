@@ -27,8 +27,7 @@ without the manual at hand. The manual itself is Evident's; it is not part of th
 - Which call is allowed in which state is the manual's section 3.6. Two entries shape the driver:
   `Protocol.stopProtocol` is refused while IDLING, so `stop()` sends nothing when nothing runs; and
   `Repeat.stop` is allowed only in RESTING or WAITING during a live scan, so a live scan is counted as
-  running in any state but IDLING. `MATL_ROI_ENABLE_SETTING` cannot be read back, so that change is
-  confirmed by nothing.
+  running in any state but IDLING.
 
 ## Positions and units
 
@@ -49,11 +48,12 @@ Channels (`LSM_CHANNEL_*`: enable, HV, gain, offset, digital gain, the laser of 
 `channelId`), lasers (`LSM_LASER_*`: enable and intensity in percent, by `laserId`; an intensity
 outside the laser's range is clipped by FLUOVIEW), the z-stack (`LSM_Z_COORDINATE_*`), the time lapse
 (`LSM_TIME_LAPS_*`: enable, repeat count, interval with a unit), the scanner (`LSM_SCANNER_TYPE_SETTING`
-GALVANO or RESONANT, `LSM_SCANNER_MODE_SETTING` ONEWAY or ROUNDTRIP), brightness adjustment over depth
-(`LSM_BRIGHTNESS_ADJUSTMENT_*`) and multi-area imaging (`MATL_ROI_*`: create a group of columns and
-rows, duplicate a well, delete, enable, position in XY and Z, the Z origin, and per area delete, enable
-and Z range). `XY_STAGE_WELL_POSITION_SETTING`, which moves to a named well, is deliberately not offered:
-its destination is not known to the limits before the move.
+GALVANO or RESONANT, `LSM_SCANNER_MODE_SETTING` ONEWAY or ROUNDTRIP). These are the settings a ZMART
+state holds. The manual offers more that the driver deliberately leaves to FLUOVIEW, because no
+controller command needs them: brightness adjustment over depth (`LSM_BRIGHTNESS_ADJUSTMENT_*`),
+multi-area imaging (`MATL_ROI_*`) and its stitching (the Processing category), the live image
+(`Canvas.getCanvasImage`), setting the Z origin (`LSM_Z_COORDINATE_BASE_SETTING`, which is read but not
+set), and `XY_STAGE_WELL_POSITION_SETTING`, whose destination the limits could not know before the move.
 
 ## Taking and reading a picture
 

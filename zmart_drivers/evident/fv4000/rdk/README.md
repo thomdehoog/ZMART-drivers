@@ -17,8 +17,9 @@ limits before it is sent, and read back afterwards, so you know what the microsc
 - **Known limits of this beta:**
   - The z axis is FLUOVIEW's focus motor (its "Z stage"). A z piezo, when there is one, is read and
     reported beside it but never moved to focus; `move_piezo` moves it on request.
-  - Multi-area (MATL) imaging is set up through `change_setting`, but `acquire` captures with the
-    main protocol only; a MATL run is not read back and saved by the driver.
+  - The driver offers what a ZMART workflow sets through the state, and no more. FLUOVIEW's
+    multi-area (MATL) imaging, stitching, brightness adjustment over depth and live image are not
+    offered; set them up in FLUOVIEW itself when an experiment needs them.
   - The image size and pixel size of the current settings are not reported by FLUOVIEW's interface.
     The driver learns them from the first picture under each objective; until then the state says
     they are not known. See [Setting up the driver](#setting-up-the-driver).
@@ -102,6 +103,10 @@ The name is the first column. The arguments are given by name, for example
 `change_setting("laser_intensity", laser_id="LASER_488", value=2.5)`. Channel and laser ids are the
 ones FLUOVIEW reports (`state()["changeable"]["channels"]` and `["lasers"]`). Lengths are in
 micrometres and are sent to FLUOVIEW in nanometres; the read-back is exact unless a tolerance is given.
+These are exactly the settings `set_state` applies, and `state()` reports each of them, so a state
+saved from one session re-applies the same imaging in the next. FLUOVIEW's own Z origin, the zero of
+`z_stack_start` and `z_stack_end`, is reported (`state()["observed"]["z_origin_um"]`) but left to
+FLUOVIEW, because a saved state is re-applied at other positions.
 
 | Name | Arguments | FLUOVIEW setting |
 |---|---|---|
@@ -118,19 +123,12 @@ micrometres and are sent to FLUOVIEW in nanometres; the read-back is exact unles
 | `z_stack_step` | `value_um` | `LSM_Z_COORDINATE_STEP_SIZE_SETTING` |
 | `z_stack_start`, `z_stack_end` | `value_um`, counted from FLUOVIEW's own Z origin | `LSM_Z_COORDINATE_START_SETTING`, `..._END_SETTING` |
 | `z_stack_range` | `value_um` | `LSM_Z_COORDINATE_RANGE_SETTING` |
-| `z_origin` | `value_um`: FLUOVIEW's Z origin, the zero of a z-stack | `LSM_Z_COORDINATE_BASE_SETTING` |
-| `z_type` | `method`: how the stack is defined, as FLUOVIEW names it | `LSM_Z_COORDINATE_TYPE_SETTING` |
+| `z_type` | `method`: `START_END` (the stack runs from start to end) or `RANGE` (a range around the focus) | `LSM_Z_COORDINATE_TYPE_SETTING` |
 | `time_lapse_enable` | `enable` | `LSM_TIME_LAPS_ENABLE_SETTING` |
 | `time_lapse_repeat` | `value` | `LSM_TIME_LAPS_REPEAT_TIMES_SETTING` |
 | `time_lapse_interval` | `value_s` (sent in the finest unit FLUOVIEW offers for it) | `LSM_TIME_LAPS_INTERVAL_SETTING` |
 | `scanner_type` | `value`: `GALVANO` or `RESONANT` | `LSM_SCANNER_TYPE_SETTING` |
 | `scanner_mode` | `value`: `ONEWAY` or `ROUNDTRIP` | `LSM_SCANNER_MODE_SETTING` |
-| `brightness_adjustment_create`, `_enable`, `_delete_all` | none; `enable`; none: the brightness-over-depth points of a stack | `LSM_BRIGHTNESS_ADJUSTMENT_*` |
-| `matl_create` | `columns`, `rows`: a new multi-area group | `MATL_ROI_CREATE` |
-| `matl_well_duplicate` | `source_well`, `target_well` | `MATL_ROI_WELL_DUPLICATE` |
-| `matl_delete`, `matl_enable` | `group_id`; `group_id`, `enable` | `MATL_ROI_DELETE`, `MATL_ROI_ENABLE_SETTING` |
-| `matl_xy`, `matl_z`, `matl_z_origin` | `group_id`, `x_um`, `y_um`; `group_id`, `z_um`: a group's position, checked against the limits like a move | `MATL_ROI_XY_POSITION_SETTING`, `..._Z_POSITION_SETTING`, `..._Z_ORIGIN_SETTING` |
-| `matl_area_delete`, `matl_area_enable`, `matl_area_z_range` | `group_id`, `column`, `row` (and `enable`) | `MATL_ROI_AREA_*` |
 
 The vocabulary of a limits file is one entry per setting, `set_<name>`, so a microscope can bound each
 of them (a range or a list of allowed values); `driver_setup/limits/defaults/limits.json` shows them all.

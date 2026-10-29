@@ -417,8 +417,6 @@ class Setting:
     read: str | None = None
     about: str | None = None
     accept: Callable[[dict], Callable[[object], bool]] | None = None
-    #: The limits policy this setting is checked under; its own name when None.
-    policy_values: Callable[[dict], dict] | None = None
 
 
 def _rows() -> list[Setting]:
@@ -590,16 +588,6 @@ def _rows() -> list[Setting]:
         read="z_stack_range_um",
         accept=lambda a: near(float(a["value_um"]), 0.001),
     )
-    add(
-        "z_origin",
-        ("value_um",),
-        "LSM_Z_COORDINATE_BASE_SETTING",
-        lambda a: {"originPosition": _nm(a["value_um"])},
-        lambda a: f"FLUOVIEW z origin -> {a['value_um']} um",
-        value="value_um",
-        read="z_origin",
-        accept=lambda a: near(float(a["value_um"]), 0.001),
-    )
     # The manual lists two parameters both called zType (the drive, MOTOR or
     # PIEZO, and the method). A payload cannot carry the same key twice, so
     # the method alone is sent: START_END and RANGE use the motor, PIEZO the piezo.
@@ -665,156 +653,11 @@ def _rows() -> list[Setting]:
         read="scanner_mode",
         accept=lambda a: exactly(str(a["value"])),
     )
-    # --- brightness adjustment (FLUOVIEW's per-depth correction) ---------------------
-    add(
-        "brightness_adjustment_create",
-        (),
-        "LSM_BRIGHTNESS_ADJUSTMENT_CREATE_OR_UPDATE_SETTING",
-        lambda a: {},
-        lambda a: "brightness adjustment point recorded",
-    )
-    add(
-        "brightness_adjustment_enable",
-        ("enable",),
-        "LSM_BRIGHTNESS_ADJUSTMENT_ENABLE_SETTING",
-        lambda a: {"enable": bool(a["enable"])},
-        lambda a: f"brightness adjustment {'on' if a['enable'] else 'off'}",
-        value="enable",
-        read="brightness_adjustment_enabled",
-        accept=lambda a: exactly(bool(a["enable"])),
-    )
-    add(
-        "brightness_adjustment_delete_all",
-        (),
-        "LSM_BRIGHTNESS_ADJUSTMENT_DELETE_ALL_SETTING",
-        lambda a: {},
-        lambda a: "brightness adjustment points deleted",
-    )
-    # --- multi-area time lapse (MATL): the registered groups and their areas ---------
-    add(
-        "matl_create",
-        ("columns", "rows"),
-        "MATL_ROI_CREATE",
-        lambda a: {
-            "acquisitionType": "LSM_IMAGING",
-            "roiType": "DEFINE_MATRIX",
-            "column": int(a["columns"]),
-            "row": int(a["rows"]),
-        },
-        lambda a: f"MATL matrix {a['columns']} x {a['rows']} registered",
-    )
-    add(
-        "matl_well_duplicate",
-        ("source_well", "target_well"),
-        "MATL_ROI_WELL_DUPLICATE",
-        lambda a: {
-            "srcWellId": str(a["source_well"]),
-            "dstWellId": str(a["target_well"]),
-        },
-        lambda a: f"MATL well {a['source_well']} copied to {a['target_well']}",
-    )
-    add(
-        "matl_delete",
-        ("group_id",),
-        "MATL_ROI_DELETE",
-        lambda a: {"groupId": str(a["group_id"])},
-        lambda a: f"MATL group {a['group_id']} deleted",
-    )
-    add(
-        "matl_enable",
-        ("group_id", "enable"),
-        "MATL_ROI_ENABLE_SETTING",
-        lambda a: {"groupId": str(a["group_id"]), "enable": bool(a["enable"])},
-        lambda a: f"MATL group {a['group_id']} {'on' if a['enable'] else 'off'}",
-        value="enable",
-        # FLUOVIEW cannot read this setting back (the manual's section 3.6 marks its
-        # getParameter n/a), so the change is confirmed by nothing.
-    )
-    # A group's position is checked against the stage limits like a move,
-    # although registering it moves nothing: the scan will go there.
-    add(
-        "matl_xy",
-        ("group_id", "x_um", "y_um"),
-        "MATL_ROI_XY_POSITION_SETTING",
-        lambda a: {
-            "groupId": str(a["group_id"]),
-            "x": _nm(a["x_um"]),
-            "y": _nm(a["y_um"]),
-        },
-        lambda a: f"MATL group {a['group_id']} -> ({a['x_um']:g}, {a['y_um']:g}) um",
-        read="matl_xy",
-        about="group_id",
-        accept=lambda a: within_xy(float(a["x_um"]), float(a["y_um"]), 0.001),
-        policy_values=lambda a: {"x_um": float(a["x_um"]), "y_um": float(a["y_um"])},
-    )
-    add(
-        "matl_z",
-        ("group_id", "z_um"),
-        "MATL_ROI_Z_POSITION_SETTING",
-        lambda a: {"groupId": str(a["group_id"]), "z": _nm(a["z_um"])},
-        lambda a: f"MATL group {a['group_id']} z -> {a['z_um']:g} um",
-        policy_values=lambda a: {"z_um": float(a["z_um"])},
-    )
-    add(
-        "matl_z_origin",
-        ("group_id", "z_um"),
-        "MATL_ROI_Z_ORIGIN_SETTING",
-        lambda a: {"groupId": str(a["group_id"]), "zOrigin": _nm(a["z_um"])},
-        lambda a: f"MATL group {a['group_id']} z origin -> {a['z_um']:g} um",
-        read="matl_z_origin_um",
-        about="group_id",
-        accept=lambda a: near(float(a["z_um"]), 0.001),
-        policy_values=lambda a: {"z_um": float(a["z_um"])},
-    )
-    add(
-        "matl_area_delete",
-        ("group_id", "column", "row"),
-        "MATL_ROI_AREA_DELETE_SETTING",
-        lambda a: {
-            "groupId": str(a["group_id"]),
-            "column": int(a["column"]),
-            "row": int(a["row"]),
-        },
-        lambda a: (
-            f"MATL group {a['group_id']} area ({a['column']}, {a['row']}) deleted"
-        ),
-    )
-    add(
-        "matl_area_enable",
-        ("group_id", "column", "row", "enable"),
-        "MATL_ROI_AREA_ENABLE_SETTING",
-        lambda a: {
-            "groupId": str(a["group_id"]),
-            "column": int(a["column"]),
-            "row": int(a["row"]),
-            "enable": bool(a["enable"]),
-        },
-        lambda a: (
-            f"MATL group {a['group_id']} area ({a['column']}, {a['row']}) {'on' if a['enable'] else 'off'}"
-        ),
-        value="enable",
-    )
-    add(
-        "matl_area_z_range",
-        ("group_id", "column", "row"),
-        "MATL_ROI_AREA_Z_RANGE_SETTING",
-        lambda a: {
-            "groupId": str(a["group_id"]),
-            "column": int(a["column"]),
-            "row": int(a["row"]),
-        },
-        lambda a: (
-            f"MATL group {a['group_id']} area ({a['column']}, {a['row']}) takes the current z-stack"
-        ),
-    )
     return rows
 
 
 #: The settings by name.
 SETTINGS: dict[str, Setting] = {row.name: row for row in _rows()}
-
-#: The settings a MATL position shares with a stage move: checked under ``set_xyz``.
-STAGE_POLICY_SETTINGS = frozenset({"matl_xy", "matl_z", "matl_z_origin"})
 
 
 def arguments_of(name: str, given: dict) -> dict:
@@ -849,9 +692,7 @@ def change(name: str, **given) -> Write:
     def fill(payload):
         payload.update(settingId=setting.setting_id, **body)
 
-    if setting.policy_values is not None:
-        values = setting.policy_values(arguments)
-    elif setting.value is not None:
+    if setting.value is not None:
         values = {"value": arguments[setting.value]}
     else:
         values = {}

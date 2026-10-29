@@ -59,8 +59,7 @@ def get_acquisition_settings(handle) -> dict:
 
     That is the only trigger this driver has, so it is the only option and
     the default. What the imaging is (its z-stack, channels, lasers) is part
-    of the state (``set_state``); a multi-area time lapse set up in FLUOVIEW
-    is not captured through this driver yet.
+    of the state (``set_state``).
     """
     handle.require_open()
     return {"trigger": {"options": ["full"], "default": "full", "active": "full"}}

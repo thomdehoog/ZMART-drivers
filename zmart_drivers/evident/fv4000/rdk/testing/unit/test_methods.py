@@ -222,3 +222,35 @@ def test_the_running_log_is_started_in_the_settings_folder(scope):
     from zmart_drivers.evident.fv4000.rdk.driver_setup.store import MACHINE
 
     assert (MACHINE.snapshot_root() / "logs" / methods.FILE_NAME).exists()
+
+
+def test_the_z_stack_method_is_part_of_the_state_and_applied_before_the_numbers(
+    scope, mock
+):
+    changeable = scope.state()["changeable"]
+    assert (
+        changeable["z_stack_method"] == "START_END"
+        and changeable["z_stack_range_um"] == 4.0
+    )
+    applied = scope.set_state({"z_stack_range_um": 10.0, "z_stack_method": "RANGE"})[
+        "applied"
+    ]
+    assert applied == {"z_stack_method": "RANGE", "z_stack_range_um": 10.0}
+    assert list(applied) == ["z_stack_method", "z_stack_range_um"], (
+        "the method goes first"
+    )
+    assert (mock.z_stack["type"], mock.z_stack["range_nm"]) == ("RANGE", 10_000)
+
+
+def test_change_setting_offers_exactly_what_the_state_can_set():
+    from zmart_drivers.evident.fv4000.rdk.primitives.rdk import writes
+    from zmart_drivers.evident.fv4000.rdk.procedures import state
+
+    reached = {setting for _key, _reading, setting, _arg in state.SIMPLE_SETTINGS}
+    reached |= {
+        setting for _f, _r, setting, _a in state.CHANNEL_FIELDS + state.LASER_FIELDS
+    }
+    reached |= {"channel_laser"}
+    assert reached == set(writes.SETTINGS), (
+        "one vocabulary: nothing set_state cannot reach"
+    )
