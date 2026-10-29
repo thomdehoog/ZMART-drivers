@@ -453,7 +453,21 @@ Saving it is `save_data`; letting LAS X go of it is `clear_cache`.
 - The direction of a saved stack is checked in the code and the offline
   tests, not yet on a microscope.
 
-The Nikon, ZEISS and mesoSPIM drivers and the controller's mock driver are not
+## The ZEISS driver
+
+The second driver in this anatomy is `zmart_drivers/zeiss/light_microscope/zen_api_grpc/`, for
+ZEN 3.13 and its gRPC ZEN API. Its dispatcher is the Leica driver's, copied byte for byte; its
+architecture guard checks that the copy stays unchanged. It has one class of primitive:
+
+| Class | Transfer | Reads | Writes | Profile |
+|---|---|---|---|---|
+| `gateway/` | The ZEN API through the ZEN API Gateway: ZEISS's `zen_api` classes over gRPC and TLS, on a loop thread of its own (`client.py`) | Stage, focus, objectives, experiments, an experiment's status, z-stack and tracks, ZEN's image folder | Moves, the objective, loading an experiment, a capture (sent once), the z-stack, focusing | The waiting rule; ZEN's gRPC status sorted temporary or permanent; the profile handed to `run()` |
+
+ZEN answers every call itself and its moves return once they are done, so there is no route chain,
+no dialog watch and no log reader. A capture leaves ZEN's own CZI file, moved into the run's
+folder, with a `.zmart.json` record beside it. The driver's README says the rest.
+
+The Nikon and mesoSPIM drivers and the controller's mock driver are not
 in this beta. When they come back, they come back in this anatomy.
 
 ## Open questions

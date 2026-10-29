@@ -20,7 +20,7 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Image Acquisition",
 ]
 
-# What the driver needs beyond the controller: pip install -e ".[leica]".
+# What each driver needs beyond the controller: pip install -e ".[leica]" or ".[zeiss]".
 [project.optional-dependencies]
 # The Leica driver: images and their metadata (numpy, tifffile; zarr and
 # OME's ome-zarr-models for saving a capture as OME-Zarr 0.5), the setup
@@ -46,6 +46,19 @@ leica = [
     "pythonnet>=3; sys_platform == 'win32'",
     "pywin32>=306; sys_platform == 'win32'",
     "comtypes>=1.4; sys_platform == 'win32'",
+]
+# The ZEISS driver (zmart_drivers/zeiss/light_microscope/zen_api_grpc): ZEISS's
+# zen_api package for ZEN 3.13, which ZEISS publishes in its OAD repository
+# and not on PyPI, so it is installed from there; grpclib, the gRPC transport
+# it uses; pylibCZIrw, ZEISS's reader of the CZI files ZEN writes (the planes
+# of a capture and the orientation setup read them); numpy for the
+# orientation setup, and ipython for the setup notebooks.
+zeiss = [
+    "zen_api @ https://raw.githubusercontent.com/zeiss-microscopy/OAD/v2025.10.1/ZEN-API/python_packages/zen_api-2025.10.1/dist/zen_api-2025.10.1-py3-none-any.whl",
+    "grpclib>=0.4.7",
+    "pylibCZIrw>=4.1",
+    "numpy>=1.24",
+    "ipython>=8",
 ]
 # The ZMART Controller the driver plugs into. It is not on PyPI, so it is
 # installed from its own repository: pip install "zmart-drivers[leica,controller]".

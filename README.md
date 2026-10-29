@@ -37,14 +37,15 @@ and the driver plugged into it does the rest:
 How a driver is organised inside, so that the safety behaviour is the same on every
 microscope, is described in [the anatomy of a ZMART driver](docs/driver-anatomy.md).
 
-## The driver in this beta
+## The drivers in this beta
 
 | Microscope | Vendor interface | Driver | Status |
 |---|---|---|---|
 | Leica STELLARIS | LAS X: its hardware server first, the Python (CAM) API behind it | [`zmart_drivers/leica/stellaris/navigator_expert/`](zmart_drivers/leica/stellaris/navigator_expert/README.md) | **Beta `0.7.0b9`.** 0.7.0b9 keeps the settings in configs chosen when connecting, writes a mean pyramid into every store, and fixes what the first end-to-end run on the STELLARIS found. 0.7.0b6 tested on the LAS X simulator, 0.7.0b5 also on a STELLARIS; 0.7.0b7 adds the setup wizard and 0.7.0b8 its hardware check and a CI that also runs without the controller, tested offline. Laid out as [the anatomy of a ZMART driver](docs/driver-anatomy.md) describes. |
+| ZEISS light microscopes (ZEN 3.13) | The ZEN API over gRPC, through the ZEN API Gateway (ZEISS's `zen_api` 2025.10.1) | [`zmart_drivers/zeiss/light_microscope/zen_api_grpc/`](zmart_drivers/zeiss/light_microscope/zen_api_grpc/README.md) | **Beta `0.1.0b1`, not yet run against ZEN.** Tested offline against a stand-in for ZEN, and over ZEISS's own classes, gRPC and TLS against a small gateway inside the tests. Laid out as the anatomy describes, with the Leica driver's dispatcher. |
 
-This beta holds only the Leica driver. The Nikon, ZEISS, mesoSPIM and Evident drivers are in
-the repository's history.
+The Nikon, mesoSPIM and Evident drivers, and an earlier ZEISS driver, are in the repository's
+history.
 
 The driver works by itself, from a notebook or a script, and it plugs into the ZMART
 Controller. Its README says how to do both. Before the first experiment, a few things are set
@@ -63,6 +64,10 @@ extra to drive it through the ZMART Controller as well.
 pip install -e ".[leica]"              # the driver on its own
 pip install -e ".[leica,controller]"   # with the ZMART Controller
 ```
+
+The ZEISS driver installs the same way with the `zeiss` extra, which brings ZEISS's `zen_api`
+package from ZEISS's own repository; its [README](zmart_drivers/zeiss/light_microscope/zen_api_grpc/README.md)
+says how to set ZEN up for it.
 
 The driver runs on the computer that runs LAS X, because it loads Leica's interface into
 Python. Use it by itself:
@@ -110,13 +115,17 @@ pip install -e ".[leica,controller,test]"     # also with the ZMART Controller
 python zmart_drivers/leica/stellaris/navigator_expert/testing/run_ci.py
 ```
 
+The ZEISS driver's suite runs the same way:
+`pip install -e ".[zeiss,test]"`, then
+`python zmart_drivers/zeiss/light_microscope/zen_api_grpc/testing/run_ci.py`.
+
 The suite has two layers. The first checks the driver on its own, which is how many people use
 it. The second checks the driver inside the ZMART Controller; it runs when the controller is
 installed and is shown as `SKIP` when it is not. Add `--controller` to make a missing
 controller a failure instead, on a computer that is meant to have it.
 
-The continuous-integration workflow in `.github/workflows/` runs both layers on Linux and
-Windows, with Python 3.11 and 3.12, and the driver alone on both systems as well.
+The continuous-integration workflow in `.github/workflows/` runs both layers of each driver on
+Linux and Windows, with Python 3.11 and 3.12, and each driver alone on both systems as well.
 
 ## Author
 

@@ -178,11 +178,18 @@ answers `{"success", "confirmed", "message", "timing", "logs", "route"}`.
 `confirmed` is True when the read-back showed the change, False when it never
 did, and None when there was nothing to read back or the write failed first.
 
+## A second vendor
+
+The ZEISS driver (`zmart_drivers/zeiss/light_microscope/zen_api_grpc/`) brings one class,
+`primitives/gateway/`, whose `profile.py` is the profile handed to `run()`. Its transfer keeps
+ZEN's answer, or the gRPC error ZEN raised, as the reply (`client.reply`), and `check_reply` sorts
+the error by its status. It runs on the dispatcher unchanged.
+
 ## Not yet shared
 
 The list of kinds of error and the rule for each (only a temporary error is
-sent again) are in the Leica driver's `cam_api/profile.py`. A second vendor
-writes its own until they move into the dispatcher.
+sent again) are in the Leica driver's `cam_api/profile.py`; the ZEISS driver has its own in
+`gateway/profile.py`. Each vendor writes its own until they move into the dispatcher.
 
 Author: Thom de Hoog, Center for Microscopy and Image Analysis (ZMB),
 University of Zurich (thom.dehoog@zmb.uzh.ch, thomdehoog@gmail.com)
