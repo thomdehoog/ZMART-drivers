@@ -1,13 +1,26 @@
-"""Saving a capture: move the CZI ZEN wrote into the run's folder, write the record beside it, describe the planes.
+"""Saving a capture: ZEN's CZI file becomes one OME-Zarr store in the run's folder, and its planes are described.
 
 ZEN writes every acquisition as one CZI file in its image output folder on
-the ZEN computer. The driver does not rewrite the pixels: the CZI is ZEISS's
-own format, and every ZEISS tool and most others read it. Saving a capture
-means moving that file into the folder the workflow asked for (renaming it
-on the same disk when it can, copying otherwise), writing the capture's
-record beside it as ``<name>.zmart.json`` (the controller's state, the
-capture record, the frame of the pixels and the driver's own facts, in the
-words of the ZMART metadata convention), and describing the planes.
+the ZEN computer. Every ZMART driver saves a capture as one OME-Zarr store
+(the ZMART metadata convention), so that the ZMART Viewer and ZMART Analysis
+read every microscope's captures the same way. Saving a capture therefore
+means:
+
+1. reading the CZI's planes and ZEN's description of them;
+2. writing them as ``data/<name>.ome.zarr`` in the run's folder, turned onto
+   the stage's axes and placed where they were taken, with the controller's
+   state, the capture record and ZEN's own description inside the store
+   (``ome_zarr.py`` says what the store holds);
+3. for a z-stack, writing the brightest pixel over z as a second store in
+   ``projections/``, a quick overview of the stack;
+4. moving ZEN's CZI into ``data/metadata/vendor/``, so nothing ZEN wrote is
+   lost and ZEN's own image folder does not fill up (``KEEP_CZI``);
+5. writing ZMART's account of the capture as plain text beside it, in
+   ``data/metadata/ZMART_state/<name>.json``.
+
+The CZI is only moved once the store has been written and its pixels read
+back, so a capture that cannot be saved is never lost: it stays in ZEN's
+folder and the session keeps it for another try.
 
 When the driver runs on another computer than ZEN, ZEN's image folder must
 be reachable here, under the path ZEN reports or under the one the
@@ -25,11 +38,13 @@ import logging
 import os
 import shutil
 import time
+from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
 
 from zmart_drivers import metadata_convention as convention
 
+from . import ome_zarr
 from . import planes as _planes
 from .naming import Naming
 from .product import SavedAcquisition
@@ -42,7 +57,16 @@ FILE_WAIT_S = 30.0
 FILE_SETTLE_S = 0.5
 
 #: The name of the vendor's software, as the record names it.
-VENDOR = "zeiss-zen"
+VENDOR = ome_zarr.VENDOR
+
+#: Whether ZEN's own CZI is kept, in ``data/metadata/vendor/``, once the
+#: store is written. The store holds every pixel and ZEN's whole description,
+#: so it can be set to False to save disk space; ZEN's copy is then deleted.
+KEEP_CZI = True
+
+#: What is projected from a capture with more than one plane, into
+#: ``projections/``: its maximum over z (``"max"``), or nothing (``"none"``).
+PROJECTION = "max"
 
 
 def where_zen_put_it(
@@ -93,11 +117,12 @@ def move_file(source: Path, destination: Path) -> Path:
 
 
 def save(handle, pending, *, controller_version: str | None = None) -> SavedAcquisition:
-    """Save one pending capture: find ZEN's CZI, move it, write the record, describe the planes.
+    """Save one pending capture as an OME-Zarr store, keep ZEN's CZI beside it, and describe the planes.
 
     *pending* is the ``PendingCapture`` ``acquire`` left in the session.
-    Raises ``RuntimeError`` when the file ZEN wrote cannot be found here, and
-    ``FileExistsError`` when the name is taken after all.
+    Raises ``RuntimeError`` when the file ZEN wrote cannot be found or read
+    here, and ``FileExistsError`` when the name is taken after all. Until
+    the store is written, ZEN's file is left where it is.
     """
     acq = pending.acq
     source = where_zen_put_it(pending.zen_folder, acq.output_name, handle.zen_images)
@@ -109,19 +134,32 @@ def save(handle, pending, *, controller_version: str | None = None) -> SavedAcqu
         )
     naming: Naming = pending.naming
     folder = Path(pending.output_root)
-    czi = move_file(source, naming.czi(folder))
+    store_path = naming.store(folder)
+    if store_path.exists():
+        raise FileExistsError(
+            f"{store_path} exists already; a capture never overwrites another"
+        )
 
-    shape = _planes.read_czi_shape(czi)
-    channels, heights, time_points = _dimensions(handle, pending, shape)
-    planes = _planes.describe_planes(
-        path=czi,
-        channels=channels,
+    shape = _planes.read_czi_shape(source)
+    czi = ome_zarr.read_czi(source)
+    _channels, heights, _time_points = _dimensions(handle, pending, shape)
+    matrix = (
+        handle.orientation.image_to_stage
+        if handle.orientation is not None
+        else ((1, 0), (0, 1))
+    )
+    capture = ome_zarr.gather(
+        czi,
+        image_to_stage=matrix,
         heights_um=heights,
-        time_points=time_points,
-        x_um=pending.at["x"],
-        y_um=pending.at["y"],
+        centre_um=(pending.at["x"], pending.at["y"]),
+        readings=_stage_readings(pending),
+        raw_z_um=[_raw_focus(pending, height) for height in heights],
+        # ZEN's description of the objective in place: its name, magnification and NA.
+        objective=(pending.state.get("vendor") or {}).get("objective"),
     )
     if shape and shape.get("pixel_size_um") and shape.get("width_px"):
+        # The camera's own numbers, before the turn: what state() reports.
         handle.last_frame = {
             "image_size_px": [int(shape["width_px"]), int(shape["height_px"])],
             "pixel_size_um": [float(v) for v in shape["pixel_size_um"]],
@@ -133,34 +171,102 @@ def save(handle, pending, *, controller_version: str | None = None) -> SavedAcqu
     notes = convention.Notes(
         controller_state=pending.state.get("controller_state"),
         capture_record=record,
-        pixels_to_position=handle.orientation.image_to_stage
-        if handle.orientation is not None
-        else ((1, 0), (0, 1)),
+        pixels_to_position=matrix,
         vendor=VENDOR,
         vendor_facts={
             **(pending.state.get("vendor") or {}),
             "czi": {
-                "name": czi.name,
-                "shape": shape,
-                "written_by_zen_as": acq.output_name,
+                "written_by_zen_as": f"{acq.output_name}.czi",
                 "zen_folder": pending.zen_folder,
+                "kept_as": _relative(naming.czi(folder), folder) if KEEP_CZI else None,
+                "shape": shape,
             },
             "unconfirmed": list(pending.unconfirmed),
         },
+        vendor_descriptions=(czi["description"],) if czi["description"] else (),
+        image_description=acq.output_name,
     )
-    sidecar = naming.sidecar(folder)
-    sidecar.write_text(
-        json.dumps(notes.as_json(), indent=2, default=str) + "\n", encoding="utf-8"
+    store = ome_zarr.write_store(capture, store_path, notes=notes)
+
+    projection = None
+    if PROJECTION == "max" and capture.volume.shape[2] > 1:
+        projection = ome_zarr.write_store(
+            ome_zarr.max_projection(capture),
+            naming.projection(folder),
+            notes=replace(
+                notes,
+                capture_record={
+                    **record,
+                    "derived_from": {
+                        "store": _relative(store, naming.projection(folder).parent),
+                        "operation": "max over z",
+                    },
+                },
+            ),
+        )
+
+    # The store is written and checked: only now does ZEN's file leave its folder.
+    kept = None
+    if KEEP_CZI:
+        kept = move_file(source, naming.czi(folder))
+    else:
+        try:
+            source.unlink()
+        except OSError as why:
+            log.warning("ZEN's copy %s could not be removed: %s", source, why)
+
+    state = naming.state(folder)
+    state.parent.mkdir(parents=True, exist_ok=True)
+    state.write_text(
+        json.dumps(
+            {**notes.as_json(), "store": _relative(store, folder)},
+            indent=2,
+            default=str,
+        )
+        + "\n",
+        encoding="utf-8",
     )
+    files = [str(path) for path in (store, projection, kept, state) if path is not None]
     return SavedAcquisition(
         position_label=pending.label,
         acquisition_type=pending.acquisition_type,
-        files=[str(czi), str(sidecar)],
-        planes=planes,
-        czi=czi,
-        sidecar=sidecar,
+        files=files,
+        planes=_planes.describe_planes(capture, store),
+        store=store,
+        czi=kept,
+        state=state,
+        projection=projection,
         record=record,
     )
+
+
+def _stage_readings(pending) -> dict[str, float]:
+    """What the stage's own drives read at the capture, keyed ``<axis>/<actuator>`` as the convention keeps them."""
+    readings = {}
+    for axis in ("x", "y"):
+        found = ((pending.state.get("xyz") or {}).get(axis) or {}).get(
+            "actuator_readings"
+        ) or {}
+        for actuator, value in found.items():
+            try:
+                readings[f"{axis}/{actuator}"] = float(value)
+            except (TypeError, ValueError):
+                continue
+    return readings
+
+
+def _raw_focus(pending, height_um: float) -> float:
+    """ZEN's own focus reading for a slice at *height_um* in the frame: the frame's z, put back."""
+    return (
+        float(height_um)
+        + float(pending.origin.get("z_um") or 0.0)
+        + float(pending.objective_translation_um[2])
+    )
+
+
+def _relative(path: Path, start: Path) -> str:
+    """*path* from *start*, with forward slashes, so a record stays true when the run is moved."""
+    return Path(os.path.relpath(path, start)).as_posix()
 
 
 def _dimensions(

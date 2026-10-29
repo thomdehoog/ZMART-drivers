@@ -464,8 +464,9 @@ architecture guard checks that the copy stays unchanged. It has one class of pri
 | `gateway/` | The ZEN API through the ZEN API Gateway: ZEISS's `zen_api` classes over gRPC and TLS, on a loop thread of its own (`client.py`) | Stage, focus, objectives, experiments, an experiment's status, z-stack and tracks, ZEN's image folder | Moves, the objective, loading an experiment, a capture (sent once), the z-stack, focusing | The waiting rule; ZEN's gRPC status sorted temporary or permanent; the profile handed to `run()` |
 
 ZEN answers every call itself and its moves return once they are done, so there is no route chain,
-no dialog watch and no log reader. A capture leaves ZEN's own CZI file, moved into the run's
-folder, with a `.zmart.json` record beside it. Its `driver_setup/wizard/` has the Leica wizard's
+no dialog watch and no log reader. A capture is saved as one OME-Zarr store in the run's `data`
+folder, made from the CZI ZEN wrote, in the layout the Leica driver uses; ZEN's CZI is kept
+beside it. Its `driver_setup/wizard/` has the Leica wizard's
 framework, server, launcher and look, with its own five steps; the objective calibration in it is
 done by eye. The driver's README says the rest.
 

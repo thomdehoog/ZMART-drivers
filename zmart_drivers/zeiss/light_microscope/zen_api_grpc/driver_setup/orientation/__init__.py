@@ -7,11 +7,12 @@ direction. The orientation records that fixed relation, measured once per
 microscope by ``measure_orientation.py`` and its notebook, as one of eight
 lossless turns: 0, 90, 180 or 270 degrees, with or without a mirror.
 
-The ZEISS driver does not turn the pixels of the CZI file ZEN writes: the
-file stays as ZEN made it, so every ZEISS tool reads it as usual. The
-orientation goes with every capture instead, in the record beside the file
-(the image frame of the ZMART metadata convention), so a reader knows how the
-picture's columns and rows map onto the stage's x and y.
+When a capture is saved as an OME-Zarr store, its pixels are turned with
+this orientation, so the stored picture's columns run along the stage's x
+and its rows along the stage's y, as every ZMART store's do. The turn only
+rearranges pixels. The store also says which turn was applied (the image
+frame of the ZMART metadata convention), and ZEN's own CZI, kept beside the
+store, stays as the camera saw it.
 
 The same measurement gives the **frame**: the image size in pixels and the
 pixel size in micrometres, under the objective it was measured with. The ZEN

@@ -6,12 +6,11 @@ point ``t``, and the stage position it was taken at, in the sample's frame.
 ``z = 0`` is the lowest slice and each depth above it is higher, whichever
 way the microscope moved.
 
-Where the numbers come from, in this order: the CZI file ZEN wrote, read
-with ZEISS's ``pylibCZIrw`` when it is installed (its sizes, channel names
-and pixel size are exact); else what ZEN said about the experiment (its
-z-stack, its tracks, the status after the run). The slice heights come from
-the experiment's z-stack: ZEN's focus positions, put into the frame like
-every other position.
+The sizes, channel names and pixel size come from the CZI file ZEN wrote,
+read with ZEISS's ``pylibCZIrw``. The slice heights come from the
+experiment's z-stack: ZEN's focus positions, put into the frame like every
+other position. The planes the controller is told about are those of the
+OME-Zarr store the capture is saved as (``ome_zarr.py``).
 
 Author: Thom de Hoog, Center for Microscopy and Image Analysis (ZMB),
 University of Zurich (thom.dehoog@zmb.uzh.ch, thomdehoog@gmail.com).
@@ -119,38 +118,24 @@ def slice_heights_um(
     return [to_frame(first + index * interval) for index in range(slices)]
 
 
-def describe_planes(
-    *,
-    path: Path | str,
-    channels: list[str],
-    heights_um: list[float],
-    time_points: int,
-    x_um: float,
-    y_um: float,
-) -> list[dict]:
-    """One entry per plane, with ``z`` counted from the lowest slice upwards.
+def describe_planes(capture, store: Path | str) -> list[dict]:
+    """One entry per plane of the saved *store*, in the controller's words.
 
-    *heights_um* are the slice heights in the CZI's order; ``czi_z`` keeps
-    that order, so the plane can be found in the file, while ``z`` is the
-    depth index the controller asks for.
+    Each holds the store's ``path``, the plane's channel ``c``, depth ``z``
+    (0 is the lowest slice) and time point ``t``, where it was taken
+    (``x_um``, ``y_um``, ``z_um``, in the frame) and the channel's name.
     """
-    ascending = sorted(range(len(heights_um)), key=lambda index: heights_um[index])
-    depth_of = {czi_index: depth for depth, czi_index in enumerate(ascending)}
-    planes = []
-    for t in range(time_points):
-        for c, channel in enumerate(channels):
-            for czi_z, height in enumerate(heights_um):
-                planes.append(
-                    {
-                        "path": str(path),
-                        "c": c,
-                        "z": depth_of[czi_z],
-                        "t": t,
-                        "x_um": float(x_um),
-                        "y_um": float(y_um),
-                        "z_um": float(height),
-                        "channel": channel,
-                        "czi_z": czi_z,
-                    }
-                )
-    return planes
+    names = [channel.name for channel in capture.channels]
+    return [
+        {
+            "path": str(store),
+            "c": plane.c,
+            "z": plane.z,
+            "t": plane.t,
+            "x_um": plane.x_um,
+            "y_um": plane.y_um,
+            "z_um": plane.z_um,
+            "channel": names[plane.c] if plane.c < len(names) else f"channel {plane.c}",
+        }
+        for plane in capture.planes
+    ]

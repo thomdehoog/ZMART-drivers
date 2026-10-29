@@ -51,14 +51,16 @@ leica = [
 # zen_api package for ZEN 3.13, which ZEISS publishes in its OAD repository
 # and not on PyPI, so it is installed from there; grpclib, the gRPC transport
 # it uses; pylibCZIrw, ZEISS's reader of the CZI files ZEN writes (the planes
-# of a capture and the orientation setup read them); numpy for the
-# orientation setup; ipython for the setup notebooks, and pywebview for the
-# setup wizard's window.
+# of a capture and the orientation setup read them); numpy, zarr and OME's
+# ome-zarr-models for saving each capture as an OME-Zarr 0.5 store; ipython
+# for the setup notebooks, and pywebview for the setup wizard's window.
 zeiss = [
     "zen_api @ https://raw.githubusercontent.com/zeiss-microscopy/OAD/v2025.10.1/ZEN-API/python_packages/zen_api-2025.10.1/dist/zen_api-2025.10.1-py3-none-any.whl",
     "grpclib>=0.4.7",
     "pylibCZIrw>=4.1",
     "numpy>=1.24",
+    "zarr>=3",
+    "ome-zarr-models>=1.7",
     "ipython>=8",
     "pywebview>=5",
 ]

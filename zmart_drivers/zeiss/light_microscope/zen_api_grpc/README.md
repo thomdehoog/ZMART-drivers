@@ -40,9 +40,10 @@ Three things are good to know before you start:
   time series, tiles) is a ZEN *experiment*, a `.czexp` you set up and save in ZEN as usual. The
   driver loads an experiment by name and runs it. It can change the experiment's z-stack, but it
   does not build experiments.
-- **ZEN writes the images.** Every capture becomes one CZI file in ZEN's image folder. The driver
-  moves that file into the folder the workflow asked for, keeps it exactly as ZEN wrote it, and
-  writes a `.zmart.json` record beside it.
+- **ZEN writes the images, the driver saves them as OME-Zarr.** Every capture becomes one CZI file
+  in ZEN's image folder. When it is saved, the driver turns it into one OME-Zarr store in the run's
+  `data` folder, the format every ZMART driver saves in, so the ZMART Viewer and ZMART Analysis
+  open a ZEISS capture as they open any other. ZEN's own CZI is kept beside it.
 - **ZEN speaks metres and waits until done.** ZEN's moves answer when the stage has arrived, and
   its acquisitions when they are finished. The driver converts to micrometres in one place, and
   its read-backs are a second opinion, not the signal that a move is over.
@@ -137,7 +138,7 @@ mic.connect("zeiss-zen", {"experiment": "ZMART_Snap"})                          
 | `z_stack()`, `set_z_stack(first_um, last_um, interval_um)` | Read or change the loaded experiment's z-stack; the ends are micrometres from the origin's focus, checked against the focus limits. |
 | `acquisition_settings()` | How a capture is triggered: `full` (the whole experiment) or `snap` (one picture with its channels). |
 | `acquire(position_label=None, acquisition_type="acquisition", output_folder=None, acquisition_settings=None)` | Run the loaded experiment once. ZEN writes the CZI; it waits in ZEN's folder until `save()`. A picture is sent once and never again. |
-| `save(label=None)` | Move the waiting captures into their folders, write their records, and describe their planes. |
+| `save(label=None)` | Save the waiting captures, each as one OME-Zarr store in its run's `data` folder, keep ZEN's CZI beside it, and describe their planes. |
 | `autofocus(timeout_s=None)` | ZEN's software autofocus, with the focus search of the loaded experiment. |
 | `find_surface()`, `store_focus()`, `recall_focus()` | The Definite Focus, on stands that have one. |
 | `stop()` | Stop whatever ZEN is acquiring. |
@@ -148,19 +149,46 @@ mic.connect("zeiss-zen", {"experiment": "ZMART_Snap"})                          
 
 ```
 <output folder>/
-  overview_A1.czi          the picture, exactly as ZEN wrote it
-  overview_A1.zmart.json   its record: the controller's state, the capture record,
-                           the image frame and the driver's facts, in the words of the
-                           ZMART metadata convention
+  data/
+    overview_A1.ome.zarr              the capture: one OME-Zarr 0.5 store
+    metadata/
+      vendor/overview_A1.czi          ZEN's own file, exactly as ZEN wrote it
+      ZMART_state/overview_A1.json    ZMART's account of the capture, readable as text
+  projections/
+    overview_A1.ome.zarr              for a z-stack: the brightest pixel over z
 ```
 
-A name already used gets `_001`, `_002` and so on, so no capture overwrites another. The planes
-the answer lists give each image's channel, depth and time point, and where it was taken in the
-sample's frame; `z = 0` is the lowest slice. They are read from the CZI itself with ZEISS's
-`pylibCZIrw`, and the slice heights from the experiment's z-stack.
+This is the layout the Leica driver writes, so a run's `data` folder opens in the ZMART Viewer as
+one picture of all its positions. A name already used gets `_001`, `_002` and so on, so no capture
+overwrites another.
 
-The CZI is not turned to the stage's axes, so every ZEISS tool reads it as usual. The record's
-image frame says how its columns and rows map onto the stage's x and y.
+**What the store holds.** It follows the
+[ZMART metadata convention](../../../../zmart_drivers/metadata_convention/README.md), like every
+ZMART driver's store:
+
+- every plane of the capture, axes t, c, z, y, x, with the lowest slice first;
+- the pixels turned onto the stage's axes, with the orientation the setup measured, so the
+  picture's columns run along the stage's x and its rows along its y. The turn only rearranges
+  pixels, so nothing is lost;
+- the pixel size, and where on the sample the image lies, in micrometres from the origin;
+- each channel's name and colour as ZEN described them, and coarser levels for zooming out;
+- in `OME/METADATA.ome.xml`: the objective, where each plane was taken and what the drives read,
+  the controller's state and the capture record, and ZEN's own description of the image, the
+  CZI's metadata, byte for byte.
+
+A colour camera's picture becomes three channels, red, green and blue. A tile scan is saved as
+the stitched picture ZEN's reader gives, one store for the whole mosaic, placed around where the
+stage stood when the capture began; for a tile region that is not centred on that point, the
+placement is not yet right, which the first runs on ZEN will have to settle.
+
+The planes the answer lists give each image's channel, depth and time point, and where it was
+taken in the sample's frame; `z = 0` is the lowest slice. Each names the store as its `path`.
+
+**ZEN's CZI.** The CZI is moved into `data/metadata/vendor/` only after the store is written and
+its pixels read back, so a save that fails loses nothing: the file stays in ZEN's folder and the
+capture waits for another try. To save disk space, set
+`procedures.save_data.save.KEEP_CZI = False`; ZEN's file is then deleted once the store is
+written. `PROJECTION = "none"` in the same file leaves the projections out.
 
 ## Setting up the driver
 
@@ -269,8 +297,8 @@ handed to the dispatcher. How it differs from the Leica driver:
 - **The objective calibration is done by eye.** The operator centres and focuses one feature under
   each objective, and the driver reads the positions; the Leica driver matches z-stacks and
   pictures instead. The setup wizard follows the same way.
-- **The CZI is moved, not converted.** The Leica driver writes OME-Zarr from LAS X's cache; this
-  driver keeps ZEN's own file and writes the record beside it.
+- **The store is made from ZEN's CZI.** The Leica driver writes its store from LAS X's cache; this
+  driver reads the CZI ZEN wrote, and keeps that file beside the store.
 
 ## References
 

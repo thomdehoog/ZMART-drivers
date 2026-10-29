@@ -5,8 +5,8 @@ and leaves the CZI file where ZEN wrote it, in ZEN's image folder. Nothing
 is moved yet. Instead it notes what only the moment of the capture can tell
 (where the stage stood, which experiment ran, the state of the microscope,
 the experiment's z-stack and channels) and keeps the note with the session
-as a :class:`PendingCapture`. Moving the file into the run's folder and
-describing its planes is the ``save_data`` procedure.
+as a :class:`PendingCapture`. Saving the file as an OME-Zarr store in the
+run's folder, and describing its planes, is the ``save_data`` procedure.
 
 A change that was sent but could not be confirmed is recorded and the
 capture carries on, so the workflow is told rather than stopped. The
@@ -134,7 +134,7 @@ def acquire(
 
     Args:
         position_label: What the workflow calls this place. The file is named
-            after the acquisition type and the label (``overview_A1.czi``);
+            after the acquisition type and the label (``overview_A1.ome.zarr``);
             a name already used gets ``_001``, ``_002``, ... so no capture
             is ever overwritten. When omitted, the next per-session counter
             value is used.

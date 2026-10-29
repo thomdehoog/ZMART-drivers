@@ -404,9 +404,9 @@ class Microscope:
     ) -> dict:
         """Run the loaded experiment once; ZEN writes the CZI, which waits in ZEN's folder until :meth:`save`.
 
-        The file will be named after *acquisition_type* and *position_label*,
-        in *output_folder*, or else in this session's folder under the data
-        location.
+        The capture will be named after *acquisition_type* and
+        *position_label*, and saved in *output_folder*, or else in this
+        session's folder under the data location.
         """
         return acquire_step.acquire(
             self.handle,
@@ -417,7 +417,12 @@ class Microscope:
         )
 
     def save(self, label: str | None = None) -> list[dict]:
-        """Move the captures that are waiting (only *label* when given) into their folders; one record each."""
+        """Save the captures that are waiting (only *label* when given), each as one OME-Zarr store; one answer each.
+
+        Each answer lists the files written (the store, its projection for a
+        z-stack, ZEN's CZI and ZMART's account of the capture) and the planes
+        the store holds, in the controller's words.
+        """
         return save_step.save_waiting(self.handle, label)
 
     # --- focusing and stopping ------------------------------------------------------------

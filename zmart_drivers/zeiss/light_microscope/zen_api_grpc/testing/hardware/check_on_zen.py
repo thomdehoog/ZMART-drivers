@@ -196,9 +196,27 @@ def _snapped(scope) -> dict:
         acquisition_settings={"trigger": "snap"},
     )
     (saved,) = scope.save()
-    if not Path(saved["czi"]).is_file() or not saved["planes"]:
+    if not Path(saved["store"]).is_dir() or not saved["planes"]:
         raise RuntimeError(f"the snap was not saved as expected: {saved}")
-    return {"czi": saved["czi"], "planes": len(saved["planes"])}
+    # The store follows the ZMART metadata convention, as every driver's does.
+    try:
+        from zmart_drivers import metadata_convention as convention
+
+        problems = convention.check_store(saved["store"])
+    except ImportError:
+        problems = None  # ome-types is part of the test extra only
+    if problems:
+        raise RuntimeError(
+            f"the saved store does not follow the convention: {problems}"
+        )
+    return {
+        "store": saved["store"],
+        "czi": saved["czi"],
+        "planes": len(saved["planes"]),
+        "convention": "checked"
+        if problems == []
+        else "not checked (ome-types missing)",
+    }
 
 
 def finish(report_dir: Path, results: list[dict]) -> int:

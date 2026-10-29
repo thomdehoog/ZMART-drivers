@@ -302,6 +302,7 @@ def test_the_driver_connects_moves_and_snaps_over_the_real_wire(
 
         microscope.acquire("A1", acquisition_settings={"trigger": "snap"})
         (saved,) = microscope.save()
+        assert Path(saved["store"]).name == "acquisition_A1.ome.zarr"
         assert Path(saved["czi"]).name == "acquisition_A1.czi"
         assert [p["channel"] for p in saved["planes"]] == ["DAPI", "GFP"]
 
