@@ -92,6 +92,8 @@ class ChannelMetadata:
     detector_id: str | None = None
     detector_gain: float | None = None
     detector_offset: float | None = None
+    #: A PMT's high voltage, in volts (FLUOVIEW's HV).
+    detector_voltage_v: float | None = None
     laser_id: str | None = None
     laser_attenuation: float | None = None
 

@@ -182,6 +182,8 @@ def _append_channel(pixels: ET.Element, channel: ChannelMetadata) -> None:
             detector["Offset"] = _num(channel.detector_offset)
         if channel.detector_gain is not None:
             detector["Gain"] = _num(channel.detector_gain)
+        if channel.detector_voltage_v is not None:
+            detector.update(Voltage=_num(channel.detector_voltage_v), VoltageUnit="V")
         ET.SubElement(element, _tag("DetectorSettings"), detector)
 
 

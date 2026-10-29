@@ -166,3 +166,45 @@ def test_the_mean_pyramid_halves_down_to_one_chunk():
         ]
         == 4
     )
+
+
+def test_the_ome_model_gets_each_channels_laser_and_detector_from_the_state_at_the_capture(
+    scope, tmp_path, mock
+):
+    mock.channels["CH1"].hv = 610
+    mock.channels["CH1"].offset = 3
+    scope.acquire("L1", output_folder=str(tmp_path / "run"))
+    (record,) = scope.save()
+    store = Path(record["files"][0])
+    xml = (store / "OME" / "METADATA.ome.xml").read_text()
+    assert convention.check_store(store) == [], "still valid against the OME schema"
+    assert 'Laser ID="LightSource:LASER_488"' in xml and 'Wavelength="488"' in xml
+    assert 'ExcitationWavelength="488"' in xml
+    assert 'LightSourceSettings ID="LightSource:LASER_488" Attenuation="0.98"' in xml, (
+        "2 % power"
+    )
+    assert 'Voltage="610"' in xml and 'Offset="3"' in xml and 'Gain="1"' in xml
+
+
+def test_fluoviews_own_answers_about_the_picture_are_kept_whole_in_the_vendor_layer(
+    scope, tmp_path
+):
+    import xml.etree.ElementTree as ET
+
+    scope.acquire("V2", output_folder=str(tmp_path / "run"))
+    (record,) = scope.save()
+    root = ET.parse(Path(record["files"][0]) / "OME" / "METADATA.ome.xml").getroot()
+    texts = [
+        "".join(el.itertext())
+        for el in root.iter()
+        if el.tag.endswith("CommentAnnotation")
+        and "/vendor/evident-fluoview" in (el.get("Namespace") or "")
+    ]
+    described = [json.loads(t) for t in texts if '"IDA.getProperty"' in t]
+    assert len(described) == 1
+    keys = [entry["key"] for entry in described[0]["IDA.getProperty"]]
+    assert {"EnabledChannelIdList", "ChannelInfo", "Axes", "PixelLength"} <= set(keys)
+    info = next(e for e in described[0]["IDA.getProperty"] if e["key"] == "ChannelInfo")
+    assert info["answer"]["structValue"][0]["bitCount"] == 12, (
+        "the answer is kept as FLUOVIEW gave it"
+    )

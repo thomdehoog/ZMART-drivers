@@ -104,6 +104,9 @@ class OpenedImage:
         self._group_index, self._level, self._area_index = group, level, area
         self.file_id = self.group_id = self.area_id = None
         self.description: ImageDescription | None = None
+        #: Every property answer FLUOVIEW gave while the picture was described, whole and in
+        #: the order asked: FLUOVIEW's own description of the picture, kept for the store.
+        self.answers: list[dict] = []
 
     def __enter__(self) -> OpenedImage:
         client = self.client
@@ -158,6 +161,9 @@ class OpenedImage:
         if additional:
             payload["additional"] = additional
         answer = _ida(self.client, "getProperty", **payload)
+        self.answers.append(
+            {"key": key, "additional": dict(additional), "answer": answer}
+        )
         return answer.get("value", answer.get("structValue"))
 
     def _describe(self) -> ImageDescription:

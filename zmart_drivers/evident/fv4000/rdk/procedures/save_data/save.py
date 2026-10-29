@@ -98,6 +98,7 @@ def save_pending(
         started_at=p.acq.started_at,
         objective=(p.at or {}).get("objective"),
         version=(p.state or {}).get("vendor", {}).get("software", {}).get("version"),
+        state=(p.state or {}).get("controller_state"),
     )
     where = place_planes(p.at, capture.z_positions_um)
     metadata = replace(
@@ -113,7 +114,7 @@ def save_pending(
             for index, plane in metadata.planes.items()
         },
     )
-    notes = store_notes(p, orientation)
+    notes = store_notes(p, orientation, capture)
     gathered = ome_zarr.gather(
         capture.volume,
         metadata,
@@ -235,8 +236,15 @@ def place_planes(at: dict, z_positions_um: list[float] | None):
     return where
 
 
-def store_notes(pending, orientation: Orientation) -> convention.Notes:
-    """What the store says about a capture besides its pixels, from the note taken at the capture."""
+def store_notes(pending, orientation: Orientation, capture=None) -> convention.Notes:
+    """What the store says about a capture besides its pixels, from the note taken at the capture.
+
+    FLUOVIEW has no call that hands over a picture's whole description, so its
+    description is what it answered about the picture while it was read back
+    (every image property, through the RDK's IDA calls). Those answers are
+    kept whole, as JSON, as the vendor's description: nothing FLUOVIEW said
+    about the picture is lost, even where the OME model has no field for it.
+    """
     noted = pending.state or {}
     record = {
         "position_label": pending.label,
@@ -266,7 +274,30 @@ def store_notes(pending, orientation: Orientation) -> convention.Notes:
         else Orientation().image_to_stage,
         vendor=VENDOR,
         vendor_facts=vendor,
+        vendor_descriptions=_fluoview_description(pending, capture),
         image_description=Path(pending.acq.target).name,
+    )
+
+
+def _fluoview_description(pending, capture) -> tuple[str, ...]:
+    """FLUOVIEW's answers about the picture, as one JSON text; nothing when the picture was not read."""
+    answers = getattr(capture, "fluoview_answers", ()) if capture is not None else ()
+    if not answers:
+        return ()
+    import json
+
+    return (
+        json.dumps(
+            {
+                "fluoview_file": pending.acq.target,
+                "fluoview_version": ((pending.state or {}).get("vendor") or {})
+                .get("software", {})
+                .get("version"),
+                "IDA.getProperty": list(answers),
+            },
+            indent=1,
+            default=str,
+        ),
     )
 
 

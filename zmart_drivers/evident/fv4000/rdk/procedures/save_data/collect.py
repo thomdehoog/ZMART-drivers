@@ -26,6 +26,7 @@ import numpy as np
 from ...primitives.rdk.image_data import ImageDescription, OpenedImage
 from .product import (
     AcquisitionMetadata,
+    Laser,
     ChannelMetadata,
     Detector,
     Instrument,
@@ -55,6 +56,8 @@ class CaptureData:
     z_positions_um: list[float] | None
     #: The time of each time point from the first, in seconds; None when FLUOVIEW did not say.
     t_offsets_s: list[float] | None
+    #: FLUOVIEW's own answers about the picture (every image property it was asked for), whole.
+    fluoview_answers: tuple = ()
 
     @property
     def bit_count(self) -> int:
@@ -96,6 +99,7 @@ def read_capture(client, path: str) -> CaptureData:
                         volume[t, ci * size_l + lam, z] = image.read_plane(
                             channel.id, t=t, z=z, lam=lam
                         )
+        answers = list(image.answers)
     z_axis = description.axes.get("ZSTACK")
     z_positions = None
     if z_axis is not None and z_axis.size > 1 and z_axis.start is not None:
@@ -127,6 +131,7 @@ def read_capture(client, path: str) -> CaptureData:
         pixel_size_um=description.pixel_length_um,
         z_positions_um=z_positions,
         t_offsets_s=t_offsets,
+        fluoview_answers=tuple(answers),
     )
 
 
@@ -136,21 +141,30 @@ def metadata_of(
     started_at: float | None = None,
     objective: dict | None = None,
     version: str | None = None,
+    state: dict | None = None,
 ) -> AcquisitionMetadata:
     """The ``AcquisitionMetadata`` of *capture*: sizes, pixel size, channels, planes, and the instrument as far as it is known.
 
     The planes carry no position yet: the save places them in the frame the
     workflow drives in (``save.py``). *objective* is ``{"slot", "name"}`` as
-    read when the picture was taken.
+    read when the picture was taken. *state* is the driver's state at the
+    capture (``get_state``): from it each channel gets its laser, the laser's
+    wavelength and power, and the detector's high voltage, gain and offset,
+    the fields the OME model has for them. A channel the state does not name
+    keeps only what the picture itself says.
     """
     size_t, size_c, size_z, size_y, size_x = capture.volume.shape
     pixel = capture.pixel_size_um
     z_step = None
     if capture.z_positions_um and len(capture.z_positions_um) > 1:
         z_step = abs(capture.z_positions_um[1] - capture.z_positions_um[0])
+    settings = _channel_settings(state)
     channels = tuple(
         ChannelMetadata(
-            index=index, name=name, detector_id=f"Detector:{capture.channel_ids[index]}"
+            index=index,
+            name=name,
+            detector_id=f"Detector:{capture.channel_ids[index]}",
+            **settings["channels"].get(capture.channel_ids[index], {}),
         )
         for index, name in enumerate(capture.channel_names)
     )
@@ -205,7 +219,58 @@ def metadata_of(
             if objective
             else None,
             detectors=detectors,
+            lasers=settings["lasers"],
         ),
         planes=planes,
         annotations=tuple(facts),
     )
+
+
+def _number(value) -> float | None:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _channel_settings(state: dict | None) -> dict:
+    """Per channel id, the OME fields the driver's state at the capture can fill, and the lasers they point to.
+
+    The laser power FLUOVIEW reports is a percentage; OME's attenuation is how
+    much of the light is held back, so 2 % power is an attenuation of 0.98.
+    """
+    changeable = (state or {}).get("changeable") or {}
+    observed = (state or {}).get("observed") or {}
+    lines = {
+        str(line.get("id")): line
+        for line in observed.get("laser_lines") or []
+        if isinstance(line, dict)
+    }
+    powers = changeable.get("lasers") or {}
+    channels, used = {}, {}
+    for channel_id, fields in (changeable.get("channels") or {}).items():
+        if not isinstance(fields, dict):
+            continue
+        entry = {
+            "detector_voltage_v": _number(fields.get("hv")),
+            "detector_gain": _number(fields.get("gain")),
+            "detector_offset": _number(fields.get("offset")),
+        }
+        lasers = [str(laser) for laser in fields.get("lasers") or []]
+        if lasers:
+            laser = lasers[0]
+            line = lines.get(laser, {})
+            wavelength = _number(line.get("wavelength_nm"))
+            power = _number((powers.get(laser) or {}).get("intensity"))
+            entry.update(
+                laser_id=f"LightSource:{laser}",
+                excitation_wavelength_nm=wavelength,
+                laser_attenuation=None if power is None else 1 - power / 100,
+            )
+            used[laser] = Laser(
+                id=f"LightSource:{laser}",
+                model=str(line.get("type") or laser),
+                wavelength_nm=wavelength,
+            )
+        channels[str(channel_id)] = {k: v for k, v in entry.items() if v is not None}
+    return {"channels": channels, "lasers": tuple(used.values())}
