@@ -260,11 +260,14 @@ nothing installed. It calls NIS's functions directly, from the same table the dr
 3. In NIS-Elements: **Macro > Run Macro From File**, and pick `testing\hardware\check_hardware.mac`.
 4. When NIS says it has finished, send the `results` folder beside `check_hardware_nis.py`.
 
-**With the microscope switched off**, run it with everything switched off: it still reads which functions
-NIS offers, NIS's own description of each, and what NIS's macro reference on the PC says about their
-arguments (copied into `reference.txt`; a compiled help file about macros is copied into the results
-folder whole). That is what corrects the table before anything is sent to the hardware. The changes,
-the stage moves and the picture wait for a day with the microscope on.
+**With the microscope switched off**, run it as it comes, with every switch off. It reads which functions NIS
+offers and what NIS's macro reference on the PC says about them (quoted into `reference.txt`, and the help
+pages that name them copied into `help_pages`). Then it calls each of the driver's 96 functions once, with
+the arguments the driver sends, and says per function, one line each, whether NIS took them: with the
+hardware off, NIS answers "not available" (−4) to the right arguments and "Bad number of parameters" to
+wrong ones. The changes are only called when NIS reports the stage as not available, each with the device's
+own value (or a neutral one), never for the heating stage, the incubator or TIRF, and a laser only ever
+with 0. Switching the groups on waits for a day with the microscope on.
 
 It reads which of the driver's functions NIS offers (with NIS's own description of each, and what NIS's
 macro reference says about it), every hardware setting that is there and its value, and the stage. Each

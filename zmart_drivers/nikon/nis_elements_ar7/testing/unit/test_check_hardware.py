@@ -141,6 +141,31 @@ def test_a_function_nis_does_not_offer_is_reported(tmp_path, monkeypatch):
     assert found["answer"]["not offered"] == ["Stg_GetCondenserPosition"]
 
 
+def test_a_spinning_disk_answering_nonsense_with_the_hardware_off_is_not_offered(
+    tmp_path, monkeypatch
+):
+    """NIS 7 read a disk speed of 7297880 with the hardware off: no believable disk, and so no disk shutter."""
+    import mock_nis
+
+    script = load_script()
+    monkeypatch.setitem(mock_nis.FUNCTIONS, "Stg_GetDiskSpeed", lambda scope: 7297880)
+    monkeypatch.setitem(mock_nis.FUNCTIONS, "Stg_GetCSUShutterState", lambda scope: 0)
+    report = script.main(make_nis(), str(tmp_path / "results"))
+    inventory = next(
+        c for c in report["checks"] if c["check"].startswith("every hardware setting")
+    )["answer"]
+    assert (
+        inventory["disk_speed"]["devices"] == []
+        and inventory["disk_shutter"]["devices"] == []
+    )
+    monkeypatch.setitem(mock_nis.FUNCTIONS, "Stg_GetDiskSpeed", lambda scope: 4000)
+    report = script.main(make_nis(), str(tmp_path / "again"))
+    inventory = next(
+        c for c in report["checks"] if c["check"].startswith("every hardware setting")
+    )["answer"]
+    assert inventory["disk_speed"]["devices"] and inventory["disk_shutter"]["devices"]
+
+
 def test_the_macro_finds_the_script_on_the_desktop_and_runs_it(tmp_path, monkeypatch):
     """The macro's own Python line, run as NIS would, with this repository on a pretend Desktop."""
     line = re.search(
@@ -229,8 +254,106 @@ def test_nis_own_macro_reference_is_found_and_quoted(tmp_path, monkeypatch):
     report = script.main(make_nis(), str(tmp_path / "results"))
     found = next(c for c in report["checks"] if c["check"] == "NIS's macro reference")
     assert found["outcome"] == "ok" and found["answer"]["functions found in them"] >= 1
+    assert "Stg_SetShutterStateEx" not in found["answer"]["functions not found in them"]
+    assert list((tmp_path / "results" / "help_pages").iterdir()), (
+        "the page that names it is copied, to be sent along"
+    )
     assert (
         "int Stg_SetShutterStateEx(char *Name, int State)"
         in (tmp_path / "results" / "reference.txt").read_text()
     )
     assert (tmp_path / "results" / "help_MacroFunctions.chm").is_file()
+
+
+def test_a_function_list_naming_functions_without_brackets_is_quoted(
+    tmp_path, monkeypatch
+):
+    """NIS 7's own FunctionList page names the functions without their brackets; it is found all the same."""
+    script = load_script()
+    docs = tmp_path / "NIS-Elements" / "Docs" / "nis"
+    docs.mkdir(parents=True)
+    (docs / "FunctionList_7.01.03.html").write_text(
+        "<tr><td>Stg_GetShutterStateEx</td><td>Device</td></tr><tr><td>Stg_GetShutterStateExtra</td></tr>",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(script, "NIS_FOLDERS", (str(tmp_path / "NIS-Elements"),))
+    report = script.main(make_nis(), str(tmp_path / "results"))
+    found = next(c for c in report["checks"] if c["check"] == "NIS's macro reference")[
+        "answer"
+    ]
+    assert found["functions found in them"] == 1
+    assert found["pages copied into help_pages"] == 1
+
+
+def test_with_the_microscope_off_every_function_is_called_once_and_nothing_changes(
+    tmp_path,
+):
+    """With the hardware off, the check tries each of the driver's functions with its arguments, as NIS would take them."""
+    script = load_script()
+    nis = make_nis()
+    nis.scope.hardware_on = False
+    before = (
+        dict(nis.scope.shutters),
+        dict(nis.scope.filters),
+        nis.scope.light_path,
+        nis.scope.condenser,
+        nis.scope.nosepiece,
+    )
+    report = script.main(nis, str(tmp_path / "results"))
+    tried = {
+        c["check"]: c for c in report["checks"] if c["check"].startswith("arguments of")
+    }
+    assert len(tried) > 80
+    assert [name for name, c in tried.items() if c["outcome"] != "ok"] == []
+    assert (
+        "arguments of Stg_SetShutterStateEx (a change, with the microscope off)"
+        in tried
+    )
+    assert not any(
+        "Stg_HeatStage_SetTemperature" in name or "Stg_Incubator_Set" in name
+        for name in tried
+    )
+    laser = tried[
+        "arguments of Stg_SetMultiLaserPower (a change, with the microscope off)"
+    ]
+    assert laser["answer"]["arguments"][-1] == 0, "a laser is only ever sent 0"
+    after = (
+        dict(nis.scope.shutters),
+        dict(nis.scope.filters),
+        nis.scope.light_path,
+        nis.scope.condenser,
+        nis.scope.nosepiece,
+    )
+    assert after == before
+    summary = (tmp_path / "results" / "check_summary.txt").read_text()
+    assert summary.count("\n") > 80 and summary.strip().endswith("0 failed")
+
+
+def test_wrong_arguments_are_named_in_the_summary(tmp_path, monkeypatch):
+    import mock_nis
+
+    script = load_script()
+    nis = make_nis()
+    nis.scope.hardware_on = False
+
+    def takes_three(scope, a, b, c):
+        return 1
+
+    monkeypatch.setitem(
+        mock_nis.FUNCTIONS, "Stg_SetLightPathPosition", mock_nis._function(takes_three)
+    )
+    report = script.main(nis, str(tmp_path / "results"))
+    failed = [c for c in report["checks"] if c["outcome"] != "ok"]
+    assert [c["check"] for c in failed] == [
+        "arguments of Stg_SetLightPathPosition (a change, with the microscope off)"
+    ]
+    assert "Bad number of parameters" in failed[0]["answer"]
+
+
+def test_with_the_microscope_on_no_change_is_sent_by_the_argument_check(tmp_path):
+    script = load_script()
+    nis = make_nis()
+    report = script.main(nis, str(tmp_path / "results"))
+    assert not any(c["changes"] for c in report["checks"])
+    note = next(c for c in report["checks"] if c["check"] == "the changes' arguments")
+    assert "not tried" in note["answer"]

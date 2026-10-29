@@ -101,6 +101,13 @@ class Setting:
     ``guarded`` settings are refused until this microscope's limits allow
     them, because a wrong value could harm the sample, the microscope or a
     person (lasers, heating, gas).
+
+    Some devices have no "is it there?" function in NIS, and NIS then answers
+    a reading of absent hardware with a meaningless number (a spinning disk
+    read 7297880 with the hardware off). ``plausible`` is the range a real
+    reading falls in: outside it, the device counts as not there.
+    ``present_if`` names another setting of the same device: this one is
+    there only when that one is (the disk's shutter, when the disk is).
     """
 
     key: str
@@ -120,6 +127,8 @@ class Setting:
     confirms: bool = True
     guarded: bool = False
     confirmed: bool = False
+    plausible: tuple | None = None
+    present_if: str | None = None
     functions: tuple = field(init=False, default=())
 
     def __post_init__(self) -> None:
@@ -326,14 +335,6 @@ TABLE: tuple[Setting, ...] = (
     ),
     # --- spinning disk and TIRF ------------------------------------------------------------
     Setting(
-        key="disk_shutter",
-        group="spinning disk",
-        says="the spinning-disk unit's own shutter: 1 open, 0 closed",
-        kind=SWITCH,
-        read=Call("Stg_GetCSUShutterState"),
-        write=Call("Stg_SetCSUShutterState", (VALUE,)),
-    ),
-    Setting(
         key="disk_speed",
         group="spinning disk",
         says="the spinning disk's speed",
@@ -341,6 +342,17 @@ TABLE: tuple[Setting, ...] = (
         read=Call("Stg_GetDiskSpeed"),
         write=Call("Stg_SetDiskSpeed", (VALUE,)),
         tolerance=1.0,
+        # No "is it there?" function: a real disk turns at most a few thousand rpm.
+        plausible=(0, 20000),
+    ),
+    Setting(
+        key="disk_shutter",
+        group="spinning disk",
+        says="the spinning-disk unit's own shutter: 1 open, 0 closed",
+        kind=SWITCH,
+        read=Call("Stg_GetCSUShutterState"),
+        write=Call("Stg_SetCSUShutterState", (VALUE,)),
+        present_if="disk_speed",
     ),
     Setting(
         key="tirf_position",
@@ -581,7 +593,12 @@ def instances(call: Callable, row: Setting) -> list[dict]:
                     if int(ask(call, row.present)) > 0
                     else []
                 )
-            read(call, row)
+            value = read(call, row)
+            if (
+                row.plausible is not None
+                and not row.plausible[0] <= value <= row.plausible[1]
+            ):
+                return []  # a meaningless answer: the device is not there
             return [{"instance": None, "label": None}]
         except Exception:  # noqa: BLE001 -- a device NIS cannot answer for is not offered
             return []
@@ -629,6 +646,11 @@ def discover(call: Callable) -> dict:
             "devices": [],
             "error": None,
         }
+        if row.present_if is not None and not (found.get(row.present_if) or {}).get(
+            "devices"
+        ):
+            found[row.key] = entry  # the device it belongs to is not there
+            continue
         try:
             for device in instances(call, row):
                 tokens = tokens_for(row, device["instance"])

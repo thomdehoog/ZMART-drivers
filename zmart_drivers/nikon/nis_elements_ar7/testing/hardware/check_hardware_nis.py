@@ -68,6 +68,10 @@ ALLOW_STAGE = False  # x and y 20 um and back, z 2 um and back
 ALLOW_OBJECTIVE = False  # the nosepiece one position and back
 ALLOW_OPTICAL_CONFIGURATION = False  # the selected optical configuration selected again
 ALLOW_SNAP = False  # one picture, saved as a TIFF in the results folder
+# With the microscope switched off, call every one of the driver's functions once,
+# with the arguments the driver sends, to see whether NIS takes them. It changes
+# nothing: it only runs when NIS reports the stage as not available.
+ALLOW_ARGUMENT_CHECK_WHEN_OFF = True
 
 STAGE_STEP_UM = 20.0
 #: How long to let a device settle after each change, before it is read back.
@@ -253,15 +257,23 @@ def read_text(path: str) -> str | None:
     return raw.decode("latin-1", errors="replace")
 
 
+#: The most help pages copied into the results folder, and their largest total size.
+PAGES_KEPT = 300
+PAGES_BYTES = 30_000_000
+
+
 def reference(check: Check) -> dict:
     """Find NIS's macro reference on this computer, and copy out what it says about each function the driver uses.
 
-    A help file is anything under NIS's folders whose path speaks of macros,
-    help or functions. What a text file says about each function is copied
-    into ``reference.txt``. A compiled help file (``.chm``) cannot be read
-    here, so the ones about macros are copied into the results folder whole,
-    to be sent along.
+    A help file is anything under NIS's folders that is documentation (in a
+    ``Docs`` folder) or whose path speaks of macros, help or functions. Every
+    place a text page names one of the driver's functions is quoted into
+    ``reference.txt``, and each such page is copied into the results folder's
+    ``help_pages``, to be sent along. A compiled help file (``.chm``) cannot be
+    read here, so the ones about macros are copied whole.
     """
+    import re
+
     roots = nis_folders()
     files = []
     for root in roots:
@@ -270,7 +282,8 @@ def reference(check: Check) -> dict:
                 path = os.path.join(folder, name)
                 lowered = path.lower()
                 if lowered.endswith(REFERENCE_SUFFIXES) and any(
-                    word in lowered for word in ("macro", "help", "function")
+                    word in lowered
+                    for word in ("macro", "help", "function", os.sep + "docs" + os.sep)
                 ):
                     files.append(path)
     copied = []
@@ -285,19 +298,47 @@ def reference(check: Check) -> dict:
                 copy.write(source.read())
             copied.append(target)
     names = functions_used(check)
-    excerpts = []
-    for path in files[:2000]:
+    named = re.compile(
+        r"(?<![A-Za-z0-9_])("
+        + "|".join(sorted(map(re.escape, names), key=len, reverse=True))
+        + r")(?![A-Za-z0-9_])"
+    )
+    excerpts, mentioned, pages = [], set(), []
+    pages_dir = os.path.join(check.out_dir, "help_pages")
+    kept_bytes = 0
+    for path in files[:20000]:
         if not path.lower().endswith((".htm", ".html", ".txt", ".xml", ".json")):
             continue
         text = read_text(path)
-        if text is None:
+        if not text:
             continue
-        for name in names:
-            start = text.find(name + "(")
-            if start >= 0:
-                excerpts.append(
-                    f"--- {name}  ({path})\n{text[max(start - 200, 0) : start + 600]}\n"
+        here = set()
+        for match in named.finditer(text):
+            name = match.group(1)
+            if name in here:
+                continue
+            here.add(name)
+            excerpts.append(
+                f"--- {name}  ({path})\n{text[max(match.start() - 300, 0) : match.start() + 900]}\n"
+            )
+        if here:
+            mentioned |= here
+            size = os.path.getsize(path)
+            if len(pages) < PAGES_KEPT and kept_bytes + size <= PAGES_BYTES:
+                os.makedirs(pages_dir, exist_ok=True)
+                relative = os.path.relpath(
+                    path,
+                    os.path.commonpath([path, *roots])
+                    if roots
+                    else os.path.dirname(path),
                 )
+                target = os.path.join(
+                    pages_dir, relative.replace(os.sep, "__").replace(":", "")
+                )
+                with open(path, "rb") as source, open(target, "wb") as copy:
+                    copy.write(source.read())
+                pages.append(path)
+                kept_bytes += size
     with open(
         os.path.join(check.out_dir, "reference.txt"), "w", encoding="utf-8"
     ) as handle:
@@ -311,7 +352,9 @@ def reference(check: Check) -> dict:
         "searched": roots,
         "help files": len(files),
         "first help files": files[:50],
-        "functions found in them": len(excerpts),
+        "functions found in them": len(mentioned),
+        "functions not found in them": sorted(set(names) - mentioned),
+        "pages copied into help_pages": len(pages),
         "compiled help copied (send these along)": copied,
     }
 
@@ -523,6 +566,149 @@ def snap(check: Check) -> None:
     )
 
 
+# -- with the microscope off: does NIS take each function's arguments? -------------------
+
+#: NIS's answer to a function whose hardware is not there (or switched off).
+NOT_AVAILABLE = -4
+#: The words NIS raises when a function is given the wrong number of arguments.
+WRONG_COUNT = "Bad number of parameters"
+
+#: The driver's own functions outside the table, with the arguments it sends
+#: (``None`` is filled in from the stage's own reading, so a call moves nothing).
+DRIVER_CALLS = (
+    ("Get_InfoStr", [INFO_VERSION, {"ptr": "char"}]),
+    ("StgGetPosXY", [{"ptr": "double"}, {"ptr": "double"}]),
+    ("StgGetPosZ", [{"ptr": "double"}, 0]),
+    ("StgXY_GetLimits", [{"ptr": "double"}] * 4),
+    ("StgZ_GetLimits", [{"ptr": "double"}] * 2),
+    ("GetOptConfCount", []),
+    ("GetOptConfName", [0, {"ptr": "char"}, 256]),
+    ("GetSelectedOptConf", [{"ptr": "char"}, {"ptr": "char"}, {"ptr": "char"}, 256]),
+    ("Stg_IsNosepiecePresent", []),
+    ("Stg_GetNosepiecePositions", []),
+    ("Stg_GetNosepiecePosition", []),
+    ("Stg_GetNosepieceObjectiveName", [1, {"ptr": "char"}, 256]),
+    ("Stg_IsPFSPresent", []),
+    ("Stg_GetPFSStatus", []),
+    (
+        "Get_ImageInfo",
+        ["", {"ptr": "int"}, {"ptr": "int"}, {"ptr": "int"}, {"ptr": "int"}],
+    ),
+    (
+        "Get_Calibration",
+        [{"ptr": "char"}, {"ptr": "double"}, {"ptr": "double"}, {"ptr": "int"}],
+    ),
+    ("GetOpenedDocumentList", [{"ptr": "char"}, 4096]),
+)
+#: Groups whose changes are never sent in this mode, even with the microscope off:
+#: a wrong target there could matter if something were on after all.
+NEVER_SENT_WHEN_OFF = ("environment", "TIRF")
+
+
+def classify(check: Check, fn: str, args: list) -> dict:
+    """Call *fn* once with *args*; whether NIS took the arguments, and what it answered."""
+    try:
+        answer = check.call(fn, args)
+    except Exception as error:  # noqa: BLE001 -- the error is the answer
+        text = f"{type(error).__name__}: {error}"
+        if WRONG_COUNT.lower() in text.lower():
+            raise RuntimeError(f"NIS refused the arguments {args!r}: {text}") from None
+        raise RuntimeError(f"NIS raised for {args!r}: {text}") from None
+    returned = answer.get("return")
+    meaning = (
+        "not available (the hardware is off or absent)"
+        if returned == NOT_AVAILABLE
+        else "answered"
+    )
+    return {
+        "arguments": args,
+        "returned": returned,
+        "values": answer.get("values"),
+        "meaning": meaning,
+    }
+
+
+def microscope_is_off(check: Check) -> bool:
+    """Whether NIS reports the stage as not available, which it does with the microscope switched off."""
+    try:
+        return (
+            check.call("StgGetPosXY", [{"ptr": "double"}, {"ptr": "double"}])["return"]
+            == NOT_AVAILABLE
+        )
+    except Exception:  # noqa: BLE001 -- when in doubt, it is not off
+        return False
+
+
+def argument_check(check: Check) -> None:
+    """Call every function the driver uses once, with its arguments, and say for each whether NIS took them."""
+    devices = check.devices
+    for fn, args in DRIVER_CALLS:
+        check.check(
+            f"arguments of {fn}", lambda fn=fn, args=args: classify(check, fn, args)
+        )
+    seen = {fn for fn, _ in DRIVER_CALLS}
+    tokens = {devices.NAME: "", devices.INDEX: 0, devices.LASER: 0, devices.LINE: 0}
+    for row in devices.TABLE:
+        for call in (row.present, row.count, row.name, row.positions, row.read):
+            if call is None or call.fn in seen:
+                continue
+            seen.add(call.fn)
+            args = devices.arguments(call.args, tokens)
+            check.check(
+                f"arguments of {call.fn}",
+                lambda fn=call.fn, args=args: classify(check, fn, args),
+            )
+    if "Stg_GetMultiLaserNumLines" not in seen:
+        check.check(
+            "arguments of Stg_GetMultiLaserNumLines",
+            lambda: classify(check, "Stg_GetMultiLaserNumLines", [0]),
+        )
+
+    if not microscope_is_off(check):
+        check.check(
+            "the changes' arguments",
+            lambda: (
+                "not tried: NIS reports the stage as available, so the "
+                "microscope may be on; switch on one group at a time at the top instead"
+            ),
+        )
+        return
+    xy = check.call("StgGetPosXY", [{"ptr": "double"}, {"ptr": "double"}])["values"]
+    z = check.call("StgGetPosZ", [{"ptr": "double"}, 0])["values"][0]
+    position = check.call("Stg_GetNosepiecePosition", [])["return"]
+    writes = [
+        ("StgMoveXY", [xy[0], xy[1], 0]),
+        ("StgMoveZ", [z, 0]),
+        (
+            "Stg_SetNosepiecePosition",
+            [position if isinstance(position, int) and position > 0 else 1],
+        ),
+    ]
+    for row in devices.TABLE:
+        if row.group in NEVER_SENT_WHEN_OFF:
+            continue
+        try:
+            value = devices.read(
+                lambda fn, args: check.call(fn, args),
+                row,
+                ""
+                if row.devices == "named"
+                else ("0.0" if row.devices == "laser_lines" else None),
+            )
+        except Exception:  # noqa: BLE001 -- absent: a neutral value, which the hardware cannot act on while off
+            value = 1 if row.kind == devices.CHOICE else 0
+        if row.devices == "laser_lines":
+            value = 0  # a laser line is never switched on or powered, not even here
+        args = devices.arguments(row.write.args, tokens, value)
+        writes.append((row.write.fn, args))
+    for fn, args in writes:
+        check.check(
+            f"arguments of {fn} (a change, with the microscope off)",
+            lambda fn=fn, args=args: classify(check, fn, args),
+            changes=True,
+        )
+
+
 def main(nis_module=None, out_dir: str | None = None) -> dict:
     if nis_module is None:
         import nis as nis_module  # exists only inside NIS-Elements
@@ -561,6 +747,8 @@ def main(nis_module=None, out_dir: str | None = None) -> dict:
         )
         or {}
     )
+    if ALLOW_ARGUMENT_CHECK_WHEN_OFF:
+        argument_check(check)
     changes(check, inventory)
     if ALLOW_STAGE:
         stage(check)
