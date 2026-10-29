@@ -9,7 +9,6 @@ University of Zurich (thom.dehoog@zmb.uzh.ch, thomdehoog@gmail.com).
 
 from __future__ import annotations
 
-import json
 import logging
 from pathlib import Path
 
@@ -117,7 +116,7 @@ def test_an_experiment_zen_does_not_have_is_a_wrong_request(scope):
         scope.load_experiment("Nope")
 
 
-def test_a_capture_is_saved_as_one_ome_zarr_store_with_zens_czi_kept_beside_it(
+def test_a_capture_is_saved_as_one_ome_zarr_store_with_its_metadata_inside(
     scope, tmp_path
 ):
     scope.load_experiment("ZMART_ZStack")
@@ -135,17 +134,13 @@ def test_a_capture_is_saved_as_one_ome_zarr_store_with_zens_czi_kept_beside_it(
     assert saved["format"] == "ome-zarr"
     assert Path(saved["store"]) == run / "data" / "overview_A1.ome.zarr"
     assert Path(saved["projection"]) == run / "projections" / "overview_A1.ome.zarr"
-    assert (
-        Path(saved["czi"]) == run / "data" / "metadata" / "vendor" / "overview_A1.czi"
-    )
-    assert Path(saved["czi"]).is_file()
-    assert not (Path(scope.handle.image_output_path) / "overview_A1.czi").exists()
-    assert saved["files"] == [
-        saved["store"],
-        saved["projection"],
-        saved["czi"],
-        saved["state"],
-    ]
+    assert saved["files"] == [saved["store"], saved["projection"]]
+    # Nothing beside the stores: the metadata is inside them.
+    assert sorted(p.name for p in run.iterdir()) == ["data", "projections"]
+    assert [p.name for p in (run / "data").iterdir()] == ["overview_A1.ome.zarr"]
+    # ZEN's own file stays where ZEN wrote it.
+    zen_copy = Path(scope.handle.image_output_path) / "overview_A1.czi"
+    assert Path(saved["zen_czi"]) == zen_copy and zen_copy.is_file()
     assert {p["path"] for p in saved["planes"]} == {saved["store"]}
     assert [p["z"] for p in saved["planes"]] == [0, 1, 2, 3, 4]
     assert [p["z_um"] for p in saved["planes"]] == pytest.approx(
@@ -155,11 +150,11 @@ def test_a_capture_is_saved_as_one_ome_zarr_store_with_zens_czi_kept_beside_it(
         p["x_um"] == pytest.approx(10.0) and p["y_um"] == pytest.approx(20.0)
         for p in saved["planes"]
     )
-    record = json.loads(Path(saved["state"]).read_text(encoding="utf-8"))
-    assert record["capture_record"]["position_label"] == "A1"
-    assert record["controller_state"]["changeable"]["experiment"] == "ZMART_ZStack"
-    assert record["vendor"] == "zeiss-zen"
-    assert record["store"] == "data/overview_A1.ome.zarr"
+    xml = (Path(saved["store"]) / "OME" / "METADATA.ome.xml").read_text(
+        encoding="utf-8"
+    )
+    assert "capture-record" in xml and "controller-state" in xml
+    assert "ZMART_ZStack" in xml and "&lt;ImageDocument&gt;" in xml
 
 
 def test_a_snap_takes_one_plane_per_channel(scope):

@@ -7,16 +7,14 @@ made safe for a file name, and free: a name already used in the run's folder,
 or in ZEN's own image folder, gets ``_001``, ``_002`` and so on, so no
 capture ever overwrites another.
 
-A run's folder holds, as the Leica driver's does::
+A run's folder holds stores and nothing else; each store carries its own
+metadata inside::
 
-    data/<name>.ome.zarr                    the capture, as one OME-Zarr store
-    data/metadata/vendor/<name>.czi         ZEN's own file, as ZEN wrote it
-    data/metadata/ZMART_state/<name>.json   ZMART's account of the capture
-    projections/<name>.ome.zarr             the brightest pixel over z, for a z-stack
+    data/<name>.ome.zarr          the capture, as one OME-Zarr store
+    projections/<name>.ome.zarr   the brightest pixel over z, for a z-stack
 
-The images get a folder of their own, so the ZMART Viewer can open ``data``
-as one picture of the whole run, and nothing beside them has to be told
-apart from an image by its name.
+The captures get a folder of their own, so the ZMART Viewer can open
+``data`` as one picture of the whole run.
 
 Author: Thom de Hoog, Center for Microscopy and Image Analysis (ZMB),
 University of Zurich (thom.dehoog@zmb.uzh.ch, thomdehoog@gmail.com).
@@ -57,14 +55,6 @@ class Naming:
         """Its projection over z, beside ``data``."""
         return Path(folder) / "projections" / f"{self.stem}{STORE}"
 
-    def czi(self, folder: Path) -> Path:
-        """ZEN's own file, kept with the vendor's metadata."""
-        return data_dir(folder) / "metadata" / "vendor" / f"{self.stem}{CZI}"
-
-    def state(self, folder: Path) -> Path:
-        """ZMART's account of the capture: the controller's state and the capture record, readable as text."""
-        return data_dir(folder) / "metadata" / "ZMART_state" / f"{self.stem}.json"
-
 
 def data_dir(folder: Path | str) -> Path:
     """Where a run's images go: ``data``."""
@@ -79,9 +69,7 @@ def free_stem(stem: str, *folders: Path | str | None) -> str:
     def taken(candidate: str) -> bool:
         naming = Naming(candidate)
         return any(
-            (place / f"{candidate}{CZI}").exists()
-            or naming.store(place).exists()
-            or naming.czi(place).exists()
+            (place / f"{candidate}{CZI}").exists() or naming.store(place).exists()
             for place in places
         )
 

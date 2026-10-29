@@ -43,7 +43,7 @@ Three things are good to know before you start:
 - **ZEN writes the images, the driver saves them as OME-Zarr.** Every capture becomes one CZI file
   in ZEN's image folder. When it is saved, the driver turns it into one OME-Zarr store in the run's
   `data` folder, the format every ZMART driver saves in, so the ZMART Viewer and ZMART Analysis
-  open a ZEISS capture as they open any other. ZEN's own CZI is kept beside it.
+  open a ZEISS capture as they open any other. All its metadata is inside the store.
 - **ZEN speaks metres and waits until done.** ZEN's moves answer when the stage has arrived, and
   its acquisitions when they are finished. The driver converts to micrometres in one place, and
   its read-backs are a second opinion, not the signal that a move is over.
@@ -138,7 +138,7 @@ mic.connect("zeiss-zen", {"experiment": "ZMART_Snap"})                          
 | `z_stack()`, `set_z_stack(first_um, last_um, interval_um)` | Read or change the loaded experiment's z-stack; the ends are micrometres from the origin's focus, checked against the focus limits. |
 | `acquisition_settings()` | How a capture is triggered: `full` (the whole experiment) or `snap` (one picture with its channels). |
 | `acquire(position_label=None, acquisition_type="acquisition", output_folder=None, acquisition_settings=None)` | Run the loaded experiment once. ZEN writes the CZI; it waits in ZEN's folder until `save()`. A picture is sent once and never again. |
-| `save(label=None)` | Save the waiting captures, each as one OME-Zarr store in its run's `data` folder, keep ZEN's CZI beside it, and describe their planes. |
+| `save(label=None)` | Save the waiting captures, each as one OME-Zarr store in its run's `data` folder with all its metadata inside, and describe their planes. |
 | `autofocus(timeout_s=None)` | ZEN's software autofocus, with the focus search of the loaded experiment. |
 | `find_surface()`, `store_focus()`, `recall_focus()` | The Definite Focus, on stands that have one. |
 | `stop()` | Stop whatever ZEN is acquiring. |
@@ -151,15 +151,13 @@ mic.connect("zeiss-zen", {"experiment": "ZMART_Snap"})                          
 <output folder>/
   data/
     overview_A1.ome.zarr              the capture: one OME-Zarr 0.5 store
-    metadata/
-      vendor/overview_A1.czi          ZEN's own file, exactly as ZEN wrote it
-      ZMART_state/overview_A1.json    ZMART's account of the capture, readable as text
   projections/
     overview_A1.ome.zarr              for a z-stack: the brightest pixel over z
 ```
 
-This is the layout the Leica driver writes, so a run's `data` folder opens in the ZMART Viewer as
-one picture of all its positions. A name already used gets `_001`, `_002` and so on, so no capture
+There are only stores, and nothing beside them: everything that says how a capture was made is
+inside its store. A run's `data` folder opens in the ZMART Viewer as one picture of all its
+positions. A name already used gets `_001`, `_002` and so on, so no capture
 overwrites another.
 
 **What the store holds.** It follows the
@@ -184,11 +182,13 @@ placement is not yet right, which the first runs on ZEN will have to settle.
 The planes the answer lists give each image's channel, depth and time point, and where it was
 taken in the sample's frame; `z = 0` is the lowest slice. Each names the store as its `path`.
 
-**ZEN's CZI.** The CZI is moved into `data/metadata/vendor/` only after the store is written and
-its pixels read back, so a save that fails loses nothing: the file stays in ZEN's folder and the
-capture waits for another try. To save disk space, set
-`procedures.save_data.save.KEEP_CZI = False`; ZEN's file is then deleted once the store is
-written. `PROJECTION = "none"` in the same file leaves the projections out.
+**ZEN's CZI.** The CZI stays in ZEN's own image folder, where ZEN wrote it, as ZEN leaves every
+image it takes; the answer names it as `zen_czi`. The store already holds all its pixels and its
+whole description, so to keep ZEN's folder from filling up, set
+`procedures.save_data.save.DELETE_ZEN_CZI = True`: ZEN's file is then deleted once the store is
+written and its pixels have been read back. A save that fails loses nothing either way: the file
+stays in ZEN's folder and the capture waits for another try. `PROJECTION = "none"` in the same file
+leaves the projections out.
 
 ## Setting up the driver
 
@@ -298,7 +298,8 @@ handed to the dispatcher. How it differs from the Leica driver:
   each objective, and the driver reads the positions; the Leica driver matches z-stacks and
   pictures instead. The setup wizard follows the same way.
 - **The store is made from ZEN's CZI.** The Leica driver writes its store from LAS X's cache; this
-  driver reads the CZI ZEN wrote, and keeps that file beside the store.
+  driver reads the CZI ZEN wrote. Unlike the Leica driver, it writes no copies of the metadata
+  beside the store: all of it is inside.
 
 ## References
 

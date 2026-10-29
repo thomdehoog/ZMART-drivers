@@ -3,8 +3,8 @@
 :class:`AcquisitionResult` is what ``changes.take_picture`` answers: which
 experiment ran, under which id, what ZEN called the file, and when.
 :class:`SavedAcquisition` is what ``save_data`` answers: the OME-Zarr store
-it wrote, the files beside it, and the planes the store holds, in the
-controller's words.
+it wrote, its projection for a z-stack, and the planes the store holds, in
+the controller's words.
 
 Author: Thom de Hoog, Center for Microscopy and Image Analysis (ZMB),
 University of Zurich (thom.dehoog@zmb.uzh.ch, thomdehoog@gmail.com).
@@ -31,20 +31,23 @@ class AcquisitionResult:
 
 @dataclass(frozen=True)
 class SavedAcquisition:
-    """One capture saved: its store, the files beside it, its planes, and its record."""
+    """One capture saved: its store (and projection), its planes, and its record."""
 
     position_label: str
     acquisition_type: str
     files: list[str]
     planes: list[dict]
     store: Path
-    czi: Path | None
-    state: Path
+    zen_czi: Path | None
     projection: Path | None = None
     record: dict = field(default_factory=dict)
 
     def as_dict(self) -> dict:
-        """The answer in the controller's words (``position_label``, ``acquisition_type``, ``files``, ``planes``), and where each file went."""
+        """The answer in the controller's words (``position_label``, ``acquisition_type``, ``files``, ``planes``), and where the store is.
+
+        ``zen_czi`` is ZEN's own file, still in ZEN's folder; it is not one of
+        the capture's files, and is None once deleted.
+        """
         return {
             "position_label": self.position_label,
             "acquisition_type": self.acquisition_type,
@@ -53,6 +56,5 @@ class SavedAcquisition:
             "planes": [dict(plane) for plane in self.planes],
             "store": str(self.store),
             "projection": str(self.projection) if self.projection else None,
-            "czi": str(self.czi) if self.czi else None,
-            "state": str(self.state),
+            "zen_czi": str(self.zen_czi) if self.zen_czi else None,
         }

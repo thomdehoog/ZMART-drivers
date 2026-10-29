@@ -465,8 +465,8 @@ architecture guard checks that the copy stays unchanged. It has one class of pri
 
 ZEN answers every call itself and its moves return once they are done, so there is no route chain,
 no dialog watch and no log reader. A capture is saved as one OME-Zarr store in the run's `data`
-folder, made from the CZI ZEN wrote, in the layout the Leica driver uses; ZEN's CZI is kept
-beside it. Its `driver_setup/wizard/` has the Leica wizard's
+folder, made from the CZI ZEN wrote, with all its metadata inside and nothing beside it; ZEN's
+CZI stays in ZEN's own image folder. Its `driver_setup/wizard/` has the Leica wizard's
 framework, server, launcher and look, with its own five steps; the objective calibration in it is
 done by eye. The driver's README says the rest.
 

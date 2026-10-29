@@ -8,19 +8,20 @@ means:
 
 1. reading the CZI's planes and ZEN's description of them;
 2. writing them as ``data/<name>.ome.zarr`` in the run's folder, turned onto
-   the stage's axes and placed where they were taken, with the controller's
-   state, the capture record and ZEN's own description inside the store
-   (``ome_zarr.py`` says what the store holds);
+   the stage's axes and placed where they were taken. Everything that says
+   how the pixels were made goes inside the store, never in a file beside
+   it: the controller's state, the capture record and ZEN's own description
+   of the image (``ome_zarr.py`` says what the store holds);
 3. for a z-stack, writing the brightest pixel over z as a second store in
-   ``projections/``, a quick overview of the stack;
-4. moving ZEN's CZI into ``data/metadata/vendor/``, so nothing ZEN wrote is
-   lost and ZEN's own image folder does not fill up (``KEEP_CZI``);
-5. writing ZMART's account of the capture as plain text beside it, in
-   ``data/metadata/ZMART_state/<name>.json``.
+   ``projections/``, a quick overview of the stack, with its metadata
+   inside it too.
 
-The CZI is only moved once the store has been written and its pixels read
-back, so a capture that cannot be saved is never lost: it stays in ZEN's
-folder and the session keeps it for another try.
+ZEN's CZI is left where ZEN wrote it, in ZEN's own image folder, as ZEN
+leaves every image it takes; the store already holds all its pixels and its
+whole description. ``DELETE_ZEN_CZI`` deletes it instead, once the store is
+written and its pixels have been read back. A capture that cannot be saved
+is never lost: its CZI stays in ZEN's folder and the session keeps it for
+another try.
 
 When the driver runs on another computer than ZEN, ZEN's image folder must
 be reachable here, under the path ZEN reports or under the one the
@@ -33,10 +34,8 @@ University of Zurich (thom.dehoog@zmb.uzh.ch, thomdehoog@gmail.com).
 
 from __future__ import annotations
 
-import json
 import logging
 import os
-import shutil
 import time
 from dataclasses import replace
 from datetime import UTC, datetime
@@ -59,10 +58,11 @@ FILE_SETTLE_S = 0.5
 #: The name of the vendor's software, as the record names it.
 VENDOR = ome_zarr.VENDOR
 
-#: Whether ZEN's own CZI is kept, in ``data/metadata/vendor/``, once the
-#: store is written. The store holds every pixel and ZEN's whole description,
-#: so it can be set to False to save disk space; ZEN's copy is then deleted.
-KEEP_CZI = True
+#: Whether ZEN's own CZI is deleted from ZEN's image folder once the store is
+#: written and checked. The store holds every pixel and ZEN's whole
+#: description, so nothing is lost; set it to True so ZEN's folder does not
+#: fill up. By default the file is left where ZEN wrote it.
+DELETE_ZEN_CZI = False
 
 #: What is projected from a capture with more than one plane, into
 #: ``projections/``: its maximum over z (``"max"``), or nothing (``"none"``).
@@ -96,33 +96,13 @@ def wait_for_file(
     return False
 
 
-def move_file(source: Path, destination: Path) -> Path:
-    """Move *source* to *destination*, never over an existing file: a rename on the same disk, a copy otherwise."""
-    destination.parent.mkdir(parents=True, exist_ok=True)
-    if destination.exists():
-        raise FileExistsError(
-            f"{destination} exists already; a capture never overwrites another"
-        )
-    try:
-        os.replace(source, destination)
-    except OSError:
-        shutil.copy2(source, destination)
-        try:
-            source.unlink()
-        except OSError as why:
-            log.warning(
-                "the CZI was copied, but ZEN's copy could not be removed: %s", why
-            )
-    return destination
-
-
 def save(handle, pending, *, controller_version: str | None = None) -> SavedAcquisition:
-    """Save one pending capture as an OME-Zarr store, keep ZEN's CZI beside it, and describe the planes.
+    """Save one pending capture as an OME-Zarr store, with all its metadata inside, and describe the planes.
 
     *pending* is the ``PendingCapture`` ``acquire`` left in the session.
     Raises ``RuntimeError`` when the file ZEN wrote cannot be found or read
-    here, and ``FileExistsError`` when the name is taken after all. Until
-    the store is written, ZEN's file is left where it is.
+    here, and ``FileExistsError`` when the name is taken after all. ZEN's
+    file is left where it is, unless ``DELETE_ZEN_CZI`` says otherwise.
     """
     acq = pending.acq
     source = where_zen_put_it(pending.zen_folder, acq.output_name, handle.zen_images)
@@ -178,7 +158,7 @@ def save(handle, pending, *, controller_version: str | None = None) -> SavedAcqu
             "czi": {
                 "written_by_zen_as": f"{acq.output_name}.czi",
                 "zen_folder": pending.zen_folder,
-                "kept_as": _relative(naming.czi(folder), folder) if KEEP_CZI else None,
+                "left_in_zen_folder": not DELETE_ZEN_CZI,
                 "shape": shape,
             },
             "unconfirmed": list(pending.unconfirmed),
@@ -205,36 +185,23 @@ def save(handle, pending, *, controller_version: str | None = None) -> SavedAcqu
             ),
         )
 
-    # The store is written and checked: only now does ZEN's file leave its folder.
-    kept = None
-    if KEEP_CZI:
-        kept = move_file(source, naming.czi(folder))
-    else:
+    # The store is written and checked: only now may ZEN's file go.
+    zen_czi = source
+    if DELETE_ZEN_CZI:
         try:
             source.unlink()
+            zen_czi = None
         except OSError as why:
             log.warning("ZEN's copy %s could not be removed: %s", source, why)
 
-    state = naming.state(folder)
-    state.parent.mkdir(parents=True, exist_ok=True)
-    state.write_text(
-        json.dumps(
-            {**notes.as_json(), "store": _relative(store, folder)},
-            indent=2,
-            default=str,
-        )
-        + "\n",
-        encoding="utf-8",
-    )
-    files = [str(path) for path in (store, projection, kept, state) if path is not None]
+    files = [str(path) for path in (store, projection) if path is not None]
     return SavedAcquisition(
         position_label=pending.label,
         acquisition_type=pending.acquisition_type,
         files=files,
         planes=_planes.describe_planes(capture, store),
         store=store,
-        czi=kept,
-        state=state,
+        zen_czi=zen_czi,
         projection=projection,
         record=record,
     )

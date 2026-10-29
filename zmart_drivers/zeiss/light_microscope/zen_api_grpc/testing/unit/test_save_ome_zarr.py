@@ -5,8 +5,8 @@ sample that shifts as the stage moves, seen through a camera that can be
 turned against the stage. Saving turns each CZI into ``data/<name>.ome.zarr``.
 These tests check what a reader of the store relies on: that it follows the
 ZMART metadata convention, that its pixels are exactly ZEN's, turned onto the
-stage's axes, that it lies where it was taken, and that a save that fails
-loses nothing.
+stage's axes, that it lies where it was taken, that everything said about
+the capture is inside it, and that a save that fails loses nothing.
 
 Author: Thom de Hoog, Center for Microscopy and Image Analysis (ZMB),
 University of Zurich (thom.dehoog@zmb.uzh.ch, thomdehoog@gmail.com).
@@ -81,7 +81,7 @@ def test_the_store_holds_zens_pixels_lowest_plane_first_with_their_channels(
 
     group = _open(saved["store"])
     full = np.asarray(group["0"])
-    czi = ome_zarr.read_czi(saved["czi"])["volume"]
+    czi = ome_zarr.read_czi(saved["zen_czi"])["volume"]
     assert full.shape == czi.shape == (1, 1, 5, 96, 128)
     assert full.dtype == czi.dtype
     # The pretend ZEN stacks upwards, so ZEN's order is already lowest first.
@@ -197,16 +197,21 @@ def test_the_projection_is_the_brightest_pixel_over_z_and_says_what_it_came_from
     assert "derived_from" in xml and "max over z" in xml
 
 
-def test_zens_czi_can_be_let_go_once_the_store_is_written(scope, monkeypatch):
-    monkeypatch.setattr(save_step, "KEEP_CZI", False)
+def test_zens_czi_stays_in_zens_folder_or_is_deleted_once_the_store_is_written(
+    scope, monkeypatch
+):
     scope.acquire("A1", acquisition_settings={"trigger": "snap"})
     zen_copy = Path(scope.handle.image_output_path) / "acquisition_A1.czi"
-    assert zen_copy.is_file()
+    (kept,) = scope.save()
+    assert Path(kept["zen_czi"]) == zen_copy and zen_copy.is_file()
 
-    (saved,) = scope.save()
+    monkeypatch.setattr(save_step, "DELETE_ZEN_CZI", True)
+    scope.acquire("A2", acquisition_settings={"trigger": "snap"})
+    (deleted,) = scope.save()
 
-    assert saved["czi"] is None and not zen_copy.exists()
-    assert Path(saved["store"]).is_dir()
+    assert deleted["zen_czi"] is None
+    assert not (Path(scope.handle.image_output_path) / "acquisition_A2.czi").exists()
+    assert Path(deleted["store"]).is_dir()
 
 
 def test_a_store_that_cannot_be_written_leaves_zens_file_and_the_capture_waiting(

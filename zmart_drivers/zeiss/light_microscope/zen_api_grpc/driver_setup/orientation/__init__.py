@@ -11,8 +11,8 @@ When a capture is saved as an OME-Zarr store, its pixels are turned with
 this orientation, so the stored picture's columns run along the stage's x
 and its rows along the stage's y, as every ZMART store's do. The turn only
 rearranges pixels. The store also says which turn was applied (the image
-frame of the ZMART metadata convention), and ZEN's own CZI, kept beside the
-store, stays as the camera saw it.
+frame of the ZMART metadata convention), and ZEN's own CZI, left in ZEN's
+image folder, stays as the camera saw it.
 
 The same measurement gives the **frame**: the image size in pixels and the
 pixel size in micrometres, under the objective it was measured with. The ZEN

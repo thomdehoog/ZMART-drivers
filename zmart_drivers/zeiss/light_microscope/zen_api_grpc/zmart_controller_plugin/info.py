@@ -28,7 +28,7 @@ Settings (the changeable part of the state): experiment is the name of a ZEN exp
 
 Objectives on the changer, as position: name: {objectives}.
 
-Acquiring has two triggers: full runs the whole loaded experiment as ZEN would (its z-stack, time series and tiles); snap takes one picture with its active channels. ZEN writes one CZI file per capture. The driver saves it as one OME-Zarr store in the data folder of the output folder acquire is given, or else under this microscope's data location, named by the acquisition type and the position label. The store's pixels are turned onto the stage's axes, and it holds the controller's state, the capture record and ZEN's own description of the image. ZEN's CZI is kept beside it, in data/metadata/vendor, and a z-stack also gets its brightest pixel over z in projections."""
+Acquiring has two triggers: full runs the whole loaded experiment as ZEN would (its z-stack, time series and tiles); snap takes one picture with its active channels. ZEN writes one CZI file per capture. The driver saves it as one OME-Zarr store in the data folder of the output folder acquire is given, or else under this microscope's data location, named by the acquisition type and the position label. The store's pixels are turned onto the stage's axes, and all its metadata is inside it: the controller's state, the capture record and ZEN's own description of the image. A z-stack also gets its brightest pixel over z, as a store in projections. ZEN's CZI stays in ZEN's own image folder."""
 
 
 def get_info(handle) -> dict:
@@ -112,7 +112,7 @@ def _setup(handle) -> dict:
         },
         "data_location": {
             "done": handle.data_location is not None,
-            "says": f"{handle.data_location}, as OME-Zarr with ZEN's CZI kept beside it"
+            "says": f"{handle.data_location}, as OME-Zarr stores with their metadata inside"
             if handle.data_location is not None
             else SET_UP,
         },

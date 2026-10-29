@@ -211,7 +211,7 @@ def _snapped(scope) -> dict:
         )
     return {
         "store": saved["store"],
-        "czi": saved["czi"],
+        "zen_czi": saved["zen_czi"],
         "planes": len(saved["planes"]),
         "convention": "checked"
         if problems == []

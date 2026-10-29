@@ -64,8 +64,8 @@ class ZmartControllerPlugin:
 
         ``chooses_its_own_folder`` is False: ZEN writes the CZI in its own
         folder, but the driver saves the capture as an OME-Zarr store in the
-        ``output_folder`` ``acquire`` is given, and moves the CZI there too,
-        so every file the answer lists is there.
+        ``output_folder`` ``acquire`` is given, so every file the answer
+        lists is there.
         """
         answer = info.get_info(self.microscope.handle)
         return True, (

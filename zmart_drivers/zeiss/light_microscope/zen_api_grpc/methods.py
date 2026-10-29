@@ -419,9 +419,9 @@ class Microscope:
     def save(self, label: str | None = None) -> list[dict]:
         """Save the captures that are waiting (only *label* when given), each as one OME-Zarr store; one answer each.
 
-        Each answer lists the files written (the store, its projection for a
-        z-stack, ZEN's CZI and ZMART's account of the capture) and the planes
-        the store holds, in the controller's words.
+        Each answer lists the files written (the store, and its projection
+        for a z-stack; the metadata is inside them) and the planes the store
+        holds, in the controller's words.
         """
         return save_step.save_waiting(self.handle, label)
 
