@@ -49,7 +49,8 @@ leica = [
 ]
 # The Nikon driver for NIS-Elements AR 7: images and their metadata (numpy,
 # tifffile to read the TIFF NIS saves; zarr and OME's ome-zarr-models to save
-# a capture as OME-Zarr 0.5) and ipython for the setup notebooks. NIS-Elements
+# a capture as OME-Zarr 0.5), ipython for the setup notebooks, and pywebview for
+# the setup wizard's window. NIS-Elements
 # brings its own Python for the bridge, which needs nothing installed.
 nikon = [
     "numpy>=1.24",
@@ -57,6 +58,8 @@ nikon = [
     "zarr>=3",
     "ome-zarr-models>=1.7",
     "ipython>=8",
+    # The setup wizard's window.
+    "pywebview>=5",
 ]
 # The ZMART Controller the driver plugs into. It is not on PyPI, so it is
 # installed from its own repository: pip install "zmart-drivers[leica,controller]".

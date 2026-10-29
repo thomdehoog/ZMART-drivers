@@ -219,14 +219,21 @@ before taking a picture.
 
 ## Setting up the driver
 
-A few things are set up once per microscope, each with a notebook in `driver_setup/`. What is set up is
+A few things are set up once per microscope. The easiest way is the [setup wizard](driver_setup/wizard/README.md),
+which walks through them in a window of its own, as the Leica driver's does:
+
+```bash
+python -m zmart_drivers.nikon.nis_elements_ar7.driver_setup.wizard
+```
+
+Each item also has a notebook in `driver_setup/`. What is set up is
 saved under `C:\ProgramData\zmart-microscopy\nikon\<microscope>\nis_elements_ar7\` and loaded every
 time the driver connects.
 
 | Item | Notebook | Until it is done |
 |---|---|---|
 | The limits | `driver_setup/limits/notebooks/set_limits.ipynb` | x and y stay within NIS's own travel, and z within 100 µm of where it stood at connect. |
-| The orientation | `driver_setup/orientation/notebooks/set_orientation.ipynb` | Pictures are saved as the camera gives them. |
+| The orientation | the wizard (measured from three pictures), or `driver_setup/orientation/notebooks/set_orientation.ipynb` | Pictures are saved as the camera gives them. |
 | The data location | `driver_setup/data_location/notebooks/set_data_location.ipynb` | `acquire` needs an `output_folder`. |
 | The origin | `scope.set_origin()` | Positions are NIS's own stage coordinates. |
 | The pixel calibration | in NIS-Elements itself (Calibration) | Pictures with that objective cannot be saved. |

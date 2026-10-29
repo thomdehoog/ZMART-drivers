@@ -172,6 +172,13 @@ def _imported_parts(path: Path, part: str) -> set[str]:
     return found - {part}
 
 
+# The setup wizard sits in driver_setup/ but is an operator tool above the driver:
+# it connects the way a user does, through methods.connect(), and names the
+# driver's version among what Connect found. It is the only part of
+# driver_setup/ allowed to import methods and the version (as in the Leica driver).
+WIZARD = Path("driver_setup/wizard")
+
+
 def test_each_part_only_imports_what_the_anatomy_allows():
     for part, allowed in ALLOWED.items():
         folder = DRIVER_ROOT / part
@@ -182,6 +189,8 @@ def test_each_part_only_imports_what_the_anatomy_allows():
             if "__pycache__" in path.parts:
                 continue
             used = _imported_parts(path, part)
+            if WIZARD in path.relative_to(DRIVER_ROOT).parents:
+                used -= {"methods", "__version__"}
             assert used <= allowed, (
                 f"{path.relative_to(DRIVER_ROOT)} imports {sorted(used - allowed)}; the anatomy lets {part} import only {sorted(allowed)}"
             )
@@ -290,5 +299,40 @@ def test_the_dispatcher_is_the_same_as_in_every_other_driver():
         return
     for name in DISPATCHER_FILES:
         assert (DRIVER_ROOT / "dispatcher" / name).read_bytes() == (
+            leica / name
+        ).read_bytes(), name
+
+
+def test_nothing_in_the_driver_imports_the_setup_wizard():
+    """The wizard calls the setup items; no item, procedure or method calls it back."""
+    for rel, text in _driver_sources():
+        if WIZARD in rel.parents:
+            continue
+        for node in ast.walk(ast.parse(text)):
+            if isinstance(node, ast.ImportFrom):
+                names = [node.module or "", *(a.name for a in node.names)]
+            elif isinstance(node, ast.Import):
+                names = [a.name for a in node.names]
+            else:
+                continue
+            assert not any(
+                n == "wizard" or n.endswith(".wizard") or ".wizard." in n for n in names
+            ), str(rel)
+
+
+def test_the_wizards_core_is_the_same_as_the_leica_drivers():
+    """framework.py and server.py know no microscope: they are copied from the Leica driver, never edited here."""
+    leica = (
+        DRIVER_ROOT.parents[1]
+        / "leica"
+        / "stellaris"
+        / "navigator_expert"
+        / "driver_setup"
+        / "wizard"
+    )
+    if not leica.is_dir():
+        return
+    for name in ("framework.py", "server.py"):
+        assert (DRIVER_ROOT / WIZARD / name).read_bytes() == (
             leica / name
         ).read_bytes(), name

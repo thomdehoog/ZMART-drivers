@@ -37,6 +37,7 @@ thomdehoog/nis-useq-aiagent, and on the NIS 6.10 driver's ``fake_nis_api.py``.
 
 from __future__ import annotations
 
+import functools
 import inspect
 import threading
 import time
@@ -121,6 +122,8 @@ class PretendMicroscope:
         )
         self.xy_limits = (-50000.0, -30000.0, 50000.0, 30000.0)  # x0, y0, x1, y1
         self.z_limits = (0.0, 10000.0)
+        #: How the camera is mounted: (quarter turns clockwise in degrees, mirrored).
+        self.camera_mount = (0, False)
         self.x_from, self.y_from, self.z_from = 1000.0, 2000.0, 3000.0
         self.x_to, self.y_to, self.z_to = self.x_from, self.y_from, self.z_from
         self.moved_at = 0.0
@@ -187,20 +190,62 @@ class PretendMicroscope:
     # -- a picture -------------------------------------------------------------------------
 
     def picture(self) -> np.ndarray:
-        """A pattern that depends on where the stage stands, different in every direction."""
-        x, y, _ = self.position()
-        rows, cols = np.mgrid[0:HEIGHT, 0:WIDTH]
-        top = (1 << self.bits) - 1
-        base = (rows * 7 + cols * 3 + int(abs(x)) // 10 + int(abs(y)) // 100) % (
-            top + 1
+        """What the camera sees: a sample that stays put while the stage moves under it.
+
+        The sample is a fixed, random pattern, different in every direction.
+        A stage move shifts it in the picture by the move divided by the pixel
+        size, the opposite way, as on a real microscope; the camera's mount
+        (``camera_mount``) then turns or mirrors the picture, so the driver's
+        orientation measurement has something to find.
+        """
+        from zmart_drivers.nikon.nis_elements_ar7.driver_setup.orientation import (
+            Orientation,
         )
-        if self.channels == "mono":
-            return base.astype(np.uint16 if self.bits > 8 else np.uint8)
-        layers = [(base + shift * 101) % (top + 1) for shift in range(3)]
+
+        x, y, _ = self.position()
+        pixel = PIXEL_SIZE_UM.get(self.nosepiece, 1.0)
+        rows, cols = np.mgrid[0:HEIGHT, 0:WIDTH]
+        sample = _sample(self.bits)
+        size = sample.shape[0]
+        base = sample[
+            (rows + round(y / pixel)) % size, (cols + round(x / pixel)) % size
+        ]
+        mount = Orientation(
+            rotate_deg=self.camera_mount[0], mirrored=self.camera_mount[1]
+        )
+        base = _as_mounted(base, mount)
+        top = (1 << self.bits) - 1
         dtype = np.uint16 if self.bits > 8 else np.uint8
+        if self.channels == "mono":
+            return base.astype(dtype)
+        layers = [(base + shift * 101) % (top + 1) for shift in range(3)]
         if self.channels == "rgb":
             return np.stack(layers, axis=-1).astype(np.uint8)
         return np.stack(layers, axis=0).astype(dtype)
+
+
+@functools.lru_cache(maxsize=4)
+def _sample(bits: int) -> np.ndarray:
+    """The pretend sample: smooth blobs at random places, the same every time."""
+    generator = np.random.default_rng(7)
+    size = 512
+    noise = generator.random((size, size))
+    blurred = np.real(np.fft.ifft2(np.fft.fft2(noise) * _soft(size, 4.0)))
+    blurred = (blurred - blurred.min()) / (np.ptp(blurred) or 1.0)
+    return np.rint(blurred * ((1 << bits) - 1)).astype(np.int64)
+
+
+def _soft(size: int, width: float) -> np.ndarray:
+    frequency = np.fft.fftfreq(size)
+    fy, fx = np.meshgrid(frequency, frequency, indexing="ij")
+    return np.exp(-((fx**2 + fy**2) * (2 * np.pi * width) ** 2) / 2)
+
+
+def _as_mounted(picture: np.ndarray, mount) -> np.ndarray:
+    """The picture as a camera mounted *mount* gives it: the driver's correction for *mount* undoes this."""
+    k = mount.rotate_deg // 90
+    turned = np.rot90(picture, k=k, axes=(-2, -1)) if k else picture
+    return np.ascontiguousarray(np.flip(turned, axis=-1) if mount.mirrored else turned)
 
 
 def _function(fn):

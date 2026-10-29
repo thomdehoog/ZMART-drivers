@@ -615,3 +615,26 @@ new document, the snap now has NIS write the document's whole description with
 TIFF's own, and deletes the file with the TIFF. When NIS writes none, the picture is saved all
 the same and the capture log says why. The hardware check confirms the function's argument
 and the text's encoding (UTF-16, UTF-8 and the Windows code page are all read).
+
+
+## 14. The setup wizard (added 2026-10-29)
+
+The Nikon driver has the same setup wizard as the Leica driver (`driver_setup/wizard/`): the
+same framework and local server, copied unchanged (a test keeps them identical), the same page
+built from TypeScript into plain files, and five Nikon steps in `steps.py`:
+
+1. **Connect**: writes `start_bridge.mac`, connects through the bridge, saves the data folder.
+2. **Define limits**: stage and focus ranges (four corners and the lowest and highest focus,
+   imported from the stage), the objectives and optical configurations automation may choose,
+   and the guarded hardware it may set.
+3. **Define coordinate system origin**: read, then Save and adopt.
+4. **Image-to-stage orientation**: measured from three pictures (here, after +x, after +y),
+   by phase correlation over the eight ways a picture can lie
+   (`driver_setup/orientation/measure_orientation.py`, numpy only), or chosen by hand. The
+   notebook still asks the operator to state it.
+5. **Hardware settings**, in place of the Leica wizard's objective calibration: every setting
+   NIS reports, with its value; each can be tried through the limits.
+
+The pretend NIS's camera now shows a sample that stays put while the stage moves, and can be
+mounted turned or mirrored, so the orientation measurement is tested for all eight mounts. A
+browser test walks the whole setup on the pretend NIS.
