@@ -14,5 +14,9 @@ from zmart_drivers.evident.fv4000.rdk.driver_setup.notebook_support import (
 )
 
 NOTEBOOK = NotebookCheckpoint(
-    NOTEBOOK_PATH, required_code=("result = measure_orientation.measure(scope.handle)",)
+    NOTEBOOK_PATH,
+    required_code=(
+        "session = wf.run_notebook_measurement()",
+        "validation_path = wf.validate(session)",
+    ),
 )

@@ -25,6 +25,7 @@ University of Zurich (thom.dehoog@zmb.uzh.ch, thomdehoog@gmail.com).
 
 from __future__ import annotations
 
+import functools
 import itertools
 import threading
 import time
@@ -37,6 +38,10 @@ from zmart_drivers.evident.fv4000.rdk.primitives.rdk.client import ConnectionLos
 
 OK = {"result": "OK"}
 FIELD_SIZE = 2048
+#: The size, in micrometres, of one pixel of the pretend sample (so the sample is 512 µm across).
+SCENE_UM_PER_PX = 0.25
+#: How much the picture blurs away from focus: the blur's width, in micrometres, per micrometre out of focus.
+BLUR_UM_PER_UM = 0.6
 IMAGE_SIZE = 256
 BIT_COUNT = 12
 
@@ -57,15 +62,41 @@ def _error(code: str) -> dict:
 
 
 def make_field(seed: int = 7) -> np.ndarray:
-    """The pretend sample: a square field of bright beads on a faint background, as 12-bit pixels."""
+    """The pretend sample, as 12-bit pixels of ``SCENE_UM_PER_PX`` micrometres: beads of several sizes on a faint, uneven background.
+
+    The scene is drawn in micrometres, not in pixels of one objective, so every
+    objective sees the same sample at its own magnification. It repeats beyond
+    its edge (``FIELD_SIZE`` pixels across), which keeps every stage position
+    inside it. It is made once per seed and shared, because it takes a moment.
+    """
+    return _field(seed).copy()
+
+
+@functools.lru_cache(maxsize=4)
+def _field(seed: int) -> np.ndarray:
+    from scipy.ndimage import gaussian_filter
+
     rng = np.random.default_rng(seed)
-    field = rng.integers(40, 80, size=(FIELD_SIZE, FIELD_SIZE)).astype(np.int32)
-    for _ in range(6000):
-        r, c = rng.integers(2, FIELD_SIZE - 2, size=2)
-        bright = int(rng.integers(1500, 3900))
-        field[r - 1 : r + 2, c - 1 : c + 2] += bright // 3
-        field[r, c] += bright
-    return np.clip(field, 0, (1 << BIT_COUNT) - 1).astype(np.uint16)
+    spots = np.zeros((FIELD_SIZE, FIELD_SIZE))
+    # (bead size in micrometres, how many, how bright at their centre)
+    for sigma_um, count, peak in (
+        (0.5, 6000, 3000.0),
+        (1.2, 1500, 1800.0),
+        (3.0, 250, 700.0),
+    ):
+        layer = np.zeros_like(spots)
+        rows = rng.integers(0, FIELD_SIZE, size=count)
+        cols = rng.integers(0, FIELD_SIZE, size=count)
+        np.add.at(layer, (rows, cols), rng.uniform(0.5, 1.0, size=count))
+        sigma_px = sigma_um / SCENE_UM_PER_PX
+        spots += (
+            gaussian_filter(layer, sigma_px, mode="wrap")
+            * (2 * np.pi * sigma_px**2)
+            * peak
+        )
+    background = gaussian_filter(rng.normal(0, 1, size=spots.shape), 30, mode="wrap")
+    background = 60 + 25 * background / max(np.abs(background).max(), 1e-9)
+    return np.clip(background + spots, 0, (1 << BIT_COUNT) - 1).astype(np.uint16)
 
 
 @dataclass
@@ -131,6 +162,14 @@ class MockFluoview:
         # The optics.
         self.objectives = [(0, "UPLXAPO10X"), (1, "UPLXAPO20X"), (2, "UPLXAPO60XO")]
         self.pixel_um_by_slot = {0: 1.242, 1: 0.621, 2: 0.207}
+        #: Where each objective looks and focuses relative to slot 0, in micrometres (x, y, z): how far
+        #: the stage must move, after a change to that objective, to see and focus the same point.
+        #: All zero unless a test sets them, as a calibration would then measure them.
+        self.objective_offsets_um = {
+            slot: (0.0, 0.0, 0.0) for slot, _name in self.objectives
+        }
+        #: The focus motor reading, in micrometres, at which the sample is sharp under slot 0.
+        self.surface_z_um = 2500.0
         self.objective_slot = 0
         self.channels = {
             "CH1": Channel(lasers=["LASER_488"]),
@@ -708,30 +747,38 @@ class MockFluoview:
     def pixel_um(self) -> float:
         return self.pixel_um_by_slot[self.objective_slot]
 
-    def view(self, channel_index: int, z_index: int = 0, size_z: int = 1) -> np.ndarray:
-        """The stage-aligned view of the sample under the stage now: rows grow with +Y, columns with +X.
+    def view(self, channel_index: int, z_um: float | None = None) -> np.ndarray:
+        """The stage-aligned view of the sample under the objective now: rows grow with +Y, columns with +X.
 
-        The sample rides on the stage, so when the stage moves +X the sample
-        moves +X in the picture too; the window into the field moves the other way.
+        A position is where the field of view lies on the sample, so moving the
+        stage +X shows the sample further along +X, and the features shift
+        towards the first column (the convention the Leica driver checked on a
+        STELLARIS). Each objective samples the same sample at its own pixel
+        size, from the spot its offset says, and the picture is blurred by how
+        far *z_um* (the focus motor now, when None) lies from that objective's
+        sharp plane.
         """
-        pixel_nm = self.pixel_um() * 1000
-        col = (
-            -round((self.x_nm() - 10_000_000) / pixel_nm)
-            + FIELD_SIZE // 2
-            - IMAGE_SIZE // 2
-            + channel_index * 7
+        from scipy.ndimage import gaussian_filter, map_coordinates
+
+        pixel_um = self.pixel_um()
+        dx, dy, dz = self.objective_offsets_um.get(self.objective_slot, (0.0, 0.0, 0.0))
+        # The sample point on the optical axis: the stage moved by an objective's offset sees the same point.
+        centre_x = (self.x_nm() / 1000 - 10_000.0) - dx + channel_index * 1.5
+        centre_y = (self.y_nm() / 1000 - 8_000.0) - dy
+        offsets = (np.arange(IMAGE_SIZE) - IMAGE_SIZE / 2 + 0.5) * pixel_um
+        rows = (centre_y + offsets)[:, None] / SCENE_UM_PER_PX + FIELD_SIZE / 2
+        cols = (centre_x + offsets)[None, :] / SCENE_UM_PER_PX + FIELD_SIZE / 2
+        rows, cols = np.broadcast_arrays(rows, cols)
+        plane = map_coordinates(
+            self.field.astype(np.float64), [rows, cols], order=1, mode="grid-wrap"
         )
-        row = (
-            -round((self.y_nm() - 8_000_000) / pixel_nm)
-            + FIELD_SIZE // 2
-            - IMAGE_SIZE // 2
-        )
-        rows = np.arange(row, row + IMAGE_SIZE) % FIELD_SIZE
-        cols = np.arange(col, col + IMAGE_SIZE) % FIELD_SIZE
-        plane = self.field[np.ix_(rows, cols)].astype(np.float64)
-        # Slices away from the middle of a stack are dimmer, so a max projection differs from any one slice.
-        focus = 1.0 - 0.6 * abs(z_index - (size_z - 1) / 2) / max(size_z, 1)
-        return np.clip(plane * focus, 0, (1 << BIT_COUNT) - 1).astype(np.uint16)
+        focus_um = self.z_nm() / 1000 if z_um is None else float(z_um)
+        out_of_focus = abs(focus_um - (self.surface_z_um + dz))
+        if out_of_focus > 0:
+            plane = gaussian_filter(
+                plane, BLUR_UM_PER_UM * out_of_focus / pixel_um, mode="nearest"
+            )
+        return np.clip(plane, 0, (1 << BIT_COUNT) - 1).astype(np.uint16)
 
     def scanned(self, view: np.ndarray) -> np.ndarray:
         """*view* as the scanner delivers it: turned and mirrored the way the scanner is mounted."""
@@ -758,7 +805,9 @@ class MockFluoview:
         for t in range(size_t):
             for ci, name in enumerate(channels):
                 for z in range(size_z):
-                    planes[(t, name, z, 0)] = self.scanned(self.view(ci, z, size_z))
+                    planes[(t, name, z, 0)] = self.scanned(
+                        self.view(ci, z_positions[z])
+                    )
         path = f"D:/Images/image_{next(self.image_counter):04d}.oir"
         return PretendFile(
             path,

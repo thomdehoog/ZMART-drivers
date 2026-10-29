@@ -49,13 +49,20 @@ leica = [
 ]
 # The Evident FV4000 driver: it talks to FLUOVIEW over XML-RPC with Python's
 # own standard library, so it needs only what reading a picture back and
-# saving it as OME-Zarr 0.5 takes (numpy, zarr, ome-zarr-models), plus
-# ipython, which its setup notebooks show their steps with. It runs on any
+# saving it as OME-Zarr 0.5 takes (numpy, zarr, ome-zarr-models), and what its
+# setup measurements take, the same as the Leica driver's: image matching and
+# focus finding (scipy, scikit-image, opencv), the plots and previews they
+# show (matplotlib, pillow), and the notebooks (ipython). It runs on any
 # computer that can reach FLUOVIEW's computer over the network.
 evident = [
     "numpy>=1.24",
     "zarr>=3",
     "ome-zarr-models>=1.7",
+    "scipy>=1.10",
+    "scikit-image>=0.21",
+    "opencv-python-headless>=4.8",
+    "matplotlib>=3.7",
+    "pillow>=10",
     "ipython>=8",
 ]
 # The ZMART Controller the driver plugs into. It is not on PyPI, so it is
