@@ -167,6 +167,8 @@ DOCUMENT_LIST_SIZE = 4096
 #: ``ImageSaveAs``'s format number for a TIFF with every layer, and no compression.
 TIFF_FORMAT = 18
 NO_COMPRESSION = 0
+#: The file beside a staged TIFF that holds NIS's whole description of the picture.
+DESCRIPTION_SUFFIX = ".nis_description.txt"
 #: ``CloseCurrentDocument``'s answer to "save changes?": no, and do not ask.
 CLOSE_WITHOUT_SAVING = 2
 TEXT_SIZE = 256
@@ -360,6 +362,7 @@ class Bridge:
         os.makedirs(os.path.dirname(path), exist_ok=True)
         call(self.nis, "ImageSaveAs", [path, TIFF_FORMAT, NO_COMPRESSION])
         saved = os.path.exists(path)
+        description = self.save_description(path) if saved else None
         call(self.nis, "CloseCurrentDocument", [CLOSE_WITHOUT_SAVING])
         if not saved:
             raise Refused(
@@ -379,6 +382,7 @@ class Bridge:
                 "bits": bits,
                 "components": components,
             },
+            "description": description,
             "calibration": {
                 "objective": objective,
                 "pixel": pixel,
@@ -386,6 +390,27 @@ class Bridge:
                 "unit": unit,
             },
         }
+
+    def save_description(self, path: str) -> dict:
+        """Have NIS write the new document's whole description (camera, exposure, channels...) beside the TIFF.
+
+        A TIFF keeps little of what NIS knows about how a picture was taken;
+        NIS's own description of the document keeps it all, as text. It is
+        saved as ``<picture>.nis_description.txt`` and goes into the store as
+        the vendor's own description. When NIS cannot write it, the picture
+        is still saved, and the answer says why.
+        """
+        target = os.path.splitext(path)[0] + DESCRIPTION_SUFFIX
+        try:
+            returned = call(self.nis, "SaveImageFullDescription", [target])["return"]
+        except Exception as error:  # noqa: BLE001 -- the picture matters more than its description
+            return {"path": None, "why": f"{type(error).__name__}: {error}"}
+        if not os.path.isfile(target):
+            return {
+                "path": None,
+                "why": f"SaveImageFullDescription answered {returned!r} and wrote no file",
+            }
+        return {"path": target, "why": None}
 
     def documents(self) -> list[str]:
         answer = call(

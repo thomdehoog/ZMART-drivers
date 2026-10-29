@@ -33,6 +33,7 @@ from zmart_drivers import metadata_convention as convention
 
 from ...driver_setup.orientation import Orientation, reorient_array
 from ...primitives.nis_python.reads import calibration_from
+from ...primitives.nis_python.server import DESCRIPTION_SUFFIX
 from . import naming, ome_zarr
 from .ome_xml import VENDOR
 from .product import (
@@ -54,6 +55,31 @@ def note_path(tif: Path) -> Path:
     return tif.with_suffix(".json")
 
 
+def description_path(tif: Path) -> Path:
+    """NIS's whole description of the picture, beside its TIFF (written by the bridge's snap)."""
+    return tif.with_name(tif.stem + DESCRIPTION_SUFFIX)
+
+
+def read_description(tif: Path) -> str | None:
+    """NIS's whole description of the picture, as text; None when NIS wrote none.
+
+    NIS may write it as UTF-16 (with a byte-order mark), UTF-8 or the
+    Windows code page; each is tried in that order, so no letter is lost.
+    """
+    path = description_path(tif)
+    if not path.is_file():
+        return None
+    raw = path.read_bytes()
+    if raw.startswith((b"\xff\xfe", b"\xfe\xff")):
+        return raw.decode("utf-16").strip() or None
+    for encoding in ("utf-8-sig", "cp1252"):
+        try:
+            return raw.decode(encoding).strip() or None
+        except UnicodeDecodeError:
+            continue
+    return raw.decode("latin-1").strip() or None
+
+
 def when(seconds: float | None) -> str | None:
     """A time from the clock as an ISO 8601 moment in UTC."""
     if not isinstance(seconds, (int, float)):
@@ -69,7 +95,7 @@ def controller_version() -> str | None:
         return None
 
 
-def notes_for(note: dict, description: str | None) -> convention.Notes:
+def notes_for(note: dict, *descriptions: str | None) -> convention.Notes:
     """What the store says besides its pixels: the convention's three annotations, and NIS's own words."""
     record = {
         "position_label": note["position_label"],
@@ -104,7 +130,8 @@ def notes_for(note: dict, description: str | None) -> convention.Notes:
         ),
         vendor=VENDOR,
         vendor_facts=facts,
-        vendor_descriptions=(description,) if description else (),
+        # The TIFF's own short description, then NIS's whole description of the picture.
+        vendor_descriptions=tuple(d for d in descriptions if d),
         image_description=note["snap"].get("document"),
     )
 
@@ -206,7 +233,7 @@ def convert(tif: str | Path) -> dict:
     store = ome_zarr.write_store(
         capture,
         naming.store_path(output_root, stem),
-        notes=notes_for(note, picture.description),
+        notes=notes_for(note, picture.description, read_description(tif)),
     )
 
     planes = [
@@ -245,6 +272,7 @@ def convert(tif: str | Path) -> dict:
     )
     tif.unlink()
     note_path(tif).unlink()
+    description_path(tif).unlink(missing_ok=True)
     try:
         tif.parent.rmdir()  # only when nothing else waits there
     except OSError:

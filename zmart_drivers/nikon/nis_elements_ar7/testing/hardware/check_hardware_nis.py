@@ -187,6 +187,7 @@ DRIVER_FUNCTIONS_BEYOND_THE_TABLE = (
     "ImageSaveAs",
     "CloseCurrentDocument",
     "ActivateDocument",
+    "SaveImageFullDescription",
 )
 
 

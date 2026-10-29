@@ -198,6 +198,19 @@ that follows the ZMART metadata convention, and deletes the TIFF only once the s
     log/<type>_<label>.log.json      what the driver was asked, and what it did
 ```
 
+What the store says about the picture comes in four layers, as in every ZMART driver (the ZMART
+metadata convention, `zmart_drivers/metadata_convention`):
+
+1. **OME-Zarr itself** (`zarr.json`): the axes, the pyramid, the pixel size as scale, and where the
+   picture lies on the stage as translation.
+2. **OME-XML** (`OME/METADATA.ome.xml`, the OME schema OME-TIFF uses): the image, its channels, each
+   plane's stage position, the objective and the date.
+3. **The driver's state at the capture**: everything `state()` said (the objective, the optical
+   configuration, every hardware setting), the capture record, and each motor's own reading.
+4. **NIS's own words**: NIS's whole description of the picture (camera, exposure, binning, channels...),
+   which the snap has NIS write with `SaveImageFullDescription` before it closes the document, and what
+   NIS answered to the capture.
+
 The pixel size comes from NIS's own calibration of the objective. A picture taken with an objective
 that is not calibrated in NIS cannot be placed on the sample, so it is not saved: it stays in
 `.staging`, and the error says to calibrate the objective in NIS and then run `save_staged()` (or the

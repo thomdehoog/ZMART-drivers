@@ -192,3 +192,23 @@ def test_an_output_folder_given_to_acquire_is_used(scope, tmp_path):
     elsewhere = tmp_path / "elsewhere"
     record = scope.acquire("A1", output_folder=str(elsewhere))
     assert Path(record["store"]).is_relative_to(elsewhere)
+
+
+def test_nis_own_description_of_the_picture_goes_into_the_store(scope, output_root):
+    """The vendor's layer: NIS's whole description (camera, exposure...) is kept in the OME-XML, and its file removed."""
+    record = scope.acquire("A1")
+    xml = (Path(record["store"]) / "OME" / "METADATA.ome.xml").read_text(
+        encoding="ascii"
+    )
+    assert "Exposure: 100 ms" in xml and "Pretend sCMOS" in xml
+    assert not list(output_root.rglob("*.nis_description.txt"))
+
+
+def test_a_picture_is_saved_even_when_nis_writes_no_description(
+    scope, stand_in, output_root
+):
+    stand_in.scope.answer_next["SaveImageFullDescription"] = -1
+    record = scope.acquire("A1")
+    assert convention.check_store(record["store"]) == []
+    log = json.loads(Path(record["log"]).read_text(encoding="utf-8"))
+    assert log["capture"]["nis"]["description"]["path"] is None

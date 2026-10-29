@@ -449,6 +449,25 @@ def ImageSaveAs(scope, path, file_type, compression):
 
 
 @_function
+def SaveImageFullDescription(scope, path):
+    """The document's whole description, as NIS writes it: one setting per line (UTF-16, as Windows tools often do)."""
+    document = scope.current
+    if document is None:
+        return -1
+    lines = [
+        f"Name: {document.name}",
+        "Camera: Pretend sCMOS",
+        "Exposure: 100 ms",
+        "Binning: 1x1",
+        f"Objective: {OBJECTIVES[document.objective]}",
+        f"Bit depth: {document.bits}",
+    ]
+    with open(path, "w", encoding="utf-16") as handle:
+        handle.write("\n".join(lines))
+    return 1
+
+
+@_function
 def CloseCurrentDocument(scope, mode):
     document = scope.current
     if document is None:
@@ -834,6 +853,7 @@ FUNCTIONS = {
         Capture,
         ImageSaveAs,
         CloseCurrentDocument,
+        SaveImageFullDescription,
         Stg_GetShutterCount,
         Stg_GetShutterName,
         Stg_GetShutterStateEx,

@@ -605,3 +605,13 @@ the same script, and the macro's own line, against the pretend NIS with every sw
 
 Writing `start_bridge.mac` also works with NIS's own `python.exe`: the package now loads
 `connect` and `Microscope` (which need numpy) only when they are first used.
+
+### The vendor's own description of each picture
+
+A TIFF keeps little of what NIS knows about how a picture was taken. Before it closes the
+new document, the snap now has NIS write the document's whole description with
+`SaveImageFullDescription(path)` (offered without hardware in step 0) beside the staged TIFF.
+`save_data` keeps that text in the store's OME-XML as the vendor's description, after the
+TIFF's own, and deletes the file with the TIFF. When NIS writes none, the picture is saved all
+the same and the capture log says why. The hardware check confirms the function's argument
+and the text's encoding (UTF-16, UTF-8 and the Windows code page are all read).
