@@ -14,7 +14,7 @@ driver relies on is in [rdk-notes.md](rdk-notes.md).
 | procedures | Chains of steps: move, change a setting, take a picture, save it, keep the sample in view. | `procedures/` |
 | dispatcher | Runs one reading or one change, the same way for every driver. Holds the limits gate. Byte for byte the Leica driver's. | `dispatcher/` |
 | primitives | The one way of reaching FLUOVIEW: its Remote Development Kit (RDK), spoken over XML-RPC. | `primitives/rdk/` |
-| setup | What is set up once per microscope: limits, origin, orientation, objective calibration, data location, and the frame the driver learns. | `driver_setup/` |
+| setup | What is set up once per microscope: limits, origin, orientation, objective calibration, data location, and the frame the driver learns; and the wizard that walks through them. The measurements and the wizard are the Leica driver's, ported. | `driver_setup/` |
 | controller plugin | The ZMART Controller's view of the `Microscope`. | `zmart_controller_plugin/` |
 
 ## 2. How a call travels
@@ -130,7 +130,7 @@ LOCAL mode.
 | primitives | the dispatcher |
 | dispatcher | nothing of the driver |
 | procedures | primitives, dispatcher, setup (only the loaders, never the measuring code) |
-| setup | primitives, dispatcher, procedures |
+| setup | primitives, dispatcher, procedures (the wizard also `methods.py`) |
 | `methods.py` | primitives, dispatcher, procedures, setup |
 | controller plugin | `methods.py`, procedures, setup, dispatcher |
 

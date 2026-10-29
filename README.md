@@ -42,7 +42,7 @@ microscope, is described in [the anatomy of a ZMART driver](docs/driver-anatomy.
 | Microscope | Vendor interface | Driver | Status |
 |---|---|---|---|
 | Leica STELLARIS | LAS X: its hardware server first, the Python (CAM) API behind it | [`zmart_drivers/leica/stellaris/navigator_expert/`](zmart_drivers/leica/stellaris/navigator_expert/README.md) | **Beta `0.7.0b9`.** 0.7.0b9 keeps the settings in configs chosen when connecting, writes a mean pyramid into every store, and fixes what the first end-to-end run on the STELLARIS found. 0.7.0b6 tested on the LAS X simulator, 0.7.0b5 also on a STELLARIS; 0.7.0b7 adds the setup wizard and 0.7.0b8 its hardware check and a CI that also runs without the controller, tested offline. Laid out as [the anatomy of a ZMART driver](docs/driver-anatomy.md) describes. |
-| Evident FLUOVIEW FV4000 | FLUOVIEW's Remote Development Kit (RDK, FV40S-RMTDK): XML-RPC over the network | [`zmart_drivers/evident/fv4000/rdk/`](zmart_drivers/evident/fv4000/rdk/README.md) | **Beta `0.7.0b9`, offline only.** Written from the RDK manual, laid out as the anatomy describes, with the dispatcher shared byte for byte with the Leica driver. Tested against a pretend FLUOVIEW that follows the manual; not yet run on an FV4000. |
+| Evident FLUOVIEW FV4000 | FLUOVIEW's Remote Development Kit (RDK, FV40S-RMTDK): XML-RPC over the network | [`zmart_drivers/evident/fv4000/rdk/`](zmart_drivers/evident/fv4000/rdk/README.md) | **Beta `0.7.0b9`, offline only.** Written from the RDK manual, laid out as the anatomy describes, with the dispatcher shared byte for byte with the Leica driver, and the Leica driver's setup: the same picture-based orientation and objective calibration, and the same setup wizard. Tested against a pretend FLUOVIEW that follows the manual; not yet run on an FV4000. |
 
 This beta holds the Leica driver, tested on a STELLARIS, and the new Evident driver, tested
 offline only. The Nikon, ZEISS and mesoSPIM drivers are in the repository's history.
@@ -51,7 +51,7 @@ Each driver works by itself, from a notebook or a script, and it plugs into the 
 Controller. Its README says how to do both. Before the first experiment, a few things are set
 up once on the microscope: the travel limits, the image orientation, the objective calibration
 and the zero point of the coordinates. The notebooks for them are in the driver's
-`driver_setup/` folder, and a [setup wizard](zmart_drivers/leica/stellaris/navigator_expert/driver_setup/wizard/README.md) walks through the same steps in a window: `python -m zmart_drivers.leica.stellaris.navigator_expert.driver_setup.wizard`. What is set up is saved in the computer's configuration folder,
+`driver_setup/` folder, and a setup wizard walks through the same steps in a window, the same for both drivers: `python -m zmart_drivers.leica.stellaris.navigator_expert.driver_setup.wizard` ([Leica](zmart_drivers/leica/stellaris/navigator_expert/driver_setup/wizard/README.md)) or `python -m zmart_drivers.evident.fv4000.rdk.driver_setup.wizard` ([Evident](zmart_drivers/evident/fv4000/rdk/driver_setup/wizard/README.md)). What is set up is saved in the computer's configuration folder,
 `C:\ProgramData\zmart-microscopy` on Windows, and loaded every time the driver connects.
 
 ## Try it yourself

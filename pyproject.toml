@@ -52,7 +52,8 @@ leica = [
 # saving it as OME-Zarr 0.5 takes (numpy, zarr, ome-zarr-models), and what its
 # setup measurements take, the same as the Leica driver's: image matching and
 # focus finding (scipy, scikit-image, opencv), the plots and previews they
-# show (matplotlib, pillow), and the notebooks (ipython). It runs on any
+# show (matplotlib, pillow), the notebooks (ipython) and the setup wizard's
+# window (pywebview). It runs on any
 # computer that can reach FLUOVIEW's computer over the network.
 evident = [
     "numpy>=1.24",
@@ -64,6 +65,8 @@ evident = [
     "matplotlib>=3.7",
     "pillow>=10",
     "ipython>=8",
+    # The setup wizard's window.
+    "pywebview>=5",
 ]
 # The ZMART Controller the driver plugs into. It is not on PyPI, so it is
 # installed from its own repository: pip install "zmart-drivers[leica,controller]"

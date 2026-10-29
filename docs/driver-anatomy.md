@@ -464,7 +464,11 @@ byte for byte, and a test keeps it so. Where it differs:
 - A sixth setup item, the frame (`driver_setup/frame.py`), is learned from the
   pictures rather than measured: FLUOVIEW's settings do not report the image
   size or pixel size the controller asks for.
-- There is no setup wizard; the notebooks do the work.
+- The setup wizard and the picture-based orientation and objective
+  calibration are the Leica driver's, ported. Only
+  `driver_setup/optical_calibration/calibration_common.py` touches FLUOVIEW:
+  a capture, a verified move, and the pixel size and slice heights read from
+  the picture.
 - `stop()` and `live()` exist, because the RDK offers them; the open question on
   stopping below is answered for this driver.
 

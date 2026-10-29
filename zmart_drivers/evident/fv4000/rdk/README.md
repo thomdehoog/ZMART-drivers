@@ -140,6 +140,19 @@ where its pictures go, how far the stage may travel, the point that counts as (0
 picture is turned relative to the stage, and how far the sample shifts between objectives. A sixth is
 learned by itself: what one picture covers.
 
+**With the setup wizard (recommended).** One window walks you through all of them, step by step, and
+saves each where the driver loads it. It is the Leica driver's wizard, with the same steps and cells:
+
+```bash
+python -m zmart_drivers.evident.fv4000.rdk.driver_setup.wizard
+```
+
+Its steps are Connect (with the data folder), Define limits, Define coordinate system origin,
+Image-to-stage calibration and Objective calibration. Its [README](driver_setup/wizard/README.md) says
+more about each.
+
+**Or with the notebooks**, one per item, in its own folder:
+
 | What | Notebook or call |
 |---|---|
 | Data location | `driver_setup/data_location/notebooks/set_data_location.ipynb` |
@@ -150,7 +163,12 @@ learned by itself: what one picture covers.
 | Frame (image size and pixel size) | Take one picture under each objective and save it; the driver remembers them from then on. |
 
 Do the limits first: the orientation is measured within them, and the objective calibration needs both.
-This driver has no setup wizard yet; the notebooks do the same work step by step.
+
+The orientation and the objective calibration are measured from pictures, as on the Leica driver: the
+orientation from three pictures and two small stage moves (four image-matching methods vote), the
+calibration from a focus stack and a picture under each objective. For the calibration, set up the
+z-stack in FLUOVIEW, and set the zoom under each objective so both give the same pixel size: the
+pictures are matched pixel by pixel.
 
 **Where the settings are kept.** On this computer, in
 `C:\ProgramData\zmart-microscopy\evident\fv4000\rdk\` (or under the folder the environment variable
