@@ -117,4 +117,31 @@ def connect_handshake(
         log.error("%s", error)
         state = gate.GateState(limits=None, stage_cfg=None, error=error)
     gate.install(client, state)
+    if state.limits is not None and state.limits.devices:
+        warn_about_unknown_devices(client, state.limits.devices)
     return gate.status(state)
+
+
+def warn_about_unknown_devices(client: Any, entries: dict) -> None:
+    """Say, at connect, when a limits entry names a device NIS does not report: a misspelling would limit nothing.
+
+    ``"lamp_voltage/dia"`` against NIS's ``DIA`` would never match, so the
+    lamp would be left unlimited without a word. Never raises.
+    """
+    from ...procedures import readings
+
+    try:
+        present = readings.device_names(readings.devices(client))
+    except Exception as why:  # noqa: BLE001 -- only a warning; the limits are already installed
+        log.warning(
+            "the devices named in the limits could not be checked against NIS: %s", why
+        )
+        return
+    for name in entries:
+        if "/" in name and name not in present:
+            log.warning(
+                "the limits name %r, but NIS reports no such device, so that entry limits nothing; "
+                "the devices NIS reports are %s",
+                name,
+                sorted(n for n in present if n.startswith(name.split("/")[0] + "/")),
+            )

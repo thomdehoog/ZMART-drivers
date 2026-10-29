@@ -99,7 +99,8 @@ nis_elements_ar7/
     helpers/mock_nis.py       the stand-in `nis` module with a pretend microscope
     helpers/bridge_stand_in.py  the real server.py over the mock, pumped by a thread
     unit/                     the offline suite (section 10)
-    hardware/check_hardware.py   the first checks at a microscope: reads only, unless asked
+    hardware/check_hardware.mac  the first checks at a microscope, inside NIS: reads only, unless asked
+    hardware/check_hardware_nis.py
 ```
 
 These are not in this first driver, and the README says so plainly: a setup wizard, an
@@ -448,14 +449,14 @@ answered, and nothing of the operator's is touched.
   - the driver layer;
   - the controller layer: SKIP without the controller, and `--controller` makes it count;
   - coverage and reports;
-  - `--hardware` runs `testing/hardware/check_hardware.py`.
+  - `--hardware` says how to run the hardware check, which runs inside NIS (section 13).
 - **The workflow** `.github/workflows/drivers-offline.yml` gets its own `nikon` jobs, with
   and without the controller, each with its own extras and its own `run_ci.py`.
   `pyproject.toml` gets a `nikon` extra: numpy, tifffile, zarr, ome-zarr-models, ipython.
 
 ## 11. What only the microscope can settle
 
-Each of these is said in the README's status, and `check_hardware.py` checks it first:
+Each of these is said in the README's status, and the hardware check (section 13) checks it first:
 
 1. **The moves.** Does `0` in `StgMoveXY(x, y, 0)` and `StgMoveZ(z, 0)` mean absolute, and
    does each call return once the stage has arrived? If it returns earlier, the read-back
@@ -528,3 +529,79 @@ heaviest points. These changed:
   - Sizes swap with a quarter turn.
   - The CI gets its own Nikon jobs.
   - Section 1 now says that `GetOptConfCount` answered 0 when NIS started normally.
+
+
+## 13. Every hardware setting, from one table (added 2026-10-29)
+
+The first version changed only the stage, the objective and the optical configuration. This
+section adds every piece of hardware NIS controls on its own, and moves the hardware check
+into NIS, because the microscope PC may have no Python but NIS's own.
+
+### The table
+
+`primitives/nis_python/devices.py` holds one row per hardware setting: 24 rows, 71 NIS
+functions. Each row names the function that reads the setting and the one that changes it,
+side by side, and says how to find the devices (one device there or not, devices NIS lists by
+name, or every line of every laser), what the setting takes (a switch, a position from 1, or a
+number with a tolerance), and whether it is **guarded**.
+
+- Light: shutters, lamps and LEDs (on, brightness, iris, their own ND filter), the ND filter.
+- Filters: every filter wheel and turret, by name.
+- Optics: light path, condenser, aperture, analyzer, zoom, relay lens, correction collar.
+- Focus: Perfect Focus on or off, and its offset.
+- Spinning disk: its shutter and speed.
+- Guarded: the TIRF position, the laser lines (used, power), the heating stage's temperature,
+  the incubator's gas and humidity.
+
+Every function name is in NIS-Elements AR 7.01.03's own list from step 0, and NIS offered every
+one without hardware (a test checks both against `testing/data/nis7_functions.csv`).
+
+**Left out, on purpose:** acquisitions NIS runs itself (ND experiments, stage scans, large
+images), actions with no reading (perfusion, the slide loader, autofocus runs), raw outputs
+(TTL, analog, serial ports, `PI_GcsCommand`), switching the microscope off, and the camera's own
+functions, which NIS offers only with the camera on. ZMART workflows build z-stacks and time
+series from single moves and pictures.
+
+### How the table is used
+
+The bridge allows the table's functions and no others. The driver reads a setting as
+`device/<key>/<device>` through the dispatcher, changes it with `set_device` (limits first,
+then the change, then the row's own reading as read-back), and lists every setting that is
+there in `get_state`'s changeable part (`"shutter/EPI"`, `"light_path"`). `set_state` applies
+the objective, then the optical configuration, then the hardware settings with the light last,
+and sends nothing for a setting that already holds the asked value. The limits file may hold
+`"devices": {"<key>" or "<key>/<device>": {"allowed": [...]} or {"range": [low, high]}}`; a
+guarded setting without an entry is refused.
+
+### What only the microscope can settle
+
+The argument lists follow Nikon's macro reference and the conventions the NIS 7 study confirmed
+for the first readings: a count, a position or a state as the return value; a name through an
+index from 0, a text place and its size; the device's name first. None is confirmed with the
+hardware on (every row says `confirmed=False`). The hardware check reports, for each:
+
+1. whether NIS offers the function, with NIS's own description where it gives one, and what
+   NIS's macro reference on the PC says about it (`reference.txt`);
+2. whether the device is found, and its value;
+3. with its group switched on: whether the change takes the arguments, what it returns (a DR
+   code is assumed: 1 or more is success), whether the reading shows it, and whether putting it
+   back works.
+
+Open points it settles: whether counts and states come back as the return value or through an
+argument; whether name lists count from 0; whether positions count from 1; which Perfect Focus
+statuses mean "holding"; how the laser unit numbers its lasers and lines; whether a lamp's
+"voltage" is a voltage or a percentage on LED sources.
+
+### The hardware check inside NIS
+
+`testing/hardware/check_hardware.mac` finds `check_hardware_nis.py` (at `C:\ZMART-drivers` or
+on the Desktop) and runs it in NIS's own Python, which needs nothing installed. The script
+loads the bridge's `server.py` and the table by their paths, and calls NIS exactly as the
+bridge does. Part 1 only reads. Part 2 changes what is switched on at the top of the script,
+one group at a time: a switch is turned over and back, a choice moves one position and back, a
+number (and anything guarded) is set to its own value. Part 3 takes one picture as the snap
+does. It replaces `check_hardware.py`, which needed a Python outside NIS. The offline suite runs
+the same script, and the macro's own line, against the pretend NIS with every switch on.
+
+Writing `start_bridge.mac` also works with NIS's own `python.exe`: the package now loads
+`connect` and `Microscope` (which need numpy) only when they are first used.

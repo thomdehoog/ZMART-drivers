@@ -123,6 +123,11 @@ def test_the_bridge_and_the_readings_agree_on_what_may_be_read():
             and isinstance(node.args[0], ast.Constant)
         ):
             called.add(node.args[0].value)
+    from zmart_drivers.nikon.nis_elements_ar7.primitives.nis_python import devices
+
+    called |= (
+        devices.READ_FUNCTIONS
+    )  # the table's readings, which reads.py calls through it
     assert called - server.READS == set(), (
         f"readings call NIS functions the bridge refuses: {sorted(called - server.READS)}"
     )

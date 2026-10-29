@@ -26,6 +26,7 @@ from __future__ import annotations
 from typing import Any
 
 from ..dispatcher import dispatch
+from ..primitives.nis_python import devices as device_table
 from ..primitives.nis_python import profile, writes
 from . import readings
 
@@ -94,3 +95,37 @@ def take_picture(client: Any, path: str) -> dict:
     if not result.get("success") or not reply.get("ok"):
         raise RuntimeError(f"the capture failed: {result.get('message')}")
     return dict(reply["answer"])
+
+
+def split_device_name(name: str) -> tuple[str, str | None]:
+    """``"shutter/EPI"`` as ``("shutter", "EPI")``; ``"light_path"`` as ``("light_path", None)``."""
+    key, _, instance = str(name).partition("/")
+    return key, instance or None
+
+
+def set_device(
+    client: Any, name: str, value: Any, *, inventory: dict | None = None
+) -> dict:
+    """Set one hardware setting, by its name (``"shutter/EPI"``, ``"light_path"``), and read it back.
+
+    The setting must be one of the table's (``devices.py``) and its device
+    must be there, and the value must be one it takes (1 or 0 for a switch,
+    a position from 1 for a choice, a number otherwise): otherwise
+    ``ValueError``, before anything is sent. Then the limits are asked, the
+    change is sent, and the setting is read back. *inventory* is what
+    ``readings.devices`` answered, when the caller has it already.
+    """
+    key, instance = split_device_name(name)
+    row = device_table.setting(key)
+    device_table.tokens_for(row, instance)
+    inventory = inventory if inventory is not None else readings.devices(client)
+    present = {
+        item["instance"]: item for item in inventory.get(key, {}).get("devices", [])
+    }
+    if instance not in present:
+        there = sorted(key + (f"/{i}" if i else "") for i in present) or "none"
+        raise ValueError(
+            f"NIS reports no device {name!r}; the {key} devices there are {there}"
+        )
+    checked = device_table.checked_value(row, value, present[instance].get("positions"))
+    return dispatch.run(profile, client, writes.set_device(key, instance, checked))

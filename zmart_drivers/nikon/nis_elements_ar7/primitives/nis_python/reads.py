@@ -28,6 +28,7 @@ from __future__ import annotations
 import math
 from typing import Any
 
+from . import devices
 from .client import NisRefused, ptr
 
 #: NIS's own return codes of its device functions, by name.
@@ -291,6 +292,31 @@ def get_open_documents(client) -> list[str]:
     )
 
 
+def nis_call(client):
+    """How the table of hardware settings reaches NIS from the driver: through the client's readings."""
+    return lambda fn, args: client.read(fn, args)
+
+
+def get_devices(client) -> dict:
+    """Every hardware setting of the table, as NIS has it now (see ``devices.discover``)."""
+    return devices.discover(nis_call(client))
+
+
+def get_device(client, key: str, instance: str | None = None):
+    """One hardware setting's value now, for one of its devices; ``NisRefused`` when NIS gives none."""
+    return devices.read(nis_call(client), devices.setting(key), instance)
+
+
+def device_reading(name: str):
+    """The reading for ``device/<key>`` or ``device/<key>/<device>``: a function of the client alone."""
+    _, key, *rest = name.split("/", 2)
+    instance = rest[0] if rest else None
+    devices.tokens_for(
+        devices.setting(key), instance
+    )  # a wrong name is said now, not at every try
+    return lambda client: get_device(client, key, instance)
+
+
 READS = {
     "version": get_version,
     "xy": get_xy,
@@ -302,4 +328,5 @@ READS = {
     "pfs": get_pfs,
     "image_info": get_image_info,
     "calibration": get_calibration,
+    "devices": get_devices,
 }

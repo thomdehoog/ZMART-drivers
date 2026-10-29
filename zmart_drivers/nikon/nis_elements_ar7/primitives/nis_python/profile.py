@@ -119,6 +119,7 @@ SUCCESS = {
     "pfs": is_dict,
     "image_info": is_dict,
     "calibration": is_dict,
+    "devices": is_dict,
 }
 
 DATUMS = {
@@ -127,8 +128,21 @@ DATUMS = {
 }
 
 
+def has_value(value, *, about=None) -> bool:
+    return value is not None
+
+
 def spec(datum) -> DatumSpec:
-    """The row of the table of readings for *datum*."""
+    """The row of the table of readings for *datum*.
+
+    A hardware setting of the table in ``devices.py`` is read by the name
+    ``device/<key>`` (a single device) or ``device/<key>/<device>``, such as
+    ``device/shutter/EPI``.
+    """
+    if isinstance(datum, str) and datum.startswith("device/"):
+        return DatumSpec(
+            name=datum, read=reads.device_reading(datum), success=has_value
+        )
     found = DATUMS.get(datum)
     if found is None:
         raise ValueError(

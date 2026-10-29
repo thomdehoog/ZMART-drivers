@@ -56,6 +56,8 @@ Settings (the changeable part of the state): objective_position is the nosepiece
 
 Objectives on the nosepiece, as position: name: {objectives}.
 
+Hardware settings (also changeable, by set_state, and applied after the objective and the optical configuration, the light last so that it comes on only once its path is set): {hardware} A setting marked guarded is refused until this microscope's limits allow it, because a wrong value could harm the sample, the microscope or a person.
+
 Acquiring has one trigger, snap: one picture with the settings as they are, taken into a new NIS document, saved by NIS as a TIFF, and then converted by the driver into one OME-Zarr store in the output folder acquire is given (or else this microscope's data location), named by the acquisition type and the position label. The pixel size is NIS's own calibration of the objective; a picture taken with an uncalibrated objective cannot be placed on the sample and is not saved."""
 
 
@@ -97,12 +99,47 @@ def described(handle) -> str:
         ", ".join(try_(lambda: readings.optical_configurations(handle.client)) or [])
         or "none"
     )
+    inventory = try_(lambda: readings.devices(handle.client)) or {}
     return DESCRIPTION.format(
+        hardware=hardware_described(inventory),
         version=handle.nis_version or "7",
         limits=limits,
         pfs=pfs,
         configurations=configurations,
         objectives=objectives,
+    )
+
+
+def hardware_described(inventory: dict) -> str:
+    """One sentence per hardware setting this microscope has: its name in set_state, what it is, what it takes."""
+    sentences = []
+    for key, entry in inventory.items():
+        for item in entry.get("devices", []):
+            name = key + (f"/{item['instance']}" if item["instance"] else "")
+            label = (
+                f" ({item['label']})"
+                if item.get("label") and item["label"] != item["instance"]
+                else ""
+            )
+            if entry["kind"] == "switch":
+                takes = "1 or 0"
+            elif entry["kind"] == "choice":
+                takes = (
+                    f"a position from 1 to {item['positions']}"
+                    if item.get("positions")
+                    else "a position from 1"
+                )
+            else:
+                takes = "a number" + (
+                    f" in {entry['unit']}" if entry.get("unit") else ""
+                )
+            guarded = ", guarded" if entry.get("guarded") else ""
+            sentences.append(
+                f"{name}{label} is {entry['says']}; it takes {takes}{guarded}, and is {item['value']} now."
+            )
+    return (
+        " ".join(sentences)
+        or "NIS reports none of the hardware settings the driver knows."
     )
 
 

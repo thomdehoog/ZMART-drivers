@@ -474,7 +474,12 @@ The dispatcher is the Leica driver's, copied unchanged.
   records the picture size and pixel size seen for each objective and optical
   configuration, which `get_state` reports.
 - Most of what NIS 7 does with the microscope switched on is not yet known;
-  `testing/hardware/check_hardware.py` asks it.
+  the hardware check asks it. It runs inside NIS's own Python
+  (`testing/hardware/check_hardware.mac`), because a microscope PC may
+  have no other Python.
+- Every hardware setting NIS controls on its own is one row of a table,
+  `primitives/nis_python/devices.py`, which the bridge, the driver and the
+  hardware check all read: a reading and a change side by side.
 
 The ZEISS and mesoSPIM drivers and the controller's mock driver are not in
 this beta. When they come back, they come back in this anatomy.

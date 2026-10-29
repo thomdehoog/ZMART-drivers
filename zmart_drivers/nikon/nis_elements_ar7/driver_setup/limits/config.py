@@ -29,9 +29,48 @@ import math
 from pathlib import Path
 from typing import Any
 
+from ...primitives.nis_python import devices as device_table
 from .. import store
 
 KEYS = ("x_um", "y_um", "z_um", "objective_position", "optical_configuration")
+#: Keys a limits file may leave out.
+OPTIONAL_KEYS = ("devices",)
+
+
+def _devices(value: Any, *, path: Path) -> dict:
+    """The hardware settings' limits: ``{"<key>" or "<key>/<device>": {"allowed": [...]} or {"range": [low, high]}}``."""
+    if not isinstance(value, dict):
+        raise ValueError(  # noqa: TRY004 -- a wrong file is a ValueError, as every limits problem is
+            f"{path}: devices must map each hardware setting to its limits, got {value!r}"
+        )
+    checked = {}
+    for name, entry in value.items():
+        key = str(name).split("/", 1)[0]
+        if key not in device_table.SETTINGS:
+            raise ValueError(
+                f"{path}: devices.{name}: no hardware setting {key!r}; the settings are {sorted(device_table.SETTINGS)}"
+            )
+        if (
+            not isinstance(entry, dict)
+            or not entry
+            or set(entry) - {"allowed", "range"}
+        ):
+            raise ValueError(
+                f"{path}: devices.{name} must be {{'allowed': [values]}} or {{'range': [low, high]}}, got {entry!r}"
+            )
+        out = {}
+        if "allowed" in entry:
+            if not isinstance(entry["allowed"], list) or not entry["allowed"]:
+                raise ValueError(
+                    f"{path}: devices.{name}.allowed must be a list of values, got {entry['allowed']!r}"
+                )
+            out["allowed"] = list(entry["allowed"])
+        if "range" in entry:
+            out["range"] = _range(
+                {"range": entry["range"]}, path=path, name=f"devices.{name}"
+            )
+        checked[str(name)] = out
+    return checked
 
 
 def _range(value: Any, *, path: Path, name: str) -> list[float]:
@@ -83,10 +122,10 @@ def validate_payload(payload: Any, *, path: Path = Path("limits.json")) -> dict:
     if not isinstance(payload, dict):
         raise ValueError(f"{path}: the limits must be a JSON object")  # noqa: TRY004 -- a wrong file is a ValueError, as every limits problem is
     missing = sorted(set(KEYS) - set(payload))
-    unknown = sorted(set(payload) - set(KEYS))
+    unknown = sorted(set(payload) - set(KEYS) - set(OPTIONAL_KEYS))
     if missing or unknown:
         raise ValueError(
-            f"{path}: missing {missing}, unknown {unknown}; the keys are {list(KEYS)}"
+            f"{path}: missing {missing}, unknown {unknown}; the keys are {list(KEYS)}, and optionally {list(OPTIONAL_KEYS)}"
         )
     checked = {
         axis: {"range": _range(payload[axis], path=path, name=axis)}
@@ -101,6 +140,8 @@ def validate_payload(payload: Any, *, path: Path = Path("limits.json")) -> dict:
         name="optical_configuration",
         kind=str,
     )
+    if "devices" in payload:
+        checked["devices"] = _devices(payload["devices"], path=path)
     return checked
 
 

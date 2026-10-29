@@ -5,7 +5,7 @@
 
     python run_ci.py               the offline suite: lint, the driver layer, the controller layer, coverage
     python run_ci.py --controller  as above, and a missing ZMART Controller is a failure
-    python run_ci.py --hardware    the first checks at a real microscope (testing/hardware/check_hardware.py)
+    python run_ci.py --hardware    how to run the hardware check, which runs inside NIS-Elements
 
 There are two layers of tests. The driver layer needs only the driver,
 because the driver is also used by itself. The controller layer checks the
@@ -37,6 +37,17 @@ DRIVER_ROOT = Path(__file__).resolve().parents[1]
 REPO_ROOT = DRIVER_ROOT.parents[2]
 TESTING = DRIVER_ROOT / "testing"
 REPORT_DIR = TESTING / "report"
+
+
+HARDWARE_HOW_TO = """
+The hardware check runs inside NIS-Elements, in NIS's own Python, so it is not started from here.
+At the microscope:
+  1. Copy the ZMART-drivers folder to C:\\ZMART-drivers (or onto the Desktop).
+  2. Open testing\\hardware\\check_hardware_nis.py in Notepad and switch on, at the top,
+     what may change (one group at a time, with someone at the microscope).
+  3. In NIS-Elements: Macro > Run Macro From File > testing\\hardware\\check_hardware.mac.
+  4. The results folder appears beside check_hardware_nis.py.
+"""
 
 
 def build_env() -> dict:
@@ -96,7 +107,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--hardware",
         action="store_true",
-        help="run the first checks at a real microscope",
+        help="say how to run the hardware check inside NIS-Elements",
     )
     parser.add_argument(
         "--no-coverage", action="store_true", help="run without measuring coverage"
@@ -110,11 +121,12 @@ def main(argv: list[str] | None = None) -> int:
     ]
 
     if args.hardware:
+        print(HARDWARE_HOW_TO, flush=True)
         steps.append(
-            run_step(
+            skipped(
                 "hardware",
-                [python, str(TESTING / "hardware" / "check_hardware.py")],
-                fatal=True,
+                "runs inside NIS-Elements, started by check_hardware.mac",
+                fatal=False,
             )
         )
     else:

@@ -52,3 +52,25 @@ def test_each_bootstrap_finds_the_repository():
     for bootstrap in driver.rglob("notebooks/bootstrap.py"):
         assert "parents[6]" in bootstrap.read_text(encoding="utf-8"), bootstrap
         assert bootstrap.resolve().parents[6] == REPO_ROOT
+
+
+def test_the_bridge_macro_is_written_by_nis_own_python_with_nothing_installed(tmp_path):
+    """On the microscope PC only NIS's own Python may be there; writing start_bridge.mac must need nothing more."""
+    code = (
+        "import builtins, runpy, sys;"
+        "real = builtins.__import__;"
+        "blocked = ('numpy', 'tifffile', 'zarr', 'ome_zarr_models', 'pydantic_zarr', 'ome_types', 'zmart_controller');"
+        "builtins.__import__ = lambda name, *a, **k: (_ for _ in ()).throw(ImportError(name)) if name.split('.')[0] in blocked else real(name, *a, **k);"
+        f"sys.argv = ['nis_bridge', '--folder', {str(tmp_path)!r}];"
+        "runpy.run_module('zmart_drivers.nikon.nis_elements_ar7.driver_setup.nis_bridge', run_name='__main__')"
+    )
+    done = subprocess.run(
+        [sys.executable, "-c", code],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        timeout=60,
+        check=False,
+    )
+    assert done.returncode == 0, done.stderr
+    assert (tmp_path / "start_bridge.mac").is_file()

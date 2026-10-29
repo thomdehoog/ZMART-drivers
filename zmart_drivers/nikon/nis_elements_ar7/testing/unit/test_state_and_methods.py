@@ -26,10 +26,11 @@ def test_connect_reads_the_version_and_installs_the_limits(scope):
 
 def test_the_state_can_be_read_with_no_image_open(scope):
     state = scope.state()
-    assert state["changeable"] == {
-        "objective_position": 1,
-        "optical_configuration": None,
-    }
+    assert state["changeable"]["objective_position"] == 1
+    assert state["changeable"]["optical_configuration"] is None
+    assert (
+        state["changeable"]["shutter/EPI"] == 0
+    )  # and every hardware setting that is there
     observed = state["observed"]
     assert (
         observed["image_size_px"] is None
@@ -73,7 +74,10 @@ def test_a_quarter_turn_swaps_the_picture_size(scope):
 def test_set_state_round_trips_get_state(scope):
     scope.set_state({"objective_position": 2, "optical_configuration": "GFP"})
     changeable = scope.state()["changeable"]
-    assert changeable == {"objective_position": 2, "optical_configuration": "GFP"}
+    assert (
+        changeable["objective_position"] == 2
+        and changeable["optical_configuration"] == "GFP"
+    )
     assert scope.set_state(changeable)["applied"] == changeable
 
 

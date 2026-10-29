@@ -3,12 +3,19 @@
 The *changeable* part is what ``set_state`` applies: the objective (its
 position on the nosepiece, counted from 1) and the optical configuration (a
 named setup in NIS-Elements that carries the light path, the filters, the
-camera's exposure and, often, the objective). Applying both again restores
-the imaging setup. The *observed* part can only be read: the NIS version,
+camera's exposure and, often, the objective), then every hardware setting of
+the table in ``primitives/nis_python/devices.py`` whose device NIS reports:
+a shutter is ``"shutter/EPI"``, the light path is ``"light_path"``, a laser
+line's power is ``"laser_power/0.2"``. Applying them all again restores the
+imaging setup. ``set_state`` applies the objective, then the optical
+configuration, then the hardware settings, the light last (see
+:data:`GROUP_ORDER`). The *observed* part can only be read: the NIS version,
 the stage's travel, the objectives and optical configurations there are,
 Perfect Focus, the limits in force, which objective the origin was saved
 under, how far this microscope is set up, the changes that were sent but
-never confirmed, and the size of a picture and of its pixels.
+never confirmed, every hardware setting there is with what it means and
+which values it takes (``devices``), and the size of a picture and of its
+pixels.
 
 The size of a picture (``image_size_px``) and of its pixels
 (``pixel_size_um``) are the two keys the ZMART Controller asks every driver
@@ -35,6 +42,7 @@ from typing import Any
 
 from ..dispatcher import limits as gate
 from ..driver_setup import pixel_size
+from ..primitives.nis_python import devices as device_table
 from . import changes, readings
 
 log = logging.getLogger(__name__)
@@ -127,6 +135,7 @@ def get_state(handle) -> dict:
         lambda: readings.selected_optical_configuration(client),
     )
     limits = gate.describe(client)
+    inventory = _try("the hardware settings", lambda: readings.devices(client)) or {}
     origin_objective = handle.origin.get("objective")
     observed: dict[str, Any] = {
         "vendor": "nikon",
@@ -145,30 +154,44 @@ def get_state(handle) -> dict:
         "orientation": dict(handle.orientation_info or {}),
         "setup": setup_readiness(handle, limits),
         "unconfirmed": list(handle.unconfirmed),
+        "devices": {
+            key: entry
+            for key, entry in inventory.items()
+            if entry["devices"] or entry["error"]
+        },
     }
     return {
         "changeable": {
             "objective_position": position,
             "optical_configuration": configuration,
+            **readings.device_names(inventory, settable_only=True),
         },
         "observed": observed,
     }
 
 
 def set_state(handle, changeable: dict) -> dict:
-    """Apply the objective, then the optical configuration (it may bring an objective of its own); what was applied.
+    """Apply the objective, then the optical configuration (it may bring an objective of its own), then the hardware settings; what was applied.
 
-    Each is read back. ``ValueError`` for a setting this microscope does not
-    have, or a value NIS does not offer; ``RuntimeError`` when NIS refused or
-    the limits did. A change that was sent but never seen is recorded, and
-    reported with the answer.
+    The hardware settings are named as ``get_state`` names them
+    (``"shutter/EPI"``, ``"light_path"``) and applied in the order of
+    :data:`GROUP_ORDER`, the light last. Each change is read back.
+
+    Everything asked is checked before anything is sent: an unknown setting
+    or a value it does not take raises ``ValueError``, and a value the limits
+    refuse raises ``RuntimeError``, with nothing changed. A hardware setting
+    is read again just before its turn, after the optical configuration has
+    had its say, and is not sent when it already holds the asked value. A
+    change that was sent but never seen is recorded, and reported with the
+    answer.
     """
     handle.require_open()
-    unknown = sorted(set(changeable) - set(CHANGEABLE))
-    if unknown:
-        raise ValueError(
-            f"no changeable setting {unknown}; the changeable settings are {list(CHANGEABLE)}"
-        )
+    client = handle.client
+    asked = {name: value for name, value in changeable.items() if value is not None}
+    asked_devices = {
+        name: value for name, value in asked.items() if name not in CHANGEABLE
+    }
+    checked = check_everything(handle, asked, asked_devices)
     noted_before = len(handle.unconfirmed)
     applied: dict[str, Any] = {}
     steps = (
@@ -176,10 +199,10 @@ def set_state(handle, changeable: dict) -> dict:
         ("optical_configuration", changes.select_optical_configuration),
     )
     for name, change in steps:
-        value = changeable.get(name)
-        if value is None:
+        if name not in asked:
             continue
-        result = change(handle.client, value)
+        value = asked[name]
+        result = change(client, value)
         if not result.get("success"):
             raise RuntimeError(
                 f"{name} {value!r} was not applied: {result.get('message')}"
@@ -187,4 +210,123 @@ def set_state(handle, changeable: dict) -> dict:
         if not result.get("confirmed"):
             handle.note_unconfirmed(f"set_state: {name} {value!r}", result)
         applied[name] = value
+    for name in device_order(asked_devices):
+        value = checked[name]
+        key, instance = changes.split_device_name(name)
+        row = device_table.setting(key)
+        if row.confirms:
+            try:
+                now = readings.device(client, key, instance)
+            except RuntimeError:
+                now = None
+            if device_table.matches(row, value, now):
+                applied[name] = (
+                    value  # already so: nothing is sent, not even to a guarded setting
+                )
+                continue
+        result = changes.set_device(
+            client, name, value, inventory=checked["_inventory"]
+        )
+        if not result.get("success"):
+            raise RuntimeError(
+                f"{name} {value!r} was not applied: {result.get('message')}"
+            )
+        if not result.get("confirmed") and row.confirms:
+            handle.note_unconfirmed(f"set_state: {name} {value!r}", result)
+        applied[name] = value
     return {"applied": applied, "unconfirmed": list(handle.unconfirmed[noted_before:])}
+
+
+def check_everything(handle, asked: dict, asked_devices: dict) -> dict:
+    """Check every asked setting and value, and ask the limits, before anything is sent.
+
+    Answers the hardware settings' values as they will be sent (a switch as
+    1 or 0, a position as a whole number), and, under ``"_inventory"``, what
+    NIS reported about its devices. Raises ``ValueError`` for an unknown
+    setting or a value it does not take, and ``RuntimeError`` for a value
+    the limits refuse.
+    """
+    client = handle.client
+    checked: dict[str, Any] = {"_inventory": None}
+    if "optical_configuration" in asked:
+        known = readings.optical_configurations(client)
+        if asked["optical_configuration"] not in known:
+            raise ValueError(
+                f"no optical configuration {asked['optical_configuration']!r}; NIS has {known}"
+            )
+    for name, command in (
+        ("objective_position", "set_objective"),
+        ("optical_configuration", "select_optical_configuration"),
+    ):
+        if name in asked:
+            refusal = gate.check_refusal(client, command, {name: asked[name]})
+            if refusal:
+                raise RuntimeError(f"nothing was changed: {refusal}")
+    if not asked_devices:
+        return checked
+    inventory = readings.devices(client)
+    checked["_inventory"] = inventory
+    offered = readings.device_names(inventory)
+    unknown = sorted(set(asked_devices) - set(offered))
+    if unknown:
+        raise ValueError(
+            f"no changeable setting {unknown}; the changeable settings are "
+            f"{list(CHANGEABLE) + sorted(readings.device_names(inventory, settable_only=True))}"
+        )
+    for name, value in asked_devices.items():
+        key, instance = changes.split_device_name(name)
+        row = device_table.setting(key)
+        positions = next(
+            (
+                d.get("positions")
+                for d in inventory[key]["devices"]
+                if d["instance"] == instance
+            ),
+            None,
+        )
+        value = device_table.checked_value(row, value, positions)
+        checked[name] = value
+        if row.confirms and device_table.matches(row, value, offered.get(name)):
+            # Already so: nothing will be sent unless it changes before its turn,
+            # and then the limits gate is asked as for every change.
+            continue
+        refusal = gate.check_refusal(
+            client, "set_device", {"device": key, "instance": instance, "value": value}
+        )
+        if refusal:
+            raise RuntimeError(f"nothing was changed: {refusal}")
+        checked[name] = value
+    return checked
+
+
+#: The order in which ``set_state`` applies hardware settings: the light path,
+#: optics and filters first, and the light itself last, so that a shutter
+#: opens or a lamp comes on only once the light has its way to the sample.
+GROUP_ORDER = (
+    "optics",
+    "filters",
+    "focus",
+    "spinning disk",
+    "TIRF",
+    "environment",
+    "lasers",
+    "light",
+)
+
+
+def device_order(names) -> list[str]:
+    """The hardware settings in the order they are applied (see :data:`GROUP_ORDER`), then the table's order."""
+    rows = {row.key: index for index, row in enumerate(device_table.TABLE)}
+
+    def place(name: str) -> tuple:
+        key = name.partition("/")[0]
+        group = (
+            device_table.SETTINGS[key].group if key in device_table.SETTINGS else None
+        )
+        return (
+            GROUP_ORDER.index(group) if group in GROUP_ORDER else len(GROUP_ORDER),
+            rows.get(key, 0),
+            name,
+        )
+
+    return sorted(names, key=place)

@@ -122,3 +122,19 @@ def test_save_data_runs_and_an_unknown_procedure_fails(controller):
     assert controller.run_procedure({"name": "save_data"})["success"]
     unknown = controller.run_procedure({"name": "clear_cache"})
     assert unknown["success"] is False and "unknown procedure" in unknown["output"]
+
+
+def test_a_hardware_setting_goes_through_the_controllers_set_state(
+    controller, stand_in
+):
+    state = controller.get_state()["output"]
+    assert state["changeable"]["shutter/EPI"] == 0
+    applied = controller.set_state({"changeable": {"shutter/EPI": 1, "light_path": 2}})
+    assert applied == {
+        "success": True,
+        "output": {"applied": {"light_path": 2, "shutter/EPI": 1}},
+    }
+    assert stand_in.scope.shutters["EPI"] == 1 and stand_in.scope.light_path == 2
+    refused = controller.set_state({"changeable": {"laser_power/0.1": 40.0}})
+    assert refused["success"] is False and "guarded" in refused["output"]
+    assert "shutter/EPI" in controller.get_info()["output"]["description"]

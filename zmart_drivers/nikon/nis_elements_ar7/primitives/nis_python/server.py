@@ -94,31 +94,59 @@ PTR_TYPES = (
     "word",
 )
 
+
+def _sibling(name: str) -> Any:
+    """A file beside this one, loaded by its path: inside NIS this file is not part of a package."""
+    import importlib.util
+
+    # Always loaded afresh: NIS's Python lives on between runs of the macro,
+    # and an updated table must never meet an old copy of itself.
+    module_name = f"zmart_nis_bridge_{name}"
+    spec = importlib.util.spec_from_file_location(
+        module_name,
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), f"{name}.py"),
+    )
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[module_name] = (
+        module  # a dataclass looks its module up while it is made
+    )
+    spec.loader.exec_module(module)
+    return module
+
+
+#: The table of hardware settings (``devices.py``), whose functions the bridge also allows.
+devices = _sibling("devices")
+
 #: The NIS functions the driver may read through, and nothing else.
-READS = frozenset(
-    {
-        "Get_InfoStr",
-        "StgGetPosXY",
-        "StgGetPosZ",
-        "StgXY_GetLimits",
-        "StgZ_GetLimits",
-        "GetOptConfCount",
-        "GetOptConfName",
-        "GetSelectedOptConf",
-        "Stg_IsNosepiecePresent",
-        "Stg_GetNosepiecePositions",
-        "Stg_GetNosepiecePosition",
-        "Stg_GetNosepieceObjectiveName",
-        "Stg_IsPFSPresent",
-        "Stg_GetPFSStatus",
-        "Get_ImageInfo",
-        "Get_Calibration",
-        "GetOpenedDocumentList",
-    }
+READS = (
+    frozenset(
+        {
+            "Get_InfoStr",
+            "StgGetPosXY",
+            "StgGetPosZ",
+            "StgXY_GetLimits",
+            "StgZ_GetLimits",
+            "GetOptConfCount",
+            "GetOptConfName",
+            "GetSelectedOptConf",
+            "Stg_IsNosepiecePresent",
+            "Stg_GetNosepiecePositions",
+            "Stg_GetNosepiecePosition",
+            "Stg_GetNosepieceObjectiveName",
+            "Stg_IsPFSPresent",
+            "Stg_GetPFSStatus",
+            "Get_ImageInfo",
+            "Get_Calibration",
+            "GetOpenedDocumentList",
+        }
+    )
+    | devices.READ_FUNCTIONS
 )
-#: The NIS functions that change something, sent only as a ``write``.
-WRITES = frozenset(
-    {"StgMoveXY", "StgMoveZ", "SelectOptConf", "Stg_SetNosepiecePosition"}
+#: The NIS functions that change something, sent only as a ``write``: the
+#: stage, the objective, the optical configuration, and each row of the table.
+WRITES = (
+    frozenset({"StgMoveXY", "StgMoveZ", "SelectOptConf", "Stg_SetNosepiecePosition"})
+    | devices.WRITE_FUNCTIONS
 )
 #: The moves, checked against NIS's own travel before they are called.
 MOVES = {"StgMoveXY", "StgMoveZ"}

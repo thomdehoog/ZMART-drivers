@@ -29,4 +29,17 @@ __version__ = "0.1.0a1"
 
 __all__ = ["Microscope", "__version__", "connect"]
 
-from .methods import Microscope, connect
+
+def __getattr__(name):
+    """``connect`` and ``Microscope``, loaded when first asked for.
+
+    They need numpy and the OME-Zarr packages, which NIS-Elements' own Python
+    does not have. Loading them only when asked lets that Python use the
+    parts that need nothing installed, such as writing the bridge's macro
+    (``python -m zmart_drivers.nikon.nis_elements_ar7.driver_setup.nis_bridge``).
+    """
+    if name in ("connect", "Microscope"):
+        from . import methods
+
+        return getattr(methods, name)
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

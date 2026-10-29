@@ -55,7 +55,7 @@ from .driver_setup.origin import saved_origin
 from .driver_setup.origin import set_origin as origin_step
 from .primitives.nis_python import server
 from .primitives.nis_python.client import NisClient
-from .procedures import absolute_coordinate_system, readings
+from .procedures import absolute_coordinate_system, changes, readings
 from .procedures import acquire as acquire_step
 from .procedures import state as state_step
 from .procedures.save_data import save as save_step
@@ -322,13 +322,47 @@ class Microscope:
         return state_step.get_state(self.handle)
 
     def set_state(self, changeable: dict) -> dict:
-        """Change the objective and the optical configuration together: ``{"objective_position", "optical_configuration"}``.
+        """Change several settings together, named as ``state()["changeable"]`` names them.
 
-        Either may be left out. The objective is changed first, because an
-        optical configuration may bring an objective of its own and should
-        have the last word. Answers ``{"applied", "unconfirmed"}``.
+        For example ``{"objective_position": 2, "optical_configuration": "GFP",
+        "shutter/EPI": 1}``; any may be left out. The objective is changed
+        first, because an optical configuration may bring an objective of its
+        own and should have the last word; the hardware settings follow, the
+        light last. Answers ``{"applied", "unconfirmed"}``.
         """
         return state_step.set_state(self.handle, changeable)
+
+    # --- the hardware settings -----------------------------------------------------------
+
+    def devices(self) -> dict:
+        """Every hardware setting the driver knows, and which of them this microscope has.
+
+        Each entry says what the setting is (``says``), its kind (``switch``:
+        1 or 0; ``choice``: a position from 1; ``number``), its unit, whether
+        it is ``guarded`` (refused until this microscope's limits allow it),
+        and its ``devices``: each one NIS reports, with its value now and, for
+        a choice, how many positions it has. A setting with no devices is not
+        on this microscope.
+        """
+        self.handle.require_open()
+        return readings.devices(self.handle.client)
+
+    def device(self, name: str):
+        """One hardware setting's value now, by its name: ``device("shutter/EPI")``, ``device("light_path")``."""
+        self.handle.require_open()
+        key, instance = changes.split_device_name(name)
+        return readings.device(self.handle.client, key, instance)
+
+    def set_device(self, name: str, value) -> dict:
+        """Set one hardware setting and read it back: ``set_device("shutter/EPI", 1)``; ``{"applied", "unconfirmed"}``.
+
+        ``ValueError`` when the setting or its device is not there, or the
+        value is not one it takes; ``RuntimeError`` when the limits or NIS
+        refused it.
+        """
+        if value is None:
+            raise ValueError(f"set_device({name!r}) needs a value")
+        return state_step.set_state(self.handle, {name: value})
 
 
 def saved_data_location(machine: store.MachineProfile) -> Path | None:

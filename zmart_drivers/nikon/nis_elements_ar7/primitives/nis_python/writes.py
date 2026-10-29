@@ -27,6 +27,8 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 
+from . import devices
+
 #: How close a move must come, in micrometres, unless the caller says.
 XY_TOLERANCE_UM = 1.0
 Z_TOLERANCE_UM = 0.5
@@ -222,4 +224,34 @@ def capture(path: str) -> Write:
         description=f"Capture -> {path}",
         never_resend=True,
         dr_code=False,
+    )
+
+
+def set_device(key: str, instance: str | None, value) -> Write:
+    """Set one hardware setting of the table (``devices.py``) to *value*, and read it back.
+
+    The value must already be checked (``devices.checked_value``). The
+    reading that confirms it is the row's own reading, ``device/<key>`` or
+    ``device/<key>/<device>``, the mirror of the change. A setting that only
+    moves towards its target (a temperature) is sent and not read back.
+    Setting the same value twice does no harm, so a setting is sent again
+    when it was not seen to take effect.
+    """
+    row = devices.setting(key)
+    arguments = devices.write_arguments(row, instance, value)
+    reading = f"device/{key}" + (f"/{instance}" if instance else "")
+
+    def fill(request):
+        request.args = list(arguments)
+
+    def shows(found) -> bool:
+        return devices.matches(row, value, found)
+
+    return Write(
+        command="set_device",
+        values={"device": key, "instance": instance, "value": value},
+        request=row.write.fn,
+        fill=fill,
+        description=f"{row.write.fn} -> {reading.removeprefix('device/')} = {value}",
+        confirm=Expect(reading, shows) if row.confirms else None,
     )

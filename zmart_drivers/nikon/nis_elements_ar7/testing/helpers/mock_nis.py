@@ -135,6 +135,26 @@ class PretendMicroscope:
         self.calls: list[str] = []
         #: Function name -> the value it answers next time instead of doing its work.
         self.answer_next: dict[str, object] = {}
+        #: The hardware of the table in devices.py that this pretend microscope has.
+        #: What is left out here (an ND filter, an aperture, a zoom, a spinning
+        #: disk, TIRF, a heating stage) answers as NIS does for absent hardware.
+        self.shutters = {"EPI": 0, "DIA": 0}
+        self.lamps = {"DIA LED": {"state": 0, "voltage": 3.0, "iris": 1.0, "nd": 1}}
+        self.lamp_nd_steps = 4
+        self.filters = {"Filter Turret 1": 1, "Emission Wheel": 1}
+        self.filter_positions = 6
+        self.light_path = 1
+        self.light_path_positions = 4
+        self.condenser = 1
+        self.condenser_positions = 7
+        self.pfs_offset = 100
+        self.laser_lines = {
+            "405 nm": [0, 0.0],
+            "488 nm": [0, 0.0],
+            "561 nm": [0, 0.0],
+            "640 nm": [0, 0.0],
+        }
+        self.incubator = {"gas": 5.0, "humidity": 90.0}
 
     # -- the stage ---------------------------------------------------------------------------
 
@@ -150,10 +170,12 @@ class PretendMicroscope:
         )
 
     def _start_move(self, x=None, y=None, z=None):
+        # An axis that is not asked keeps going to where it was going: the
+        # stage's axes move independently, as on a real microscope.
         self.x_from, self.y_from, self.z_from = self.position()
-        self.x_to = self.x_from if x is None else x
-        self.y_to = self.y_from if y is None else y
-        self.z_to = self.z_from if z is None else z
+        self.x_to = self.x_to if x is None else x
+        self.y_to = self.y_to if y is None else y
+        self.z_to = self.z_to if z is None else z
         self.moved_at = time.monotonic()
 
     def place(self, x: float, y: float, z: float) -> None:
@@ -436,6 +458,354 @@ def CloseCurrentDocument(scope, mode):
     return 1
 
 
+# =============================================================================
+# The hardware of the table in devices.py
+# =============================================================================
+#
+# These follow the arguments the table expects (a count or a position as the
+# return value, a name through an index, a text place and its size; the
+# setting's device by its name first). That is what is known of NIS 7 so far;
+# the hardware check confirms it at a microscope. A device the pretend
+# microscope does not have answers DR_NOTAVAILABLE (-4), or 0 when asked
+# whether it is there.
+
+NOT_AVAILABLE = -4
+
+
+def _named(table, index, text):
+    names = list(table)
+    if not 0 <= index < len(names):
+        return -2
+    text.set(names[index])
+    return 1
+
+
+def _set_from(table, name, value, key=None):
+    if name not in table:
+        return -2
+    if key is None:
+        table[name] = value
+    else:
+        table[name][key] = value
+    return 1
+
+
+@_function
+def Stg_GetShutterCount(scope):
+    return len(scope.shutters)
+
+
+@_function
+def Stg_GetShutterName(scope, index, text, size):
+    return _named(scope.shutters, index, text)
+
+
+@_function
+def Stg_GetShutterStateEx(scope, name, state):
+    if name not in scope.shutters:
+        return -2
+    state.set(scope.shutters[name])
+    return 1
+
+
+@_function
+def Stg_SetShutterStateEx(scope, name, state):
+    return _set_from(scope.shutters, name, int(state))
+
+
+@_function
+def Stg_Light_GetCount(scope):
+    return len(scope.lamps)
+
+
+@_function
+def Stg_Light_GetName(scope, index, text, size):
+    return _named(scope.lamps, index, text)
+
+
+def _lamp_reader(key):
+    def read(scope, name, out):
+        if name not in scope.lamps:
+            return -2
+        out.set(scope.lamps[name][key])
+        return 1
+
+    return read
+
+
+def _lamp_writer(key, kind):
+    def write(scope, name, value):
+        return _set_from(scope.lamps, name, kind(value), key)
+
+    return write
+
+
+def _with_name(fn, name):
+    fn.__name__ = name
+    return _function(fn)
+
+
+Stg_Light_GetState = _with_name(_lamp_reader("state"), "Stg_Light_GetState")
+Stg_Light_SetState = _with_name(_lamp_writer("state", int), "Stg_Light_SetState")
+Stg_Light_GetVoltage = _with_name(_lamp_reader("voltage"), "Stg_Light_GetVoltage")
+Stg_Light_SetVoltage = _with_name(
+    _lamp_writer("voltage", float), "Stg_Light_SetVoltage"
+)
+Stg_Light_GetIrisIntensity = _with_name(
+    _lamp_reader("iris"), "Stg_Light_GetIrisIntensity"
+)
+Stg_Light_SetIrisIntensity = _with_name(
+    _lamp_writer("iris", float), "Stg_Light_SetIrisIntensity"
+)
+Stg_Light_GetNDFilterPosition = _with_name(
+    _lamp_reader("nd"), "Stg_Light_GetNDFilterPosition"
+)
+Stg_Light_SetNDFilterPosition = _with_name(
+    _lamp_writer("nd", int), "Stg_Light_SetNDFilterPosition"
+)
+
+
+@_function
+def Stg_Light_GetNDFilterSteps(scope, name):
+    return scope.lamp_nd_steps if name in scope.lamps else -2
+
+
+@_function
+def Stg_Filter_GetCount(scope):
+    return len(scope.filters)
+
+
+@_function
+def Stg_Filter_GetName(scope, index, text, size):
+    return _named(scope.filters, index, text)
+
+
+@_function
+def Stg_Filter_GetPosition(scope, name, position):
+    if name not in scope.filters:
+        return -2
+    position.set(scope.filters[name])
+    return 1
+
+
+@_function
+def Stg_Filter_SetPosition(scope, name, position):
+    if not 1 <= int(position) <= scope.filter_positions:
+        return -2
+    return _set_from(scope.filters, name, int(position))
+
+
+@_function
+def Stg_Filter_GetPositionCount(scope, name):
+    return scope.filter_positions if name in scope.filters else -2
+
+
+@_function
+def Stg_IsLightPathPresent(scope):
+    return 1
+
+
+@_function
+def Stg_GetLightPathPosition(scope):
+    return scope.light_path
+
+
+@_function
+def Stg_SetLightPathPosition(scope, position):
+    if not 1 <= int(position) <= scope.light_path_positions:
+        return -2
+    scope.light_path = int(position)
+    return 1
+
+
+@_function
+def Stg_GetLightPathPositions(scope):
+    return scope.light_path_positions
+
+
+@_function
+def Stg_IsCondenserPresent(scope):
+    return 1
+
+
+@_function
+def Stg_GetCondenserPosition(scope):
+    return scope.condenser
+
+
+@_function
+def Stg_SetCondenserPosition(scope, position):
+    if not 1 <= int(position) <= scope.condenser_positions:
+        return -2
+    scope.condenser = int(position)
+    return 1
+
+
+@_function
+def Stg_GetCondenserPositions(scope):
+    return scope.condenser_positions
+
+
+@_function
+def Stg_SetPFSStatus(scope, on):
+    if not scope.has_pfs:
+        return NOT_AVAILABLE
+    scope.pfs_on = bool(on)
+    return 1
+
+
+@_function
+def Stg_GetPFSLensOffsetPosition(scope):
+    return scope.pfs_offset if scope.has_pfs else NOT_AVAILABLE
+
+
+@_function
+def Stg_SetPFSLensOffsetPosition(scope, offset):
+    if not scope.has_pfs:
+        return NOT_AVAILABLE
+    scope.pfs_offset = int(offset)
+    return 1
+
+
+@_function
+def Stg_GetMultiLaserCount(scope):
+    return 1 if scope.laser_lines else 0
+
+
+@_function
+def Stg_GetMultiLaserNumLines(scope, laser):
+    return len(scope.laser_lines) if laser == 0 else -2
+
+
+def _line(scope, laser, line):
+    names = list(scope.laser_lines)
+    if laser != 0 or not 0 <= line < len(names):
+        return None
+    return scope.laser_lines[names[line]]
+
+
+@_function
+def Stg_GetMultiLaserLineName(scope, laser, line, text, size):
+    names = list(scope.laser_lines)
+    if laser != 0 or not 0 <= line < len(names):
+        return -2
+    text.set(names[line])
+    return 1
+
+
+@_function
+def Stg_GetMultiLaserLineUsed(scope, laser, line, used):
+    found = _line(scope, laser, line)
+    if found is None:
+        return -2
+    used.set(found[0])
+    return 1
+
+
+@_function
+def Stg_SetMultiLaserLineUsed(scope, laser, line, used):
+    found = _line(scope, laser, line)
+    if found is None:
+        return -2
+    found[0] = int(used)
+    return 1
+
+
+@_function
+def Stg_GetMultiLaserPower(scope, laser, line, power):
+    found = _line(scope, laser, line)
+    if found is None:
+        return -2
+    power.set(found[1])
+    return 1
+
+
+@_function
+def Stg_SetMultiLaserPower(scope, laser, line, power):
+    found = _line(scope, laser, line)
+    if found is None or not 0 <= float(power) <= 100:
+        return -2
+    found[1] = float(power)
+    return 1
+
+
+@_function
+def Stg_Incubator_GetTargetGas(scope, gas):
+    gas.set(scope.incubator["gas"])
+    return 1
+
+
+@_function
+def Stg_Incubator_SetTargetGas(scope, gas):
+    scope.incubator["gas"] = float(gas)
+    return 1
+
+
+@_function
+def Stg_Incubator_GetTargetHumidity(scope, humidity):
+    humidity.set(scope.incubator["humidity"])
+    return 1
+
+
+@_function
+def Stg_Incubator_SetTargetHumidity(scope, humidity):
+    scope.incubator["humidity"] = float(humidity)
+    return 1
+
+
+def _absent_single(name):
+    """A device this pretend microscope does not have: asked whether it is there, it says no."""
+    return _with_name(lambda scope: 0, name)
+
+
+def _not_available(name, count):
+    """A function of absent hardware: it answers DR_NOTAVAILABLE, with the number of arguments the table gives it."""
+    parameters = ", ".join(f"a{i}" for i in range(count))
+    namespace = {}
+    exec(  # noqa: S102 -- a stand-in function with the number of arguments the table gives
+        f"def {name}(scope{', ' if count else ''}{parameters}):\n    return {NOT_AVAILABLE}",
+        namespace,
+    )
+    return _function(namespace[name])
+
+
+ABSENT = [
+    _absent_single(name)
+    for name in (
+        "Stg_IsNDFilterPresent",
+        "Stg_IsAperturePresent",
+        "Stg_IsAnalyzerPresent",
+        "Stg_IsZoomPresent",
+    )
+] + [
+    _not_available(name, count)
+    for name, count in (
+        ("Stg_GetNDFilterPosition", 0),
+        ("Stg_SetNDFilterPosition", 1),
+        ("Stg_GetNDFilterSteps", 0),
+        ("Stg_GetAperturePosition", 1),
+        ("Stg_SetAperturePosition", 1),
+        ("Stg_GetAnalyzerState", 0),
+        ("Stg_SetAnalyzerState", 1),
+        ("Stg_GetZoomPosition", 1),
+        ("Stg_SetZoomPosition", 1),
+        ("Stg_GetRelayLensPosition", 0),
+        ("Stg_SetRelayLensPosition", 1),
+        ("Stg_CorrectionCollar_GetPosition", 1),
+        ("Stg_CorrectionCollar_SetPosition", 1),
+        ("Stg_GetCSUShutterState", 0),
+        ("Stg_SetCSUShutterState", 1),
+        ("Stg_GetDiskSpeed", 0),
+        ("Stg_SetDiskSpeed", 1),
+        ("Stg_GetTIRFPosition", 1),
+        ("Stg_SetTIRFPosition", 1),
+        ("Stg_HeatStage_GetCount", 0),
+        ("Stg_HeatStage_GetName", 3),
+        ("Stg_HeatStage_GetCurrentTemperature", 2),
+        ("Stg_HeatStage_SetTemperature", 2),
+    )
+]
+
 FUNCTIONS = {
     function.__name__: function
     for function in (
@@ -464,6 +834,49 @@ FUNCTIONS = {
         Capture,
         ImageSaveAs,
         CloseCurrentDocument,
+        Stg_GetShutterCount,
+        Stg_GetShutterName,
+        Stg_GetShutterStateEx,
+        Stg_SetShutterStateEx,
+        Stg_Light_GetCount,
+        Stg_Light_GetName,
+        Stg_Light_GetState,
+        Stg_Light_SetState,
+        Stg_Light_GetVoltage,
+        Stg_Light_SetVoltage,
+        Stg_Light_GetIrisIntensity,
+        Stg_Light_SetIrisIntensity,
+        Stg_Light_GetNDFilterPosition,
+        Stg_Light_SetNDFilterPosition,
+        Stg_Light_GetNDFilterSteps,
+        Stg_Filter_GetCount,
+        Stg_Filter_GetName,
+        Stg_Filter_GetPosition,
+        Stg_Filter_SetPosition,
+        Stg_Filter_GetPositionCount,
+        Stg_IsLightPathPresent,
+        Stg_GetLightPathPosition,
+        Stg_SetLightPathPosition,
+        Stg_GetLightPathPositions,
+        Stg_IsCondenserPresent,
+        Stg_GetCondenserPosition,
+        Stg_SetCondenserPosition,
+        Stg_GetCondenserPositions,
+        Stg_SetPFSStatus,
+        Stg_GetPFSLensOffsetPosition,
+        Stg_SetPFSLensOffsetPosition,
+        Stg_GetMultiLaserCount,
+        Stg_GetMultiLaserNumLines,
+        Stg_GetMultiLaserLineName,
+        Stg_GetMultiLaserLineUsed,
+        Stg_SetMultiLaserLineUsed,
+        Stg_GetMultiLaserPower,
+        Stg_SetMultiLaserPower,
+        Stg_Incubator_GetTargetGas,
+        Stg_Incubator_SetTargetGas,
+        Stg_Incubator_GetTargetHumidity,
+        Stg_Incubator_SetTargetHumidity,
+        *ABSENT,
     )
 }
 

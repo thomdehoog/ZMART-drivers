@@ -41,7 +41,6 @@ from __future__ import annotations
 from typing import Any
 
 from ..methods import Microscope, named_configurations
-from ..procedures.state import CHANGEABLE
 from . import info, procedure_menu
 
 #: The three axes, in the order the controller's canvas lists them.
@@ -120,17 +119,14 @@ class ZmartControllerPlugin:
     def set_state(self, changeable):
         """Apply the changeable settings and answer ``True, applied``.
 
-        The changeable settings are ``objective_position`` (counted from 1)
-        and ``optical_configuration`` (a name NIS knows). Any other is a
+        The changeable settings are ``objective_position`` (counted from 1),
+        ``optical_configuration`` (a name NIS knows), and each hardware
+        setting ``get_state`` lists, such as ``"shutter/EPI"`` (1 open, 0
+        closed) or ``"light_path"`` (a position from 1). Any other is a
         setting this microscope does not have, and is refused with
         ``ValueError`` before anything changes.
         """
         changeable = dict(changeable)
-        unknown = sorted(set(changeable) - set(CHANGEABLE))
-        if unknown:
-            raise ValueError(
-                f"no changeable setting {unknown}; the changeable settings are {list(CHANGEABLE)}"
-            )
         asked = {name: value for name, value in changeable.items() if value is not None}
         if not asked:
             return True, {}

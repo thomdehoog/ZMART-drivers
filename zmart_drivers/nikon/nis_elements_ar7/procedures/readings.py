@@ -91,3 +91,43 @@ def image_info(client) -> dict:
 
 def calibration(client) -> dict:
     return value(client, "calibration")
+
+
+def devices(client) -> dict:
+    """Every hardware setting the driver knows, as NIS has it now: which devices are there, and their values.
+
+    ``{key: {"group", "says", "kind", "unit", "guarded", "devices": [{"instance", "label",
+    "positions", "value"}], "error"}}``. A setting whose device is not there has an
+    empty ``devices`` list.
+    """
+    return value(client, "devices")
+
+
+def device(client, key: str, instance: str | None = None):
+    """One hardware setting's value now: ``device("shutter", "EPI")``; ``RuntimeError`` when NIS gives none."""
+    return value(client, f"device/{key}" + (f"/{instance}" if instance else ""))
+
+
+def device_names(inventory: dict, *, settable_only: bool = False) -> dict:
+    """``{"shutter/EPI": value, "light_path": value, ...}``: each device that is there, by the name ``set_state`` takes.
+
+    With *settable_only*, a setting whose reading is not what it sets (a
+    heating stage reads its current temperature, but is set to a target) is
+    left out: handing its reading back to ``set_state`` would make the
+    current temperature the new target.
+    """
+    from ..primitives.nis_python import devices as device_table
+
+    found = {}
+    for key, entry in inventory.items():
+        if (
+            settable_only
+            and key in device_table.SETTINGS
+            and not device_table.SETTINGS[key].confirms
+        ):
+            continue
+        for item in entry["devices"]:
+            found[key + (f"/{item['instance']}" if item["instance"] else "")] = item[
+                "value"
+            ]
+    return found

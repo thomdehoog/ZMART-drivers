@@ -10,15 +10,21 @@ know what the microscope really did.
 - **Status:** **Alpha (`0.1.0a1`).** Tested offline only, against a pretend NIS-Elements that behaves as
   the NIS 7 study showed (steps 0, 1 and 2 of thomdehoog/nis-useq-aiagent, run on NIS-Elements AR
   7.01.03 with the microscope switched off). It has **not yet driven a real microscope**. Before it
-  does, run `testing/hardware/check_hardware.py` at the microscope: it asks NIS the questions only a
+  does, run the hardware check inside NIS (see [Testing](#testing)): it asks NIS the questions only a
   switched-on microscope can answer (listed in [the plan](../../../docs/nikon/PLAN_NIS_ELEMENTS_AR7.md),
-  section 11), such as whether a stage move waits until the stage has arrived, and whether the TIFF that
-  NIS saves holds the camera's own values.
+  sections 11 and 13), such as whether a stage move waits until the stage has arrived, whether the TIFF
+  that NIS saves holds the camera's own values, and whether each hardware setting's function takes the
+  arguments the driver sends.
 - **Known limits of this alpha:**
   - There is no objective calibration. Changing the objective does not move the stage to keep the same
     spot in view, so positions shift by the difference between the two objectives.
   - The focus is not moved while Perfect Focus holds it: switch Perfect Focus off in NIS first.
-  - One picture at a time (`snap`): no z-stacks, time series or ND acquisitions yet.
+  - One picture at a time (`snap`): no z-stacks, time series or ND acquisitions yet; ZMART workflows
+    build those from single moves and pictures.
+  - The camera's own settings (exposure, gain, binning) are set through an optical configuration; NIS
+    offers its camera functions only with the camera on, so they are not in the table yet.
+  - The hardware settings' function arguments follow Nikon's macro reference and are marked unconfirmed
+    until the hardware check has tried them.
   - The picture size is known only once one picture has been taken with the current objective and
     optical configuration. Until then `state()` says so, and the ZMART Controller's check of the
     driver reports that one gap.
@@ -40,6 +46,21 @@ The bridge is careful in a few ways that matter at the microscope:
   images in NIS are never saved over or closed. If NIS captures into an image you have open (its
   "capture creates a new document" option is off), nothing is saved and nothing is closed.
 - When the macro is stopped with NIS's Stop button, the driver says so instead of waiting.
+
+## What runs where
+
+On a microscope PC where NIS-Elements brings the only Python, three parts run in NIS's own Python and
+need nothing installed:
+
+- **the bridge**, started inside NIS by `start_bridge.mac`;
+- **writing that macro**, with NIS's own `python.exe`, from the repository's root folder:
+  `"C:\Program Files\NIS-Elements\Python\python.exe" -m zmart_drivers.nikon.nis_elements_ar7.driver_setup.nis_bridge`;
+- **the hardware check**, started inside NIS by `testing/hardware/check_hardware.mac`.
+
+The driver itself (`connect()` and the ZMART Controller plugin) also needs numpy, tifffile and the OME-Zarr
+packages, to save each picture as OME-Zarr. They are installed into the Python that runs the driver: NIS's
+own, when that is allowed (`pip install -e ".[nikon]"` with NIS's `python.exe`), or another one on the same
+computer.
 
 ## How to call the driver
 
@@ -70,10 +91,10 @@ import zmart_drivers.nikon.nis_elements_ar7 as nis_elements_ar7
 
 scope = nis_elements_ar7.connect(microscope="nikon-ti2-zmb")
 
-scope.move_to(100.0, 250.0, 0.0)                # micrometres from the saved origin
-scope.select_optical_configuration("GFP")       # read back
-scope.change_objective(2)                        # nosepiece position 2, read back
-scope.acquire("A1")                              # one picture, saved as OME-Zarr
+scope.move_to(100.0, 250.0, 0.0)  # micrometres from the saved origin
+scope.select_optical_configuration("GFP")  # read back
+scope.change_objective(2)  # nosepiece position 2, read back
+scope.acquire("A1")  # one picture, saved as OME-Zarr
 
 scope.close()
 ```
@@ -101,7 +122,7 @@ configuration), and `acquire` is `acquire()`.
 from zmart_controller import mic
 
 mic.register_driver(r"C:\ZMART-drivers\zmart_drivers\nikon\nis_elements_ar7")  # once
-mic.connect("nikon-nis-elements-ar7")                                          # every session
+mic.connect("nikon-nis-elements-ar7")  # every session
 ```
 
 ## The calls
@@ -116,14 +137,54 @@ mic.connect("nikon-nis-elements-ar7")                                          #
 | `change_objective(position)` | Turn the nosepiece to `position` (counted from 1) and read it back. |
 | `optical_configurations()` | The optical configurations NIS has, and the selected one. |
 | `select_optical_configuration(name)` | Select an optical configuration and read it back. It may bring its own objective. |
-| `set_state(changeable)` | Both at once: `{"objective_position": 2, "optical_configuration": "GFP"}`, objective first. |
+| `set_state(changeable)` | Several at once, as `state()` names them: `{"objective_position": 2, "optical_configuration": "GFP", "shutter/EPI": 1}`. The objective first, then the configuration, then the hardware settings, the light last. |
 | `acquisition_settings()` | How a capture is triggered: `snap`, one picture with the settings as they are. |
 | `acquire(position_label=None, acquisition_type="acquisition", output_folder=None)` | Take one picture and save it as one OME-Zarr store, with its log. |
 | `save_staged(output_folder=None)` | Save the pictures whose saving failed earlier (they wait in `.staging`). |
-| `state()` | The objective and optical configuration, and what can only be read: the objectives, Perfect Focus, the limits in force, the picture size, the changes that were never confirmed. |
+| `devices()` | Every hardware setting the driver knows, which of them this microscope has, and their values now. |
+| `device(name)` | One hardware setting's value now: `device("shutter/EPI")`, `device("light_path")`. |
+| `set_device(name, value)` | Set one hardware setting and read it back: `set_device("filter/Emission Wheel", 3)`. |
+| `state()` | The objective, the optical configuration and every hardware setting, and what can only be read: the objectives, Perfect Focus, the limits in force, the picture size, the changes that were never confirmed. |
 | `stop_bridge()` | Ask the bridge's macro in NIS to end, and close this session. |
 | `close()` | Close the session; every later call is refused. The bridge keeps running in NIS. |
 | `client` | The bridge's client itself, for the setup notebooks. |
+
+## The hardware settings
+
+Besides the stage, the objective and the optical configuration, the driver can set each piece of hardware
+NIS controls on its own. Every one is a row of one table, `primitives/nis_python/devices.py`, which names
+the NIS function that reads it and the one that changes it, side by side. The driver, the bridge and the
+hardware check all read that one table, so what the check confirms at the microscope is what the driver
+sends.
+
+| Group | Settings (their names in `state()` and `set_state`) |
+|---|---|
+| Light | `shutter/<name>` (1 open, 0 closed), `lamp/<name>` (1 on, 0 off), `lamp_voltage/<name>`, `lamp_iris/<name>`, `lamp_nd_filter/<name>`, `nd_filter` |
+| Filters | `filter/<name>`: a filter wheel or turret's position, from 1 |
+| Optics | `light_path`, `condenser`, `aperture`, `analyzer`, `zoom`, `relay_lens`, `correction_collar` |
+| Focus | `pfs` (1 holds the focus), `pfs_offset` |
+| Spinning disk | `disk_shutter`, `disk_speed` |
+| TIRF *(guarded)* | `tirf_position` |
+| Lasers *(guarded)* | `laser_line/<laser>.<line>` (1 used), `laser_power/<laser>.<line>` (percent) |
+| Environment *(guarded)* | `stage_temperature/<name>`, `incubator_gas`, `incubator_humidity` |
+
+`<name>` is the device's name as NIS lists it, such as `shutter/EPI`. When connected, the driver asks NIS
+which of these devices are there, and offers only those; `devices()` lists them, with what each takes.
+
+**Guarded settings** are refused until this microscope's limits allow them, because a wrong value could
+harm the sample, the microscope or a person. Allow one by adding it under `devices` in this microscope's
+`limits.json`, with the values or the range it may take. An entry for one device wins over the setting's:
+
+```json
+"devices": {
+    "laser_power": {"range": [0, 30]},
+    "incubator_gas": {"range": [4.5, 5.5]},
+    "shutter/DIA": {"allowed": [0, 1]}
+}
+```
+
+A setting that is not guarded needs no entry, but may have one to narrow it. `set_state` sends nothing for
+a setting that already holds the asked value, so `set_state(state()["changeable"])` is always safe.
 
 ## What a capture leaves on disk
 
@@ -168,13 +229,21 @@ pip install -e ".[nikon,controller,test]"     # also with the ZMART Controller
 python zmart_drivers/nikon/nis_elements_ar7/testing/run_ci.py
 ```
 
-At the microscope, with NIS-Elements running and `start_bridge.mac` started in it:
+**The hardware check, at the microscope.** It runs inside NIS-Elements, in NIS's own Python, and needs
+nothing installed. It calls NIS's functions directly, from the same table the driver uses:
 
-```bash
-python zmart_drivers/nikon/nis_elements_ar7/testing/hardware/check_hardware.py           # reads only
-python zmart_drivers/nikon/nis_elements_ar7/testing/hardware/check_hardware.py --move    # also small moves
-python zmart_drivers/nikon/nis_elements_ar7/testing/hardware/check_hardware.py --snap D:\check
-```
+1. Put the ZMART-drivers folder at `C:\ZMART-drivers` (or on the Desktop).
+2. Open `testing\hardware\check_hardware_nis.py` in Notepad. At the top, switch on what may change:
+   a group of hardware settings, the stage, the objective, the optical configuration, one picture. Switch
+   on one at a time, with someone at the microscope. With everything off, the check only reads.
+3. In NIS-Elements: **Macro > Run Macro From File**, and pick `testing\hardware\check_hardware.mac`.
+4. When NIS says it has finished, send the `results` folder beside `check_hardware_nis.py`.
+
+It reads which of the driver's functions NIS offers (with NIS's own description of each, and what NIS's
+macro reference says about it), every hardware setting that is there and its value, and the stage. Each
+change it is allowed to make is read back and put back as it was: a switch is turned over and back, a
+choice moves one position and back, and a number, or anything guarded, is set to the value it already has,
+which tries the function's arguments without changing anything.
 
 ## More about the driver
 

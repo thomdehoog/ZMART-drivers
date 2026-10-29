@@ -32,6 +32,7 @@ from collections.abc import Mapping
 from typing import Any
 
 from ...dispatcher.limits import LimitsError, LimitsStatus, LimitViolation
+from ...primitives.nis_python import devices
 
 #: How far z may move either way from where it stood at connect, until limits are published.
 UNPUBLISHED_Z_WINDOW_UM = 100.0
@@ -46,6 +47,7 @@ COMMANDS = {
     "set_objective": ("objective_position",),
     "select_optical_configuration": ("optical_configuration",),
     "capture": (),
+    "set_device": ("devices",),
 }
 
 
@@ -100,6 +102,8 @@ class NikonLimits:
             self.ranges["z_um"] = [max(z[0], z_window[0]), min(z[1], z_window[1])]
             if self.ranges["z_um"][0] > self.ranges["z_um"][1]:
                 raise LimitsError(f"z at connect lies outside the z range {z}")
+        #: The hardware settings' own limits: ``{key: {"allowed": [...]} or {"range": [low, high]}}``.
+        self.devices = dict(policy.get("devices") or {})
         self.allowed = {
             name: (None if policy[name] == [] else tuple(policy[name]["allowed"]))
             for name in ("objective_position", "optical_configuration")
@@ -154,6 +158,57 @@ class NikonLimits:
             ):
                 raise LimitViolation(
                     f"{name}={value!r} is not allowed; the limits allow {list(allowed)} ({self._origin()})"
+                )
+        elif command == "set_device":
+            self.check_device(
+                values.get("device"), values.get("instance"), values.get("value")
+            )
+
+    def check_device(self, key: Any, instance: Any, value: Any) -> None:
+        """Refuse a hardware setting the limits do not allow.
+
+        The limits file may hold an entry for a setting (``"lamp_voltage"``)
+        or for one device of it (``"lamp_voltage/DIA"``, which then wins):
+        ``{"allowed": [values]}`` or ``{"range": [low, high]}``. A setting
+        without an entry is allowed, unless the table marks it as guarded
+        (lasers, heating, gas): those are refused until this microscope's
+        limits allow them, because a wrong value could harm the sample, the
+        microscope or a person.
+        """
+        if key not in devices.SETTINGS:
+            raise LimitsError(
+                f"{key!r} is not a hardware setting the limits know; it is refused"
+            )
+        row = devices.SETTINGS[key]
+        entry = self.devices.get(f"{key}/{instance}") if instance else None
+        entry = entry if entry is not None else self.devices.get(key)
+        if entry is None:
+            if row.guarded:
+                raise LimitViolation(
+                    f"{key} is guarded ({row.says}); it is refused until this microscope's limits allow it: "
+                    f'add "{key}" under "devices" in limits.json ({self._origin()})'
+                )
+            return
+        if "allowed" in entry:
+            if row.kind == devices.NUMBER:
+                fits = any(
+                    number(value, key) == float(a)
+                    for a in entry["allowed"]
+                    if not isinstance(a, bool)
+                )
+            else:
+                fits = any(
+                    value == a and type(value) is type(a) for a in entry["allowed"]
+                )
+            if not fits:
+                raise LimitViolation(
+                    f"{key}={value!r} is not allowed; the limits allow {list(entry['allowed'])} ({self._origin()})"
+                )
+        if "range" in entry:
+            low, high = entry["range"]
+            if not low <= number(value, key) <= high:
+                raise LimitViolation(
+                    f"{key}={value} is outside the limits [{low:g}, {high:g}] ({self._origin()})"
                 )
 
     def stage_um(self) -> dict:
