@@ -207,3 +207,25 @@ def test_a_device_is_put_back_even_when_its_reading_fails_after_the_change(
     assert nis.scope.shutters["EPI"] == 0, (
         "the shutter is closed again although its reading failed"
     )
+
+
+def test_nis_own_macro_reference_is_found_and_quoted(tmp_path, monkeypatch):
+    """The reference on the PC says what each function takes: its text is quoted, a compiled help file copied whole."""
+    script = load_script()
+    nis_folder = tmp_path / "NIS-Elements"
+    (nis_folder / "Help" / "Macro").mkdir(parents=True)
+    (nis_folder / "Help" / "Macro" / "Stg_SetShutterStateEx.htm").write_text(
+        "<p>int Stg_SetShutterStateEx(char *Name, int State);</p>", encoding="utf-16"
+    )
+    (nis_folder / "Help" / "MacroFunctions.chm").write_bytes(
+        b"ITSF pretend compiled help"
+    )
+    monkeypatch.setattr(script, "NIS_FOLDERS", (str(nis_folder),))
+    report = script.main(make_nis(), str(tmp_path / "results"))
+    found = next(c for c in report["checks"] if c["check"] == "NIS's macro reference")
+    assert found["outcome"] == "ok" and found["answer"]["functions found in them"] >= 1
+    assert (
+        "int Stg_SetShutterStateEx(char *Name, int State)"
+        in (tmp_path / "results" / "reference.txt").read_text()
+    )
+    assert (tmp_path / "results" / "help_MacroFunctions.chm").is_file()

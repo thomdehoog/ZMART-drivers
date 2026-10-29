@@ -259,6 +259,12 @@ nothing installed. It calls NIS's functions directly, from the same table the dr
 3. In NIS-Elements: **Macro > Run Macro From File**, and pick `testing\hardware\check_hardware.mac`.
 4. When NIS says it has finished, send the `results` folder beside `check_hardware_nis.py`.
 
+**With the microscope switched off**, run it with everything switched off: it still reads which functions
+NIS offers, NIS's own description of each, and what NIS's macro reference on the PC says about their
+arguments (copied into `reference.txt`; a compiled help file about macros is copied into the results
+folder whole). That is what corrects the table before anything is sent to the hardware. The changes,
+the stage moves and the picture wait for a day with the microscope on.
+
 It reads which of the driver's functions NIS offers (with NIS's own description of each, and what NIS's
 macro reference says about it), every hardware setting that is there and its value, and the stage. Each
 change it is allowed to make is read back and put back as it was: a switch is turned over and back, a

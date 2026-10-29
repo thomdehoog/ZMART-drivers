@@ -218,27 +218,79 @@ def offered(check: Check) -> dict:
     return {"functions": found, "not offered": missing}
 
 
+def nis_folders() -> list[str]:
+    """Where NIS-Elements may be installed on this computer: the usual places, and wherever its Python runs from."""
+    found = {path for path in NIS_FOLDERS if os.path.isdir(path)}
+    for pattern in (r"C:\Program Files*\*NIS*", r"C:\Program Files*\Nikon\*"):
+        found.update(path for path in glob.glob(pattern) if os.path.isdir(path))
+    for place in (sys.executable, sys.prefix):
+        for folder in (
+            os.path.dirname(place),
+            os.path.dirname(os.path.dirname(place)),
+            place,
+        ):
+            if folder and "nis" in folder.lower() and os.path.isdir(folder):
+                found.add(folder)
+    # A folder inside another one found is searched with it.
+    return sorted(
+        f for f in found if not any(f != o and f.startswith(o + os.sep) for o in found)
+    )
+
+
+def read_text(path: str) -> str | None:
+    """A help file's text, whatever Windows encoding it is in."""
+    try:
+        raw = open(path, "rb").read()  # noqa: SIM115 -- read whole, closed at once
+    except OSError:
+        return None
+    if raw.startswith((b"\xff\xfe", b"\xfe\xff")):
+        return raw.decode("utf-16", errors="replace")
+    for encoding in ("utf-8", "cp1252"):
+        try:
+            return raw.decode(encoding)
+        except UnicodeDecodeError:
+            continue
+    return raw.decode("latin-1", errors="replace")
+
+
 def reference(check: Check) -> dict:
-    """Find NIS's macro reference on this computer, and copy out what it says about each function the driver uses."""
-    roots = set(NIS_FOLDERS)
-    nis_home = os.path.dirname(os.path.dirname(sys.executable))
-    if "nis" in nis_home.lower():  # NIS's own Python lives in <NIS folder>\Python
-        roots.add(nis_home)
+    """Find NIS's macro reference on this computer, and copy out what it says about each function the driver uses.
+
+    A help file is anything under NIS's folders whose path speaks of macros,
+    help or functions. What a text file says about each function is copied
+    into ``reference.txt``. A compiled help file (``.chm``) cannot be read
+    here, so the ones about macros are copied into the results folder whole,
+    to be sent along.
+    """
+    roots = nis_folders()
     files = []
-    for root in sorted(r for r in roots if r and os.path.isdir(r)):
-        for pattern in REFERENCE_PATTERNS:
-            for path in glob.glob(os.path.join(root, "**", pattern), recursive=True):
-                if path.lower().endswith(REFERENCE_SUFFIXES) and path not in files:
+    for root in roots:
+        for folder, _, names in os.walk(root):
+            for name in names:
+                path = os.path.join(folder, name)
+                lowered = path.lower()
+                if lowered.endswith(REFERENCE_SUFFIXES) and any(
+                    word in lowered for word in ("macro", "help", "function")
+                ):
                     files.append(path)
+    copied = []
+    for path in files:
+        if (
+            path.lower().endswith(".chm")
+            and "macro" in path.lower()
+            and os.path.getsize(path) < 50_000_000
+        ):
+            target = os.path.join(check.out_dir, "help_" + os.path.basename(path))
+            with open(path, "rb") as source, open(target, "wb") as copy:
+                copy.write(source.read())
+            copied.append(target)
     names = functions_used(check)
     excerpts = []
-    for path in files[:200]:
+    for path in files[:2000]:
         if not path.lower().endswith((".htm", ".html", ".txt", ".xml", ".json")):
             continue
-        try:
-            with open(path, encoding="utf-8", errors="replace") as handle:
-                text = handle.read()
-        except OSError:
+        text = read_text(path)
+        if text is None:
             continue
         for name in names:
             start = text.find(name + "(")
@@ -255,7 +307,13 @@ def reference(check: Check) -> dict:
             + "\n\n"
             + "\n".join(excerpts)
         )
-    return {"files": files[:50], "functions found in them": len(excerpts)}
+    return {
+        "searched": roots,
+        "help files": len(files),
+        "first help files": files[:50],
+        "functions found in them": len(excerpts),
+        "compiled help copied (send these along)": copied,
+    }
 
 
 def stage_and_optics(check: Check) -> dict:
