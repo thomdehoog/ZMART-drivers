@@ -20,6 +20,7 @@ from pathlib import Path
 from zmart_drivers import metadata_convention as convention
 
 from ...driver_setup.orientation import Orientation
+from ..devices import DEVICES
 from . import naming as _naming
 from . import ome_zarr
 
@@ -88,6 +89,7 @@ def save_pending(pending, *, orientation: Orientation) -> dict:
         if p.state
         else None,
         acquired_at=datetime.fromtimestamp(p.started_at, tz=UTC),
+        excitation_nm=lines_on(p.state),
         position_label=p.label,
         description=f"NIS-Elements snap, optical configuration {p.channel or 'unknown'}",
     )
@@ -168,6 +170,12 @@ def store_notes(pending, orientation: Orientation) -> convention.Notes:
         "channel": p.channel,
         "objective": p.objective,
         "pixel_size_um": p.pixel_size_um,
+        "laser_lines_on_nm": list(lines_on(p.state)),
+        "devices": {
+            name: changeable[name]
+            for name in DEVICES
+            if (changeable := (p.state or {}).get("changeable") or {}).get(name)
+        },
         "answered": p.answered,
         "unconfirmed": list(p.unconfirmed),
         "noted at": p.noted_at,
@@ -179,6 +187,19 @@ def store_notes(pending, orientation: Orientation) -> convention.Notes:
         pixels_to_position=orientation.picture_to_stage,
         vendor=VENDOR,
         vendor_facts=vendor,
+    )
+
+
+def lines_on(state: dict | None) -> tuple:
+    """The laser lines that were on at the capture, in nm, lowest first; empty when none was or the lasers were not read."""
+    lasers = ((state or {}).get("changeable") or {}).get("lasers") or {}
+    return tuple(
+        sorted(
+            int(nm)
+            for lines in lasers.values()
+            for nm, line in lines.items()
+            if line.get("on")
+        )
     )
 
 

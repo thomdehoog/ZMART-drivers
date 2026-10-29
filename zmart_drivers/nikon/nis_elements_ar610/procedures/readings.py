@@ -31,8 +31,10 @@ def wait_for(datum, client, **keywords):
     return _door.run(dll_profile, client, datum, **keywords)
 
 
-def _routed(datum, client, *, diagnostics=False, deadline=None, accept=None):
-    reading = wait_for(datum, client, accept=accept, deadline=deadline)
+def _routed(
+    datum, client, *, diagnostics=False, deadline=None, accept=None, about=None
+):
+    reading = wait_for(datum, client, accept=accept, deadline=deadline, about=about)
     return _plain_or_diagnostic(reading, diagnostics)
 
 
@@ -73,6 +75,54 @@ def get_camera(client, *, diagnostics=False, deadline=None, accept=None):
     """The camera and its exposure (through the macro class: about a tenth of a second)."""
     return _routed(
         "camera", client, diagnostics=diagnostics, deadline=deadline, accept=accept
+    )
+
+
+def get_lights(client, *, diagnostics=False, deadline=None):
+    """Each lamp or LED by name: on, and its voltage and iris where NIS controls them."""
+    return _routed("lights", client, diagnostics=diagnostics, deadline=deadline)
+
+
+def get_lasers(client, *, diagnostics=False, deadline=None):
+    """Each laser light source by name, and its lines by wavelength: on, power, power steps."""
+    return _routed("lasers", client, diagnostics=diagnostics, deadline=deadline)
+
+
+def get_filters(client, *, diagnostics=False, deadline=None):
+    """Each filter changer by name: its position (from 1) and the filter in each position."""
+    return _routed("filters", client, diagnostics=diagnostics, deadline=deadline)
+
+
+def get_shutters(client, *, diagnostics=False, deadline=None):
+    """Each shutter by name: True when it is open."""
+    return _routed("shutters", client, diagnostics=diagnostics, deadline=deadline)
+
+
+def get_light_path(client, *, diagnostics=False, deadline=None):
+    """The condenser, the apertures, the zoom, the analyzer, the light port and the spinning disk."""
+    return _routed("light_path", client, diagnostics=diagnostics, deadline=deadline)
+
+
+def get_environment(client, *, diagnostics=False, deadline=None):
+    """The heating and cooling stages by name: temperature and status."""
+    return _routed("environment", client, diagnostics=diagnostics, deadline=deadline)
+
+
+def get_incubator(client, key=None, *, diagnostics=False, deadline=None):
+    """An incubator's gas and pressure, now and as set; *key* names one, None the one there is."""
+    return _routed(
+        "incubator", client, diagnostics=diagnostics, deadline=deadline, about=key
+    )
+
+
+def get_optical_configuration(client, name, *, diagnostics=False, deadline=None):
+    """What the optical configuration *name* holds as NIS saved it: objective, camera, exposure, light path."""
+    return _routed(
+        "optical_configuration",
+        client,
+        diagnostics=diagnostics,
+        deadline=deadline,
+        about=name,
     )
 
 

@@ -1,10 +1,14 @@
 """What the instrument is doing now and what can be changed: its state.
 
-The *changeable* part is what ``set_state`` can apply: the channel (NIS's
-optical configuration), the exposure, the objective and whether the Perfect
-Focus System is on. The *observed* part is a read-only report: the stage,
-the objectives, the camera, the limits in force, what is set up, and the
-changes this session could not confirm.
+The *changeable* part is what ``set_state`` can apply: the objective, the
+channel (NIS's optical configuration), the devices beyond the stage (the
+light path, the port, the filters, the camera, the lights, the lasers and
+the shutters, see ``devices.py``), the exposure, and the Perfect Focus
+System with its offset. A state read with ``get_state`` can be handed back
+to ``set_state`` as it is: only what differs from the microscope now is
+changed. The *observed* part is a read-only report: the stage, the
+objectives, the camera, the environment and the incubator, the limits in
+force, what is set up, and the changes this session could not confirm.
 
 One thing NIS-Elements cannot tell: which optical configuration is selected.
 The driver remembers what it selected itself, and reports None until it has
@@ -21,15 +25,24 @@ import re
 from typing import Any
 
 from ..dispatcher import limits as _gate
-from . import changes, keep_in_view
+from . import changes, devices, keep_in_view
 from . import readings as _readers
 
 log = logging.getLogger(__name__)
 
 #: The settings ``set_state`` can change, in the order it applies them: the
-#: objective first, since it changes what a picture shows; the PFS last, so
-#: it locks on the final objective.
-CHANGEABLE = ("objective", "channel", "exposure_ms", "pfs")
+#: objective first, since it changes what a picture shows; then the channel,
+#: which sets many devices at once; then the devices one by one, so what is
+#: asked for them wins over the channel's own; the exposure after them, since
+#: a channel brings its own; the PFS last, so it locks on the final objective.
+CHANGEABLE = (
+    "objective",
+    "channel",
+    *devices.DEVICES,
+    "exposure_ms",
+    "pfs_offset",
+    "pfs",
+)
 
 _MAGNIFICATION = re.compile(r"(\d+(?:\.\d+)?)\s*[xX]\b")
 
@@ -123,6 +136,7 @@ def get_state(handle) -> dict:
     pfs = _readers.get_pfs(client)
     configurations = _readers.get_optical_configurations(client)
     limits = _gate.describe(client)
+    found = devices.get_devices(client)
     current = objectives.get("current")
     objective_name = (
         objectives["objectives"].get(current) if current is not None else None
@@ -132,7 +146,9 @@ def get_state(handle) -> dict:
         "changeable": {
             "objective": current,
             "channel": handle.channel,
+            **{device: found.get(device) for device in devices.DEVICES},
             "exposure_ms": camera["exposure_ms"] if camera else None,
+            "pfs_offset": _pfs_offset_state(pfs),
             "pfs": bool(pfs["on"]) if pfs else None,
         },
         "observed": {
@@ -149,6 +165,18 @@ def get_state(handle) -> dict:
             "channel_known": handle.channel is not None,
             "camera": camera,
             "pfs": pfs,
+            "lights": _readers.get_lights(client),
+            "lasers": _readers.get_lasers(client),
+            "filters": _readers.get_filters(client),
+            "shutters": _readers.get_shutters(client),
+            "light_path": _readers.get_light_path(client),
+            "environment": _readers.get_environment(client),
+            "incubator": _readers.get_incubator(client),
+            "channel_settings": (
+                _readers.get_optical_configuration(client, handle.channel)
+                if handle.channel is not None
+                else None
+            ),
             # The controller's own keys: the image size and pixel size of these settings.
             "image_size_px": image_size_px(camera),
             "pixel_size_um": pixel_size,
@@ -176,10 +204,20 @@ def set_state(handle, changeable: dict) -> dict:
         )
     applied: dict[str, Any] = {}
     noted_before = len(handle.unconfirmed)
+    asked_devices = {
+        name: changeable[name]
+        for name in devices.DEVICES
+        if changeable.get(name) is not None
+    }
+    if asked_devices:
+        # Every device name is checked before anything moves, objective included.
+        devices.check_names(handle.client, asked_devices)
     for name in CHANGEABLE:
         if name not in changeable or changeable[name] is None:
             continue
         value = changeable[name]
+        if name in _SIMPLE and _already(handle, name, value):
+            continue
         if name == "objective":
             result = keep_in_view.set_objective(handle, _slot(value))
             applied["objective"] = _checked(
@@ -206,6 +244,25 @@ def set_state(handle, changeable: dict) -> dict:
                 f"set_state: exposure {value} ms",
                 read=lambda r, v=value: (r.get("answered") or {}).get("exposure_ms", v),
             )
+        elif name in devices.DEVICES:
+            # The devices are applied together, in their own order, at the
+            # first one reached; the others are then already done.
+            if asked_devices:
+                applied.update(devices.apply_devices(handle, asked_devices))
+                asked_devices = {}
+        elif name == "pfs_offset":
+            if not isinstance(value, dict) or not set(value) <= {"offset", "dish"}:
+                raise ValueError(
+                    f"pfs_offset is given as {{'offset': ..., 'dish': 'glass' or 'plastic'}}, not {value!r}"
+                )
+            now = _pfs_offset_state(_readers.get_pfs(handle.client)) or {}
+            differs = {
+                k: v for k, v in value.items() if v is not None and v != now.get(k)
+            }
+            if differs:
+                result = changes.set_pfs_offset(handle.client, **differs)
+                _checked(handle, result, f"set_state: pfs offset {differs}")
+                applied["pfs_offset"] = differs
         elif name == "pfs":
             if not isinstance(value, bool):
                 raise ValueError(f"pfs is switched with True or False, not {value!r}")
@@ -214,6 +271,37 @@ def set_state(handle, changeable: dict) -> dict:
                 handle, result, f"set_state: pfs {value}", read=lambda r, v=value: v
             )
     return {"applied": applied, "unconfirmed": list(handle.unconfirmed[noted_before:])}
+
+
+#: The single settings that are skipped when the microscope already has them.
+_SIMPLE = ("objective", "exposure_ms", "pfs")
+
+
+def _already(handle, name: str, value) -> bool:
+    """Whether the microscope already has *value* for *name*, so there is nothing to send."""
+    client = handle.client
+    if name == "objective":
+        found = _readers.get_objectives(client) or {}
+        return (
+            isinstance(value, int)
+            and not isinstance(value, bool)
+            and found.get("current") == value
+        )
+    if name == "exposure_ms":
+        camera = _readers.get_camera(client)
+        return bool(camera) and camera.get("exposure_ms") == value
+    pfs = _readers.get_pfs(client)
+    return bool(pfs) and isinstance(value, bool) and bool(pfs.get("on")) is value
+
+
+def _pfs_offset_state(pfs: dict | None) -> dict | None:
+    """The PFS offset and dish, in the shape ``set_state`` takes; None without a PFS."""
+    if not pfs or not pfs.get("present") or pfs.get("offset") is None:
+        return None
+    state = {"offset": pfs["offset"]}
+    if pfs.get("dish") is not None:
+        state["dish"] = pfs["dish"]
+    return state
 
 
 def _slot(value) -> int:

@@ -5,5 +5,10 @@
   "objective_slot": [],
   "optical_configuration": [],
   "exposure_ms": {"range": [0.01, 10000]},
-  "autofocus_range_um": {"range": [1, 500]}
+  "autofocus_range_um": {"range": [1, 500]},
+  "laser_wavelength_nm": [],
+  "laser_power": [],
+  "light_voltage": [],
+  "pfs_offset": [],
+  "piezo_step_um": {"range": [-50, 50]}
 }

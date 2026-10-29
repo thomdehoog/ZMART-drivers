@@ -41,6 +41,28 @@ def camera_present(value) -> bool:
         return False
 
 
+def lasers_present(value) -> bool:
+    """Each light source with its lines by wavelength; an empty reading is a real answer (no lasers)."""
+    return isinstance(value, dict) and all(
+        isinstance(lines, dict) for lines in value.values()
+    )
+
+
+def configuration_present(value) -> bool:
+    """A saved optical configuration with its name; its exposure may be None (NIS saved none)."""
+    return isinstance(value, dict) and bool(value.get("name"))
+
+
+def incubator_present(value) -> bool:
+    return isinstance(value, dict) and "gas_percent" in value
+
+
 #: The readings of this class, and what counts as an answer to each.
 READS = macro_reads.READS
-SUCCESS = {"camera": camera_present}
+ABOUT = macro_reads.ABOUT
+SUCCESS = {
+    "camera": camera_present,
+    "lasers": lasers_present,
+    "optical_configuration": configuration_present,
+    "incubator": incubator_present,
+}

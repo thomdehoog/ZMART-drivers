@@ -1,8 +1,9 @@
 """The readings the ``dll`` class can answer, one function each.
 
 Each function sends one read-only request to the bridge and hands back the
-answer in the driver's own words: micrometres, nosepiece slots as whole
-numbers, and the PFS state as the bridge reports it. They read and change
+answer in the driver's own words: micrometres, nosepiece and filter
+positions as whole numbers counted from 1, and each device by its name, as
+NIS-Elements names it. They read and change
 nothing. The rest of the driver never calls them directly: it asks the
 dispatcher's ``run()`` for a reading by its name, and the profile
 (``profile.py``) looks the function up in ``READS``.
@@ -55,8 +56,77 @@ def get_objectives(client) -> dict:
 
 
 def get_pfs(client) -> dict:
-    """The Perfect Focus System: ``present``, ``on``, NIS's ``status`` code and its ``meaning``."""
+    """The Perfect Focus System: ``present``, ``on``, NIS's ``status`` code and its ``meaning``.
+
+    With a PFS there are two more: ``offset``, the plane the PFS keeps, in
+    NIS's own units (not micrometres), and ``dish``, ``glass`` or ``plastic``,
+    or None when this PFS does not let the dish type be changed.
+    """
     return dict(client.request("get_pfs"))
+
+
+def get_lights(client) -> dict:
+    """Each lamp or LED, by name: ``{"on", "voltage", "iris"}``.
+
+    A value NIS-Elements does not control is None: many LEDs have no
+    voltage, and many lamps no iris.
+    """
+    return {
+        light["name"]: {key: light.get(key) for key in ("on", "voltage", "iris")}
+        for light in client.request("get_lights")
+    }
+
+
+def get_filters(client) -> dict:
+    """Each filter changer (a turret or a wheel), by name: ``{"position", "filters"}``.
+
+    Positions count from 1, as NIS-Elements' own panels show them, and
+    ``filters`` names the filter in each position (an empty name for an
+    empty one).
+    """
+    return {
+        changer["name"]: {
+            "position": int(changer["position"]),
+            "filters": {
+                int(position): str(name or "")
+                for position, name in changer["filters"].items()
+            },
+        }
+        for changer in client.request("get_filters")
+    }
+
+
+def get_shutters(client) -> dict:
+    """Each shutter, by name: True when it is open."""
+    return {
+        shutter["name"]: bool(shutter["open"])
+        for shutter in client.request("get_shutters")
+    }
+
+
+def get_light_path(client) -> dict:
+    """The transmitted light path, the light port and the spinning disk, as NIS reports them.
+
+    ``condenser`` (``position`` of ``positions``), ``apertures`` (by name:
+    ``field``, ``epi_field``, ``dia``, each with its ``size`` and
+    ``steps``), ``zoom`` (``zoom`` and ``manual``, True when it is turned by
+    hand), ``analyzer`` (``inserted``), ``port`` (``position`` of
+    ``positions``), ``disk`` (``shutter_open``, ``speed_rpm``) and
+    ``piezo_z`` (whether there is one). A part NIS-Elements does not have is
+    None.
+    """
+    return dict(client.request("get_light_path"))
+
+
+def get_environment(client) -> dict:
+    """The heating and cooling stages: each with its ``temperature`` (degrees C) and ``status``. Reads only."""
+    return {
+        stage["name"]: {
+            "temperature": stage["temperature"],
+            "status": stage["status"],
+        }
+        for stage in client.request("get_environment")["heat_stages"]
+    }
 
 
 def get_version(client) -> str:
@@ -76,5 +146,10 @@ READS = {
     "optical_configurations": get_optical_configurations,
     "objectives": get_objectives,
     "pfs": get_pfs,
+    "lights": get_lights,
+    "filters": get_filters,
+    "shutters": get_shutters,
+    "light_path": get_light_path,
+    "environment": get_environment,
     "version": get_version,
 }

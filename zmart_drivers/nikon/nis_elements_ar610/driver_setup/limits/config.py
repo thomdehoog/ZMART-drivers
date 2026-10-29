@@ -10,13 +10,21 @@ entry per setting automation may choose::
       "objective_slot": [],
       "optical_configuration": [],
       "exposure_ms": {"range": [0.01, 10000]},
-      "autofocus_range_um": {"range": [1, 500]}
+      "autofocus_range_um": {"range": [1, 500]},
+      "laser_wavelength_nm": [],
+      "laser_power": [],
+      "light_voltage": [],
+      "pfs_offset": [],
+      "piezo_step_um": {"range": [-50, 50]}
     }
 
 A range includes both ends. ``[]`` means reviewed and unrestricted: which
-slots and configurations exist is checked live against NIS-Elements anyway,
-so an allow-list there is only for fencing automation to some of them. A
-file with a missing, extra or malformed entry is refused whole, never
+slots, configurations and laser lines exist is checked live against
+NIS-Elements anyway, so an allow-list there is only for fencing automation to
+some of them. ``laser_power`` is in NIS's power steps (0 to 100 on the Ti2
+simulator's light source), ``pfs_offset`` in NIS's own units, and
+``piezo_step_um`` bounds one relative step of the piezo Z drive (the bridge
+itself allows at most 50 micrometres). A file with a missing, extra or malformed entry is refused whole, never
 guessed at.
 
 ``adopt_limits`` publishes a new record of the file from the ``set_limits``
@@ -45,6 +53,11 @@ _SETTING_KIND = {
     "optical_configuration": "allowed",
     "exposure_ms": "range",
     "autofocus_range_um": "range",
+    "laser_wavelength_nm": "allowed",
+    "laser_power": "range",
+    "light_voltage": "range",
+    "pfs_offset": "range",
+    "piezo_step_um": "range",
 }
 
 
@@ -92,6 +105,12 @@ def _normalize_typed(name: str, entry: Any, *, path: Path, kind: str) -> dict:
     ):
         raise ValueError(
             f"{path}: objective_slot.allowed must hold nosepiece slots counted from 1, got {values!r}"
+        )
+    if name == "laser_wavelength_nm" and any(
+        isinstance(v, bool) or not isinstance(v, int) or v <= 0 for v in values
+    ):
+        raise ValueError(
+            f"{path}: laser_wavelength_nm.allowed must hold wavelengths in whole nanometres, got {values!r}"
         )
     if name == "optical_configuration" and any(
         not isinstance(v, str) or not v for v in values

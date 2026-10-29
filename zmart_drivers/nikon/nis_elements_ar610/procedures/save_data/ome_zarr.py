@@ -61,6 +61,10 @@ class Capture:
     acquired_at: datetime
     position_label: str
     description: str = ""
+    #: The laser lines that were on, in nm. When exactly one was on, it is
+    #: written as the channel's excitation wavelength; with none or several,
+    #: OME has no single number for it, so none is written.
+    excitation_nm: tuple = ()
 
 
 def write_store(path: Path, capture: Capture, notes: convention.Notes) -> Path:
@@ -265,6 +269,14 @@ def image_xml(capture: Capture, notes: convention.Notes, dtype) -> str:
             "ID": "Channel:0:0",
             "Name": capture.channel or "channel 0",
             "SamplesPerPixel": "1",
+            **(
+                {
+                    "ExcitationWavelength": _num(capture.excitation_nm[0]),
+                    "ExcitationWavelengthUnit": "nm",
+                }
+                if len(capture.excitation_nm) == 1
+                else {}
+            ),
         },
     )
     if capture.camera:

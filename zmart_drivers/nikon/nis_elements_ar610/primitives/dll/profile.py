@@ -184,15 +184,30 @@ def version_present(value) -> bool:
     return isinstance(value, str) and bool(value)
 
 
+def by_name(value) -> bool:
+    """A reading of devices by name; an empty one is a real answer (NIS has none of them)."""
+    return isinstance(value, dict) and all(isinstance(name, str) for name in value)
+
+
+def light_path_present(value) -> bool:
+    return isinstance(value, dict) and "apertures" in value and "disk" in value
+
+
 @dataclass(frozen=True)
 class Datum:
-    """One reading: the class that answers it, its function, what counts, and the class's pace."""
+    """One reading: the class that answers it, its function, what counts, and the class's pace.
+
+    ``takes_about`` says the reading is about one item (a saved optical
+    configuration by name, an incubator by its key): ``read`` is then called
+    with that item too.
+    """
 
     name: str
     source: str  # "dll" or "macro"
-    read: Callable  # read(client) -> the value
+    read: Callable  # read(client) -> the value, or read(client, about)
     success: Callable  # success(value) -> bool
     poll_s: Callable[[], float]  # how long to wait before asking the class again
+    takes_about: bool = False
 
 
 #: What counts as an answer to each reading of the dll class.
@@ -202,6 +217,11 @@ SUCCESS = {
     "optical_configurations": names_listed,
     "objectives": objectives_present,
     "pfs": pfs_present,
+    "lights": by_name,
+    "filters": by_name,
+    "shutters": by_name,
+    "light_path": light_path_present,
+    "environment": by_name,
     "version": version_present,
 }
 
@@ -217,7 +237,12 @@ DATUMS = {
     },
     **{
         name: Datum(
-            name, "macro", macro_profile.READS[name], success, macro_profile.poll_s
+            name,
+            "macro",
+            macro_profile.READS[name],
+            success,
+            macro_profile.poll_s,
+            takes_about=name in macro_profile.ABOUT,
         )
         for name, success in macro_profile.SUCCESS.items()
     },
@@ -301,7 +326,7 @@ def ask(leg, spec, client, *, until, answer_counts, about, source_kwargs):
     """
     while True:
         try:
-            value = spec.read(client)
+            value = spec.read(client, about) if spec.takes_about else spec.read(client)
         except Exception as why:  # noqa: BLE001 -- the error is carried, never raised
             log.warning(
                 "%s: the %s class could not answer (%s: %s)",

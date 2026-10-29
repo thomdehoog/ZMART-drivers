@@ -1,7 +1,7 @@
 # nis_elements_ar610 — Nikon NIS-Elements AR 6.10 microscope driver
 
 `nis_elements_ar610` drives a **Nikon Ti2** widefield microscope from Python, through NIS-Elements AR 6.10
-and the [nis-bridge](https://github.com/thomdehoog/nis-useq-aiagent/tree/bridge-hybrid-610/1_nis_bridge).
+and the [nis-bridge](https://github.com/thomdehoog/nis-useq-aiagent/tree/6670cfc755950f4d27fe8bd070aaf6ea0b57982c/1_nis_bridge).
 It works on its own, from a notebook or a script, and it is the Nikon driver behind the ZMART
 Controller. Every change is checked against this microscope's limits before it is sent, and read back
 afterwards wherever NIS-Elements can report it, so you know what the microscope really did.
@@ -32,8 +32,8 @@ two ways, and the driver keeps the two apart as its two classes of primitive:
 
 | Class | How NIS answers inside | What it carries | Cost |
 |---|---|---|---|
-| `dll` | `g5_regprocs.dll`, the C library NIS ships, exports most of its macro functions | the stage, the limits, the nosepiece, the Perfect Focus System, the optical configurations, the focus sweep, capturing | well under a millisecond |
-| `macro` | a few lines of NIS macro, run with `RunMacro`, because NIS 6.10 cannot hand values back from its Python safely | the camera report and the exposure | about 24 ms per function, a tenth of a second for the camera report |
+| `dll` | `g5_regprocs.dll`, the C library NIS ships, exports most of its macro functions | the stage, the limits, the nosepiece, the Perfect Focus System and its offset, the optical configurations, the focus sweep, capturing, the lamps, the filter turrets, the shutters, the condenser and apertures, the zoom and analyzer, the port and spinning disk, the piezo Z drive, escape and refocus, the stand's sensors, the safe state | well under a millisecond |
+| `macro` | a few lines of NIS macro, run with `RunMacro`, because NIS 6.10 cannot hand values back from its Python safely; or, for the saved optical configurations, a NIS backup file the bridge reads and writes | the camera report, its format, ROI, averaging and integration, and the exposure; the laser lines; live view and auto exposure; the incubator; reading, editing, copying and deleting a saved optical configuration | about 24 ms per function, a tenth of a second for the camera report |
 
 Both travel over the same bridge connection. The `macro` class is asked again at a slower pace, so it
 never keeps NIS's main thread busy.
@@ -44,8 +44,9 @@ The driver runs on the computer that runs NIS-Elements. Three things to install 
 3.11 or newer:
 
 1. **The bridge, inside NIS-Elements.** Clone
-   [thomdehoog/nis-useq-aiagent](https://github.com/thomdehoog/nis-useq-aiagent), branch
-   `bridge-hybrid-610`, and follow its part 1 README: `pip install -e "./1_nis_bridge"`, then
+   [thomdehoog/nis-useq-aiagent](https://github.com/thomdehoog/nis-useq-aiagent) and check out
+   commit `6670cfc` of its `main` branch (the bridge this driver was tested against), then follow its
+   part 1 README: `pip install -e "./1_nis_bridge"`, then
    `python -m nis_bridge.install_macros`, then start NIS-Elements and run `start_bridge.mac` in it
    (or `python -m nis_bridge.start`, which does both). NIS then shows "nis-bridge: running on port
    54470". The macro keeps running while the bridge is up; that is intended.
@@ -115,10 +116,55 @@ mic.connect("nikon-nis-elements-ar610")  # every session
 | `acquisition_settings()` | How a capture is triggered: `snap`, one picture with the settings as they are. |
 | `acquire(position_label=None, acquisition_type="acquisition", output_folder=None)` | Take one picture. It is staged as a TIFF with a note of how it was taken; nothing is written to its final place yet. |
 | `save(label=None)` | Write the captures that are waiting as OME-Zarr stores, by the ZMART metadata convention, with a log beside each. |
-| `state()` / `set_state(changeable)` | The changeable settings (`objective`, `channel`, `exposure_ms`, `pfs`) and what can only be read: the stage, the camera, the limits in force, what is set up, the changes never confirmed. |
+| `devices()` | Every device's settings in one dictionary (see below), in the shape `set_state` takes. |
+| `lights()` / `set_light(name, on=, voltage=, iris=)` | The lamps and LEDs, and switching or setting one. Only what you give is changed. |
+| `lasers()` / `set_laser(wavelength_nm, on=, power=, laser=None)` | The laser lines by wavelength, and switching one or setting its power in NIS's power steps. Name the `laser` only when two light sources have the same wavelength. |
+| `filters()` / `set_filter(changer, position=None, filter_name=None)` | The filter turrets and what each position holds, and turning one, by position or by the filter's name. |
+| `shutters()` / `set_shutter(name, open_)` | The shutters, and opening (`True`) or closing one. |
+| `light_path()` / `set_light_path(condenser=, aperture=, size=, zoom=, analyzer=)` | The condenser, apertures, zoom, analyzer, port and spinning disk, and setting the first four. |
+| `set_port(port, disk_shutter=, disk_speed_rpm=)` | Send the light to a camera port, or set the spinning disk. |
+| `set_camera(format=, roi=, averaging=, integration=)` | The camera's format (binning and bit depth), region of interest, averaging and integration. |
+| `set_pfs_offset(offset, dish=)` | The plane the Perfect Focus System keeps, in NIS's units, and the dish: `glass` or `plastic`. |
+| `environment()` / `incubator(key=None)` | What the stand's sensors and the incubator report. Read only. |
+| `channel_settings(name)` | What a saved optical configuration holds, such as its exposure. |
+| `edit_channel(name, exposure_ms)` / `copy_channel(name, new_name, exposure_ms=None)` / `delete_channel(name)` | Change what a saved optical configuration holds, save a copy under a new name, or delete one. NIS keeps a backup file of every change; a deletion cannot be undone from the driver. |
+| `live(on)` / `auto_exposure()` | Start or stop the live view; let NIS choose the exposure for what is in view. |
+| `move_piezo_z(distance_um)` / `center_piezo_z()` | A small relative step of the piezo focus drive, within the limits, and back to the middle of its travel. |
+| `escape()` / `refocus()` | Lower the objective away from the sample, for changing the dish, and bring it back. |
+| `safe_state()` | Switch off everything that sends light to the sample: lamps, laser lines, shutters, the disk shutter. Safe at any time. |
+| `state()` / `set_state(changeable)` | The changeable settings and what can only be read (the stage, the camera, the environment, the limits in force, what is set up, the changes never confirmed). A state read with `state()` can be handed back to `set_state` later: only what differs from the microscope now is changed. |
 | `reconnect()` | Open the bridge connection again, after the macro was restarted or a request timed out. |
 | `close()` | Close the session. Every later call is refused. The bridge keeps running in NIS-Elements. |
 | `client` | The bridge connection itself, for the setup notebooks. |
+
+### What `set_state` can change
+
+Every key is optional. They are applied in this order: the objective first, then the channel (which
+sets many devices at once), then the devices one by one, so what you ask of a device wins over what
+the channel set, then the exposure, and the Perfect Focus System last, so it locks on the final
+objective. Every name is checked against NIS-Elements before anything changes, so a typo changes
+nothing.
+
+| Key | Shape |
+|---|---|
+| `objective` | the nosepiece slot, from 1 |
+| `channel` | the name of an optical configuration |
+| `light_path` | `{"condenser": 1, "apertures": {"epi_field": 80.0}, "zoom": 1.5, "analyzer": False}` |
+| `port` | `{"port": 1, "disk_shutter": False, "disk_speed_rpm": 4000}` |
+| `filters` | `{"Turret-Up": 2}`: the position, from 1 |
+| `camera` | `{"format": "FMT 2x2 16", "roi": {"left", "top", "right", "bottom"}, "averaging": 1, "integration": 1}` |
+| `lights` | `{"DIA": {"on": True, "voltage": 3.0, "iris": 0.5}}` |
+| `lasers` | `{"SpectraIII": {"475": {"on": True, "power": 20}}}`: by wavelength in nm |
+| `shutters` | `{"EPI": True}`: `True` is open |
+| `exposure_ms` | the camera exposure in milliseconds |
+| `pfs_offset` | `{"offset": 3000, "dish": "glass"}` |
+| `pfs` | `True` or `False` |
+
+The limits file fences the new settings too: `laser_wavelength_nm` (which lines automation may use),
+`laser_power`, `light_voltage`, `pfs_offset` and `piezo_step_um` (one step of the piezo drive).
+
+Each saved picture notes every device's setting with it. When exactly one laser line was on, its
+wavelength is also written as the channel's excitation wavelength in the OME metadata.
 
 ## Setting up the driver
 
@@ -163,7 +209,7 @@ Nothing is overwritten, so you can always see what the microscope was told and w
   with a section on this driver; what another microscope must bring:
   [`docs/vendor-contract.md`](../../../../docs/vendor-contract.md).
 - The bridge and what it can ask of NIS-Elements: its
-  [README](https://github.com/thomdehoog/nis-useq-aiagent/blob/bridge-hybrid-610/1_nis_bridge/README.md).
+  [README](https://github.com/thomdehoog/nis-useq-aiagent/blob/6670cfc755950f4d27fe8bd070aaf6ea0b57982c/1_nis_bridge/README.md).
 - The tests: `python zmart_drivers/nikon/nis_elements_ar610/testing/run_ci.py` runs the offline suite
   from the repository root, in two layers: the driver on its own, and the driver inside the ZMART
   Controller when that is installed. The suite stands a mock NIS-Elements behind the real bridge

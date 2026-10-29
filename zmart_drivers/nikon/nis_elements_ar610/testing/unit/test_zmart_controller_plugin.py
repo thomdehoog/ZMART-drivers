@@ -105,4 +105,48 @@ def test_a_procedure_answers_the_name_of_what_ran_and_an_unknown_one_fails(conne
         session.disconnect()
     assert ran == {"success": True, "output": {"ran": "autofocus"}}
     assert unknown["success"] is False and "unknown procedure" in unknown["output"]
-    assert set(menu) == {"autofocus", "lock_focus", "save_data", "set_origin"}
+    assert set(menu) == {
+        "autofocus",
+        "lock_focus",
+        "save_data",
+        "set_origin",
+        "safe_state",
+        "escape",
+        "refocus",
+        "live",
+        "auto_exposure",
+        "move_piezo_z",
+        "center_piezo_z",
+        "edit_optical_configuration",
+        "copy_optical_configuration",
+        "delete_optical_configuration",
+    }
+
+
+def test_the_new_procedures_and_a_device_setting_through_the_controller(connection):
+    session = zmart_controller.ZmartController(
+        zmart_controller_plugin.ZmartControllerPlugin, connection
+    )
+    try:
+        lit = session.set_state(
+            {"changeable": {"lights": {"DIA": {"on": True}}, "shutters": {"EPI": True}}}
+        )
+        safe = session.run_procedure({"name": "safe_state"})
+        edited = session.run_procedure(
+            {
+                "name": "edit_optical_configuration",
+                "configuration": "DAPI",
+                "exposure_ms": 40,
+            }
+        )
+        unnamed = session.run_procedure({"name": "delete_optical_configuration"})
+        missing = session.run_procedure({"name": "move_piezo_z"})
+        state = session.get_state()["output"]
+    finally:
+        session.disconnect()
+    assert lit["success"] is True, lit
+    assert safe == {"success": True, "output": {"ran": "safe_state"}}
+    assert edited == {"success": True, "output": {"ran": "edit_optical_configuration"}}
+    assert unnamed["success"] is False and "needs 'configuration'" in unnamed["output"]
+    assert missing["success"] is False and "needs 'distance_um'" in missing["output"]
+    assert state["changeable"]["shutters"] == {"DIA LED": False, "EPI": False}

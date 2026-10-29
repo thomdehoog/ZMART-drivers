@@ -459,7 +459,7 @@ Saving it is `save_data`; letting LAS X go of it is `clear_cache`.
 
 The Nikon driver, `zmart_drivers/nikon/nis_elements_ar610/`, is the second driver
 built this way, for a Nikon microscope (a Ti2) run by NIS-Elements AR 6.10. It reaches NIS-Elements
-through the [nis-bridge](https://github.com/thomdehoog/nis-useq-aiagent/tree/bridge-hybrid-610/1_nis_bridge):
+through the [nis-bridge](https://github.com/thomdehoog/nis-useq-aiagent/tree/6670cfc755950f4d27fe8bd070aaf6ea0b57982c/1_nis_bridge):
 a small server that a NIS macro runs inside NIS-Elements' own Python, which
 takes one request at a time over a socket on the same computer and answers it
 once NIS has carried it out.

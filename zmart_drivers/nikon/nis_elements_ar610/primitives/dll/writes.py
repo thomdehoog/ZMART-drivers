@@ -8,7 +8,11 @@ it may never be sent again. The dispatcher's ``run()`` does the rest. Nothing
 here talks to the bridge.
 
 The builders: :func:`move_xyz`, :func:`select_optical_configuration`,
-:func:`set_objective`, :func:`set_pfs`, :func:`autofocus` and :func:`snap`.
+:func:`set_objective`, :func:`set_pfs`, :func:`set_pfs_offset`,
+:func:`autofocus`, :func:`snap`, :func:`set_light`, :func:`set_shutter`,
+:func:`set_filter`, :func:`set_light_path`, :func:`set_port`,
+:func:`move_piezo_z`, :func:`center_piezo_z`, :func:`escape` and
+:func:`safe_state`.
 The checks that say how close counts (:func:`within_xyz`, :func:`slot_is`,
 :func:`pfs_is`) each take one reading's value and answer True or False, so
 each can be tested alone.
@@ -257,4 +261,346 @@ def snap(path: str) -> Write:
         description=f"snap to {path}",
         timeout_s=SNAP_TIMEOUT_S,
         never_resend=True,
+    )
+
+
+# =============================================================================
+# The PFS offset, the lights, the shutters, the filters
+# =============================================================================
+
+#: How close a value read back must come, where NIS may round what it was
+#: given. Unknown on the instrument, so generous; to be checked on the Ti2.
+VOLTAGE_TOLERANCE_V = 0.1
+IRIS_TOLERANCE = 0.01
+APERTURE_TOLERANCE = 0.5
+ZOOM_TOLERANCE = 0.01
+DISK_SPEED_TOLERANCE_RPM = 10.0
+
+
+def _close(value, target, tolerance) -> bool:
+    try:
+        return abs(float(value) - float(target)) <= tolerance
+    except (TypeError, ValueError):
+        return False
+
+
+def pfs_settings_are(offset=None, dish=None):
+    """The PFS reading shows the offset and the dish asked for (those that were asked)."""
+
+    def check(pfs) -> bool:
+        try:
+            return (offset is None or pfs["offset"] == offset) and (
+                dish is None or pfs["dish"] == dish
+            )
+        except (KeyError, TypeError):
+            return False
+
+    return check
+
+
+def set_pfs_offset(offset: int | None = None, dish: str | None = None) -> Write:
+    """Set the plane the Perfect Focus System keeps (``offset``, in NIS's units) and the dish (``glass`` or ``plastic``)."""
+
+    def fill(args):
+        args.update(
+            {
+                key: value
+                for key, value in (("offset", offset), ("dish", dish))
+                if value is not None
+            }
+        )
+
+    return Write(
+        command="set_pfs_offset",
+        values={"offset": offset, "dish": dish},
+        request="set_pfs_offset",
+        fill=fill,
+        description=f"PFS offset {offset}, dish {dish}",
+        confirm=Expect("pfs", pfs_settings_are(offset, dish)),
+    )
+
+
+def light_is(name, on=None, voltage=None, iris=None):
+    """The lights reading shows *name* switched and set as asked (only what was asked)."""
+
+    def check(lights) -> bool:
+        try:
+            light = lights[name]
+            return (
+                (on is None or light["on"] is on)
+                and (
+                    voltage is None
+                    or _close(light["voltage"], voltage, VOLTAGE_TOLERANCE_V)
+                )
+                and (iris is None or _close(light["iris"], iris, IRIS_TOLERANCE))
+            )
+        except (KeyError, TypeError):
+            return False
+
+    return check
+
+
+def set_light(
+    name: str,
+    *,
+    on: bool | None = None,
+    voltage: float | None = None,
+    iris: float | None = None,
+) -> Write:
+    """Switch the lamp or LED *name* on or off, and set its voltage or iris, where NIS controls them."""
+
+    def fill(args):
+        args.update(
+            name=name,
+            **{
+                k: v
+                for k, v in (("on", on), ("voltage", voltage), ("iris", iris))
+                if v is not None
+            },
+        )
+
+    return Write(
+        command="set_light",
+        values={"name": name, "on": on, "voltage": voltage, "iris": iris},
+        request="set_light",
+        fill=fill,
+        description=f"light {name!r}: on {on}, voltage {voltage}, iris {iris}",
+        confirm=Expect("lights", light_is(name, on, voltage, iris)),
+    )
+
+
+def shutter_is(name, open_):
+    def check(shutters) -> bool:
+        try:
+            return shutters[name] is open_
+        except (KeyError, TypeError):
+            return False
+
+    return check
+
+
+def set_shutter(name: str, open_: bool) -> Write:
+    """Open or close the shutter *name*."""
+
+    def fill(args):
+        args.update(name=name, open=bool(open_))
+
+    return Write(
+        command="set_shutter",
+        values={"name": name, "open": open_},
+        request="set_shutter",
+        fill=fill,
+        description=f"shutter {name!r} {'open' if open_ else 'closed'}",
+        confirm=Expect("shutters", shutter_is(name, open_)),
+    )
+
+
+def filter_at(changer, position):
+    def check(filters) -> bool:
+        try:
+            return filters[changer]["position"] == position
+        except (KeyError, TypeError):
+            return False
+
+    return check
+
+
+def set_filter(changer: str, position: int) -> Write:
+    """Turn the filter changer *changer* to *position*, counted from 1."""
+
+    def fill(args):
+        args.update(changer=changer, position=int(position))
+
+    return Write(
+        command="set_filter",
+        values={"changer": changer, "position": position},
+        request="set_filter",
+        fill=fill,
+        description=f"filter changer {changer!r} to position {position}",
+        confirm=Expect("filters", filter_at(changer, position)),
+    )
+
+
+# =============================================================================
+# The light path, the port and the spinning disk
+# =============================================================================
+
+
+def light_path_is(condenser=None, aperture=None, size=None, zoom=None, analyzer=None):
+    """The light-path reading shows what was asked (only what was asked)."""
+
+    def check(path) -> bool:
+        try:
+            return (
+                (condenser is None or path["condenser"]["position"] == condenser)
+                and (
+                    aperture is None
+                    or _close(
+                        path["apertures"][aperture]["size"], size, APERTURE_TOLERANCE
+                    )
+                )
+                and (zoom is None or _close(path["zoom"]["zoom"], zoom, ZOOM_TOLERANCE))
+                and (analyzer is None or path["analyzer"]["inserted"] is analyzer)
+            )
+        except (KeyError, TypeError):
+            return False
+
+    return check
+
+
+def set_light_path(
+    *,
+    condenser: int | None = None,
+    aperture: str | None = None,
+    size: float | None = None,
+    zoom: float | None = None,
+    analyzer: bool | None = None,
+) -> Write:
+    """Set the condenser position, an aperture's size (``field``, ``epi_field`` or ``dia``), the zoom, or the analyzer."""
+    given = {
+        "condenser": condenser,
+        "aperture": aperture,
+        "size": size,
+        "zoom": zoom,
+        "analyzer": analyzer,
+    }
+
+    def fill(args):
+        args.update({key: value for key, value in given.items() if value is not None})
+
+    return Write(
+        command="set_light_path",
+        values=dict(given),
+        request="set_light_path",
+        fill=fill,
+        description=f"light path: {', '.join(f'{k} {v}' for k, v in given.items() if v is not None)}",
+        confirm=Expect(
+            "light_path", light_path_is(condenser, aperture, size, zoom, analyzer)
+        ),
+    )
+
+
+def port_is(port=None, disk_shutter=None, disk_speed_rpm=None):
+    def check(path) -> bool:
+        try:
+            return (
+                (port is None or path["port"]["position"] == port)
+                and (
+                    disk_shutter is None or path["disk"]["shutter_open"] is disk_shutter
+                )
+                and (
+                    disk_speed_rpm is None
+                    or _close(
+                        path["disk"]["speed_rpm"],
+                        disk_speed_rpm,
+                        DISK_SPEED_TOLERANCE_RPM,
+                    )
+                )
+            )
+        except (KeyError, TypeError):
+            return False
+
+    return check
+
+
+def set_port(
+    *,
+    port: int | None = None,
+    disk_shutter: bool | None = None,
+    disk_speed_rpm: int | None = None,
+) -> Write:
+    """Send the light to a port, and open or close the spinning disk's shutter or set its speed."""
+    given = {
+        "port": port,
+        "disk_shutter": disk_shutter,
+        "disk_speed_rpm": disk_speed_rpm,
+    }
+
+    def fill(args):
+        args.update({key: value for key, value in given.items() if value is not None})
+
+    return Write(
+        command="set_port",
+        values=dict(given),
+        request="set_port",
+        fill=fill,
+        description=f"port and disk: {', '.join(f'{k} {v}' for k, v in given.items() if v is not None)}",
+        confirm=Expect("light_path", port_is(port, disk_shutter, disk_speed_rpm)),
+    )
+
+
+# =============================================================================
+# The piezo Z drive, escape, and the safe state
+# =============================================================================
+
+
+def move_piezo_z(distance_um: float) -> Write:
+    """Move the piezo Z drive by *distance_um*, relative to where it is.
+
+    NIS cannot read the piezo's position back, so there is nothing to
+    confirm. A relative move sent twice would move twice, so it is never
+    sent again.
+    """
+
+    def fill(args):
+        args.update(distance_um=float(distance_um))
+
+    return Write(
+        command="move_piezo_z",
+        values={"distance_um": distance_um},
+        request="move_piezo_z",
+        fill=fill,
+        description=f"piezo Z by {distance_um:g} um",
+        never_resend=True,
+    )
+
+
+def center_piezo_z() -> Write:
+    """Bring the piezo Z drive back to the middle of its travel, keeping the focus."""
+
+    def fill(args):
+        args.update(center=True)
+
+    return Write(
+        command="center_piezo_z",
+        values={},
+        request="move_piezo_z",
+        fill=fill,
+        description="piezo Z to the middle of its travel",
+    )
+
+
+def escape(on: bool) -> Write:
+    """Lower the objective away from the sample (``on`` True), or bring it back to the focus it left.
+
+    The bridge answers whether the objective is escaped; there is no reading
+    of it to wait for, so its answer is the record.
+    """
+
+    def fill(args):
+        args.update(on=bool(on))
+
+    return Write(
+        command="escape",
+        values={"on": on},
+        request="escape",
+        fill=fill,
+        description="escape: the objective lowered away"
+        if on
+        else "refocus: the objective back to its focus",
+    )
+
+
+def safe_state() -> Write:
+    """Switch off everything that sends light to the sample: every laser line, every shutter and the disk shutter, every lamp.
+
+    The bridge tries every part even when one fails, and answers what it
+    switched off and what failed. Sending it again does no harm.
+    """
+    return Write(
+        command="safe_state",
+        values={},
+        request="safe_state",
+        fill=lambda args: None,
+        description="safe state: every light source off",
     )

@@ -53,7 +53,7 @@ leica = [
 # as OME-Zarr 0.5. The bridge itself runs inside NIS-Elements on Windows,
 # from a clone of that repository (the driver's README says how).
 nikon-ar610 = [
-    "nis-bridge @ git+https://github.com/thomdehoog/nis-useq-aiagent@bridge-hybrid-610#subdirectory=1_nis_bridge",
+    "nis-bridge @ git+https://github.com/thomdehoog/nis-useq-aiagent@6670cfc755950f4d27fe8bd070aaf6ea0b57982c#subdirectory=1_nis_bridge",
     "numpy>=1.24",
     "tifffile>=2024.1",
     "zarr>=3",

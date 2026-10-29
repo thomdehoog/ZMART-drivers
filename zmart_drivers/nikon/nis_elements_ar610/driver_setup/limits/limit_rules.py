@@ -17,8 +17,10 @@ A stage move is held to two layers, both here:
    nothing to type in here: the backstop comes from the instrument.
 
 The other entries of the file fence what automation may choose: the
-nosepiece slots, the optical configurations, the exposure and the range of
-the image-based focus sweep. Each is either ``[]`` (reviewed; no limit) or
+nosepiece slots, the optical configurations (selected, edited, copied or
+deleted), the exposure, the range of the image-based focus sweep, the laser
+lines and their power, a lamp's voltage, the PFS offset, and how far one
+step of the piezo Z drive may go. Each is either ``[]`` (reviewed; no limit) or
 one constraint, ``{"range": [min, max]}`` or ``{"allowed": [...]}``.
 
 Author: Thom de Hoog, Center for Microscopy and Image Analysis (ZMB),
@@ -45,26 +47,51 @@ SETTING_LIMIT_KEYS = (
     "optical_configuration",
     "exposure_ms",
     "autofocus_range_um",
+    "laser_wavelength_nm",
+    "laser_power",
+    "light_voltage",
+    "pfs_offset",
+    "piezo_step_um",
 )
 
-#: Every change the dispatcher can be handed, and the entries of the file it is checked against.
-#: A change missing here is a mistake in the driver, and ``check_command`` raises for it.
+#: Every change the dispatcher can be handed, and what of it the file checks:
+#: ``"stage"`` for a move, else the pairs ``(entry of the file, the value it
+#: checks)``. A value shown as None was not asked for and is not checked; a
+#: value the change does not show at all is a mistake in the driver. A change
+#: with no pairs is checked by nothing in the file, only by the gate being
+#: there. A change missing here is a mistake too, and ``check_command``
+#: raises for it.
 MUTATING_COMMANDS = {
     "move_xyz": "stage",
-    "set_objective": "objective_slot",
-    "select_optical_configuration": "optical_configuration",
-    "set_exposure": "exposure_ms",
-    "autofocus": "autofocus_range_um",
-    "set_pfs": None,
-    "snap": None,
-}
-
-#: What the gate is shown for each command, by the entry it is checked against.
-_VALUE_KEY = {
-    "objective_slot": "objective_slot",
-    "optical_configuration": "name",
-    "exposure_ms": "exposure_ms",
-    "autofocus_range_um": "range_um",
+    "set_objective": (("objective_slot", "objective_slot"),),
+    "select_optical_configuration": (("optical_configuration", "name"),),
+    "set_exposure": (("exposure_ms", "exposure_ms"),),
+    "autofocus": (("autofocus_range_um", "range_um"),),
+    "set_pfs": (),
+    "set_pfs_offset": (("pfs_offset", "offset"),),
+    "snap": (),
+    "set_light": (("light_voltage", "voltage"),),
+    "set_laser": (("laser_wavelength_nm", "wavelength_nm"), ("laser_power", "power")),
+    "set_shutter": (),
+    "set_filter": (),
+    "set_light_path": (),
+    "set_port": (),
+    "set_camera": (),
+    "move_piezo_z": (("piezo_step_um", "distance_um"),),
+    "center_piezo_z": (),
+    "escape": (),
+    "live": (),
+    "auto_exposure": (),
+    "safe_state": (),
+    "edit_optical_configuration": (
+        ("optical_configuration", "name"),
+        ("exposure_ms", "exposure_ms"),
+    ),
+    "copy_optical_configuration": (
+        ("optical_configuration", "name"),
+        ("exposure_ms", "exposure_ms"),
+    ),
+    "delete_optical_configuration": (("optical_configuration", "name"),),
 }
 
 
@@ -192,18 +219,17 @@ class NikonLimits:
             raise KeyError(
                 f"{command!r} is not a change the limits know; add it to MUTATING_COMMANDS"
             )
-        entry = MUTATING_COMMANDS[command]
-        if entry is None:
-            return
-        if entry == "stage":
+        checks = MUTATING_COMMANDS[command]
+        if checks == "stage":
             self.check_stage(values)
             return
-        key = _VALUE_KEY[entry]
-        if key not in values:
-            raise LimitsError(
-                f"{command} was not shown its {key!r}, which the limits check ({self._origin()})"
-            )
-        self.check_setting(entry, values[key])
+        for entry, key in checks:
+            if key not in values:
+                raise LimitsError(
+                    f"{command} was not shown its {key!r}, which the limits check ({self._origin()})"
+                )
+            if values[key] is not None:
+                self.check_setting(entry, values[key])
 
     def status(self) -> LimitsStatus:
         return LimitsStatus(

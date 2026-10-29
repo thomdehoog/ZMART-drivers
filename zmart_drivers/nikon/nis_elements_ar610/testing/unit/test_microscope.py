@@ -148,22 +148,24 @@ def test_set_state_applies_in_order_and_refuses_a_setting_the_microscope_does_no
         {"objective": 2, "channel": "DAPI", "exposure_ms": 50, "pfs": False}
     )
 
+    # The PFS was already off, so nothing is sent for it: only what differs changes.
     assert applied["applied"] == {
         "objective": 2,
         "channel": "DAPI",
         "exposure_ms": 50,
-        "pfs": False,
     }
     assert [c for c in mock.calls if not c.startswith("move")] == [
         "objective(2)",
         "config(DAPI)",
         "exposure(50)",
-        "pfs(off)",
     ]
     with pytest.raises(ValueError, match="zoom"):
         scope.set_state({"zoom": 2})
     state = scope.state()
-    assert state["changeable"] == {
+    assert {
+        key: state["changeable"][key]
+        for key in ("objective", "channel", "exposure_ms", "pfs")
+    } == {
         "objective": 2,
         "channel": "DAPI",
         "exposure_ms": 50.0,

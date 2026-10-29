@@ -3,8 +3,10 @@
 ``connect()`` reaches NIS-Elements through the bridge, loads this
 microscope's settings and hands back a :class:`Microscope`. Its methods are
 everything the driver can do: read and move the stage in the sample's frame,
-select a channel, set the exposure, change the objective, focus, take a
-picture, save it, and describe the instrument::
+select a channel, set the exposure, change the objective, focus, set the
+lights, lasers, filters, shutters, light path and camera, edit the saved
+optical configurations, take a picture, save it, and describe the
+instrument::
 
     import zmart_drivers.nikon.nis_elements_ar610 as nis_elements
 
@@ -59,6 +61,7 @@ from .driver_setup.store import MACHINE, use_configuration
 from .primitives.dll import client as bridge_client
 from .procedures import absolute_coordinate_system, changes, keep_in_view, readings
 from .procedures import acquire as acquire_step
+from .procedures import devices as devices_step
 from .procedures import focus as focus_step
 from .procedures import state as state_step
 from .procedures.save_data import save_waiting as save_step
@@ -339,6 +342,252 @@ class Microscope:
         """Switch the Perfect Focus System on (waiting for it to lock) or off; answers its state."""
         return focus_step.lock_focus(self.handle, on)
 
+    # --- the devices beyond the stage ------------------------------------------------------
+
+    def devices(self) -> dict:
+        """Every device's settings (light path, port, filters, camera, lights, lasers, shutters), as ``set_state`` takes them."""
+        self.handle.require_open()
+        return devices_step.get_devices(self.handle.client)
+
+    def lights(self) -> dict:
+        """Each lamp or LED by name: ``{"on", "voltage", "iris"}``; a value NIS does not control is None."""
+        self.handle.require_open()
+        return readings.get_lights(self.handle.client) or {}
+
+    def set_light(
+        self,
+        name: str,
+        *,
+        on: bool | None = None,
+        voltage: float | None = None,
+        iris: float | None = None,
+    ) -> dict:
+        """Switch the light *name* on or off, or set its voltage or iris; only what is given changes."""
+        return state_step.set_state(
+            self.handle, {"lights": {name: _given(on=on, voltage=voltage, iris=iris)}}
+        )
+
+    def lasers(self) -> dict:
+        """Each light source's lines, by wavelength in nm: ``{"line", "on", "power", "power_steps"}``."""
+        self.handle.require_open()
+        return readings.get_lasers(self.handle.client) or {}
+
+    def set_laser(
+        self,
+        wavelength_nm: int,
+        *,
+        on: bool | None = None,
+        power: float | None = None,
+        laser: str | None = None,
+    ) -> dict:
+        """Switch a laser line on or off, or set its power (in NIS's power steps).
+
+        The line is chosen by its wavelength. When more than one light source
+        has that wavelength, name the one you mean with *laser*.
+        """
+        self.handle.require_open()
+        source = devices_step.resolve_laser(self.handle.client, wavelength_nm, laser)
+        return state_step.set_state(
+            self.handle,
+            {"lasers": {source: {str(int(wavelength_nm)): _given(on=on, power=power)}}},
+        )
+
+    def filters(self) -> dict:
+        """Each filter changer: ``{"position", "filters": {position: name}}``, positions counted from 1."""
+        self.handle.require_open()
+        return readings.get_filters(self.handle.client) or {}
+
+    def set_filter(
+        self,
+        changer: str,
+        position: int | None = None,
+        *,
+        filter_name: str | None = None,
+    ) -> dict:
+        """Turn the filter changer *changer* to *position*, or to the position holding *filter_name*."""
+        self.handle.require_open()
+        to = devices_step.resolve_filter(
+            self.handle.client, changer, position, filter_name
+        )
+        return state_step.set_state(self.handle, {"filters": {changer: to}})
+
+    def shutters(self) -> dict:
+        """Each shutter by name: True when it is open."""
+        self.handle.require_open()
+        return readings.get_shutters(self.handle.client) or {}
+
+    def set_shutter(self, name: str, open_: bool) -> dict:
+        """Open (True) or close (False) the shutter *name*."""
+        return state_step.set_state(self.handle, {"shutters": {name: bool(open_)}})
+
+    def light_path(self) -> dict:
+        """The condenser, the apertures, the zoom, the analyzer, the port and the spinning disk, as NIS reports them."""
+        self.handle.require_open()
+        return readings.get_light_path(self.handle.client) or {}
+
+    def set_light_path(
+        self,
+        *,
+        condenser: int | None = None,
+        aperture: str | None = None,
+        size: float | None = None,
+        zoom: float | None = None,
+        analyzer: bool | None = None,
+    ) -> dict:
+        """Set the condenser position, one aperture's size, the zoom or the analyzer; only what is given changes."""
+        wanted = _given(condenser=condenser, zoom=zoom, analyzer=analyzer)
+        if (aperture is None) != (size is None):
+            raise ValueError("an aperture is set with both its name and its size")
+        if aperture is not None:
+            wanted["apertures"] = {aperture: size}
+        return state_step.set_state(self.handle, {"light_path": wanted})
+
+    def set_port(
+        self,
+        port: int | None = None,
+        *,
+        disk_shutter: bool | None = None,
+        disk_speed_rpm: float | None = None,
+    ) -> dict:
+        """Send the light to camera port *port*, or open the spinning disk's shutter or set its speed."""
+        return state_step.set_state(
+            self.handle,
+            {
+                "port": _given(
+                    port=port, disk_shutter=disk_shutter, disk_speed_rpm=disk_speed_rpm
+                )
+            },
+        )
+
+    def set_camera(
+        self,
+        *,
+        format: str | None = None,
+        roi: dict | None = None,
+        averaging: int | None = None,
+        integration: int | None = None,
+    ) -> dict:
+        """Set the camera's format (binning and bit depth), its region of interest, averaging or integration."""
+        return state_step.set_state(
+            self.handle,
+            {
+                "camera": _given(
+                    format=format, roi=roi, averaging=averaging, integration=integration
+                )
+            },
+        )
+
+    def set_pfs_offset(
+        self, offset: int | None = None, *, dish: str | None = None
+    ) -> dict:
+        """Set the plane the Perfect Focus System keeps (in NIS's units) and the dish, ``glass`` or ``plastic``."""
+        return state_step.set_state(
+            self.handle, {"pfs_offset": _given(offset=offset, dish=dish)}
+        )
+
+    def environment(self) -> dict:
+        """What the stand's sensors report, by name: ``{"temperature", "status"}``."""
+        self.handle.require_open()
+        return readings.get_environment(self.handle.client) or {}
+
+    def incubator(self, key: str | None = None) -> Any:
+        """The incubator's readings (temperature, CO2, humidity), or the one named by *key*."""
+        self.handle.require_open()
+        return readings.get_incubator(self.handle.client, key)
+
+    # --- saved optical configurations -------------------------------------------------------
+
+    def channel_settings(self, name: str) -> dict | None:
+        """What the optical configuration *name* has saved, such as its exposure."""
+        self.handle.require_open()
+        return readings.get_optical_configuration(self.handle.client, name)
+
+    def edit_channel(self, name: str, exposure_ms: float) -> dict:
+        """Save a new exposure into the optical configuration *name*, and read it back."""
+        self.handle.require_open()
+        return checked(
+            self.handle,
+            changes.edit_optical_configuration(self.handle.client, name, exposure_ms),
+            f"edit_channel({name!r})",
+        )
+
+    def copy_channel(
+        self, name: str, new_name: str, exposure_ms: float | None = None
+    ) -> dict:
+        """Save a copy of the optical configuration *name* as *new_name*, with its own exposure when given."""
+        self.handle.require_open()
+        return checked(
+            self.handle,
+            changes.copy_optical_configuration(
+                self.handle.client, name, new_name, exposure_ms
+            ),
+            f"copy_channel({name!r}, {new_name!r})",
+        )
+
+    def delete_channel(self, name: str) -> dict:
+        """Delete the optical configuration *name* from NIS-Elements. This cannot be undone from the driver."""
+        self.handle.require_open()
+        result = checked(
+            self.handle,
+            changes.delete_optical_configuration(self.handle.client, name),
+            f"delete_channel({name!r})",
+        )
+        if self.handle.channel == name:
+            self.handle.channel = None
+        return result
+
+    # --- live view, exposure, piezo, safety -------------------------------------------------
+
+    def live(self, on: bool = True) -> dict:
+        """Start (True) or stop (False) NIS's live view."""
+        self.handle.require_open()
+        return checked(self.handle, changes.live(self.handle.client, on), f"live({on})")
+
+    def auto_exposure(self) -> dict:
+        """Let NIS choose the exposure for what is in view; answers the exposure it chose."""
+        self.handle.require_open()
+        checked(
+            self.handle, changes.auto_exposure(self.handle.client), "auto_exposure()"
+        )
+        return {"exposure_ms": self.exposure()}
+
+    def move_piezo_z(self, distance_um: float) -> dict:
+        """Move the piezo focus drive by *distance_um* (a relative step, within the limits)."""
+        self.handle.require_open()
+        return checked(
+            self.handle,
+            changes.move_piezo_z(self.handle.client, distance_um),
+            f"move_piezo_z({distance_um})",
+        )
+
+    def center_piezo_z(self) -> dict:
+        """Move the piezo focus drive back to the middle of its travel."""
+        self.handle.require_open()
+        return checked(
+            self.handle, changes.center_piezo_z(self.handle.client), "center_piezo_z()"
+        )
+
+    def escape(self) -> dict:
+        """Lower the objective away from the sample, for changing the dish. :meth:`refocus` brings it back."""
+        self.handle.require_open()
+        return checked(
+            self.handle, changes.escape(self.handle.client, True), "escape()"
+        )
+
+    def refocus(self) -> dict:
+        """Bring the objective back to where it was before :meth:`escape`."""
+        self.handle.require_open()
+        return checked(
+            self.handle, changes.escape(self.handle.client, False), "refocus()"
+        )
+
+    def safe_state(self) -> dict:
+        """Switch off everything that sends light to the sample: every lamp and laser line, every shutter, the disk shutter."""
+        self.handle.require_open()
+        return checked(
+            self.handle, changes.safe_state(self.handle.client), "safe_state()"
+        )
+
     # --- pictures -------------------------------------------------------------------------
 
     def acquisition_settings(self) -> dict:
@@ -373,12 +622,22 @@ class Microscope:
     # --- the state ------------------------------------------------------------------------
 
     def state(self) -> dict:
-        """``{"changeable", "observed"}``: the channel, exposure, objective and PFS, and what can only be read."""
+        """``{"changeable", "observed"}``: what ``set_state`` can apply, and what can only be read."""
         return state_step.get_state(self.handle)
 
     def set_state(self, changeable: dict) -> dict:
-        """Apply the changeable settings (``objective``, ``channel``, ``exposure_ms``, ``pfs``), each read back."""
+        """Apply the changeable settings, each read back; only what differs from the microscope now is changed.
+
+        The settings are ``objective``, ``channel``, the devices
+        (``light_path``, ``port``, ``filters``, ``camera``, ``lights``,
+        ``lasers``, ``shutters``), ``exposure_ms``, ``pfs_offset`` and ``pfs``.
+        """
         return state_step.set_state(self.handle, changeable)
+
+
+def _given(**values) -> dict:
+    """The values that were given: a setting left at None is not changed."""
+    return {key: value for key, value in values.items() if value is not None}
 
 
 def checked(handle: Session, result: dict, what: str) -> dict:
