@@ -30,22 +30,16 @@ def load_script():
     spec = importlib.util.spec_from_file_location("check_hardware_nis", SCRIPT)
     script = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(script)
+    script.SETTLE_S = 0.0  # the pretend microscope settles at once
     return script
 
 
 @pytest.fixture
 def everything_on(monkeypatch):
+    """The check with every change it can make: the nosepiece turned and Perfect Focus switched too."""
     script = load_script()
-    monkeypatch.setattr(
-        script, "ALLOW_GROUPS", {group: True for group in script.ALLOW_GROUPS}
-    )
-    for switch in (
-        "ALLOW_STAGE",
-        "ALLOW_OBJECTIVE",
-        "ALLOW_OPTICAL_CONFIGURATION",
-        "ALLOW_SNAP",
-    ):
-        monkeypatch.setattr(script, switch, True)
+    monkeypatch.setattr(script, "TURN_NOSEPIECE", True)
+    monkeypatch.setattr(script, "SWITCH_PFS", True)
     monkeypatch.setattr(script, "SETTLE_S", 0.0)
     return script
 
@@ -91,8 +85,24 @@ def test_with_everything_switched_on_every_check_passes_and_everything_is_put_ba
         "the operator's image stays, and the check's own picture is closed"
     )
     summary = (tmp_path / "results" / "check_summary.txt").read_text()
-    assert summary.strip().endswith("0 failed")
+    assert " 0 failed" in summary
     assert list((tmp_path / "results").glob("snap_*.tif"))
+    # The driver itself ran, through its own bridge, and so did the controller's commands.
+    driver = {
+        c["check"]
+        for c in report["checks"]
+        if c["check"].startswith(("driver:", "controller plugin:"))
+    }
+    assert {
+        "driver: connect()",
+        "driver: move_to() x 5 um and back",
+        "driver: set_device('shutter/EPI') and back",
+        "driver: acquire(), saved as OME-Zarr",
+        "controller plugin: get_info()",
+        "controller plugin: get_xyz()",
+        "controller plugin: get_state()",
+    } <= driver
+    assert list((tmp_path / "results" / "driver_data" / "data").glob("*.ome.zarr"))
 
 
 def test_a_guarded_setting_is_only_ever_set_to_its_own_value(everything_on, tmp_path):
@@ -105,26 +115,6 @@ def test_a_guarded_setting_is_only_ever_set_to_its_own_value(everything_on, tmp_
     assert line["answer"]["set to"] == line["answer"]["before"] == 0, (
         "a laser line is never switched on by the check"
     )
-
-
-def test_by_default_nothing_changes(tmp_path):
-    script = load_script()
-    nis = make_nis()
-    report = script.main(nis, str(tmp_path / "results"))
-    assert not any(c["changes"] for c in report["checks"])
-    writes = {
-        "StgMoveXY",
-        "StgMoveZ",
-        "Capture",
-        "SelectOptConf",
-        "Stg_SetShutterStateEx",
-        "Stg_Filter_SetPosition",
-    }
-    assert writes.isdisjoint(nis.scope.calls)
-    inventory = next(
-        c for c in report["checks"] if c["check"].startswith("every hardware setting")
-    )
-    assert inventory["outcome"] == "ok" and inventory["answer"]["shutter"]["devices"]
 
 
 def test_a_function_nis_does_not_offer_is_reported(tmp_path, monkeypatch):
@@ -285,56 +275,100 @@ def test_a_function_list_naming_functions_without_brackets_is_quoted(
     assert found["pages copied into help_pages"] == 1
 
 
-def test_with_the_microscope_off_every_function_is_called_once_and_nothing_changes(
-    tmp_path,
-):
-    """With the hardware off, the check tries each of the driver's functions with its arguments, as NIS would take them."""
+def test_with_changes_off_nothing_is_ever_sent(tmp_path, monkeypatch):
     script = load_script()
+    monkeypatch.setattr(script, "CHANGES", False)
+    nis = make_nis()
+    report = script.main(nis, str(tmp_path / "results"))
+    assert [c["check"] for c in report["checks"] if c["outcome"] != "ok"] == []
+    writes = {
+        "StgMoveXY",
+        "StgMoveZ",
+        "Capture",
+        "Stg_SetShutterStateEx",
+        "Stg_Filter_SetPosition",
+        "Stg_SetLightPathPosition",
+    }
+    changed = [c for c in nis.scope.calls if c in writes]
+    # With CHANGES off, a setting is only ever set to the value it already has.
+    assert "Capture" not in changed
+    assert nis.scope.position() == pytest.approx((1000.0, 2000.0, 3000.0))
+
+
+def test_the_changes_are_the_smallest_that_can_be_seen(tmp_path, monkeypatch):
+    script = load_script()
+    monkeypatch.setattr(script, "SETTLE_S", 0.0)
+    report = script.main(make_nis(), str(tmp_path / "results"))
+    by = {c["check"]: c for c in report["checks"]}
+    assert by["change filter/Emission Wheel"]["answer"]["set to"] == 2, (
+        "one position, from 1"
+    )
+    voltage = by["change lamp_voltage/DIA LED"]["answer"]
+    assert abs(voltage["set to"] - voltage["before"]) == pytest.approx(0.15)
+    stage = by["stage x 5 um and back"]["answer"]
+    assert stage["to"][0] - stage["from"][0] == 5.0
+    assert (
+        by["change pfs"]["answer"]["set to"] == by["change pfs"]["answer"]["before"]
+    ), "Perfect Focus is not switched by default"
+    assert (
+        by["nosepiece set to its own position"]["answer"]["to"]
+        == by["nosepiece set to its own position"]["answer"]["from"]
+    )
+
+
+def test_with_the_microscope_off_every_call_is_tried_and_the_answers_are_the_baseline(
+    tmp_path, monkeypatch
+):
+    """The same checks with the hardware off: NIS answers "not available", which is fine; nothing changes."""
+    script = load_script()
+    monkeypatch.setattr(script, "SETTLE_S", 0.0)
     nis = make_nis()
     nis.scope.hardware_on = False
-    before = (
-        dict(nis.scope.shutters),
-        dict(nis.scope.filters),
-        nis.scope.light_path,
-        nis.scope.condenser,
-        nis.scope.nosepiece,
-    )
+    for name in (
+        "Stg_GetShutterCount",
+        "Stg_Light_GetCount",
+        "Stg_Filter_GetCount",
+        "Stg_IsLightPathPresent",
+        "Stg_IsCondenserPresent",
+        "Stg_GetMultiLaserCount",
+    ):
+        nis.scope.answer_next[
+            name
+        ] = -4  # as NIS 7.01.03 answered with the hardware off
     report = script.main(nis, str(tmp_path / "results"))
-    tried = {
-        c["check"]: c for c in report["checks"] if c["check"].startswith("arguments of")
-    }
-    assert len(tried) > 80
-    assert [name for name, c in tried.items() if c["outcome"] != "ok"] == []
+    failed = [c["check"] for c in report["checks"] if c["outcome"] != "ok"]
+    assert failed == []
+    by = {c["check"]: c for c in report["checks"]}
     assert (
-        "arguments of Stg_SetShutterStateEx (a change, with the microscope off)"
-        in tried
+        "read StgGetPosXY" in by and by["read StgGetPosXY"]["answer"]["returned"] == -4
     )
-    assert not any(
-        "Stg_HeatStage_SetTemperature" in name or "Stg_Incubator_Set" in name
-        for name in tried
+    assert (
+        "sent once (the stage is not available)"
+        in by["stage x 5 um and back"]["answer"]
     )
-    laser = tried[
-        "arguments of Stg_SetMultiLaserPower (a change, with the microscope off)"
-    ]
-    assert laser["answer"]["arguments"][-1] == 0, "a laser is only ever sent 0"
-    after = (
-        dict(nis.scope.shutters),
-        dict(nis.scope.filters),
-        nis.scope.light_path,
-        nis.scope.condenser,
-        nis.scope.nosepiece,
+    assert (
+        "capture" in by["one picture, saved as a TIFF, its document closed"]["answer"]
     )
-    assert after == before
-    summary = (tmp_path / "results" / "check_summary.txt").read_text()
-    assert summary.count("\n") > 80 and summary.strip().endswith("0 failed")
+    assert len(report["checks"]) > 90
+    driver = {
+        name: c
+        for name, c in by.items()
+        if name.startswith(("driver:", "controller plugin:"))
+    }
+    assert (
+        "driver: connect()" in driver
+        and "driver: move_to() while the stage is not available" in driver
+    )
+    assert all(c["outcome"] != "FAIL" for c in driver.values()), {
+        n: c["answer"] for n, c in driver.items() if c["outcome"] == "FAIL"
+    }
 
 
 def test_wrong_arguments_are_named_in_the_summary(tmp_path, monkeypatch):
     import mock_nis
 
     script = load_script()
-    nis = make_nis()
-    nis.scope.hardware_on = False
+    monkeypatch.setattr(script, "SETTLE_S", 0.0)
 
     def takes_three(scope, a, b, c):
         return 1
@@ -342,18 +376,31 @@ def test_wrong_arguments_are_named_in_the_summary(tmp_path, monkeypatch):
     monkeypatch.setitem(
         mock_nis.FUNCTIONS, "Stg_SetLightPathPosition", mock_nis._function(takes_three)
     )
-    report = script.main(nis, str(tmp_path / "results"))
+    report = script.main(make_nis(), str(tmp_path / "results"))
     failed = [c for c in report["checks"] if c["outcome"] != "ok"]
+    # The call itself, and the driver's own set_device, which sends the same call through the bridge.
     assert [c["check"] for c in failed] == [
-        "arguments of Stg_SetLightPathPosition (a change, with the microscope off)"
+        "change light_path",
+        "driver: set_device('light_path') and back",
     ]
-    assert "Bad number of parameters" in failed[0]["answer"]
+    assert all("Bad number of parameters" in c["answer"] for c in failed)
 
 
-def test_with_the_microscope_on_no_change_is_sent_by_the_argument_check(tmp_path):
+def test_a_driver_that_cannot_load_is_said_and_the_rest_still_runs(
+    tmp_path, monkeypatch
+):
+    """Should NIS's Python lack what the driver needs (numpy), the check says so in one line and finishes."""
+    import zmart_drivers.nikon.nis_elements_ar7 as package
+
     script = load_script()
-    nis = make_nis()
-    report = script.main(nis, str(tmp_path / "results"))
-    assert not any(c["changes"] for c in report["checks"])
-    note = next(c for c in report["checks"] if c["check"] == "the changes' arguments")
-    assert "not tried" in note["answer"]
+    # As NIS's Python would be without numpy: the driver's methods cannot be loaded.
+    monkeypatch.setitem(
+        sys.modules, "zmart_drivers.nikon.nis_elements_ar7.methods", None
+    )
+    monkeypatch.delattr(package, "methods", raising=False)
+    report = script.main(make_nis(), str(tmp_path / "results"))
+    line = next(
+        c for c in report["checks"] if c["check"] == "driver: loads in NIS's Python"
+    )
+    assert line["outcome"] == "FAIL" and "cannot be loaded" in line["answer"]
+    assert (tmp_path / "results" / "check_summary.txt").is_file()

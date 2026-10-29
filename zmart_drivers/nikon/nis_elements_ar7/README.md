@@ -250,30 +250,39 @@ python zmart_drivers/nikon/nis_elements_ar7/testing/run_ci.py
 ```
 
 **The hardware check, at the microscope.** It runs inside NIS-Elements, in NIS's own Python, and needs
-nothing installed. It calls NIS's functions directly, from the same table the driver uses:
+nothing installed. The same checks run with the microscope switched on or off: with it off, NIS answers
+"not available" where the hardware is missing, which is the baseline of how it reacts; with it on, each
+change really happens and is seen.
 
 1. Unzip the ZMART-drivers folder onto the Desktop, into Documents or Downloads, or at `C:\ZMART-drivers`.
    The macro finds it there, also with the extra folder Windows' "Extract all" adds.
-2. Open `testing\hardware\check_hardware_nis.py` in Notepad. At the top, switch on what may change:
-   a group of hardware settings, the stage, the objective, the optical configuration, one picture. Switch
-   on one at a time, with someone at the microscope. With everything off, the check only reads.
-3. In NIS-Elements: **Macro > Run Macro From File**, and pick `testing\hardware\check_hardware.mac`.
-4. When NIS says it has finished, send the `results` folder beside `check_hardware_nis.py`.
+2. In NIS-Elements: **Macro > Run Macro From File**, and pick `testing\hardware\check_hardware.mac`.
+3. When NIS says it has finished, send the `results` folder beside `check_hardware_nis.py`.
 
-**With the microscope switched off**, run it as it comes, with every switch off. It reads which functions NIS
-offers and what NIS's macro reference on the PC says about them (quoted into `reference.txt`, and the help
-pages that name them copied into `help_pages`). Then it calls each of the driver's 96 functions once, with
-the arguments the driver sends, and says per function, one line each, whether NIS took them: with the
-hardware off, NIS answers "not available" (−4) to the right arguments and "Bad number of parameters" to
-wrong ones. The changes are only called when NIS reports the stage as not available, each with the device's
-own value (or a neutral one), never for the heating stage, the incubator or TIRF, and a laser only ever
-with 0. Switching the groups on waits for a day with the microscope on.
+What it does, one line each in `check_summary.txt`:
 
-It reads which of the driver's functions NIS offers (with NIS's own description of each, and what NIS's
-macro reference says about it), every hardware setting that is there and its value, and the stage. Each
-change it is allowed to make is read back and put back as it was: a switch is turned over and back, a
-choice moves one position and back, and a number, or anything guarded, is set to the value it already has,
-which tries the function's arguments without changing anything.
+1. **What NIS has**: NIS's version; whether NIS offers each of the driver's functions; what NIS's macro
+   reference on the PC says about them (`reference.txt`, and the pages in `help_pages`); every hardware
+   setting, which devices are there, and their values.
+2. **Every reading**, called once with the driver's own arguments. NIS answers "not available" (−4) to right
+   arguments with the hardware off, and "Bad number of parameters" to wrong ones.
+3. **Every change, the smallest that can be seen, each put back**: a switch turned over and back, a position
+   one step and back, a number nudged by about three times its read-back tolerance and back, the stage 5 µm
+   and back, the focus 1 µm and back. Each is read after the change and again after putting it back. Set
+   only to the value they already have: Perfect Focus on or off, the nosepiece, the disk's speed, lasers,
+   TIRF, heating and gas. Where a value cannot be read (the hardware off), the change is sent once with a
+   neutral value, and "not available" is the expected answer.
+4. **One picture**, into a new document of its own, saved as a TIFF, and only that document closed.
+5. **The driver itself**: the check starts the driver's own bridge on NIS's thread and runs the real driver
+   against it, as in use: `connect()`, `state()`, `position()`, `move_to()` 5 µm and back, `devices()`,
+   `set_device()` for each device with the smallest change and back, `objectives()`,
+   `optical_configurations()`, `set_state()` with what `state()` answered, and `acquire()`, saved as
+   OME-Zarr (reported as skipped when NIS's Python lacks tifffile or zarr). The driver keeps its settings in a
+   scratch folder in the results, so the microscope's real setup is never touched.
+
+At the top of `check_hardware_nis.py`: `CHANGES = False` makes a run that only reads; `TURN_NOSEPIECE` and
+`SWITCH_PFS` also turn the nosepiece and switch Perfect Focus; `SNAP` and `DRIVER` leave out the picture or
+the driver part.
 
 ## More about the driver
 

@@ -6,28 +6,31 @@ functions directly, exactly as the bridge does for the driver, from the same
 table (``primitives/nis_python/devices.py``). What it confirms here is
 therefore what the driver sends.
 
-It runs in three parts. The first only reads; the others are switched off
-until you switch them on below, one at a time, with someone at the microscope.
+The same checks run with the microscope switched on or off. With it off,
+NIS answers "not available" (-4) where the hardware is missing: that is the
+baseline of how it reacts, and it shows that NIS takes each call's arguments
+(a wrong argument list is refused with "Bad number of parameters" instead).
+With it on, each change really happens, and is seen.
 
-1. **What NIS has** (always; nothing changes):
-   - NIS's version and its Python;
-   - whether NIS offers each function the driver uses, with NIS's own
-     description of it where NIS gives one;
-   - where NIS keeps its macro reference, and what it says about each of
-     these functions (copied into ``reference.txt``);
-   - every hardware setting of the table: which devices are there, and their
-     values now;
-   - the stage, the focus, the objectives and the optical configurations.
-2. **Small changes, each put back**: for each group switched on below, every
-   device that is there is changed and read back, then put back as it was.
-   A switch is turned over and back; a choice moves one position and back; a
-   number is set to the value it already has, which tries the function's
-   arguments without changing anything. A guarded group (lasers, TIRF, the
-   environment) is only ever set to the value it already has.
-   The stage moves 20 um and back, the focus 2 um and back, the nosepiece one
-   position and back, and the optical configuration is selected again.
-3. **One picture**, taken into a new document, saved as a TIFF in the results
-   folder, and that document alone closed, as the driver's snap does.
+1. **What NIS has**: NIS's version and its Python; whether NIS offers each
+   function the driver uses; what NIS's macro reference on this computer
+   says about them (``reference.txt``, and the pages in ``help_pages``);
+   every hardware setting, which devices are there, and their values.
+2. **Every reading**, called once with the driver's arguments, one line each.
+3. **Every change, the smallest that can be seen, each put back**: a switch
+   is turned over and back; a position moves one step and back; a number is
+   nudged by about three times its read-back tolerance and back; the stage
+   moves 5 um and back, the focus 1 um and back. Each is read back after the
+   change and again after putting it back. What must not change is set to
+   the value it already has: Perfect Focus on or off and the nosepiece
+   (unless switched on below), the disk's speed, and everything guarded
+   (lasers, TIRF, heating, gas). Where a value cannot be read (the hardware
+   off), the change is sent once with a neutral value, and "not available"
+   is the expected answer; a guarded one is not sent at all.
+4. **One picture**, taken into a new document, saved as a TIFF in the
+   results folder, and that document alone closed, as the driver's snap does.
+
+Set ``CHANGES = False`` below for a run that only reads.
 
 Everything goes into a ``results`` folder beside this file:
 ``check_summary.txt`` (one line per check), ``check_report.json`` (all of it),
@@ -52,32 +55,30 @@ import sys
 import time
 import traceback
 
-# -- switch on what may change, one at a time, with someone at the microscope ---------------
-ALLOW_GROUPS = {
-    "optics": False,  # light path, condenser, aperture, analyzer, zoom, relay lens, correction collar
-    "filters": False,  # filter wheels and turrets
-    "light": False,  # shutters, lamps and LEDs (turned on and off again), ND filters
-    "focus": False,  # Perfect Focus switched on and off again, its offset set to its own value
-    "spinning disk": False,  # its shutter and speed
-    # Guarded groups: only ever set to the value they already have.
-    "TIRF": False,
-    "lasers": False,
-    "environment": False,
-}
-ALLOW_STAGE = False  # x and y 20 um and back, z 2 um and back
-ALLOW_OBJECTIVE = False  # the nosepiece one position and back
-ALLOW_OPTICAL_CONFIGURATION = False  # the selected optical configuration selected again
-ALLOW_SNAP = False  # one picture, saved as a TIFF in the results folder
-# With the microscope switched off, call every one of the driver's functions once,
-# with the arguments the driver sends, to see whether NIS takes them. It changes
-# nothing: it only runs when NIS reports the stage as not available.
-ALLOW_ARGUMENT_CHECK_WHEN_OFF = True
+# -- what the check may change ------------------------------------------------------------
+# The same checks run with the microscope on or off. With it off, NIS answers
+# "not available" (-4), which is the baseline of how it reacts. With it on,
+# each change is the smallest that can be seen, read back, and put back.
+CHANGES = True  # False: only read, change nothing at all
+TURN_NOSEPIECE = (
+    False  # True: turn to the next objective and back (mind a long or oil objective)
+)
+SWITCH_PFS = False  # True: switch Perfect Focus on and off again (it may drive the focus a long way)
+SNAP = True  # one picture, into a new document of its own, saved as a TIFF in the results folder
+DRIVER = True  # also run the driver itself (connect, move, set, state, acquire) through its bridge
+#: The longest the driver part may take before the check gives up on it.
+DRIVER_TIME_LIMIT_S = 600
 
-STAGE_STEP_UM = 20.0
+#: The smallest moves that the read-back can tell apart (its tolerance is 1 um for x and y, 0.5 um for z).
+STAGE_STEP_UM = 5.0
+Z_STEP_UM = 1.0
+#: A number is nudged by this many times its read-back tolerance, and back.
+NUDGE_TOLERANCES = 3
 #: How long to let a device settle after each change, before it is read back.
 SETTLE_S = 0.5
-Z_STEP_UM = 2.0
-GUARDED_GROUPS = ("TIRF", "lasers", "environment")
+#: Settings only ever set to the value they already have: a wrong value could harm the
+#: sample, the microscope or a person, and a disk takes long to change speed.
+OWN_VALUE_ONLY = ("disk_speed",)
 #: What Get_InfoStr is asked for NIS's version, as the driver's own reading asks it.
 INFO_VERSION = 1
 
@@ -137,7 +138,9 @@ class Check:
         started = time.monotonic()
         try:
             answer = how()
-            outcome = "ok"
+            outcome = (
+                "skip" if isinstance(answer, dict) and answer.get("skipped") else "ok"
+            )
         except Exception as error:  # noqa: BLE001 -- every failure is an answer worth keeping
             answer = f"{type(error).__name__}: {error}"
             outcome = "FAIL"
@@ -151,7 +154,7 @@ class Check:
         }
         self.report["checks"].append(entry)
         self.log(f"   {outcome}: {answer!r}"[:2000])
-        return answer if outcome == "ok" else None
+        return answer if outcome != "FAIL" else None
 
     def finish(self) -> dict:
         self.report["finished"] = time.strftime("%Y-%m-%d %H:%M:%S")
@@ -160,8 +163,11 @@ class Check:
         ) as handle:
             json.dump(self.report, handle, indent=2, default=repr)
         lines = [f"{e['outcome']:4}  {e['check']}" for e in self.report["checks"]]
-        failed = sum(e["outcome"] != "ok" for e in self.report["checks"])
-        lines.append(f"{len(lines) - failed} ok, {failed} failed")
+        failed = sum(e["outcome"] == "FAIL" for e in self.report["checks"])
+        skipped = sum(e["outcome"] == "skip" for e in self.report["checks"])
+        lines.append(
+            f"{len(lines) - failed - skipped} ok, {failed} failed, {skipped} skipped"
+        )
         with open(
             os.path.join(self.out_dir, "check_summary.txt"), "w", encoding="utf-8"
         ) as handle:
@@ -172,11 +178,13 @@ class Check:
 
 def settings() -> dict:
     return {
-        "ALLOW_GROUPS": dict(ALLOW_GROUPS),
-        "ALLOW_STAGE": ALLOW_STAGE,
-        "ALLOW_OBJECTIVE": ALLOW_OBJECTIVE,
-        "ALLOW_OPTICAL_CONFIGURATION": ALLOW_OPTICAL_CONFIGURATION,
-        "ALLOW_SNAP": ALLOW_SNAP,
+        "CHANGES": CHANGES,
+        "TURN_NOSEPIECE": TURN_NOSEPIECE,
+        "SWITCH_PFS": SWITCH_PFS,
+        "SNAP": SNAP,
+        "DRIVER": DRIVER,
+        "STAGE_STEP_UM": STAGE_STEP_UM,
+        "Z_STEP_UM": Z_STEP_UM,
     }
 
 
@@ -383,199 +391,15 @@ def stage_and_optics(check: Check) -> dict:
     }
 
 
-# -- part 2: small changes, each put back --------------------------------------------------------
+# -- part 2: every function, and the smallest change, each put back ---------------------------
 
-
-def try_setting(check: Check, row, item: dict) -> dict:
-    """Change one device of one row, read it back, put it back, read it again."""
-    devices = check.devices
-    caller = lambda fn, args: check.call(fn, args)
-    instance = item["instance"]
-    before = devices.read(caller, row, instance)
-    guarded = row.guarded or row.group in GUARDED_GROUPS
-    if guarded or row.kind == devices.NUMBER:
-        target = before
-    elif row.kind == devices.SWITCH:
-        target = 1 - int(before)
-    else:
-        positions = item.get("positions") or 0
-        target = before % positions + 1 if positions >= 2 else before
-    try:
-        sent = check.call(row.write.fn, devices.write_arguments(row, instance, target))
-        time.sleep(SETTLE_S)
-        after = devices.read(caller, row, instance)
-    finally:
-        # Whatever happened above, the device is put back as it was.
-        back = check.call(row.write.fn, devices.write_arguments(row, instance, before))
-    time.sleep(SETTLE_S)
-    again = devices.read(caller, row, instance)
-    return {
-        "before": before,
-        "set to": target,
-        "returned": sent["return"],
-        "read after": after,
-        "shows it": devices.matches(row, target, after)
-        if row.confirms
-        else "not read back (a target)",
-        "put back returned": back["return"],
-        "read at the end": again,
-        "back as before": devices.matches(row, before, again)
-        if row.confirms
-        else "not read back (a target)",
-    }
-
-
-def changes(check: Check, inventory: dict) -> None:
-    for row in check.devices.TABLE:
-        if not ALLOW_GROUPS.get(row.group):
-            continue
-        if not row.confirms:
-            # Its reading is not what it sets (a heating stage reads its current
-            # temperature but is set to a target): writing the reading back would
-            # change the target. It is listed in part 1 and never written here.
-            continue
-        for item in inventory.get(row.key, {}).get("devices", []):
-            name = row.key + (f"/{item['instance']}" if item["instance"] else "")
-
-            def attempt(row=row, item=item):
-                found = try_setting(check, row, item)
-                if row.confirms and not (found["shows it"] and found["back as before"]):
-                    raise RuntimeError(
-                        f"not seen as set, or not back as before: {found}"
-                    )
-                return found
-
-            check.check(f"change {name}", attempt, changes=True)
-
-
-def stage(check: Check) -> None:
-    call = check.call
-
-    def xy():
-        x, y = call("StgGetPosXY", [{"ptr": "double"}, {"ptr": "double"}])["values"]
-        started = time.monotonic()
-        try:
-            moved = call("StgMoveXY", [x + STAGE_STEP_UM, y, 0])["return"]
-            returned_after = round(time.monotonic() - started, 3)
-            there = call("StgGetPosXY", [{"ptr": "double"}, {"ptr": "double"}])[
-                "values"
-            ]
-        finally:
-            call("StgMoveXY", [x, y, 0])
-        back = call("StgGetPosXY", [{"ptr": "double"}, {"ptr": "double"}])["values"]
-        return {
-            "from": [x, y],
-            "returned": moved,
-            "returned after s": returned_after,
-            "read there": there,
-            "read back": back,
-        }
-
-    def z():
-        z0 = call("StgGetPosZ", [{"ptr": "double"}, 0])["values"][0]
-        started = time.monotonic()
-        try:
-            moved = call("StgMoveZ", [z0 + Z_STEP_UM, 0])["return"]
-            returned_after = round(time.monotonic() - started, 3)
-            there = call("StgGetPosZ", [{"ptr": "double"}, 0])["values"][0]
-        finally:
-            call("StgMoveZ", [z0, 0])
-        back = call("StgGetPosZ", [{"ptr": "double"}, 0])["values"][0]
-        return {
-            "from": z0,
-            "returned": moved,
-            "returned after s": returned_after,
-            "read there": there,
-            "read back": back,
-        }
-
-    check.check("stage x, y 20 um and back", xy, changes=True)
-    check.check("focus 2 um and back", z, changes=True)
-
-
-def objective(check: Check) -> None:
-    call = check.call
-
-    def turn():
-        before = call("Stg_GetNosepiecePosition", [])["return"]
-        positions = call("Stg_GetNosepiecePositions", [])["return"]
-        target = before % positions + 1
-        z_before = call("StgGetPosZ", [{"ptr": "double"}, 0])["values"][0]
-        try:
-            returned = call("Stg_SetNosepiecePosition", [target])["return"]
-            there = call("Stg_GetNosepiecePosition", [])["return"]
-            z_there = call("StgGetPosZ", [{"ptr": "double"}, 0])["values"][0]
-        finally:
-            call("Stg_SetNosepiecePosition", [before])
-        back = call("Stg_GetNosepiecePosition", [])["return"]
-        return {
-            "from": before,
-            "to": target,
-            "returned": returned,
-            "read there": there,
-            "z before": z_before,
-            "z there": z_there,
-            "read back": back,
-        }
-
-    check.check("nosepiece one position and back", turn, changes=True)
-
-
-def optical_configuration(check: Check, names: list) -> None:
-    call = check.call
-
-    def again():
-        texts = call(
-            "GetSelectedOptConf",
-            [{"ptr": "char"}, {"ptr": "char"}, {"ptr": "char"}, 256],
-        )["values"][:3]
-        chosen = next((t for t in texts if t in names), names[0] if names else None)
-        if chosen is None:
-            raise RuntimeError("NIS has no optical configuration")
-        returned = call("SelectOptConf", [chosen])["return"]
-        after = call(
-            "GetSelectedOptConf",
-            [{"ptr": "char"}, {"ptr": "char"}, {"ptr": "char"}, 256],
-        )["values"][:3]
-        return {
-            "selected": chosen,
-            "texts before": texts,
-            "returned": returned,
-            "texts after": after,
-        }
-
-    check.check("optical configuration selected again", again, changes=True)
-
-
-def snap(check: Check) -> None:
-    def picture():
-        bridge = check.server.Bridge(check.nis, "check")
-        path = os.path.join(
-            os.path.abspath(check.out_dir), f"snap_{time.strftime('%H%M%S')}.tif"
-        )
-        documents_before = bridge.documents()
-        answer = bridge.snap(path)
-        return {
-            **answer,
-            "documents before": documents_before,
-            "documents after": bridge.documents(),
-        }
-
-    check.check(
-        "one picture, saved as a TIFF, its document closed", picture, changes=True
-    )
-
-
-# -- with the microscope off: does NIS take each function's arguments? -------------------
-
-#: NIS's answer to a function whose hardware is not there (or switched off).
+#: NIS's answer to a function whose hardware is not there, or switched off.
 NOT_AVAILABLE = -4
 #: The words NIS raises when a function is given the wrong number of arguments.
 WRONG_COUNT = "Bad number of parameters"
 
-#: The driver's own functions outside the table, with the arguments it sends
-#: (``None`` is filled in from the stage's own reading, so a call moves nothing).
-DRIVER_CALLS = (
+#: The driver's readings outside the table, with the arguments the driver sends.
+DRIVER_READS = (
     ("Get_InfoStr", [INFO_VERSION, {"ptr": "char"}]),
     ("StgGetPosXY", [{"ptr": "double"}, {"ptr": "double"}]),
     ("StgGetPosZ", [{"ptr": "double"}, 0]),
@@ -600,112 +424,608 @@ DRIVER_CALLS = (
     ),
     ("GetOpenedDocumentList", [{"ptr": "char"}, 4096]),
 )
-#: Groups whose changes are never sent in this mode, even with the microscope off:
-#: a wrong target there could matter if something were on after all.
-NEVER_SENT_WHEN_OFF = ("environment", "TIRF")
 
 
-def classify(check: Check, fn: str, args: list) -> dict:
-    """Call *fn* once with *args*; whether NIS took the arguments, and what it answered."""
+def answered(check: Check, fn: str, args: list) -> dict:
+    """Call *fn* once; NIS's answer. ``RuntimeError`` only when NIS refused the call itself (wrong arguments)."""
     try:
         answer = check.call(fn, args)
     except Exception as error:  # noqa: BLE001 -- the error is the answer
         text = f"{type(error).__name__}: {error}"
-        if WRONG_COUNT.lower() in text.lower():
-            raise RuntimeError(f"NIS refused the arguments {args!r}: {text}") from None
-        raise RuntimeError(f"NIS raised for {args!r}: {text}") from None
+        why = (
+            "NIS refused the arguments"
+            if WRONG_COUNT.lower() in text.lower()
+            else "NIS raised"
+        )
+        raise RuntimeError(f"{fn}{tuple(args)!r}: {why}: {text}") from None
     returned = answer.get("return")
-    meaning = (
-        "not available (the hardware is off or absent)"
-        if returned == NOT_AVAILABLE
-        else "answered"
-    )
     return {
         "arguments": args,
         "returned": returned,
         "values": answer.get("values"),
-        "meaning": meaning,
+        "meaning": "not available (the hardware is off or absent)"
+        if returned == NOT_AVAILABLE
+        else "answered",
     }
 
 
-def microscope_is_off(check: Check) -> bool:
-    """Whether NIS reports the stage as not available, which it does with the microscope switched off."""
-    try:
-        return (
-            check.call("StgGetPosXY", [{"ptr": "double"}, {"ptr": "double"}])["return"]
-            == NOT_AVAILABLE
-        )
-    except Exception:  # noqa: BLE001 -- when in doubt, it is not off
-        return False
+def available(answer: dict) -> bool:
+    """Whether a reading came with a value, not NIS's code for "not available" (or another failure)."""
+    returned = answer.get("returned")
+    return not (
+        isinstance(returned, int) and not isinstance(returned, bool) and returned < 0
+    )
 
 
-def argument_check(check: Check) -> None:
-    """Call every function the driver uses once, with its arguments, and say for each whether NIS took them."""
+def reads(check: Check) -> None:
+    """Every reading the driver uses, called once with its arguments: one line each."""
     devices = check.devices
-    for fn, args in DRIVER_CALLS:
-        check.check(
-            f"arguments of {fn}", lambda fn=fn, args=args: classify(check, fn, args)
-        )
-    seen = {fn for fn, _ in DRIVER_CALLS}
+    for fn, args in DRIVER_READS:
+        check.check(f"read {fn}", lambda fn=fn, args=args: answered(check, fn, args))
+    seen = {fn for fn, _ in DRIVER_READS}
     tokens = {devices.NAME: "", devices.INDEX: 0, devices.LASER: 0, devices.LINE: 0}
-    for row in devices.TABLE:
-        for call in (row.present, row.count, row.name, row.positions, row.read):
-            if call is None or call.fn in seen:
-                continue
-            seen.add(call.fn)
-            args = devices.arguments(call.args, tokens)
-            check.check(
-                f"arguments of {call.fn}",
-                lambda fn=call.fn, args=args: classify(check, fn, args),
-            )
-    if "Stg_GetMultiLaserNumLines" not in seen:
+    extra = [devices.Call("Stg_GetMultiLaserNumLines", (devices.LASER,))]
+    for call in [
+        c
+        for row in devices.TABLE
+        for c in (row.present, row.count, row.name, row.positions, row.read)
+    ] + extra:
+        if call is None or call.fn in seen:
+            continue
+        seen.add(call.fn)
+        args = devices.arguments(call.args, tokens)
         check.check(
-            "arguments of Stg_GetMultiLaserNumLines",
-            lambda: classify(check, "Stg_GetMultiLaserNumLines", [0]),
+            f"read {call.fn}", lambda fn=call.fn, args=args: answered(check, fn, args)
         )
 
-    if not microscope_is_off(check):
-        check.check(
-            "the changes' arguments",
-            lambda: (
-                "not tried: NIS reports the stage as available, so the "
-                "microscope may be on; switch on one group at a time at the top instead"
+
+def smallest_change(row, devices, before, positions):
+    """The smallest value that differs visibly from *before*, or *before* itself where it must not change."""
+    if not CHANGES or row.guarded or row.key in OWN_VALUE_ONLY or not row.confirms:
+        return before
+    if row.kind == devices.SWITCH:
+        if row.key == "pfs" and not SWITCH_PFS:
+            return before
+        return 1 - int(before)
+    if row.kind == devices.CHOICE:
+        if not positions or positions < 2:
+            return before
+        return before + 1 if before < positions else before - 1
+    step = max(row.tolerance * NUDGE_TOLERANCES, 1e-3)
+    return before - step if before >= step else before + step
+
+
+def neutral(row, devices):
+    """What a change is sent when its value cannot be read (the hardware off): nothing it could act on while off."""
+    return 1 if row.kind == devices.CHOICE else 0
+
+
+def exercise_setting(check: Check, row, instance, positions) -> dict:
+    """Read one device, change it the smallest visible amount, read it back, put it back, read it again."""
+    devices = check.devices
+    tokens = (
+        devices.tokens_for(row, instance)
+        if instance is not None or row.devices == "one"
+        else {devices.NAME: "", devices.LASER: 0, devices.LINE: 0}
+    )
+    read_args = devices.arguments(row.read.args, tokens)
+    first = answered(check, row.read.fn, read_args)
+    try:
+        before = devices.as_value(
+            row,
+            devices.answer_of(
+                row.read, {"return": first["returned"], "values": first["values"]}
             ),
         )
-        return
-    xy = check.call("StgGetPosXY", [{"ptr": "double"}, {"ptr": "double"}])["values"]
-    z = check.call("StgGetPosZ", [{"ptr": "double"}, 0])["values"][0]
-    position = check.call("Stg_GetNosepiecePosition", [])["return"]
-    writes = [
-        ("StgMoveXY", [xy[0], xy[1], 0]),
-        ("StgMoveZ", [z, 0]),
-        (
-            "Stg_SetNosepiecePosition",
-            [position if isinstance(position, int) and position > 0 else 1],
-        ),
-    ]
-    for row in devices.TABLE:
-        if row.group in NEVER_SENT_WHEN_OFF:
-            continue
-        try:
-            value = devices.read(
-                lambda fn, args: check.call(fn, args),
-                row,
-                ""
-                if row.devices == "named"
-                else ("0.0" if row.devices == "laser_lines" else None),
+    except Exception:  # noqa: BLE001 -- not available: the baseline of the hardware off
+        before = None
+    if before is None:
+        if not CHANGES or row.guarded:
+            return {
+                "read": first,
+                "change": "not sent: the value cannot be read"
+                + (" and the setting is guarded" if row.guarded else ""),
+            }
+        sent = answered(
+            check,
+            row.write.fn,
+            devices.arguments(row.write.args, tokens, neutral(row, devices)),
+        )
+        return {"read": first, "sent once (the value cannot be read)": sent}
+    target = smallest_change(row, devices, before, positions)
+    read_back = lambda: devices.as_value(
+        row, devices.answer_of(row.read, check.call(row.read.fn, read_args))
+    )
+    try:
+        sent = answered(
+            check, row.write.fn, devices.arguments(row.write.args, tokens, target)
+        )
+        time.sleep(SETTLE_S)
+        after = read_back()
+    finally:
+        # Whatever happened above, the device is put back as it was.
+        back = answered(
+            check, row.write.fn, devices.arguments(row.write.args, tokens, before)
+        )
+    time.sleep(SETTLE_S)
+    again = read_back()
+    found = {
+        "before": before,
+        "set to": target,
+        "sent": sent["returned"],
+        "read after": after,
+        "put back": back["returned"],
+        "read at the end": again,
+    }
+    if row.confirms:
+        if target != before and not devices.matches(row, target, after):
+            raise RuntimeError(f"the change was not seen: {found}")
+        if not devices.matches(row, before, again):
+            raise RuntimeError(f"it is not back as it was: {found}")
+    return found
+
+
+def exercise_settings(check: Check, inventory: dict) -> None:
+    """Every hardware setting of the table: each device NIS reports, or, with none reported, the call once."""
+    for row in check.devices.TABLE:
+        entry = inventory.get(row.key) or {}
+        items = entry.get("devices") or [
+            {"instance": None, "positions": None, "absent": True}
+        ]
+        for item in items:
+            name = row.key + (f"/{item['instance']}" if item.get("instance") else "")
+            if item.get("absent"):
+                name += " (none reported)"
+            check.check(
+                f"change {name}",
+                lambda row=row, item=item: exercise_setting(
+                    check,
+                    row,
+                    item.get("instance") if not item.get("absent") else None,
+                    item.get("positions"),
+                ),
+                changes=CHANGES,
             )
-        except Exception:  # noqa: BLE001 -- absent: a neutral value, which the hardware cannot act on while off
-            value = 1 if row.kind == devices.CHOICE else 0
-        if row.devices == "laser_lines":
-            value = 0  # a laser line is never switched on or powered, not even here
-        args = devices.arguments(row.write.args, tokens, value)
-        writes.append((row.write.fn, args))
-    for fn, args in writes:
+
+
+def stage(check: Check) -> None:
+    """x by the smallest step the read-back sees and back, then the focus the same way."""
+    xy = answered(check, "StgGetPosXY", [{"ptr": "double"}, {"ptr": "double"}])
+    z = answered(check, "StgGetPosZ", [{"ptr": "double"}, 0])
+
+    def move_x():
+        x, y = xy["values"]
+        if not available(xy):
+            return {
+                "read": xy,
+                "sent once (the stage is not available)": answered(
+                    check, "StgMoveXY", [x, y, 0]
+                ),
+            }
+        target = x + (STAGE_STEP_UM if CHANGES else 0.0)
+        started = time.monotonic()
+        try:
+            sent = answered(check, "StgMoveXY", [target, y, 0])
+            returned_after = round(time.monotonic() - started, 3)
+            there = answered(
+                check, "StgGetPosXY", [{"ptr": "double"}, {"ptr": "double"}]
+            )["values"]
+        finally:
+            back = answered(check, "StgMoveXY", [x, y, 0])
+        again = answered(check, "StgGetPosXY", [{"ptr": "double"}, {"ptr": "double"}])[
+            "values"
+        ]
+        return {
+            "from": [x, y],
+            "to": [target, y],
+            "sent": sent["returned"],
+            "returned after s": returned_after,
+            "read there": there,
+            "put back": back["returned"],
+            "read at the end": again,
+        }
+
+    def move_z():
+        z0 = z["values"][0]
+        if not available(z):
+            return {
+                "read": z,
+                "sent once (the focus is not available)": answered(
+                    check, "StgMoveZ", [z0, 0]
+                ),
+            }
+        target = z0 + (Z_STEP_UM if CHANGES else 0.0)
+        started = time.monotonic()
+        try:
+            sent = answered(check, "StgMoveZ", [target, 0])
+            returned_after = round(time.monotonic() - started, 3)
+            there = answered(check, "StgGetPosZ", [{"ptr": "double"}, 0])["values"][0]
+        finally:
+            back = answered(check, "StgMoveZ", [z0, 0])
+        again = answered(check, "StgGetPosZ", [{"ptr": "double"}, 0])["values"][0]
+        return {
+            "from": z0,
+            "to": target,
+            "sent": sent["returned"],
+            "returned after s": returned_after,
+            "read there": there,
+            "put back": back["returned"],
+            "read at the end": again,
+        }
+
+    check.check(f"stage x {STAGE_STEP_UM:g} um and back", move_x, changes=CHANGES)
+    check.check(f"focus {Z_STEP_UM:g} um and back", move_z, changes=CHANGES)
+
+
+def objective(check: Check) -> None:
+    """The nosepiece: set to its own position (or, with TURN_NOSEPIECE, the next one and back)."""
+
+    def turn():
+        now = answered(check, "Stg_GetNosepiecePosition", [])
+        before = now["returned"]
+        if not (isinstance(before, int) and before > 0):
+            return {
+                "read": now,
+                "sent once (no position to read)": answered(
+                    check, "Stg_SetNosepiecePosition", [1]
+                ),
+            }
+        positions = answered(check, "Stg_GetNosepiecePositions", [])["returned"]
+        target = (
+            (before % positions + 1)
+            if (CHANGES and TURN_NOSEPIECE and positions)
+            else before
+        )
+        try:
+            sent = answered(check, "Stg_SetNosepiecePosition", [target])
+            there = answered(check, "Stg_GetNosepiecePosition", [])["returned"]
+        finally:
+            back = answered(check, "Stg_SetNosepiecePosition", [before])
+        return {
+            "from": before,
+            "to": target,
+            "sent": sent["returned"],
+            "read there": there,
+            "put back": back["returned"],
+        }
+
+    check.check(
+        "nosepiece"
+        + (" one position and back" if TURN_NOSEPIECE else " set to its own position"),
+        turn,
+        changes=CHANGES,
+    )
+
+
+def optical_configuration(check: Check) -> None:
+    """The optical configuration in use, selected again: no change, but the call is tried."""
+
+    def again():
+        texts = answered(
+            check,
+            "GetSelectedOptConf",
+            [{"ptr": "char"}, {"ptr": "char"}, {"ptr": "char"}, 256],
+        )["values"][:3]
+        count = answered(check, "GetOptConfCount", [])["returned"] or 0
+        names = [
+            answered(check, "GetOptConfName", [i, {"ptr": "char"}, 256])["values"][1]
+            for i in range(max(int(count), 0))
+        ]
+        chosen = next((t for t in texts if t in names), None)
+        if chosen is None:
+            return {
+                "selected texts": texts,
+                "configurations": names,
+                "change": "not sent: none is selected, and selecting one would change NIS",
+            }
+        return {
+            "selected": chosen,
+            "sent": answered(check, "SelectOptConf", [chosen])["returned"],
+        }
+
+    check.check("optical configuration selected again", again, changes=CHANGES)
+
+
+def snap(check: Check) -> None:
+    """One picture into a new document of its own, saved as a TIFF, and only that document closed."""
+
+    def picture():
+        bridge = check.server.Bridge(check.nis, "check")
+        path = os.path.join(
+            os.path.abspath(check.out_dir), f"snap_{time.strftime('%H%M%S')}.tif"
+        )
+        documents_before = bridge.documents()
+        try:
+            answer = bridge.snap(path)
+        except check.server.Refused as refused:
+            if "answered -" in str(refused):
+                return {
+                    "documents before": documents_before,
+                    "capture": f"not taken: {refused}",
+                }
+            raise
+        return {
+            **answer,
+            "documents before": documents_before,
+            "documents after": bridge.documents(),
+        }
+
+    check.check(
+        "one picture, saved as a TIFF, its document closed", picture, changes=True
+    )
+
+
+# -- part 3: the driver itself, through its bridge, inside NIS -----------------------------
+
+#: The repository's root: the folder that holds ``zmart_drivers``.
+REPO_ROOT = os.path.dirname(
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(HERE))))
+)
+#: How NIS says a device is not there or switched off, as the driver's errors carry it.
+NOT_THERE = (
+    "DR_NOTAVAILABLE",
+    "answered -4",
+    "answered -9",
+    "not available",
+    "could not be read",
+)
+
+
+def not_there(error: BaseException) -> bool:
+    return any(words in str(error) for words in NOT_THERE)
+
+
+def baseline(how):
+    """Run *how*; NIS saying a device is not there is an answer (the hardware off), any other error a failure."""
+
+    def run():
+        try:
+            return how()
+        except Exception as error:
+            if not_there(error):
+                return {
+                    "not available (the hardware is off or absent)": f"{type(error).__name__}: {error}"
+                }
+            raise
+
+    return run
+
+
+def driver_checks(check: Check, package, port: int, data: str) -> None:
+    """The driver's own calls, as a user or the ZMART Controller makes them, each with the smallest change and back."""
+    devices = check.devices
+    scope = check.check(
+        "driver: connect()", lambda: package.connect(port=port, output_root=data)
+    )
+    if scope is None:
+        return
+    try:
+        check.check("driver: state()", lambda: scope.state())
+        here = check.check("driver: position()", baseline(lambda: scope.position()))
+
+        def move():
+            x, y, z = (here[a]["position"] for a in ("x", "y", "z"))
+            step = STAGE_STEP_UM if CHANGES else 0.0
+            try:
+                there = scope.move_to(x + step, y, z)
+            finally:
+                back = scope.move_to(x, y, z)
+            return {
+                "from": [x, y, z],
+                "there": there["x"]["position"],
+                "back": back["x"]["position"],
+            }
+
+        if isinstance(here, dict) and "x" in here:
+            check.check(
+                f"driver: move_to() x {STAGE_STEP_UM:g} um and back",
+                move,
+                changes=CHANGES,
+            )
+        else:
+
+            def move_while_off():
+                # x and y cannot be read, so the move goes to (0, 0) at the focus where it stands:
+                # with the stage off, NIS cannot act on it, and the driver's answer is the baseline.
+                from zmart_drivers.nikon.nis_elements_ar7.procedures import readings
+
+                z_now = readings.z(scope.client)["z_um"] - scope.handle.origin["z_um"]
+                return scope.move_to(0.0, 0.0, z_now)
+
+            check.check(
+                "driver: move_to() while the stage is not available",
+                baseline(move_while_off),
+            )
+        found = check.check("driver: devices()", lambda: scope.devices()) or {}
+        tried = 0
+        for key, entry in found.items():
+            row = devices.SETTINGS.get(key)
+            for item in entry.get("devices") or []:
+                name = key + (f"/{item['instance']}" if item["instance"] else "")
+                tried += 1
+
+                def set_and_back(row=row, item=item, name=name):
+                    before = scope.device(name)
+                    target = smallest_change(
+                        row, devices, before, item.get("positions")
+                    )
+                    if target == before:
+                        return {
+                            "before": before,
+                            "change": "not sent: it holds this value (guarded, or kept as it is)",
+                        }
+                    try:
+                        scope.set_device(name, target)
+                        after = scope.device(name)
+                    finally:
+                        scope.set_device(name, before)
+                    again = scope.device(name)
+                    if not devices.matches(row, target, after) or not devices.matches(
+                        row, before, again
+                    ):
+                        raise RuntimeError(
+                            f"before {before}, set {target}, read {after}, back {again}"
+                        )
+                    return {
+                        "before": before,
+                        "set to": target,
+                        "read after": after,
+                        "read at the end": again,
+                    }
+
+                check.check(
+                    f"driver: set_device({name!r}) and back",
+                    baseline(set_and_back),
+                    changes=CHANGES,
+                )
+        if not tried:
+
+            def refused():
+                try:
+                    scope.set_device("light_path", 1)
+                except ValueError as why:
+                    return {"refused before anything was sent": str(why)}
+                raise RuntimeError("a device NIS does not report was not refused")
+
+            check.check(
+                "driver: set_device() of a device NIS does not report is refused",
+                refused,
+            )
+        check.check("driver: objectives()", baseline(lambda: scope.objectives()))
         check.check(
-            f"arguments of {fn} (a change, with the microscope off)",
-            lambda fn=fn, args=args: classify(check, fn, args),
-            changes=True,
+            "driver: optical_configurations()",
+            baseline(lambda: scope.optical_configurations()),
+        )
+        check.check(
+            "driver: set_state(state()['changeable']) sends nothing that is unchanged",
+            baseline(lambda: scope.set_state(scope.state()["changeable"])),
+        )
+        if CHANGES and SNAP:
+
+            def picture():
+                try:
+                    return scope.acquire(
+                        "zmart_check", acquisition_type="check", output_folder=data
+                    )
+                except RuntimeError as why:
+                    if "No module named" in str(why):
+                        return {
+                            "skipped": True,
+                            "why": f"the picture was taken, but saving it as OME-Zarr needs packages this Python lacks: {why}",
+                        }
+                    raise
+
+            check.check(
+                "driver: acquire(), saved as OME-Zarr", baseline(picture), changes=True
+            )
+    finally:
+        check.check("driver: close()", lambda: scope.close() or "closed")
+    plugin_checks(check, port)
+
+
+def plugin_checks(check: Check, port: int) -> None:
+    """The ZMART Controller's commands, through the driver's plugin class (the controller itself is not needed)."""
+    from zmart_drivers.nikon.nis_elements_ar7.zmart_controller_plugin.zmart_controller_plugin import (
+        ZmartControllerPlugin,
+    )
+
+    plugin = check.check(
+        "controller plugin: connect", lambda: ZmartControllerPlugin({"port": port})
+    )
+    if plugin is None:
+        return
+    try:
+        for command in (
+            "get_info",
+            "get_actuators",
+            "get_xyz",
+            "get_state",
+            "get_acquisition_settings",
+            "get_procedures",
+        ):
+            check.check(
+                f"controller plugin: {command}()",
+                baseline(lambda command=command: getattr(plugin, command)()[1]),
+            )
+        state = check.check(
+            "controller plugin: state for set_state",
+            baseline(lambda: plugin.get_state()[1][0]),
+        )
+        if isinstance(state, dict) and "objective_position" in state:
+            check.check(
+                "controller plugin: set_state(changeable) sends nothing that is unchanged",
+                baseline(lambda: plugin.set_state(state)[1]),
+            )
+    finally:
+        check.check(
+            "controller plugin: disconnect()",
+            lambda: plugin.disconnect() or "disconnected",
+        )
+
+
+def driver_part(check: Check) -> None:
+    """Run the driver itself inside NIS: its bridge on NIS's thread, the driver's calls on another, as in use.
+
+    The driver keeps its settings in a scratch folder inside the results, so
+    the microscope's real setup (limits, origin, orientation) is never read
+    or changed by the check.
+    """
+    import secrets
+    import threading
+
+    os.environ["ZMART_MICROSCOPY_ROOT"] = os.path.join(
+        os.path.abspath(check.out_dir), "driver_settings"
+    )
+    if REPO_ROOT not in sys.path:
+        sys.path.insert(0, REPO_ROOT)
+    try:
+        import zmart_drivers.nikon.nis_elements_ar7 as package
+        from zmart_drivers.nikon.nis_elements_ar7.driver_setup import store
+        from zmart_drivers.nikon.nis_elements_ar7.driver_setup.nis_bridge import macro
+        from zmart_drivers.nikon.nis_elements_ar7.primitives.nis_python import (
+            server as bridge_server,
+        )
+
+        package.connect  # noqa: B018 -- loads the driver's methods, and with them numpy
+    except Exception as error:  # noqa: BLE001 -- said in the summary
+        why = f"{type(error).__name__}: {error}"
+
+        def cannot_load():
+            raise RuntimeError(f"the driver cannot be loaded here: {why}")
+
+        check.check("driver: loads in NIS's Python", cannot_load)
+        return
+    store.MACHINE = store.MachineProfile()
+    store.use_configuration(None)
+    key = secrets.token_hex(16)
+    key_file = macro.files()["key"]
+    os.makedirs(os.path.dirname(key_file), exist_ok=True)
+    with open(key_file, "w", encoding="ascii") as handle:
+        handle.write(key)
+    bridge = bridge_server.serve(check.nis, key, port=0)
+    port = bridge.server.server_address[1]
+    data = os.path.join(os.path.abspath(check.out_dir), "driver_data")
+    os.makedirs(data, exist_ok=True)
+    done = threading.Event()
+
+    def work():
+        try:
+            driver_checks(check, package, port, data)
+        finally:
+            done.set()
+
+    threading.Thread(target=work, name="zmart-check-driver", daemon=True).start()
+    deadline = time.monotonic() + DRIVER_TIME_LIMIT_S
+    # This thread is NIS's own, as the bridge's macro loop is: it runs the driver's requests.
+    while not done.is_set() and time.monotonic() < deadline:
+        bridge.pump(wait_s=0.01)
+    bridge.close()
+    if not done.is_set():
+        check.check(
+            "driver: finished in time",
+            lambda: (_ for _ in ()).throw(
+                RuntimeError(f"still running after {DRIVER_TIME_LIMIT_S} s")
+            ),
         )
 
 
@@ -740,24 +1060,19 @@ def main(nis_module=None, out_dir: str | None = None) -> dict:
         )
         or {}
     )
-    readings = (
-        check.check(
-            "the stage, the focus, the objectives, the optical configurations",
-            lambda: stage_and_optics(check),
-        )
-        or {}
+    check.check(
+        "the stage, the focus, the objectives, the optical configurations",
+        lambda: stage_and_optics(check),
     )
-    if ALLOW_ARGUMENT_CHECK_WHEN_OFF:
-        argument_check(check)
-    changes(check, inventory)
-    if ALLOW_STAGE:
-        stage(check)
-    if ALLOW_OBJECTIVE:
-        objective(check)
-    if ALLOW_OPTICAL_CONFIGURATION:
-        optical_configuration(check, readings.get("optical configurations") or [])
-    if ALLOW_SNAP:
+    reads(check)
+    exercise_settings(check, inventory)
+    stage(check)
+    objective(check)
+    optical_configuration(check)
+    if CHANGES and SNAP:
         snap(check)
+    if DRIVER:
+        driver_part(check)
     report = check.finish()
     try:
         nis_module.log(f"ZMART hardware check finished: {out_dir}")
