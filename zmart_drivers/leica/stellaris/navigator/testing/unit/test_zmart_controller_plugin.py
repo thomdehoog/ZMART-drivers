@@ -1,0 +1,178 @@
+"""The driver plugs into the ZMART Controller as a ``ZmartControllerPlugin`` class.
+
+These tests do what an operator does on the LAS X computer: point the
+controller at the driver's ``zmart_controller_plugin`` folder, which holds
+``zmart_controller_plugin.json`` and ``zmart_controller_plugin.py``, and let
+the controller's own ``validate_driver`` check every answer against its
+contract. The driver connects to the stand-in for LAS X's plain Navigator,
+so the tests run on any computer that has the controller installed.
+
+Author: Thom de Hoog, Center for Microscopy and Image Analysis (ZMB),
+University of Zurich (thom.dehoog@zmb.uzh.ch, thomdehoog@gmail.com).
+"""
+
+from __future__ import annotations
+
+import os
+from pathlib import Path
+
+import pytest
+
+# These tests check the driver inside the ZMART Controller. On a computer without
+# the controller they are skipped, because the driver is also used by itself.
+pytest.importorskip("zmart_controller", reason="the ZMART Controller is not installed")
+pytestmark = pytest.mark.controller
+
+import zmart_controller
+from lasx_stand_in import PlainNavigator, attach
+from limits_fixtures import hermetic_mock_machine_root
+from zmart_controller.registry import load_driver
+
+from zmart_drivers.leica.stellaris.navigator import methods
+from zmart_drivers.leica.stellaris.navigator.zmart_controller_plugin import (
+    procedure_menu,
+    zmart_controller_plugin,
+)
+
+# The folder to register is the driver's: the one that holds zmart_controller_plugin/.
+DRIVER_FOLDER = Path(zmart_controller_plugin.__file__).resolve().parents[1]
+
+
+def _offline(monkeypatch, tmp_path):
+    """Stand LAS X's plain Navigator in for the hardware server, with a throwaway machine root."""
+    monkeypatch.setenv("ZMART_MICROSCOPY_ROOT", os.environ["ZMART_MICROSCOPY_ROOT"])
+    monkeypatch.setenv("APPDATA", os.environ.get("APPDATA", str(tmp_path)))
+    hermetic_mock_machine_root()
+    attach(monkeypatch, PlainNavigator())
+    return {"output_root": str(tmp_path / "out")}
+
+
+def test_the_folder_holds_the_two_files_the_controller_reads():
+    driver = load_driver(DRIVER_FOLDER)
+
+    assert driver.NAME == "stellaris-navigator"
+    assert driver.ZmartControllerPlugin is zmart_controller_plugin.ZmartControllerPlugin
+    assert driver.CONNECTION["microscope"] == "stellaris-y42h93"
+
+
+def test_the_class_fits_the_controller_contract_offline(monkeypatch, tmp_path):
+    """Point validate_driver at the folder, as register_driver is; it finds no problems."""
+    connection = _offline(monkeypatch, tmp_path)
+
+    problems = zmart_controller.validate_driver(DRIVER_FOLDER, connection)
+
+    assert problems == []
+
+
+def test_the_class_describes_the_microscope_and_what_is_set_up(monkeypatch, tmp_path):
+    """The class answers the controller's questions, including what is set up once."""
+    connection = _offline(monkeypatch, tmp_path)
+    through_class = zmart_controller.ZmartController(zmart_controller_plugin.ZmartControllerPlugin, connection)
+    try:
+        as_class = {name: getattr(through_class, name)()["output"] for name in ("get_actuators", "get_xyz", "get_state", "get_procedures")}
+        class_info = through_class.get_info()["output"]
+    finally:
+        through_class.disconnect()
+
+    assert class_info["description"].strip()
+    assert "output_root" not in class_info
+    assert set(class_info["setup"]) == {"limits", "orientation", "calibration", "origin", "data_location"}
+    for item in class_info["setup"].values():
+        assert isinstance(item["done"], bool) and item["says"].strip()
+    assert class_info["connection_status"]
+    assert all(isinstance(said, str) and said for said in class_info["connection_status"].values())
+    assert as_class["get_xyz"]["z"]["actuator_readings"].keys() == {"z-wide", "z-galvo"}
+    assert as_class["get_state"]["observed"]["navigator"] == "plain"
+    assert set(as_class["get_state"]["changeable"]) == {"zoom", "scan_speed", "scan_field_rotation", "line_average", "pinhole_airy", "objective"}
+
+
+def test_the_class_says_it_saves_where_it_is_told(monkeypatch, tmp_path):
+    """The driver writes every file itself, from LAS X's cache, so it can choose the folder."""
+    connection = _offline(monkeypatch, tmp_path)
+    session = zmart_controller.ZmartController(zmart_controller_plugin.ZmartControllerPlugin, connection)
+    try:
+        info = session.get_info()["output"]
+    finally:
+        session.disconnect()
+
+    assert info["chooses_its_own_folder"] is False
+
+
+def test_the_class_hands_the_type_and_the_folder_to_the_capture(monkeypatch, tmp_path):
+    connection = _offline(monkeypatch, tmp_path)
+    asked = {}
+
+    def capture(handle, **given):
+        asked.update(given)
+        return {"position_label": given["position_label"]}
+
+    def save_waiting(handle, label):
+        return [{"files": [], "planes": []}]
+
+    session = zmart_controller.ZmartController(zmart_controller_plugin.ZmartControllerPlugin, connection)
+    try:
+        monkeypatch.setattr(methods.acquire_step, "acquire", capture)
+        monkeypatch.setattr(methods.save_step, "save_waiting", save_waiting)
+        answer = session.acquire("A1", acquisition_type="overview", output_folder=str(tmp_path / "run"))
+    finally:
+        session.disconnect()
+
+    assert asked == {
+        "position_label": "A1",
+        "acquisition_settings": None,
+        "acquisition_type": "overview",
+        "output_folder": str(tmp_path / "run"),
+    }
+    assert answer["output"]["acquisition_type"] == "overview"
+
+
+def test_a_setting_is_changed_through_the_controller(monkeypatch, tmp_path):
+    connection = _offline(monkeypatch, tmp_path)
+    session = zmart_controller.ZmartController(zmart_controller_plugin.ZmartControllerPlugin, connection)
+    try:
+        answer = session.set_state({"changeable": {"zoom": 2.0}})
+        state = session.get_state()["output"]
+    finally:
+        session.disconnect()
+
+    assert answer["success"] is True
+    assert state["changeable"]["zoom"] == pytest.approx(2.0)
+
+
+def test_a_setting_the_microscope_does_not_have_is_refused(monkeypatch, tmp_path):
+    """Only the five settings and the objective can be set; anything else is a wrong request, not ignored."""
+    connection = _offline(monkeypatch, tmp_path)
+    session = zmart_controller.ZmartController(zmart_controller_plugin.ZmartControllerPlugin, connection)
+    try:
+        answer = session.set_state({"changeable": {"laser_power": 2.0}})
+    finally:
+        session.disconnect()
+
+    assert answer["success"] is False
+    assert "ValueError" in answer["output"] and "laser_power" in answer["output"]
+
+
+def test_a_procedure_answers_the_name_of_what_ran(monkeypatch, tmp_path):
+    """The controller's contract: ``run_procedure`` returns ``True, ran``, the routine's name."""
+    connection = _offline(monkeypatch, tmp_path)
+    session = zmart_controller.ZmartController(zmart_controller_plugin.ZmartControllerPlugin, connection)
+    try:
+        answer = session.run_procedure({"name": "clear_cache"})
+    finally:
+        session.disconnect()
+
+    assert answer == {"success": True, "output": {"ran": "clear_cache"}}
+
+
+def test_a_procedure_that_did_not_finish_its_work_is_a_failure(monkeypatch, tmp_path):
+    """A picture LAS X would not let go of fails the procedure, by name, instead of hiding in a detail."""
+    connection = _offline(monkeypatch, tmp_path)
+    monkeypatch.setattr(procedure_menu, "clear", lambda handle: {"cleared": [], "failed": {"Image007": "still in use"}})
+    session = zmart_controller.ZmartController(zmart_controller_plugin.ZmartControllerPlugin, connection)
+    try:
+        answer = session.run_procedure({"name": "clear_cache"})
+    finally:
+        session.disconnect()
+
+    assert answer["success"] is False
+    assert "Image007" in answer["output"] and "still in use" in answer["output"]

@@ -42,6 +42,7 @@ microscope, is described in [the anatomy of a ZMART driver](docs/driver-anatomy.
 | Microscope | Vendor interface | Driver | Status |
 |---|---|---|---|
 | Leica STELLARIS | LAS X: its hardware server first, the Python (CAM) API behind it | [`zmart_drivers/leica/stellaris/navigator_expert/`](zmart_drivers/leica/stellaris/navigator_expert/README.md) | **Beta `0.7.0b9`.** 0.7.0b9 keeps the settings in configs chosen when connecting, writes a mean pyramid into every store, and fixes what the first end-to-end run on the STELLARIS found. 0.7.0b6 tested on the LAS X simulator, 0.7.0b5 also on a STELLARIS; 0.7.0b7 adds the setup wizard and 0.7.0b8 its hardware check and a CI that also runs without the controller, tested offline. Laid out as [the anatomy of a ZMART driver](docs/driver-anatomy.md) describes. |
+| Leica STELLARIS, through LAS X's plain Navigator | LAS X: its hardware server only (no Navigator Expert add-in, no CAM API) | [`zmart_drivers/leica/stellaris/navigator/`](zmart_drivers/leica/stellaris/navigator/README.md) | **Beta `0.1.0b1`.** The route it is built on passed its 50 checks on the STELLARIS on 15 October 2026; the driver itself, with its setup wizard, is tested offline against a stand-in for LAS X. Five settings, the stage, both z drives, a capture and a tile scan, saved as OME-Zarr. Laid out as the anatomy describes, beside `navigator_expert`. |
 
 This beta holds only the Leica driver. The Nikon, ZEISS, mesoSPIM and Evident drivers are in
 the repository's history.
@@ -50,7 +51,7 @@ The driver works by itself, from a notebook or a script, and it plugs into the Z
 Controller. Its README says how to do both. Before the first experiment, a few things are set
 up once on the microscope: the travel limits, the image orientation, the objective calibration
 and the zero point of the coordinates. The notebooks for them are in the driver's
-`driver_setup/` folder, and a [setup wizard](zmart_drivers/leica/stellaris/navigator_expert/driver_setup/wizard/README.md) walks through the same steps in a window: `python -m zmart_drivers.leica.stellaris.navigator_expert.driver_setup.wizard`. What is set up is saved in the computer's configuration folder,
+`driver_setup/` folder, and a [setup wizard](zmart_drivers/leica/stellaris/navigator_expert/driver_setup/wizard/README.md) walks through the same steps in a window: `python -m zmart_drivers.leica.stellaris.navigator_expert.driver_setup.wizard`. The plain Navigator driver has the same wizard: `python -m zmart_drivers.leica.stellaris.navigator.driver_setup.wizard`. What is set up is saved in the computer's configuration folder,
 `C:\ProgramData\zmart-microscopy` on Windows, and loaded every time the driver connects.
 
 ## Try it yourself
@@ -108,6 +109,7 @@ software. Install the test extra, then run it from the root folder of this repos
 pip install -e ".[leica,test]"                # the driver on its own
 pip install -e ".[leica,controller,test]"     # also with the ZMART Controller
 python zmart_drivers/leica/stellaris/navigator_expert/testing/run_ci.py
+python zmart_drivers/leica/stellaris/navigator/testing/run_ci.py
 ```
 
 The suite has two layers. The first checks the driver on its own, which is how many people use

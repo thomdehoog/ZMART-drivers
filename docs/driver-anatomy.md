@@ -4,7 +4,9 @@ Every ZMART driver has the same files and folders, with the same names and the
 same jobs. This page describes them. The Leica driver,
 `zmart_drivers/leica/stellaris/navigator_expert/`, is the first driver built
 this way and the example to read beside the text. A new driver copies its
-layout.
+layout. The second, `zmart_drivers/leica/stellaris/navigator/`, drives the
+same microscope through LAS X's plain Navigator window and has the same tree
+with one primitive class, `primitives/direct/`, instead of three.
 
 What a new microscope brings to the shared dispatcher is on one page:
 [the vendor contract](vendor-contract.md). The controller's side, the

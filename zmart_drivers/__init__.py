@@ -1,9 +1,11 @@
 """ZMART Drivers: the drivers that connect the ZMART Controller to real microscopes.
 
 Each driver lives in its own folder, organised by vendor, then by microscope,
-then by the vendor interface it uses. This beta holds one driver::
+then by the vendor interface it uses. This beta holds two drivers for the
+same microscope, one per LAS X window::
 
-    zmart_drivers/leica/stellaris/navigator_expert/   Leica STELLARIS, LAS X
+    zmart_drivers/leica/stellaris/navigator_expert/   Leica STELLARIS, LAS X with Navigator Expert
+    zmart_drivers/leica/stellaris/navigator/          Leica STELLARIS, LAS X's plain Navigator
 
 Importing this package does not import the driver. Use the driver by itself
 with its ``connect()``, or register its folder, which holds
