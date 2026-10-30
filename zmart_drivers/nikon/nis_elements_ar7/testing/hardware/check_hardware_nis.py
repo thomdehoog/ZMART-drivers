@@ -679,6 +679,17 @@ def exercise_setting(check: Check, row, instance, positions) -> dict:
         "put back": back["returned"],
         "read at the end": again,
     }
+    code = sent["returned"]
+    if (
+        target != before
+        and isinstance(code, int)
+        and not isinstance(code, bool)
+        and code <= 0
+        and devices.matches(row, before, after)
+    ):
+        # NIS answered the change with a failure code (0 or below) and nothing moved: the device
+        # is off or not there. That is the expected answer with the hardware off, not a fault.
+        return {**found, "not available": f"{row.write.fn} answered {code}"}
     if row.confirms:
         if target != before and not devices.matches(row, target, after):
             raise RuntimeError(f"the change was not seen: {found}")

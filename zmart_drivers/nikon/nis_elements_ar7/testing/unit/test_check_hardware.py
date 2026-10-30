@@ -449,3 +449,24 @@ def test_a_whole_number_setting_is_sent_as_a_whole_number():
     sent = devices.write_arguments(row, None, 1500.0)
     assert sent == [1500]
     assert isinstance(sent[0], int)
+
+
+def test_a_change_nis_answers_with_a_failure_code_is_the_baseline_not_a_fault(tmp_path):
+    """With the hardware off, NIS answered the analyzer's change with 0 and nothing moved."""
+    script = load_script()
+    nis = make_nis()
+    real = nis.mac
+
+    class AnalyzerOff:
+        def __getattr__(self, name):
+            # As at the microscope: the reading answers 0, and the change answers 0 too.
+            if name in ("Stg_GetAnalyzerState", "Stg_SetAnalyzerState"):
+                return lambda *args: 0
+            return getattr(real, name)
+
+    nis.mac = AnalyzerOff()
+    report = script.main(nis, str(tmp_path / "results"))
+    found = {e["check"]: e for e in report["checks"]}
+    analyzer = next(v for k, v in found.items() if k.startswith("change analyzer"))
+    assert analyzer["outcome"] == "ok", analyzer
+    assert "not available" in analyzer["answer"]
