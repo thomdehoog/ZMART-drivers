@@ -470,3 +470,29 @@ def test_a_change_nis_answers_with_a_failure_code_is_the_baseline_not_a_fault(tm
     analyzer = next(v for k, v in found.items() if k.startswith("change analyzer"))
     assert analyzer["outcome"] == "ok", analyzer
     assert "not available" in analyzer["answer"]
+
+
+def test_the_pages_that_describe_the_functions_are_kept_first(tmp_path, monkeypatch):
+    """The page limit once left out every device page; now those come first, and each entry is in signatures.txt."""
+    script = load_script()
+    docs = tmp_path / "NIS-Elements" / "Docs" / "nis" / "eng_ar"
+    docs.mkdir(parents=True)
+    for n in range(5):
+        (docs / f"a_menu{n}.html").write_text(
+            "<p>See Stg_GetZoomPosition.</p>", encoding="utf-8"
+        )
+    (docs / "p4c8s41.html").write_text(
+        '<div class="varlistentry cdesc"><a name="FR_Stg_GetZoomPosition"></a>'
+        '<pre class="synopsis"> Stg_GetZoomPosition();</pre>'
+        "<p>Returns the current zoom position of the stage.</p></div>"
+        '<div class="varlistentry cdesc"><a name="FR_Other"></a></div>',
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(script, "NIS_FOLDERS", (str(tmp_path / "NIS-Elements"),))
+    monkeypatch.setattr(script, "PAGES_KEPT", 1)
+    script.main(make_nis(), str(tmp_path / "results"))
+    kept = [p.name for p in (tmp_path / "results" / "help_pages").iterdir()]
+    assert len(kept) == 1 and kept[0].endswith("p4c8s41.html")
+    signatures = (tmp_path / "results" / "signatures.txt").read_text(encoding="utf-8")
+    assert "Stg_GetZoomPosition();" in signatures
+    assert "Returns the current zoom position" in signatures

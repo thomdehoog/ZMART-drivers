@@ -14,7 +14,8 @@ With it on, each change really happens, and is seen.
 
 1. **What NIS has**: NIS's version and its Python; whether NIS offers each
    function the driver uses; what NIS's macro reference on this computer
-   says about them (``reference.txt``, and the pages in ``help_pages``);
+   says about them (``signatures.txt``: each function's own entry, with its
+   arguments; ``reference.txt``; and the pages in ``help_pages``);
    every hardware setting, which devices are there, and their values.
 2. **Every reading**, called once with the driver's arguments, one line each.
 3. **Every change, the smallest that can be seen, each put back**: a switch
@@ -289,6 +290,16 @@ PAGES_KEPT = 300
 PAGES_BYTES = 30_000_000
 
 
+def plain_text(page: str) -> str:
+    """A piece of a help page as plain text: no tags, entities decoded, one space between words."""
+    import html
+    import re
+
+    text = re.sub(r"<[^>]+>", " ", page)
+    text = re.sub(r"[ \t\r\f\v]+", " ", html.unescape(text))
+    return re.sub(r"\n[ \n]*\n", "\n", text).strip()
+
+
 def reference(check: Check) -> dict:
     """Find NIS's macro reference on this computer, and copy out what it says about each function the driver uses.
 
@@ -333,6 +344,7 @@ def reference(check: Check) -> dict:
     excerpts, mentioned, pages = [], set(), []
     pages_dir = os.path.join(check.out_dir, "help_pages")
     kept_bytes = 0
+    definitions, found_pages = {}, []
     for path in files[:20000]:
         if not path.lower().endswith((".htm", ".html", ".txt", ".xml", ".json")):
             continue
@@ -348,24 +360,43 @@ def reference(check: Check) -> dict:
             excerpts.append(
                 f"--- {name}  ({path})\n{text[max(match.start() - 300, 0) : match.start() + 900]}\n"
             )
+        defined = 0
+        for name in here:
+            # NIS's help marks the entry that describes a function with an anchor "FR_<name>".
+            at = text.find(f'name="FR_{name}"')
+            if at < 0 or name in definitions:
+                continue
+            following = text.find('class="varlistentry', at + 1)
+            entry = text[at : following if following > 0 else at + 6000]
+            definitions[name] = (path, plain_text(entry))
+            defined += 1
         if here:
             mentioned |= here
-            size = os.path.getsize(path)
-            if len(pages) < PAGES_KEPT and kept_bytes + size <= PAGES_BYTES:
-                os.makedirs(pages_dir, exist_ok=True)
-                relative = os.path.relpath(
-                    path,
-                    os.path.commonpath([path, *roots])
-                    if roots
-                    else os.path.dirname(path),
-                )
-                target = os.path.join(
-                    pages_dir, relative.replace(os.sep, "__").replace(":", "")
-                )
-                with open(path, "rb") as source, open(target, "wb") as copy:
-                    copy.write(source.read())
-                pages.append(path)
-                kept_bytes += size
+            found_pages.append((-defined, path))
+    # The pages that describe the driver's functions are copied first, so the page limit
+    # never leaves them out (in the first runs it left out every device page).
+    for _, path in sorted(found_pages):
+        size = os.path.getsize(path)
+        if len(pages) >= PAGES_KEPT or kept_bytes + size > PAGES_BYTES:
+            break
+        os.makedirs(pages_dir, exist_ok=True)
+        relative = os.path.relpath(
+            path,
+            os.path.commonpath([path, *roots]) if roots else os.path.dirname(path),
+        )
+        target = os.path.join(
+            pages_dir, relative.replace(os.sep, "__").replace(":", "")
+        )
+        with open(path, "rb") as source, open(target, "wb") as copy:
+            copy.write(source.read())
+        pages.append(path)
+        kept_bytes += size
+    with open(
+        os.path.join(check.out_dir, "signatures.txt"), "w", encoding="utf-8"
+    ) as handle:
+        for name in names:
+            where, entry = definitions.get(name, (None, "not described in NIS's help"))
+            handle.write(f"=== {name}  ({where})\n{entry}\n\n")
     with open(
         os.path.join(check.out_dir, "reference.txt"), "w", encoding="utf-8"
     ) as handle:
@@ -381,6 +412,7 @@ def reference(check: Check) -> dict:
         "first help files": files[:50],
         "functions found in them": len(mentioned),
         "functions not found in them": sorted(set(names) - mentioned),
+        "functions described (in signatures.txt)": len(definitions),
         "pages copied into help_pages": len(pages),
         "compiled help copied (send these along)": copied,
     }

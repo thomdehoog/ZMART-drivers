@@ -265,7 +265,8 @@ change really happens and is seen.
 What it does, one line each in `check_summary.txt`:
 
 1. **What NIS has**: NIS's version; whether NIS offers each of the driver's functions; what NIS's macro
-   reference on the PC says about them (`reference.txt`, and the pages in `help_pages`); every hardware
+   reference on the PC says about them (`signatures.txt`, each function's own entry with its arguments;
+   `reference.txt`; and the pages in `help_pages`, the ones describing the functions first); every hardware
    setting, which devices are there, and their values.
 2. **Every reading**, called once with the driver's own arguments. NIS answers "not available" (−4) to right
    arguments with the hardware off, and "Bad number of parameters" to wrong ones. For each reading NIS
