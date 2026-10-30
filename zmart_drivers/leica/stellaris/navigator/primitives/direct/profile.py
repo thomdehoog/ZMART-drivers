@@ -102,6 +102,21 @@ def pair_present(value) -> bool:
     return isinstance(value, tuple) and len(value) == 2 and all(_finite(v) for v in value)
 
 
+def z_stack_read() -> dict:
+    """The z-stack wrapped as ``{"stack": ...}``, so that no stack (None) is still an answer.
+
+    The read loop takes a None value for no answer and would wait out every
+    window for it; ``procedures/readings.get_z_stack`` hands the stack on
+    unwrapped.
+    """
+    return {"stack": direct_reader.get_z_stack()}
+
+
+def z_stack_present(value) -> bool:
+    """A z-stack LAS X reported, or its word that there is none."""
+    return isinstance(value, dict) and "stack" in value and (value["stack"] is None or dict_present(value["stack"]))
+
+
 @dataclass(frozen=True)
 class DatumSpec:
     """One reading: its name, how the direct reader answers it, and what counts as its answer.
@@ -135,7 +150,7 @@ DATUMS = {
         DatumSpec("fov", direct_reader.get_fov, pair_present),
         DatumSpec("pixel_size", direct_reader.get_pixel_size, pair_present),
         DatumSpec("bit_depth", direct_reader.get_bit_depth, number_present),
-        DatumSpec("z_stack", direct_reader.get_z_stack, lambda v: v is None or dict_present(v)),
+        DatumSpec("z_stack", z_stack_read, z_stack_present),
         DatumSpec("serial_number", direct_reader.get_serial_number, text_present),
         DatumSpec("jobs", direct_reader.get_jobs, listed),
         DatumSpec("hardware_info", direct_reader.get_hardware_info, dict_present),

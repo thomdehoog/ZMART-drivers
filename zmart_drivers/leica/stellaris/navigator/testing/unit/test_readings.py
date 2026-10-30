@@ -59,6 +59,35 @@ def test_what_las_x_is_set_to_now(lasx, client):
     assert readings.get_serial_number(client) == "STELLARIS SIMULATOR"
 
 
+def test_no_z_stack_is_an_answer_at_once_not_a_reading_that_never_came(lasx, client):
+    # On the simulator (2026-10-30) every reading of a missing stack waited out
+    # its four windows, 12 s, because the read loop takes None for no answer.
+    reading = readings.get_z_stack(client, diagnostics=True)
+
+    assert reading.value is None
+    assert reading.error is None and reading.observed_at is not None
+
+
+def test_a_z_stack_names_the_drive_that_carries_it(lasx, client):
+    # The nodes as read on the LAS X simulator on 2026-10-30, with a stack of
+    # five sections set up on z-wide: ZPositionMode says z-wide (2), while
+    # ZStackUseMode stays 1 whichever drive carries the stack.
+    stack = ("Acquire", "AcquireZStackInfo")
+    lasx.live.update({
+        (*stack, "BeginValue"): 0.000995,
+        (*stack, "EndValue"): 0.001005,
+        (*stack, "StepSize"): 2.5e-06,
+        (*stack, "SectionsCount"): 5,
+        ("Acquire", "ZStackUseMode"): 1,
+        ("Acquire", "ZPositionMode"): 2,
+    })
+
+    assert readings.get_z_stack(client) == {
+        "begin": pytest.approx(995.0), "end": pytest.approx(1005.0), "stepSize": pytest.approx(2.5),
+        "size": pytest.approx(10.0), "sections": 5, "mode": "z-wide",
+    }
+
+
 def test_the_instrument_is_described_whole(lasx, client):
     info = readings.get_hardware_info(client)
     assert info["SerialNumber"] == "STELLARIS SIMULATOR"

@@ -336,9 +336,10 @@ def get_z_stack() -> dict | None:
     """The z-stack, as the job settings' raw ``stack`` in micrometres; None without one (one section).
 
     ``begin``, ``end``, ``stepSize``, ``size``, ``sections`` and ``mode``,
-    the drive that carries it (``Acquire/ZStackUseMode``, coded like the
-    drives' ``ZUseMode``: 1 z-galvo, 2 z-wide). Only the case without a
-    stack has been seen on the simulator so far.
+    the drive that carries it (``Acquire/ZPositionMode``, coded like the
+    drives' ``ZUseMode``: 1 z-galvo, 2 z-wide). On the simulator
+    (2026-10-30) ``ZPositionMode`` followed the drive chosen in LAS X's
+    z-stack panel, while ``Acquire/ZStackUseMode`` stayed 1 for either drive.
     """
     found = settings(
         "the z-stack",
@@ -347,7 +348,7 @@ def get_z_stack() -> dict | None:
             "end": (*Z_STACK, "EndValue"),
             "stepSize": (*Z_STACK, "StepSize"),
             "sections": (*Z_STACK, "SectionsCount"),
-            "mode": ("Acquire", "ZStackUseMode"),
+            "mode": ("Acquire", "ZPositionMode"),
         },
     )
     if not isinstance(found["sections"], int) or found["sections"] <= 1:

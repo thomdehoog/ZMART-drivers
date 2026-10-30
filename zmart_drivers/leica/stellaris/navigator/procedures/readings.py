@@ -18,6 +18,7 @@ import logging
 
 from ..dispatcher import dispatch as _door
 from ..dispatcher.read import Reading  # noqa: F401
+from ..dispatcher.read import derive as _derive
 from ..dispatcher.read import plain_or_diagnostic as _plain_or_diagnostic
 from ..primitives.direct import profile as direct_profile
 from ..primitives.direct import reads as direct_reader
@@ -128,9 +129,16 @@ def get_bit_depth(client, **keywords):
     return _routed("bit_depth", client, **keywords)
 
 
-def get_z_stack(client, **keywords):
-    """The z-stack of the current settings, in micrometres; None when there is none (one section)."""
-    return _routed("z_stack", client, **keywords)
+def get_z_stack(client, *, diagnostics=False, deadline=None):
+    """The z-stack of the current settings, in micrometres; None when there is none (one section).
+
+    The table's row answers ``{"stack": ...}`` (``z_stack_read`` in the
+    profile), so that no stack counts as an answer; it is unwrapped here.
+    """
+    reading = wait_for("z_stack", client, deadline=deadline)
+    if reading is not None and isinstance(reading.value, dict):
+        reading = _derive(reading, reading.value["stack"])
+    return _plain_or_diagnostic(reading, diagnostics)
 
 
 def get_serial_number(client, **keywords):
