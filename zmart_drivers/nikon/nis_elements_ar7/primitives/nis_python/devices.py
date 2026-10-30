@@ -455,6 +455,8 @@ TABLE: tuple[Setting, ...] = (
         unit="%",
         tolerance=0.05,
         guarded=True,
+        # NIS answers "done, 0 %" even with no incubator there, so a target of 0 counts as none.
+        plausible=(0.01, 100),
     ),
     Setting(
         key="incubator_humidity",
@@ -466,6 +468,7 @@ TABLE: tuple[Setting, ...] = (
         unit="%",
         tolerance=0.5,
         guarded=True,
+        plausible=(0.01, 100),
     ),
 )
 

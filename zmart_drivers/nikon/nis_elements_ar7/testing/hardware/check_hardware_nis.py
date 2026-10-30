@@ -726,7 +726,7 @@ def exercise_setting(check: Check, row, instance, positions) -> dict:
     code = sent["returned"]
     if (
         target != before
-        and isinstance(code, int)
+        and isinstance(code, (int, float))
         and not isinstance(code, bool)
         and code <= 0
         and devices.matches(row, before, after)
@@ -957,6 +957,10 @@ NOT_THERE = (
 )
 
 
+#: How the driver says it refused a move because this microscope has no limits yet.
+NO_LIMITS = ("no limits could be installed", "No limits are loaded")
+
+
 def not_there(error: BaseException) -> bool:
     return any(words in str(error) for words in NOT_THERE)
 
@@ -971,6 +975,12 @@ def baseline(how):
             if not_there(error):
                 return {
                     "not available (the hardware is off or absent)": f"{type(error).__name__}: {error}"
+                }
+            if any(words in str(error) for words in NO_LIMITS):
+                # Refusing every move until the microscope's limits are set is what the driver
+                # must do; the limits are set once, in the setup wizard.
+                return {
+                    "refused, as it must be: no limits are set on this microscope yet": f"{error}"
                 }
             raise
 

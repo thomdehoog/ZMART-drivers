@@ -413,3 +413,15 @@ def test_the_pretend_nis_takes_as_many_arguments_as_the_real_one():
         if taken != expected[name]:
             wrong[name] = (taken, expected[name])
     assert wrong == {}
+
+
+def test_an_incubator_whose_target_reads_zero_is_not_offered():
+    """With no incubator there, NIS 7 still answered "done, 0 %"; such an incubator is not offered."""
+    nis = mock_nis.make_nis()
+    nis.scope.incubator = {"gas": 0.0, "humidity": 0.0}
+    found = devices.discover(lambda fn, args: server.call(nis, fn, args))
+    assert found["incubator_gas"]["devices"] == []
+    assert found["incubator_humidity"]["devices"] == []
+    nis.scope.incubator = {"gas": 5.0, "humidity": 90.0}
+    found = devices.discover(lambda fn, args: server.call(nis, fn, args))
+    assert [d["value"] for d in found["incubator_gas"]["devices"]] == [5.0]
