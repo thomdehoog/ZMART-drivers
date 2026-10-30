@@ -29,6 +29,14 @@ if str(_HELPERS) not in sys.path:
 
 TEST_DATA = Path(__file__).resolve().parent / "data"
 
+import matplotlib
+
+# The calibration's pictures are drawn without a window. Otherwise matplotlib
+# picks Tk on Windows, and Tk fails now and then when many tests in one run
+# start it (seen on the LAS X computer on 2026-10-30). This must come before
+# any test imports matplotlib.pyplot.
+matplotlib.use("Agg")
+
 
 @pytest.fixture(autouse=True)
 def _hermetic_machine_root(tmp_path_factory, monkeypatch):
