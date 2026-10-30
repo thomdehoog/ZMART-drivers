@@ -161,9 +161,29 @@ KIND_CLOSED = "closed"
 KIND_NOT_PUMPING = "not_pumping"
 KIND_REFUSED = "refused"  # NIS itself, or the bridge's own check, said no
 
-#: ``GetOpenedDocumentList``'s text and how many characters it may hold
-#: (to be confirmed on the microscope; see the plan, section 11).
-DOCUMENT_LIST_SIZE = 4096
+#: How ``GetOpenedDocumentList`` is asked only for the number of open documents.
+#: Given room for no names (0 items, each of up to 256 characters), NIS writes
+#: nothing and answers how many documents are open. That is all the snap needs,
+#: and it never asks NIS to write more names than its text place can hold.
+DOCUMENT_COUNT_ARGS = [{"ptr": "char"}, 0, 256]
+#: The parts of NIS's description of a picture, in the order
+#: ``LoadImageFullDescription`` fills them in (after the file's name).
+DESCRIPTION_PARTS = (
+    "Optics",
+    "Type",
+    "Sample ID",
+    "Author",
+    "Description",
+    "Image ID",
+    "Group",
+    "Capturing",
+    "Sampling",
+    "Location",
+    "Date",
+    "Conclusion",
+    "Info 1",
+    "Info 2",
+)
 #: ``ImageSaveAs``'s format number for a TIFF with every layer, and no compression.
 TIFF_FORMAT = 18
 NO_COMPRESSION = 0
@@ -212,21 +232,6 @@ def call(nis_module: Any, fn: str, args: list) -> dict:
         "return": result,
         "values": [v.get() if hasattr(v, "get") else v for v in values],
     }
-
-
-def document_names(text: Any) -> list[str]:
-    """The names in ``GetOpenedDocumentList``'s text, split on ``;``, new lines or tabs."""
-    names = []
-    for part in (
-        str(text or "")
-        .replace("\r", "\n")
-        .replace("\t", "\n")
-        .replace(";", "\n")
-        .split("\n")
-    ):
-        if part.strip():
-            names.append(part.strip())
-    return names
 
 
 # =============================================================================
@@ -320,7 +325,8 @@ class Bridge:
         All of it runs in one pass of the macro loop, so nothing the operator
         clicks can come in between. The operator's own documents are never
         saved or closed: when ``Capture`` makes no new document, nothing is
-        saved and nothing is closed.
+        saved and nothing is closed. NIS makes the new document the current
+        one, so the saving and the closing act on it alone.
         """
         if not os.path.isabs(path) or not path.lower().endswith((".tif", ".tiff")):
             raise Refused(
@@ -331,7 +337,7 @@ class Bridge:
             raise Refused(
                 f"{path} exists already; a capture is never saved over another"
             )
-        before = self.documents()
+        before = self.document_count()
         started = time.time()
         captured = call(self.nis, "Capture", [])["return"]
         finished = time.time()
@@ -343,15 +349,13 @@ class Bridge:
             raise Refused(
                 f"Capture answered {captured}: no picture was taken (is the camera on?); nothing was saved"
             )
-        after = self.documents()
-        new = [name for name in after if name not in before]
-        if len(new) != 1:
+        after = self.document_count()
+        if after != before + 1:
             raise Refused(
-                f"Capture made {len(new)} new documents ({new}), not one: NIS may have captured into an "
-                "existing document (switch on 'capture creates a new document' in NIS). Nothing was saved or closed."
+                f"Capture left {after} documents open where {before} were, not one more: NIS may have "
+                "captured into an existing document (switch on 'capture creates a new document' in NIS). "
+                "Nothing was saved or closed."
             )
-        document = new[0]
-        call(self.nis, "ActivateDocument", [document])
         info = call(self.nis, "Get_ImageInfo", ["", *([{"ptr": "int"}] * 4)])
         width, height, bits, components = (int(v) for v in info["values"][1:5])
         calibration = call(
@@ -372,7 +376,7 @@ class Bridge:
         return {
             "path": path,
             "bytes": os.path.getsize(path),
-            "document": document,
+            "documents_open": {"before": before, "after": after},
             "capture_return": captured,
             "started": started,
             "finished": finished,
@@ -392,31 +396,45 @@ class Bridge:
         }
 
     def save_description(self, path: str) -> dict:
-        """Have NIS write the new document's whole description (camera, exposure, channels...) beside the TIFF.
+        """Write NIS's own description of the saved picture (optics, how it was captured...) beside the TIFF.
 
-        A TIFF keeps little of what NIS knows about how a picture was taken;
-        NIS's own description of the document keeps it all, as text. It is
-        saved as ``<picture>.nis_description.txt`` and goes into the store as
-        the vendor's own description. When NIS cannot write it, the picture
-        is still saved, and the answer says why.
+        A TIFF keeps little of what NIS knows about how a picture was taken.
+        NIS's ``LoadImageFullDescription`` reads back the description NIS
+        keeps with the picture, in fourteen parts; the parts that say
+        something are written, one per line, to
+        ``<picture>.nis_description.txt``, which goes into the store as the
+        vendor's own description. When NIS gives none, the picture is still
+        saved, and the answer says why.
         """
         target = os.path.splitext(path)[0] + DESCRIPTION_SUFFIX
         try:
-            returned = call(self.nis, "SaveImageFullDescription", [target])["return"]
+            answer = call(
+                self.nis,
+                "LoadImageFullDescription",
+                [path, *([{"ptr": "char"}] * len(DESCRIPTION_PARTS))],
+            )
         except Exception as error:  # noqa: BLE001 -- the picture matters more than its description
             return {"path": None, "why": f"{type(error).__name__}: {error}"}
-        if not os.path.isfile(target):
+        returned = answer["return"]
+        lines = [
+            f"{part}: {str(value).strip()}"
+            for part, value in zip(DESCRIPTION_PARTS, answer["values"][1:])
+            if str(value or "").strip()
+        ]
+        if (isinstance(returned, int) and returned < 1) or not lines:
             return {
                 "path": None,
-                "why": f"SaveImageFullDescription answered {returned!r} and wrote no file",
+                "why": f"LoadImageFullDescription answered {returned!r} with no description",
             }
+        with open(target, "w", encoding="utf-8") as handle:
+            handle.write("\n".join(lines) + "\n")
         return {"path": target, "why": None}
 
-    def documents(self) -> list[str]:
-        answer = call(
-            self.nis, "GetOpenedDocumentList", [{"ptr": "char"}, DOCUMENT_LIST_SIZE]
+    def document_count(self) -> int:
+        """How many documents are open in NIS now."""
+        return int(
+            call(self.nis, "GetOpenedDocumentList", DOCUMENT_COUNT_ARGS)["return"]
         )
-        return document_names(answer["values"][0])
 
     def run_job(self, job: Job) -> None:
         """Run one queued request and fill in its reply. Never raises."""

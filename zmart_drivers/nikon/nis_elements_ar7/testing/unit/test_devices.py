@@ -186,7 +186,7 @@ def test_a_device_that_is_not_there_is_refused_before_anything_is_sent(
 
 
 def test_a_guarded_setting_is_refused_until_the_limits_allow_it(governed, stand_in):
-    refused = changes.set_device(governed, "laser_power/0.1", 20.0)
+    refused = changes.set_device(governed, "laser_power/LU-N4.1", 20.0)
     assert not refused["success"] and "guarded" in refused["message"]
     assert "Stg_SetMultiLaserPower" not in stand_in.scope.calls
 
@@ -205,8 +205,8 @@ def test_published_device_limits_allow_and_bound_a_guarded_setting(client, stand
         }
     )
     handshake.connect_handshake(client)
-    assert changes.set_device(client, "laser_power/0.1", 20.0)["confirmed"]
-    over = changes.set_device(client, "laser_power/0.1", 50.0)
+    assert changes.set_device(client, "laser_power/LU-N4.1", 20.0)["confirmed"]
+    over = changes.set_device(client, "laser_power/LU-N4.1", 50.0)
     assert not over["success"] and "outside the limits" in over["message"]
     assert not changes.set_device(client, "shutter/DIA", 1)["success"], (
         "an entry for one device wins over the setting"
@@ -255,8 +255,8 @@ def test_set_state_applies_the_light_last(scope, stand_in):
 
 
 def test_a_setting_that_already_holds_the_value_is_not_sent(scope, stand_in):
-    applied = scope.set_state({"shutter/EPI": 0, "laser_power/0.0": 0.0})
-    assert applied["applied"] == {"shutter/EPI": 0, "laser_power/0.0": 0.0}
+    applied = scope.set_state({"shutter/EPI": 0, "laser_power/LU-N4.0": 0.0})
+    assert applied["applied"] == {"shutter/EPI": 0, "laser_power/LU-N4.0": 0.0}
     assert "Stg_SetShutterStateEx" not in stand_in.scope.calls
     assert "Stg_SetMultiLaserPower" not in stand_in.scope.calls
 
@@ -324,7 +324,7 @@ def test_a_wrong_value_changes_nothing_at_all(scope, stand_in):
 def test_a_refused_guarded_value_changes_nothing_at_all(scope, stand_in):
     with pytest.raises(RuntimeError, match="nothing was changed"):
         scope.set_state(
-            {"objective_position": 2, "shutter/EPI": 1, "laser_power/0.1": 40.0}
+            {"objective_position": 2, "shutter/EPI": 1, "laser_power/LU-N4.1": 40.0}
         )
     assert stand_in.scope.nosepiece == 1 and stand_in.scope.shutters["EPI"] == 0
 
@@ -363,3 +363,53 @@ def test_the_bridge_loads_the_table_afresh_each_time(tmp_path):
     first = server._sibling("devices")
     second = server._sibling("devices")
     assert first is not second
+
+
+#: Each NIS function's arguments as NIS-Elements AR 7.01.03's own help writes them.
+SIGNATURES = Path(__file__).resolve().parents[1] / "data" / "nis7_signatures.csv"
+
+
+def _signatures() -> dict[str, int]:
+    with SIGNATURES.open(encoding="utf-8") as handle:
+        return {
+            row["function"]: int(row["arguments"]) for row in csv.DictReader(handle)
+        }
+
+
+def test_every_call_of_the_table_gives_nis_as_many_arguments_as_its_help_says():
+    """NIS refuses a wrong number of arguments ("Bad number of parameters"); the table matches NIS's own help."""
+    expected = _signatures()
+    calls = [
+        call
+        for row in devices.TABLE
+        for call in (
+            row.read,
+            row.write,
+            row.present,
+            row.count,
+            row.name,
+            row.positions,
+        )
+        if call is not None
+    ] + [devices.LASER_NAME, devices.LASER_LINE_COUNT]
+    wrong = {
+        call.fn: (len(call.args), expected.get(call.fn))
+        for call in calls
+        if expected.get(call.fn) != len(call.args)
+    }
+    assert wrong == {}, "the table's number of arguments, and NIS's help's"
+    assert expected["GetOpenedDocumentList"] == len(server.DOCUMENT_COUNT_ARGS)
+    assert expected["LoadImageFullDescription"] == 1 + len(server.DESCRIPTION_PARTS)
+
+
+def test_the_pretend_nis_takes_as_many_arguments_as_the_real_one():
+    """The offline tests are only as good as the pretend NIS: each of its functions takes what NIS's help says."""
+    expected = _signatures()
+    wrong = {}
+    for name, function in mock_nis.FUNCTIONS.items():
+        if name not in expected:
+            continue
+        taken = len(inspect.signature(function.__wrapped__).parameters) - 1
+        if taken != expected[name]:
+            wrong[name] = (taken, expected[name])
+    assert wrong == {}

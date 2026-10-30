@@ -201,13 +201,14 @@ def test_nis_own_description_of_the_picture_goes_into_the_store(scope, output_ro
         encoding="ascii"
     )
     assert "Exposure: 100 ms" in xml and "Pretend sCMOS" in xml
+    assert "Optics: " in xml  # each part of the description, by its name
     assert not list(output_root.rglob("*.nis_description.txt"))
 
 
 def test_a_picture_is_saved_even_when_nis_writes_no_description(
     scope, stand_in, output_root
 ):
-    stand_in.scope.answer_next["SaveImageFullDescription"] = -1
+    stand_in.scope.answer_next["LoadImageFullDescription"] = 0
     record = scope.acquire("A1")
     assert convention.check_store(record["store"]) == []
     log = json.loads(Path(record["log"]).read_text(encoding="utf-8"))

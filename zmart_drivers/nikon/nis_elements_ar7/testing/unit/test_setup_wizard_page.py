@@ -232,8 +232,8 @@ def test_a_guarded_try_is_refused_in_red_and_changes_nothing(
     page.locator(".step").first.wait_for()
     connect(page, tmp_path)
     open_step(page, "Hardware settings")
-    page.get_by_label("laser_power/0.1, a value to try").fill("20")
-    press(page, "Try", page.locator(".setup-row", has_text="laser_power/0.1"))
+    page.get_by_label("laser_power/LU-N4.1, a value to try").fill("20")
+    press(page, "Try", page.locator(".setup-row", has_text="laser_power/LU-N4.1"))
     says(page, "guarded", kind="bad")
     assert stand_in.scope.laser_lines["488 nm"][1] == 0.0
 

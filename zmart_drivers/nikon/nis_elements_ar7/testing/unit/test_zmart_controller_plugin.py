@@ -135,6 +135,6 @@ def test_a_hardware_setting_goes_through_the_controllers_set_state(
         "output": {"applied": {"light_path": 2, "shutter/EPI": 1}},
     }
     assert stand_in.scope.shutters["EPI"] == 1 and stand_in.scope.light_path == 2
-    refused = controller.set_state({"changeable": {"laser_power/0.1": 40.0}})
+    refused = controller.set_state({"changeable": {"laser_power/LU-N4.1": 40.0}})
     assert refused["success"] is False and "guarded" in refused["output"]
     assert "shutter/EPI" in controller.get_info()["output"]["description"]

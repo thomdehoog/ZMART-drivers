@@ -41,7 +41,7 @@ def test_a_snap_saves_the_new_picture_and_keeps_the_operators_image(
         "components": 1,
     }
     assert answer["calibration"]["pixel"] == pytest.approx(0.65)
-    assert answer["document"] != mine.name
+    assert answer["documents_open"] == {"before": 1, "after": 2}
     assert [d.name for d in stand_in.scope.documents] == [mine.name]
     assert stand_in.scope.current is mine
 

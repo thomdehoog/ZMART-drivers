@@ -119,13 +119,13 @@ def test_the_limits_are_measured_saved_and_govern_at_once(connected, stand_in):
     assert Path(saved["saved_to"]).is_file()
     assert status(connected, "limits")["done"]
     refused = connected.call(
-        "hardware", "set", {"name": "laser_power/0.1", "value": 30.0}
+        "hardware", "set", {"name": "laser_power/LU-N4.1", "value": 30.0}
     )
     assert not refused["ok"] and "outside the limits" in refused["error"]
     assert (
         ok(
             connected.call(
-                "hardware", "set", {"name": "laser_power/0.1", "value": 10.0}
+                "hardware", "set", {"name": "laser_power/LU-N4.1", "value": 10.0}
             )
         )["value"]
         == 10.0
@@ -203,7 +203,7 @@ def test_the_hardware_is_listed_tried_and_noted(connected, stand_in):
     )
     assert stand_in.scope.shutters["EPI"] == 1
     refused = connected.call(
-        "hardware", "set", {"name": "laser_power/0.1", "value": 5.0}
+        "hardware", "set", {"name": "laser_power/LU-N4.1", "value": 5.0}
     )
     assert not refused["ok"] and "guarded" in refused["error"]
     ok(connected.call("hardware", "publish", {}))

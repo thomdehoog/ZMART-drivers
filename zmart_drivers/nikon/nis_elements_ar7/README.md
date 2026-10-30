@@ -161,11 +161,11 @@ sends.
 |---|---|
 | Light | `shutter/<name>` (1 open, 0 closed), `lamp/<name>` (1 on, 0 off), `lamp_voltage/<name>`, `lamp_iris/<name>`, `lamp_nd_filter/<name>`, `nd_filter` |
 | Filters | `filter/<name>`: a filter wheel or turret's position, from 1 |
-| Optics | `light_path`, `condenser`, `aperture`, `analyzer`, `zoom`, `relay_lens`, `correction_collar` |
+| Optics | `light_path`, `condenser`, `aperture/<diaphragm>` (`dia_field`, `epi_field`, `dia_aperture`, `epi_aperture`), `analyzer`, `zoom`, `relay_lens/<port>`, `correction_collar` |
 | Focus | `pfs` (1 holds the focus), `pfs_offset` |
 | Spinning disk | `disk_shutter`, `disk_speed` |
 | TIRF *(guarded)* | `tirf_position` |
-| Lasers *(guarded)* | `laser_line/<laser>.<line>` (1 used), `laser_power/<laser>.<line>` (percent) |
+| Lasers *(guarded)* | `laser_line/<laser>.<line>` (1 used), `laser_power/<laser>.<line>` (percent, a whole number); `<laser>` is the laser unit's name in NIS, such as `laser_power/LU-N4.1` |
 | Environment *(guarded)* | `stage_temperature/<name>`, `incubator_gas`, `incubator_humidity` |
 
 `<name>` is the device's name as NIS lists it, such as `shutter/EPI`. When connected, the driver asks NIS
@@ -208,8 +208,8 @@ metadata convention, `zmart_drivers/metadata_convention`):
 3. **The driver's state at the capture**: everything `state()` said (the objective, the optical
    configuration, every hardware setting), the capture record, and each motor's own reading.
 4. **NIS's own words**: NIS's whole description of the picture (camera, exposure, binning, channels...),
-   which the snap has NIS write with `SaveImageFullDescription` before it closes the document, and what
-   NIS answered to the capture.
+   which the snap reads back with `LoadImageFullDescription` from the saved picture before it closes the
+   document, and what NIS answered to the capture.
 
 The pixel size comes from NIS's own calibration of the objective. A picture taken with an objective
 that is not calibrated in NIS cannot be placed on the sample, so it is not saved: it stays in

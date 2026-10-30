@@ -68,7 +68,7 @@ def test_with_everything_switched_on_every_check_passes_and_everything_is_put_ba
         "change filter/Filter Turret 1",
         "change light_path",
         "change pfs",
-        "change laser_power/0.1",
+        "change laser_power/LU-N4.1",
     } <= names
     after = (
         dict(scope.shutters),
@@ -109,9 +109,13 @@ def test_a_guarded_setting_is_only_ever_set_to_its_own_value(everything_on, tmp_
     nis = make_nis()
     nis.scope.laser_lines["488 nm"][1] = 12.5
     report = everything_on.main(nis, str(tmp_path / "results"))
-    found = next(c for c in report["checks"] if c["check"] == "change laser_power/0.1")
+    found = next(
+        c for c in report["checks"] if c["check"] == "change laser_power/LU-N4.1"
+    )
     assert found["answer"]["set to"] == found["answer"]["before"] == 12.5
-    line = next(c for c in report["checks"] if c["check"] == "change laser_line/0.1")
+    line = next(
+        c for c in report["checks"] if c["check"] == "change laser_line/LU-N4.1"
+    )
     assert line["answer"]["set to"] == line["answer"]["before"] == 0, (
         "a laser line is never switched on by the check"
     )
@@ -416,27 +420,27 @@ def test_a_reading_nis_refuses_is_tried_with_other_arguments_until_one_is_taken(
     nis = make_nis()
     real = nis.mac
 
-    class ZoomAnswersDirectly:
-        """A NIS whose zoom reading takes nothing and answers the zoom itself."""
+    class ZoomWantsOneArgument:
+        """A NIS whose zoom reading wants one argument, where the table gives it none."""
 
         def __getattr__(self, name):
             if name == "Stg_GetZoomPosition":
 
                 def zoom(*args):
-                    if args:
+                    if len(args) != 1:
                         raise RuntimeError("Bad number of parameters")
                     return 2
 
                 return zoom
             return getattr(real, name)
 
-    nis.mac = ZoomAnswersDirectly()
+    nis.mac = ZoomWantsOneArgument()
     report = script.main(nis, str(tmp_path / "results"))
     found = {e["check"]: e for e in report["checks"]}
     assert found["read Stg_GetZoomPosition"]["outcome"] == "FAIL"
     probe = found["arguments Stg_GetZoomPosition takes"]
     assert probe["outcome"] == "ok"
-    assert probe["answer"]["takes"] == []
+    assert len(probe["answer"]["takes"]) == 1
     assert probe["answer"]["answer"]["return"] == 2
 
 

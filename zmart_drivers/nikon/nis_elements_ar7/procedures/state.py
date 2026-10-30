@@ -6,7 +6,7 @@ named setup in NIS-Elements that carries the light path, the filters, the
 camera's exposure and, often, the objective), then every hardware setting of
 the table in ``primitives/nis_python/devices.py`` whose device NIS reports:
 a shutter is ``"shutter/EPI"``, the light path is ``"light_path"``, a laser
-line's power is ``"laser_power/0.2"``. Applying them all again restores the
+line's power is ``"laser_power/LU-N4.2"``. Applying them all again restores the
 imaging setup. ``set_state`` applies the objective, then the optical
 configuration, then the hardware settings, the light last (see
 :data:`GROUP_ORDER`). The *observed* part can only be read: the NIS version,

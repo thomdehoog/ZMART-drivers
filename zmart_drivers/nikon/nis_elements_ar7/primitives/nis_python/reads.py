@@ -276,20 +276,16 @@ def get_calibration(client) -> dict:
 
 
 #: Every reading by name: what the profile's table of readings is built from.
-def get_open_documents(client) -> list[str]:
-    """The names of the documents open in NIS now, as the snap sees them before and after a capture.
+def get_open_document_count(client) -> int:
+    """How many documents are open in NIS now, as the snap counts them before and after a capture.
 
     Not one of the named readings below: the driver itself never needs it,
     but the first checks at a microscope use it to show that a capture left
     the operator's own images open and untouched.
     """
-    from .server import DOCUMENT_LIST_SIZE, document_names
+    from .server import DOCUMENT_COUNT_ARGS
 
-    return document_names(
-        client.read("GetOpenedDocumentList", [ptr("char"), DOCUMENT_LIST_SIZE])[
-            "values"
-        ][0]
-    )
+    return int(client.read("GetOpenedDocumentList", DOCUMENT_COUNT_ARGS)["return"])
 
 
 def nis_call(client):

@@ -213,13 +213,14 @@ closing the "current" document can close the operator's own image. So the whole 
 one bridge request, `snap(path)`. NIS runs it in one pass of the macro loop, so nothing the
 operator clicks can come in between:
 
-1. Read the list of open documents (`GetOpenedDocumentList`).
+1. Count the open documents (`GetOpenedDocumentList`, given room for no names, answers
+   how many there are).
 2. `Capture()`. A negative return is a failure: nothing is saved or closed, and the reply
    says why.
-3. Read the list again. Exactly one new document must be there; otherwise the snap fails,
-   saying that NIS captured into an existing document (NIS's "capture creates a new
-   document" option may be off) and that nothing was saved or closed.
-4. Make that new document current (`ActivateDocument`), and read its `Get_ImageInfo` and
+3. Count them again. Exactly one more must be open; otherwise the snap fails, saying that
+   NIS captured into an existing document (NIS's "capture creates a new document" option
+   may be off) and that nothing was saved or closed.
+4. NIS makes the new document the current one; read its `Get_ImageInfo` and
    `Get_Calibration`.
 5. `ImageSaveAs(path, 18, 0)` writes it as a TIFF into the staging folder. The bridge
    creates the folder first, and then checks that the file exists.
@@ -609,12 +610,13 @@ Writing `start_bridge.mac` also works with NIS's own `python.exe`: the package n
 ### The vendor's own description of each picture
 
 A TIFF keeps little of what NIS knows about how a picture was taken. Before it closes the
-new document, the snap now has NIS write the document's whole description with
-`SaveImageFullDescription(path)` (offered without hardware in step 0) beside the staged TIFF.
+new document, the snap reads back the description NIS keeps with the saved picture, with
+`LoadImageFullDescription(path, ...)` and its fourteen parts (optics, how it was captured,
+sampling, and so on), and writes the parts that say something beside the staged TIFF.
 `save_data` keeps that text in the store's OME-XML as the vendor's description, after the
-TIFF's own, and deletes the file with the TIFF. When NIS writes none, the picture is saved all
-the same and the capture log says why. The hardware check confirms the function's argument
-and the text's encoding (UTF-16, UTF-8 and the Windows code page are all read).
+TIFF's own, and deletes the file with the TIFF. When NIS gives none, the picture is saved all
+the same and the capture log says why. (An earlier version used `SaveImageFullDescription`,
+which NIS's help shows *changes* a picture's description rather than reading it.)
 
 
 ## 14. The setup wizard (added 2026-10-29)
@@ -638,3 +640,30 @@ built from TypeScript into plain files, and five Nikon steps in `steps.py`:
 The pretend NIS's camera now shows a sample that stays put while the stage moves, and can be
 mounted turned or mirrored, so the orientation measurement is tested for all eight mounts. A
 browser test walks the whole setup on the pretend NIS.
+
+
+## 15. The arguments, from NIS's own help (added 2026-10-30)
+
+The second run at the microscope (NIS-Elements AR 7.01.03, the hardware switched off) passed
+the whole driver part and the ZMART Controller plugin part, and showed that about twenty of
+the table's functions were given the wrong arguments. NIS's own help pages for its device
+functions (`Docs\nis\eng_ar\p4c8s*.html`) were then read, and the table now follows them:
+
+- Most readings give the value as the function's own answer and take only the device's name:
+  `Stg_GetShutterStateEx(name)`, `Stg_Light_GetState(name)`, `Stg_Filter_GetPosition(name)`,
+  `Stg_GetZoomPosition()`, `Stg_GetTIRFPosition()`.
+- Lamps, filter changers and heating stages are named with `(index, text)`, without a size.
+- The four diaphragms are numbered by NIS (0 the transmitted-light field diaphragm, 1 the
+  epi-fluorescence field diaphragm, 2 and 3 the aperture diaphragms), so `aperture` has one
+  device for each. The CSU-W1's relay lens is read per camera port.
+- Laser units are named, not numbered: `Stg_GetMultiLaserName(index, text)`, then
+  `Stg_GetMultiLaserNumLines(name)`, and each line's settings take `(name, line)`. The power is
+  a whole number.
+- The incubator functions take the incubator's key from NIS's Device Manager first; the driver
+  passes an empty key, which NIS accepts, for the one incubator there is.
+- Both neutral density filters are set as a density (a number), not as a position.
+
+`testing/data/nis7_signatures.csv` keeps each function's arguments as NIS's help writes them,
+and a test checks that every call in the table, and every function of the pretend NIS, takes
+exactly that many. The hardware check now copies the help pages that describe the driver's
+functions first, and writes each function's own entry into `signatures.txt`.

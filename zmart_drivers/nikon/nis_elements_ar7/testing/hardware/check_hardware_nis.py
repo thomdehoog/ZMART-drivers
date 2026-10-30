@@ -218,8 +218,7 @@ DRIVER_FUNCTIONS_BEYOND_THE_TABLE = (
     "Capture",
     "ImageSaveAs",
     "CloseCurrentDocument",
-    "ActivateDocument",
-    "SaveImageFullDescription",
+    "LoadImageFullDescription",
 )
 
 
@@ -473,7 +472,7 @@ DRIVER_READS = (
         "Get_Calibration",
         [{"ptr": "char"}, {"ptr": "double"}, {"ptr": "double"}, {"ptr": "int"}],
     ),
-    ("GetOpenedDocumentList", [{"ptr": "char"}, 4096]),
+    ("GetOpenedDocumentList", [{"ptr": "char"}, 0, 256]),
 )
 
 
@@ -514,8 +513,14 @@ def reads(check: Check) -> None:
     for fn, args in DRIVER_READS:
         check.check(f"read {fn}", lambda fn=fn, args=args: answered(check, fn, args))
     seen = {fn for fn, _ in DRIVER_READS}
-    tokens = {devices.NAME: "", devices.INDEX: 0, devices.LASER: 0, devices.LINE: 0}
-    extra = [devices.Call("Stg_GetMultiLaserNumLines", (devices.LASER,))]
+    tokens = {
+        devices.NAME: "",
+        devices.INDEX: 0,
+        devices.KIND: 0,
+        devices.LASER: "",
+        devices.LINE: 0,
+    }
+    extra = [devices.LASER_NAME, devices.LASER_LINE_COUNT]
     for call in [
         c
         for row in devices.TABLE
@@ -605,12 +610,19 @@ def argument_shapes(check: Check) -> None:
             refused.append(name[len("read ") :])
     first_args = dict(DRIVER_READS)
     devices = check.devices
-    tokens = {devices.NAME: "", devices.INDEX: 0, devices.LASER: 0, devices.LINE: 0}
+    tokens = {
+        devices.NAME: "",
+        devices.INDEX: 0,
+        devices.KIND: 0,
+        devices.LASER: "",
+        devices.LINE: 0,
+    }
     for row in devices.TABLE:
         for call in (row.present, row.count, row.name, row.positions, row.read):
             if call is not None and call.fn not in first_args:
                 first_args[call.fn] = devices.arguments(call.args, tokens)
-    first_args.setdefault("Stg_GetMultiLaserNumLines", [0])
+    for call in (devices.LASER_NAME, devices.LASER_LINE_COUNT):
+        first_args.setdefault(call.fn, devices.arguments(call.args, tokens))
 
     def probe(fn):
         tried = []
@@ -654,7 +666,7 @@ def exercise_setting(check: Check, row, instance, positions) -> dict:
     tokens = (
         devices.tokens_for(row, instance)
         if instance is not None or row.devices == "one"
-        else {devices.NAME: "", devices.LASER: 0, devices.LINE: 0}
+        else {devices.NAME: "", devices.KIND: 0, devices.LASER: "", devices.LINE: 0}
     )
     read_args = devices.arguments(row.read.args, tokens)
     first = answered(check, row.read.fn, read_args)
@@ -906,22 +918,22 @@ def snap(check: Check) -> None:
         path = os.path.join(
             os.path.abspath(check.out_dir), f"snap_{time.strftime('%H%M%S')}.tif"
         )
-        # The list of open documents is only a courtesy here: if NIS refuses it, the picture is still taken.
-        documents = lambda: _or_error(bridge.documents)
+        # The count of open documents is only a courtesy here: if NIS refuses it, the picture is still taken.
+        documents = lambda: _or_error(bridge.document_count)
         documents_before = documents()
         try:
             answer = bridge.snap(path)
         except check.server.Refused as refused:
             if "answered -" in str(refused):
                 return {
-                    "documents before": documents_before,
+                    "documents open before": documents_before,
                     "capture": f"not taken: {refused}",
                 }
             raise
         return {
             **answer,
-            "documents before": documents_before,
-            "documents after": documents(),
+            "documents open before": documents_before,
+            "documents open after": documents(),
         }
 
     check.check(

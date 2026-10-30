@@ -26,23 +26,24 @@ values and "pointers", places NIS fills in with its answer. In the table:
 - ``{"ptr": "int"}`` (and ``double``, ``char``) is such a place;
 - ``NAME`` is the device's name, as NIS lists it (a shutter called "EPI");
 - ``INDEX`` is a number counted from 0, while the names are being listed;
-- ``LASER`` and ``LINE`` number a laser and one of its lines, from 0;
+- ``KIND`` is the number NIS gives one of a fixed set of devices (the four
+  diaphragms: 0 is the transmitted-light field diaphragm, and so on);
+- ``LASER`` is a laser unit's name, as NIS lists it, and ``LINE`` one of its
+  lines, counted from 0;
 - ``VALUE`` is the value being set;
 - ``TEXT_SIZE`` is the room given to NIS for a text.
 
 Where a function's answer is: ``"return"`` for its return value, or a number
 for the argument NIS filled in (0 is the first argument).
 
-What is known, and what is not. The function names all come from NIS-Elements
-AR 7.01.03's own function list (step 0 of the NIS 7 study). The arguments
-follow Nikon's macro reference and the conventions the NIS 7 study confirmed
-for the readings the driver already uses (a count or a position as the return
-value, a name through an index, a text place and its size). They have not
-been tried with the hardware switched on: every row says ``confirmed=False``
-until the hardware check has tried it on a microscope. A wrong number of
-arguments is refused by NIS with "Bad number of parameters" and changes
-nothing; the hardware check reports it, with NIS's own description of the
-function where NIS gives one.
+What is known, and what is not. The function names and their arguments come
+from NIS-Elements AR 7.01.03's own help (the device pages, "p4c8s...", read at
+the microscope on 30 October 2026), and NIS 7 accepted every reading's
+arguments at the microscope with the hardware switched off. Most readings
+give their value as the function's own answer and take only the device's
+name, if any. Nothing here has yet been seen to change real hardware: every
+row says ``confirmed=False`` until the hardware check has tried it with the
+microscope switched on.
 
 Author: Thom de Hoog, Center for Microscopy and Image Analysis (ZMB),
 University of Zurich (thom.dehoog@zmb.uzh.ch, thomdehoog@gmail.com).
@@ -57,6 +58,7 @@ from typing import Any
 
 NAME = "$name"
 INDEX = "$index"
+KIND = "$kind"
 LASER = "$laser"
 LINE = "$line"
 VALUE = "$value"
@@ -65,6 +67,11 @@ TEXT_SIZE = 256
 INT = {"ptr": "int"}
 DOUBLE = {"ptr": "double"}
 TEXT = {"ptr": "char"}
+
+#: Which incubator the incubator functions talk to. NIS names an incubator by
+#: a key from its Device Manager and has no function that lists the keys; an
+#: empty key, which NIS accepts, means the incubator there is.
+INCUBATOR = ""
 
 #: The kinds of value a setting takes.
 SWITCH = "switch"  # 0 or 1: closed or open, off or on
@@ -91,8 +98,9 @@ class Setting:
     ``key`` is its name in the driver (``shutter``). ``says`` explains it in
     plain words. ``devices`` says how the devices it belongs to are found:
     ``"one"`` (one device, there or not), ``"named"`` (listed by ``count`` and
-    ``name``) or ``"laser_lines"`` (every line of every laser). ``present`` is
-    asked for a single device; when it is None, the device counts as present
+    ``name``), ``"fixed"`` (the devices in ``fixed``, each there or not) or
+    ``"laser_lines"`` (every line of every laser). ``present`` is asked for a
+    single device, or for each fixed one; when it is None, the device counts as present
     when it can be read. ``positions``, for a choice, counts the positions.
     ``on_values``, for a switch whose reading says more than on and off, are
     the readings that mean on. ``tolerance`` is how close a number must read
@@ -110,6 +118,9 @@ class Setting:
     there only when that one is (the disk's shutter, when the disk is).
     ``whole`` is True for a number NIS takes only as a whole number (the
     disk's speed, Perfect Focus's offset): NIS refuses 10.0 where it wants 10.
+    ``fixed`` lists the devices of a setting whose devices NIS numbers in a
+    fixed way rather than by name (``devices="fixed"``): each is
+    ``(name in the driver, label, NIS's number)``.
     """
 
     key: str
@@ -132,6 +143,7 @@ class Setting:
     plausible: tuple | None = None
     present_if: str | None = None
     whole: bool = False
+    fixed: tuple = ()
     functions: tuple = field(init=False, default=())
 
     def __post_init__(self) -> None:
@@ -155,25 +167,42 @@ _SHUTTERS = {
     "count": Call("Stg_GetShutterCount"),
     "name": Call("Stg_GetShutterName", (INDEX, TEXT, TEXT_SIZE), 1),
 }
+# Shutters take a text place and its size; lamps, filter changers and heating
+# stages take only the text place (NIS's help, and NIS 7 at the microscope).
 _LAMPS = {
     "devices": "named",
     "count": Call("Stg_Light_GetCount"),
-    "name": Call("Stg_Light_GetName", (INDEX, TEXT, TEXT_SIZE), 1),
+    "name": Call("Stg_Light_GetName", (INDEX, TEXT), 1),
 }
 _FILTERS = {
     "devices": "named",
     "count": Call("Stg_Filter_GetCount"),
-    "name": Call("Stg_Filter_GetName", (INDEX, TEXT, TEXT_SIZE), 1),
+    "name": Call("Stg_Filter_GetName", (INDEX, TEXT), 1),
 }
 _HEAT_STAGES = {
     "devices": "named",
     "count": Call("Stg_HeatStage_GetCount"),
-    "name": Call("Stg_HeatStage_GetName", (INDEX, TEXT, TEXT_SIZE), 1),
+    "name": Call("Stg_HeatStage_GetName", (INDEX, TEXT), 1),
 }
+#: How the laser units and their lines are listed: the units by index, each
+#: unit's name, its number of lines, and each line's name. The settings of a
+#: line then name the unit and the line's number.
+LASER_NAME = Call("Stg_GetMultiLaserName", (INDEX, TEXT), 1)
+LASER_LINE_COUNT = Call("Stg_GetMultiLaserNumLines", (LASER,))
 _LASER_LINES = {
     "devices": "laser_lines",
     "count": Call("Stg_GetMultiLaserCount"),
-    "name": Call("Stg_GetMultiLaserLineName", (LASER, LINE, TEXT, TEXT_SIZE), 2),
+    "name": Call("Stg_GetMultiLaserLineName", (LASER, LINE, TEXT), 2),
+}
+#: The four diaphragms NIS knows, by the number its aperture functions take.
+_DIAPHRAGMS = {
+    "devices": "fixed",
+    "fixed": (
+        ("dia_field", "transmitted-light field diaphragm", 0),
+        ("epi_field", "epi-fluorescence field diaphragm", 1),
+        ("dia_aperture", "transmitted-light aperture diaphragm", 2),
+        ("epi_aperture", "epi-fluorescence aperture diaphragm", 3),
+    ),
 }
 
 
@@ -184,7 +213,7 @@ TABLE: tuple[Setting, ...] = (
         group="light",
         says="a shutter, by its name in NIS: 1 open, 0 closed",
         kind=SWITCH,
-        read=Call("Stg_GetShutterStateEx", (NAME, INT), 1),
+        read=Call("Stg_GetShutterStateEx", (NAME,)),
         write=Call("Stg_SetShutterStateEx", (NAME, VALUE)),
         **_SHUTTERS,
     ),
@@ -193,7 +222,7 @@ TABLE: tuple[Setting, ...] = (
         group="light",
         says="a lamp or LED, by its name in NIS: 1 on, 0 off",
         kind=SWITCH,
-        read=Call("Stg_Light_GetState", (NAME, INT), 1),
+        read=Call("Stg_Light_GetState", (NAME,)),
         write=Call("Stg_Light_SetState", (NAME, VALUE)),
         **_LAMPS,
     ),
@@ -202,7 +231,7 @@ TABLE: tuple[Setting, ...] = (
         group="light",
         says="a lamp's brightness, as NIS sets it (its voltage, or an LED's intensity)",
         kind=NUMBER,
-        read=Call("Stg_Light_GetVoltage", (NAME, DOUBLE), 1),
+        read=Call("Stg_Light_GetVoltage", (NAME,)),
         write=Call("Stg_Light_SetVoltage", (NAME, VALUE)),
         tolerance=0.05,
         **_LAMPS,
@@ -212,7 +241,7 @@ TABLE: tuple[Setting, ...] = (
         group="light",
         says="a lamp's iris, which sets how much of its light passes",
         kind=NUMBER,
-        read=Call("Stg_Light_GetIrisIntensity", (NAME, DOUBLE), 1),
+        read=Call("Stg_Light_GetIrisIntensity", (NAME,)),
         write=Call("Stg_Light_SetIrisIntensity", (NAME, VALUE)),
         tolerance=0.05,
         **_LAMPS,
@@ -220,22 +249,24 @@ TABLE: tuple[Setting, ...] = (
     Setting(
         key="lamp_nd_filter",
         group="light",
-        says="a lamp's own neutral density filter, which dims it in steps",
-        kind=CHOICE,
-        read=Call("Stg_Light_GetNDFilterPosition", (NAME, INT), 1),
+        says="a lamp's own neutral density filter, which dims it: its density, as NIS gives it",
+        kind=NUMBER,
+        read=Call("Stg_Light_GetNDFilterPosition", (NAME,)),
         write=Call("Stg_Light_SetNDFilterPosition", (NAME, VALUE)),
         positions=Call("Stg_Light_GetNDFilterSteps", (NAME,)),
+        tolerance=0.01,
         **_LAMPS,
     ),
     Setting(
         key="nd_filter",
         group="light",
-        says="the microscope's neutral density filter, which dims the light in steps",
-        kind=CHOICE,
+        says="the microscope's neutral density filter, which dims the light: its density, as NIS gives it",
+        kind=NUMBER,
         read=Call("Stg_GetNDFilterPosition"),
         write=Call("Stg_SetNDFilterPosition", (VALUE,)),
         present=Call("Stg_IsNDFilterPresent"),
         positions=Call("Stg_GetNDFilterSteps"),
+        tolerance=0.01,
     ),
     # --- filters -------------------------------------------------------------------------
     Setting(
@@ -243,7 +274,7 @@ TABLE: tuple[Setting, ...] = (
         group="filters",
         says="a filter wheel or filter turret, by its name in NIS: its position, from 1",
         kind=CHOICE,
-        read=Call("Stg_Filter_GetPosition", (NAME, INT), 1),
+        read=Call("Stg_Filter_GetPosition", (NAME,)),
         write=Call("Stg_Filter_SetPosition", (NAME, VALUE)),
         positions=Call("Stg_Filter_GetPositionCount", (NAME,)),
         **_FILTERS,
@@ -272,12 +303,13 @@ TABLE: tuple[Setting, ...] = (
     Setting(
         key="aperture",
         group="optics",
-        says="the aperture diaphragm's opening",
+        says="a diaphragm's opening: the field or aperture diaphragm, for transmitted light or epi-fluorescence",
         kind=NUMBER,
-        read=Call("Stg_GetAperturePosition", (DOUBLE,), 0),
-        write=Call("Stg_SetAperturePosition", (VALUE,)),
-        present=Call("Stg_IsAperturePresent"),
+        read=Call("Stg_GetAperturePosition", (KIND,)),
+        write=Call("Stg_SetAperturePosition", (KIND, VALUE)),
+        present=Call("Stg_IsAperturePresent", (KIND,)),
         tolerance=0.01,
+        **_DIAPHRAGMS,
     ),
     Setting(
         key="analyzer",
@@ -293,7 +325,7 @@ TABLE: tuple[Setting, ...] = (
         group="optics",
         says="the zoom's magnification",
         kind=NUMBER,
-        read=Call("Stg_GetZoomPosition", (DOUBLE,), 0),
+        read=Call("Stg_GetZoomPosition"),
         write=Call("Stg_SetZoomPosition", (VALUE,)),
         present=Call("Stg_IsZoomPresent"),
         tolerance=0.01,
@@ -301,10 +333,15 @@ TABLE: tuple[Setting, ...] = (
     Setting(
         key="relay_lens",
         group="optics",
-        says="the relay lens in front of the camera, as a position from 1",
+        says="the relay lens of a Yokogawa CSU-W1 spinning disk, at one of its camera ports, as a position from 1",
         kind=CHOICE,
-        read=Call("Stg_GetRelayLensPosition"),
-        write=Call("Stg_SetRelayLensPosition", (VALUE,)),
+        read=Call("Stg_GetRelayLensPosition", (KIND,)),
+        write=Call("Stg_SetRelayLensPosition", (KIND, VALUE)),
+        devices="fixed",
+        # NIS's help does not number the ports; these are tried, and a port
+        # that answers no position counted from 1 is not there.
+        fixed=(("port_1", "camera port 1", 1), ("port_2", "camera port 2", 2)),
+        plausible=(1, 10),
     ),
     Setting(
         key="correction_collar",
@@ -364,7 +401,7 @@ TABLE: tuple[Setting, ...] = (
         group="TIRF",
         says="the TIRF illuminator's position, which sets the angle of the laser at the coverslip",
         kind=NUMBER,
-        read=Call("Stg_GetTIRFPosition", (DOUBLE,), 0),
+        read=Call("Stg_GetTIRFPosition"),
         write=Call("Stg_SetTIRFPosition", (VALUE,)),
         tolerance=0.01,
         guarded=True,
@@ -373,9 +410,9 @@ TABLE: tuple[Setting, ...] = (
     Setting(
         key="laser_line",
         group="lasers",
-        says="one line of a laser unit (laser.line, from 0): 1 used, 0 not used",
+        says="one line of a laser unit (the unit's name, a dot, and the line from 0): 1 used, 0 not used",
         kind=SWITCH,
-        read=Call("Stg_GetMultiLaserLineUsed", (LASER, LINE, INT), 2),
+        read=Call("Stg_GetMultiLaserLineUsed", (LASER, LINE)),
         write=Call("Stg_SetMultiLaserLineUsed", (LASER, LINE, VALUE)),
         guarded=True,
         **_LASER_LINES,
@@ -383,12 +420,13 @@ TABLE: tuple[Setting, ...] = (
     Setting(
         key="laser_power",
         group="lasers",
-        says="the power of one line of a laser unit (laser.line, from 0), in percent",
+        says="the power of one line of a laser unit (the unit's name, a dot, and the line from 0), in percent",
         kind=NUMBER,
-        read=Call("Stg_GetMultiLaserPower", (LASER, LINE, DOUBLE), 2),
+        read=Call("Stg_GetMultiLaserPower", (LASER, LINE)),
         write=Call("Stg_SetMultiLaserPower", (LASER, LINE, VALUE)),
         unit="%",
-        tolerance=0.1,
+        tolerance=0.5,
+        whole=True,  # NIS takes the power as a whole number
         guarded=True,
         **_LASER_LINES,
     ),
@@ -398,11 +436,13 @@ TABLE: tuple[Setting, ...] = (
         group="environment",
         says="a heating stage's target temperature; the reading is its current temperature",
         kind=NUMBER,
-        read=Call("Stg_HeatStage_GetCurrentTemperature", (NAME, DOUBLE), 1),
+        read=Call("Stg_HeatStage_GetCurrentTemperature", (NAME,)),
         write=Call("Stg_HeatStage_SetTemperature", (NAME, VALUE)),
         unit="degrees C",
         confirms=False,
         guarded=True,
+        # NIS answered 7298120 for a heating stage with the hardware off.
+        plausible=(-50, 150),
         **_HEAT_STAGES,
     ),
     Setting(
@@ -410,8 +450,8 @@ TABLE: tuple[Setting, ...] = (
         group="environment",
         says="the incubator's target CO2 (or other gas), in percent",
         kind=NUMBER,
-        read=Call("Stg_Incubator_GetTargetGas", (DOUBLE,), 0),
-        write=Call("Stg_Incubator_SetTargetGas", (VALUE,)),
+        read=Call("Stg_Incubator_GetTargetGas", (INCUBATOR, DOUBLE), 1),
+        write=Call("Stg_Incubator_SetTargetGas", (INCUBATOR, VALUE)),
         unit="%",
         tolerance=0.05,
         guarded=True,
@@ -421,8 +461,8 @@ TABLE: tuple[Setting, ...] = (
         group="environment",
         says="the incubator's target humidity, in percent",
         kind=NUMBER,
-        read=Call("Stg_Incubator_GetTargetHumidity", (DOUBLE,), 0),
-        write=Call("Stg_Incubator_SetTargetHumidity", (VALUE,)),
+        read=Call("Stg_Incubator_GetTargetHumidity", (INCUBATOR, DOUBLE), 1),
+        write=Call("Stg_Incubator_SetTargetHumidity", (INCUBATOR, VALUE)),
         unit="%",
         tolerance=0.5,
         guarded=True,
@@ -461,7 +501,7 @@ def setting(key: str) -> Setting:
 
 
 def tokens_for(row: Setting, instance: str | None) -> dict:
-    """What fills a row's ``NAME``, ``LASER`` and ``LINE`` for one of its devices."""
+    """What fills a row's ``NAME``, ``KIND``, ``LASER`` and ``LINE`` for one of its devices."""
     if row.devices == "one":
         return {}
     if row.devices == "named":
@@ -470,13 +510,21 @@ def tokens_for(row: Setting, instance: str | None) -> dict:
                 f"{row.key} needs the device's name, such as {row.key}/EPI"
             )
         return {NAME: instance}
-    try:
-        laser, line = (int(part) for part in str(instance).split("."))
-    except ValueError:
+    if row.devices == "fixed":
+        for name, _, number in row.fixed:
+            if instance == name:
+                return {KIND: number}
         raise ValueError(
-            f"{row.key} needs the laser and its line, such as {row.key}/0.2"
-        ) from None
-    return {LASER: laser, LINE: line}
+            f"{row.key} needs one of {[name for name, _, _ in row.fixed]}, not {instance!r}"
+        )
+    # A laser line is named by its unit's name, a dot, and the line's number:
+    # "LU-N4.1". The unit's own name may hold dots, so the last one counts.
+    laser, _, line = str(instance or "").rpartition(".")
+    if not laser or not line.isdigit():
+        raise ValueError(
+            f"{row.key} needs the laser unit's name and the line, such as {row.key}/LU-N4.1"
+        )
+    return {LASER: laser, LINE: int(line)}
 
 
 def arguments(template: tuple, tokens: dict, value: Any = None) -> list:
@@ -598,22 +646,14 @@ def instances(call: Callable, row: Setting) -> list[dict]:
     can be read. Any error asking NIS means "not there" for that device.
     """
     if row.devices == "one":
-        try:
-            if row.present is not None:
-                return (
-                    [{"instance": None, "label": None}]
-                    if int(ask(call, row.present)) > 0
-                    else []
-                )
-            value = read(call, row)
-            if (
-                row.plausible is not None
-                and not row.plausible[0] <= value <= row.plausible[1]
-            ):
-                return []  # a meaningless answer: the device is not there
-            return [{"instance": None, "label": None}]
-        except Exception:  # noqa: BLE001 -- a device NIS cannot answer for is not offered
-            return []
+        there = _there(call, row, None)
+        return [{"instance": None, "label": None}] if there else []
+    if row.devices == "fixed":
+        return [
+            {"instance": name, "label": label}
+            for name, label, _ in row.fixed
+            if _there(call, row, name)
+        ]
     found = []
     try:
         count = int(ask(call, row.count) or 0)
@@ -622,22 +662,40 @@ def instances(call: Callable, row: Setting) -> list[dict]:
     if row.devices == "named":
         for index in range(max(count, 0)):
             name = str(ask(call, row.name, {INDEX: index})).strip()
-            if name:
+            if name and (row.plausible is None or _there(call, row, name)):
                 found.append({"instance": name, "label": name})
         return found
-    for laser in range(max(count, 0)):
-        lines = int(
-            ask(call, Call("Stg_GetMultiLaserNumLines", (LASER,)), {LASER: laser}) or 0
-        )
+    for index in range(max(count, 0)):
+        laser = str(ask(call, LASER_NAME, {INDEX: index})).strip()
+        if not laser:
+            continue
+        lines = int(ask(call, LASER_LINE_COUNT, {LASER: laser}) or 0)
         for line in range(max(lines, 0)):
             label = str(ask(call, row.name, {LASER: laser, LINE: line})).strip()
             found.append(
                 {
                     "instance": f"{laser}.{line}",
-                    "label": label or f"laser {laser} line {line}",
+                    "label": label or f"{laser} line {line}",
                 }
             )
     return found
+
+
+def _there(call: Callable, row: Setting, instance: str | None) -> bool:
+    """Whether one single or fixed device is there: its "is it there?" function, or a sensible reading.
+
+    Some devices have no "is it there?" function in NIS; for those, a reading
+    that NIS gives and that falls in the setting's ``plausible`` range counts
+    as there. Any error asking NIS means "not there".
+    """
+    tokens = tokens_for(row, instance)
+    try:
+        if row.present is not None:
+            return int(ask(call, row.present, tokens)) > 0
+        value = read(call, row, instance)
+    except Exception:  # noqa: BLE001 -- a device NIS cannot answer for is not offered
+        return False
+    return row.plausible is None or row.plausible[0] <= value <= row.plausible[1]
 
 
 def discover(call: Callable) -> dict:
@@ -687,5 +745,5 @@ def discover(call: Callable) -> dict:
 
 
 #: The functions the listing of laser lines needs besides a row's own.
-EXTRA_READ_FUNCTIONS = frozenset({"Stg_GetMultiLaserNumLines"})
+EXTRA_READ_FUNCTIONS = frozenset({LASER_NAME.fn, LASER_LINE_COUNT.fn})
 READ_FUNCTIONS = READ_FUNCTIONS | EXTRA_READ_FUNCTIONS

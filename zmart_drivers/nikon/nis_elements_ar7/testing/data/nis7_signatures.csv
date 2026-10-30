@@ -1,0 +1,96 @@
+function,arguments,as NIS help writes them,help page
+Capture,0,,p4c1s3.html
+CloseCurrentDocument,1,int Save,p4c11s3.html
+GetOpenedDocumentList,3,char *OpenedDocumentList; int MaxItems; int MaxPath,p4c11s1.html
+GetOptConfCount,0,,p4c1s23.html
+GetOptConfName,3,int Index; char *CurrOptConf; int ObjectiveNameMaxLength,p4c1s23.html
+GetSelectedOptConf,4,char *OptConfObj; char *OptConfCam; char *OptConfMic; int ObjectiveNameMaxLength,p4c1s23.html
+Get_Calibration,4,char *LpObjectiveName; double *lpcal; double *LpAspect; int *lpunit,p4c17s12.html
+Get_ImageInfo,5,char *Filename; int *LpWidth; int *LpHeight; int *LpBpc; int *LpPlaneCount,p4c11s5.html
+Get_InfoStr,2,int what; char *infostr,p4c17s4.html
+ImageSaveAs,3,char *Image; int ImType; int ImCompr,p4c11s14.html
+LoadImageFullDescription,15,char *Filename; char *LimOptics; char *LimType; char *LimSampleID; char *LimAuthor; char *LimDescription; char *ImageID; char *Group; char *Capturing; char *Sampling; char *Location; char *Jp2Date; char *Conclusion; char *Info1; char *Info2,p4c11s5.html
+SelectOptConf,1,char OptConf,p4c1s23.html
+StgGetPosXY,2,double *LpStgX; double *LpStgY,p4c8s38.html
+StgGetPosZ,2,double *LpStgZ; int ZDevice,p4c8s40.html
+StgMoveXY,3,double x; double y; int relative,p4c8s38.html
+StgMoveZ,2,double z; int relative,p4c8s40.html
+StgXY_GetLimits,4,double *LpMinX; double *LpMinY; double *LpMaxX; double *LpMaxY,p4c8s38.html
+StgZ_GetLimits,2,double *LpMinZ; double *LpMaxZ,p4c8s40.html
+Stg_CorrectionCollar_GetPosition,1,double *LpCorrectionCollarPosition,p4c8s9.html
+Stg_CorrectionCollar_SetPosition,1,double CorrectionCollarPosition,p4c8s9.html
+Stg_Filter_GetCount,0,,p4c8s12.html
+Stg_Filter_GetName,2,int FilterChangerIndex; char *FilterChangerName,p4c8s12.html
+Stg_Filter_GetPosition,1,char *FilterChangerName,p4c8s12.html
+Stg_Filter_GetPositionCount,1,char *FilterChangerName,p4c8s12.html
+Stg_Filter_SetPosition,2,char *FilterChangerName; int FilterPosition,p4c8s12.html
+Stg_GetAnalyzerState,0,,p4c8s2.html
+Stg_GetAperturePosition,1,int ApertureType,p4c8s3.html
+Stg_GetCSUShutterState,0,,p4c8s5.html
+Stg_GetCondenserPosition,0,,p4c8s6.html
+Stg_GetCondenserPositions,0,,p4c8s6.html
+Stg_GetDiskSpeed,0,,p4c8s5.html
+Stg_GetLightPathPosition,0,,p4c8s19.html
+Stg_GetLightPathPositions,0,,p4c8s19.html
+Stg_GetMultiLaserCount,0,,p4c8s21.html
+Stg_GetMultiLaserLineName,3,char *MultiLaserName; int LaserLine; char *LaserLineName,p4c8s21.html
+Stg_GetMultiLaserLineUsed,2,char *MultiLaserName; int LaserLine,p4c8s21.html
+Stg_GetMultiLaserName,2,int MultiLaserIndex; char *MultiLaserName,p4c8s21.html
+Stg_GetMultiLaserNumLines,1,char *MultiLaserName,p4c8s21.html
+Stg_GetMultiLaserPower,2,char *MultiLaserName; int LaserLine,p4c8s21.html
+Stg_GetNDFilterPosition,0,,p4c8s22.html
+Stg_GetNDFilterSteps,0,,p4c8s22.html
+Stg_GetNosepieceObjectiveName,3,int NosepiecePosition; char *Name; int maxLength,p4c8s23.html
+Stg_GetNosepiecePosition,0,,p4c8s23.html
+Stg_GetNosepiecePositions,0,,p4c8s23.html
+Stg_GetPFSLensOffsetPosition,0,,p4c8s25.html
+Stg_GetPFSStatus,0,,p4c8s25.html
+Stg_GetRelayLensPosition,1,int RelayLensPort,p4c8s5.html
+Stg_GetShutterCount,0,,p4c8s29.html
+Stg_GetShutterName,3,int Index; char *ShutterName; int ShutterNameMaxLength,p4c8s29.html
+Stg_GetShutterStateEx,1,char *ShutterName,p4c8s29.html
+Stg_GetTIRFPosition,0,,p4c8s34.html
+Stg_GetZoomPosition,0,,p4c8s41.html
+Stg_HeatStage_GetCount,0,,p4c8s14.html
+Stg_HeatStage_GetCurrentTemperature,1,char *HeatStageName,p4c8s14.html
+Stg_HeatStage_GetName,2,int HeatStageIndex; char *HeatStageName,p4c8s14.html
+Stg_HeatStage_SetTemperature,2,char *HeatStageName; double Temperature,p4c8s14.html
+Stg_Incubator_GetTargetGas,2,char *wcsIncubatorKey; double *dGasValueOut,p4c8s15.html
+Stg_Incubator_GetTargetHumidity,2,char *wcsIncubatorKey; double dHumidityValueOut,p4c8s15.html
+Stg_Incubator_SetTargetGas,2,char *wcsIncubatorKey; double dGasValueIn,p4c8s15.html
+Stg_Incubator_SetTargetHumidity,2,char *wcsIncubatorKey; double dHumidityValueIn,p4c8s15.html
+Stg_IsAnalyzerPresent,0,,p4c8s2.html
+Stg_IsAperturePresent,1,int ApertureType,p4c8s3.html
+Stg_IsCondenserPresent,0,,p4c8s6.html
+Stg_IsLightPathPresent,0,,p4c8s19.html
+Stg_IsNDFilterPresent,0,,p4c8s22.html
+Stg_IsNosepiecePresent,0,,p4c8s23.html
+Stg_IsPFSPresent,0,,p4c8s25.html
+Stg_IsZoomPresent,0,,p4c8s41.html
+Stg_Light_GetCount,0,,p4c8s18.html
+Stg_Light_GetIrisIntensity,1,char *name,p4c8s18.html
+Stg_Light_GetNDFilterPosition,1,char *name,p4c8s18.html
+Stg_Light_GetNDFilterSteps,1,char *name,p4c8s18.html
+Stg_Light_GetName,2,int LightIndex; char *name,p4c8s18.html
+Stg_Light_GetState,1,char *name,p4c8s18.html
+Stg_Light_GetVoltage,1,char *name,p4c8s18.html
+Stg_Light_SetIrisIntensity,2,char *name; double density,p4c8s18.html
+Stg_Light_SetNDFilterPosition,2,char *name; double density,p4c8s18.html
+Stg_Light_SetState,2,char *name; int state,p4c8s18.html
+Stg_Light_SetVoltage,2,char *name; double Voltage,p4c8s18.html
+Stg_SetAnalyzerState,1,int AnalyzerState,p4c8s2.html
+Stg_SetAperturePosition,2,int ApertureType; double Aperture,p4c8s3.html
+Stg_SetCSUShutterState,1,int ShutterState,p4c8s5.html
+Stg_SetCondenserPosition,1,int CondenserPosition,p4c8s6.html
+Stg_SetDiskSpeed,1,int DiskSpeed,p4c8s5.html
+Stg_SetLightPathPosition,1,int LightPathPosition,p4c8s19.html
+Stg_SetMultiLaserLineUsed,3,char *MultiLaserName; int LaserLine; int LineUsed,p4c8s21.html
+Stg_SetMultiLaserPower,3,char *MultiLaserName; int LaserLine; dword Power,p4c8s21.html
+Stg_SetNDFilterPosition,1,double NDFilterPosition,p4c8s22.html
+Stg_SetNosepiecePosition,1,int NosepiecePosition,p4c8s23.html
+Stg_SetPFSLensOffsetPosition,1,int PFSLensOffset,p4c8s25.html
+Stg_SetPFSStatus,1,int PFSStatus,p4c8s25.html
+Stg_SetRelayLensPosition,2,int RelayLensPort; int RelayLensPosition,p4c8s5.html
+Stg_SetShutterStateEx,2,char *ShutterName; int ShutterState,p4c8s29.html
+Stg_SetTIRFPosition,1,double TIRFPosition,p4c8s34.html
+Stg_SetZoomPosition,1,double Zoom,p4c8s41.html
