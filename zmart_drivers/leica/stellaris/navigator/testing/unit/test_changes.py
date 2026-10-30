@@ -232,6 +232,19 @@ class TestPictures:
         assert acq.command_result["put_back"]["confirmed"] is True
         assert lasx.live[("Acquire", "ScanDimensionList", "ScanModeName")] == "xyz"
 
+    def test_a_tile_scan_whose_scan_never_starts_still_puts_everything_back(self, lasx, client, monkeypatch):
+        # As on the LAS X simulator on 2026-10-30: the preparation is taken (the
+        # scan mode is xyt), then LAS X cannot start the scan, because no channel
+        # is active. What the preparation changed must not be left behind.
+        monkeypatch.setattr(PlainNavigator, "take_StartAcquiring", lambda self, e: None)
+        positions = [(63500.0, 41500.0, 0.0), (64139.0, 41500.0, 0.0)]
+
+        with pytest.raises(RuntimeError, match="never started"):
+            changes.take_tile_scan(client, positions, start_timeout=0.2, poll_interval=0.01)
+
+        assert lasx.commands()[-5:] == ["StageMoveToCoordinates", "SetStageUseMode", "ATL_SuppressAtlasAttachment", "ScanMode", "ActivateAutoFocus"]
+        assert lasx.live[("Acquire", "ScanDimensionList", "ScanModeName")] == "xyz"
+
     def test_a_tile_scan_with_a_position_outside_the_limits_sends_nothing(self, lasx, client):
         with pytest.raises(RuntimeError, match="backstop"):
             changes.take_tile_scan(client, [(63500.0, 41500.0, 0.0), (500_000.0, 41500.0, 0.0)])

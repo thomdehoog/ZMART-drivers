@@ -252,16 +252,21 @@ def take_tile_scan(client: Any, positions_um, project=None, **watching) -> Acqui
 
     The put-back (``after_tile_scan``) returns the stage to the first
     position; a put-back that could not be confirmed is noted in the
-    result's ``command_result["put_back"]``, and the caller decides.
+    result's ``command_result["put_back"]``, and the caller decides. It is
+    sent whenever the tile scan was sent, also when its scan never started:
+    LAS X may have taken the preparation (the scan mode xyt, say) before it
+    refused to start.
     """
     positions = [tuple(float(v) for v in p) for p in positions_um]
     started_at = time.time()
     result = tile_scan(client, positions, project, **watching)
     finished_at = time.time()
-    if result.get("success") and result["timing"].get("attempts", 0) > 0:
+    if result.get("timing", {}).get("attempts", 0) > 0:
         result["put_back"] = after_tile_scan(client, *positions[0])
     if not result.get("success"):
-        raise RuntimeError(f"the tile scan failed: {result.get('message')}")
+        put_back = result.get("put_back")
+        undone = "" if put_back is None else f"; put back: {put_back.get('message')}"
+        raise RuntimeError(f"the tile scan failed: {result.get('message')}{undone}")
     return AcquisitionResult(picture="tile_scan", started_at=started_at, finished_at=finished_at, command_result=result)
 
 
