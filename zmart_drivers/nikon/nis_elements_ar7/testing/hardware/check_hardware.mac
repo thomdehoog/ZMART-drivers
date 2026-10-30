@@ -1,3 +1,3 @@
 WaitText(1, "ZMART hardware check - running. Leave NIS alone until it says finished.");
 Python_RunString("import os, glob, runpy; h = os.path.expanduser('~'); n = 'zmart_drivers/nikon/nis_elements_ar7/testing/hardware/check_hardware_nis.py'; c = ['C:/ZMART-drivers/' + n] + [p for d in ('/Desktop/', '/OneDrive*/Desktop/', '/Documents/', '/Downloads/') for p in sorted(glob.glob(h + d + '*/' + n)) + sorted(glob.glob(h + d + '*/*/' + n))]; f = next((p for p in c if os.path.isfile(p)), None); runpy.run_path(f, run_name='__main__') if f else open(h + '/Desktop/zmart_check_NOT_FOUND.txt', 'w').write('check_hardware_nis.py was not found; put the unzipped folder at C:/ZMART-drivers, or on the Desktop, in Documents or in Downloads. Looked in: ' + repr(c))");
-WaitText(2, "ZMART hardware check - finished. The results folder is beside check_hardware_nis.py.");
+WaitText(2, "ZMART hardware check - finished. The results are in the folder ZMART check results on the Desktop.");

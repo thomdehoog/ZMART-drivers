@@ -108,6 +108,8 @@ class Setting:
     reading falls in: outside it, the device counts as not there.
     ``present_if`` names another setting of the same device: this one is
     there only when that one is (the disk's shutter, when the disk is).
+    ``whole`` is True for a number NIS takes only as a whole number (the
+    disk's speed, Perfect Focus's offset): NIS refuses 10.0 where it wants 10.
     """
 
     key: str
@@ -129,6 +131,7 @@ class Setting:
     confirmed: bool = False
     plausible: tuple | None = None
     present_if: str | None = None
+    whole: bool = False
     functions: tuple = field(init=False, default=())
 
     def __post_init__(self) -> None:
@@ -332,6 +335,7 @@ TABLE: tuple[Setting, ...] = (
         write=Call("Stg_SetPFSLensOffsetPosition", (VALUE,)),
         present=Call("Stg_IsPFSPresent"),
         tolerance=1.0,
+        whole=True,
     ),
     # --- spinning disk and TIRF ------------------------------------------------------------
     Setting(
@@ -342,6 +346,7 @@ TABLE: tuple[Setting, ...] = (
         read=Call("Stg_GetDiskSpeed"),
         write=Call("Stg_SetDiskSpeed", (VALUE,)),
         tolerance=1.0,
+        whole=True,
         # No "is it there?" function: a real disk turns at most a few thousand rpm.
         plausible=(0, 20000),
     ),
@@ -543,7 +548,14 @@ def read(call: Callable, row: Setting, instance: str | None = None) -> Any:
 
 def write_arguments(row: Setting, instance: str | None, value: Any) -> list:
     """The arguments of the row's change for one device and one value."""
-    return arguments(row.write.args, tokens_for(row, instance), value)
+    return arguments(row.write.args, tokens_for(row, instance), sent_value(row, value))
+
+
+def sent_value(row: Setting, value: Any) -> Any:
+    """*value* as NIS is sent it: rounded to a whole number for a setting that takes only those."""
+    if row.whole and isinstance(value, (int, float)) and not isinstance(value, bool):
+        return round(value)
+    return value
 
 
 def matches(row: Setting, value: Any, reading: Any) -> bool:

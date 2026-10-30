@@ -32,7 +32,8 @@ With it on, each change really happens, and is seen.
 
 Set ``CHANGES = False`` below for a run that only reads.
 
-Everything goes into a ``results`` folder beside this file:
+Everything goes into a folder named after the time of the run, inside the
+folder ``ZMART check results`` on the Desktop:
 ``check_summary.txt`` (one line per check), ``check_report.json`` (all of it),
 ``check.log`` (written as it goes: if NIS hangs, its last line names the
 call) and ``reference.txt``.
@@ -87,8 +88,26 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 NIS_PYTHON = os.path.join(
     os.path.dirname(os.path.dirname(HERE)), "primitives", "nis_python"
 )
-#: Where the results folder goes: beside this file, unless ZMART_CHECK_RESULTS names another folder.
-RESULTS_ROOT = os.environ.get("ZMART_CHECK_RESULTS") or HERE
+
+
+def desktop() -> str:
+    """The Desktop of the person running NIS (also when OneDrive keeps it), or their home folder."""
+    home = os.path.expanduser("~")
+    for place in [
+        os.path.join(home, "Desktop"),
+        *sorted(glob.glob(os.path.join(home, "OneDrive*", "Desktop"))),
+    ]:
+        if os.path.isdir(place):
+            return place
+    return home
+
+
+#: Where the results go: a folder "ZMART check results" on the Desktop, one folder per run in it,
+#: unless ZMART_CHECK_RESULTS names another place. It is kept short on purpose: Windows refuses
+#: paths longer than 260 characters, and an unzipped download often sits two folders deep.
+RESULTS_ROOT = os.environ.get("ZMART_CHECK_RESULTS") or os.path.join(
+    desktop(), "ZMART check results"
+)
 
 #: Where NIS may keep its macro reference, besides the folder its Python runs from.
 NIS_FOLDERS = (r"C:\Program Files\NIS-Elements", r"C:\Program Files (x86)\NIS-Elements")
@@ -479,6 +498,103 @@ def reads(check: Check) -> None:
         )
 
 
+#: How NIS says it does not take the arguments it was given (as opposed to an answer about the hardware).
+REFUSED_ARGUMENTS = ("Bad number of parameters", "Expected macro param")
+#: The most argument shapes tried for one reading.
+SHAPES_TRIED = 40
+
+
+def shapes(args: list) -> list[list]:
+    """Other ways of giving a reading its arguments, closest to *args* first.
+
+    NIS's Python does not always take its functions' arguments the way the
+    macro language writes them: a value may come back as the function's
+    answer instead of through a pointer, a device may be named by its index
+    instead of its name, and a number may be whole instead of decimal. Each
+    shape here changes one or two of those things, so that the first shape NIS
+    accepts tells how the table should call the function.
+    """
+    pointers = ("char", "int", "double")
+    is_ptr = lambda a: isinstance(a, dict) and "ptr" in a
+    is_size = lambda a: a in (256, 4096) and not isinstance(a, bool)
+    plain = [a for a in args if not is_ptr(a)]
+    bases = [
+        [a for a in args if not is_size(a)],
+        plain,
+        [a for a in plain if not is_size(a)],
+        [],
+    ]
+    # The device named by its index instead of its name, and the other way round.
+    swap = lambda shape: [
+        0 if a == "" else "" if a == 0 and not isinstance(a, bool) else a for a in shape
+    ]
+    bases += [swap(b) for b in [args, *bases]]
+    found = []
+    for base in bases:
+        found.append(base)
+        # Each pointer of another kind.
+        for i, a in enumerate(base):
+            if is_ptr(a):
+                for kind in pointers:
+                    if kind != a["ptr"]:
+                        found.append([*base[:i], {"ptr": kind}, *base[i + 1 :]])
+        # The value given back through one pointer of each kind, after the other arguments.
+        if not any(is_ptr(a) for a in base):
+            for kind in pointers:
+                found.append([*base, {"ptr": kind}])
+                if kind == "char":
+                    found.append([*base, {"ptr": kind}, 256])
+            # A name or an index in front, for a device NIS asks to be named.
+            for first in ("", 0):
+                for kind in pointers:
+                    found.append([first, *base, {"ptr": kind}])
+    unique = []
+    for shape in found:
+        if shape != list(args) and shape not in unique:
+            unique.append(shape)
+    return unique[:SHAPES_TRIED]
+
+
+def argument_shapes(check: Check) -> None:
+    """For each reading NIS refused the arguments of, find the arguments it takes.
+
+    Only readings are tried, so nothing on the microscope changes. A shape that
+    NIS accepts may still answer "not available" while the hardware is off; it
+    is still the right shape, because NIS checked the arguments first.
+    """
+    refused = []
+    for entry in check.report["checks"]:
+        name = entry["check"]
+        if (
+            name.startswith("read ")
+            and entry["outcome"] == "FAIL"
+            and any(words in str(entry["answer"]) for words in REFUSED_ARGUMENTS)
+        ):
+            refused.append(name[len("read ") :])
+    first_args = dict(DRIVER_READS)
+    devices = check.devices
+    tokens = {devices.NAME: "", devices.INDEX: 0, devices.LASER: 0, devices.LINE: 0}
+    for row in devices.TABLE:
+        for call in (row.present, row.count, row.name, row.positions, row.read):
+            if call is not None and call.fn not in first_args:
+                first_args[call.fn] = devices.arguments(call.args, tokens)
+    first_args.setdefault("Stg_GetMultiLaserNumLines", [0])
+
+    def probe(fn):
+        tried = []
+        for shape in shapes(list(first_args.get(fn, []))):
+            try:
+                answer = check.call(fn, shape)
+            except Exception as error:  # noqa: BLE001 -- each refusal is part of the answer
+                tried.append({"arguments": shape, "refused": f"{error}"[:200]})
+                continue
+            return {"takes": shape, "answer": answer, "tried before": tried}
+        raise RuntimeError(f"no shape tried was accepted: {tried}")
+
+    for fn in refused:
+        check.check(f"arguments {fn} takes", lambda fn=fn: probe(fn))
+
+
 def smallest_change(row, devices, before, positions):
     """The smallest value that differs visibly from *before*, or *before* itself where it must not change."""
     if not CHANGES or row.guarded or row.key in OWN_VALUE_ONLY or not row.confirms:
@@ -529,7 +645,9 @@ def exercise_setting(check: Check, row, instance, positions) -> dict:
         sent = answered(
             check,
             row.write.fn,
-            devices.arguments(row.write.args, tokens, neutral(row, devices)),
+            devices.arguments(
+                row.write.args, tokens, devices.sent_value(row, neutral(row, devices))
+            ),
         )
         return {"read": first, "sent once (the value cannot be read)": sent}
     target = smallest_change(row, devices, before, positions)
@@ -538,14 +656,18 @@ def exercise_setting(check: Check, row, instance, positions) -> dict:
     )
     try:
         sent = answered(
-            check, row.write.fn, devices.arguments(row.write.args, tokens, target)
+            check,
+            row.write.fn,
+            devices.arguments(row.write.args, tokens, devices.sent_value(row, target)),
         )
         time.sleep(SETTLE_S)
         after = read_back()
     finally:
         # Whatever happened above, the device is put back as it was.
         back = answered(
-            check, row.write.fn, devices.arguments(row.write.args, tokens, before)
+            check,
+            row.write.fn,
+            devices.arguments(row.write.args, tokens, devices.sent_value(row, before)),
         )
     time.sleep(SETTLE_S)
     again = read_back()
@@ -726,6 +848,13 @@ def optical_configuration(check: Check) -> None:
     check.check("optical configuration selected again", again, changes=CHANGES)
 
 
+def _or_error(how):
+    try:
+        return how()
+    except Exception as error:  # noqa: BLE001 -- kept as the answer
+        return f"{type(error).__name__}: {error}"
+
+
 def snap(check: Check) -> None:
     """One picture into a new document of its own, saved as a TIFF, and only that document closed."""
 
@@ -734,7 +863,9 @@ def snap(check: Check) -> None:
         path = os.path.join(
             os.path.abspath(check.out_dir), f"snap_{time.strftime('%H%M%S')}.tif"
         )
-        documents_before = bridge.documents()
+        # The list of open documents is only a courtesy here: if NIS refuses it, the picture is still taken.
+        documents = lambda: _or_error(bridge.documents)
+        documents_before = documents()
         try:
             answer = bridge.snap(path)
         except check.server.Refused as refused:
@@ -747,7 +878,7 @@ def snap(check: Check) -> None:
         return {
             **answer,
             "documents before": documents_before,
-            "documents after": bridge.documents(),
+            "documents after": documents(),
         }
 
     check.check(
@@ -1032,9 +1163,7 @@ def driver_part(check: Check) -> None:
 def main(nis_module=None, out_dir: str | None = None) -> dict:
     if nis_module is None:
         import nis as nis_module  # exists only inside NIS-Elements
-    out_dir = out_dir or os.path.join(
-        RESULTS_ROOT, "results", time.strftime("%Y%m%d_%H%M%S")
-    )
+    out_dir = out_dir or os.path.join(RESULTS_ROOT, time.strftime("%Y%m%d_%H%M%S"))
     check = Check(nis_module, out_dir)
     check.check(
         "NIS and its Python",
@@ -1065,6 +1194,7 @@ def main(nis_module=None, out_dir: str | None = None) -> dict:
         lambda: stage_and_optics(check),
     )
     reads(check)
+    argument_shapes(check)
     exercise_settings(check, inventory)
     stage(check)
     objective(check)

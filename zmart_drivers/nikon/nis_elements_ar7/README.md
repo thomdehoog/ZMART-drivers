@@ -257,7 +257,10 @@ change really happens and is seen.
 1. Unzip the ZMART-drivers folder onto the Desktop, into Documents or Downloads, or at `C:\ZMART-drivers`.
    The macro finds it there, also with the extra folder Windows' "Extract all" adds.
 2. In NIS-Elements: **Macro > Run Macro From File**, and pick `testing\hardware\check_hardware.mac`.
-3. When NIS says it has finished, send the `results` folder beside `check_hardware_nis.py`.
+3. When NIS says it has finished, open the folder **ZMART check results** on the Desktop. Each run has its
+   own folder in it, named after the date and time (for example `20261030_093126`); send that one. The
+   results are kept there, and not beside the script, because Windows refuses paths longer than 260
+   characters, and the unzipped folder is already deep.
 
 What it does, one line each in `check_summary.txt`:
 
@@ -265,7 +268,10 @@ What it does, one line each in `check_summary.txt`:
    reference on the PC says about them (`reference.txt`, and the pages in `help_pages`); every hardware
    setting, which devices are there, and their values.
 2. **Every reading**, called once with the driver's own arguments. NIS answers "not available" (−4) to right
-   arguments with the hardware off, and "Bad number of parameters" to wrong ones.
+   arguments with the hardware off, and "Bad number of parameters" to wrong ones. For each reading NIS
+   refuses, the check then tries other ways of giving its arguments (the value as the function's answer
+   instead of through a pointer, a device by its index instead of its name, and so on) and reports the
+   first one NIS takes, as `arguments … takes`. Only readings are tried this way, so nothing changes.
 3. **Every change, the smallest that can be seen, each put back**: a switch turned over and back, a position
    one step and back, a number nudged by about three times its read-back tolerance and back, the stage 5 µm
    and back, the focus 1 µm and back. Each is read after the change and again after putting it back. Set

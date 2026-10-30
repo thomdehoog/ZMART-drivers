@@ -172,10 +172,12 @@ def test_the_macro_finds_the_script_on_the_desktop_and_runs_it(tmp_path, monkeyp
     )
     monkeypatch.setenv("HOME", str(home))
     monkeypatch.setenv("USERPROFILE", str(home))
-    monkeypatch.setenv("ZMART_CHECK_RESULTS", str(tmp_path / "here"))
+    monkeypatch.delenv("ZMART_CHECK_RESULTS", raising=False)
     monkeypatch.setitem(sys.modules, "nis", make_nis())
     exec(line, {})  # noqa: S102 -- the macro's own line, run as NIS would
-    assert list((tmp_path / "here" / "results").glob("*/check_summary.txt"))
+    # The results go to a short place on the Desktop, not two folders deep beside the script,
+    # because Windows refuses paths longer than 260 characters.
+    assert list((home / "Desktop" / "ZMART check results").glob("*/check_summary.txt"))
 
 
 def test_the_check_needs_only_the_standard_library():
@@ -404,3 +406,46 @@ def test_a_driver_that_cannot_load_is_said_and_the_rest_still_runs(
     )
     assert line["outcome"] == "FAIL" and "cannot be loaded" in line["answer"]
     assert (tmp_path / "results" / "check_summary.txt").is_file()
+
+
+def test_a_reading_nis_refuses_is_tried_with_other_arguments_until_one_is_taken(
+    tmp_path,
+):
+    """NIS 7 refused some readings' arguments ("Bad number of parameters"); the check finds the ones it takes."""
+    script = load_script()
+    nis = make_nis()
+    real = nis.mac
+
+    class ZoomAnswersDirectly:
+        """A NIS whose zoom reading takes nothing and answers the zoom itself."""
+
+        def __getattr__(self, name):
+            if name == "Stg_GetZoomPosition":
+
+                def zoom(*args):
+                    if args:
+                        raise RuntimeError("Bad number of parameters")
+                    return 2
+
+                return zoom
+            return getattr(real, name)
+
+    nis.mac = ZoomAnswersDirectly()
+    report = script.main(nis, str(tmp_path / "results"))
+    found = {e["check"]: e for e in report["checks"]}
+    assert found["read Stg_GetZoomPosition"]["outcome"] == "FAIL"
+    probe = found["arguments Stg_GetZoomPosition takes"]
+    assert probe["outcome"] == "ok"
+    assert probe["answer"]["takes"] == []
+    assert probe["answer"]["answer"]["return"] == 2
+
+
+def test_a_whole_number_setting_is_sent_as_a_whole_number():
+    """NIS refused 7297880.0 for the disk's speed: it wants 7297880."""
+    devices = load_script().load(
+        "d", str(Path(SCRIPT).parents[2] / "primitives" / "nis_python" / "devices.py")
+    )
+    row = next(r for r in devices.TABLE if r.key == "disk_speed")
+    sent = devices.write_arguments(row, None, 1500.0)
+    assert sent == [1500]
+    assert isinstance(sent[0], int)
