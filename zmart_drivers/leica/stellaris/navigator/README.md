@@ -35,7 +35,8 @@ what the microscope really did.
 ## How to call the driver
 
 The driver runs on the computer that runs LAS X, because it reaches LAS X's hardware server through
-Leica's own .NET interface from the LAS X installation. Install it with Python 3.11 or newer, from the
+Windows' COM (ActiveX), as the running LAS X offers it, and LAS X's Data Container through Leica's own
+.NET interface from the LAS X installation. Install it with Python 3.11 or newer, from the
 repository's root folder:
 
 ```bash
