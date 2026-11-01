@@ -375,3 +375,21 @@ Through the ZMART Driver (`change_setting`), each confirmed by its read-back: `b
 16 and 8; `system_optimized_step` True and False. `bit_depth` 10 was refused, with nothing
 written. The stack was put back to 1505 to 1515 µm at 2.5 µm with `set_z_stack`, and the bit
 depth to 8.
+
+## 22. The pan
+
+Thom moved the pan to the right in LAS X's window, in the normal acquisition view. LCS received
+no command, and none of its 12,525 state-tree values changed. A setting saved afterwards held
+`PanFirstDim` 0.0001743713507108436 m (174.4 µm to the right; it had been 8.67e-19 m, zero)
+and `PanSecondDim` still zero. The same setting, its `PanFirstDim` written as 0 and loaded,
+left the pan at 174.4 µm. One capture through the ZMART Driver with the pan moved: LCS was sent
+`StopAcquiring` and `StartAcquiring` only, and no pan value appeared in the state tree.
+
+So LAS X keeps the pan in its own setting and hands it to the hardware by a way that is not
+seen here. The pan can be read from a saved setting; it cannot be set. It stays where Thom put it.
+
+The same capture took the z-stack (1505 to 1515 µm) and left z-wide at 1510 µm, the middle of
+the stack; before it, z-wide stood at 1495.6 µm. The detectors' `IsEnabled` went from True to
+False during the scan, while `IsActive`, whether a detector is on, stayed True for HyD 2 and
+HyD S 3.
+

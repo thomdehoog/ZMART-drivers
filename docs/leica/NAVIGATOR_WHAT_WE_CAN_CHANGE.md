@@ -60,7 +60,7 @@ discovery session in `SCOPE_RUN_2026-11-01_NAVIGATOR_DISCOVERY.md` and the build
 | Sequential mode | Tried; not built, because it also rearranges which detectors and shutters are on |
 | Scan direction (uni- or bidirectional) | Works: written into LAS X's state tree |
 | Phase X | Works: written into LAS X's state tree, within LAS X's own range |
-| Pan | Not yet learned |
+| Pan | Tried; cannot be set: LAS X keeps it in its own setting, not in LCS, and a loaded setting does not apply it |
 | Bit depth | Works: written into LAS X's state tree, one of LAS X's own list (8, 12, 16) |
 | Autofocus on or off | Works |
 
@@ -147,6 +147,6 @@ service and the person responsible for the instrument.
 | State | Settings |
 |---|---|
 | Works | 50 (the objective among them, not yet tried) |
-| Tried | 1 |
+| Tried | 2 |
 | Command known | 0 |
-| Not yet learned | 9 |
+| Not yet learned | 8 |
