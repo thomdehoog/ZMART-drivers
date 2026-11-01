@@ -169,6 +169,21 @@ class TestAnswering:
         assert dialog.pressed == []
         assert "Please keep minimum distance of 8nm." in caplog.text
 
+    def test_an_ok_only_warning_not_known_to_be_harmless_is_left_open_and_refused(
+        self, lasx_log, monkeypatch, caplog
+    ):
+        """Only the notices known to change nothing are answered; a person reads every other one."""
+        show(
+            lasx_log,
+            "2026-10-14 19:00:00.000 0007  Info DbTracer 'MessageBox Warning: The stage is not initialized.'\n",
+        )
+        dialog = StandInDialog(lasx_log)
+        use(monkeypatch, StandInWindows([dialog]))
+        with caplog.at_level(logging.WARNING), pytest.raises(answer_dialogs.DialogOpen, match="not initialized"):
+            answer_dialogs.answer_warnings()
+        assert dialog.pressed == []
+        assert "not known to be harmless" in caplog.text
+
     def test_a_question_is_never_answered(self, lasx_log, monkeypatch):
         show(lasx_log, SHOWN.replace("MessageBox Warning", "MessageBox Question"))
         dialog = StandInDialog(lasx_log)

@@ -72,9 +72,10 @@ What every call does for you:
   it; the work goes on.
 - **A mistake is said in words.** A request that is wrong raises `ValueError`; a change that LAS X
   refused, or that failed, raises `RuntimeError` with the reason.
-- **LAS X's own message boxes are answered.** An Information or Warning box with only an OK button,
-  the kind LAS X shows when a scan is stopped or a setting is adjusted, is pressed from here, and the
-  running log says so. A box with a choice is left for you.
+- **LAS X's harmless notices are answered.** An Information or Warning box with only an OK button
+  is pressed from here when it is one of the notices known to change nothing, such as "Can not start
+  scan!", and the running log says so. Every other box is left for you, and the change that met it is
+  refused with its text.
 
 `connect()` takes a few keys, all optional: `output_root` (where captures go when no folder is given),
 `config` (the name of a saved configuration), `client` (the name LAS X sees, `ZMART`), and

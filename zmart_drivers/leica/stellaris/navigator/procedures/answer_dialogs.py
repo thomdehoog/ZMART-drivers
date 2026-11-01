@@ -14,7 +14,8 @@ Automation: the dialog is a second top-level window of LAS X's process
 holding ``MessageBoxContent``, its buttons named by their automation ids
 (simulator, 2026-10-14: ``ButtonMessageOk`` alone).
 
-The driver answers a warning or an information box whose only button is OK
+The driver answers a warning or an information box whose only button is OK,
+when its text is one of the notices known to change nothing (:data:`HARMLESS`)
 (LAS X refuses a start with one: "Can not start scan! (Reason: No channel
 active)", simulator 2026-10-15; the command has failed already, OK only
 closes the notice), and writes its text to the log. It answers nothing
@@ -71,6 +72,17 @@ OK_BUTTON = "ButtonMessageOk"
 WARNING = "Warning"
 #: The dialogs answered with OK, when OK is their only button: notices, never questions.
 ANSWERED_CAPTIONS = (WARNING, "Information")
+
+#: How the notices start that change nothing and are answered: each reports a
+#: start LAS X refused, or asks the operator to keep a distance it has kept
+#: already (all seen on the simulator, 2026-10-13 to 2026-11-01). Every other
+#: box, OK-only or not, is left for the person at the microscope.
+HARMLESS = (
+    "Can not start scan!",
+    "Can not start while live scan is running!",
+    "Please keep minimum distance of",
+    "I Cannot Start The Scan",
+)
 
 #: COM's answer when a thread's COM is set up already, in another mode: usable as it is.
 RPC_E_CHANGED_MODE = -2147417850
@@ -271,6 +283,8 @@ def answer_open_warning() -> Answered | None:
             dialog,
             f"not a warning or information box with OK alone: {dialog.caption}, buttons {buttons}",
         )
+    if not dialog.text.startswith(HARMLESS):
+        raise left_open(dialog, "an OK-only notice not known to be harmless; a person reads it")
     windows[0].press(OK_BUTTON)
     deadline = time.monotonic() + ANSWER_WAIT_S
     while pending() is not None:
