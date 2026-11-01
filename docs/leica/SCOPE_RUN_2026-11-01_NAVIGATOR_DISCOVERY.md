@@ -219,3 +219,27 @@ So frame average, line and frame accumulation, format, filter wheel, objective (
 index), shutter and resonant scanner can be set by command and read back. Sequential mode
 works but rearranges the setting, so it needs a read-back of the detectors and shutters too.
 The detection band is not learned. No LCS dump came during these tries.
+
+## 12. Settings saved and loaded as files
+
+LAS X's Setting panel saves and loads a setting with two commands LCS logged:
+
+- `<ATL FileName="...settings.seq" Command="ATL_Block_Save_To_XML" Attribute="2"/>`
+- `<ATL FileName="...settings.seq" CreateNewInstedOfReplace="0" ElementIDAfterLoadedBlock="0" Command="ATL_Block_Load_From_XML" Attribute="2"/>`
+
+The file is the same XML as a block in a Navigator Expert scanning template (`.lrp`): the
+setting's master, `Setting 1` and the `Best Focus Setting`, each with its scan, lasers,
+detectors and filters. Values changed in a saved file and loaded again, on the simulator:
+
+| Field changed in the file | Applied on load |
+|---|---|
+| Laser line power (`LaserLineSetting IntensityDev`) | yes: 405 nm 1.96 to 5.1 %, and back |
+| Detector gain (`Detector Gain`), detector not in photon counting | yes: HyD S 3 2.5 to 50 (`HighVoltage` too) |
+| Detector gain, detector in photon counting | no: LAS X fixes the gain in counting mode |
+| Detector on (`Detector IsActive`) | yes: HyD 4 on, gain 10, band 676 to 695 nm |
+| Detector range (`DetectionRangeBegin`, `DetectionRangeEnd`) | no: these seem to be the detector's whole range, not its band |
+| Bidirectional X (`ATLConfocalSettingDefinition ScanDirectionX`) | no, when changed in every setting of the file |
+
+Changing a value in every setting of the file also changed the Best Focus setting: with HyD 4
+switched on there, its format went from 64 x 64 to 8192 x 8192. A change must be made in the
+one setting meant, and LCS's values compared before and after the load.

@@ -68,6 +68,7 @@ READS = (
     "autofocus",
     "light_sources",
     "filter_wheels",
+    "detectors",
     "laser_lines",
     "scan_field_rotation",
     "sequential_mode",

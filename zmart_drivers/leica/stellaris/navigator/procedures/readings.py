@@ -166,6 +166,11 @@ def get_filter_wheels(client, **keywords):
     return _routed("filter_wheels", client, **keywords)
 
 
+def get_detectors(client, **keywords):
+    """The detectors in use: name, band, dye, gain."""
+    return _routed("detectors", client, **keywords)
+
+
 def get_serial_number(client, **keywords):
     """The instrument's serial number."""
     return _routed("serial_number", client, **keywords)

@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import json
 import re
+from pathlib import Path
 import time
 import xml.etree.ElementTree as ET
 
@@ -69,6 +70,7 @@ class PlainNavigator:
         self.scanning_until = 0.0
         self.scan_s = scan_s  # how long a scan lasts
         self.captures = 0
+        self.loaded: list[str] = []  # the setting files loaded
         self.nodes = StandInNodes(
             dict,
             stage=lambda: (self.x_um * 1e-6, self.y_um * 1e-6),
@@ -229,6 +231,68 @@ class PlainNavigator:
     def take_FilterWheel_ApiSetSlot(self, e):
         wheel = next(w for w in self.nodes.filter_wheels["FilterWheel"] if w["FilterWheelType"] == int(e.get("FilterWheelType")))
         wheel["CurrentSlotPosition"] = int(e.get("SlotIndex"))
+
+
+    # --- a setting saved and loaded as a file, as LAS X's Setting panel does (simulator, 2026-11-01)
+
+    def setting_xml(self, name):
+        """One setting as LAS X writes it: its lasers, detectors and bands."""
+        lasers = "".join(
+            f'<LaserLineSetting LaserLine="{line["WaveLength"]:g}" IntensityDev="{line["Intensity"]:g}" '
+            f'LineIndex="{line["LineIndex"]}" SequenceIndex="0"/>'
+            for source in self.nodes.light_sources
+            for line in source["AOTF"]["AotfLine"]
+        )
+        units = [u for s in self.nodes.detection["Spectrophotometer"] for u in s["DetectionUnitList"]["DetectorHWInfo"]]
+        detectors = "".join(
+            f'<Detector Version="2" Name="{u["Name"]}" Channel="{u["BeamRoute"][1]}" IsActive="{int(u["IsActive"])}" '
+            f'Gain="{u["HighVoltage"]:g}" DetectionRangeBegin="320" DetectionRangeEnd="910"/>'
+            for u in units
+        )
+        bands = "".join(
+            f'<MultiBand Version="3" Channel="{u["BeamRoute"][1]}" LeftWorld="{u["WaveLengthBegin"]:g}" '
+            f'RightWorld="{u["WaveLengthEnd"]:g}" TargetWaveLengthBegin="{u["WaveLengthBegin"]:g}" '
+            f'TargetWaveLengthEnd="{u["WaveLengthEnd"]:g}"/>'
+            for u in units
+        )
+        return (
+            f'<ATLConfocalSettingDefinition UserSettingName="{name}" ScanDirectionX="1">'
+            f"<LaserArray>{lasers}</LaserArray><DetectorList>{detectors}</DetectorList><Spectro>{bands}</Spectro>"
+            "</ATLConfocalSettingDefinition>"
+        )
+
+    def take_ATL_Block_Save_To_XML(self, e):
+        settings = "".join(self.setting_xml(f"Setting {n + 1}") for n in range(getattr(self, "sequential", 1)))
+        Path(e.get("FileName")).write_text(
+            '<?xml version="1.0"?><Configuration Type="1"><LDM_Block_Sequential BlockName="Job 1">'
+            f"<LDM_Block_Sequential_Master>{self.setting_xml('S2')}</LDM_Block_Sequential_Master>"
+            f"<LDM_Block_Sequential_List>{settings}"
+            f'<Autofocus_Block BlockName="AutoFocus of Job 1">{self.setting_xml("Best Focus Setting")}</Autofocus_Block>'
+            "</LDM_Block_Sequential_List></LDM_Block_Sequential></Configuration>",
+            encoding="utf-8",
+        )
+        return "<Result/>"
+
+    def take_ATL_Block_Load_From_XML(self, e):
+        """Setting 1's lasers, detectors and bands applied, as LCS applied them on the simulator."""
+        self.loaded.append(e.get("FileName"))
+        root = ET.parse(e.get("FileName")).getroot()
+        setting = next(s for s in root.iter("ATLConfocalSettingDefinition") if s.get("UserSettingName") == "Setting 1")
+        for line in setting.iter("LaserLineSetting"):
+            for source in self.nodes.light_sources:
+                for aotf in source["AOTF"]["AotfLine"]:
+                    if aotf["WaveLength"] == float(line.get("LaserLine")):
+                        aotf["Intensity"] = round(float(line.get("IntensityDev")) / 100 * 255) / 255 * 100
+        units = {u["Name"]: u for s in self.nodes.detection["Spectrophotometer"] for u in s["DetectionUnitList"]["DetectorHWInfo"]}
+        by_channel = {str(u["BeamRoute"][1]): u for u in units.values()}
+        for det in setting.iter("Detector"):
+            unit = units[det.get("Name")]
+            unit["IsActive"] = det.get("IsActive") == "1"
+            unit["HighVoltage"] = float(det.get("Gain"))
+        for band in setting.iter("MultiBand"):
+            unit = by_channel[band.get("Channel")]
+            unit["WaveLengthBegin"], unit["WaveLengthEnd"] = float(band.get("LeftWorld")), float(band.get("RightWorld"))
+        return "<Result/>"
 
     def take_ActivateAutoFocus(self, e):
         self.live[("Acquire", "AutoFocusInfo", "IsSeriesScanAutofocusActive")] = e.get("Activate") == "1"

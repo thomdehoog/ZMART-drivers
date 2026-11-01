@@ -156,6 +156,7 @@ DATUMS = {
         DatumSpec("laser_lines", direct_reader.get_laser_lines, listed),
         DatumSpec("light_sources", direct_reader.get_light_sources, listed),
         DatumSpec("filter_wheels", direct_reader.get_filter_wheels, listed),
+        DatumSpec("detectors", direct_reader.get_detectors, listed),
         DatumSpec("serial_number", direct_reader.get_serial_number, text_present),
         DatumSpec("jobs", direct_reader.get_jobs, listed),
         DatumSpec("hardware_info", direct_reader.get_hardware_info, dict_present),

@@ -69,6 +69,7 @@ from .procedures import (
 )
 from .procedures import acquire as acquire_step
 from .procedures import state as state_step
+from .procedures import setting_files
 from .procedures.clear_cache import clear as clear_step
 from .procedures.save_data import save_waiting as save_step
 from .procedures.save_data.naming import run_hash
@@ -285,6 +286,36 @@ class Microscope:
             raise ValueError(f"no setting {name!r}; the settings are {sorted([*SETTINGS, *NAMED_SETTINGS])}")
         result = changes.change(self.handle.client, name, value)
         return checked(self.handle, result, f"change_setting({name!r}, {value!r})")
+
+    def set_detector(self, name: str, *, on: bool | None = None, gain: float | None = None, band=None) -> dict:
+        """Switch the detector *name* on or off, set its gain, or its band ``(begin_nm, end_nm)``; read back.
+
+        LAS X takes these through a whole setting: the current setting is
+        saved, only Setting 1 is changed in a copy, its laser powers and gains
+        are checked against the limits, and the copy is loaded. The result's
+        ``changed`` lists everything else LAS X changed with it. Refused when
+        LAS X has several sequential settings. In photon counting LAS X keeps
+        the gain fixed.
+        """
+        self.handle.require_open()
+        result = setting_files.set_detector(self.handle.client, setting_files.folder_for(self.handle), name, on=on, gain=gain, band=band)
+        return checked(self.handle, result, f"set_detector({name!r})")
+
+    def save_setting(self, path) -> dict:
+        """Save LAS X's current setting to the file *path*, as its Setting panel does."""
+        self.handle.require_open()
+        return checked(self.handle, setting_files.save(self.handle.client, path), f"save_setting({str(path)!r})")
+
+    def load_setting(self, path) -> dict:
+        """Load the setting in the file *path* (one saved in LAS X, say); its laser powers and gains are checked against the limits first.
+
+        The result's ``changed`` lists every reading that changed with it.
+        """
+        self.handle.require_open()
+        result = setting_files.load(self.handle.client, path)
+        if result.get("success"):
+            result["confirmed"] = True
+        return checked(self.handle, result, f"load_setting({str(path)!r})")
 
     def set_filter_wheel(self, wheel: int, filter_name: str) -> dict:
         """Turn the filter wheel of type *wheel* (LAS X's number, as :meth:`state` lists the wheels) to *filter_name*; read back.

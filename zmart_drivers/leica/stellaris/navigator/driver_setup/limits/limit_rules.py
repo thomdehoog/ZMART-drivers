@@ -213,6 +213,7 @@ SETTER_LIMIT_KEYS = (
     "set_format",
     "set_resonant_scanner",
     "set_filter_wheel",
+    "set_detector_gain",
 )
 
 
@@ -273,6 +274,12 @@ class LeicaLimits:
             return
         if function == "z_stack":
             self._check_z_stack(values)
+            return
+        if function == "setting_file":
+            for percent in values.get("laser_power", []):
+                self._check_one("set_laser_power", self._policy["set_laser_power"], percent)
+            for gain in values.get("detector_gain", []):
+                self._check_one("set_detector_gain", self._policy["set_detector_gain"], gain)
             return
         if function == "set_objective":
             if "objective_slot" in values:
@@ -396,6 +403,9 @@ MUTATING_COMMANDS = {
     "set_z_stack_drive": "set_z_stack_drive",
     "set_z_stack_range": "z_stack",
     "z_stack_picture": "z_stack",
+    # a whole setting as a file: saving changes nothing; a file's values are checked before it is loaded
+    "save_setting": "save_setting",
+    "load_setting": "setting_file",
 }
 
 

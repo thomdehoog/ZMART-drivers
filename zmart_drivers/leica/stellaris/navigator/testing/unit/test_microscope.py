@@ -267,3 +267,8 @@ def test_the_acquisition_settings_are_changed_like_every_setting(scope, lasx):
     assert scope.change_setting("frame_average", 2)["confirmed"] is True
     assert scope.change_setting("format", (256, 256))["confirmed"] is True
     assert scope.set_filter_wheel(140, "Substrate")["confirmed"] is True
+
+
+
+def test_a_detector_is_set_through_a_setting_file(scope, lasx):
+    assert scope.set_detector("HyD S 3", gain=40.0)["confirmed"] is True

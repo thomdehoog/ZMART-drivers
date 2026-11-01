@@ -697,6 +697,51 @@ def z_stack_picture(project: int, drive: str, begin_um: float, end_um: float, *,
 
 
 # =============================================================================
+# A whole setting as a file: LAS X's Setting panel, save and load (simulator, 2026-11-01)
+# =============================================================================
+
+
+def save_setting(path) -> Write:
+    """Save the current setting to the file *path*, as LAS X's Setting panel does; changes nothing on the instrument."""
+
+    def fill(request: Request) -> None:
+        request.elements = [f'<ATL Command="ATL_Block_Save_To_XML" FileName="{path}" Attribute="2"/>']
+
+    return Write(
+        command="save_setting",
+        values={"path": str(path)},
+        request="ATL_Block_Save_To_XML",
+        fill=fill,
+        description=f"Save the setting to {path}",
+        ready=idle(),
+    )
+
+
+def load_setting(path, values: dict) -> Write:
+    """Load the setting in the file *path*, as LAS X's Setting panel does.
+
+    *values* (``laser_power`` in percent, ``detector_gain``) is what the
+    limits are shown of the file before it is loaded. Read back by the
+    procedure that loads it, which knows what was meant to change.
+    """
+
+    def fill(request: Request) -> None:
+        request.elements = [
+            f'<ATL Command="ATL_Block_Load_From_XML" FileName="{path}" CreateNewInstedOfReplace="0" '
+            'ElementIDAfterLoadedBlock="0" Attribute="2"/>'
+        ]
+
+    return Write(
+        command="load_setting",
+        values={"path": str(path), **values},
+        request="ATL_Block_Load_From_XML",
+        fill=fill,
+        description=f"Load the setting {path}",
+        ready=idle(),
+    )
+
+
+# =============================================================================
 # The objective
 # =============================================================================
 

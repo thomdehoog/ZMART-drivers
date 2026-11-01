@@ -176,10 +176,14 @@ ALLOWED_COMMANDS = frozenset(
         "SetFormat",
         "SetScannerToResonant",
         "FilterWheel_ApiSetSlot",
+        "ATL_Block_Save_To_XML",
+        "ATL_Block_Load_From_XML",
     }
 )
 
-COMMAND = re.compile(r'^\s*<\w+\s+Command="([^"]+)"')
+#: An element's command, wherever it stands among the attributes (LAS X's window
+#: writes ``FileName`` before ``Command`` in its setting commands).
+COMMAND = re.compile(r'^\s*<\w+\b[^>]*?\sCommand="([^"]+)"')
 
 
 class NotAllowed(RuntimeError):
