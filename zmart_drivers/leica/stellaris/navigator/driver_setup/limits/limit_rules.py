@@ -202,6 +202,7 @@ SETTER_LIMIT_KEYS = (
     "set_scan_field_rotation",
     "set_line_average",
     "set_pinhole_airy",
+    "set_z_stack_step",
 )
 
 
@@ -260,6 +261,9 @@ class LeicaLimits:
         if function == "set_xyz":
             self._check_positions(values)
             return
+        if function == "z_stack":
+            self._check_z_stack(values)
+            return
         if function == "set_objective":
             if "objective_slot" in values:
                 self._check_one("objective_slot", self._policy["objective_slot"], values["objective_slot"])
@@ -308,6 +312,23 @@ class LeicaLimits:
                 raise LimitViolation(str(exc)) from exc
         # Then how far each move goes: a second guard, against an unexpected jump.
         self._check_steps(values, places)
+
+    def _check_z_stack(self, values: Mapping[str, Any]) -> None:
+        """A z-stack's two ends, each like a z move from where the drive stands: the file's range, the backstop, the step."""
+        axis = values.get("axis")
+        if axis not in ("z_galvo_um", "z_wide_um"):
+            raise LimitViolation(f"a z-stack names its drive's axis, z_galvo_um or z_wide_um, not {axis!r}")
+        z_mode = "galvo" if axis == "z_galvo_um" else "zwide"
+        for end in ("begin_um", "end_um"):
+            z = values.get(end)
+            self._check_one(axis, self._policy[axis], z)
+            try:
+                check_z(z, z_mode)
+            except RuntimeError as exc:
+                raise LimitViolation(f"the z-stack's {end[:-3]}: {exc}") from exc
+            # Each end on its own from where z stands: the stack's length is a
+            # gradual sweep, not a jump.
+            self._check_steps(values, [{axis: z}])
 
     def _check_steps(self, values: Mapping[str, Any], places: list) -> None:
         """Each step against its largest: from where the drive stands (``from_<axis>``) to the first place, then place to place."""
@@ -361,6 +382,10 @@ MUTATING_COMMANDS = {
     "after_tile_scan": "set_xyz",
     # a picture
     "capture": "capture",
+    # the z-stack: its ends are z positions the scan moves through
+    "set_z_stack_drive": "set_z_stack_drive",
+    "set_z_stack_range": "z_stack",
+    "z_stack_picture": "z_stack",
 }
 
 

@@ -172,6 +172,30 @@ class PlainNavigator:
             self.z_um[drive] = self.tiles[0]
             self.tiles = None
 
+    # The z-stack as LCS answered the window's commands (simulator, 2026-11-01):
+    # 2 leaves that end as it is, and the sections follow from range and step.
+    def stack_sections(self):
+        stack = ("Acquire", "AcquireZStackInfo")
+        step = self.live[(*stack, "StepSize")] or 1e-06
+        self.live[(*stack, "StepSize")] = step
+        size = abs(self.live[(*stack, "EndValue")] - self.live[(*stack, "BeginValue")])
+        self.live[(*stack, "SectionsCount")] = int(round(size / step)) + 1
+
+    def take_SetZStackDefinition(self, e):
+        stack = ("Acquire", "AcquireZStackInfo")
+        if e.get("SetBegin") == "1":
+            self.live[(*stack, "BeginValue")] = float(e.get("BeginValue"))
+        if e.get("SetEnd") == "1":
+            self.live[(*stack, "EndValue")] = float(e.get("EndValue"))
+        self.stack_sections()
+
+    def take_SetStackStepSize(self, e):
+        self.live[("Acquire", "AcquireZStackInfo", "StepSize")] = float(e.get("StepSizeInMeter"))
+        self.stack_sections()
+
+    def take_SetZUseMode(self, e):
+        self.live[("Acquire", "ZPositionMode")] = int(e.get("UseMode"))
+
     def take_ScanMode(self, e):
         self.live[("Acquire", "ScanDimensionList", "ScanModeName")] = e.get("ScanMode")
 

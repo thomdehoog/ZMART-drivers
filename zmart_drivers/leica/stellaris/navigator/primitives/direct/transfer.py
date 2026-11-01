@@ -165,6 +165,9 @@ ALLOWED_COMMANDS = frozenset(
         "ScanMode",
         "ActivateAutoFocus",
         "StageMoveToCoordinates",
+        "SetZUseMode",
+        "SetZStackDefinition",
+        "SetStackStepSize",
     }
 )
 

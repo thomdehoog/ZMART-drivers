@@ -105,9 +105,10 @@ mic.connect("stellaris-navigator")                                              
 | `zero_z_galvo()` | Park the z-galvo at 0 without changing the focus: its offset moves onto z-wide. |
 | `settings()` | What LAS X is set to now: the zoom, the scan speed, the rotation, the averaging, the pinhole, the format, the scan mode, the objective and the z-stack, as LAS X reports them. |
 | `change_setting(name, value)` | Change one of the five settings below and read it back. |
+| `set_z_stack(drive, begin_um, end_um, step_um)` | Set LAS X's z-stack: its drive (`z-galvo` or `z-wide`), its begin and end in that drive's own micrometres, and its step. Answers the stack as LAS X holds it; LAS X may stretch the end to fit whole steps. Each end is checked like a z move from where the drive stands. From then on `acquire()` takes the whole stack. |
 | `change_objective(slot=None, name=None, magnification=None)` | Turn to another objective, and move the stage by the measured offset so the same spot stays in view. Refused before the turret turns when the objective has another immersion, or the calibration does not cover the change. |
 | `acquisition_settings()` | How a capture is triggered: `full`, one picture with the current settings. |
-| `acquire(position_label=None, acquisition_type="acquisition", output_folder=None)` | Take one picture, as the window's Capture Image does. It stays in LAS X's cache, with a note of how it was taken. Nothing is written yet. |
+| `acquire(position_label=None, acquisition_type="acquisition", output_folder=None)` | Take one picture with the current settings: one plane with the window's Capture Image, or, when LAS X has a z-stack set, the whole stack with its Start. It stays in LAS X's cache, with a note of how it was taken. Nothing is written yet. |
 | `tile_scan(positions, position_label=None, acquisition_type="tile_scan", output_folder=None)` | Take one picture of several fields, as the window's Preview does, at `(x, y)` positions in micrometres from the origin, at the current focus. Afterwards the stage is back at the first field. |
 | `row_of_fields(count)` | `count` positions in a row from where the stage stands, a field and a tenth apart, for `tile_scan`. |
 | `save(label=None)` | Write the pictures that are waiting as OME-Zarr, one store per field, with their projection and log. |

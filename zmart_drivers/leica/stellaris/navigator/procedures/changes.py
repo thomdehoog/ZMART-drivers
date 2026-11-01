@@ -245,18 +245,64 @@ def picture(client, change, **watching) -> dict:
 
 
 def capture(client, project=None, **watching) -> dict:
-    """Take one picture with the current settings; see :func:`picture`.
+    """Take one picture with the current settings, the whole z-stack when one is set; see :func:`picture`.
 
     *project* is the LAS X project the picture goes into; None chooses one
     as the Navigator Expert driver does (an open project, or a new
-    ``ZMART_Experiment<N>``).
+    ``ZMART_Experiment<N>``). With a z-stack set (more than one section) the
+    picture is taken with the window's Start, which takes every plane, and
+    the result's ``picture`` is ``"z_stack"``; else with Capture Image, one
+    plane, ``"capture"``. A stack that cannot be read is taken for none.
     """
     try:
         into = project if project is not None else data_container.experiment_for_capture()
-        change = writes.capture(into)
+        stack = readers.get_z_stack(client)
+        if stack:
+            drive = stack["mode"]
+            axis = "z_galvo_um" if drive == "z-galvo" else "z_wide_um"
+            now = readers.read_z_um(client, drive)
+            if now is None:
+                raise RuntimeError(f"where {drive} stands could not be read, so the z-stack cannot be checked")
+            change = writes.z_stack_picture(into, drive, stack["begin"], stack["end"], start={f"from_{axis}": now})
+        else:
+            change = writes.capture(into)
     except (RuntimeError, ValueError) as why:
-        return dispatch.refused(f"no LAS X project for the picture: {why}", logged=True)
-    return picture(client, change, **watching)
+        return dispatch.refused(f"the picture cannot be taken: {why}", logged=True)
+    result = picture(client, change, **watching)
+    result["picture"] = "z_stack" if stack else "capture"
+    return result
+
+
+def set_z_stack(client, drive, begin_um, end_um, step_um, *, max_retries=None) -> dict:
+    """Set LAS X's z-stack: its drive, its begin and end, its step, in that order; the result carries ``z_stack`` read back.
+
+    Each is its own change through the limits and its own read-back; the
+    first that is refused or fails ends it, and is the result. Each end is
+    checked like a z move from where the drive stands.
+    """
+    axis = {"z-galvo": "z_galvo_um", "z-wide": "z_wide_um"}.get(drive)
+    if axis is None:
+        return dispatch.refused(f"no z drive {drive!r}; the drives are z-galvo and z-wide")
+    now = readers.read_z_um(client, drive)
+    if now is None:
+        return dispatch.refused(f"where {drive} stands could not be read, so the z-stack cannot be checked")
+    try:
+        steps = (
+            writes.z_stack_drive(drive),
+            writes.z_stack_range(drive, float(begin_um), float(end_um), start={f"from_{axis}": now}),
+            writes.z_stack_step(float(step_um)),
+        )
+    except (TypeError, ValueError) as why:
+        return dispatch.refused(f"the z-stack cannot be set: {why}")
+    confirmed = True
+    for change in steps:
+        result = run(client, change, max_retries=max_retries)
+        if not result["success"]:
+            return result
+        confirmed = confirmed and result.get("confirmed") is True
+    result["confirmed"] = confirmed
+    result["z_stack"] = readers.get_z_stack(client)
+    return result
 
 
 def tile_z_um(client, positions_um) -> float | None:
@@ -333,7 +379,9 @@ def take_picture(client: Any, project=None, **watching) -> AcquisitionResult:
     finished_at = time.time()
     if not result or not result.get("success"):
         raise RuntimeError(f"the capture failed: {result.get('message') if result else result}")
-    return AcquisitionResult(picture="capture", started_at=started_at, finished_at=finished_at, command_result=result)
+    return AcquisitionResult(
+        picture=result.get("picture", "capture"), started_at=started_at, finished_at=finished_at, command_result=result
+    )
 
 
 def take_tile_scan(client: Any, positions_um, project=None, **watching) -> AcquisitionResult:

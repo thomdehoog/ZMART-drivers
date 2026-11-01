@@ -115,7 +115,8 @@ class TestTheFiveSettings:
     def test_each_setting_has_its_own_key_in_the_bundled_limits(self):
         bundled = json.loads((DRIVER_ROOT / "driver_setup" / "limits" / "defaults" / "limits.json").read_text())
         assert set(limit_rules.SETTER_LIMIT_KEYS) <= set(bundled)
-        assert set(limit_rules.SETTER_LIMIT_KEYS) == {f"set_{name}" for name in writes.SETTINGS}
+        # The settings table, and the settings with a write of their own.
+        assert set(limit_rules.SETTER_LIMIT_KEYS) == {f"set_{name}" for name in writes.SETTINGS} | {"set_z_stack_step"}
 
     @pytest.mark.parametrize("name", list(writes.SETTINGS))
     def test_a_ranged_setting_is_refused_outside_its_range_and_passed_inside(self, name):
@@ -238,3 +239,44 @@ class TestTheLargestStep:
 
         assert loaded["policy"]["step_z_wide_um"] == {"range": [0.0, 100.0]}
         assert loaded["stage_um"]["x"] == [1000.0, 130000.0]
+
+
+
+class TestTheZStack:
+    """A z-stack moves z from its begin to its end: each end is checked like a z move from where z stands."""
+
+    @pytest.fixture
+    def stepped(self):
+        client = object()
+        payload = merged_limits_payload(dict(DEFAULT_STAGE_UM))
+        gate.install(client, gate.GateState(
+            limits=limit_rules.LeicaLimits(payload, source="test", path=None, is_fallback=False),
+            stage_cfg=None, error=None))
+        limit_rules.set_stage_limits(
+            x_min=1000.0, x_max=130000.0, y_min=1000.0, y_max=100000.0,
+            z_galvo_min=-250.0, z_galvo_max=250.0, z_wide_min=0.0, z_wide_max=8000.0,
+        )
+        yield client
+        gate.uninstall(client)
+
+    def stack(self, begin, end, now):
+        return {"axis": "z_wide_um", "begin_um": begin, "end_um": end, "from_z_wide_um": now}
+
+    def test_a_stack_around_the_focus_passes(self, stepped):
+        assert gate.check_refusal(stepped, "set_z_stack_range", self.stack(995.0, 1005.0, 1000.0)) is None
+        assert gate.check_refusal(stepped, "z_stack_picture", self.stack(995.0, 1005.0, 1000.0)) is None
+
+    def test_a_stack_outside_the_z_range_is_refused(self, stepped):
+        refusal = gate.check_refusal(stepped, "set_z_stack_range", self.stack(7990.0, 8050.0, 8000.0))
+        assert refusal is not None and "z_wide_um" in refusal
+
+    def test_a_stack_far_from_the_focus_is_refused_like_a_jump(self, stepped):
+        # LCS accepted a stack from 3345 to -1727 um without a word (simulator, 2026-11-01).
+        refusal = gate.check_refusal(stepped, "set_z_stack_range", self.stack(3345.0, 3355.0, 1000.0))
+        assert refusal is not None and "step_z_wide_um" in refusal
+        refusal = gate.check_refusal(stepped, "z_stack_picture", self.stack(995.0, 1300.0, 1000.0))
+        assert refusal is not None and "step_z_wide_um" in refusal
+
+    def test_the_step_size_has_a_limits_entry_of_its_own(self):
+        assert "set_z_stack_step" in limit_rules.SETTER_LIMIT_KEYS
+        assert limit_rules.MUTATING_COMMANDS["set_z_stack_step"] == "set_z_stack_step"

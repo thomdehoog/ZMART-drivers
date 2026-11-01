@@ -327,3 +327,36 @@ class TestTheLargestStepOnTheWay:
 
     def test_a_stage_move_hands_the_gate_where_the_stage_stands(self, lasx, stepped):
         assert changes.move_xy(stepped, 64000.0, 41500.0, tolerance=1)["confirmed"] is True
+
+
+
+class TestTheZStack:
+    def test_the_stack_is_set_drive_range_and_step_and_read_back(self, lasx, client):
+        lasx.z_um = {1: 0.0, 2: 1000.0}
+
+        result = changes.set_z_stack(client, "z-wide", 995.0, 1005.0, 2.5)
+
+        assert result["confirmed"] is True
+        assert result["z_stack"] == {
+            "begin": pytest.approx(995.0), "end": pytest.approx(1005.0), "stepSize": pytest.approx(2.5),
+            "size": pytest.approx(10.0), "sections": 5, "mode": "z-wide",
+        }
+        assert lasx.commands() == ["SetZUseMode", "SetZStackDefinition", "SetStackStepSize"]
+
+    def test_with_a_stack_set_a_picture_takes_the_whole_stack(self, lasx, client, monkeypatch):
+        monkeypatch.setattr(data_container, "experiment_for_capture", lambda: 2518)
+        lasx.z_um = {1: 0.0, 2: 1000.0}
+        changes.set_z_stack(client, "z-wide", 995.0, 1005.0, 2.5)
+
+        acq = changes.take_picture(client, poll_interval=0.01)
+
+        assert acq.picture == "z_stack"
+        assert lasx.commands()[-2:] == ["StopAcquiring", "StartAcquiring"]
+
+    def test_without_a_stack_a_picture_is_one_frame(self, lasx, client, monkeypatch):
+        monkeypatch.setattr(data_container, "experiment_for_capture", lambda: 2518)
+
+        acq = changes.take_picture(client, poll_interval=0.01)
+
+        assert acq.picture == "capture"
+        assert lasx.commands()[-1] == "CaptureSingleFrame"

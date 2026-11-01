@@ -12,5 +12,6 @@
   "set_scan_speed": [],
   "set_scan_field_rotation": [],
   "set_line_average": [],
-  "set_pinhole_airy": []
+  "set_pinhole_airy": [],
+  "set_z_stack_step": []
 }

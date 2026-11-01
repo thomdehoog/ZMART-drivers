@@ -282,6 +282,22 @@ class Microscope:
         result = changes.change(self.handle.client, name, value)
         return checked(self.handle, result, f"change_setting({name!r}, {value!r})")
 
+    def set_z_stack(self, drive: str, begin_um: float, end_um: float, step_um: float) -> dict:
+        """Set LAS X's z-stack and answer it as LAS X holds it, as :meth:`settings` gives ``z_stack``.
+
+        *drive* is ``"z-galvo"`` or ``"z-wide"``; *begin_um* and *end_um* are
+        that drive's own positions in micrometres, as LAS X's z-stack panel
+        shows them (begin above end runs the stack downwards); *step_um* is
+        the distance between sections, whose number follows. Each end is
+        checked like a z move from where the drive stands, so a stack far
+        from the focus is refused. LAS X may stretch the end to fit whole
+        steps. From then on :meth:`acquire` takes the whole stack.
+        """
+        self.handle.require_open()
+        result = changes.set_z_stack(self.handle.client, drive, begin_um, end_um, step_um)
+        checked(self.handle, result, f"set_z_stack({drive!r}, {begin_um!r}, {end_um!r}, {step_um!r})")
+        return result["z_stack"]
+
     def change_objective(self, slot: int | None = None, name: str | None = None, magnification: float | None = None) -> dict:
         """Change the objective, by its slot, name or magnification, and keep the same spot in view.
 

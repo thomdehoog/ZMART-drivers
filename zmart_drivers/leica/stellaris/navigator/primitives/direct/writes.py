@@ -336,6 +336,142 @@ def move_z(drive: str, target_um: float, *, tolerance=None, now=None, start: dic
 
 
 # =============================================================================
+# The z-stack: LAS X's z-stack panel, as the window sent it (simulator, 2026-11-01)
+# =============================================================================
+
+#: How close a z-stack's begin must come, in micrometres.
+STACK_TOLERANCE_UM = 0.1
+
+
+def unwrapped(reading):
+    """A z-stack reading as a stack, or None: the profile's row answers ``{"stack": ...}``."""
+    if isinstance(reading, dict) and "stack" in reading:
+        return reading["stack"]
+    return reading
+
+
+def z_stack_drive(drive: str) -> Write:
+    """Have the z-stack (and a tile's z) use *drive*, ``"z-galvo"`` or ``"z-wide"``; read back as the drive in use."""
+    if drive not in Z_DRIVES:
+        raise ValueError(f"no z drive {drive!r}; the drives are {sorted(Z_DRIVES)}")
+    elements = [f'<Scanner Command="SetZUseMode" UseMode="{Z_DRIVES[drive]}"/>']
+
+    def fill(request: Request) -> None:
+        request.elements = list(elements)
+
+    return Write(
+        command="set_z_stack_drive",
+        values={"drive": drive},
+        request="SetZUseMode",
+        fill=fill,
+        description=f"Z-stack drive -> {drive}",
+        ready=idle(),
+        confirm=Expect("z_drive_in_use", lambda reading: reading == drive),
+    )
+
+
+def z_stack_range(drive: str, begin_um: float, end_um: float, *, start: dict | None = None) -> Write:
+    """Set the z-stack from *begin_um* to *end_um* on *drive*, both at once; begin above end runs it downwards.
+
+    Read back as the z-stack: the begin within :data:`STACK_TOLERANCE_UM`,
+    and the end within one step, because LCS stretches the end to fit whole
+    steps and still answers ``Error="0"`` (1530 um became 1531.6 um with
+    2.4 um steps). *start* (where the drive stands) goes to the limits: each
+    end is checked like a z move from there.
+    """
+    if drive not in Z_DRIVES:
+        raise ValueError(f"no z drive {drive!r}; the drives are {sorted(Z_DRIVES)}")
+    axis = "z_galvo_um" if drive == "z-galvo" else "z_wide_um"
+    elements = [
+        f'<Scanner Command="SetZStackDefinition" SetBegin="1" SetEnd="1" '
+        f'BeginValue="{metres(begin_um)}" EndValue="{metres(end_um)}" {CURRENT}/>'
+    ]
+
+    def fill(request: Request) -> None:
+        request.elements = list(elements)
+
+    def shows(reading) -> bool:
+        stack = unwrapped(reading)
+        if not isinstance(stack, dict) or stack.get("mode") != drive:
+            return False
+        try:
+            same_way = (stack["end"] - stack["begin"]) * (end_um - begin_um) > 0
+            return (
+                same_way
+                and abs(stack["begin"] - begin_um) <= STACK_TOLERANCE_UM
+                and abs(stack["end"] - end_um) <= stack["stepSize"] + STACK_TOLERANCE_UM
+            )
+        except (KeyError, TypeError):
+            return False
+
+    return Write(
+        command="set_z_stack_range",
+        values={"drive": drive, "axis": axis, "begin_um": begin_um, "end_um": end_um, **(start or {})},
+        request="SetZStackDefinition",
+        fill=fill,
+        description=f"Z-stack -> {begin_um:g} to {end_um:g} um ({drive})",
+        ready=idle(),
+        confirm=Expect("z_stack", shows),
+    )
+
+
+def z_stack_step(step_um: float) -> Write:
+    """Set the z-stack's step to *step_um*; the number of sections follows from the range. Read back within 0.05 um."""
+    if isinstance(step_um, bool) or not isinstance(step_um, (int, float)) or not step_um > 0:
+        raise ValueError(f"a z-stack step is a number of micrometres above 0, not {step_um!r}")
+    elements = [f'<Scanner Command="SetStackStepSize" StepSizeInMeter="{metres(step_um)}" {CURRENT}/>']
+
+    def fill(request: Request) -> None:
+        request.elements = list(elements)
+
+    def shows(reading) -> bool:
+        stack = unwrapped(reading)
+        try:
+            return abs(stack["stepSize"] - step_um) <= 0.05
+        except (KeyError, TypeError):
+            return False
+
+    return Write(
+        command="set_z_stack_step",
+        values={"value": step_um},
+        request="SetStackStepSize",
+        fill=fill,
+        description=f"Z-stack step -> {step_um:g} um",
+        ready=idle(),
+        confirm=Expect("z_stack", shows),
+    )
+
+
+def z_stack_picture(project: int, drive: str, begin_um: float, end_um: float, *, start: dict | None = None) -> Write:
+    """Take the whole z-stack LAS X is set to, into *project*: the window's Start.
+
+    Capture Image takes one plane even with a stack set; Start took all of
+    them in one picture (simulator, 2026-10-30). The stack's ends go to the
+    limits, as for :func:`z_stack_range`, because the scan moves z through
+    them. Never sent again, like a capture.
+    """
+    parent = checked_project(project)
+    axis = "z_galvo_um" if drive == "z-galvo" else "z_wide_um"
+    elements = [
+        '<AcquireControl Command="StopAcquiring" DCParentElementID="0"/>',
+        f'<AcquireControl Command="StartAcquiring" DCParentElementID="{parent}"/>',
+    ]
+
+    def fill(request: Request) -> None:
+        request.elements = list(elements)
+
+    return Write(
+        command="z_stack_picture",
+        values={"project": project, "drive": drive, "axis": axis, "begin_um": begin_um, "end_um": end_um, **(start or {})},
+        request="StartAcquiring",
+        fill=fill,
+        description=f"Z-stack {begin_um:g} to {end_um:g} um ({drive}) into project {project}",
+        ready=idle(without_limit=True),
+        never_resend=True,
+    )
+
+
+# =============================================================================
 # The objective
 # =============================================================================
 

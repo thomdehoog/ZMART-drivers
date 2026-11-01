@@ -65,6 +65,8 @@ DESCRIPTION = re.compile(r"V2LMSDC_OBJ(\d+)_([0-9a-fA-F]+)\.tmp")
 PICTURE_NAMES = {
     "capture": re.compile(r"Image\d+"),
     "tile_scan": re.compile(r"Mosaic\d+"),
+    # A z-stack taken with Start: Mosaic<n> with the Navigator open, Series<n> in Navigator Expert.
+    "z_stack": re.compile(r"(?:Mosaic|Series)\d+"),
 }
 
 #: How long to wait for a picture to appear and be finished after the scan

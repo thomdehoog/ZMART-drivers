@@ -226,3 +226,23 @@ def test_every_call_of_the_microscope_and_every_setting_is_in_the_readme():
 
     assert [name for name in calls if not re.search(rf"`{name}[`(]", section)] == []
     assert [name for name in SETTINGS if f"| `{name}` |" not in section] == []
+
+
+def test_the_z_stack_is_set_and_answered_as_las_x_holds_it(scope, lasx):
+    lasx.z_um[2] = 1000.0
+
+    stack = scope.set_z_stack("z-wide", 995.0, 1005.0, 2.5)
+
+    assert (stack["begin"], stack["end"], stack["sections"], stack["mode"]) == (
+        pytest.approx(995.0), pytest.approx(1005.0), 5, "z-wide"
+    )
+    assert scope.settings()["z_stack"]["sections"] == 5
+
+
+def test_a_z_stack_far_from_the_focus_is_refused(scope, lasx):
+    lasx.z_um[2] = 1000.0
+
+    with pytest.raises(RuntimeError, match="step_z_wide_um"):
+        scope.set_z_stack("z-wide", 3000.0, 3010.0, 2.5)
+
+    assert "SetZStackDefinition" not in lasx.commands()

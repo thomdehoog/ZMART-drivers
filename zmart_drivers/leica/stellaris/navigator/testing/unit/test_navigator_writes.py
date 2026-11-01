@@ -210,3 +210,45 @@ def test_every_element_the_driver_builds_is_on_the_transfer_s_allowlist():
         for element in elements(write):
             command = re.search(r'Command="([^"]+)"', element)[1]
             assert command in transfer.ALLOWED_COMMANDS, f"{write.command} sends {command}, not on the allowlist"
+
+
+
+class TestTheZStack:
+    """The z-stack panel's own commands, as LAS X's window sent them (simulator, 2026-11-01)."""
+
+    def test_the_drive_is_chosen_by_its_number(self):
+        assert elements(writes.z_stack_drive("z-wide")) == ['<Scanner Command="SetZUseMode" UseMode="2"/>']
+        assert elements(writes.z_stack_drive("z-galvo")) == ['<Scanner Command="SetZUseMode" UseMode="1"/>']
+        with pytest.raises(ValueError):
+            writes.z_stack_drive("z-up")
+
+    def test_begin_and_end_are_set_together_in_metres(self):
+        write = writes.z_stack_range("z-wide", 995.0, 1005.0)
+        assert elements(write) == [
+            '<Scanner Command="SetZStackDefinition" SetBegin="1" SetEnd="1" '
+            'BeginValue="0.0009950000" EndValue="0.0010050000" BlockId="0"/>'
+        ]
+        assert write.values["axis"] == "z_wide_um"
+        assert (write.values["begin_um"], write.values["end_um"]) == (995.0, 1005.0)
+
+    def test_the_end_may_be_stretched_to_whole_steps_but_the_begin_must_hold(self):
+        # LCS stretched an end of 1530 um to 1531.6 um to fit whole 2.4 um steps, and answered Error="0".
+        accept = writes.z_stack_range("z-wide", 1510.0, 1530.0).confirm.accept
+        assert accept({"begin": 1510.0, "end": 1531.6, "stepSize": 2.4, "sections": 10, "mode": "z-wide"})
+        assert not accept({"begin": 1512.0, "end": 1530.0, "stepSize": 2.4, "sections": 9, "mode": "z-wide"})
+        assert not accept({"begin": 1510.0, "end": 1540.0, "stepSize": 2.4, "sections": 13, "mode": "z-wide"})
+        assert not accept(None)
+
+    def test_the_step_is_set_in_metres_and_read_back(self):
+        write = writes.z_stack_step(2.5)
+        assert elements(write) == ['<Scanner Command="SetStackStepSize" StepSizeInMeter="0.0000025000" BlockId="0"/>']
+        assert write.values == {"value": 2.5}
+        assert write.confirm.accept({"begin": 995.0, "end": 1005.0, "stepSize": 2.5, "sections": 5, "mode": "z-wide"})
+
+    def test_a_z_stack_picture_is_the_window_s_start_into_its_project(self):
+        write = writes.z_stack_picture(2518, "z-wide", 995.0, 1005.0)
+        assert elements(write) == [
+            '<AcquireControl Command="StopAcquiring" DCParentElementID="0"/>',
+            '<AcquireControl Command="StartAcquiring" DCParentElementID="2518"/>',
+        ]
+        assert write.never_resend is True
