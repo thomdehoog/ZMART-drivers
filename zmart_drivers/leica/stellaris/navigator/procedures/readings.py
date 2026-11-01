@@ -141,6 +141,11 @@ def get_z_stack(client, *, diagnostics=False, deadline=None):
     return _plain_or_diagnostic(reading, diagnostics)
 
 
+def get_z_drive_in_use(client, **keywords):
+    """The z drive LAS X's z-stack panel uses, ``"z-galvo"`` or ``"z-wide"``; a tile's z is read on it."""
+    return _routed("z_drive_in_use", client, **keywords)
+
+
 def get_serial_number(client, **keywords):
     """The instrument's serial number."""
     return _routed("serial_number", client, **keywords)

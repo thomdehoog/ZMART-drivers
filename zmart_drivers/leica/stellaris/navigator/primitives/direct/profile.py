@@ -151,6 +151,7 @@ DATUMS = {
         DatumSpec("pixel_size", direct_reader.get_pixel_size, pair_present),
         DatumSpec("bit_depth", direct_reader.get_bit_depth, number_present),
         DatumSpec("z_stack", z_stack_read, z_stack_present),
+        DatumSpec("z_drive_in_use", direct_reader.get_z_drive_in_use, text_present),
         DatumSpec("serial_number", direct_reader.get_serial_number, text_present),
         DatumSpec("jobs", direct_reader.get_jobs, listed),
         DatumSpec("hardware_info", direct_reader.get_hardware_info, dict_present),

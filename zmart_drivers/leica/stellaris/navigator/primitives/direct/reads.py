@@ -64,6 +64,7 @@ READS = (
     "objective",
     "fov",
     "z_stack",
+    "z_drive_in_use",
     "laser_lines",
     "scan_field_rotation",
     "sequential_mode",
@@ -368,6 +369,20 @@ def get_z_stack() -> dict | None:
         "sections": found["sections"],
         "mode": drives[found["mode"]],
     }
+
+
+def get_z_drive_in_use() -> str:
+    """The z drive LAS X's z-stack panel uses, ``"z-galvo"`` or ``"z-wide"`` (``Acquire/ZPositionMode``).
+
+    It matters also without a stack: LCS reads a tile's ``ZPos`` as the
+    position of this drive (simulator, 2026-11-01). Raises
+    :class:`HardwareServerUnavailable` for a code it does not know.
+    """
+    mode = settings("the z-stack's drive", {"mode": ("Acquire", "ZPositionMode")})["mode"]
+    drives = {code: drive for drive, code in Z_USE_MODE.items()}
+    if mode not in drives:
+        raise HardwareServerUnavailable(f"the state tree names z-stack drive {mode!r}")
+    return drives[mode]
 
 
 def light_layout(nodes, node, kids):

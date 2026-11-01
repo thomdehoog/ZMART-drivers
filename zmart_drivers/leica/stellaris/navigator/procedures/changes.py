@@ -222,19 +222,63 @@ def capture(client, project=None, **watching) -> dict:
     return picture(client, change, **watching)
 
 
+def tile_z_um(client, positions_um) -> float | None:
+    """The z every tile is sent with, or None to send each position's own z-galvo.
+
+    LCS reads a tile's ``ZPos`` as the position of the drive LAS X's z-stack
+    uses (``Acquire/ZPositionMode``): with it on z-wide, a tile scan sent
+    with z-galvo's positions drove z-wide from 1522.7 µm to 0 (simulator,
+    2026-11-01). So with the z-stack on z-wide the tiles carry z-wide's
+    position now, and the focus stays where it is. Raises RuntimeError,
+    before anything is sent, when the drive cannot be read, or when a
+    position asks for another z-galvo than the current one while the
+    z-stack is on z-wide, which a tile cannot carry.
+    """
+    drive = readers.get_z_drive_in_use(client)
+    if drive is None:
+        raise RuntimeError("the drive LAS X's z-stack uses could not be read, so the tiles' z is not known")
+    if drive == "z-galvo":
+        return None
+    galvo = readers.read_z_um(client, "z-galvo")
+    wide = readers.read_z_um(client, "z-wide")
+    if galvo is None or wide is None:
+        raise RuntimeError("the z drives could not be read, so the tiles' z is not known")
+    asked = [float(position[2]) for position in positions_um]
+    if any(abs(z - galvo) > writes.Z_TOLERANCE_UM for z in asked):
+        raise RuntimeError(
+            f"LAS X's z-stack is on z-wide, so every tile is taken at z-wide's position; "
+            f"a tile at z-galvo {asked} other than where z-galvo stands ({galvo:.2f} um) cannot be sent"
+        )
+    return wide
+
+
 def tile_scan(client, positions_um, project=None, **watching) -> dict:
-    """Take a tile scan over *positions_um* (x, y, z per field, micrometres); see :func:`picture`."""
+    """Take a tile scan over *positions_um* (x, y, z-galvo per field, micrometres); see :func:`picture`.
+
+    The tiles carry the z LCS reads them on (:func:`tile_z_um`), noted in
+    the result as ``tile_z_um``.
+    """
     try:
+        tile_z = tile_z_um(client, positions_um)
         into = project if project is not None else data_container.experiment_for_capture()
-        change = writes.tile_scan(positions_um, into)
+        change = writes.tile_scan(positions_um, into, tile_z_um=tile_z)
     except (RuntimeError, ValueError, TypeError) as why:
         return dispatch.refused(f"the tile scan cannot be made: {why}", logged=True)
-    return picture(client, change, **watching)
+    result = picture(client, change, **watching)
+    result["tile_z_um"] = tile_z
+    return result
 
 
-def after_tile_scan(client, x_um, y_um, z_um, *, max_retries=None) -> dict:
-    """Put back what a tile scan changed: the stage to (*x_um*, *y_um*, *z_um*), scan mode xyz, autofocus on."""
-    return run(client, writes.after_tile_scan(float(x_um), float(y_um), float(z_um)), max_retries=max_retries)
+def after_tile_scan(client, x_um, y_um, z_um, *, max_retries=None, tile_z_um=None) -> dict:
+    """Put back what a tile scan changed: the stage to (*x_um*, *y_um*, *z_um*), scan mode xyz, autofocus on.
+
+    *tile_z_um* is the z the tile scan sent its tiles with, sent again here.
+    """
+    return run(
+        client,
+        writes.after_tile_scan(float(x_um), float(y_um), float(z_um), tile_z_um=tile_z_um),
+        max_retries=max_retries,
+    )
 
 
 def take_picture(client: Any, project=None, **watching) -> AcquisitionResult:
@@ -262,7 +306,7 @@ def take_tile_scan(client: Any, positions_um, project=None, **watching) -> Acqui
     result = tile_scan(client, positions, project, **watching)
     finished_at = time.time()
     if result.get("timing", {}).get("attempts", 0) > 0:
-        result["put_back"] = after_tile_scan(client, *positions[0])
+        result["put_back"] = after_tile_scan(client, *positions[0], tile_z_um=result.get("tile_z_um"))
     if not result.get("success"):
         put_back = result.get("put_back")
         undone = "" if put_back is None else f"; put back: {put_back.get('message')}"

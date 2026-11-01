@@ -159,9 +159,18 @@ class PlainNavigator:
         self.captures += 1
         self.scanning_until = time.monotonic() + self.scan_s
 
+    def take_SetStageIrregularTileScanPositions(self, e):
+        self.tiles = [float(tile.get("ZPos")) * 1e6 for tile in e.findall("Tile")]
+
     def take_StartAcquiring(self, e):
         self.captures += 1
         self.scanning_until = time.monotonic() + self.scan_s
+        # As LCS did on the simulator (2026-11-01): a tile scan drives the drive the
+        # z-stack uses (Acquire/ZPositionMode) to the tiles' ZPos.
+        if getattr(self, "tiles", None):
+            drive = self.live[("Acquire", "ZPositionMode")]
+            self.z_um[drive] = self.tiles[0]
+            self.tiles = None
 
     def take_ScanMode(self, e):
         self.live[("Acquire", "ScanDimensionList", "ScanModeName")] = e.get("ScanMode")

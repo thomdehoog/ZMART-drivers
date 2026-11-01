@@ -421,10 +421,15 @@ def capture(project: int) -> Write:
     )
 
 
-def tile_elements(positions_um: Iterable[tuple[float, float, float]]) -> str:
-    """The positions of a tile scan, as LAS X's window lists them."""
+def tile_elements(positions_um: Iterable[tuple[float, float, float]], tile_z_um: float | None = None) -> str:
+    """The positions of a tile scan, as LAS X's window lists them.
+
+    LCS reads a tile's ``ZPos`` as the position of the drive LAS X's z-stack
+    uses (simulator, 2026-11-01). *tile_z_um*, when given, is that drive's
+    position and is sent for every tile instead of the position's own z.
+    """
     tiles = "".join(
-        f'<Tile XPos="{metres(x)}" YPos="{metres(y)}" ZPos="{metres(z)}" '
+        f'<Tile XPos="{metres(x)}" YPos="{metres(y)}" ZPos="{metres(z if tile_z_um is None else tile_z_um)}" '
         'FocusStabilizerOffset="0.0000000000"/>'
         for x, y, z in positions_um
     )
@@ -437,7 +442,7 @@ def tile_elements(positions_um: Iterable[tuple[float, float, float]]) -> str:
 
 
 def tile_scan_elements(
-    positions_um: Iterable[tuple[float, float, float]], project: int
+    positions_um: Iterable[tuple[float, float, float]], project: int, tile_z_um: float | None = None
 ) -> list[str]:
     """The window's Preview over *positions_um* (x, y, z) into *project*: the preparation, then the start.
 
@@ -447,7 +452,7 @@ def tile_scan_elements(
     the preparation changed.
     """
     parent = checked_project(project)
-    positions = tile_elements(positions_um)
+    positions = tile_elements(positions_um, tile_z_um)
     return [
         '<AcquireControl Command="StopAcquiring" DCParentElementID="0"/>',
         '<Scanner Command="SetStageUseMode" StageUseMode="7"/>',
@@ -461,14 +466,16 @@ def tile_scan_elements(
     ]
 
 
-def tile_scan(positions_um: list[tuple[float, float, float]], project: int) -> Write:
-    """Take a tile scan over *positions_um* (x, y, z in micrometres) into the LAS X project *project*.
+def tile_scan(positions_um: list[tuple[float, float, float]], project: int, *, tile_z_um: float | None = None) -> Write:
+    """Take a tile scan over *positions_um* (x, y, z-galvo in micrometres) into the LAS X project *project*.
 
-    Every position is shown to the limits first. Never sent again, like a
-    capture; sent once the scanner is idle, however long that takes.
+    Every position is shown to the limits first, with its z-galvo. With
+    *tile_z_um* the tiles carry that z instead (:func:`tile_elements`).
+    Never sent again, like a capture; sent once the scanner is idle,
+    however long that takes.
     """
     positions = [tuple(float(v) for v in p) for p in positions_um]
-    elements = tile_scan_elements(positions, project)
+    elements = tile_scan_elements(positions, project, tile_z_um)
 
     def fill(request: Request) -> None:
         request.elements = list(elements)
@@ -485,7 +492,7 @@ def tile_scan(positions_um: list[tuple[float, float, float]], project: int) -> W
 
 
 def after_tile_scan_elements(x_um: float, y_um: float, z_um: float) -> list[str]:
-    """What the window sends after its Preview: the stage back to (*x_um*, *y_um*, *z_um*), the rest as it was."""
+    """What the window sends after its Preview: the stage back to (*x_um*, *y_um*), *z_um* as LCS reads a tile's z, the rest as it was."""
     return [
         f'<Scanner Command="StageMoveToCoordinates" PosX="{metres(x_um)}" PosY="{metres(y_um)}" '
         f'PosZ="{metres(z_um)}"/>',
@@ -496,14 +503,16 @@ def after_tile_scan_elements(x_um: float, y_um: float, z_um: float) -> list[str]
     ]
 
 
-def after_tile_scan(x_um: float, y_um: float, z_um: float, *, tolerance=None) -> Write:
+def after_tile_scan(x_um: float, y_um: float, z_um: float, *, tolerance=None, tile_z_um: float | None = None) -> Write:
     """Put back what a tile scan changed, and the stage to (*x_um*, *y_um*, *z_um*).
 
-    Read back until the stage is within *tolerance* (``XY_TOLERANCE_UM``
-    when None); sent again when it is not, it is the same put-back.
+    *z_um* is z-galvo, shown to the limits; with *tile_z_um* the element
+    carries that z instead, as the tile scan did. Read back until the stage
+    is within *tolerance* (``XY_TOLERANCE_UM`` when None); sent again when
+    it is not, it is the same put-back.
     """
     tolerance = XY_TOLERANCE_UM if tolerance is None else tolerance
-    elements = after_tile_scan_elements(x_um, y_um, z_um)
+    elements = after_tile_scan_elements(x_um, y_um, z_um if tile_z_um is None else tile_z_um)
 
     def fill(request: Request) -> None:
         request.elements = list(elements)

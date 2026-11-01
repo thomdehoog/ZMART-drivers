@@ -245,6 +245,46 @@ class TestPictures:
         assert lasx.commands()[-5:] == ["StageMoveToCoordinates", "SetStageUseMode", "ATL_SuppressAtlasAttachment", "ScanMode", "ActivateAutoFocus"]
         assert lasx.live[("Acquire", "ScanDimensionList", "ScanModeName")] == "xyz"
 
+    def test_a_tile_scan_leaves_z_wide_where_it_is_when_the_z_stack_is_on_z_wide(self, lasx, client):
+        # On the simulator (2026-11-01) LCS read a tile's ZPos as the position of the
+        # z-stack's drive: with the stack on z-wide, z-wide went from 1522.7 µm to 0.
+        lasx.live[("Acquire", "ZPositionMode")] = 2
+        lasx.z_um = {1: 0.0, 2: 1522.7}
+        positions = [(63500.0, 41500.0, 0.0), (64800.0, 41500.0, 0.0)]
+
+        changes.take_tile_scan(client, positions, poll_interval=0.01)
+
+        assert lasx.z_um[2] == pytest.approx(1522.7)
+        tiles = next(x for x in lasx.sent if "SetStageIrregularTileScanPositions" in x)
+        assert tiles.count('ZPos="0.0015227000"') == 2
+        assert 'PosZ="0.0015227000"' in next(x for x in lasx.sent if "StageMoveToCoordinates" in x)
+
+    def test_a_tile_scan_keeps_z_galvo_s_position_when_the_z_stack_is_on_z_galvo(self, lasx, client):
+        lasx.live[("Acquire", "ZPositionMode")] = 1
+        lasx.z_um = {1: 2.0, 2: 1522.7}
+
+        changes.take_tile_scan(client, [(63500.0, 41500.0, 2.0)], poll_interval=0.01)
+
+        assert 'ZPos="0.0000020000"' in next(x for x in lasx.sent if "SetStageIrregularTileScanPositions" in x)
+        assert lasx.z_um == {1: pytest.approx(2.0), 2: pytest.approx(1522.7)}
+
+    def test_a_tile_scan_at_another_z_galvo_position_is_refused_when_the_z_stack_is_on_z_wide(self, lasx, client):
+        lasx.live[("Acquire", "ZPositionMode")] = 2
+        lasx.z_um = {1: 0.0, 2: 1522.7}
+
+        with pytest.raises(RuntimeError, match="z-wide"):
+            changes.take_tile_scan(client, [(63500.0, 41500.0, 5.0)], poll_interval=0.01)
+
+        assert lasx.commands() == []
+
+    def test_a_tile_scan_is_refused_when_the_z_stack_s_drive_cannot_be_read(self, lasx, client):
+        lasx.live[("Acquire", "ZPositionMode")] = 7
+
+        with pytest.raises(RuntimeError, match="drive"):
+            changes.take_tile_scan(client, [(63500.0, 41500.0, 0.0)], poll_interval=0.01)
+
+        assert lasx.commands() == []
+
     def test_a_tile_scan_with_a_position_outside_the_limits_sends_nothing(self, lasx, client):
         with pytest.raises(RuntimeError, match="backstop"):
             changes.take_tile_scan(client, [(63500.0, 41500.0, 0.0), (500_000.0, 41500.0, 0.0)])
