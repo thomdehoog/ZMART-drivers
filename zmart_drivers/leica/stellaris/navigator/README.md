@@ -150,6 +150,7 @@ confirmed, with what LAS X set instead.
 | `frame_accumulation` | 1, 2, 3, ... | exact |
 | `format` | `(x, y)` pixels, such as `(512, 512)` | exact |
 | `resonant_scanner` | `True` or `False` | exact |
+| `bidirectional` | `True` or `False`; written into LAS X's state tree, as its window does, the one value the driver writes there | exact |
 
 ## Setting up the driver
 

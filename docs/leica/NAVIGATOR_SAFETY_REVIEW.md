@@ -127,6 +127,11 @@ with no command in LCS's log). The ZMART Driver never does, because:
 
 Every change goes through a command (`SendCommand2`), which LCS checks and answers.
 
+**One decided exception (Thom, 1 November 2026):** Bidirectional X, which neither a command
+nor a loaded setting reaches. Only `Confocal/ScanningParameter/ScanDirectionX`, only the
+values 1 and 2, the node looked up by its path at each write, and read back; the transfer
+refuses every other node. It moves nothing and makes no light.
+
 ## One more thing the driver does on its own
 
 The driver presses OK on LAS X's message boxes that have an OK button and nothing else, and

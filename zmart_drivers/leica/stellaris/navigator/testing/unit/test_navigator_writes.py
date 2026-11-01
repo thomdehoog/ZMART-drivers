@@ -362,3 +362,12 @@ class TestChannelColour:
             '<BeamPosition BeamPositionLevel="1" BeamPosition="3"/></BeamRoute></Scanner>'
         ]
         assert write.confirm.accept({3: "Green", 4: "Yellow"}) and not write.confirm.accept({3: "Gray"})
+
+
+
+class TestBidirectional:
+    def test_bidirectional_is_the_one_state_tree_write_and_is_read_back(self):
+        write = writes.named_setting("bidirectional", True)
+        assert elements(write) == ['<StateTree Command="ScanDirectionX" Value="2"/>']
+        assert elements(writes.named_setting("bidirectional", False)) == ['<StateTree Command="ScanDirectionX" Value="1"/>']
+        assert write.confirm.accept(True) and not write.confirm.accept(False)

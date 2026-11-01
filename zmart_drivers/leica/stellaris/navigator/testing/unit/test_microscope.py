@@ -303,3 +303,9 @@ def test_without_a_valid_optimal_format_nothing_is_changed(scope, lasx):
         scope.optimize_format()
 
     assert "SetFormat" not in lasx.commands()
+
+
+
+def test_bidirectional_is_changed_like_every_setting(scope, lasx):
+    assert scope.change_setting("bidirectional", True)["confirmed"] is True
+    assert scope.settings()["bidirectional"] is True

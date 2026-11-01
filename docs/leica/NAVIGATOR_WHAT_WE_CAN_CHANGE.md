@@ -58,7 +58,7 @@ discovery session in `SCOPE_RUN_2026-11-01_NAVIGATOR_DISCOVERY.md` and the build
 | Scan mode (xyz, xyt, ...) | Works |
 | Resonant scanner on or off | Works |
 | Sequential mode | Tried; not built, because it also rearranges which detectors and shutters are on |
-| Scan direction (uni- or bidirectional) | Not yet learned |
+| Scan direction (uni- or bidirectional) | Works: written into LAS X's state tree, the one value the ZMART Driver writes there |
 | Pan | Not yet learned |
 | Bit depth | Not yet learned |
 | Autofocus on or off | Works |
@@ -143,7 +143,7 @@ service and the person responsible for the instrument.
 
 | State | Settings |
 |---|---|
-| Works | 43 (the objective among them, not yet tried) |
+| Works | 44 (the objective among them, not yet tried) |
 | Tried | 1 |
 | Command known | 0 |
-| Not yet learned | 13 |
+| Not yet learned | 12 |

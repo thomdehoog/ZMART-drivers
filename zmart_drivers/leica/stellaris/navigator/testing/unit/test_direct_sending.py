@@ -174,3 +174,13 @@ class TestADialogInTheWay:
     def test_a_log_that_is_not_there_reports_nothing(self, tmp_path, monkeypatch):
         monkeypatch.setattr(send_command, "LASX_LOG", tmp_path / "missing.log")
         assert send_command.DIRECT.dialog_warning_since(time.time() - 60, "Zoom") is None
+
+
+
+def test_only_bidirectional_may_be_written_into_the_state_tree_and_only_as_1_or_2(server):
+    with pytest.raises(send_command.NotAllowed, match="PhaseX"):
+        send_command.send('<StateTree Command="PhaseX" Value="-20"/>')
+    with pytest.raises(send_command.NotAllowed, match="3"):
+        send_command.send('<StateTree Command="ScanDirectionX" Value="3"/>')
+
+    assert server.received == []

@@ -132,7 +132,14 @@ class Sender:
         while True:
             xml, outcome, done = self.waiting.get()
             try:
-                outcome["answer"] = str(hardware_server.connected_server().SendCommand2(xml, ""))
+                tree = STATE_TREE.match(xml)
+                if tree is not None:
+                    from . import state_tree
+
+                    state_tree.change_node(STATE_TREE_WRITES[tree[1]][0], int(tree[2]))
+                    outcome["answer"] = '<Result Error="0"/>'
+                else:
+                    outcome["answer"] = str(hardware_server.connected_server().SendCommand2(xml, ""))
             except Exception as why:  # noqa: BLE001 -- handed to the caller as it is
                 hardware_server.forget_connection()
                 outcome["error"] = why
@@ -182,6 +189,18 @@ ALLOWED_COMMANDS = frozenset(
     }
 )
 
+#: The values the driver may write straight into LCS's state tree, by name: their
+#: path and the values allowed. LAS X's window changes these with no command LCS
+#: logs, and a loaded setting does not change them; every other node is refused.
+#: Bidirectional X moves nothing and makes no light (simulator, 2026-11-01: the
+#: frame rate halved and doubled with it, so the scan follows the value).
+STATE_TREE_WRITES = {
+    "ScanDirectionX": (("Confocal", "ScanningParameter", "ScanDirectionX"), frozenset({1, 2})),
+}
+
+#: A write into the state tree, as the writes build it: ``<StateTree Command="name" Value="n"/>``.
+STATE_TREE = re.compile(r'^\s*<StateTree\s+Command="([^"]+)"\s+Value="([^"]+)"\s*/>\s*$')
+
 #: An element's command, wherever it stands among the attributes (LAS X's window
 #: writes ``FileName`` before ``Command`` in its setting commands).
 COMMAND = re.compile(r'^\s*<\w+\b[^>]*?\sCommand="([^"]+)"')
@@ -193,6 +212,14 @@ class NotAllowed(RuntimeError):
 
 def allowed(xml: str) -> str:
     """The command *xml* carries, when the driver may send it; :class:`NotAllowed` otherwise."""
+    tree = STATE_TREE.match(xml or "")
+    if tree is not None:
+        name, value = tree[1], tree[2]
+        if name not in STATE_TREE_WRITES:
+            raise NotAllowed(f"not written: {name} is not a value this driver writes into the state tree")
+        if not value.lstrip("-").isdigit() or int(value) not in STATE_TREE_WRITES[name][1]:
+            raise NotAllowed(f"not written: {name} takes {sorted(STATE_TREE_WRITES[name][1])}, not {value}")
+        return name
     found = COMMAND.match(xml or "")
     if found is None:
         raise NotAllowed(f"not sent: no command can be read in {xml[:80]!r}")

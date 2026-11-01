@@ -176,6 +176,11 @@ def get_detection_units(client, **keywords):
     return _routed("detection_units", client, **keywords)
 
 
+def get_bidirectional(client, **keywords):
+    """Whether the scan is bidirectional."""
+    return _routed("bidirectional", client, **keywords)
+
+
 def get_optimal_format(client, **keywords):
     """The format LAS X computes as optimal, ``(x, y)``; None when it has none (or it cannot be read)."""
     found = _routed("optimal_format", client, **keywords)

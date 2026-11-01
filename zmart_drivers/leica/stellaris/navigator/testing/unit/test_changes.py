@@ -474,3 +474,13 @@ class TestChannelColour:
 
         assert result["success"] is False and "Trans PMT" in result["message"]
         assert lasx.commands() == []
+
+
+
+class TestBidirectional:
+    def test_bidirectional_is_switched_in_the_state_tree_and_read_back(self, lasx, client):
+        assert changes.change(client, "bidirectional", True)["confirmed"] is True
+        assert lasx.live[(*SCANNING, "ScanDirectionX")] == 2
+        assert changes.change(client, "bidirectional", False)["confirmed"] is True
+        assert lasx.live[(*SCANNING, "ScanDirectionX")] == 1
+        assert lasx.commands() == []  # no command: the value is written into the state tree

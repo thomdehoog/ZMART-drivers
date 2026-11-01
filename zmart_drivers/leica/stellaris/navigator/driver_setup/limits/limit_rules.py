@@ -214,6 +214,7 @@ SETTER_LIMIT_KEYS = (
     "set_resonant_scanner",
     "set_filter_wheel",
     "set_detector_gain",
+    "set_bidirectional",
 )
 
 

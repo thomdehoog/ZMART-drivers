@@ -417,8 +417,10 @@ def filter_wheel(wheel_type: int, slot: int, filter_name: str) -> Write:
 
     def fill(request: Request) -> None:
         request.elements = [
-            f'<Scanner Command="FilterWheel_ApiSetSlot" FilterWheelType="{int(wheel_type)}" SlotIndex="{int(slot)}" '
-            f'SetMode="2" SingleSettingIndex="0" {CURRENT}><BeamRoute Version="0"/></Scanner>'
+            (
+                f'<Scanner Command="FilterWheel_ApiSetSlot" FilterWheelType="{int(wheel_type)}" SlotIndex="{int(slot)}" '
+                f'SetMode="2" SingleSettingIndex="0" {CURRENT}><BeamRoute Version="0"/></Scanner>'
+            )
         ]
 
     def shows(wheels) -> bool:
@@ -463,12 +465,37 @@ def channel_colour(route, colour: str) -> Write:
     )
 
 
+def bidirectional(on: bool) -> Write:
+    """Scan both ways (True) or one way (False): written into LCS's state tree, as LAS X's window does; read back.
+
+    The one value the driver writes there (``transfer.STATE_TREE_WRITES``):
+    LAS X's window changes it with no command LCS logs, and a loaded setting
+    does not change it (simulator, 2026-11-01).
+    """
+    if not isinstance(on, bool):
+        raise ValueError(f"bidirectional takes True or False, not {on!r}")
+
+    def fill(request: Request) -> None:
+        request.elements = [f'<StateTree Command="ScanDirectionX" Value="{2 if on else 1}"/>']
+
+    return Write(
+        command="set_bidirectional",
+        values={"value": on},
+        request="ScanDirectionX",
+        fill=fill,
+        description=f"Bidirectional -> {'on' if on else 'off'}",
+        ready=idle(),
+        confirm=Expect("bidirectional", lambda shown: shown is on),
+    )
+
+
 #: The settings with a write of their own, by name, beside the table of numbers (:data:`SETTINGS`).
 NAMED_SETTINGS = {
     "scan_mode": scan_mode,
     "autofocus": autofocus,
     "format": image_format,
     "resonant_scanner": resonant_scanner,
+    "bidirectional": bidirectional,
 }
 
 
@@ -636,8 +663,10 @@ def z_stack_range(drive: str, begin_um: float, end_um: float, *, start: dict | N
         raise ValueError(f"no z drive {drive!r}; the drives are {sorted(Z_DRIVES)}")
     axis = "z_galvo_um" if drive == "z-galvo" else "z_wide_um"
     elements = [
-        f'<Scanner Command="SetZStackDefinition" SetBegin="1" SetEnd="1" '
-        f'BeginValue="{metres(begin_um)}" EndValue="{metres(end_um)}" {CURRENT}/>'
+        (
+            f'<Scanner Command="SetZStackDefinition" SetBegin="1" SetEnd="1" '
+            f'BeginValue="{metres(begin_um)}" EndValue="{metres(end_um)}" {CURRENT}/>'
+        )
     ]
 
     def fill(request: Request) -> None:
@@ -755,8 +784,10 @@ def load_setting(path, values: dict) -> Write:
 
     def fill(request: Request) -> None:
         request.elements = [
-            f'<ATL Command="ATL_Block_Load_From_XML" FileName="{path}" CreateNewInstedOfReplace="0" '
-            'ElementIDAfterLoadedBlock="0" Attribute="2"/>'
+            (
+                f'<ATL Command="ATL_Block_Load_From_XML" FileName="{path}" CreateNewInstedOfReplace="0" '
+                'ElementIDAfterLoadedBlock="0" Attribute="2"/>'
+            )
         ]
 
     return Write(

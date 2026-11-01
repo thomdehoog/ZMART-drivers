@@ -36,6 +36,7 @@ SIMULATOR_SETTINGS = {
     ("Acquire", "AcquireZStackInfo", "StepSize"): 0.0,
     ("Acquire", "ZStackUseMode"): 1,
     ("Acquire", "ZPositionMode"): 1,
+    ("Confocal", "ScanningParameter", "ScanDirectionX"): 1,
     ("Acquire", "AutoFocusInfo", "IsSeriesScanAutofocusActive"): True,
     ("Confocal", "ScanningParameter", "IsResonantConfocalScanner"): False,
     ("Confocal", "ScanningParameter", "Speed"): 400,
@@ -400,6 +401,17 @@ class StandInNodes:
             for key, value in objective.items():
                 values[child(info, key)] = value
         return nodes, values
+
+    def ChangeNodes(self, changes):
+        """Write each ``(NodeID, Value)`` into the node it names, as LCS does for its window."""
+        nodes, _ = self.tree()
+        for change in changes:
+            path, node = [], change.NodeID
+            while node and node != 1:
+                name, parent, _kids = nodes[node]
+                path.insert(0, name)
+                node = parent
+            self.live[tuple(path)] = change.Value
 
     def GetNode(self, node_id):
         self.node_calls += 1

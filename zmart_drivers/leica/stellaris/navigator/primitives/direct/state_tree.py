@@ -22,9 +22,12 @@ Walking the tree by name costs about 270 ms; a node read by its id about
 node still carries the name it had (one ``GetNode``); a node that does not is
 looked up afresh, which is what an experiment load or a LAS X restart needs.
 
-This module only reads. ``RegisterNode`` also subscribes the connection to
-the node's updates; nothing listens, and the subscription ends with the
-connection. ``ChangeNodes``, which writes, is never called.
+This module reads, with one exception. ``RegisterNode`` also subscribes the
+connection to the node's updates; nothing listens, and the subscription ends
+with the connection. ``ChangeNodes``, which writes a node, is called by
+:func:`change_node` only, and only for the one value the transfer allows
+(``transfer.STATE_TREE_WRITES``): LAS X's window changes Bidirectional X
+there, with no command LCS logs (simulator, 2026-11-01).
 """
 
 from __future__ import annotations
@@ -164,6 +167,26 @@ def server_nodes():
         kept = (server, server.ServerNodes)
         connections.nodes = kept
     return kept[1]
+
+
+def change_node(path, value):
+    """Write *value* into the node at *path*, looked up by name now, as LAS X's window does for Bidirectional X.
+
+    Called by the transfer only, for a value on its list. A record of LCS's
+    own type when pywin32 can make one; the stand-in takes a plain one.
+    """
+    nodes = server_nodes()
+    node = node_at(nodes, path)
+    try:
+        import win32com.client
+
+        change = win32com.client.Record("UDT_SERVERNODE_CHANGE", nodes)
+    except Exception:  # noqa: BLE001 -- not LCS's COM object: the stand-in
+        from types import SimpleNamespace
+
+        change = SimpleNamespace()
+    change.NodeID, change.Value = node, value
+    nodes.ChangeNodes([change])
 
 
 def read(what, reading):

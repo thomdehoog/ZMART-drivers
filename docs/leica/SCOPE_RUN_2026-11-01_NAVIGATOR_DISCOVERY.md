@@ -323,3 +323,12 @@ Shown with Bidirectional X on. Typed in LAS X's window as -40: LCS's
 became -39.98), with no command in LCS's log. Written as -20 in the master and Setting 1 of a
 saved setting and loaded: LCS stayed at -39.976. Phase X can be read, not set: like the other
 scan parameters.
+
+## 19. Bidirectional X, written into the state tree (a decided exception)
+
+With no command and no setting-file route, Thom decided one narrow exception to "the state
+tree is read, never written": Bidirectional X only. Written with `ServerNodes.ChangeNodes` into
+`Confocal/ScanningParameter/ScanDirectionX` (1 unidirectional, 2 bidirectional), the node
+looked up by its path at each write. LCS read back the value, the frame rate halved and doubled
+with it (0.78 and 1.56 per second), so the scan follows, and LAS X's window showed the switch.
+Every other node is refused by the transfer, and only 1 or 2 is written.

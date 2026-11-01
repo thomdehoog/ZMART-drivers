@@ -72,6 +72,7 @@ READS = (
     "channel_colours",
     "detection_units",
     "optimal_format",
+    "bidirectional",
     "laser_lines",
     "scan_field_rotation",
     "sequential_mode",
@@ -421,6 +422,14 @@ def get_channel_colours() -> dict[int, str]:
         return found
 
     return read("the channel colours", reading)
+
+
+def get_bidirectional() -> bool:
+    """Whether the scan is bidirectional: ``Confocal/ScanningParameter/ScanDirectionX`` 2 (1 is unidirectional)."""
+    value = settings("the scan direction", {"x": ("Confocal", "ScanningParameter", "ScanDirectionX")})["x"]
+    if value not in (1, 2):
+        raise HardwareServerUnavailable(f"the state tree answered ScanDirectionX = {value!r}")
+    return value == 2
 
 
 def get_optimal_format() -> tuple[int, int] | None:
