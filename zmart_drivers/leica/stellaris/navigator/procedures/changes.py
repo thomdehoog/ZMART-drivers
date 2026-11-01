@@ -380,6 +380,16 @@ def smartcorr(client, project=None, **watching) -> dict:
     return result
 
 
+def set_collar_reference(client) -> dict:
+    """Store where the collar stands as the reference of the objective in the light path, as the window's Set does; read back."""
+    return run(client, writes.collar_reference(readers.get_collar(client)["percent"]))
+
+
+def reset_collar_reference(client) -> dict:
+    """Clear the collar's reference of the objective in the light path, as the window's Reset does; read back."""
+    return run(client, writes.collar_reference(None))
+
+
 def collar_to_reference(client) -> dict:
     """Turn the collar to the position stored for the objective in the light path, as the window's GoTo does; read back.
 

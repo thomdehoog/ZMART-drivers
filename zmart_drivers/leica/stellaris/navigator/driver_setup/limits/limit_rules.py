@@ -223,6 +223,7 @@ SETTER_LIMIT_KEYS = (
     "set_system_optimized_step",
     "set_collar",
     "set_smartcorr_range",
+    "set_collar_reference",
 )
 
 

@@ -33,5 +33,6 @@
   "set_bit_depth": [],
   "set_system_optimized_step": [],
   "set_collar": [],
-  "set_smartcorr_range": []
+  "set_smartcorr_range": [],
+  "set_collar_reference": []
 }

@@ -375,6 +375,16 @@ class Microscope:
         self.handle.require_open()
         return checked(self.handle, changes.smartcorr(self.handle.client, project), "smartcorr()")
 
+    def set_collar_reference(self) -> dict:
+        """Store where the collar stands as this objective's reference, as the window's Set does; read back."""
+        self.handle.require_open()
+        return checked(self.handle, changes.set_collar_reference(self.handle.client), "set_collar_reference()")
+
+    def reset_collar_reference(self) -> dict:
+        """Clear this objective's collar reference, as the window's Reset does; read back."""
+        self.handle.require_open()
+        return checked(self.handle, changes.reset_collar_reference(self.handle.client), "reset_collar_reference()")
+
     def collar_to_reference(self) -> dict:
         """Turn the collar to the position stored for this objective, as the window's GoTo does; read back."""
         self.handle.require_open()

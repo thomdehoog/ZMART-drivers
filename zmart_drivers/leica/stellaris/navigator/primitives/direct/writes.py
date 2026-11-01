@@ -457,6 +457,36 @@ def smartcorr_range(value) -> Write:
     )
 
 
+def collar_reference(percent) -> Write:
+    """Store *percent* as the collar's reference for the objective in the light path, as the window's Set does; None clears it, as its Reset does.
+
+    Written into that objective's ``MotCorrRefPos`` in LCS's state tree, -1
+    for none, as the window writes it (simulator, 2026-11-01); read back.
+    """
+    if percent is not None and (isinstance(percent, bool) or not isinstance(percent, (int, float)) or not 0 <= percent <= 100):
+        raise ValueError(f"the collar's reference takes 0 to 100 percent or None, not {percent!r}")
+    written = -1.0 if percent is None else float(percent)
+
+    def fill(request: Request) -> None:
+        request.elements = [f'<StateTree Command="MotCorrRefPos" Value="{written!r}"/>']
+
+    def shows(reading) -> bool:
+        stored = reading.get("reference") if isinstance(reading, dict) else "unread"
+        if percent is None:
+            return stored is None
+        return stored is not None and stored != "unread" and abs(stored - percent) <= COLLAR_TOLERANCE_PERCENT
+
+    return Write(
+        command="set_collar_reference",
+        values={"value": written},
+        request="MotCorrRefPos",
+        fill=fill,
+        description=f"Collar reference -> {'none' if percent is None else f'{percent:g} %'}",
+        ready=idle(),
+        confirm=Expect("collar", shows),
+    )
+
+
 def smartcorr(project: int) -> Write:
     """SmartCORR, the window's Start SmartCORR: a scan through the collar positions of its range, into *project*.
 

@@ -58,6 +58,7 @@ _ADDED_LATER = (*STEP_LIMIT_KEYS, "set_z_stack_step", "set_scan_mode", "set_auto
     "set_format", "set_resonant_scanner", "set_filter_wheel", "set_detector_gain", "set_bidirectional",
     "set_phase_x", "set_pinhole_um", "set_pinhole_unit", "set_emission_wavelength",
     "set_bit_depth", "set_system_optimized_step", "set_collar", "set_smartcorr_range",
+    "set_collar_reference",
 )
 
 

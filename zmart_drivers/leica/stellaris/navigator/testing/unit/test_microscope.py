@@ -365,3 +365,14 @@ def test_smartcorr_and_the_collar_s_reference(scope, lasx):
     lasx.nodes.objectives[0]["MotCorrRefPos"] = 10.0
     assert scope.collar_to_reference()["confirmed"] is True
     assert scope.settings()["collar"]["reference"] == 10.0
+
+
+
+def test_the_collar_s_reference_is_set_gone_to_and_reset(scope, lasx):
+    assert scope.change_setting("collar", 40)["confirmed"] is True
+    assert scope.set_collar_reference()["confirmed"] is True
+    assert scope.change_setting("collar", 0)["confirmed"] is True
+    assert scope.collar_to_reference()["confirmed"] is True
+    assert scope.settings()["collar"]["percent"] == 40.0
+    assert scope.reset_collar_reference()["confirmed"] is True
+    assert scope.settings()["collar"]["reference"] is None

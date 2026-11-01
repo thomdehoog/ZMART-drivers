@@ -428,6 +428,12 @@ class StandInNodes:
                 name, parent, _kids = nodes[node]
                 path.insert(0, name)
                 node = parent
+            if path[:3] == ["Microscope", "ObjectiveList", "ObjectiveInfo"]:
+                # An objective's own value: the n-th ObjectiveInfo is the n-th objective.
+                info = nodes[change.NodeID][1]
+                infos = [n for n in nodes[nodes[info][1]][2] if nodes[n][0] == "ObjectiveInfo"]
+                self.objectives[infos.index(info)][path[-1]] = change.Value
+                continue
             self.live[tuple(path)] = change.Value
             if tuple(path) == ("Acquire", "AcquireZStackInfo", "StackCalculationMode"):
                 # LCS follows step mode 2 with its optimal step, as for the window's System Optimized.

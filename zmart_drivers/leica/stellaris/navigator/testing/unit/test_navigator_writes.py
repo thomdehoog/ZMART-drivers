@@ -461,3 +461,19 @@ class TestSmartCorr:
             '<AcquireControl Command="StopAcquiring" DCParentElementID="0"/>',
             '<AcquireControl Command="StartMotCorrAutomation" DCParentElementID="24"/>',
         ]
+
+
+
+class TestCollarReference:
+    def test_set_writes_the_position_and_reset_writes_none(self):
+        write = writes.collar_reference(30.0)
+        assert elements(write) == ['<StateTree Command="MotCorrRefPos" Value="30.0"/>']
+        assert write.confirm.accept({"reference": 30.0}) and not write.confirm.accept({"reference": None})
+        cleared = writes.collar_reference(None)
+        assert elements(cleared) == ['<StateTree Command="MotCorrRefPos" Value="-1.0"/>']
+        assert cleared.confirm.accept({"reference": None}) and not cleared.confirm.accept({"reference": 30.0})
+
+    @pytest.mark.parametrize("percent", [-1, 100.5, "half"])
+    def test_a_reference_outside_the_collar_is_refused(self, percent):
+        with pytest.raises(ValueError):
+            writes.collar_reference(percent)

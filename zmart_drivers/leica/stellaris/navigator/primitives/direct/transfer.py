@@ -195,10 +195,12 @@ class TreeWrite:
     """One value the driver may write into LCS's state tree, and the values it may take.
 
     ``kind`` is ``int`` or ``float``. A value is one of ``choices``, or lies
-    within ``within`` (a fixed range LCS keeps to), or lies between the two
-    nodes ``between`` names beside it: LCS's own minimum and maximum, read
-    at the moment of the write; or it is one of the values in the node
-    ``listed`` names beside it, LCS's own list, read at the write.
+    within ``within`` (a fixed range LCS keeps to; with ``choices`` too,
+    either will do), or lies between the two nodes ``between`` names beside
+    it: LCS's own minimum and maximum, read at the moment of the write; or
+    it is one of the values in the node ``listed`` names beside it, LCS's
+    own list, read at the write. ``of_objective``: the node belongs to the
+    objective in the light path, found at the write.
     """
 
     path: tuple[str, ...]
@@ -207,6 +209,7 @@ class TreeWrite:
     within: tuple[float, float] | None = None
     between: tuple[str, str] | None = None
     listed: str | None = None
+    of_objective: bool = False
 
 
 HW_PARAMETER = ("Confocal", "HWParameter")
@@ -248,6 +251,13 @@ STATE_TREE_WRITES = {
     "AutomationBegin": TreeWrite(("Microscope", "MotCorrAutomationInfo", "AutomationBegin"), float, within=(0, 100)),
     "AutomationEnd": TreeWrite(("Microscope", "MotCorrAutomationInfo", "AutomationEnd"), float, within=(0, 100)),
     "AutomationSteps": TreeWrite(("Microscope", "MotCorrAutomationInfo", "AutomationSteps"), within=(2, 100)),
+    # The collar position stored for the objective in the light path, which
+    # GoTo goes to: the window's Set writes the collar's position here, its
+    # Reset -1, none (simulator, 2026-11-01). Only this objective's is written.
+    "MotCorrRefPos": TreeWrite(
+        ("Microscope", "ObjectiveList", "ObjectiveInfo", "MotCorrRefPos"), float,
+        choices=frozenset({-1.0}), within=(0, 100), of_objective=True,
+    ),
 }
 
 #: A write into the state tree, as the writes build it: ``<StateTree Command="name" Value="n"/>``.
@@ -277,9 +287,13 @@ def tree_value(name: str, text: str):
         raise NotAllowed(f"not written: {name} takes a {entry.kind.__name__}, not {text}") from None
     if entry.kind is float and not math.isfinite(value):
         raise NotAllowed(f"not written: {name} takes a finite number, not {text}")
-    if entry.choices and value not in entry.choices:
+    chosen = value in entry.choices
+    within = entry.within is not None and entry.within[0] <= value <= entry.within[1]
+    if entry.choices and entry.within is not None and not (chosen or within):
+        raise NotAllowed(f"not written: {name} takes {sorted(entry.choices)} or {entry.within[0]} to {entry.within[1]}, not {text}")
+    if entry.choices and entry.within is None and not chosen:
         raise NotAllowed(f"not written: {name} takes {sorted(entry.choices)}, not {text}")
-    if entry.within is not None and not entry.within[0] <= value <= entry.within[1]:
+    if entry.within is not None and not entry.choices and not within:
         raise NotAllowed(f"not written: {name} takes {entry.within[0]} to {entry.within[1]}, not {text}")
     return value
 
@@ -312,7 +326,7 @@ def write_into_state_tree(name: str, text: str) -> str:
         room = 1e-9 * max(abs(low), abs(high))
         if not low - room <= value <= high + room:
             return f'<Result Error="1">{name} {text} is outside the range of LAS X, {low} to {high}; not written</Result>'
-    state_tree.change_node(entry.path, value)
+    state_tree.change_node(entry.path, value, of_objective=entry.of_objective)
     return '<Result Error="0"/>'
 
 

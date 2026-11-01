@@ -170,14 +170,25 @@ def server_nodes():
     return kept[1]
 
 
-def change_node(path, value):
+def objective_node(nodes, name):
+    """The node *name* of the objective in the light path: in the ``ObjectiveInfo`` of ``Microscope/SlotPosition``'s slot."""
+    slot = node_value(nodes, node_at(nodes, ("Microscope", "SlotPosition")))
+    infos = of_name(nodes, children(nodes, node_at(nodes, ("Microscope", "ObjectiveList"))), "ObjectiveInfo")
+    if not isinstance(slot, int) or not 0 <= slot < len(infos):
+        raise HardwareServerUnavailable(f"the state tree has no objective in slot {slot} ({len(infos)} listed)")
+    return named(nodes, infos[slot], name)
+
+
+def change_node(path, value, *, of_objective=False):
     """Write *value* into the node at *path*, looked up by name now, as LAS X's window does for Bidirectional X.
 
-    Called by the transfer only, for a value on its list. A record of LCS's
-    own type when pywin32 can make one; the stand-in takes a plain one.
+    With *of_objective*, the node is the objective in the light path's own
+    (:func:`objective_node`), looked up now. Called by the transfer only, for
+    a value on its list. A record of LCS's own type when pywin32 can make
+    one; the stand-in takes a plain one.
     """
     nodes = server_nodes()
-    node = node_at(nodes, path)
+    node = objective_node(nodes, path[-1]) if of_objective else node_at(nodes, path)
     try:
         import win32com.client
 

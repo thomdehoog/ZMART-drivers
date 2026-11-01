@@ -584,3 +584,22 @@ class TestSmartCorr:
 
         assert result["success"] is False and "reference" in result["message"]
         assert lasx.commands() == []
+
+
+
+class TestCollarReference:
+    def test_set_stores_where_the_collar_stands_for_the_objective_in_the_light_path(self, lasx, client):
+        lasx.live[("Microscope", "SlotPosition")] = 1
+        lasx.live[("Microscope", "CurrentMotCorrPos")] = 35.0
+
+        assert changes.set_collar_reference(client)["confirmed"] is True
+        assert lasx.nodes.objectives[1]["MotCorrRefPos"] == 35.0
+        assert lasx.nodes.objectives[0]["MotCorrRefPos"] == -1.0  # the other objectives keep theirs
+        assert lasx.commands() == []
+
+    def test_reset_clears_it_and_goto_is_then_refused(self, lasx, client):
+        lasx.nodes.objectives[0]["MotCorrRefPos"] = 20.0
+
+        assert changes.reset_collar_reference(client)["confirmed"] is True
+        assert lasx.nodes.objectives[0]["MotCorrRefPos"] == -1.0
+        assert changes.collar_to_reference(client)["success"] is False

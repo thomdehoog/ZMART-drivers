@@ -35,7 +35,7 @@ discovery session in `SCOPE_RUN_2026-11-01_NAVIGATOR_DISCOVERY.md` and the build
 | Collar to the stored reference (GoTo) | Works, with LAS X's command |
 | SmartCORR range (Begin, End, Steps) | Works: written into LAS X's state tree |
 | SmartCORR (automatic collar scan) | Works, with LAS X's command |
-| Collar reference stored or cleared (Set, Reset) | Learned, not built: it writes into LAS X's objective list |
+| Collar reference stored or cleared (Set, Reset) | Works: written into LAS X's state tree, for the objective in the light path only |
 
 ## Taking pictures
 
@@ -102,7 +102,7 @@ discovery session in `SCOPE_RUN_2026-11-01_NAVIGATOR_DISCOVERY.md` and the build
 |---|---|
 | A channel on or off | Works (through a saved setting) |
 | Gain | Works (through a saved setting; fixed by LAS X in photon counting) |
-| Offset | Not yet learned |
+| Offset | Not built: LCS holds a value per detector (-100 to 100 %), but LAS X's window offers no control for it, and the driver changes only what the window can |
 | Detection band (begin and end) | Works (through a saved setting) |
 | Operating mode (Fast Mode, Counting, Analog, Reflection) | Works (through a saved setting) |
 | Tau mode (Intensity, TauGating, TauScan, TauSeparation, TauInteraction; with a pulsed WLL line) | Works (through a saved setting) |
@@ -150,7 +150,7 @@ service and the person responsible for the instrument.
 
 | State | Settings |
 |---|---|
-| Works | 55 (the objective among them, not yet tried) |
+| Works | 56 (the objective among them, not yet tried) |
 | Tried | 1 |
 | Command known | 0 |
-| Not yet learned | 7 |
+| Not yet learned | 6 |

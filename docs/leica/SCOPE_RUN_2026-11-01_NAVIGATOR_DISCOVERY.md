@@ -469,10 +469,23 @@ built with LCS's own commands, and the range as state-tree writes, as for Bidire
 
 Built: `change_setting("collar", percent)`, 0 to 100; `change_setting("smartcorr_range", (begin,
 end, steps))`; `smartcorr(project=None)`; `collar_to_reference()`, which reads `MotCorrRefPos` of
-the objective in the light path and is refused when none is stored. Set and Reset are not built:
-they write into LAS X's objective list. Through the driver: the collar 25 confirmed, 150 refused,
+the objective in the light path and is refused when none is stored. Set and Reset were then built too
+(Thom asked): `set_collar_reference()` writes the collar's position into `MotCorrRefPos` of the
+objective in the light path, found at the write, and `reset_collar_reference()` writes -1. Through the driver: the collar 25 confirmed, 150 refused,
 0 confirmed; the range (10, 90, 5) confirmed; SmartCORR confirmed, the collar left at 10; GoTo
 refused without a reference; the range put back to (0, 100, 10) and the collar to 0. The Set
 pressed during the learning was cleared with Reset, so the simulator's objective has no stored
 reference, as before.
+
+Set and Reset through the driver: the collar 40, `set_collar_reference()` stored 40; the collar 0,
+`collar_to_reference()` brought it to 40; `reset_collar_reference()` cleared it; the collar back to 0.
+
+## 26. The detector offset: not in LAS X's window
+
+LCS holds an `Offset` for each detector (`DetectorHWInfo/Offset`, `OffsetMin` -100, `OffsetMax`
+100, in %), all 0. No control in any of LAS X's windows is named Offset (searched with UI
+Automation, visible and hidden), and a loaded setting does not apply the setting file's offset
+(section 16). The STELLARIS's HyD detectors count photons or run in Fast Mode, where a black
+level is not set. Thom decided: what the window does not offer, the driver does not change. Not
+built.
 
