@@ -15,6 +15,11 @@ LAS X's cache (``procedures/save_data``) and letting go of it
 2. zoom, scan speed, scan field rotation, line average and pinhole, each to
    a value inside its own range and back;
 3. z-galvo and z-wide +2 um and back, the stage +25 um in x and back;
+3b. the other settings, each to another value and back: frame average, line
+    and frame accumulation, format, resonant scanner, scan mode, autofocus,
+    a filter wheel, the 405 line's power (by 1 %) and its shutter, and the
+    z-stack, only when LAS X has one already (a stack cannot be removed by
+    command, so none is left behind);
 4. with ``--allow-objective`` only: another objective of the same immersion,
    and back; z-wide, which LAS X moves by itself on an objective change, is
    reported and left as LAS X put it;
@@ -199,6 +204,61 @@ def main() -> int:
         finally:
             outcome(step, "stage back", changes.move_xy(client, x0, y0, tolerance=1),
                     f"read {d.get_xy()['x_um']:.0f}, {d.get_xy()['y_um']:.0f}")
+
+        # --- 3b. the other settings, each changed and put back
+        step = "3b other settings"
+        averaging = d.get_averaging()
+        fmt = tuple(int(v) for v in d.get_format().split(" x "))
+        others = [
+            ("frame_average", 2 if averaging["frameAverage"] == 1 else 1, averaging["frameAverage"]),
+            ("line_accumulation", 2 if averaging["lineAccumulation"] == 1 else 1, averaging["lineAccumulation"]),
+            ("frame_accumulation", 2 if averaging["frameAccumulation"] == 1 else 1, averaging["frameAccumulation"]),
+            ("format", (256, 256) if fmt != (256, 256) else (512, 512), fmt),
+            ("scan_mode", "xyt", d.get_scan_mode().replace("N", "")),
+            ("autofocus", not d.get_autofocus(), d.get_autofocus()),
+        ]
+        for name, target, current in others:
+            try:
+                outcome(step, f"{name} to {target}", changes.change(client, name, target))
+            except Exception as why:  # noqa: BLE001
+                run.note(step, f"{name} to {target}", False, f"{type(why).__name__}: {why}")
+            finally:
+                outcome(step, f"{name} back to {current}", changes.change(client, name, current))
+        wheels = [w for w in d.get_filter_wheels() if w["type"] not in changes.INTERNAL_WHEELS and len(w["filterNames"]) > 1]
+        if wheels:
+            wheel = wheels[0]
+            names = [str(n).strip() for n in wheel["filterNames"]]
+            here = names[wheel["filterIndex"]]
+            other = next(n for n in names if n != here)
+            try:
+                outcome(step, f"filter wheel {wheel['type']} to {other}", changes.set_filter_wheel(client, wheel["type"], other))
+            finally:
+                outcome(step, f"filter wheel {wheel['type']} back to {here}", changes.set_filter_wheel(client, wheel["type"], here))
+        else:
+            run.note(step, "a filter wheel", None, "no wheel besides LAS X's own")
+        lines = [line for line in d.get_laser_lines() if line["wavelength"] == 405.0]
+        if lines:
+            power = round(lines[0]["intensity"] * 100, 2)
+            try:
+                outcome(step, "405 nm power +1 %", changes.set_laser_power(client, 405.0, power + 1))
+            finally:
+                outcome(step, f"405 nm power back to {power} %", changes.set_laser_power(client, 405.0, power))
+            shutter = lines[0]["shutterOpen"]
+            try:
+                outcome(step, "405 nm shutter switched", changes.set_laser_shutter(client, 405.0, not shutter))
+            finally:
+                outcome(step, "405 nm shutter back", changes.set_laser_shutter(client, 405.0, shutter))
+        else:
+            run.note(step, "the 405 line's power and shutter", None, "the 405 line is not in use")
+        stack = d.get_z_stack()
+        if stack:
+            drive, begin, end, step_um = stack["mode"], stack["begin"], stack["end"], stack["stepSize"]
+            try:
+                outcome(step, "z-stack shifted by 1 um", changes.set_z_stack(client, drive, begin + 1, end + 1, step_um))
+            finally:
+                outcome(step, "z-stack back", changes.set_z_stack(client, drive, begin, end, step_um))
+        else:
+            run.note(step, "the z-stack", None, "LAS X has no z-stack set; none is set here, because none can be removed by command")
 
         # --- 4. objective
         step = "4 objective"
