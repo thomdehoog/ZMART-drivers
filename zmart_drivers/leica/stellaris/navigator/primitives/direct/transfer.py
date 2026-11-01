@@ -142,6 +142,48 @@ class Sender:
 senders = {"current": None}
 senders_lock = threading.Lock()
 
+#: Every command the driver may send to LCS, by name. LCS takes many more,
+#: calibration and service commands among them; the transfer refuses each
+#: one that is not here, before anything reaches LCS. A new change adds its
+#: commands here, in the same step as its builder in ``writes.py``.
+ALLOWED_COMMANDS = frozenset(
+    {
+        "SetZoom",
+        "SetScanSpeed",
+        "SetConfocalScanFieldRotation",
+        "SetLineAverage",
+        "SetPinholeAU",
+        "SetStagePositionInHwOnly",
+        "SetZPosition",
+        "SetSlotPosition",
+        "StopAcquiring",
+        "CaptureSingleFrame",
+        "StartAcquiring",
+        "SetStageUseMode",
+        "SetStageIrregularTileScanPositions",
+        "ATL_SuppressAtlasAttachment",
+        "ScanMode",
+        "ActivateAutoFocus",
+        "StageMoveToCoordinates",
+    }
+)
+
+COMMAND = re.compile(r'^\s*<\w+\s+Command="([^"]+)"')
+
+
+class NotAllowed(RuntimeError):
+    """An element whose command is not in :data:`ALLOWED_COMMANDS`; it was not sent."""
+
+
+def allowed(xml: str) -> str:
+    """The command *xml* carries, when the driver may send it; :class:`NotAllowed` otherwise."""
+    found = COMMAND.match(xml or "")
+    if found is None:
+        raise NotAllowed(f"not sent: no command can be read in {xml[:80]!r}")
+    if found[1] not in ALLOWED_COMMANDS:
+        raise NotAllowed(f"not sent: {found[1]} is not a command this driver sends")
+    return found[1]
+
 
 def send(xml: str) -> str:
     """Send one element to the hardware server; return LAS X's answer. Never sent twice.
@@ -150,9 +192,12 @@ def send(xml: str) -> str:
     element caused waits for the operator) ends the wait with
     ``HardwareServerUnavailable``. The element stays with LAS X, which may
     still apply it once the operator answers; the next element goes through
-    a new sender.
+    a new sender. A command not in :data:`ALLOWED_COMMANDS` raises
+    :class:`NotAllowed`, and nothing is sent.
     """
     from . import profile as waiting
+
+    allowed(xml)
 
     with senders_lock:
         if senders["current"] is None:

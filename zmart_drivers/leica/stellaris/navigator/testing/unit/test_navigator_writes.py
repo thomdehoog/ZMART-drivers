@@ -189,3 +189,24 @@ def test_every_change_hands_its_name_and_values_to_the_dispatcher():
             keywords = {k.arg for k in node.keywords}
             assert {"command", "values"} <= keywords, f"line {node.lineno}: Write needs command= and values="
     assert calls >= 7
+
+
+def test_every_element_the_driver_builds_is_on_the_transfer_s_allowlist():
+    """The transfer refuses every command it does not know; each builder only uses known ones."""
+    import re
+
+    from zmart_drivers.leica.stellaris.navigator.primitives.direct import transfer
+
+    built = [writes.setting(name, 1.0) for name in writes.SETTINGS]
+    built += [
+        writes.move_xy(63500.0, 41500.0),
+        writes.move_z("z-wide", 10.0, now=lambda: 0.0),
+        writes.set_objective(1, "20x"),
+        writes.capture(2518),
+        writes.tile_scan([(63500.0, 41500.0, 0.0)], 2518),
+        writes.after_tile_scan(63500.0, 41500.0, 0.0),
+    ]
+    for write in built:
+        for element in elements(write):
+            command = re.search(r'Command="([^"]+)"', element)[1]
+            assert command in transfer.ALLOWED_COMMANDS, f"{write.command} sends {command}, not on the allowlist"

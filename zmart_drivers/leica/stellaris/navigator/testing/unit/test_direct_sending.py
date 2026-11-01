@@ -65,20 +65,39 @@ def test_an_element_is_sent_and_las_xs_answer_comes_back(server):
     assert server.received == ['<Scanner Command="SetZoom" Zoom="2" BlockId="0"/>']
 
 
+ZOOM = '<Scanner Command="SetZoom" Zoom="2" BlockId="0"/>'
+SPEED = '<Scanner Command="SetScanSpeed" Speed="600" BlockId="0"/>'
+
+
 def test_the_same_sender_carries_the_next_element(server):
-    send_command.send("<a/>")
+    send_command.send(ZOOM)
     first = send_command.senders["current"]
-    send_command.send("<b/>")
+    send_command.send(SPEED)
 
     assert send_command.senders["current"] is first
-    assert server.received == ["<a/>", "<b/>"]
+    assert server.received == [ZOOM, SPEED]
+
+
+def test_a_command_not_on_the_allowlist_is_never_sent(server):
+    # LCS takes calibration and service commands too; the driver sends none of them.
+    with pytest.raises(send_command.NotAllowed, match="ActivateBleachPointCalibration"):
+        send_command.send('<Scanner Command="ActivateBleachPointCalibration" Activate="1"/>')
+
+    assert server.received == []
+
+
+def test_an_element_without_a_command_is_never_sent(server):
+    with pytest.raises(send_command.NotAllowed):
+        send_command.send("<a/>")
+
+    assert server.received == []
 
 
 def test_a_server_that_fails_raises_its_error_and_the_connection_is_forgotten(server):
     server.fail = OSError("the hardware server went away")
 
     with pytest.raises(OSError, match="went away"):
-        send_command.send("<a/>")
+        send_command.send(ZOOM)
 
     assert server.forgotten == [1]
 
@@ -87,24 +106,24 @@ def test_a_server_that_never_answers_is_given_up_on_and_the_element_is_not_sent_
     server.hold = threading.Event()
 
     with pytest.raises(hardware_server.HardwareServerUnavailable, match="did not answer"):
-        send_command.send("<a/>")
+        send_command.send(ZOOM)
 
-    assert server.received == ["<a/>"]
+    assert server.received == [ZOOM]
     assert send_command.senders["current"] is None  # the next element gets a new sender
 
 
 def test_after_a_server_that_never_answered_the_next_element_goes_through_a_new_sender(server):
     server.hold = threading.Event()
     with pytest.raises(hardware_server.HardwareServerUnavailable):
-        send_command.send("<a/>")
+        send_command.send(ZOOM)
     held = server.hold
     server.hold = None
 
-    answer = send_command.send("<b/>")
+    answer = send_command.send(SPEED)
     held.set()
 
     assert answer == '<Result Error="0"/>'
-    assert "<b/>" in server.received
+    assert SPEED in server.received
 
 
 @pytest.mark.parametrize(
