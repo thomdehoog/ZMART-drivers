@@ -385,6 +385,11 @@ and `PanSecondDim` still zero. The same setting, its `PanFirstDim` written as 0 
 left the pan at 174.4 µm. One capture through the ZMART Driver with the pan moved: LCS was sent
 `StopAcquiring` and `StartAcquiring` only, and no pan value appeared in the state tree.
 
+Tried again, wider: the whole state tree (all 14 roots, 16 levels deep, lists included:
+15,201 values) and every LAS X log, marked before and compared after Thom clicked the pan five
+times to the left. No value changed and no log grew. A setting saved afterwards held
+`PanFirstDim` -0.00069757778991061652 m (697.6 µm to the left), so the clicks had moved the pan.
+
 So LAS X keeps the pan in its own setting and hands it to the hardware by a way that is not
 seen here. The pan can be read from a saved setting; it cannot be set. It stays where Thom put it.
 
