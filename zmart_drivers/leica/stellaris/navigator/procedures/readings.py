@@ -171,6 +171,16 @@ def get_detectors(client, **keywords):
     return _routed("detectors", client, **keywords)
 
 
+def get_detection_units(client, **keywords):
+    """Every detector, in use or not: name, route, type."""
+    return _routed("detection_units", client, **keywords)
+
+
+def get_channel_colours(client, **keywords):
+    """Each channel's colour, by channel number."""
+    return _routed("channel_colours", client, **keywords)
+
+
 def get_serial_number(client, **keywords):
     """The instrument's serial number."""
     return _routed("serial_number", client, **keywords)

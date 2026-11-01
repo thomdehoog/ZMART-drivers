@@ -178,6 +178,7 @@ ALLOWED_COMMANDS = frozenset(
         "FilterWheel_ApiSetSlot",
         "ATL_Block_Save_To_XML",
         "ATL_Block_Load_From_XML",
+        "SetLut",
     }
 )
 

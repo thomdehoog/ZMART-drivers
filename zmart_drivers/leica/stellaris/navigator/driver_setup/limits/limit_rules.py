@@ -406,6 +406,8 @@ MUTATING_COMMANDS = {
     # a whole setting as a file: saving changes nothing; a file's values are checked before it is loaded
     "save_setting": "save_setting",
     "load_setting": "setting_file",
+    # how a channel is shown: not the light, not the detector
+    "set_channel_colour": "set_channel_colour",
 }
 
 

@@ -157,6 +157,8 @@ DATUMS = {
         DatumSpec("light_sources", direct_reader.get_light_sources, listed),
         DatumSpec("filter_wheels", direct_reader.get_filter_wheels, listed),
         DatumSpec("detectors", direct_reader.get_detectors, listed),
+        DatumSpec("detection_units", direct_reader.get_detection_units, listed),
+        DatumSpec("channel_colours", direct_reader.get_channel_colours, lambda v: isinstance(v, dict) and bool(v)),
         DatumSpec("serial_number", direct_reader.get_serial_number, text_present),
         DatumSpec("jobs", direct_reader.get_jobs, listed),
         DatumSpec("hardware_info", direct_reader.get_hardware_info, dict_present),

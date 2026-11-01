@@ -156,6 +156,28 @@ def set_laser_shutter(client, wavelength_nm, open_, *, max_retries=None) -> dict
     return run(client, change, max_retries=max_retries)
 
 
+#: The route of LAS X's spectral detection: a detector on 40;n is channel n.
+SPECTRAL_DETECTION = 40
+
+
+def set_channel_colour(client, detector, colour, *, max_retries=None) -> dict:
+    """Give the channel of *detector* (as LAS X names it, ``"HyD S 3"``) the colour *colour*; read back.
+
+    Only the detectors of the spectral detection: how the others' channels
+    are numbered has not been learned.
+    """
+    units = {unit.get("Name"): unit for unit in readers.get_detection_units(client) or []}
+    unit = units.get(detector)
+    route = tuple(int(part) for part in str((unit or {}).get("BeamRoute", "")).split(";") if part)
+    if len(route) != 2 or route[0] != SPECTRAL_DETECTION:
+        return dispatch.refused(f"{detector!r} is not a detector of the spectral detection; its channel's colour is not set here")
+    try:
+        change = writes.channel_colour(route, colour)
+    except ValueError as why:
+        return dispatch.refused(str(why))
+    return run(client, change, max_retries=max_retries)
+
+
 #: LAS X's own wheels: the galvo and scanner switches (types 200, 160, 170 on the
 #: simulator) and the multi-function port. They are never turned by this driver.
 INTERNAL_WHEELS = (200, 160, 170)

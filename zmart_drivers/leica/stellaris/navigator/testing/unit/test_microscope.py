@@ -272,3 +272,8 @@ def test_the_acquisition_settings_are_changed_like_every_setting(scope, lasx):
 
 def test_a_detector_is_set_through_a_setting_file(scope, lasx):
     assert scope.set_detector("HyD S 3", gain=40.0)["confirmed"] is True
+
+
+
+def test_a_detector_s_channel_gets_a_colour(scope, lasx):
+    assert scope.set_channel_colour("HyD S 3", "Green")["confirmed"] is True

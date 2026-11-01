@@ -294,6 +294,11 @@ class PlainNavigator:
             unit["WaveLengthBegin"], unit["WaveLengthEnd"] = float(band.get("LeftWorld")), float(band.get("RightWorld"))
         return "<Result/>"
 
+    def take_SetLut(self, e):
+        channel = [int(p.get("BeamPosition")) for p in e.iter("BeamPosition")][1]
+        next(lut for lut in self.nodes.luts if lut["Channel"] == channel)["LUTName"] = e.get("LutName")
+        return "<Result/>"
+
     def take_ActivateAutoFocus(self, e):
         self.live[("Acquire", "AutoFocusInfo", "IsSeriesScanAutofocusActive")] = e.get("Activate") == "1"
 

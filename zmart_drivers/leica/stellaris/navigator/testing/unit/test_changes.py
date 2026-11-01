@@ -459,3 +459,18 @@ class TestTheAcquisitionSettings:
 
         assert result["success"] is False and "Polarizer" in result["message"]
         assert lasx.commands() == []
+
+
+
+class TestChannelColour:
+    def test_a_detector_s_colour_is_set_and_read_back(self, lasx, client):
+        result = changes.set_channel_colour(client, "HyD S 3", "Green")
+
+        assert result["confirmed"] is True
+        assert direct_reader.get_channel_colours()[3] == "Green"
+
+    def test_a_detector_outside_the_spectral_detection_is_refused(self, lasx, client):
+        result = changes.set_channel_colour(client, "Trans PMT", "Green")
+
+        assert result["success"] is False and "Trans PMT" in result["message"]
+        assert lasx.commands() == []

@@ -435,6 +435,34 @@ def filter_wheel(wheel_type: int, slot: int, filter_name: str) -> Write:
     )
 
 
+def channel_colour(route, colour: str) -> Write:
+    """Give the channel of the detector on *route* the colour *colour* (LAS X's LUT name, such as ``"Green"``); read back by its channel.
+
+    The command LAS X's window sent (``SetLut``, simulator, 2026-11-01). It
+    changes how the channel is shown, not the light or the detector.
+    """
+    if not isinstance(colour, str) or not colour.strip():
+        raise ValueError(f"a channel colour is LAS X's name of a colour table, such as 'Green', not {colour!r}")
+    channel = int(route[1])
+    element = (
+        f'<Scanner Command="SetLut" DetectorOrCameraChannel="1" IsUserDefined="0" SequentialSettingIndex="0" '
+        f'LutName="{colour}">{beam_route(route)}</Scanner>'
+    )
+
+    def fill(request: Request) -> None:
+        request.elements = [element]
+
+    return Write(
+        command="set_channel_colour",
+        values={"value": colour, "channel": channel},
+        request="SetLut",
+        fill=fill,
+        description=f"Channel {channel} -> {colour}",
+        ready=idle(),
+        confirm=Expect("channel_colours", lambda colours: isinstance(colours, dict) and colours.get(channel) == colour),
+    )
+
+
 #: The settings with a write of their own, by name, beside the table of numbers (:data:`SETTINGS`).
 NAMED_SETTINGS = {
     "scan_mode": scan_mode,

@@ -69,6 +69,8 @@ READS = (
     "light_sources",
     "filter_wheels",
     "detectors",
+    "channel_colours",
+    "detection_units",
     "laser_lines",
     "scan_field_rotation",
     "sequential_mode",
@@ -399,6 +401,25 @@ def get_autofocus() -> bool:
     if not isinstance(value, bool):
         raise HardwareServerUnavailable(f"the state tree answered autofocus = {value!r}")
     return value
+
+
+def get_channel_colours() -> dict[int, str]:
+    """Each channel's colour (LAS X's LUT name), by channel: ``{3: "Gray", 4: "Yellow", ...}``.
+
+    ``Acquire/LUT/LUT_Entry``: a detector of the spectral detection on route
+    ``40;n`` is channel *n* (simulator, 2026-11-01).
+    """
+
+    def reading(nodes):
+        found = {}
+        for entry in of_name(nodes, children(nodes, node_at(nodes, ("Acquire", "LUT"))), "LUT_Entry"):
+            channel = node_value(nodes, named(nodes, entry, "Channel"))
+            name = node_value(nodes, named(nodes, entry, "LUTName"))
+            if isinstance(channel, int) and isinstance(name, str):
+                found[channel] = name
+        return found
+
+    return read("the channel colours", reading)
 
 
 def light_layout(nodes, node, kids):

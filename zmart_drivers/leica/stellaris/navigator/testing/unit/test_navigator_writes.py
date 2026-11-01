@@ -350,3 +350,15 @@ class TestTheAcquisitionSettings:
         assert write.values == {"value": "Substrate", "wheel": 140}
         assert write.confirm.accept([{"type": 140, "filterIndex": 1}])
         assert not write.confirm.accept([{"type": 140, "filterIndex": 2}])
+
+
+
+class TestChannelColour:
+    def test_a_channel_s_colour_is_set_by_its_detector_s_route_and_read_back_by_its_channel(self):
+        write = writes.channel_colour((40, 3), "Green")
+        assert elements(write) == [
+            '<Scanner Command="SetLut" DetectorOrCameraChannel="1" IsUserDefined="0" SequentialSettingIndex="0" '
+            'LutName="Green"><BeamRoute Version="0"><BeamPosition BeamPositionLevel="0" BeamPosition="40"/>'
+            '<BeamPosition BeamPositionLevel="1" BeamPosition="3"/></BeamRoute></Scanner>'
+        ]
+        assert write.confirm.accept({3: "Green", 4: "Yellow"}) and not write.confirm.accept({3: "Gray"})

@@ -301,6 +301,16 @@ class Microscope:
         result = setting_files.set_detector(self.handle.client, setting_files.folder_for(self.handle), name, on=on, gain=gain, band=band)
         return checked(self.handle, result, f"set_detector({name!r})")
 
+    def set_channel_colour(self, detector: str, colour: str) -> dict:
+        """Give the channel of *detector* (``"HyD S 3"``) the colour *colour* (LAS X's name, ``"Green"``); read back.
+
+        It changes how the channel is shown, and the colour saved with its
+        pictures, not the light. Only the detectors of the spectral detection.
+        """
+        self.handle.require_open()
+        result = changes.set_channel_colour(self.handle.client, detector, colour)
+        return checked(self.handle, result, f"set_channel_colour({detector!r}, {colour!r})")
+
     def save_setting(self, path) -> dict:
         """Save LAS X's current setting to the file *path*, as its Setting panel does."""
         self.handle.require_open()

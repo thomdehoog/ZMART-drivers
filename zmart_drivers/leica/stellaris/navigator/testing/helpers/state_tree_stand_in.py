@@ -277,6 +277,10 @@ class StandInNodes:
         self.filter_wheels = copy.deepcopy(
             SIMULATOR_FILTER_WHEELS
         )  # Confocal/HWParameter/FilterWheelList
+        self.luts = [
+            {"Channel": channel, "LUTName": name, "IsUserDefinedLut": False}
+            for channel, name in ((100, "Gray"), (1, "Blue"), (2, "Cyan"), (3, "Gray"), (4, "Yellow"), (5, "Red"))
+        ]  # Acquire/LUT, as on the simulator (2026-11-01)
         self.generation = 0
         self.reads = 0
         self.node_calls = 0
@@ -384,6 +388,7 @@ class StandInNodes:
 
         confocal = child(1, "Confocal")
         graft(confocal, "LightSourceList", {"LightSource": self.light_sources})
+        graft(child(1, "Acquire"), "LUT", {"LUT_Entry": self.luts})
         graft(confocal, "SpectralDetection", self.detection)
         graft(child(confocal, "HWParameter"), "FilterWheelList", self.filter_wheels)
         objective_list = child(child(1, "Microscope"), "ObjectiveList")

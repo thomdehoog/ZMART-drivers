@@ -106,6 +106,7 @@ mic.connect("stellaris-navigator")                                              
 | `settings()` | What LAS X is set to now: the zoom, the scan speed, the rotation, the averaging, the pinhole, the format, the scan mode, the objective and the z-stack, as LAS X reports them. |
 | `change_setting(name, value)` | Change one of the five settings below and read it back. |
 | `set_detector(name, on=None, gain=None, band=None)` | Switch a detector on or off, set its gain, or its band `(begin_nm, end_nm)`, and read it back. LAS X takes these only through a whole setting, so the driver saves the current setting, changes Setting 1 in a copy, checks it against the limits and loads it; the answer's `changed` lists everything else LAS X changed with it. In photon counting LAS X keeps the gain fixed. Refused with several sequential settings. |
+| `set_channel_colour(detector, colour)` | Give a detector's channel a colour, LAS X's name of a colour table such as `"Green"`, and read it back. It changes how the channel is shown, not the light. Only the detectors of the spectral detection. |
 | `save_setting(path)` | Save LAS X's current setting to a file, as its Setting panel does. |
 | `load_setting(path)` | Load a setting file, one saved in LAS X, say. Its laser powers and detector gains are checked against the limits first; the answer's `changed` lists what changed. |
 | `set_filter_wheel(wheel, filter_name)` | Turn the filter wheel of that type (LAS X's number) to the filter of that name, and read it back. LAS X's own galvo and scanner wheels are never turned. |
