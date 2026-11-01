@@ -288,6 +288,17 @@ class Microscope:
         result = changes.change(self.handle.client, name, value)
         return checked(self.handle, result, f"change_setting({name!r}, {value!r})")
 
+    def optimize_format(self) -> dict:
+        """Set the format to the one LAS X computes as optimal, as its "Optimize XY Format" button does; read back.
+
+        Refused when LAS X has no optimal format now.
+        """
+        self.handle.require_open()
+        optimal = readings.get_optimal_format(self.handle.client)
+        if optimal is None:
+            raise RuntimeError("LAS X has no optimal format now, so the format is not changed")
+        return self.change_setting("format", optimal)
+
     def set_detector(
         self, name: str, *, on: bool | None = None, gain: float | None = None, band=None,
         operating_mode: str | None = None, tau_mode: str | None = None, tau_contrast: bool | None = None, dye: str | None = None,

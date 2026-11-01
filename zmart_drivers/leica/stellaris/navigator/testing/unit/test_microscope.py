@@ -282,3 +282,24 @@ def test_a_detector_s_channel_gets_a_colour(scope, lasx):
 
 def test_a_detector_s_mode_and_dye_are_set(scope, lasx):
     assert scope.set_detector("HyD S 3", operating_mode="Analog", dye="Leica/ALEXA 488")["confirmed"] is True
+
+
+def test_the_format_is_set_to_the_one_las_x_computes_as_optimal(scope, lasx):
+    # LAS X's "Optimize XY Format" button: the optimal format is in LCS's state (simulator, 2026-11-01).
+    block = ("Acquire", "ATL", "CurrentBlock", "ConfocalSequentialInfo")
+    lasx.live.update({(*block, "OptimizedFormatX"): 2824, (*block, "OptimizedFormatY"): 2824, (*block, "IsOptimizeFormatValid"): True})
+
+    result = scope.optimize_format()
+
+    assert result["confirmed"] is True
+    assert scope.settings()["format"] == "2824 x 2824"
+
+
+def test_without_a_valid_optimal_format_nothing_is_changed(scope, lasx):
+    block = ("Acquire", "ATL", "CurrentBlock", "ConfocalSequentialInfo")
+    lasx.live.update({(*block, "OptimizedFormatX"): 2824, (*block, "OptimizedFormatY"): 2824, (*block, "IsOptimizeFormatValid"): False})
+
+    with pytest.raises(RuntimeError, match="optimal"):
+        scope.optimize_format()
+
+    assert "SetFormat" not in lasx.commands()

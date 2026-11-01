@@ -71,6 +71,7 @@ READS = (
     "detectors",
     "channel_colours",
     "detection_units",
+    "optimal_format",
     "laser_lines",
     "scan_field_rotation",
     "sequential_mode",
@@ -420,6 +421,23 @@ def get_channel_colours() -> dict[int, str]:
         return found
 
     return read("the channel colours", reading)
+
+
+def get_optimal_format() -> tuple[int, int] | None:
+    """The image format LAS X computes as optimal for the current zoom and objective, ``(x, y)``; None when it has none.
+
+    What LAS X's "Optimize XY Format" button sets: ``OptimizedFormatX`` and
+    ``OptimizedFormatY`` of the current block, valid while
+    ``IsOptimizeFormatValid`` (simulator, 2026-11-01: 2824 x 2824).
+    """
+    block = ("Acquire", "ATL", "CurrentBlock", "ConfocalSequentialInfo")
+    found = settings(
+        "the optimal format",
+        {"x": (*block, "OptimizedFormatX"), "y": (*block, "OptimizedFormatY"), "valid": (*block, "IsOptimizeFormatValid")},
+    )
+    if found["valid"] is not True or not all(isinstance(found[k], int) and found[k] > 0 for k in ("x", "y")):
+        return None
+    return found["x"], found["y"]
 
 
 def light_layout(nodes, node, kids):

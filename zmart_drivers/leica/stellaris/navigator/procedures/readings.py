@@ -176,6 +176,12 @@ def get_detection_units(client, **keywords):
     return _routed("detection_units", client, **keywords)
 
 
+def get_optimal_format(client, **keywords):
+    """The format LAS X computes as optimal, ``(x, y)``; None when it has none (or it cannot be read)."""
+    found = _routed("optimal_format", client, **keywords)
+    return found["format"] if isinstance(found, dict) else None
+
+
 def get_channel_colours(client, **keywords):
     """Each channel's colour, by channel number."""
     return _routed("channel_colours", client, **keywords)

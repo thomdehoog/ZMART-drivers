@@ -295,3 +295,23 @@ Excitation Line: each setting has one `DetectionReferenceLine` (`LaserName`, `La
 `IsAutomaticAssigned`): "Auto (405)" is `Laser 405`, 405, `1`; choosing 497 made it
 `WLL`, 497, `0`. One per setting, not one per detector: which detector it belongs to
 with several on is not known.
+
+## 16. What a loaded setting does not apply: the scan parameters
+
+Changed in a saved setting and loaded, with nothing in LCS's values changing afterwards:
+the detector offset (`Detector Offset`), the bit depth (`BitSize`), the pinhole in metres
+(`Pinhole`), the step mode (`StackCalculationMode`), the pan (`PanFirstDim`, held only by the
+master setting), the correction collar (`MotCorrPosition`, the same), and Bidirectional X.
+
+Bidirectional X switched in LAS X's window changed LCS's `ScanningParameter/ScanDirectionX` 1 to
+2 with no command in LCS's log, and the saved setting then had `ScanDirectionX="2"` and
+`ScanDirectionXName="Bidirectional"` in both the master and Setting 1. The same two values
+written back for unidirectional, in both, and loaded, left LCS at 2. A loaded setting applies
+its lasers and detectors; the scan parameters stay as they are. These stay not learned.
+
+## 17. Optimize XY Format
+
+LAS X's "Optimize XY Format" button sets the format to the one LCS holds as optimal:
+`Acquire/ATL/CurrentBlock/ConfocalSequentialInfo/OptimizedFormatX` and `OptimizedFormatY`
+(2824 x 2824 at zoom 2 with the 10x), valid while `IsOptimizeFormatValid`. The ZMART Driver
+reads them and sets the format with `SetFormat`: 512 x 512 to 2824 x 2824, read back, and back.

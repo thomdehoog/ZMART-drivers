@@ -13,8 +13,12 @@ Each setting is in one of four states:
 - **Command known**: LCS's log shows the exact command LAS X's window sends for it. Not
   tried yet.
 - **Not yet learned**: LAS X's window can change it, but no command for it has been seen in
-  LCS's log. Many of LAS X's controls change LCS without a logged command; those stay set in
-  LAS X's window.
+  LCS's log, and changing it in a saved setting did not take (a loaded setting applies its
+  lasers and detectors, not the scan parameters).
+
+"Through a saved setting" means the ZMART Driver has LAS X save its current setting, changes
+the one value in a copy, checks the copy against the limits, has LAS X load it, and reads the
+value back.
 
 Nothing has been tried on a real microscope yet (state of 1 November 2026, after the
 discovery session in `SCOPE_RUN_2026-11-01_NAVIGATOR_DISCOVERY.md` and the build that followed it).
@@ -50,6 +54,7 @@ discovery session in `SCOPE_RUN_2026-11-01_NAVIGATOR_DISCOVERY.md` and the build
 | Line accumulation | Works |
 | Frame accumulation | Works |
 | Format (pixels) | Works |
+| Optimize XY Format (LAS X's optimal format) | Works |
 | Scan mode (xyz, xyt, ...) | Works |
 | Resonant scanner on or off | Works |
 | Sequential mode | Tried; not built, because it also rearranges which detectors and shutters are on |
@@ -65,9 +70,9 @@ discovery session in `SCOPE_RUN_2026-11-01_NAVIGATOR_DISCOVERY.md` and the build
 | Which drive carries it (z-galvo or z-wide) | Works |
 | Begin and end | Works |
 | Step size | Works |
-| Number of sections | Not yet learned |
+| Number of sections | Works: it follows from the range and the step |
 | System-optimized step | Not yet learned |
-| Direction | Not yet learned |
+| Direction | Works: begin above end runs the stack downwards |
 
 ## Pinhole
 
@@ -88,11 +93,25 @@ discovery session in `SCOPE_RUN_2026-11-01_NAVIGATOR_DISCOVERY.md` and the build
 
 | Setting | State |
 |---|---|
-| A channel on or off | Not yet learned |
-| Gain | Not yet learned |
+| A channel on or off | Works (through a saved setting) |
+| Gain | Works (through a saved setting; fixed by LAS X in photon counting) |
 | Offset | Not yet learned |
-| Detection band (begin and end) | Command known, but not yet working as aimed |
-| Operating mode (photon counting, ...) | Not yet learned |
+| Detection band (begin and end) | Works (through a saved setting) |
+| Operating mode (Fast Mode, Counting, Analog, Reflection) | Works (through a saved setting) |
+| Tau mode (Intensity, TauGating, TauScan, TauSeparation, TauInteraction; with a pulsed WLL line) | Works (through a saved setting) |
+| TauContrast | Works (through a saved setting) |
+| Dye | Works (through a saved setting) |
+| Excitation line (a line, or Auto) | Works with one detector on (through a saved setting) |
+| Channel colour | Works |
+| Show the dyes' excitation and emission spectra | Works (through a saved setting) |
+
+## Whole settings and the dye library
+
+| Setting | State |
+|---|---|
+| Save LAS X's current setting to a file | Works |
+| Load a setting file (one made in LAS X), its values checked against the limits first | Works |
+| The dye library: every dye's name, peaks and spectra | Works (read only) |
 
 ## Filters
 
@@ -124,7 +143,7 @@ service and the person responsible for the instrument.
 
 | State | Settings |
 |---|---|
-| Works | 27 (the objective among them, not yet tried) |
+| Works | 43 (the objective among them, not yet tried) |
 | Tried | 1 |
-| Command known | 1 |
-| Not yet learned | 18 |
+| Command known | 0 |
+| Not yet learned | 13 |
