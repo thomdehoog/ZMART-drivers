@@ -34,6 +34,17 @@ from . import readings as readers
 from .changes import run
 
 SETTING_1 = "Setting 1"
+
+#: The Operating Mode list, as LAS X writes each choice into the setting (simulator, 2026-11-01).
+OPERATING_MODES = {
+    "Fast Mode": {"OperatingType": "2", "AcquisitionMode": "5"},
+    "Counting": {"OperatingType": "2", "AcquisitionMode": "1"},
+    "Analog": {"OperatingType": "1", "IsReflectionModeActive": "0"},
+    "Reflection": {"OperatingType": "1", "IsReflectionModeActive": "1"},
+}
+
+#: The TauModes list, as ``DigitalGatingMode`` (offered with a pulsed WLL line, in counting).
+TAU_MODES = {"Intensity": "2", "TauGating": "3", "TauScan": "5", "TauSeparation": "6", "TauInteraction": "10"}
 #: How close a detector's gain must come when read back.
 GAIN_TOLERANCE = 0.05
 
@@ -76,12 +87,92 @@ def load(client, path) -> dict:
     return result
 
 
-def set_detector(client, folder, name, *, on=None, gain=None, band=None) -> dict:
-    """Switch the detector *name* on or off, set its gain, or its band ``(begin_nm, end_nm)``, through Setting 1; read back.
+def set_detector(
+    client, folder, name, *, on=None, gain=None, band=None,
+    operating_mode=None, tau_mode=None, tau_contrast=None, dye=None,
+) -> dict:
+    """Change the detector *name* through Setting 1, and read it back; any of its fields at once.
 
-    *folder* is where the saved and the changed setting files are kept.
-    ``confirmed`` is True when the detector reads back as asked.
+    *on*, *gain* and *band* ``(begin_nm, end_nm)`` are read back from the
+    detectors in use; *operating_mode* (:data:`OPERATING_MODES`), *tau_mode*
+    (:data:`TAU_MODES`), *tau_contrast* and *dye* (LAS X's name, such as
+    ``"Leica/ALEXA 488"``) from the setting LAS X saves again afterwards.
+    *folder* is where the setting files are kept.
     """
+    if operating_mode is not None and operating_mode not in OPERATING_MODES:
+        return dispatch.refused(f"no operating mode {operating_mode!r}; LAS X offers {list(OPERATING_MODES)}")
+    if tau_mode is not None and tau_mode not in TAU_MODES:
+        return dispatch.refused(f"no tau mode {tau_mode!r}; LAS X offers {list(TAU_MODES)}")
+
+    def change(part):
+        return with_detector(
+            part, name, on=on, gain=gain, band=band,
+            operating_mode=operating_mode, tau_mode=tau_mode, tau_contrast=tau_contrast, dye=dye,
+        )
+
+    def shows(client_, folder_):
+        if not detector_shows(readers.get_detectors(client_), name, on=on, gain=gain, band=band):
+            return False
+        asked = {"operating_mode": operating_mode, "tau_mode": tau_mode, "tau_contrast": tau_contrast, "dye": dye}
+        if all(value is None for value in asked.values()):
+            return True
+        found = saved_now(client_, folder_)["detectors"].get(name, {})
+        return all(found.get(key) == value for key, value in asked.items() if value is not None)
+
+    return through_setting_1(client, folder, change, shows)
+
+
+def set_excitation_line(client, folder, line) -> dict:
+    """Choose the excitation line of the setting's detector: a wavelength in nm, or ``"auto"`` for LAS X's choice; read back.
+
+    LAS X keeps one reference line per setting, not one per detector, so
+    this is refused while more than one detector is on.
+    """
+    if len(readers.get_detectors(client) or []) != 1:
+        return dispatch.refused("the excitation line is set with one detector on; which detector it belongs to with several is not known")
+    if line != "auto":
+        found = [entry for entry in readers.get_laser_lines(client) or [] if entry.get("wavelength") == float(line)]
+        if not found:
+            return dispatch.refused(f"no laser line at {line} nm is on in the setting")
+        laser = "WLL" if found[0].get("laserName") == "WLL" else found[0].get("laserName")
+
+    def change(part):
+        tag = re.search(r"<DetectionReferenceLine [^>]*>", part)
+        if tag is None:
+            raise ValueError("the setting has no excitation line")
+        new = re.sub(r' IsAutomaticAssigned="[^"]*"', f' IsAutomaticAssigned="{1 if line == "auto" else 0}"', tag[0])
+        if line != "auto":
+            new = re.sub(r' LaserName="[^"]*"', f' LaserName="{laser}"', new)
+            new = re.sub(r' LaserWavelength="[^"]*"', f' LaserWavelength="{float(line):g}"', new)
+        return part.replace(tag[0], new, 1)
+
+    def shows(client_, folder_):
+        return saved_now(client_, folder_)["excitation_line"] == (line if line == "auto" else float(line))
+
+    return through_setting_1(client, folder, change, shows)
+
+
+def show_spectra(client, folder, *, excitation=None, emission=None) -> dict:
+    """Show or hide the dyes' excitation and emission spectra in LAS X's setting panel; read back."""
+
+    def change(part):
+        head = re.search(r"<ATLConfocalSettingDefinition [^>]*>", part)[0]
+        new = head
+        if excitation is not None:
+            new = re.sub(r' IsShowDyeExcitationSpectrum="[^"]*"', f' IsShowDyeExcitationSpectrum="{int(bool(excitation))}"', new)
+        if emission is not None:
+            new = re.sub(r' IsShowDyeEmissionSpectrum="[^"]*"', f' IsShowDyeEmissionSpectrum="{int(bool(emission))}"', new)
+        return part.replace(head, new, 1)
+
+    def shows(client_, folder_):
+        found = saved_now(client_, folder_)["show"]
+        return (excitation is None or found["excitation"] == excitation) and (emission is None or found["emission"] == emission)
+
+    return through_setting_1(client, folder, change, shows)
+
+
+def through_setting_1(client, folder, change, shows) -> dict:
+    """Save the setting, apply *change* to Setting 1's text in a copy, load it, and set ``confirmed`` by *shows*."""
     folder = Path(folder)
     folder.mkdir(parents=True, exist_ok=True)
     stamp = time.strftime("%Y%m%d-%H%M%S")
@@ -92,14 +183,50 @@ def set_detector(client, folder, name, *, on=None, gain=None, band=None) -> dict
     try:
         text = saved.read_text(encoding="utf-8")
         start, end = setting_1(text)
-        part = with_detector(text[start:end], name, on=on, gain=gain, band=band)
+        part = change(text[start:end])
     except (OSError, ValueError) as why:
-        return dispatch.refused(f"the detector cannot be set through the setting: {why}")
+        return dispatch.refused(f"the setting cannot be changed: {why}")
     changed.write_text(text[:start] + part + text[end:], encoding="utf-8")
     result = load(client, changed)
     if result.get("success"):
-        result["confirmed"] = detector_shows(readers.get_detectors(client), name, on=on, gain=gain, band=band)
+        result["confirmed"] = bool(shows(client, folder))
     return result
+
+
+def saved_now(client, folder) -> dict:
+    """Setting 1 as LAS X saves it now (:func:`read_back`); empty when it cannot be saved."""
+    Path(folder).mkdir(parents=True, exist_ok=True)
+    path = Path(folder) / f"setting_{time.strftime('%Y%m%d-%H%M%S')}_read.seq"
+    if not save(client, path).get("success"):
+        return {"detectors": {}, "excitation_line": None, "show": {}}
+    return read_back(path.read_text(encoding="utf-8"))
+
+
+def read_back(text: str) -> dict:
+    """What Setting 1 of a saved setting says: each detector's mode, tau mode, contrast and dye; the excitation line; the spectra shown."""
+    start, end = setting_1(text)
+    part = text[start:end]
+    detectors = {}
+    for tag in re.findall(r"<Detector [^>]*>", part):
+        fields = dict(re.findall(r' (\w+)="([^"]*)"', tag))
+        if fields.get("OperatingType") == "1":
+            mode = "Reflection" if fields.get("IsReflectionModeActive") == "1" else "Analog"
+        else:
+            mode = next((n for n, f in OPERATING_MODES.items() if f.get("AcquisitionMode") == fields.get("AcquisitionMode")), None)
+        detectors[fields.get("Name")] = {
+            "operating_mode": mode,
+            "tau_mode": next((n for n, code in TAU_MODES.items() if code == fields.get("DigitalGatingMode")), None),
+            "tau_contrast": fields.get("IsLifetimeContrastActive") == "1",
+            "dye": fields.get("DyeName"),
+        }
+    line = re.search(r"<DetectionReferenceLine [^>]*>", part)
+    excitation = None
+    if line:
+        fields = dict(re.findall(r' (\w+)="([^"]*)"', line[0]))
+        excitation = "auto" if fields.get("IsAutomaticAssigned") == "1" else float(fields.get("LaserWavelength", "nan"))
+    head = dict(re.findall(r' (\w+)="([^"]*)"', re.search(r"<ATLConfocalSettingDefinition [^>]*>", part)[0]))
+    show = {"excitation": head.get("IsShowDyeExcitationSpectrum") == "1", "emission": head.get("IsShowDyeEmissionSpectrum") == "1"}
+    return {"detectors": detectors, "excitation_line": excitation, "show": show}
 
 
 # =============================================================================
@@ -124,17 +251,33 @@ def setting_1(text: str) -> tuple[int, int]:
     return start, min(ends) if ends else len(text)
 
 
-def with_detector(part: str, name: str, *, on=None, gain=None, band=None) -> str:
+def with_detector(
+    part: str, name: str, *, on=None, gain=None, band=None,
+    operating_mode=None, tau_mode=None, tau_contrast=None, dye=None,
+) -> str:
     """Setting 1's text with the detector *name* changed; ValueError when it has no such detector."""
     found = re.search(rf'<Detector [^>]*Name="{re.escape(name)}"[^>]*>', part)
     if found is None:
         raise ValueError(f"the setting has no detector {name!r}")
     tag = found[0]
-    new = tag
+    fields = {}
     if on is not None:
-        new = re.sub(r' IsActive="[^"]*"', f' IsActive="{int(bool(on))}"', new)
+        fields["IsActive"] = str(int(bool(on)))
     if gain is not None:
-        new = re.sub(r' Gain="[^"]*"', f' Gain="{float(gain):g}"', new)
+        fields["Gain"] = f"{float(gain):g}"
+    if operating_mode is not None:
+        fields.update(OPERATING_MODES[operating_mode])
+    if tau_mode is not None:
+        fields["DigitalGatingMode"] = TAU_MODES[tau_mode]
+    if tau_contrast is not None:
+        fields["IsLifetimeContrastActive"] = str(int(bool(tau_contrast)))
+    if dye is not None:
+        fields["DyeName"] = str(dye)
+    new = tag
+    for key, value in fields.items():
+        if f' {key}="' not in new:
+            raise ValueError(f"the setting's detector {name!r} has no {key}")
+        new = re.sub(rf' {key}="[^"]*"', f' {key}="{value}"', new)
     part = part.replace(tag, new, 1)
     if band is not None:
         begin, end = (float(v) for v in band)
@@ -177,9 +320,7 @@ def detector_shows(detectors, name, *, on=None, gain=None, band=None) -> bool:
     detector = found[name]
     if gain is not None and abs(detector["gain"]["value"] - float(gain)) > GAIN_TOLERANCE:
         return False
-    if band is not None and (detector["detectionBegin"], detector["detectionEnd"]) != tuple(float(v) for v in band):
-        return False
-    return True
+    return band is None or (detector["detectionBegin"], detector["detectionEnd"]) == tuple(float(v) for v in band)
 
 
 def snapshot(client) -> dict:
@@ -209,7 +350,7 @@ def changes_between(before: dict, after: dict) -> list[str]:
                     said.append(f"{label} {key}: {'on' if a else 'off'} -> {'on' if b else 'off'}")
                 else:
                     said.append(f"{label} {key}: {a} -> {b}")
-    for key in before:
-        if key not in ("detectors", "laser_lines") and before[key] != after[key]:
-            said.append(f"{key}: {before[key]} -> {after[key]}")
+    for key, was in before.items():
+        if key not in ("detectors", "laser_lines") and was != after[key]:
+            said.append(f"{key}: {was} -> {after[key]}")
     return said

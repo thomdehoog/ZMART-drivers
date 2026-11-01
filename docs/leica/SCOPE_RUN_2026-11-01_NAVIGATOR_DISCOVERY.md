@@ -243,3 +243,55 @@ detectors and filters. Values changed in a saved file and loaded again, on the s
 Changing a value in every setting of the file also changed the Best Focus setting: with HyD 4
 switched on there, its format went from 64 x 64 to 8192 x 8192. A change must be made in the
 one setting meant, and LCS's values compared before and after the load.
+
+Then changed in Setting 1 only (the master and the Best Focus setting left as they were),
+loaded, LCS's values compared, the original loaded again:
+
+| Field changed in Setting 1 | Applied on load |
+|---|---|
+| Detector band (`MultiBand` of the detector's channel: `LeftWorld`, `RightWorld`, `TargetWaveLengthBegin`, `TargetWaveLengthEnd`) | yes: HyD S 3 410-676 to 450-600 nm; LAS X moved the neighbours' limits itself |
+| Bidirectional X (`ScanDirectionX` 1 to 2, 2 being bidirectional in the Best Focus setting) | no: nothing in LCS changed |
+| Operating mode (`Detector OperatingType` 1 to 2) | yes: `OperatingMode` 10 to 1, `OperatingModeIndex` 2 to 1 |
+| `Detector AcquisitionMode` 1 to 0 | no |
+| TauContrast (`IsLifetimeContrastActive`) | yes; LAS X also switched the detector to counting |
+| Dye (`DyeName` to Leica/ALEXA 488) | yes |
+| Excitation line (`DyeExcitationMode` 0 to 1) | yes |
+| Show the dye's excitation spectrum (`IsShowDyeExcitationSpectrum`, on the setting) | yes: `ShowExcitationSpectrum` True |
+
+## 13. A channel's colour
+
+`<Scanner Command="SetLut" DetectorOrCameraChannel="1" IsUserDefined="0" SequentialSettingIndex="0" LutName="Green">`
+with the detector's route sets the colour of the detector's channel: `Acquire/LUT/LUT_Entry`
+lists one colour per channel, and a detector of the spectral detection on route `40;n` is
+channel `n`. HyD S 3 went to Green and back, read back each time.
+
+## 14. The dye library
+
+`C:\ProgramData\Leica Microsystems\DyeDataBase\db\dyes` is empty on this computer: LAS X
+gets its dyes from a dye-database service. How to read it without Leica's code is still to
+be found.
+
+## 15. The detector panel's lists, as LAS X writes them
+
+Each option chosen in LAS X's window, then the setting saved by LAS X and read (so the
+numbers are LAS X's own, not guessed):
+
+| Operating Mode | In the saved setting | LCS `OperatingMode` (index) |
+|---|---|---|
+| Fast Mode | `OperatingType="2"`, `AcquisitionMode="5"` | 4 (0) |
+| Counting | `OperatingType="2"`, `AcquisitionMode="1"` | 1 (1) |
+| Analog | `OperatingType="1"`, `IsReflectionModeActive="0"` | 10 (2) |
+| Reflection | `OperatingType="1"`, `IsReflectionModeActive="1"` | 11 (3) |
+
+| TauModes (offered with a pulsed WLL line, in counting) | `DigitalGatingMode`, in the file and in LCS (index) |
+|---|---|
+| Intensity | 2 (1) |
+| TauGating | 3 (2) |
+| TauScan | 5 (3) |
+| TauSeparation | 6 (4) |
+| TauInteraction | 10 (5) |
+
+Excitation Line: each setting has one `DetectionReferenceLine` (`LaserName`, `LaserWavelength`,
+`IsAutomaticAssigned`): "Auto (405)" is `Laser 405`, 405, `1`; choosing 497 made it
+`WLL`, 497, `0`. One per setting, not one per detector: which detector it belongs to
+with several on is not known.

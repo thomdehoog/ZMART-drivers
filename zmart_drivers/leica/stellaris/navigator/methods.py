@@ -66,10 +66,10 @@ from .procedures import (
     changes,
     keep_in_view,
     readings,
+    setting_files,
 )
 from .procedures import acquire as acquire_step
 from .procedures import state as state_step
-from .procedures import setting_files
 from .procedures.clear_cache import clear as clear_step
 from .procedures.save_data import save_waiting as save_step
 from .procedures.save_data.naming import run_hash
@@ -287,8 +287,16 @@ class Microscope:
         result = changes.change(self.handle.client, name, value)
         return checked(self.handle, result, f"change_setting({name!r}, {value!r})")
 
-    def set_detector(self, name: str, *, on: bool | None = None, gain: float | None = None, band=None) -> dict:
-        """Switch the detector *name* on or off, set its gain, or its band ``(begin_nm, end_nm)``; read back.
+    def set_detector(
+        self, name: str, *, on: bool | None = None, gain: float | None = None, band=None,
+        operating_mode: str | None = None, tau_mode: str | None = None, tau_contrast: bool | None = None, dye: str | None = None,
+    ) -> dict:
+        """Change the detector *name*, any of its fields at once, and read it back.
+
+        *on*, *gain*, *band* ``(begin_nm, end_nm)``, *operating_mode* (Fast
+        Mode, Counting, Analog, Reflection), *tau_mode* (Intensity, TauGating,
+        TauScan, TauSeparation, TauInteraction; with a pulsed WLL line),
+        *tau_contrast* and *dye* (LAS X's name, such as ``"Leica/ALEXA 488"``).
 
         LAS X takes these through a whole setting: the current setting is
         saved, only Setting 1 is changed in a copy, its laser powers and gains
@@ -298,8 +306,23 @@ class Microscope:
         the gain fixed.
         """
         self.handle.require_open()
-        result = setting_files.set_detector(self.handle.client, setting_files.folder_for(self.handle), name, on=on, gain=gain, band=band)
+        result = setting_files.set_detector(
+            self.handle.client, setting_files.folder_for(self.handle), name, on=on, gain=gain, band=band,
+            operating_mode=operating_mode, tau_mode=tau_mode, tau_contrast=tau_contrast, dye=dye,
+        )
         return checked(self.handle, result, f"set_detector({name!r})")
+
+    def set_excitation_line(self, line) -> dict:
+        """Choose the excitation line: a wavelength in nm of a line that is on, or ``"auto"``; read back. With one detector on."""
+        self.handle.require_open()
+        result = setting_files.set_excitation_line(self.handle.client, setting_files.folder_for(self.handle), line)
+        return checked(self.handle, result, f"set_excitation_line({line!r})")
+
+    def show_spectra(self, *, excitation: bool | None = None, emission: bool | None = None) -> dict:
+        """Show or hide the dyes' excitation and emission spectra in LAS X's setting panel; read back."""
+        self.handle.require_open()
+        result = setting_files.show_spectra(self.handle.client, setting_files.folder_for(self.handle), excitation=excitation, emission=emission)
+        return checked(self.handle, result, "show_spectra")
 
     def set_channel_colour(self, detector: str, colour: str) -> dict:
         """Give the channel of *detector* (``"HyD S 3"``) the colour *colour* (LAS X's name, ``"Green"``); read back.

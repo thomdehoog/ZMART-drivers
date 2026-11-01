@@ -246,9 +246,15 @@ class PlainNavigator:
         units = [u for s in self.nodes.detection["Spectrophotometer"] for u in s["DetectionUnitList"]["DetectorHWInfo"]]
         detectors = "".join(
             f'<Detector Version="2" Name="{u["Name"]}" Channel="{u["BeamRoute"][1]}" IsActive="{int(u["IsActive"])}" '
-            f'Gain="{u["HighVoltage"]:g}" DetectionRangeBegin="320" DetectionRangeEnd="910"/>'
+            f'DyeName="{u["DyeName"]}" Gain="{u["HighVoltage"]:g}" DetectionRangeBegin="320" DetectionRangeEnd="910" '
+            f'AcquisitionMode="{u.get("AcquisitionMode", 1)}" DigitalGatingMode="{u.get("DigitalGatingMode", 2)}" '
+            f'IsLifetimeContrastActive="{u.get("IsLifetimeContrastActive", 0)}" OperatingType="{u.get("OperatingType", 2)}" '
+            f'IsReflectionModeActive="{u.get("IsReflectionModeActive", 0)}"/>'
             for u in units
         )
+        line = getattr(self, "reference_line", ("Laser 405", 405, 1))
+        reference = f'<DetectionReferenceLine Version="0" LaserName="{line[0]}" LaserWavelength="{line[1]:g}" IsAutomaticAssigned="{line[2]}"/>'
+        show = getattr(self, "show_spectra", (0, 1))
         bands = "".join(
             f'<MultiBand Version="3" Channel="{u["BeamRoute"][1]}" LeftWorld="{u["WaveLengthBegin"]:g}" '
             f'RightWorld="{u["WaveLengthEnd"]:g}" TargetWaveLengthBegin="{u["WaveLengthBegin"]:g}" '
@@ -256,9 +262,10 @@ class PlainNavigator:
             for u in units
         )
         return (
-            f'<ATLConfocalSettingDefinition UserSettingName="{name}" ScanDirectionX="1">'
+            f'<ATLConfocalSettingDefinition UserSettingName="{name}" ScanDirectionX="1" '
+            f'IsShowDyeEmissionSpectrum="{show[1]}" IsShowDyeExcitationSpectrum="{show[0]}">'
             f"<LaserArray>{lasers}</LaserArray><DetectorList>{detectors}</DetectorList><Spectro>{bands}</Spectro>"
-            "</ATLConfocalSettingDefinition>"
+            f"{reference}</ATLConfocalSettingDefinition>"
         )
 
     def take_ATL_Block_Save_To_XML(self, e):
@@ -289,6 +296,13 @@ class PlainNavigator:
             unit = units[det.get("Name")]
             unit["IsActive"] = det.get("IsActive") == "1"
             unit["HighVoltage"] = float(det.get("Gain"))
+            unit["DyeName"] = det.get("DyeName")
+            for field in ("AcquisitionMode", "DigitalGatingMode", "IsLifetimeContrastActive", "OperatingType", "IsReflectionModeActive"):
+                unit[field] = int(det.get(field))
+        line = setting.find("DetectionReferenceLine")
+        if line is not None:
+            self.reference_line = (line.get("LaserName"), float(line.get("LaserWavelength")), int(line.get("IsAutomaticAssigned")))
+        self.show_spectra = (int(setting.get("IsShowDyeExcitationSpectrum")), int(setting.get("IsShowDyeEmissionSpectrum")))
         for band in setting.iter("MultiBand"):
             unit = by_channel[band.get("Channel")]
             unit["WaveLengthBegin"], unit["WaveLengthEnd"] = float(band.get("LeftWorld")), float(band.get("RightWorld"))

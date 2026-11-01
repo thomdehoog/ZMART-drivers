@@ -277,3 +277,8 @@ def test_a_detector_is_set_through_a_setting_file(scope, lasx):
 
 def test_a_detector_s_channel_gets_a_colour(scope, lasx):
     assert scope.set_channel_colour("HyD S 3", "Green")["confirmed"] is True
+
+
+
+def test_a_detector_s_mode_and_dye_are_set(scope, lasx):
+    assert scope.set_detector("HyD S 3", operating_mode="Analog", dye="Leica/ALEXA 488")["confirmed"] is True
