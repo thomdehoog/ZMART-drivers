@@ -78,6 +78,16 @@ def set_objective(
                 f"refusing the objective change: could not record the pre-change position "
                 f"for objective compensation: {exc}"
             )
+        before = recorded["before"]
+        if before is not None and before["slot"] != chosen["slot"]:
+            # The calibration must cover the change before the turret turns,
+            # not be found missing afterwards with the sample out of view.
+            from ..driver_setup.optical_calibration import model as _cal_model
+
+            try:
+                _cal_model.translation_delta_um(before["translations"], before["slot"], chosen["slot"])
+            except RuntimeError as exc:
+                return dispatch.refused(f"refusing the objective change, so the turret is not turned: {exc}")
         return None
 
     result = changes.set_objective(

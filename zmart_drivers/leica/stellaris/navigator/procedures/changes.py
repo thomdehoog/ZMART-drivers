@@ -155,6 +155,9 @@ def set_objective(
     ``procedures/keep_in_view.py``; it passes *before_fire* to take its
     reading just before the change is sent. *before_fire* is called with
     ``{"slot", "name"}``; it may return a refusal, and then nothing is sent.
+    A change to an objective of another immersion (dry, water, oil ...) is
+    refused, and so is one when the objective in use cannot be read: an
+    immersion change needs a person at the microscope.
     """
     selectors = [v for v in (slot_index, name, magnification) if v is not None]
     if len(selectors) != 1:
@@ -168,12 +171,34 @@ def set_objective(
             f"Could not find objective: slot_index={slot_index}, name={name}, mag={magnification}. "
             f"Available: {available}"
         )
+    refusal = immersion_refusal(client, objectives, slot)
+    if refusal:
+        return refusal
     if before_fire is not None:
         refusal = before_fire({"slot": slot, "name": target_name})
         if refusal:
             refusal.setdefault("timing", dispatch.make_timing(total_s=0.0, attempts=0))
             return refusal
     return run(client, writes.set_objective(slot, target_name), max_retries=max_retries)
+
+
+def immersion_refusal(client, objectives, slot) -> dict | None:
+    """A refusal when the objective in *slot* has another immersion than the one in use, or that cannot be told; else None."""
+    current = readers.get_objective(client)
+    target = objective_by_slot(objectives).get(slot) or {}
+    have = str((current or {}).get("immersion") or "").strip().upper()
+    want = str(target.get("immersion") or "").strip().upper()
+    if not have or not want:
+        return dispatch.refused(
+            f"the immersion of the objective in use ({have or 'unknown'}) or of slot {slot} "
+            f"({want or 'unknown'}) could not be read, so the turret is not turned", logged=True
+        )
+    if have != want:
+        return dispatch.refused(
+            f"slot {slot} holds an objective for {want} immersion and the one in use is {have}: "
+            f"a change of immersion needs a person at the microscope, so the turret is not turned", logged=True
+        )
+    return None
 
 
 # =============================================================================

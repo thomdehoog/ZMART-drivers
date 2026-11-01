@@ -141,6 +141,27 @@ def test_the_objective_changes_and_the_sample_stays_in_view(scope, lasx):
     assert lasx.live[("Microscope", "SlotPosition")] == 1
 
 
+def test_an_objective_of_another_immersion_is_refused_before_the_turret_turns(scope, lasx):
+    lasx.nodes.objectives[1]["Immersion"] = "OIL"
+    lasx.nodes.reload()
+
+    with pytest.raises(RuntimeError, match="immersion"):
+        scope.change_objective(slot=1)
+
+    assert "SetSlotPosition" not in lasx.commands()
+    assert lasx.live[("Microscope", "SlotPosition")] == 0
+
+
+def test_an_objective_the_calibration_does_not_cover_is_refused_before_the_turret_turns(scope, lasx):
+    scope.handle.translations = {0: (0.0, 0.0, 0.0)}
+
+    with pytest.raises(RuntimeError, match="calibration"):
+        scope.change_objective(slot=1)
+
+    assert "SetSlotPosition" not in lasx.commands()
+    assert lasx.live[("Microscope", "SlotPosition")] == 0
+
+
 def test_capture_tile_scan_save_and_clear_call_their_procedures(scope, monkeypatch):
     calls = []
     monkeypatch.setattr(methods.acquire_step, "acquire", lambda handle, **asked: calls.append(("acquire", asked)) or {"position_label": "A1"})

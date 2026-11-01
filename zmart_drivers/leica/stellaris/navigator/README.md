@@ -104,7 +104,7 @@ mic.connect("stellaris-navigator")                                              
 | `zero_z_galvo()` | Park the z-galvo at 0 without changing the focus: its offset moves onto z-wide. |
 | `settings()` | What LAS X is set to now: the zoom, the scan speed, the rotation, the averaging, the pinhole, the format, the scan mode, the objective and the z-stack, as LAS X reports them. |
 | `change_setting(name, value)` | Change one of the five settings below and read it back. |
-| `change_objective(slot=None, name=None, magnification=None)` | Turn to another objective, and move the stage by the measured offset so the same spot stays in view. |
+| `change_objective(slot=None, name=None, magnification=None)` | Turn to another objective, and move the stage by the measured offset so the same spot stays in view. Refused before the turret turns when the objective has another immersion, or the calibration does not cover the change. |
 | `acquisition_settings()` | How a capture is triggered: `full`, one picture with the current settings. |
 | `acquire(position_label=None, acquisition_type="acquisition", output_folder=None)` | Take one picture, as the window's Capture Image does. It stays in LAS X's cache, with a note of how it was taken. Nothing is written yet. |
 | `tile_scan(positions, position_label=None, acquisition_type="tile_scan", output_folder=None)` | Take one picture of several fields, as the window's Preview does, at `(x, y)` positions in micrometres from the origin, at the current focus. Afterwards the stage is back at the first field. |
