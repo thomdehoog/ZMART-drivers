@@ -66,7 +66,6 @@ The simulator cannot show these; each needs one careful run on the real microsco
 
 ## Housekeeping
 
-- `docs/leica/NAVIGATOR_CONTROL.md` is still uncommitted from the morning: keep it or drop it.
 - The setup wizard does not yet show the new limits entries (`set_phase_x`, `set_pinhole_um`,
   `set_collar` and the others added this day); they are taken from the bundled defaults.
 - A version bump, when Thom decides.
