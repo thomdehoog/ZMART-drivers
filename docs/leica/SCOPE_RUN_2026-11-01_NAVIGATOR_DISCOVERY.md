@@ -380,15 +380,16 @@ depth to 8.
 
 Thom moved the pan to the right in LAS X's window, in the normal acquisition view. LCS received
 no command, and none of its 12,525 state-tree values changed. A setting saved afterwards held
-`PanFirstDim` 0.0001743713507108436 m (174.4 µm to the right; it had been 8.67e-19 m, zero)
+`PanFirstDim` 0.0001743713507108436 (it had been 8.67e-19, zero)
 and `PanSecondDim` still zero. The same setting, its `PanFirstDim` written as 0 and loaded,
-left the pan at 174.4 µm. One capture through the ZMART Driver with the pan moved: LCS was sent
+left the pan where it was. One capture through the ZMART Driver with the pan moved: LCS was sent
 `StopAcquiring` and `StartAcquiring` only, and no pan value appeared in the state tree.
 
 Tried again, wider: the whole state tree (all 14 roots, 16 levels deep, lists included:
 15,201 values) and every LAS X log, marked before and compared after Thom clicked the pan five
 times to the left. No value changed and no log grew. A setting saved afterwards held
-`PanFirstDim` -0.00069757778991061652 m (697.6 µm to the left), so the clicks had moved the pan.
+`PanFirstDim` -0.00069757778991061652, so the clicks had moved the pan: one click is 0.00017437
+and five are five times that.
 
 So LAS X keeps the pan in its own setting and hands it to the hardware by a way that is not
 seen here. The pan can be read from a saved setting; it cannot be set. It stays where Thom put it.
@@ -397,4 +398,19 @@ The same capture took the z-stack (1505 to 1515 µm) and left z-wide at 1510 µm
 the stack; before it, z-wide stood at 1495.6 µm. The detectors' `IsEnabled` went from True to
 False during the scan, while `IsActive`, whether a detector is on, stayed True for HyD 2 and
 HyD S 3.
+
+The pan is not in metres. Thom worked out its unit in March to May 2026, on the Navigator
+Expert route (ZMART-microscopy, `navigator_expert/core/utils.py`): a pan value is a fraction
+of the galvo's deflection, at most `PAN_LIMIT` 0.00775 per axis, and at that maximum the
+sample shifts by `GALVO_FIELD_FRACTION` 0.667 of the objective's field of view at zoom 1. So
+the shift in micrometres is `pan x base FOV (um) x 0.667 / 0.00775` (86.06 times the base
+FOV), the same at every zoom; the fraction 0.667 is measured per microscope. Here, with the
+10x objective (base FOV 1162.5 µm, 581.25 µm at zoom 2), one click is 0.00017437 x 1162.5 x
+86.06 = 17.4 µm, which is 3 % of the field at zoom 2: LCS's `ScanningParameter/PanePercentage`
+is 3. Five clicks to the left left the pan at -0.000698, about 70 µm to the left.
+
+On that route the pan was set by writing `PanFirstDim` and `PanSecondDim` into a Navigator
+Expert template and loading it through Navigator Expert. In the plain Navigator, the loaded
+setting (`ATL_Block_Load_From_XML`) does not apply the pan in any of its modes (above), so it
+stays read-only here.
 
