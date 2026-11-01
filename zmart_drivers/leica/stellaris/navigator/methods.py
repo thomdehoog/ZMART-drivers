@@ -64,6 +64,7 @@ from .procedures import (
     absolute_coordinate_system,
     answer_dialogs,
     changes,
+    dye_library,
     keep_in_view,
     readings,
     setting_files,
@@ -311,6 +312,18 @@ class Microscope:
             operating_mode=operating_mode, tau_mode=tau_mode, tau_contrast=tau_contrast, dye=dye,
         )
         return checked(self.handle, result, f"set_detector({name!r})")
+
+    def dyes(self, namespace: str = "Leica") -> list[str]:
+        """The names of the dyes in LAS X's dye library (``Leica``, or a user's ``User:<name>``)."""
+        return dye_library.dye_names(namespace)
+
+    def dye(self, name: str) -> dict:
+        """One dye of LAS X's library: its peaks (nm) and its excitation, emission and multiphoton spectra.
+
+        *name* as the library lists it (``"ALEXA 488"``) or as a setting names it
+        (``"Leica/ALEXA 488"``); ``setting_name`` is what :meth:`set_detector` takes as *dye*.
+        """
+        return dye_library.dye(name)
 
     def set_excitation_line(self, line) -> dict:
         """Choose the excitation line: a wavelength in nm of a line that is on, or ``"auto"``; read back. With one detector on."""
