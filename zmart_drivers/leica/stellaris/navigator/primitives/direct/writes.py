@@ -272,6 +272,83 @@ def autofocus(on: bool) -> Write:
     )
 
 
+def beam_route(route) -> str:
+    """A light source's route as LCS takes it, one ``BeamPosition`` per level (10;30 is level 0 at 10, level 1 at 30)."""
+    positions = "".join(
+        f'<BeamPosition BeamPositionLevel="{level}" BeamPosition="{position}"/>' for level, position in enumerate(route)
+    )
+    return f'<BeamRoute Version="0">{positions}</BeamRoute>'
+
+
+#: How close a line's power must come, in percent: one of LCS's steps of 1/255.
+LASER_TOLERANCE_PERCENT = 100 / 255
+
+
+def laser_power(route, line_index: int, wavelength_nm: float, percent: float) -> Write:
+    """Set the power of the line *line_index* of the light source on *route* to *percent*; 0 switches the line off.
+
+    Above 0 the line is switched on in the current setting (the 488 line
+    became used at 5 % on the simulator, 2026-11-01). Read back from the
+    lines that are on, within one of LCS's steps; at 0 the line is no longer
+    among them. *wavelength_nm* names the line for the read-back and the limits.
+    """
+    if isinstance(percent, bool) or not isinstance(percent, (int, float)) or not 0 <= percent <= 100:
+        raise ValueError(f"a laser power is a percentage from 0 to 100, not {percent!r}")
+    element = (
+        f'<Scanner Command="SetLaserLineIntensity" LineIndex="{int(line_index)}" LineIntensity="{value(percent / 100)}" '
+        f'SetMode="2" SingleSettingIndex="0" {CURRENT} IsRoiBackground="0">{beam_route(route)}</Scanner>'
+    )
+
+    def fill(request: Request) -> None:
+        request.elements = [element]
+
+    def shows(lines) -> bool:
+        if not isinstance(lines, list):
+            return False
+        found = [line for line in lines if line.get("wavelength") == wavelength_nm]
+        if percent == 0:
+            return not found
+        return len(found) == 1 and abs(found[0]["intensity"] * 100 - percent) <= LASER_TOLERANCE_PERCENT
+
+    return Write(
+        command="set_laser_power",
+        values={"value": percent, "wavelength_nm": wavelength_nm},
+        request="SetLaserLineIntensity",
+        fill=fill,
+        description=f"Laser {wavelength_nm:g} nm -> {percent:g} %",
+        ready=idle(),
+        confirm=Expect("laser_lines", shows),
+    )
+
+
+def laser_shutter(route, open_: bool) -> Write:
+    """Open or close the shutter of the light source on *route*; read back from its lines that are on."""
+    if not isinstance(open_, bool):
+        raise ValueError(f"a shutter is open (True) or closed (False), not {open_!r}")
+    element = (
+        f'<Scanner Command="ActivateShutter" Activate="{int(open_)}" SetMode="2" SingleSettingIndex="0" '
+        f'{CURRENT}>{beam_route(route)}</Scanner>'
+    )
+    named = ";".join(str(position) for position in route)
+
+    def fill(request: Request) -> None:
+        request.elements = [element]
+
+    def shows(lines) -> bool:
+        own = [line for line in lines or [] if line.get("beamRoute") == named]
+        return bool(own) and all(line.get("shutterOpen") is open_ for line in own)
+
+    return Write(
+        command="set_laser_shutter",
+        values={"value": open_},
+        request="ActivateShutter",
+        fill=fill,
+        description=f"Shutter {named} -> {'open' if open_ else 'closed'}",
+        ready=idle(),
+        confirm=Expect("laser_lines", shows),
+    )
+
+
 #: The settings with a write of their own, by name, beside the table of numbers (:data:`SETTINGS`).
 NAMED_SETTINGS = {"scan_mode": scan_mode, "autofocus": autofocus}
 

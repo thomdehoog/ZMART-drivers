@@ -284,6 +284,24 @@ class Microscope:
         result = changes.change(self.handle.client, name, value)
         return checked(self.handle, result, f"change_setting({name!r}, {value!r})")
 
+    def set_laser_power(self, wavelength_nm: float, percent: float) -> dict:
+        """Set the power of the laser line at *wavelength_nm* to *percent*, as LAS X's slider shows it, and read it back.
+
+        Above 0 the line is switched on in the current setting; 0 switches it
+        off. The limits are asked first (at most 10 % by default). LAS X sets
+        the power in steps of 1/255. The white-light laser's tunable lines are
+        not set here.
+        """
+        self.handle.require_open()
+        result = changes.set_laser_power(self.handle.client, wavelength_nm, percent)
+        return checked(self.handle, result, f"set_laser_power({wavelength_nm!r}, {percent!r})")
+
+    def set_laser_shutter(self, wavelength_nm: float, open_: bool) -> dict:
+        """Open (True) or close (False) the shutter of the light source the line at *wavelength_nm* comes from; read back."""
+        self.handle.require_open()
+        result = changes.set_laser_shutter(self.handle.client, wavelength_nm, open_)
+        return checked(self.handle, result, f"set_laser_shutter({wavelength_nm!r}, {open_!r})")
+
     def set_z_stack(self, drive: str, begin_um: float, end_um: float, step_um: float) -> dict:
         """Set LAS X's z-stack and answer it as LAS X holds it, as :meth:`settings` gives ``z_stack``.
 

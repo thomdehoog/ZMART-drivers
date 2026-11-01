@@ -53,7 +53,7 @@ _REQUIRED_FILE_KEYS = (*_AXIS_FILE_KEYS.values(), *STEP_LIMIT_KEYS, "objective_s
 # Entries added after limits files were first saved. A file saved before an
 # entry existed still counts: the entry is taken from the bundled defaults,
 # and the log says so. Every other missing entry makes the file invalid.
-_ADDED_LATER = (*STEP_LIMIT_KEYS, "set_z_stack_step", "set_scan_mode", "set_autofocus")
+_ADDED_LATER = (*STEP_LIMIT_KEYS, "set_z_stack_step", "set_scan_mode", "set_autofocus", "set_laser_power", "set_laser_shutter")
 
 
 def _driver_root() -> Path:
@@ -224,9 +224,11 @@ def build_limits_payload(stage_um: dict[str, Any]) -> dict[str, Any]:
     stage = _validate_limits(stage_um, path=Path("limits.json"))
     payload = {
         **{_AXIS_FILE_KEYS[axis]: {"range": bounds} for axis, bounds in stage.items()},
+        # The steps and the settings as the driver's defaults set them (a laser
+        # power of at most 10 %, say), so a newly measured file keeps them.
         **{key: _read_json(defaults_path())[key] for key in STEP_LIMIT_KEYS},
         "objective_slot": [],
-        **{name: [] for name in SETTER_LIMIT_KEYS},
+        **{name: _read_json(defaults_path())[name] for name in SETTER_LIMIT_KEYS},
     }
     return validate_payload(payload)
 

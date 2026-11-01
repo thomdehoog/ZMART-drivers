@@ -205,6 +205,8 @@ SETTER_LIMIT_KEYS = (
     "set_z_stack_step",
     "set_scan_mode",
     "set_autofocus",
+    "set_laser_power",
+    "set_laser_shutter",
 )
 
 

@@ -151,6 +151,16 @@ def get_autofocus(client, **keywords):
     return _routed("autofocus", client, **keywords)
 
 
+def get_laser_lines(client, **keywords):
+    """The laser lines that are on: wavelength, power as a fraction, source, route, shutter."""
+    return _routed("laser_lines", client, **keywords)
+
+
+def get_light_sources(client, **keywords):
+    """Every light source: its name, its route and its laser lines, on or not."""
+    return _routed("light_sources", client, **keywords)
+
+
 def get_serial_number(client, **keywords):
     """The instrument's serial number."""
     return _routed("serial_number", client, **keywords)

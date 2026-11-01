@@ -253,3 +253,9 @@ def test_scan_mode_and_autofocus_are_changed_like_every_setting(scope, lasx):
     assert scope.change_setting("autofocus", False)["confirmed"] is True
     assert scope.settings()["autofocus"] is False
     assert scope.change_setting("scan_mode", "xyz")["confirmed"] is True
+
+
+
+def test_a_laser_line_is_set_by_its_wavelength_in_percent(scope, lasx):
+    assert scope.set_laser_power(488.0, 5.0)["confirmed"] is True
+    assert scope.set_laser_shutter(488.0, False)["confirmed"] is True

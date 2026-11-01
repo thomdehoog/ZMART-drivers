@@ -375,3 +375,50 @@ class TestScanModeAndAutofocus:
 
         assert result["confirmed"] is True
         assert lasx.live[("Acquire", "AutoFocusInfo", "IsSeriesScanAutofocusActive")] is False
+
+
+
+class TestLasers:
+    def test_a_line_not_in_use_is_found_by_its_wavelength_switched_on_and_read_back(self, lasx, client):
+        result = changes.set_laser_power(client, 488.0, 5.0)
+
+        assert result["confirmed"] is True
+        assert '<BeamPosition BeamPositionLevel="1" BeamPosition="30"/>' in lasx.sent[-1]
+        lines = {line["wavelength"]: line for line in direct_reader.get_laser_lines()}
+        assert lines[488.0]["intensity"] == pytest.approx(0.05098, abs=0.001)
+
+    def test_zero_switches_the_line_off(self, lasx, client):
+        changes.set_laser_power(client, 488.0, 5.0)
+
+        assert changes.set_laser_power(client, 488.0, 0.0)["confirmed"] is True
+        assert 488.0 not in {line["wavelength"] for line in direct_reader.get_laser_lines()}
+
+    def test_a_wavelength_no_laser_has_is_refused_and_nothing_is_sent(self, lasx, client):
+        result = changes.set_laser_power(client, 500.0, 5.0)
+
+        assert result["success"] is False and "500" in result["message"]
+        assert lasx.commands() == []
+
+    def test_a_line_s_shutter_is_closed_and_read_back(self, lasx, client):
+        result = changes.set_laser_shutter(client, 405.0, False)
+
+        assert result["confirmed"] is True
+        assert direct_reader.get_laser_lines()[0]["shutterOpen"] is False
+
+    def test_a_power_above_the_limit_is_refused_before_anything_is_sent(self, lasx):
+        from limits_fixtures import DEFAULT_STAGE_UM, merged_limits_payload
+
+        from zmart_drivers.leica.stellaris.navigator.driver_setup.limits import limit_rules
+
+        limited = hardware_server.Client("test")
+        payload = merged_limits_payload(dict(DEFAULT_STAGE_UM))
+        gate.install(limited, gate.GateState(
+            limits=limit_rules.LeicaLimits(payload, source="test", path=None, is_fallback=False),
+            stage_cfg=None, error=None))
+        try:
+            result = changes.set_laser_power(limited, 405.0, 50.0)
+        finally:
+            gate.uninstall(limited)
+
+        assert result["success"] is False and "set_laser_power" in result["message"]
+        assert lasx.commands() == []

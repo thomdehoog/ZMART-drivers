@@ -196,6 +196,19 @@ class PlainNavigator:
     def take_SetZUseMode(self, e):
         self.live[("Acquire", "ZPositionMode")] = int(e.get("UseMode"))
 
+    def light_source(self, e):
+        route = tuple(int(p.get("BeamPosition")) for p in e.iter("BeamPosition"))
+        return next(s for s in self.nodes.light_sources if tuple(s["BeamRoute"]) == route)
+
+    def take_SetLaserLineIntensity(self, e):
+        source = self.light_source(e)
+        line = next(a for a in source["AOTF"]["AotfLine"] if a["LineIndex"] == int(e.get("LineIndex")))
+        # LCS sets a line's power in steps of 1/255 (5 % became 5.098 %).
+        line["Intensity"] = round(float(e.get("LineIntensity")) * 255) / 255 * 100
+
+    def take_ActivateShutter(self, e):
+        self.light_source(e)["Shutter"]["IsShutterActive"] = e.get("Activate") == "1"
+
     def take_ActivateAutoFocus(self, e):
         self.live[("Acquire", "AutoFocusInfo", "IsSeriesScanAutofocusActive")] = e.get("Activate") == "1"
 

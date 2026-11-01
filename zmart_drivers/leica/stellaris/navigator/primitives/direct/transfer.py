@@ -168,6 +168,8 @@ ALLOWED_COMMANDS = frozenset(
         "SetZUseMode",
         "SetZStackDefinition",
         "SetStackStepSize",
+        "SetLaserLineIntensity",
+        "ActivateShutter",
     }
 )
 

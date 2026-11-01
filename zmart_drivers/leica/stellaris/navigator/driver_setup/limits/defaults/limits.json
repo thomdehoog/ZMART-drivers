@@ -15,5 +15,7 @@
   "set_pinhole_airy": [],
   "set_z_stack_step": [],
   "set_scan_mode": [],
-  "set_autofocus": []
+  "set_autofocus": [],
+  "set_laser_power": {"range": [0, 10]},
+  "set_laser_shutter": []
 }

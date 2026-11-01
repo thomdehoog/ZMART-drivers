@@ -122,6 +122,40 @@ def change(client, name: str, value, *, max_retries=None, tolerance=None) -> dic
     return run(client, change, max_retries=max_retries)
 
 
+def laser_line(client, wavelength_nm):
+    """``(route, line_index)`` of the laser line at *wavelength_nm*, in use or not; RuntimeError when there is none.
+
+    A tunable line (the white-light laser's) is not found: how to tune it
+    has not been learned.
+    """
+    for source in readers.get_light_sources(client) or []:
+        route = tuple(int(part) for part in str(source.get("BeamRoute", "")).split(";") if part)
+        for line in source.get("LaserLines", []):
+            if line.get("MinWavelength") == line.get("MaxWavelength") == float(wavelength_nm):
+                return route, int(line["Index"])
+    raise RuntimeError(f"no laser line at {wavelength_nm:g} nm (tunable lines are not set by this driver)")
+
+
+def set_laser_power(client, wavelength_nm, percent, *, max_retries=None) -> dict:
+    """Set the power of the laser line at *wavelength_nm* to *percent*, switching it on above 0 and off at 0; read back."""
+    try:
+        route, index = laser_line(client, wavelength_nm)
+        change = writes.laser_power(route, index, float(wavelength_nm), percent)
+    except (RuntimeError, ValueError, TypeError) as why:
+        return dispatch.refused(f"the laser power cannot be set: {why}")
+    return run(client, change, max_retries=max_retries)
+
+
+def set_laser_shutter(client, wavelength_nm, open_, *, max_retries=None) -> dict:
+    """Open or close the shutter of the light source the line at *wavelength_nm* comes from; read back from its lines that are on."""
+    try:
+        route, _index = laser_line(client, wavelength_nm)
+        change = writes.laser_shutter(route, open_)
+    except (RuntimeError, ValueError, TypeError) as why:
+        return dispatch.refused(f"the shutter cannot be set: {why}")
+    return run(client, change, max_retries=max_retries)
+
+
 def objective_by_slot(objectives) -> dict[int, dict[str, Any]]:
     """``{slot: objective}`` for every occupied slot of the turret (``readings.get_objectives``).
 

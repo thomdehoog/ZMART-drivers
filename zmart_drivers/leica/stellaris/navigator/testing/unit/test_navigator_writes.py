@@ -276,3 +276,39 @@ class TestScanModeAndAutofocus:
             writes.named_setting("scan_mode", 3)
         with pytest.raises(ValueError):
             writes.named_setting("contrast", 1)
+
+
+
+class TestLasers:
+    """As LCS took them on the simulator (2026-10-30 and 2026-11-01): the line by its index and its source's route."""
+
+    def test_a_line_s_power_is_sent_as_a_fraction_with_its_source_s_route_level_by_level(self):
+        write = writes.laser_power((10, 30), 0, 488.0, 5.0)
+        assert elements(write) == [
+            '<Scanner Command="SetLaserLineIntensity" LineIndex="0" LineIntensity="0.05" SetMode="2" '
+            'SingleSettingIndex="0" BlockId="0" IsRoiBackground="0"><BeamRoute Version="0">'
+            '<BeamPosition BeamPositionLevel="0" BeamPosition="10"/>'
+            '<BeamPosition BeamPositionLevel="1" BeamPosition="30"/></BeamRoute></Scanner>'
+        ]
+        assert write.command == "set_laser_power" and write.values == {"value": 5.0, "wavelength_nm": 488.0}
+
+    def test_the_power_is_read_back_within_one_of_las_x_s_steps_and_zero_is_the_line_off(self):
+        on = writes.laser_power((10, 30), 0, 488.0, 5.0).confirm.accept
+        assert on([{"wavelength": 488.0, "intensity": 0.05098}])
+        assert not on([{"wavelength": 488.0, "intensity": 0.06}])
+        assert not on([{"wavelength": 405.0, "intensity": 0.05}])
+        off = writes.laser_power((10, 30), 0, 488.0, 0.0).confirm.accept
+        assert off([{"wavelength": 405.0, "intensity": 0.02}]) and not off([{"wavelength": 488.0, "intensity": 0.05}])
+
+    def test_a_shutter_is_its_source_s(self):
+        write = writes.laser_shutter((30,), False)
+        assert elements(write) == [
+            '<Scanner Command="ActivateShutter" Activate="0" SetMode="2" SingleSettingIndex="0" BlockId="0">'
+            '<BeamRoute Version="0"><BeamPosition BeamPositionLevel="0" BeamPosition="30"/></BeamRoute></Scanner>'
+        ]
+        assert write.confirm.accept([{"beamRoute": "30", "shutterOpen": False}])
+        assert not write.confirm.accept([{"beamRoute": "30", "shutterOpen": True}])
+
+    def test_a_power_is_a_percentage(self):
+        with pytest.raises(ValueError):
+            writes.laser_power((30,), 0, 405.0, 120.0)
