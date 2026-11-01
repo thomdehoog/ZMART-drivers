@@ -37,6 +37,7 @@ discovery session in `SCOPE_RUN_2026-11-01_NAVIGATOR_DISCOVERY.md` and the build
 | SmartCORR (automatic collar scan) | Works, with LAS X's command |
 | Collar reference stored or cleared (Set, Reset) | Works: written into LAS X's state tree, for the objective in the light path only |
 | Setting added (new, or a copy of the current one) | Works, with LAS X's command |
+| The current setting chosen (with several settings) | Works, with LAS X's command; every change goes into the current setting |
 | Setting deleted | Works, with LAS X's command; the last one never |
 | Setting switched on or off for scanning | Works, with LAS X's command |
 | Setting's name | Works: written into LAS X's state tree |
@@ -160,7 +161,7 @@ service and the person responsible for the instrument.
 
 | State | Settings |
 |---|---|
-| Works | 67 (the objective among them, not yet tried) |
+| Works | 68 (the objective among them, not yet tried) |
 | Tried | 0 |
 | Command known | 0 |
 | Not yet learned | 6 |

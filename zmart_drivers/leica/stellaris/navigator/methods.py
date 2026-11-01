@@ -371,11 +371,20 @@ class Microscope:
     def add_setting(self, copy: bool = False) -> dict:
         """Add a setting to the current job, new or a copy of the current one, as the window's "Add new Setting" does.
 
-        LAS X makes it the current setting. With more than one setting, the
-        changes through a saved setting (``set_detector`` and the like) are refused.
+        LAS X makes it the current setting, and the changes after go into it. With
+        more than one setting, the changes through a saved setting (``set_detector``
+        and the like) are refused.
         """
         self.handle.require_open()
         return checked(self.handle, changes.add_setting(self.handle.client, copy), f"add_setting({copy!r})")
+
+    def activate_setting(self, name: str) -> dict:
+        """Make the setting called *name* the current one, as clicking it in the window does; read back.
+
+        The changes after go into the current setting.
+        """
+        self.handle.require_open()
+        return checked(self.handle, changes.activate_setting(self.handle.client, name), f"activate_setting({name!r})")
 
     def delete_setting(self, name: str) -> dict:
         """Delete the setting called *name* from the current job; the last one is never deleted."""

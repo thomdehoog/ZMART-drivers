@@ -558,3 +558,13 @@ class TestLaserLinesDefinition:
         assert element.startswith('<Scanner IsBleachPointDefinition="0" IsAutoFocusDefinition="0" Command="SetConfocalLaserLinesDefinition">')
         assert element.count("<LightSource>") == 3 and "<LineIndex>1</LineIndex><WaveLength>600</WaveLength><Locked>0</Locked>" in element
         assert write.confirm is None  # a new line has no power yet; the power set after is read back
+
+
+
+class TestAddressedSetting:
+    def test_a_request_names_the_setting_its_elements_are_addressed_to(self):
+        request = writes.Request("SetLaserLineIntensity")
+        request.setting = 1
+        writes.laser_power((10, 10), 0, 497.0, 5).fill(request)
+        assert 'SingleSettingIndex="1"' in request.elements[0]
+        assert elements(writes.laser_power((10, 10), 0, 497.0, 5))[0].count('SingleSettingIndex="0"') == 1

@@ -595,3 +595,26 @@ How LAS X's window addresses a change to Setting 2 is still to be learned: a las
 hand with Setting 2 current, watched in LCS's log. Until then, changes to a second setting are
 refused rather than sent to the first.
 
+## 33. The window addresses the current setting by its place; the white-light slots are shared
+
+With Setting 2 (a copy) current, Thom's changes in the window: LCS was sent
+`<ATL SettingID="120" Command="ATL_Setting_Activate" Attribute="2"/>` when Setting 2 was clicked
+(and `SettingID="3"` for Setting 1), then `SingleSettingIndex="1"` and `<Sequence Index="1">` for
+Setting 2. A ninth line was refused by LAS X with "You can not activate laser line '730'. The
+maximum number of 8 visible laser lines is reached!". Lines could be deleted only in Setting 1.
+
+Built: every change whose commands name a setting is addressed to the current one by its place
+(`Request.setting`, filled by `changes.run`); `activate_setting(name)`. Through the driver: with
+Setting 2 current, 600 and 650 nm went into Setting 2 and Setting 1 kept its 405; Setting 1 made
+current, 497 nm went into it.
+
+That last change also turned Setting 2's 600 nm line into 497: both settings had used slot 0 of the
+white-light laser. LCS's per-setting entries (`ConfocalSequentialInfo/SequentialSettingParameter[n]/
+LightSourceList_SequentialInfo/LightSource_SequentialInfo/UnifiedLaser_SequentialInfo/
+UnifiedLaserLine_SequentialInfo`) show it: each slot has one wavelength in every setting, and each
+setting its own power. Built: `get_laser_slots` reads the lines every setting uses; `add_laser_line`
+takes a slot no setting uses and keeps 8 nm from every setting's lines; `tune_laser_line` refuses a
+slot another setting uses; a ninth line in a setting is refused. Through the driver: with Setting 1
+current, 600 nm went onto slot 2, Setting 2 untouched; 497 to 520 nm refused, slot 0 being in use in
+Setting 2.
+

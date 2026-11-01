@@ -113,6 +113,7 @@ mic.connect("stellaris-navigator")                                              
 | `set_excitation_line(line)` | Choose the excitation line, the wavelength of a line that is on, or `"auto"`; read back. With one detector on, because LAS X keeps one line per setting. |
 | `show_spectra(excitation=None, emission=None)` | Show or hide the dyes' excitation and emission spectra in LAS X's setting panel; read back. |
 | `add_setting(copy=False)` | Add a setting to the current job, new or a copy of the current one, as the window's "Add new Setting" does; LAS X makes it the current setting. With more than one setting, the changes through a saved setting (`set_detector` and the like) are refused, because which setting is meant cannot be told. |
+| `activate_setting(name)` | Make a setting the current one, as clicking it in the window does, and read it back. Every change after goes into the current setting: the driver names it by its place in the job, as the window does. |
 | `delete_setting(name)` | Delete a setting by its name; the job's last setting is never deleted. |
 | `enable_setting(on)` | Switch the current setting on or off for scanning, as the window's checkbox does, and read it back. Off, LAS X takes no picture with it. |
 | `lock_detector(name, locked=True)` | Keep a detector in use and its setting's excitation line from LAS X's Dye Assistant, or free them, as the window's detector lock does; read back. |

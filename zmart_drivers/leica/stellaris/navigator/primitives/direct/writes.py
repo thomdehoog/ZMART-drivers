@@ -86,6 +86,10 @@ class Request:
     def __init__(self, name: str) -> None:
         self.name = name
         self.elements: list[str] = []
+        #: The setting the elements are addressed to, by its place in the job,
+        #: 0 the first: LCS takes ``SingleSettingIndex`` and the like so, whichever
+        #: setting is current (simulator, 2026-11-01). ``changes.run`` names the current one.
+        self.setting = 0
 
 
 def is_idle(status) -> bool:
@@ -133,8 +137,8 @@ class Setting:
     """Everything that is particular to changing one setting of the current job.
 
     ``lasx_command`` and ``attribute`` are what the element carries;
-    ``per_setting`` adds ``SetMode="2" SingleSettingIndex="0"`` for a value
-    that belongs to the job's first sequential setting. ``reading`` names the
+    ``per_setting`` adds ``SetMode="2" SingleSettingIndex`` for a value that
+    belongs to one setting, the current one (``Request.setting``). ``reading`` names the
     reading that shows the value, ``read`` picks the number out of it, and
     ``tolerance`` says how close the read-back must come (None: exactly).
     """
@@ -197,9 +201,9 @@ SETTINGS = {
 }
 
 
-def setting_element(setting: Setting, number: float) -> str:
-    """The element that writes *number* into the current setting."""
-    one_setting = ' SetMode="2" SingleSettingIndex="0"' if setting.per_setting else ""
+def setting_element(setting: Setting, number: float, index: int = 0) -> str:
+    """The element that writes *number* into the setting at *index* (a per-setting value) or the scan (the others)."""
+    one_setting = f' SetMode="2" SingleSettingIndex="{int(index)}"' if setting.per_setting else ""
     return (
         f'<Scanner Command="{setting.lasx_command}" {setting.attribute}="{value(number)}"'
         f"{one_setting} {CURRENT}/>"
@@ -234,7 +238,7 @@ def setting(name: str, number: float, *, tolerance=None) -> Write:
         raise ValueError(f"{name} takes a number, not {number!r}")
 
     def fill(request: Request) -> None:
-        request.elements = [setting_element(chosen, number)]
+        request.elements = [setting_element(chosen, number, request.setting)]
 
     return Write(
         command=chosen.command,
@@ -318,13 +322,11 @@ def laser_power(route, line_index: int, wavelength_nm: float, percent: float) ->
     """
     if isinstance(percent, bool) or not isinstance(percent, (int, float)) or not 0 <= percent <= 100:
         raise ValueError(f"a laser power is a percentage from 0 to 100, not {percent!r}")
-    element = (
-        f'<Scanner Command="SetLaserLineIntensity" LineIndex="{int(line_index)}" LineIntensity="{value(percent / 100)}" '
-        f'SetMode="2" SingleSettingIndex="0" {CURRENT} IsRoiBackground="0">{beam_route(route)}</Scanner>'
-    )
-
     def fill(request: Request) -> None:
-        request.elements = [element]
+        request.elements = [
+            f'<Scanner Command="SetLaserLineIntensity" LineIndex="{int(line_index)}" LineIntensity="{value(percent / 100)}" '
+            f'SetMode="2" SingleSettingIndex="{request.setting}" {CURRENT} IsRoiBackground="0">{beam_route(route)}</Scanner>'
+        ]
 
     def shows(lines) -> bool:
         if not isinstance(lines, list):
@@ -354,13 +356,11 @@ def laser_wavelength(route, line_index: int, wavelength_nm: float) -> Write:
     """
     if isinstance(wavelength_nm, bool) or not isinstance(wavelength_nm, (int, float)):
         raise ValueError(f"a wavelength is a number of nanometres, not {wavelength_nm!r}")
-    element = (
-        f'<Scanner Command="SetLightSourceWavelength" LineIndex="{int(line_index)}" Wavelength="{value(wavelength_nm)}" '
-        f'SetMode="2" SingleSettingIndex="0" DoAsync="1">{beam_route(route)}</Scanner>'
-    )
-
     def fill(request: Request) -> None:
-        request.elements = [element]
+        request.elements = [
+            f'<Scanner Command="SetLightSourceWavelength" LineIndex="{int(line_index)}" Wavelength="{value(wavelength_nm)}" '
+            f'SetMode="2" SingleSettingIndex="{request.setting}" DoAsync="1">{beam_route(route)}</Scanner>'
+        ]
 
     def shows(lines) -> bool:
         return any(
@@ -408,13 +408,11 @@ def laser_lines_definition(lines, new_wavelength_nm: float) -> Write:
         f"<WaveLength>{value(wavelength)}</WaveLength><Locked>0</Locked></LightSource>"
         for route, index, wavelength in lines
     )
-    element = (
-        '<Scanner IsBleachPointDefinition="0" IsAutoFocusDefinition="0" Command="SetConfocalLaserLinesDefinition">'
-        f'<Sequences><Sequence Index="0">{listed}</Sequence></Sequences></Scanner>'
-    )
-
     def fill(request: Request) -> None:
-        request.elements = [element]
+        request.elements = [
+            '<Scanner IsBleachPointDefinition="0" IsAutoFocusDefinition="0" Command="SetConfocalLaserLinesDefinition">'
+            f'<Sequences><Sequence Index="{request.setting}">{listed}</Sequence></Sequences></Scanner>'
+        ]
 
     return Write(
         command="set_laser_lines",
@@ -431,14 +429,13 @@ def laser_shutter(route, open_: bool) -> Write:
     """Open or close the shutter of the light source on *route*; read back from its lines that are on."""
     if not isinstance(open_, bool):
         raise ValueError(f"a shutter is open (True) or closed (False), not {open_!r}")
-    element = (
-        f'<Scanner Command="ActivateShutter" Activate="{int(open_)}" SetMode="2" SingleSettingIndex="0" '
-        f'{CURRENT}>{beam_route(route)}</Scanner>'
-    )
     named = ";".join(str(position) for position in route)
 
     def fill(request: Request) -> None:
-        request.elements = [element]
+        request.elements = [
+            f'<Scanner Command="ActivateShutter" Activate="{int(open_)}" SetMode="2" SingleSettingIndex="{request.setting}" '
+            f'{CURRENT}>{beam_route(route)}</Scanner>'
+        ]
 
     def shows(lines) -> bool:
         own = [line for line in lines or [] if line.get("beamRoute") == named]
@@ -496,7 +493,7 @@ def collar(percent) -> Write:
     def fill(request: Request) -> None:
         request.elements = [
             f'<Microscope Command="SetMotCorrPosition" MotCorrPosition="{value(percent)}" '
-            f'SetMode="1" SingleSettingIndex="0" {CURRENT}/>'
+            f'SetMode="1" SingleSettingIndex="{request.setting}" {CURRENT}/>'
         ]
 
     return Write(
@@ -599,6 +596,23 @@ def sequential_mode(mode: str) -> Write:
     )
 
 
+def activate_setting(setting_id: int) -> Write:
+    """Make the setting *setting_id* the current one, as clicking it in the window does; read back."""
+
+    def fill(request: Request) -> None:
+        request.elements = [f'<ATL SettingID="{int(setting_id)}" Command="ATL_Setting_Activate" Attribute="2"/>']
+
+    return Write(
+        command="activate_setting",
+        values={"value": int(setting_id)},
+        request="ATL_Setting_Activate",
+        fill=fill,
+        description=f"Setting {setting_id} made current",
+        ready=idle(),
+        confirm=Expect("setting", lambda shown: shown["id"] == setting_id),
+    )
+
+
 def add_setting(copy: bool, now: int) -> Write:
     """Add a setting to the current job, as the window's "Add new Setting" does: new, or a copy of the current one.
 
@@ -698,10 +712,10 @@ def dye_assistant_lock(detector_route, line_route, line_index: int, locked: bool
 
     def fill(request: Request) -> None:
         request.elements = [
-            f'<Scanner Command="BlockLightSinkDetectorForDyeAssistant" SequentialSettingIndex="0" BlockedState="{state}">'
+            f'<Scanner Command="BlockLightSinkDetectorForDyeAssistant" SequentialSettingIndex="{request.setting}" BlockedState="{state}">'
             f"{beam_route(detector_route)}</Scanner>",
             f'<Scanner Command="BlockLightSourceLineForDyeAssistant" LineIndex="{int(line_index)}" '
-            f'SequentialSettingIndex="0" BlockedState="{state}">{beam_route(line_route)}</Scanner>',
+            f'SequentialSettingIndex="{request.setting}" BlockedState="{state}">{beam_route(line_route)}</Scanner>',
         ]
 
     def shows(detectors) -> bool:
@@ -776,7 +790,7 @@ def filter_wheel(wheel_type: int, slot: int, filter_name: str) -> Write:
         request.elements = [
             (
                 f'<Scanner Command="FilterWheel_ApiSetSlot" FilterWheelType="{int(wheel_type)}" SlotIndex="{int(slot)}" '
-                f'SetMode="2" SingleSettingIndex="0" {CURRENT}><BeamRoute Version="0"/></Scanner>'
+                f'SetMode="2" SingleSettingIndex="{request.setting}" {CURRENT}><BeamRoute Version="0"/></Scanner>'
             )
         ]
 
@@ -803,13 +817,11 @@ def channel_colour(route, colour: str) -> Write:
     if not isinstance(colour, str) or not colour.strip():
         raise ValueError(f"a channel colour is LAS X's name of a colour table, such as 'Green', not {colour!r}")
     channel = int(route[1])
-    element = (
-        f'<Scanner Command="SetLut" DetectorOrCameraChannel="1" IsUserDefined="0" SequentialSettingIndex="0" '
-        f'LutName="{colour}">{beam_route(route)}</Scanner>'
-    )
-
     def fill(request: Request) -> None:
-        request.elements = [element]
+        request.elements = [
+            f'<Scanner Command="SetLut" DetectorOrCameraChannel="1" IsUserDefined="0" SequentialSettingIndex="{request.setting}" '
+            f'LutName="{colour}">{beam_route(route)}</Scanner>'
+        ]
 
     return Write(
         command="set_channel_colour",

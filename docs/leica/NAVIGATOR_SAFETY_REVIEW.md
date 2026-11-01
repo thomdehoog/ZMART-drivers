@@ -169,12 +169,18 @@ arrows, the driver presses it in LAS X's window through UI Automation and reads 
 from there (Thom asked for it, 1 November 2026). It changes how LAS X's window treats a channel's
 colour, not the light or the detector, and it is refused when LAS X greys it out.
 
-## A change for setting index 0 with another setting current
+## Changes go into the current setting; the white-light slots are shared
 
-LCS takes a change addressed to setting index 0 into the job's first setting, whichever setting is
-current (simulator, 1 November 2026: laser lines meant for Setting 2 replaced Setting 1's). The
-driver refuses such a change, with nothing sent, while another setting than the first is current.
-How the window addresses a second setting is still to be learned.
+LCS takes a change into the setting its index names (`SingleSettingIndex`, `SequentialSettingIndex`,
+`<Sequence Index>`), 0 the job's first, whichever setting is current; the window names the current
+one by its place. On 1 November 2026, laser lines meant for Setting 2 and sent for index 0 replaced
+Setting 1's. The driver now names the current setting's place in every such change, and refuses one
+when that place cannot be read.
+
+A white-light slot's wavelength is shared by every setting; each has its own power. So a line is
+added only on a slot no setting uses, kept 8 nm from the lines of every setting, and a slot another
+setting uses is not retuned. A setting has at most 8 laser lines on (LAS X's own limit, which it
+answers with a message box); a ninth is refused before anything is sent.
 
 ## One more thing the driver does on its own
 

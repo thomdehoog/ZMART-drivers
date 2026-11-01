@@ -27,6 +27,8 @@ University of Zurich (thom.dehoog@zmb.uzh.ch, thomdehoog@gmail.com).
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 import logging
 import time
 from typing import Any
@@ -44,42 +46,57 @@ from .save_data.product import AcquisitionResult
 log = logging.getLogger(__name__)
 
 
-#: How a command names the setting it changes. LCS takes index 0 as the job's
-#: first setting, whichever is current: with Setting 2 current, laser lines
-#: sent with these went into Setting 1 (simulator, 2026-11-01).
-FIRST_SETTING = ('SingleSettingIndex="0"', 'SequentialSettingIndex="0"', '<Sequence Index="0">')
+#: How a command names the setting it changes, by its place in the job. LCS takes
+#: it so, whichever setting is current: with Setting 2 current, laser lines sent
+#: for index 0 went into Setting 1 (simulator, 2026-11-01); the window sends 1.
+ADDRESSED = ('SingleSettingIndex="0"', 'SequentialSettingIndex="0"', '<Sequence Index="0">')
 
 
 def run(client, change, *, max_retries=None):
     """One change through the dispatcher, with LAS X's dialogs answered around every send.
 
-    Refused, with nothing sent, when its commands are addressed to the job's
-    first setting while another setting is the current one: LCS would change
-    the first, not the one LAS X shows.
+    A change whose commands name a setting is addressed to the current one,
+    by its place in the job (:func:`for_current_setting`).
     """
-    wrong = another_setting_current(client, change)
-    if wrong:
-        return dispatch.refused(wrong)
-    return dispatch.run(direct_profile, client, change, max_retries=max_retries, dialogs=answer_dialogs)
+    addressed = for_current_setting(client, change)
+    if isinstance(addressed, str):
+        return dispatch.refused(addressed)
+    return dispatch.run(direct_profile, client, addressed, max_retries=max_retries, dialogs=answer_dialogs)
 
 
-def another_setting_current(client, change) -> str | None:
-    """Why *change* would land in another setting than the current one; None when it would not."""
-    request = writes.Request(change.request)
+def for_current_setting(client, change):
+    """*change* addressed to the current setting; a reason, as text, when its place cannot be read.
+
+    A change whose commands name no setting is returned as it is.
+    """
+    probe = writes.Request(change.request)
     try:
-        change.fill(request)
+        change.fill(probe)
     except Exception:  # noqa: BLE001 -- a change that cannot fill itself fails in the dispatcher, as before
-        return None
-    if not any(marker in element for element in request.elements or [] for marker in FIRST_SETTING):
-        return None
+        return change
+    if not any(marker in element for element in probe.elements or [] for marker in ADDRESSED):
+        return change
     shown = readers.get_setting(client)
-    listed = shown.get("all") or []
-    if not listed or listed[0]["id"] == shown["id"]:
-        return None
-    return (
-        f"{change.description}: LAS X would change {listed[0]['name']}, the job's first setting, not {shown['name']}, "
-        f"the current one; delete the other settings or make {listed[0]['name']} current first. Nothing was sent"
-    )
+    place = next((i for i, each in enumerate(shown.get("all") or []) if each["id"] == shown["id"]), None)
+    if place is None:
+        return f"{change.description}: the current setting's place in the job could not be read; nothing was sent"
+    if place == 0:
+        return change
+
+    def fill(request):
+        request.setting = place
+        change.fill(request)
+
+    return replace(change, fill=fill)
+
+
+def activate_setting(client, name, *, max_retries=None) -> dict:
+    """Make the setting called *name* the current one, as clicking it in the window does; read back."""
+    listed = readers.get_setting(client)["all"]
+    chosen = [s for s in listed if s["name"] == name]
+    if not chosen:
+        return dispatch.refused(f"no setting {name!r}; the settings are {[s['name'] for s in listed]}")
+    return run(client, writes.activate_setting(chosen[0]["id"]), max_retries=max_retries)
 
 
 # =============================================================================
@@ -175,6 +192,27 @@ def laser_line(client, wavelength_nm):
     raise RuntimeError(f"no laser line at {wavelength_nm:g} nm (a white-light line must be on at that wavelength)")
 
 
+def lines_in_any_setting(client, route) -> list[dict]:
+    """The lines of the laser on *route* in use in any of the job's settings, the current one's included.
+
+    A tunable laser's slot has one wavelength for every setting (simulator,
+    2026-11-01): a slot another setting uses is taken, and its wavelength counts.
+    """
+    current = readers.get_setting(client)["name"]
+    lines = [
+        {"setting": current, "lineIndex": line["lineIndex"], "wavelength": line["wavelength"]}
+        for line in readers.get_laser_lines(client) or [] if writes.route_of(line["beamRoute"]) == route
+    ]
+    for slot in readers.get_laser_slots(client) or []:
+        if writes.route_of(slot["beamRoute"]) == route and slot["setting"] != current:
+            lines.append({"setting": slot["setting"], "lineIndex": slot["lineIndex"], "wavelength": slot["wavelength"]})
+    return lines
+
+
+#: The most laser lines one setting can have on, all lasers counted; LAS X refuses a ninth with a
+#: message box ("The maximum number of 8 visible laser lines is reached", simulator, 2026-11-01).
+MAX_VISIBLE_LINES = 8
+
 #: The least distance, in nm, between two lines of the white-light laser that are on: LAS X
 #: holds a warning open otherwise ("Please keep minimum distance of 8nm"), and with it every command.
 WLL_MIN_DISTANCE_NM = 8.0
@@ -211,6 +249,10 @@ def add_laser_line(client, wavelength_nm, percent=2.0, *, max_retries=None) -> d
     except (ValueError, TypeError) as why:
         return dispatch.refused(f"the line cannot be switched on: {why}")
     on = readers.get_laser_lines(client) or []
+    if len(on) >= MAX_VISIBLE_LINES:
+        return dispatch.refused(
+            f"the setting has {len(on)} laser lines on, LAS X's most ({MAX_VISIBLE_LINES}); remove one first; nothing was sent"
+        )
     tunable = [
         s for s in readers.get_light_sources(client) or []
         if any(line["MinWavelength"] != line["MaxWavelength"] for line in s.get("LaserLines", []))
@@ -223,7 +265,7 @@ def add_laser_line(client, wavelength_nm, percent=2.0, *, max_retries=None) -> d
     high = max(line["MaxWavelength"] for line in source["LaserLines"])
     if not low <= float(wavelength_nm) <= high:
         return dispatch.refused(f"{wavelength_nm:g} nm is outside the laser's range, {low:g} to {high:g} nm; nothing was sent")
-    mine = [line for line in on if writes.route_of(line["beamRoute"]) == route]
+    mine = lines_in_any_setting(client, route)
     near = [line["wavelength"] for line in mine if abs(line["wavelength"] - float(wavelength_nm)) < WLL_MIN_DISTANCE_NM]
     if near:
         return dispatch.refused(f"{wavelength_nm:g} nm is within {WLL_MIN_DISTANCE_NM:g} nm of the line at {near[0]:g} nm; nothing was sent")
@@ -270,6 +312,14 @@ def tune_laser_line(client, from_nm, to_nm, *, max_retries=None) -> dict:
     if found is None:
         return dispatch.refused(f"no white-light line is on at {from_nm:g} nm; nothing was sent")
     route, index, (low, high), others = found
+    current = readers.get_setting(client)["name"]
+    sharing = [line for line in lines_in_any_setting(client, route) if line["lineIndex"] == index and line["setting"] != current]
+    if sharing:
+        return dispatch.refused(
+            f"the line at {from_nm:g} nm is also in use in {sharing[0]['setting']}, which shares its wavelength; "
+            "tuning it would change it there too; nothing was sent"
+        )
+    others = [line["wavelength"] for line in lines_in_any_setting(client, route) if line["lineIndex"] != index]
     if not low <= float(to_nm) <= high:
         return dispatch.refused(f"{to_nm:g} nm is outside the laser's range, {low:g} to {high:g} nm; nothing was sent")
     near = [o for o in others if abs(o - float(to_nm)) < WLL_MIN_DISTANCE_NM]

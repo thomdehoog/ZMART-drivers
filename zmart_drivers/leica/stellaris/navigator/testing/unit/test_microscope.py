@@ -431,3 +431,10 @@ def test_a_white_light_line_is_added(scope, lasx):
 def test_a_laser_line_is_removed(scope, lasx):
     assert scope.add_laser_line(600)["confirmed"] is True
     assert scope.remove_laser_line(600)["confirmed"] is True
+
+
+
+def test_a_setting_is_made_current(scope, lasx):
+    assert scope.add_setting()["confirmed"] is True
+    assert scope.activate_setting("Setting 1")["confirmed"] is True
+    assert scope.settings()["setting"]["name"] == "Setting 1"

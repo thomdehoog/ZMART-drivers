@@ -762,30 +762,77 @@ class TestLaserLineRemoved:
 
 
 
-class TestTheFirstSettingOnly:
-    """LCS takes a change addressed to setting index 0 into the job's first setting, whichever is current (simulator, 2026-11-01)."""
+class TestTheCurrentSetting:
+    """LCS takes a change into the setting its index names, 0 the first (simulator, 2026-11-01); the driver names the current one."""
 
-    def test_a_change_for_the_first_setting_is_refused_while_another_is_current(self, lasx, client):
+    def test_a_change_is_addressed_to_the_current_setting_by_its_place(self, lasx, client):
+        assert changes.add_setting(client)["confirmed"] is True  # Setting 2, now current
+
+        changes.change(client, "line_average", 2)
+        changes.change(client, "collar", 30)
+        changes.set_laser_power(client, 497, 5)
+
+        addressed = [e for e in lasx.sent if "SettingIndex=" in e or "<Sequence Index=" in e]
+        assert addressed and all('SettingIndex="1"' in e or '<Sequence Index="1">' in e for e in addressed)
+
+    def test_with_the_first_setting_current_the_index_is_0(self, lasx, client):
         assert changes.add_setting(client)["confirmed"] is True
-        sent = len(lasx.sent)
+        assert changes.activate_setting(client, "Setting 1")["confirmed"] is True
 
-        for result in (
-            changes.set_laser_power(client, 497, 5),
-            changes.add_laser_line(client, 600),
-            changes.change(client, "line_average", 2),
-            changes.change(client, "collar", 30),
-        ):
-            assert result["success"] is False and "Setting 1" in result["message"]
-        assert len(lasx.sent) == sent
+        changes.set_laser_power(client, 497, 5)
 
-    def test_a_change_for_every_setting_or_none_still_goes_through(self, lasx, client):
+        assert 'SingleSettingIndex="0"' in lasx.sent[-1]
+
+    def test_a_setting_is_made_current_as_the_window_does(self, lasx, client):
         assert changes.add_setting(client)["confirmed"] is True
 
-        assert changes.change(client, "zoom", 2.0)["confirmed"] is True
-        assert changes.change(client, "bidirectional", True)["confirmed"] is True
+        assert changes.activate_setting(client, "Setting 1")["confirmed"] is True
+        assert direct_reader.get_setting()["name"] == "Setting 1"
+        assert '<ATL SettingID="3" Command="ATL_Setting_Activate" Attribute="2"/>' in lasx.sent[-1]
+        assert changes.activate_setting(client, "Setting 9")["success"] is False
 
-    def test_with_the_first_setting_current_everything_goes_through(self, lasx, client):
-        assert changes.add_setting(client)["confirmed"] is True
-        assert changes.delete_setting(client, "Setting 2")["confirmed"] is True
 
-        assert changes.set_laser_power(client, 497, 5)["confirmed"] is True
+
+class TestSharedLaserSlots:
+    """A white-light slot's wavelength is shared by every setting; each has its own power (simulator, 2026-11-01)."""
+
+    @pytest.fixture
+    def another_setting_uses_slot_1(self, monkeypatch):
+        from zmart_drivers.leica.stellaris.navigator.procedures import readings
+
+        monkeypatch.setattr(readings, "get_laser_slots", lambda client, **k: [
+            {"setting": "Setting 1", "beamRoute": "10;10", "lineIndex": 0, "wavelength": 497.0},
+            {"setting": "Setting 2", "beamRoute": "10;10", "lineIndex": 1, "wavelength": 681.0},
+        ])
+
+    def test_a_line_is_added_on_a_slot_no_setting_uses(self, lasx, client, another_setting_uses_slot_1):
+        lasx.nodes.light_sources[2]["AOTF"]["AotfLine"].append({"WaveLength": 553.0, "IsLineChecked": True, "LineIndex": 2, "Intensity": 0.0})
+
+        assert changes.add_laser_line(client, 600)["confirmed"] is True
+        assert "<LineIndex>2</LineIndex>" in lasx.sent[-2]
+
+    def test_a_line_within_8_nm_of_another_setting_s_line_is_refused(self, lasx, client, another_setting_uses_slot_1):
+        result = changes.add_laser_line(client, 677)
+
+        assert result["success"] is False and "8 nm" in result["message"]
+
+    def test_a_slot_another_setting_uses_is_not_tuned(self, lasx, client, another_setting_uses_slot_1):
+        wll_line(lasx, 1)["Intensity"] = 2.0
+        wll_line(lasx, 1)["WaveLength"] = 681.0
+
+        result = changes.tune_laser_line(client, 681, 640)
+
+        assert result["success"] is False and "Setting 2" in result["message"]
+        assert lasx.commands() == []
+
+
+def test_a_ninth_visible_line_in_a_setting_is_refused_as_las_x_would(lasx, client, monkeypatch):
+    from zmart_drivers.leica.stellaris.navigator.procedures import readings
+
+    eight = [{"beamRoute": "30", "lineIndex": i, "wavelength": 400.0 + 20 * i, "intensity": 0.02} for i in range(8)]
+    monkeypatch.setattr(readings, "get_laser_lines", lambda client, **k: eight)
+
+    result = changes.add_laser_line(client, 600)
+
+    assert result["success"] is False and "8" in result["message"]
+    assert lasx.commands() == []

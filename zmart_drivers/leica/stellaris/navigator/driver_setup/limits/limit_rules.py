@@ -427,6 +427,7 @@ MUTATING_COMMANDS = {
     "set_setting_name": "set_setting_name",
     "add_setting": "add_setting",
     "delete_setting": "delete_setting",
+    "activate_setting": "activate_setting",
     # a detector and its line kept from LAS X's Dye Assistant
     "lock_detector": "lock_detector",
     # a white-light line switched on, at LCS's starting power; its power is set and checked after

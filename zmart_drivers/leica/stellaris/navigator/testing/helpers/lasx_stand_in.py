@@ -357,6 +357,17 @@ class PlainNavigator:
         self.live[(*current, "IsEnabledForScanning")] = True
         return '<Result Error="0"/>'
 
+    def take_ATL_Setting_Activate(self, e):
+        """The setting made current, as LCS did for the window."""
+        current = ("Acquire", "ATL", "CurrentSetting")
+        for each in self.nodes.settings:
+            if each["SettingID"] == self.live[(*current, "SettingID")]:
+                each["Name"], each["IsEnabledForScanning"] = self.live[(*current, "Name")], self.live[(*current, "IsEnabledForScanning")]
+        chosen = next(s for s in self.nodes.settings if s["SettingID"] == int(e.get("SettingID")))
+        self.live[(*current, "SettingID")], self.live[(*current, "Name")] = chosen["SettingID"], chosen["Name"]
+        self.live[(*current, "IsEnabledForScanning")] = chosen["IsEnabledForScanning"]
+        return "<Result/>"
+
     def take_ATL_Setting_Delete(self, e):
         """The setting deleted; the first one becomes the current one."""
         self.nodes.settings = [s for s in self.nodes.settings if s["SettingID"] != int(e.get("SettingID"))]

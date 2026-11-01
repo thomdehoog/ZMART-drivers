@@ -167,6 +167,7 @@ DATUMS = {
         DatumSpec("setting", direct_reader.get_setting, lambda v: isinstance(v, dict) and "enabled" in v),
         DatumSpec("sequential_mode", direct_reader.get_sequential_mode, lambda v: v in ("line", "frame", "stack")),
         DatumSpec("laser_line_locked", direct_reader.any_laser_line_locked, lambda v: isinstance(v, bool)),
+        DatumSpec("laser_slots", direct_reader.get_laser_slots, lambda v: isinstance(v, list)),
         DatumSpec("optimal_format", lambda: {"format": direct_reader.get_optimal_format()}, lambda v: isinstance(v, dict) and "format" in v),
         DatumSpec("channel_colours", direct_reader.get_channel_colours, lambda v: isinstance(v, dict) and bool(v)),
         DatumSpec("serial_number", direct_reader.get_serial_number, text_present),

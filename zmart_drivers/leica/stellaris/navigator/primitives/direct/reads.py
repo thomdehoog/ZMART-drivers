@@ -83,6 +83,7 @@ READS = (
     "laser_lines",
     "scan_field_rotation",
     "laser_line_locked",
+    "laser_slots",
     "pixel_size",
     "bit_depth",
     "serial_number",
@@ -943,6 +944,46 @@ def get_filter_wheels() -> list[dict]:
         }
         for wheel, slot in zip(installed_filter_wheels(), slots, strict=True)
     ]
+
+
+def get_laser_slots() -> list[dict]:
+    """The laser lines in use in each of the job's settings: ``setting`` (its name), ``beamRoute``, ``lineIndex``, ``wavelength``.
+
+    A tunable laser's line is a slot whose wavelength every setting shares;
+    each setting has its own power for it (``CurrentBlock/ConfocalSequentialInfo/
+    SequentialSettingParameter[n]``, simulator, 2026-11-01). A line is in use
+    in a setting when its power there is above 0.
+    """
+
+    def reading(nodes):
+        sources = [s["route"] for s in layout(nodes, LIGHT_SOURCES, light_layout)]
+        names = [
+            node_value(nodes, named(nodes, info, "Name"))
+            for info in of_name(nodes, children(nodes, node_at(nodes, ("Acquire", "ATL", "CurrentBlock"))), "SettingInfo")
+            if node_value(nodes, named(nodes, info, "SettingID")) is not None
+        ]
+        params = of_name(
+            nodes,
+            children(nodes, node_at(nodes, ("Acquire", "ATL", "CurrentBlock", "ConfocalSequentialInfo"))),
+            "SequentialSettingParameter",
+        )
+        used = []
+        for name, param in zip(names, params):
+            listed = child_named(nodes, param, "LightSourceList_SequentialInfo")
+            for place, source in enumerate(of_name(nodes, children(nodes, listed), "LightSource_SequentialInfo") if listed else []):
+                laser = child_named(nodes, source, "UnifiedLaser_SequentialInfo")
+                for line in of_name(nodes, children(nodes, laser), "UnifiedLaserLine_SequentialInfo") if laser else []:
+                    power = node_value(nodes, named(nodes, line, "Intensity"))
+                    if isinstance(power, (int, float)) and power > 0 and place < len(sources):
+                        used.append({
+                            "setting": name,
+                            "beamRoute": sources[place],
+                            "lineIndex": node_value(nodes, named(nodes, line, "LineIndex")),
+                            "wavelength": node_value(nodes, named(nodes, line, "WaveLength")),
+                        })
+        return used
+
+    return read("the laser lines of every setting", reading)
 
 
 def any_laser_line_locked() -> bool:
