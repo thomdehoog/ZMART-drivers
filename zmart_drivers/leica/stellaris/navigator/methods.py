@@ -371,6 +371,18 @@ class Microscope:
         self.handle.require_open()
         return pan_step.read(self.handle.client, setting_files.folder_for(self.handle))
 
+    def move_pan(self, x_um: float, y_um: float) -> dict:
+        """Move the pan by *x_um* to the right and *y_um* up (negative: left, down), and read it back.
+
+        Done as the operator does it, with the arrows of LAS X's pan pad,
+        at a zoom raised just enough that whole presses land on the
+        distance; the zoom is set back afterwards. Refused before anything
+        is pressed when the pan would go beyond LAS X's largest.
+        """
+        self.handle.require_open()
+        result = pan_step.move(self.handle.client, setting_files.folder_for(self.handle), x_um, y_um)
+        return checked(self.handle, result, f"move_pan({x_um!r}, {y_um!r})")
+
     def center_pan(self) -> dict:
         """Set the pan back to the centre, through LAS X's smallest zoom and back to the zoom it had; read back."""
         self.handle.require_open()

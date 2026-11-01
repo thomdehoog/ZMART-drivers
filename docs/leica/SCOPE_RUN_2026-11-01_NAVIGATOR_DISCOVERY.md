@@ -435,3 +435,18 @@ Through the driver, after Thom clicked 3 right and 2 down: 25.05 µm across and 
 -0.004 µm. That the smallest zoom centres the pan is seen on the simulator only; one check on the
 STELLARIS is still to do.
 
+## 24. The pan moved by a distance, with the window's arrows
+
+Thom chose the window's pan arrows. In LAS X's main window, the pan pad is the element of class
+`ScanPanControl` (automation id `PanControl`) in the XY panel, with nine unnamed buttons: four
+arrows, four diagonals and the centre. Told apart by where they sit on the pad and pressed through
+UI Automation's Invoke: right once moved the pan 8.35 µm at zoom 4.177 (one click, as by hand), and
+the centre button set it to 0.
+
+Built: `move_pan(x_um, y_um)`. Per axis, the zoom is raised just enough that a whole number of
+presses lands on the distance (a press is `PanePercentage` 3 % of the field shown), the arrow is
+pressed, and the zoom is set back. Through the driver: (20, -12) moved 20.00 and -12.01 µm; (5, 0)
+5.00 and 0.00; (-33.3, 7.7) -33.32 and 7.70; each confirmed, the zoom back at 4.177 each time.
+(2000, 0) was refused before any press: beyond the largest pan, 775 µm with the 10x.
+`center_pan()` then set it to 0.00 and 0.00 µm.
+

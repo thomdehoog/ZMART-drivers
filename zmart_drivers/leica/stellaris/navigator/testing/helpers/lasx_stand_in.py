@@ -79,6 +79,8 @@ class PlainNavigator:
             zdrives=lambda: {1: self.z_um[1] * 1e-6, 2: self.z_um[2] * 1e-6},
         )
         self.nodes.live[("Acquire", "AcquisitionState")] = self.scan_state
+        for side in ("ImageSizeX", "ImageSizeY"):  # the field shown shrinks with the zoom, 1162.5 um at zoom 1
+            self.nodes.live[("Acquire", "AcquireImageSizeInfo", side)] = lambda: 0.0011625 / self.live[(*SCANNING, "Zoom")]
         self.ServerNodes = self.nodes
 
     # --- what the reads see ----------------------------------------------------------

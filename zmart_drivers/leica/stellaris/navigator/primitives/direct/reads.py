@@ -75,6 +75,7 @@ READS = (
     "bidirectional",
     "phase_x",
     "system_optimized_step",
+    "pane_percentage",
     "laser_lines",
     "scan_field_rotation",
     "sequential_mode",
@@ -622,6 +623,11 @@ def get_system_optimized_step() -> bool:
     if not isinstance(value, bool):
         raise HardwareServerUnavailable(f"the state tree answered UseSystemOptimizedCalculation = {value!r}")
     return value
+
+
+def get_pane_percentage() -> float:
+    """How far one press of the window's pan arrows moves the pan, in percent of the field shown (``PanePercentage``)."""
+    return metres(settings("the pan step", {"p": (*SCANNING, "PanePercentage")})["p"], "PanePercentage")
 
 
 def get_bit_depth() -> int:

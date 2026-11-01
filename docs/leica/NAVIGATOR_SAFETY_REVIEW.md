@@ -147,6 +147,17 @@ for a written value. A pinhole of 2000 µm raised an error from the pinhole's mo
 opened the pinhole to its maximum; an emission of 2000 nm was kept as 800 (simulator, 1 November
 2026). A value outside its range is refused by the driver, and nothing is written.
 
+## The pan arrows, pressed in LAS X's window (a decided exception)
+
+The pan has no command, no value in LCS and no setting-file route. Thom decided (1 November
+2026) that the driver may press the arrows of the pan pad in LAS X's XY panel, through Windows
+UI Automation, as it presses OK on message boxes. `move_pan` only presses the pad's four arrows;
+it refuses before pressing when the pan would go beyond LAS X's largest (0.00775, 775 µm with the
+10x); it raises the zoom for the presses and never lowers it below the zoom it had, and sets it
+back through the limits; it reads the pan back. A press moves the scan field, not the stage or
+the objective, and makes no light. If LAS X's window changes its layout, the arrows are not found
+and nothing is pressed.
+
 ## One more thing the driver does on its own
 
 The driver presses OK on LAS X's message boxes that have an OK button and nothing else, and

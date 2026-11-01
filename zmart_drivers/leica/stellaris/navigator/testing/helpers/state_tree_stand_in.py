@@ -47,6 +47,7 @@ SIMULATOR_SETTINGS = {
     ("Confocal", "ScanningParameter", "Zoom"): 1.0,
     ("Confocal", "ScanningParameter", "ZoomMin"): 0.75,
     ("Confocal", "ScanningParameter", "ZoomMax"): 48.0,
+    ("Confocal", "ScanningParameter", "PanePercentage"): 3.0,
     ("Confocal", "ScanningParameter", "LineAverage"): 1,
     ("Confocal", "ScanningParameter", "LineAccu"): 1,
     ("Confocal", "ScanningParameter", "FrameAverage"): 1,

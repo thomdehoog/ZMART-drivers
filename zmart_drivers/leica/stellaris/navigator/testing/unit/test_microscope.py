@@ -337,3 +337,13 @@ def test_the_pan_is_read_and_centred(scope, lasx):
     assert scope.pan()["x_um"] == pytest.approx(17.44, abs=0.01)
     assert scope.center_pan()["confirmed"] is True
     assert scope.pan()["x_um"] == pytest.approx(0.0, abs=0.01)
+
+
+def test_the_pan_is_moved_by_micrometres(scope, lasx, monkeypatch):
+    from test_pan import Pad
+
+    from zmart_drivers.leica.stellaris.navigator.procedures import pan
+
+    monkeypatch.setattr(pan, "WindowPad", lambda: Pad(lasx))
+    assert scope.move_pan(15.0, 0.0)["confirmed"] is True
+    assert scope.pan()["x_um"] == pytest.approx(15.0, abs=0.01)

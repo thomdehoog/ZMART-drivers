@@ -84,3 +84,49 @@ def test_a_zoom_the_limits_refuse_leaves_everything_as_it_was(lasx, client, tmp_
 
     assert result["success"] is False
     assert lasx.pan == [0.0005, 0.0]
+
+
+class Pad:
+    """LAS X's pan arrows as the stand-in has them: each press moves the pan 3 % of the field shown."""
+
+    def __init__(self, lasx):
+        self.lasx, self.pressed = lasx, []
+
+    def press(self, arrow):
+        self.pressed.append((arrow, self.lasx.live[(*SCANNING, "Zoom")]))
+        base_um = 0.0011625 * 1e6  # the stand-in's field at zoom 1
+        click = 0.03 * base_um / self.lasx.live[(*SCANNING, "Zoom")] / pan.micrometres_per_pan(base_um)
+        across, down = {"right": (1, 0), "left": (-1, 0), "up": (0, 1), "down": (0, -1)}[arrow]
+        self.lasx.pan = [self.lasx.pan[0] + across * click, self.lasx.pan[1] + down * click]
+
+
+def test_the_pan_is_moved_by_whole_clicks_at_a_zoom_where_they_land_on_the_distance(lasx, client, tmp_path):
+    lasx.live[(*SCANNING, "Zoom")] = 4.177
+    pad = Pad(lasx)
+
+    result = pan.move(client, tmp_path, 20.0, -12.0, pad=pad)
+
+    assert result["success"] is True and result["confirmed"] is True
+    assert result["pan"]["x_um"] == pytest.approx(20.0, abs=0.01)
+    assert result["pan"]["y_um"] == pytest.approx(-12.0, abs=0.01)
+    assert lasx.live[(*SCANNING, "Zoom")] == pytest.approx(4.177)
+    assert {arrow for arrow, _ in pad.pressed} == {"right", "down"}
+    assert all(zoom >= 4.177 for _, zoom in pad.pressed)  # never below the zoom it had: a lower zoom pulls the pan in
+
+
+def test_a_move_beyond_the_largest_pan_is_refused_and_nothing_is_pressed(lasx, client, tmp_path):
+    pad = Pad(lasx)
+
+    result = pan.move(client, tmp_path, 1000.0, 0.0, pad=pad)  # the 10x's largest pan shifts 775 um
+
+    assert result["success"] is False and "largest" in result["message"]
+    assert pad.pressed == [] and lasx.pan == [0.0, 0.0]
+
+
+def test_a_move_that_did_not_land_is_not_confirmed(lasx, client, tmp_path):
+    pad = Pad(lasx)
+    pad.press = lambda arrow: None  # LAS X's arrows did nothing
+
+    result = pan.move(client, tmp_path, 20.0, 0.0, pad=pad)
+
+    assert result["confirmed"] is False and "20" in result["message"]

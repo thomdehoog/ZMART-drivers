@@ -114,6 +114,11 @@ def get_objectives(client, **keywords):
     return _routed("objectives", client, **keywords)
 
 
+def get_pane_percentage(client, **keywords):
+    """How far one press of the window's pan arrows moves the pan, in percent of the field shown."""
+    return _routed("pane_percentage", client, **keywords)
+
+
 def get_fov(client, **keywords):
     """The scan field's width and height, in metres."""
     return _routed("fov", client, **keywords)
