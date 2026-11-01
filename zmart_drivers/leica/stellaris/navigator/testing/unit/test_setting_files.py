@@ -187,3 +187,14 @@ def test_the_setting_is_read_back_also_into_a_folder_that_does_not_exist_yet(las
     found = setting_files.saved_now(client, tmp_path / "new" / "folder")
 
     assert "HyD S 3" in found["detectors"]
+
+
+
+def test_setting_1_is_found_whatever_it_is_called():
+    text = (
+        '<LDM_Block_Sequential><LDM_Block_Sequential_Master><ATLConfocalSettingDefinition UserSettingName="S2"/>'
+        '</LDM_Block_Sequential_Master><LDM_Block_Sequential_List><ATLConfocalSettingDefinition UserSettingName="ZMART test">'
+        '<Detector Name="HyD S 3"/></ATLConfocalSettingDefinition><Autofocus_Block/></LDM_Block_Sequential_List></LDM_Block_Sequential>'
+    )
+    start, end = setting_files.setting_1(text)
+    assert text[start:end].startswith('<ATLConfocalSettingDefinition UserSettingName="ZMART test">')

@@ -603,3 +603,37 @@ class TestCollarReference:
         assert changes.reset_collar_reference(client)["confirmed"] is True
         assert lasx.nodes.objectives[0]["MotCorrRefPos"] == -1.0
         assert changes.collar_to_reference(client)["success"] is False
+
+
+
+SETTING = ("Acquire", "ATL", "CurrentSetting")
+
+
+class TestTheSetting:
+    def test_the_setting_is_switched_off_and_on_by_its_id(self, lasx, client):
+        assert changes.enable_setting(client, False)["confirmed"] is True
+        assert lasx.live[(*SETTING, "IsEnabledForScanning")] is False
+        assert 'SettingID="3"' in lasx.sent[-1] and 'EnableForScanning="0"' in lasx.sent[-1]
+        assert changes.enable_setting(client, True)["confirmed"] is True
+        assert lasx.live[(*SETTING, "IsEnabledForScanning")] is True
+
+    def test_the_setting_is_renamed_in_the_state_tree(self, lasx, client):
+        assert changes.change(client, "setting_name", "ZMART test")["confirmed"] is True
+        assert lasx.live[(*SETTING, "Name")] == "ZMART test"
+        assert lasx.commands() == []
+
+
+class TestTheDetectorLock:
+    def test_a_detector_and_its_excitation_line_are_locked_and_read_back(self, lasx, client, tmp_path):
+        result = changes.lock_detector(client, tmp_path, "HyD S 3", True)
+
+        assert result["confirmed"] is True
+        assert lasx.commands() == ["ATL_Block_Save_To_XML", "BlockLightSinkDetectorForDyeAssistant", "BlockLightSourceLineForDyeAssistant"]
+        assert 'LineIndex="0"' in lasx.sent[-1] and 'BeamPosition="30"' in lasx.sent[-1]  # the 405 line, the setting's excitation line
+        assert changes.lock_detector(client, tmp_path, "HyD S 3", False)["confirmed"] is True
+
+    def test_a_detector_not_in_use_is_refused_and_nothing_is_sent(self, lasx, client, tmp_path):
+        result = changes.lock_detector(client, tmp_path, "Trans PMT", True)
+
+        assert result["success"] is False and "in use" in result["message"]
+        assert lasx.commands() == []

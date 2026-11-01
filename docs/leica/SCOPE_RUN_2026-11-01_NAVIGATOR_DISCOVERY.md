@@ -489,3 +489,25 @@ Automation, visible and hidden), and a loaded setting does not apply the setting
 level is not set. Thom decided: what the window does not offer, the driver does not change. Not
 built.
 
+## 27. The setting's checkbox and name, the two locks, the Trans PMT
+
+Each control used once in LAS X's window, marked and compared:
+
+| Control | What LCS was sent | What changed |
+|---|---|---|
+| The setting's checkbox, off | `<ATL SettingID="3" SetMode="0" EnableForScanning="0" Command="ATL_Setting_EnableDisableForScanning" Attribute="0"/>` | `IsEnabledForScanning` False; `CanDoScanSingle` False, reason 2: no picture can be taken |
+| The setting's name, edited by hand | nothing | `Acquire/ATL/CurrentSetting/Name` and two copies, "Setting 1" to "ZMART test" |
+| The detector lock ("Remove spectral range from optimization") | `BlockLightSinkDetectorForDyeAssistant` for HyD S 3 (40;3) and `BlockLightSourceLineForDyeAssistant` for line 0 of the white-light laser (10;10), the setting's excitation line at 497 nm; `BlockedState` 1 or 0 | the detector's `IsBlockedForDyeAssistant`, the line's `IsBlocked` |
+| The colour lock (`LockLut`) | nothing | nothing in LCS |
+
+The two locks were greyed out until Setting 1 was switched on (Thom). Writing "Setting 1" into
+`CurrentSetting/Name` alone renamed all three copies. Setting 1 of a saved setting is now found as
+the one setting in its list, whatever it is called.
+
+Built: `enable_setting(on)`; `change_setting("setting_name", text)`; `lock_detector(name,
+locked)`, with the line the setting excites at, among the lines that are on;
+`lock_channel_colour(locked)`, pressed in LAS X's window. The Trans PMT was already switched by
+`set_detector("Trans PMT", on=...)`. Through the driver: the setting off and on, renamed and back,
+the detector lock on and off, the colour lock on and off, each confirmed; the Trans PMT on and off,
+each confirmed, with nothing else changed.
+

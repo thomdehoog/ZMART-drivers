@@ -70,6 +70,7 @@ from .procedures import (
     setting_files,
 )
 from .procedures import acquire as acquire_step
+from .procedures import lasx_window
 from .procedures import pan as pan_step
 from .procedures import state as state_step
 from .procedures.clear_cache import clear as clear_step
@@ -266,7 +267,7 @@ class Microscope:
 
     def settings(self) -> dict:
         """What LAS X is set to now: ``zoom``, ``scan_speed``, ``scan_field_rotation``, ``averaging``, ``pinhole``, ``format``, ``scan_mode``, ``objective``, ``z_stack``, ``autofocus``,
-        ``bidirectional``, ``phase_x``, ``system_optimized_step``, ``collar``, ``smartcorr`` and ``bit_depth``."""
+        ``bidirectional``, ``phase_x``, ``system_optimized_step``, ``collar``, ``smartcorr``, ``setting`` and ``bit_depth``."""
         self.handle.require_open()
         found = acquire_step.current_settings(self.handle)
         return {name: found[name] for name in found if name != "fov_m"}
@@ -284,7 +285,8 @@ class Microscope:
         ``emission_wavelength`` (whole nanometres, for the Airy unit), ``bit_depth``
         (8, 12 or 16), ``system_optimized_step`` (True or False) and ``collar``
         (the objective's correction collar, 0 to 100 percent) and ``smartcorr_range``
-        (``(begin, end, steps)``, the collar positions SmartCORR scans through). The limits are asked
+        (``(begin, end, steps)``, the collar positions SmartCORR scans through) and
+        ``setting_name`` (the current setting's name, plain text). The limits are asked
         first. Answers the change's result, with ``confirmed`` True when the
         read-back showed the new value; a change that was never seen is
         recorded and does not raise.
@@ -364,6 +366,29 @@ class Microscope:
         self.handle.require_open()
         result = changes.set_channel_colour(self.handle.client, detector, colour)
         return checked(self.handle, result, f"set_channel_colour({detector!r}, {colour!r})")
+
+    def enable_setting(self, on: bool) -> dict:
+        """Switch the current setting on or off for scanning, as the window's checkbox does; read back.
+
+        Off, LAS X takes no picture with it.
+        """
+        self.handle.require_open()
+        return checked(self.handle, changes.enable_setting(self.handle.client, on), f"enable_setting({on!r})")
+
+    def lock_detector(self, name: str, locked: bool = True) -> dict:
+        """Keep the detector *name* and its excitation line from LAS X's Dye Assistant, or free them, as the window's detector lock does."""
+        self.handle.require_open()
+        result = changes.lock_detector(self.handle.client, setting_files.folder_for(self.handle), name, locked)
+        return checked(self.handle, result, f"lock_detector({name!r}, {locked!r})")
+
+    def lock_channel_colour(self, locked: bool = True) -> dict:
+        """Lock or free the colour of the channel LAS X's detector panel shows, as the window's colour lock does.
+
+        The lock sends LCS nothing, so it is pressed in LAS X's window and read
+        back from there; it holds the window, not the driver's ``set_channel_colour``.
+        """
+        self.handle.require_open()
+        return checked(self.handle, lasx_window.lock_channel_colour(locked), f"lock_channel_colour({locked!r})")
 
     def smartcorr(self, project=None) -> dict:
         """Run SmartCORR, as the window's Start SmartCORR: a scan through the collar positions of its range.

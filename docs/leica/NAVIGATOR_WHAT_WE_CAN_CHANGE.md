@@ -36,6 +36,11 @@ discovery session in `SCOPE_RUN_2026-11-01_NAVIGATOR_DISCOVERY.md` and the build
 | SmartCORR range (Begin, End, Steps) | Works: written into LAS X's state tree |
 | SmartCORR (automatic collar scan) | Works, with LAS X's command |
 | Collar reference stored or cleared (Set, Reset) | Works: written into LAS X's state tree, for the objective in the light path only |
+| Setting switched on or off for scanning | Works, with LAS X's command |
+| Setting's name | Works: written into LAS X's state tree |
+| Detector lock (kept from the Dye Assistant) | Works, with LAS X's commands |
+| Channel colour lock | Works: pressed in LAS X's window (it sends LAS X's hardware server nothing) |
+| Transmitted-light detector (Trans PMT) on or off | Works |
 
 ## Taking pictures
 
@@ -150,7 +155,7 @@ service and the person responsible for the instrument.
 
 | State | Settings |
 |---|---|
-| Works | 56 (the objective among them, not yet tried) |
+| Works | 61 (the objective among them, not yet tried) |
 | Tried | 1 |
 | Command known | 0 |
 | Not yet learned | 6 |

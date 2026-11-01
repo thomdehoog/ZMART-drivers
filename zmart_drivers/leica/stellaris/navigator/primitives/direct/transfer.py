@@ -187,6 +187,9 @@ ALLOWED_COMMANDS = frozenset(
         "SetLut",
         "SetMotCorrPosition",
         "StartMotCorrAutomation",
+        "ATL_Setting_EnableDisableForScanning",
+        "BlockLightSinkDetectorForDyeAssistant",
+        "BlockLightSourceLineForDyeAssistant",
     }
 )
 
@@ -194,7 +197,7 @@ ALLOWED_COMMANDS = frozenset(
 class TreeWrite:
     """One value the driver may write into LCS's state tree, and the values it may take.
 
-    ``kind`` is ``int`` or ``float``. A value is one of ``choices``, or lies
+    ``kind`` is ``int``, ``float`` or ``str`` (plain text, see :data:`PLAIN_TEXT`). A value is one of ``choices``, or lies
     within ``within`` (a fixed range LCS keeps to; with ``choices`` too,
     either will do), or lies between the two nodes ``between`` names beside
     it: LCS's own minimum and maximum, read at the moment of the write; or
@@ -254,11 +257,18 @@ STATE_TREE_WRITES = {
     # The collar position stored for the objective in the light path, which
     # GoTo goes to: the window's Set writes the collar's position here, its
     # Reset -1, none (simulator, 2026-11-01). Only this objective's is written.
+    # The current setting's name, as the window writes it when the name is
+    # edited; LCS copies it to the setting's other entries (simulator, 2026-11-01).
+    "Name": TreeWrite(("Acquire", "ATL", "CurrentSetting", "Name"), str),
     "MotCorrRefPos": TreeWrite(
         ("Microscope", "ObjectiveList", "ObjectiveInfo", "MotCorrRefPos"), float,
         choices=frozenset({-1.0}), within=(0, 100), of_objective=True,
     ),
 }
+
+#: Text the driver writes into the state tree: 1 to 64 characters, letters, digits,
+#: spaces and ``_ - . , ( ) / + #``; nothing that could be read as markup.
+PLAIN_TEXT = re.compile(r"^[\w ._,()/+#-]{1,64}$")
 
 #: A write into the state tree, as the writes build it: ``<StateTree Command="name" Value="n"/>``.
 STATE_TREE = re.compile(r'^\s*<StateTree\s+Command="([^"]+)"\s+Value="([^"]+)"\s*/>\s*$')
@@ -281,6 +291,10 @@ def tree_value(name: str, text: str):
     if name not in STATE_TREE_WRITES:
         raise NotAllowed(f"not written: {name} is not a value this driver writes into the state tree")
     entry = STATE_TREE_WRITES[name]
+    if entry.kind is str:
+        if not PLAIN_TEXT.match(text):
+            raise NotAllowed(f"not written: {name} takes plain text of 1 to 64 characters, not {text}")
+        return text
     try:
         value = entry.kind(text)
     except ValueError:

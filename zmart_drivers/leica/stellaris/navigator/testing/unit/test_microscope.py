@@ -376,3 +376,26 @@ def test_the_collar_s_reference_is_set_gone_to_and_reset(scope, lasx):
     assert scope.settings()["collar"]["percent"] == 40.0
     assert scope.reset_collar_reference()["confirmed"] is True
     assert scope.settings()["collar"]["reference"] is None
+
+
+def test_the_channel_colour_lock_is_pressed_in_las_x_s_window(scope, monkeypatch):
+    from test_lasx_window import Lock, Window
+
+    from zmart_drivers.leica.stellaris.navigator.procedures import lasx_window
+
+    lock = Lock()
+    monkeypatch.setattr(lasx_window, "MainWindow", lambda: Window(lock))
+    assert scope.lock_channel_colour(True)["confirmed"] is True
+    assert lock.on is True
+
+
+
+def test_the_setting_is_switched_renamed_and_read(scope, lasx):
+    assert scope.settings()["setting"] == {"id": 3, "name": "Setting 1", "enabled": True}
+    assert scope.enable_setting(False)["confirmed"] is True
+    assert scope.change_setting("setting_name", "ZMART test")["confirmed"] is True
+    assert scope.settings()["setting"] == {"id": 3, "name": "ZMART test", "enabled": False}
+
+
+def test_a_detector_is_locked_for_the_dye_assistant(scope, lasx):
+    assert scope.lock_detector("HyD S 3", True)["confirmed"] is True

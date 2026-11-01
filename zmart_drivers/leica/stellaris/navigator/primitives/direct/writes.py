@@ -36,6 +36,7 @@ University of Zurich (thom.dehoog@zmb.uzh.ch, thomdehoog@gmail.com).
 from __future__ import annotations
 
 import math
+import re
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 
@@ -290,6 +291,11 @@ def autofocus(on: bool) -> Write:
     )
 
 
+def route_of(text) -> tuple[int, ...]:
+    """A route as the readings give it, ``"40;3"``, as numbers: ``(40, 3)``."""
+    return tuple(int(part) for part in str(text or "").split(";") if part)
+
+
 def beam_route(route) -> str:
     """A light source's route as LCS takes it, one ``BeamPosition`` per level (10;30 is level 0 at 10, level 1 at 30)."""
     positions = "".join(
@@ -484,6 +490,88 @@ def collar_reference(percent) -> Write:
         description=f"Collar reference -> {'none' if percent is None else f'{percent:g} %'}",
         ready=idle(),
         confirm=Expect("collar", shows),
+    )
+
+
+def setting_enabled(setting_id: int, on: bool) -> Write:
+    """Switch the current setting on or off for scanning, as the window's checkbox does; read back.
+
+    Off, LAS X takes no picture with it: LCS's ``CanDoScanSingle`` went False
+    (simulator, 2026-11-01).
+    """
+    if not isinstance(on, bool):
+        raise ValueError(f"a setting is switched on with True or off with False, not {on!r}")
+
+    def fill(request: Request) -> None:
+        request.elements = [
+            f'<ATL SettingID="{int(setting_id)}" SetMode="0" EnableForScanning="{int(on)}" '
+            'Command="ATL_Setting_EnableDisableForScanning" Attribute="0"/>'
+        ]
+
+    return Write(
+        command="set_setting_enabled",
+        values={"value": on},
+        request="ATL_Setting_EnableDisableForScanning",
+        fill=fill,
+        description=f"Setting {setting_id} -> {'on' if on else 'off'}",
+        ready=idle(),
+        confirm=Expect("setting", lambda shown: shown["enabled"] is on),
+    )
+
+
+#: A setting's name as the driver writes it; the transfer checks it again.
+SETTING_NAME = re.compile(r"^[\w ._,()/+#-]{1,64}$")
+
+
+def setting_name(name: str) -> Write:
+    """Rename the current setting, as editing its name in the window does: written into the state tree; read back."""
+    if not isinstance(name, str) or not SETTING_NAME.match(name):
+        raise ValueError(f"a setting's name is 1 to 64 letters, digits, spaces or _ - . , ( ) / + #, not {name!r}")
+
+    def fill(request: Request) -> None:
+        request.elements = [f'<StateTree Command="Name" Value="{name}"/>']
+
+    return Write(
+        command="set_setting_name",
+        values={"value": name},
+        request="Name",
+        fill=fill,
+        description=f"Setting name -> {name}",
+        ready=idle(),
+        confirm=Expect("setting", lambda shown: shown["name"] == name),
+    )
+
+
+def dye_assistant_lock(detector_route, line_route, line_index: int, locked: bool) -> Write:
+    """Lock a detector and its excitation line from LAS X's Dye Assistant, as the window's detector lock does; read back.
+
+    The window sends one element for the detector and one for the line,
+    ``BlockedState`` 1 locked, 0 free (simulator, 2026-11-01).
+    """
+    state = int(bool(locked))
+
+    def fill(request: Request) -> None:
+        request.elements = [
+            f'<Scanner Command="BlockLightSinkDetectorForDyeAssistant" SequentialSettingIndex="0" BlockedState="{state}">'
+            f"{beam_route(detector_route)}</Scanner>",
+            f'<Scanner Command="BlockLightSourceLineForDyeAssistant" LineIndex="{int(line_index)}" '
+            f'SequentialSettingIndex="0" BlockedState="{state}">{beam_route(line_route)}</Scanner>',
+        ]
+
+    def shows(detectors) -> bool:
+        return any(
+            route_of(d.get("beamRoute")) == tuple(detector_route) and d.get("lockedForDyeAssistant") is bool(locked)
+            for d in detectors or []
+        )
+
+    return Write(
+        command="lock_detector",
+        values={"value": bool(locked)},
+        request="BlockLightSinkDetectorForDyeAssistant",
+        fill=fill,
+        description=f"Detector {detector_route} -> {'locked' if locked else 'free'} for the Dye Assistant",
+        ready=idle(),
+        confirm=Expect("detectors", shows),
     )
 
 
@@ -730,6 +818,7 @@ NAMED_SETTINGS = {
     "system_optimized_step": system_optimized_step,
     "collar": collar,
     "smartcorr_range": smartcorr_range,
+    "setting_name": setting_name,
 }
 
 

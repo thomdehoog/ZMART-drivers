@@ -78,6 +78,7 @@ READS = (
     "pane_percentage",
     "collar",
     "smartcorr",
+    "setting",
     "laser_lines",
     "scan_field_rotation",
     "sequential_mode",
@@ -647,6 +648,15 @@ def get_collar() -> dict:
     return read("the collar", reading)
 
 
+def get_setting() -> dict:
+    """The current setting: its ``id``, its ``name`` and whether it is ``enabled`` for scanning (the window's checkbox)."""
+    found = settings(
+        "the setting",
+        {key: ("Acquire", "ATL", "CurrentSetting", node) for key, node in (("id", "SettingID"), ("name", "Name"), ("enabled", "IsEnabledForScanning"))},
+    )
+    return {"id": found["id"], "name": found["name"], "enabled": bool(found["enabled"])}
+
+
 def get_smartcorr() -> dict:
     """SmartCORR's range: ``begin`` and ``end`` in percent of the collar, and ``steps``."""
     found = settings(
@@ -752,6 +762,7 @@ FIXED_DETECTOR_FIELDS = (
 
 #: Per detector, what can change (read every time): whether it is in use, its band, dye, gain and offset.
 CHANGING_DETECTOR_FIELDS = (
+    "IsBlockedForDyeAssistant",
     "WaveLengthBegin",
     "WaveLengthEnd",
     "DyeName",
@@ -821,6 +832,7 @@ def get_detectors() -> list[dict]:
                     "max": unit["HighVoltageMax"],
                 },
                 "offset": unit["Offset"],
+                "lockedForDyeAssistant": bool(unit["IsBlockedForDyeAssistant"]),
             }
             for unit in in_use
         ]

@@ -67,6 +67,9 @@ SIMULATOR_SETTINGS = {
     ("Microscope", "SlotPosition"): 0,
     ("Microscope", "CurrentMotCorrPos"): 0.0,
     ("Microscope", "CanDoMotCorr"): True,
+    ("Acquire", "ATL", "CurrentSetting", "SettingID"): 3,
+    ("Acquire", "ATL", "CurrentSetting", "Name"): "Setting 1",
+    ("Acquire", "ATL", "CurrentSetting", "IsEnabledForScanning"): True,
     ("Microscope", "MotCorrAutomationInfo", "AutomationBegin"): 0.0,
     ("Microscope", "MotCorrAutomationInfo", "AutomationEnd"): 100.0,
     ("Microscope", "MotCorrAutomationInfo", "AutomationSteps"): 10,
@@ -173,6 +176,7 @@ def detector(route, name, kind, begin, end, active, dye, gain, *, photon_countin
         "HighVoltageMin": 2.5,
         "HighVoltageMax": 500.0,
         "Offset": 0.0,
+        "IsBlockedForDyeAssistant": False,
         "CanDoPhotonCounting": photon_counting,
     }
 

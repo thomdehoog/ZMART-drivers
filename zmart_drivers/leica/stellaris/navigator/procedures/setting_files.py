@@ -198,7 +198,7 @@ def saved_now(client, folder) -> dict:
     Path(folder).mkdir(parents=True, exist_ok=True)
     path = Path(folder) / f"setting_{time.strftime('%Y%m%d-%H%M%S')}_read.seq"
     if not save(client, path).get("success"):
-        return {"detectors": {}, "excitation_line": None, "show": {}}
+        return {"detectors": {}, "excitation_line": None, "excitation_nm": None, "show": {}}
     return read_back(path.read_text(encoding="utf-8"))
 
 
@@ -220,13 +220,14 @@ def read_back(text: str) -> dict:
             "dye": fields.get("DyeName"),
         }
     line = re.search(r"<DetectionReferenceLine [^>]*>", part)
-    excitation = None
+    excitation = excitation_nm = None
     if line:
         fields = dict(re.findall(r' (\w+)="([^"]*)"', line[0]))
-        excitation = "auto" if fields.get("IsAutomaticAssigned") == "1" else float(fields.get("LaserWavelength", "nan"))
+        excitation_nm = float(fields.get("LaserWavelength", "nan"))
+        excitation = "auto" if fields.get("IsAutomaticAssigned") == "1" else excitation_nm
     head = dict(re.findall(r' (\w+)="([^"]*)"', re.search(r"<ATLConfocalSettingDefinition [^>]*>", part)[0]))
     show = {"excitation": head.get("IsShowDyeExcitationSpectrum") == "1", "emission": head.get("IsShowDyeEmissionSpectrum") == "1"}
-    return {"detectors": detectors, "excitation_line": excitation, "show": show}
+    return {"detectors": detectors, "excitation_line": excitation, "excitation_nm": excitation_nm, "show": show}
 
 
 # =============================================================================
@@ -237,16 +238,18 @@ def read_back(text: str) -> dict:
 def setting_1(text: str) -> tuple[int, int]:
     """Where Setting 1 is in the file: from its definition to the next definition or the autofocus block.
 
-    ValueError when the file has no Setting 1, or several sequential settings.
+    Setting 1 is the one setting in the file's list, whatever it is called
+    (the operator may rename it). ValueError when the list holds none, or
+    several sequential settings.
     """
-    listed = text[text.find("<LDM_Block_Sequential_List"):]
+    begins = text.find("<LDM_Block_Sequential_List")
+    listed = text[begins:] if begins >= 0 else ""
     in_list = listed.split("<Autofocus_Block")[0]
     if in_list.count("<ATLConfocalSettingDefinition") > 1:
         raise ValueError("LAS X has several sequential settings; which one is meant cannot be told")
-    found = text.find(f'UserSettingName="{SETTING_1}"')
-    if found < 0:
+    if begins < 0 or "<ATLConfocalSettingDefinition" not in in_list:
         raise ValueError(f"the saved setting has no {SETTING_1}")
-    start = text.rindex("<ATLConfocalSettingDefinition", 0, found)
+    start = text.index("<ATLConfocalSettingDefinition", begins)
     ends = [i for i in (text.find("<ATLConfocalSettingDefinition", start + 1), text.find("<Autofocus_Block", start)) if i > 0]
     return start, min(ends) if ends else len(text)
 

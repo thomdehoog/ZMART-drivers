@@ -112,7 +112,7 @@ def change(client, name: str, value, *, max_retries=None, tolerance=None) -> dic
     scan_speed, ...) or a setting with a write of its own
     (``writes.NAMED_SETTINGS``: scan_mode, autofocus, format, resonant_scanner,
     bidirectional, phase_x, pinhole_um, pinhole_unit, emission_wavelength, bit_depth,
-    system_optimized_step, collar, smartcorr_range). A wrong name or a
+    system_optimized_step, collar, smartcorr_range, setting_name). A wrong name or a
     value of the wrong kind raises ``ValueError``. The limits gate is
     shown the new value first, and nothing is sent if it refuses.
     *tolerance* overrides how close a number's read-back must come.
@@ -378,6 +378,40 @@ def smartcorr(client, project=None, **watching) -> dict:
     if result["success"]:
         result["collar"] = readers.get_collar(client)
     return result
+
+
+def enable_setting(client, on, *, max_retries=None) -> dict:
+    """Switch the current setting on or off for scanning, as the window's checkbox does; read back. Off, LAS X takes no picture."""
+    try:
+        change = writes.setting_enabled(readers.get_setting(client)["id"], on)
+    except ValueError as why:
+        return dispatch.refused(str(why))
+    return run(client, change, max_retries=max_retries)
+
+
+def lock_detector(client, folder, detector, locked, *, max_retries=None) -> dict:
+    """Lock *detector* and its setting's excitation line from LAS X's Dye Assistant, or free them; read back.
+
+    As the window's detector lock: only a detector in use; its excitation
+    line is the one the setting excites at, read from a setting saved now
+    into *folder*, among the laser lines that are on.
+    """
+    from . import setting_files
+
+    in_use = {d["name"]: d for d in readers.get_detectors(client) or []}
+    if detector not in in_use:
+        return dispatch.refused(f"{detector!r} is not in use; the detectors in use are {sorted(in_use)}")
+    wavelength = setting_files.saved_now(client, folder)["excitation_nm"]
+    line = next(
+        (each for each in readers.get_laser_lines(client) or [] if wavelength is not None and abs(each["wavelength"] - wavelength) < 0.5),
+        None,
+    )
+    if line is None:
+        return dispatch.refused(f"the setting's excitation line ({wavelength} nm) is not among the laser lines that are on")
+    change = writes.dye_assistant_lock(
+        writes.route_of(in_use[detector]["beamRoute"]), writes.route_of(line["beamRoute"]), line["lineIndex"], locked
+    )
+    return run(client, change, max_retries=max_retries)
 
 
 def set_collar_reference(client) -> dict:

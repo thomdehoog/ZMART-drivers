@@ -127,7 +127,7 @@ with no command in LCS's log). The ZMART Driver never does, because:
 
 Every change goes through a command (`SendCommand2`), which LCS checks and answers.
 
-**Decided exceptions (Thom, 1 November 2026):** eleven values that neither a command nor a
+**Decided exceptions (Thom, 1 November 2026):** twelve values that neither a command nor a
 loaded setting reaches. The transfer refuses every other node; each node is looked up by its
 path at each write, and each value is read back. None of them moves the stage or the objective
 or makes light.
@@ -143,6 +143,7 @@ or makes light.
 | Z-stack step mode | `Acquire/AcquireZStackInfo/StackCalculationMode` | 1 (step size kept) or 2 (System Optimized) |
 | SmartCORR's range | `Microscope/MotCorrAutomationInfo/AutomationBegin`, `AutomationEnd`, `AutomationSteps` | 0 to 100 %; 2 to 100 steps |
 | The collar's reference (Set, Reset) | `Microscope/ObjectiveList/ObjectiveInfo/MotCorrRefPos` of the objective in the light path, found at the write | 0 to 100 %, or -1 (none) |
+| The setting's name | `Acquire/ATL/CurrentSetting/Name` | plain text, 1 to 64 letters, digits, spaces or `_ - . , ( ) / + #` |
 
 Point 1 above is why the ranges are checked by the driver: LCS does not keep to its own range
 for a written value. A pinhole of 2000 µm raised an error from the pinhole's motor and still
@@ -159,6 +160,13 @@ it refuses before pressing when the pan would go beyond LAS X's largest (0.00775
 back through the limits; it reads the pan back. A press moves the scan field, not the stage or
 the objective, and makes no light. If LAS X's window changes its layout, the arrows are not found
 and nothing is pressed.
+
+## The colour lock, pressed in LAS X's window
+
+The colour lock on the detector panel's colour button (`LockLut`) sends LCS nothing. Like the pan
+arrows, the driver presses it in LAS X's window through UI Automation and reads its state back
+from there (Thom asked for it, 1 November 2026). It changes how LAS X's window treats a channel's
+colour, not the light or the detector, and it is refused when LAS X greys it out.
 
 ## One more thing the driver does on its own
 

@@ -420,6 +420,11 @@ MUTATING_COMMANDS = {
     "load_setting": "setting_file",
     # how a channel is shown: not the light, not the detector
     "set_channel_colour": "set_channel_colour",
+    # the setting switched on or off for scanning, and its name
+    "set_setting_enabled": "set_setting_enabled",
+    "set_setting_name": "set_setting_name",
+    # a detector and its line kept from LAS X's Dye Assistant
+    "lock_detector": "lock_detector",
 }
 
 

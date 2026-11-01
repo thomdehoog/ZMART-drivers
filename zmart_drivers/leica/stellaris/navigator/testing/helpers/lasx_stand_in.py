@@ -324,6 +324,20 @@ class PlainNavigator:
             unit["WaveLengthBegin"], unit["WaveLengthEnd"] = float(band.get("LeftWorld")), float(band.get("RightWorld"))
         return "<Result/>"
 
+    def take_ATL_Setting_EnableDisableForScanning(self, e):
+        if int(e.get("SettingID")) == self.live[("Acquire", "ATL", "CurrentSetting", "SettingID")]:
+            self.live[("Acquire", "ATL", "CurrentSetting", "IsEnabledForScanning")] = e.get("EnableForScanning") == "1"
+        return "<Result/>"
+
+    def take_BlockLightSinkDetectorForDyeAssistant(self, e):
+        route = tuple(int(p.get("BeamPosition")) for p in e.iter("BeamPosition"))
+        units = [u for s in self.nodes.detection["Spectrophotometer"] for u in s["DetectionUnitList"]["DetectorHWInfo"]]
+        next(u for u in units if tuple(u["BeamRoute"]) == route)["IsBlockedForDyeAssistant"] = e.get("BlockedState") == "1"
+        return "<Result/>"
+
+    def take_BlockLightSourceLineForDyeAssistant(self, e):
+        return "<Result/>"
+
     def take_SetLut(self, e):
         channel = [int(p.get("BeamPosition")) for p in e.iter("BeamPosition")][1]
         next(lut for lut in self.nodes.luts if lut["Channel"] == channel)["LUTName"] = e.get("LutName")

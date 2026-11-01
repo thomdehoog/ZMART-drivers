@@ -119,6 +119,11 @@ def get_collar(client, **keywords):
     return _routed("collar", client, **keywords)
 
 
+def get_setting(client, **keywords):
+    """The current setting: ``id``, ``name`` and ``enabled``."""
+    return _routed("setting", client, **keywords)
+
+
 def get_smartcorr(client, **keywords):
     """SmartCORR's range: ``begin``, ``end`` and ``steps``."""
     return _routed("smartcorr", client, **keywords)

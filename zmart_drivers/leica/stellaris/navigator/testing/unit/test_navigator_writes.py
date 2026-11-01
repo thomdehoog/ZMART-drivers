@@ -477,3 +477,34 @@ class TestCollarReference:
     def test_a_reference_outside_the_collar_is_refused(self, percent):
         with pytest.raises(ValueError):
             writes.collar_reference(percent)
+
+
+
+class TestSettingAndLocks:
+    def test_the_setting_is_switched_on_and_off_with_the_window_s_command(self):
+        write = writes.setting_enabled(3, False)
+        assert elements(write) == [
+            '<ATL SettingID="3" SetMode="0" EnableForScanning="0" Command="ATL_Setting_EnableDisableForScanning" Attribute="0"/>'
+        ]
+        assert write.confirm.accept({"enabled": False}) and not write.confirm.accept({"enabled": True})
+
+    def test_the_setting_s_name_is_written_into_the_state_tree(self):
+        write = writes.named_setting("setting_name", "ZMART test")
+        assert elements(write) == ['<StateTree Command="Name" Value="ZMART test"/>']
+        assert write.confirm.accept({"name": "ZMART test"}) and not write.confirm.accept({"name": "Setting 1"})
+
+    @pytest.mark.parametrize("name", ["", "a<b", 'say "hi"', "x" * 65, 7])
+    def test_a_name_that_is_empty_too_long_or_holds_markup_is_refused(self, name):
+        with pytest.raises(ValueError):
+            writes.named_setting("setting_name", name)
+
+    def test_the_detector_lock_blocks_the_detector_and_its_line_as_the_window_does(self):
+        write = writes.dye_assistant_lock((40, 3), (10, 10), 0, True)
+        assert elements(write) == [
+            '<Scanner Command="BlockLightSinkDetectorForDyeAssistant" SequentialSettingIndex="0" BlockedState="1">'
+            '<BeamRoute Version="0"><BeamPosition BeamPositionLevel="0" BeamPosition="40"/>'
+            '<BeamPosition BeamPositionLevel="1" BeamPosition="3"/></BeamRoute></Scanner>',
+            '<Scanner Command="BlockLightSourceLineForDyeAssistant" LineIndex="0" SequentialSettingIndex="0" BlockedState="1">'
+            '<BeamRoute Version="0"><BeamPosition BeamPositionLevel="0" BeamPosition="10"/>'
+            '<BeamPosition BeamPositionLevel="1" BeamPosition="10"/></BeamRoute></Scanner>',
+        ]

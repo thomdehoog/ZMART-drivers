@@ -44,7 +44,7 @@ import re
 import time
 from pathlib import Path
 
-from . import answer_dialogs, setting_files
+from . import answer_dialogs, lasx_window, setting_files
 from . import readings as readers
 from .changes import change
 
@@ -110,22 +110,13 @@ class WindowPad:
     """The pan pad in LAS X's XY panel, through Windows UI Automation: its arrows pressed by direction."""
 
     def __init__(self):
-        self.client, self.uia = answer_dialogs.automation()
+        self.window = lasx_window.MainWindow()
         self.buttons = self.find()
 
     def find(self) -> dict:
         """The pad's buttons by where they sit: ``right``, ``left``, ``up``, ``down``, the diagonals and ``centre``."""
-        c, uia = self.client, self.uia
-        tops = uia.GetRootElement().FindAll(c.TreeScope_Children, uia.CreateTrueCondition())
-        for i in range(tops.Length):
-            window = tops.GetElement(i)
-            if window.CurrentName and answer_dialogs.process_name(window.CurrentProcessId) == "LMSApplication.exe":
-                break
-        else:
-            raise answer_dialogs.WindowsUnavailable("LAS X's window was not found")
-        pad = window.FindFirst(c.TreeScope_Descendants, uia.CreatePropertyCondition(c.UIA_ClassNamePropertyId, "ScanPanControl"))
-        if pad is None:
-            raise answer_dialogs.WindowsUnavailable("LAS X's window shows no pan pad (the XY panel is closed?)")
+        c, uia = self.window.client, self.window.uia
+        pad = self.window.first(c.UIA_ClassNamePropertyId, "ScanPanControl")
         edge = pad.CurrentBoundingRectangle
         middle = ((edge.left + edge.right) / 2, (edge.top + edge.bottom) / 2)
         found = pad.FindAll(c.TreeScope_Descendants, uia.CreatePropertyCondition(c.UIA_ControlTypePropertyId, c.UIA_ButtonControlTypeId))
@@ -143,8 +134,7 @@ class WindowPad:
         return buttons
 
     def press(self, arrow: str) -> None:
-        pattern = self.buttons[arrow].GetCurrentPattern(self.client.UIA_InvokePatternId)
-        pattern.QueryInterface(self.client.IUIAutomationInvokePattern).Invoke()
+        self.window.press(self.buttons[arrow])
 
 
 def center(client, folder) -> dict:

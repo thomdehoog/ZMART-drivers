@@ -112,6 +112,9 @@ mic.connect("stellaris-navigator")                                              
 | `dye(name)` | One dye of the library: its full name, its excitation, emission and multiphoton peaks, and its spectra as `(nm, intensity)` pairs. Its `setting_name` is what `set_detector(..., dye=...)` takes. |
 | `set_excitation_line(line)` | Choose the excitation line, the wavelength of a line that is on, or `"auto"`; read back. With one detector on, because LAS X keeps one line per setting. |
 | `show_spectra(excitation=None, emission=None)` | Show or hide the dyes' excitation and emission spectra in LAS X's setting panel; read back. |
+| `enable_setting(on)` | Switch the current setting on or off for scanning, as the window's checkbox does, and read it back. Off, LAS X takes no picture with it. |
+| `lock_detector(name, locked=True)` | Keep a detector in use and its setting's excitation line from LAS X's Dye Assistant, or free them, as the window's detector lock does; read back. |
+| `lock_channel_colour(locked=True)` | Lock or free the colour of the channel LAS X's detector panel shows, as the window's colour lock does. The lock sends LAS X's hardware server nothing, so the driver presses it in LAS X's window and reads it back from there; it holds the window, not `set_channel_colour`. |
 | `smartcorr(project=None)` | Run SmartCORR, as the window's Start SmartCORR: a scan through the collar positions of its range, after which LAS X leaves the collar where the picture was best. The answer's `collar` says where. |
 | `set_collar_reference()` | Store where the collar stands as this objective's reference, as the window's Set does, and read it back. Written into LAS X's state tree, for the objective in the light path only. |
 | `reset_collar_reference()` | Clear this objective's collar reference, as the window's Reset does, and read it back. |
@@ -158,6 +161,7 @@ confirmed, with what LAS X set instead.
 | `format` | `(x, y)` pixels, such as `(512, 512)` | exact |
 | `resonant_scanner` | `True` or `False` | exact |
 | `collar` | the objective's correction collar (motCORR), 0 to 100 %, as the window's box sends it | 0.1 % |
+| `setting_name` | the current setting's name, 1 to 64 letters, digits, spaces or `_ - . , ( ) / + #`; written into LAS X's state tree, as the window does when the name is edited | exact |
 | `smartcorr_range` | `(begin, end, steps)`: the collar positions SmartCORR scans through, 0 to 100 %, and how many (2 to 100); written into LAS X's state tree, as its window does | exact |
 | `bidirectional` | `True` or `False`; written into LAS X's state tree, as its window does | exact |
 | `phase_x` | Phase X, which lines up the two directions of a bidirectional scan, within LAS X's range (-100 to 100); written into the state tree | 0.1 |
