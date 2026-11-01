@@ -98,6 +98,9 @@ def changeable_now(handle) -> dict:
         "scan_field_rotation": lambda: _readers.get_scan_field_rotation(client)["value"],
         "line_average": lambda: _readers.get_averaging(client)["lineAverage"],
         "pinhole_airy": lambda: _readers.get_pinhole(client)["airy"]["value"],
+        "frame_average": lambda: _readers.get_averaging(client)["frameAverage"],
+        "line_accumulation": lambda: _readers.get_averaging(client)["lineAccumulation"],
+        "frame_accumulation": lambda: _readers.get_averaging(client)["frameAccumulation"],
         "objective": lambda: _readers.get_objective(client)["slotIndex"],
     }
     found = {}

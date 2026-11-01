@@ -209,6 +209,27 @@ class PlainNavigator:
     def take_ActivateShutter(self, e):
         self.light_source(e)["Shutter"]["IsShutterActive"] = e.get("Activate") == "1"
 
+    def take_SetFrameAverage(self, e):
+        self.live[(*SCANNING, "FrameAverage")] = int(e.get("FrameAverage"))
+
+    def take_SetLineAccu(self, e):
+        self.live[(*SCANNING, "LineAccu")] = int(e.get("LineAccu"))
+
+    def take_SetFrameAccu(self, e):
+        self.live[(*SCANNING, "FrameAccumulation")] = int(e.get("FrameAccu"))
+
+    def take_SetFormat(self, e):
+        x, y = int(e.get("FormatX")), int(e.get("FormatY"))
+        self.live[(*SCANNING, "FormatX")], self.live[(*SCANNING, "FormatY")] = x, y
+        self.live[(*SCANNING, "CurrentFormat")] = f"{x} x {y}"
+
+    def take_SetScannerToResonant(self, e):
+        self.live[(*SCANNING, "IsResonantConfocalScanner")] = e.get("Enable") == "1"
+
+    def take_FilterWheel_ApiSetSlot(self, e):
+        wheel = next(w for w in self.nodes.filter_wheels["FilterWheel"] if w["FilterWheelType"] == int(e.get("FilterWheelType")))
+        wheel["CurrentSlotPosition"] = int(e.get("SlotIndex"))
+
     def take_ActivateAutoFocus(self, e):
         self.live[("Acquire", "AutoFocusInfo", "IsSeriesScanAutofocusActive")] = e.get("Activate") == "1"
 

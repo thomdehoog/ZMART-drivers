@@ -195,7 +195,8 @@ def test_the_state_names_the_settings_and_the_objective(scope):
 
     assert state["changeable"] == {
         "zoom": 1.0, "scan_speed": 400, "scan_field_rotation": 0.0, "line_average": 1,
-        "pinhole_airy": pytest.approx(0.9994, abs=1e-3), "objective": 0,
+        "pinhole_airy": pytest.approx(0.9994, abs=1e-3), "frame_average": 1, "line_accumulation": 1,
+        "frame_accumulation": 1, "objective": 0,
     }
     assert state["observed"]["navigator"] == "plain"
     assert state["observed"]["image_size_px"] == [512, 512]
@@ -259,3 +260,10 @@ def test_scan_mode_and_autofocus_are_changed_like_every_setting(scope, lasx):
 def test_a_laser_line_is_set_by_its_wavelength_in_percent(scope, lasx):
     assert scope.set_laser_power(488.0, 5.0)["confirmed"] is True
     assert scope.set_laser_shutter(488.0, False)["confirmed"] is True
+
+
+
+def test_the_acquisition_settings_are_changed_like_every_setting(scope, lasx):
+    assert scope.change_setting("frame_average", 2)["confirmed"] is True
+    assert scope.change_setting("format", (256, 256))["confirmed"] is True
+    assert scope.set_filter_wheel(140, "Substrate")["confirmed"] is True

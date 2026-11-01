@@ -170,6 +170,12 @@ ALLOWED_COMMANDS = frozenset(
         "SetStackStepSize",
         "SetLaserLineIntensity",
         "ActivateShutter",
+        "SetFrameAverage",
+        "SetLineAccu",
+        "SetFrameAccu",
+        "SetFormat",
+        "SetScannerToResonant",
+        "FilterWheel_ApiSetSlot",
     }
 )
 

@@ -67,6 +67,7 @@ READS = (
     "z_drive_in_use",
     "autofocus",
     "light_sources",
+    "filter_wheels",
     "laser_lines",
     "scan_field_rotation",
     "sequential_mode",

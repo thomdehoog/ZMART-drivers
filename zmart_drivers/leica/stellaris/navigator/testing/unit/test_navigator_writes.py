@@ -312,3 +312,41 @@ class TestLasers:
     def test_a_power_is_a_percentage(self):
         with pytest.raises(ValueError):
             writes.laser_power((30,), 0, 405.0, 120.0)
+
+
+
+class TestTheAcquisitionSettings:
+    """The commands LCS's log showed and LCS took on the current scan (simulator, 2026-11-01)."""
+
+    @pytest.mark.parametrize(
+        ("name", "xml"),
+        [
+            ("frame_average", '<Scanner Command="SetFrameAverage" FrameAverage="2" SetMode="2" SingleSettingIndex="0" BlockId="0"/>'),
+            ("line_accumulation", '<Scanner Command="SetLineAccu" LineAccu="2" SetMode="2" SingleSettingIndex="0" BlockId="0"/>'),
+            ("frame_accumulation", '<Scanner Command="SetFrameAccu" FrameAccu="2" SetMode="2" SingleSettingIndex="0" BlockId="0"/>'),
+        ],
+    )
+    def test_averaging_and_accumulation_are_rows_of_the_table(self, name, xml):
+        assert elements(writes.setting(name, 2)) == [xml]
+
+    def test_the_format_is_sent_as_two_numbers_and_read_back_as_las_x_writes_it(self):
+        write = writes.named_setting("format", (256, 256))
+        assert elements(write) == ['<Scanner Command="SetFormat" FormatX="256" FormatY="256" BlockId="0" IsAutoFocusDefinition="0"/>']
+        assert write.values == {"value": "256 x 256"}
+        assert write.confirm.accept("256 x 256") and not write.confirm.accept("512 x 512")
+
+    def test_the_resonant_scanner_is_switched_and_read_back_from_the_scan_speed(self):
+        write = writes.named_setting("resonant_scanner", True)
+        assert elements(write) == ['<Scanner Command="SetScannerToResonant" Enable="1" BlockId="0"/>']
+        assert write.confirm.accept({"value": 12000, "isResonant": True})
+        assert not write.confirm.accept({"value": 600, "isResonant": False})
+
+    def test_a_filter_wheel_is_turned_by_its_type_and_slot(self):
+        write = writes.filter_wheel(140, 1, "Substrate")
+        assert elements(write) == [
+            '<Scanner Command="FilterWheel_ApiSetSlot" FilterWheelType="140" SlotIndex="1" SetMode="2" '
+            'SingleSettingIndex="0" BlockId="0"><BeamRoute Version="0"/></Scanner>'
+        ]
+        assert write.values == {"value": "Substrate", "wheel": 140}
+        assert write.confirm.accept([{"type": 140, "filterIndex": 1}])
+        assert not write.confirm.accept([{"type": 140, "filterIndex": 2}])

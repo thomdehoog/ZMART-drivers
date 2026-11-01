@@ -422,3 +422,40 @@ class TestLasers:
 
         assert result["success"] is False and "set_laser_power" in result["message"]
         assert lasx.commands() == []
+
+
+
+class TestTheAcquisitionSettings:
+    @pytest.mark.parametrize(
+        ("name", "node"),
+        [("frame_average", "FrameAverage"), ("line_accumulation", "LineAccu"), ("frame_accumulation", "FrameAccumulation")],
+    )
+    def test_averaging_and_accumulation_are_changed_and_read_back(self, lasx, client, name, node):
+        assert changes.change(client, name, 2)["confirmed"] is True
+        assert lasx.live[(*SCANNING, node)] == 2
+
+    def test_the_format_is_changed_and_read_back(self, lasx, client):
+        assert changes.change(client, "format", (256, 256))["confirmed"] is True
+        assert lasx.live[(*SCANNING, "CurrentFormat")] == "256 x 256"
+
+    def test_the_resonant_scanner_is_switched_and_read_back(self, lasx, client):
+        assert changes.change(client, "resonant_scanner", True)["confirmed"] is True
+        assert lasx.live[(*SCANNING, "IsResonantConfocalScanner")] is True
+
+    def test_a_filter_wheel_is_turned_to_a_filter_by_its_name(self, lasx, client):
+        result = changes.set_filter_wheel(client, 140, "Substrate")
+
+        assert result["confirmed"] is True
+        assert direct_reader.get_filter_wheels()[1]["filterName"].strip() == "Substrate"
+
+    def test_lasx_s_own_galvo_and_scanner_wheels_are_never_turned(self, lasx, client):
+        result = changes.set_filter_wheel(client, 200, "Galvo X Pan Mirror")
+
+        assert result["success"] is False and "200" in result["message"]
+        assert lasx.commands() == []
+
+    def test_a_filter_the_wheel_does_not_hold_is_refused(self, lasx, client):
+        result = changes.set_filter_wheel(client, 140, "Polarizer")
+
+        assert result["success"] is False and "Polarizer" in result["message"]
+        assert lasx.commands() == []

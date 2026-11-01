@@ -202,11 +202,17 @@ SETTER_LIMIT_KEYS = (
     "set_scan_field_rotation",
     "set_line_average",
     "set_pinhole_airy",
+    "set_frame_average",
+    "set_line_accumulation",
+    "set_frame_accumulation",
     "set_z_stack_step",
     "set_scan_mode",
     "set_autofocus",
     "set_laser_power",
     "set_laser_shutter",
+    "set_format",
+    "set_resonant_scanner",
+    "set_filter_wheel",
 )
 
 

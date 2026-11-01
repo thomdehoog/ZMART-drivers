@@ -161,6 +161,11 @@ def get_light_sources(client, **keywords):
     return _routed("light_sources", client, **keywords)
 
 
+def get_filter_wheels(client, **keywords):
+    """Every filter wheel: its type, the filter in the light path and the filters it holds."""
+    return _routed("filter_wheels", client, **keywords)
+
+
 def get_serial_number(client, **keywords):
     """The instrument's serial number."""
     return _routed("serial_number", client, **keywords)

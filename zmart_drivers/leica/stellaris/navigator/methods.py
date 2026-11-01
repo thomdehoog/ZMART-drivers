@@ -272,8 +272,10 @@ class Microscope:
 
         *name* is one of the settings the driver can change: the numbers
         (``zoom``, ``scan_speed``, ``scan_field_rotation``, ``line_average``,
-        ``pinhole_airy``), the scan mode (``scan_mode``, LAS X's name, such
-        as ``"xyz"``) and ``autofocus`` (True or False). The limits are asked
+        ``pinhole_airy``, ``frame_average``, ``line_accumulation``,
+        ``frame_accumulation``), the scan mode (``scan_mode``, LAS X's name,
+        such as ``"xyz"``), ``autofocus`` and ``resonant_scanner`` (True or
+        False) and ``format`` (``(x, y)`` pixels). The limits are asked
         first. Answers the change's result, with ``confirmed`` True when the
         read-back showed the new value; a change that was never seen is
         recorded and does not raise.
@@ -283,6 +285,15 @@ class Microscope:
             raise ValueError(f"no setting {name!r}; the settings are {sorted([*SETTINGS, *NAMED_SETTINGS])}")
         result = changes.change(self.handle.client, name, value)
         return checked(self.handle, result, f"change_setting({name!r}, {value!r})")
+
+    def set_filter_wheel(self, wheel: int, filter_name: str) -> dict:
+        """Turn the filter wheel of type *wheel* (LAS X's number, as :meth:`state` lists the wheels) to *filter_name*; read back.
+
+        LAS X's own galvo and scanner wheels are never turned.
+        """
+        self.handle.require_open()
+        result = changes.set_filter_wheel(self.handle.client, wheel, filter_name)
+        return checked(self.handle, result, f"set_filter_wheel({wheel!r}, {filter_name!r})")
 
     def set_laser_power(self, wavelength_nm: float, percent: float) -> dict:
         """Set the power of the laser line at *wavelength_nm* to *percent*, as LAS X's slider shows it, and read it back.

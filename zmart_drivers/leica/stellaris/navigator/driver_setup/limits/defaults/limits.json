@@ -17,5 +17,11 @@
   "set_scan_mode": [],
   "set_autofocus": [],
   "set_laser_power": {"range": [0, 10]},
-  "set_laser_shutter": []
+  "set_laser_shutter": [],
+  "set_frame_average": [],
+  "set_line_accumulation": [],
+  "set_frame_accumulation": [],
+  "set_format": [],
+  "set_resonant_scanner": [],
+  "set_filter_wheel": []
 }

@@ -105,6 +105,7 @@ mic.connect("stellaris-navigator")                                              
 | `zero_z_galvo()` | Park the z-galvo at 0 without changing the focus: its offset moves onto z-wide. |
 | `settings()` | What LAS X is set to now: the zoom, the scan speed, the rotation, the averaging, the pinhole, the format, the scan mode, the objective and the z-stack, as LAS X reports them. |
 | `change_setting(name, value)` | Change one of the five settings below and read it back. |
+| `set_filter_wheel(wheel, filter_name)` | Turn the filter wheel of that type (LAS X's number) to the filter of that name, and read it back. LAS X's own galvo and scanner wheels are never turned. |
 | `set_laser_power(wavelength_nm, percent)` | Set the power of the laser line at that wavelength, in percent as LAS X's slider shows it, and read it back. Above 0 the line is switched on in the current setting, 0 switches it off; its light source's shutter stays as it was (see `set_laser_shutter`). At most 10 % unless this microscope's limits say otherwise. The white-light laser's tunable lines are not set here. |
 | `set_laser_shutter(wavelength_nm, open_)` | Open or close the shutter of the light source that line comes from, and read it back. |
 | `set_z_stack(drive, begin_um, end_um, step_um)` | Set LAS X's z-stack: its drive (`z-galvo` or `z-wide`), its begin and end in that drive's own micrometres, and its step. Answers the stack as LAS X holds it; LAS X may stretch the end to fit whole steps. Each end is checked like a z move from where the drive stands. From then on `acquire()` takes the whole stack. |
@@ -135,6 +136,11 @@ confirmed, with what LAS X set instead.
 | `pinhole_airy` | Airy units | 0.05 AU |
 | `scan_mode` | LAS X's name of the scan mode, such as `"xyz"` or `"xyt"` | exact (LAS X shows xyz as xyzN) |
 | `autofocus` | `True` or `False` | exact |
+| `frame_average` | 1, 2, 4, ... | exact |
+| `line_accumulation` | 1, 2, 3, ... | exact |
+| `frame_accumulation` | 1, 2, 3, ... | exact |
+| `format` | `(x, y)` pixels, such as `(512, 512)` | exact |
+| `resonant_scanner` | `True` or `False` | exact |
 
 ## Setting up the driver
 

@@ -110,7 +110,7 @@ def change(client, name: str, value, *, max_retries=None, tolerance=None) -> dic
 
     *name* is a row of the table of numbers (``writes.SETTINGS``: zoom,
     scan_speed, ...) or a setting with a write of its own
-    (``writes.NAMED_SETTINGS``: scan_mode, autofocus). A wrong name or a
+    (``writes.NAMED_SETTINGS``: scan_mode, autofocus, format, resonant_scanner). A wrong name or a
     value of the wrong kind raises ``ValueError``. The limits gate is
     shown the new value first, and nothing is sent if it refuses.
     *tolerance* overrides how close a number's read-back must come.
@@ -153,6 +153,32 @@ def set_laser_shutter(client, wavelength_nm, open_, *, max_retries=None) -> dict
         change = writes.laser_shutter(route, open_)
     except (RuntimeError, ValueError, TypeError) as why:
         return dispatch.refused(f"the shutter cannot be set: {why}")
+    return run(client, change, max_retries=max_retries)
+
+
+#: LAS X's own wheels: the galvo and scanner switches (types 200, 160, 170 on the
+#: simulator) and the multi-function port. They are never turned by this driver.
+INTERNAL_WHEELS = (200, 160, 170)
+
+
+def set_filter_wheel(client, wheel_type, filter_name, *, max_retries=None) -> dict:
+    """Turn the filter wheel of type *wheel_type* to the filter named *filter_name*; read back.
+
+    The filter is found by its name among the wheel's filters (LAS X's names,
+    trailing spaces ignored). LAS X's own galvo and scanner wheels and the
+    multi-function port are refused.
+    """
+    from ..primitives.direct.reads import MULTI_FUNCTION_PORT
+
+    if wheel_type in INTERNAL_WHEELS or wheel_type == MULTI_FUNCTION_PORT:
+        return dispatch.refused(f"wheel {wheel_type} is one of LAS X's own scanner wheels, never turned by this driver")
+    wheel = next((w for w in readers.get_filter_wheels(client) or [] if w.get("type") == wheel_type), None)
+    if wheel is None:
+        return dispatch.refused(f"there is no filter wheel of type {wheel_type}")
+    names = [str(name).strip() for name in wheel.get("filterNames", [])]
+    if str(filter_name).strip() not in names:
+        return dispatch.refused(f"wheel {wheel_type} holds no filter named {filter_name!r}; it holds {names}")
+    change = writes.filter_wheel(wheel_type, names.index(str(filter_name).strip()), str(filter_name).strip())
     return run(client, change, max_retries=max_retries)
 
 

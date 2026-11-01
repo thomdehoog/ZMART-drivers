@@ -171,10 +171,27 @@ PINHOLE_AIRY = Setting(
     "pinhole_airy", "SetPinholeAU", "PinholeAU", True, "pinhole",
     lambda v: v["airy"]["value"], "PinholeAU -> {value}", 0.05,
 )
+# Sent to the current scan as LCS's log showed them, and taken there (simulator, 2026-11-01).
+FRAME_AVERAGE = Setting(
+    "frame_average", "SetFrameAverage", "FrameAverage", True, "averaging",
+    lambda v: v["frameAverage"], "FrameAverage -> {value}",
+)
+LINE_ACCUMULATION = Setting(
+    "line_accumulation", "SetLineAccu", "LineAccu", True, "averaging",
+    lambda v: v["lineAccumulation"], "LineAccu -> {value}",
+)
+FRAME_ACCUMULATION = Setting(
+    "frame_accumulation", "SetFrameAccu", "FrameAccu", True, "averaging",
+    lambda v: v["frameAccumulation"], "FrameAccu -> {value}",
+)
 
 #: Every setting the plain Navigator route can change, by its name.
 SETTINGS = {
-    s.name: s for s in (ZOOM, SCAN_SPEED, SCAN_FIELD_ROTATION, LINE_AVERAGE, PINHOLE_AIRY)
+    s.name: s
+    for s in (
+        ZOOM, SCAN_SPEED, SCAN_FIELD_ROTATION, LINE_AVERAGE, PINHOLE_AIRY,
+        FRAME_AVERAGE, LINE_ACCUMULATION, FRAME_ACCUMULATION,
+    )
 }
 
 
@@ -349,8 +366,82 @@ def laser_shutter(route, open_: bool) -> Write:
     )
 
 
+def image_format(pixels) -> Write:
+    """Set the image format to *pixels*, ``(x, y)``; read back as LAS X writes it (``"512 x 512"``)."""
+    try:
+        x, y = (int(v) for v in pixels)
+    except (TypeError, ValueError):
+        raise ValueError(f"format takes two whole numbers of pixels, (x, y), not {pixels!r}") from None
+    if x <= 0 or y <= 0 or (x, y) != tuple(pixels):
+        raise ValueError(f"format takes two whole numbers of pixels above 0, not {pixels!r}")
+    shown = f"{x} x {y}"
+
+    def fill(request: Request) -> None:
+        request.elements = [f'<Scanner Command="SetFormat" FormatX="{x}" FormatY="{y}" {CURRENT} IsAutoFocusDefinition="0"/>']
+
+    return Write(
+        command="set_format",
+        values={"value": shown},
+        request="SetFormat",
+        fill=fill,
+        description=f"Format -> {shown}",
+        ready=idle(),
+        confirm=Expect("format", lambda reading: reading == shown),
+    )
+
+
+def resonant_scanner(on: bool) -> Write:
+    """Switch the resonant scanner on or off; read back from the scan speed's ``isResonant``."""
+    if not isinstance(on, bool):
+        raise ValueError(f"resonant_scanner takes True or False, not {on!r}")
+
+    def fill(request: Request) -> None:
+        request.elements = [f'<Scanner Command="SetScannerToResonant" Enable="{int(on)}" {CURRENT}/>']
+
+    def shows(reading) -> bool:
+        return isinstance(reading, dict) and reading.get("isResonant") is on
+
+    return Write(
+        command="set_resonant_scanner",
+        values={"value": on},
+        request="SetScannerToResonant",
+        fill=fill,
+        description=f"Resonant scanner -> {'on' if on else 'off'}",
+        ready=idle(),
+        confirm=Expect("scan_speed", shows),
+    )
+
+
+def filter_wheel(wheel_type: int, slot: int, filter_name: str) -> Write:
+    """Turn the filter wheel of type *wheel_type* to *slot*, which holds *filter_name*; read back as that wheel's slot."""
+
+    def fill(request: Request) -> None:
+        request.elements = [
+            f'<Scanner Command="FilterWheel_ApiSetSlot" FilterWheelType="{int(wheel_type)}" SlotIndex="{int(slot)}" '
+            f'SetMode="2" SingleSettingIndex="0" {CURRENT}><BeamRoute Version="0"/></Scanner>'
+        ]
+
+    def shows(wheels) -> bool:
+        return any(w.get("type") == wheel_type and w.get("filterIndex") == slot for w in wheels or [])
+
+    return Write(
+        command="set_filter_wheel",
+        values={"value": filter_name, "wheel": wheel_type},
+        request="FilterWheel_ApiSetSlot",
+        fill=fill,
+        description=f"Filter wheel {wheel_type} -> {filter_name}",
+        ready=idle(),
+        confirm=Expect("filter_wheels", shows),
+    )
+
+
 #: The settings with a write of their own, by name, beside the table of numbers (:data:`SETTINGS`).
-NAMED_SETTINGS = {"scan_mode": scan_mode, "autofocus": autofocus}
+NAMED_SETTINGS = {
+    "scan_mode": scan_mode,
+    "autofocus": autofocus,
+    "format": image_format,
+    "resonant_scanner": resonant_scanner,
+}
 
 
 def named_setting(name: str, value) -> Write:
