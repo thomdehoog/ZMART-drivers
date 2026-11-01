@@ -160,6 +160,7 @@ DATUMS = {
         DatumSpec("detection_units", direct_reader.get_detection_units, listed),
         DatumSpec("bidirectional", direct_reader.get_bidirectional, lambda v: isinstance(v, bool)),
         DatumSpec("phase_x", direct_reader.get_phase_x, lambda v: isinstance(v, float)),
+        DatumSpec("system_optimized_step", direct_reader.get_system_optimized_step, lambda v: isinstance(v, bool)),
         DatumSpec("optimal_format", lambda: {"format": direct_reader.get_optimal_format()}, lambda v: isinstance(v, dict) and "format" in v),
         DatumSpec("channel_colours", direct_reader.get_channel_colours, lambda v: isinstance(v, dict) and bool(v)),
         DatumSpec("serial_number", direct_reader.get_serial_number, text_present),

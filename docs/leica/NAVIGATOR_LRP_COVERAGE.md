@@ -28,7 +28,7 @@ X's window.
 | `PanFirstDim`, `PanSecondDim` (pan) | no | no | not yet learned |
 | `PhaseX` | yes | yes | none: written into LCS's state tree, within LCS's range |
 | `FlipX`, `FlipY`, `SwapXY` | no | no | not yet learned |
-| `BitSize` | yes | no | not yet learned |
+| `BitSize` | yes | yes | none: written into LCS's state tree, one of LCS's list |
 | `IsResonantScanner` | yes | no | `SetScannerToResonant` (seen in the log) |
 | `PixelDwellTime`, `LineTime`, `FrameTime` | no | no | follow from speed, format and averaging |
 

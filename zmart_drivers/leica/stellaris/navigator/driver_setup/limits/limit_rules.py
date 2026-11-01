@@ -219,6 +219,8 @@ SETTER_LIMIT_KEYS = (
     "set_pinhole_um",
     "set_pinhole_unit",
     "set_emission_wavelength",
+    "set_bit_depth",
+    "set_system_optimized_step",
 )
 
 

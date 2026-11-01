@@ -568,6 +568,31 @@ def emission_wavelength(nm) -> Write:
     )
 
 
+def bit_depth(bits) -> Write:
+    """The bits per pixel a capture is digitised with: one of LAS X's list (8, 12 or 16), read at the write."""
+    if isinstance(bits, bool) or not isinstance(bits, int):
+        raise ValueError(f"bit_depth takes whole bits, such as 8, 12 or 16, not {bits!r}")
+    return tree_write(
+        "set_bit_depth", "Resolution", bits, {"value": bits}, f"Bit depth -> {bits}",
+        Expect("bit_depth", lambda shown: shown == bits),
+    )
+
+
+def system_optimized_step(on: bool) -> Write:
+    """The z-stack's step System Optimized (True), as the window's button, or the step size kept (False).
+
+    On, LAS X takes its own optimal step and may stretch the stack's end to
+    fit whole steps; off, the step stays as it is then.
+    """
+    if not isinstance(on, bool):
+        raise ValueError(f"system_optimized_step takes True or False, not {on!r}")
+    return tree_write(
+        "set_system_optimized_step", "StackCalculationMode", 2 if on else 1, {"value": on},
+        f"System optimized step -> {'on' if on else 'off'}",
+        Expect("system_optimized_step", lambda shown: shown is on),
+    )
+
+
 #: The settings with a write of their own, by name, beside the table of numbers (:data:`SETTINGS`).
 NAMED_SETTINGS = {
     "scan_mode": scan_mode,
@@ -579,6 +604,8 @@ NAMED_SETTINGS = {
     "pinhole_um": pinhole_um,
     "pinhole_unit": pinhole_unit,
     "emission_wavelength": emission_wavelength,
+    "bit_depth": bit_depth,
+    "system_optimized_step": system_optimized_step,
 }
 
 

@@ -404,3 +404,21 @@ class TestPinholeAndPhase:
     def test_a_value_that_is_not_a_number_is_refused_before_anything_is_built(self, name):
         with pytest.raises(ValueError):
             writes.named_setting(name, "wide")
+
+
+
+class TestBitDepthAndOptimizedStep:
+    def test_the_bit_depth_is_written_into_the_state_tree_and_read_back(self):
+        write = writes.named_setting("bit_depth", 12)
+        assert elements(write) == ['<StateTree Command="Resolution" Value="12"/>']
+        assert write.confirm.accept(12) and not write.confirm.accept(8)
+        with pytest.raises(ValueError, match="12.5"):
+            writes.named_setting("bit_depth", 12.5)
+
+    def test_the_system_optimized_step_is_step_mode_2_and_off_is_mode_1(self):
+        write = writes.named_setting("system_optimized_step", True)
+        assert elements(write) == ['<StateTree Command="StackCalculationMode" Value="2"/>']
+        assert elements(writes.named_setting("system_optimized_step", False)) == ['<StateTree Command="StackCalculationMode" Value="1"/>']
+        assert write.confirm.accept(True) and not write.confirm.accept(False)
+        with pytest.raises(ValueError):
+            writes.named_setting("system_optimized_step", "yes")

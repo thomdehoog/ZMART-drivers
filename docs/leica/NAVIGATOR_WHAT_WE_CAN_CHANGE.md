@@ -61,7 +61,7 @@ discovery session in `SCOPE_RUN_2026-11-01_NAVIGATOR_DISCOVERY.md` and the build
 | Scan direction (uni- or bidirectional) | Works: written into LAS X's state tree |
 | Phase X | Works: written into LAS X's state tree, within LAS X's own range |
 | Pan | Not yet learned |
-| Bit depth | Not yet learned |
+| Bit depth | Works: written into LAS X's state tree, one of LAS X's own list (8, 12, 16) |
 | Autofocus on or off | Works |
 
 ## Z-stack
@@ -72,7 +72,7 @@ discovery session in `SCOPE_RUN_2026-11-01_NAVIGATOR_DISCOVERY.md` and the build
 | Begin and end | Works |
 | Step size | Works |
 | Number of sections | Works: it follows from the range and the step |
-| System-optimized step | Not yet learned |
+| System-optimized step | Works: written into LAS X's state tree; LAS X takes its optimal step and may stretch the end |
 | Direction | Works: begin above end runs the stack downwards |
 
 ## Pinhole
@@ -146,7 +146,7 @@ service and the person responsible for the instrument.
 
 | State | Settings |
 |---|---|
-| Works | 48 (the objective among them, not yet tried) |
+| Works | 50 (the objective among them, not yet tried) |
 | Tried | 1 |
 | Command known | 0 |
-| Not yet learned | 11 |
+| Not yet learned | 9 |

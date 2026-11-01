@@ -520,3 +520,27 @@ class TestPinholeAndPhase:
 
         assert changes.change(client, "pinhole_um", 600)["success"] is False
         assert changes.change(client, "pinhole_um", 500)["confirmed"] is True
+
+
+
+ZSTACK = ("Acquire", "AcquireZStackInfo")
+
+
+class TestBitDepthAndOptimizedStep:
+    def test_the_bit_depth_is_written_and_read_back(self, lasx, client):
+        assert changes.change(client, "bit_depth", 12)["confirmed"] is True
+        assert lasx.live[(*SCANNING, "Resolution")] == 12
+        assert lasx.commands() == []
+
+    def test_a_bit_depth_lcs_does_not_list_is_refused_and_nothing_is_written(self, lasx, client):
+        result = changes.change(client, "bit_depth", 10)
+
+        assert result["success"] is False and "8, 12, 16" in result["message"]
+        assert lasx.live[(*SCANNING, "Resolution")] == 8
+
+    def test_the_system_optimized_step_takes_lcs_optimal_step_and_is_switched_off_again(self, lasx, client):
+        assert changes.change(client, "system_optimized_step", True)["confirmed"] is True
+        assert lasx.live[(*ZSTACK, "StackCalculationMode")] == 2
+        assert lasx.live[(*ZSTACK, "StepSize")] == lasx.live[(*ZSTACK, "OptimalStepSize")]
+        assert changes.change(client, "system_optimized_step", False)["confirmed"] is True
+        assert lasx.live[(*ZSTACK, "StackCalculationMode")] == 1

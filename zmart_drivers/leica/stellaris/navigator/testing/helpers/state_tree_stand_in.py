@@ -66,6 +66,10 @@ SIMULATOR_SETTINGS = {
     ("Microscope", "SlotPosition"): 0,
     ("Microscope", "CurrentMicStandName"): "DM Manual-6",
     ("Confocal", "ScanningParameter", "Resolution"): 8,
+    ("Confocal", "ScanningParameter", "ResolutionList"): (8, 12, 16),
+    ("Acquire", "AcquireZStackInfo", "StackCalculationMode"): 1,
+    ("Acquire", "AcquireZStackInfo", "UseSystemOptimizedCalculation"): False,
+    ("Acquire", "AcquireZStackInfo", "OptimalStepSize"): 2.4e-06,
     ("Confocal", "ScanningParameter", "SpeedMin"): 1,
     ("Confocal", "ScanningParameter", "SpeedMax"): 2600,
     ("Confocal", "ScanningParameter", "IsSequentialEnabled"): True,
@@ -419,6 +423,11 @@ class StandInNodes:
                 path.insert(0, name)
                 node = parent
             self.live[tuple(path)] = change.Value
+            if tuple(path) == ("Acquire", "AcquireZStackInfo", "StackCalculationMode"):
+                # LCS follows step mode 2 with its optimal step, as for the window's System Optimized.
+                self.live[("Acquire", "AcquireZStackInfo", "UseSystemOptimizedCalculation")] = change.Value == 2
+                if change.Value == 2:
+                    self.live[("Acquire", "AcquireZStackInfo", "StepSize")] = self.live[("Acquire", "AcquireZStackInfo", "OptimalStepSize")]
 
     def GetNode(self, node_id):
         self.node_calls += 1

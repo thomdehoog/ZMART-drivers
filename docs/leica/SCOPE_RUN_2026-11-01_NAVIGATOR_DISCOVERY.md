@@ -358,3 +358,20 @@ Through the ZMART Driver (`change_setting`), each confirmed by its read-back: `p
 `pinhole_unit` "um". Refused, with nothing written and every value unchanged: `pinhole_um`
 2000 and 50, `phase_x` 150, `emission_wavelength` 900. All put back: Phase X -39.976, 100 µm,
 580 nm, AU.
+
+## 21. The bit depth and the system-optimized step, written into the state tree
+
+Thom asked for these two next. Neither has a command in LCS's log, and a loaded setting does
+not change them (section 16). Both are written into the state tree and read back:
+
+- `Confocal/ScanningParameter/Resolution`, the bit depth, beside `ResolutionList` (8, 12, 16).
+  Written 12: kept. Written 10, not on the list: LCS kept 12 and said nothing.
+- `Acquire/AcquireZStackInfo/StackCalculationMode` 2: LCS set `UseSystemOptimizedCalculation`
+  True and the step to its `OptimalStepSize` itself, as the window's System Optimized does. The
+  stack of 1505 to 1515 µm at 2.5 µm became 1.3 µm and 9 sections, the end stretched to 1515.4 µm
+  to fit whole steps. Written 1 again: the flag went False and the step stayed at 1.3 µm.
+
+Through the ZMART Driver (`change_setting`), each confirmed by its read-back: `bit_depth` 12,
+16 and 8; `system_optimized_step` True and False. `bit_depth` 10 was refused, with nothing
+written. The stack was put back to 1505 to 1515 µm at 2.5 µm with `set_z_stack`, and the bit
+depth to 8.

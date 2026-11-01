@@ -317,3 +317,16 @@ def test_the_pinhole_and_phase_x_are_read_with_the_settings(scope, lasx):
     shown = scope.settings()
     assert shown["phase_x"] == pytest.approx(10.0)
     assert shown["pinhole"]["unit"] == "airy" and shown["pinhole"]["emission_nm"] == 580
+
+
+
+def test_the_system_optimized_step_is_read_with_the_settings(scope, lasx):
+    assert scope.settings()["system_optimized_step"] is False
+    assert scope.change_setting("system_optimized_step", True)["confirmed"] is True
+    assert scope.settings()["system_optimized_step"] is True
+
+
+def test_the_bit_depth_is_read_with_the_settings(scope, lasx):
+    assert scope.settings()["bit_depth"] == 8
+    assert scope.change_setting("bit_depth", 12)["confirmed"] is True
+    assert scope.settings()["bit_depth"] == 12

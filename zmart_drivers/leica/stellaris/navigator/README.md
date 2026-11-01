@@ -155,9 +155,11 @@ confirmed, with what LAS X set instead.
 | `pinhole_um` | the pinhole in micrometres, within LAS X's range (100 to 1000 on the simulator); written into the state tree | 0.5 µm |
 | `pinhole_unit` | `"um"` or `"airy"`: the unit LAS X shows the pinhole in; the pinhole itself stays | exact |
 | `emission_wavelength` | whole nanometres, 380 to 800: the wavelength LAS X works the Airy unit out for | exact |
+| `bit_depth` | the bits per pixel, one LAS X offers (8, 12 or 16) | exact |
+| `system_optimized_step` | `True` or `False`: the z-stack's step System Optimized, as the window's button; LAS X may stretch the end to fit whole steps | exact |
 
-The last five have no command LAS X's window sends; the window writes them straight into
-LAS X's state tree, and so does the driver, for these five values only. LAS X does not keep to its
+The last seven have no command LAS X's window sends; the window writes them straight into
+LAS X's state tree, and so does the driver, for these seven values only. LAS X does not keep to its
 own range there: a pinhole written beyond it opens to the maximum. So the driver reads LAS X's own
 minimum and maximum at each write and refuses a value outside them; nothing is written then.
 `pinhole_airy` sets the pinhole in Airy units through LAS X's command, which keeps to the range itself.

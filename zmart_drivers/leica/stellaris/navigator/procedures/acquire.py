@@ -112,6 +112,7 @@ def current_settings(handle) -> dict:
             ("autofocus", _readers.get_autofocus),
             ("bidirectional", _readers.get_bidirectional),
             ("phase_x", _readers.get_phase_x),
+            ("system_optimized_step", _readers.get_system_optimized_step),
             ("fov_m", _readers.get_fov),
             ("bit_depth", _readers.get_bit_depth),
         )

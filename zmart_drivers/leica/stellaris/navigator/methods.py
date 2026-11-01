@@ -264,10 +264,11 @@ class Microscope:
     # --- the settings and the objective ---------------------------------------------------
 
     def settings(self) -> dict:
-        """What LAS X is set to now: ``zoom``, ``scan_speed``, ``scan_field_rotation``, ``averaging``, ``pinhole``, ``format``, ``scan_mode``, ``objective``, ``z_stack``, ``autofocus``."""
+        """What LAS X is set to now: ``zoom``, ``scan_speed``, ``scan_field_rotation``, ``averaging``, ``pinhole``, ``format``, ``scan_mode``, ``objective``, ``z_stack``, ``autofocus``,
+        ``bidirectional``, ``phase_x``, ``system_optimized_step`` and ``bit_depth``."""
         self.handle.require_open()
         found = acquire_step.current_settings(self.handle)
-        return {name: found[name] for name in found if name not in ("fov_m", "bit_depth")}
+        return {name: found[name] for name in found if name != "fov_m"}
 
     def change_setting(self, name: str, value) -> dict:
         """Change the setting *name* to *value*, and read it back.
@@ -279,7 +280,8 @@ class Microscope:
         such as ``"xyz"``), ``autofocus`` and ``resonant_scanner`` (True or
         False), ``bidirectional`` (True or False), ``format`` (``(x, y)`` pixels),
         ``phase_x``, ``pinhole_um`` (micrometres), ``pinhole_unit`` (``"um"`` or ``"airy"``)
-        and ``emission_wavelength`` (whole nanometres, for the Airy unit). The limits are asked
+        ``emission_wavelength`` (whole nanometres, for the Airy unit), ``bit_depth``
+        (8, 12 or 16) and ``system_optimized_step`` (True or False). The limits are asked
         first. Answers the change's result, with ``confirmed`` True when the
         read-back showed the new value; a change that was never seen is
         recorded and does not raise.

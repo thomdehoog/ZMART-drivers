@@ -176,6 +176,11 @@ def get_detection_units(client, **keywords):
     return _routed("detection_units", client, **keywords)
 
 
+def get_system_optimized_step(client, **keywords):
+    """Whether the z-stack's step is System Optimized."""
+    return _routed("system_optimized_step", client, **keywords)
+
+
 def get_phase_x(client, **keywords):
     """Phase X, as LAS X shows it."""
     return _routed("phase_x", client, **keywords)

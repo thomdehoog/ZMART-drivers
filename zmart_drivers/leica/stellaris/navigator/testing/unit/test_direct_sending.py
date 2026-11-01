@@ -181,6 +181,8 @@ class TestADialogInTheWay:
     ("xml", "why"),
     [
         ('<StateTree Command="PinholeMax" Value="0.002"/>', "PinholeMax"),
+        ('<StateTree Command="StackCalculationMode" Value="0"/>', "0"),
+        ('<StateTree Command="Resolution" Value="twelve"/>', "twelve"),
         ('<StateTree Command="ScanDirectionX" Value="3"/>', "3"),
         ('<StateTree Command="PinholeUnit" Value="0"/>', "0"),
         ('<StateTree Command="PhaseX" Value="nan"/>', "nan"),

@@ -195,7 +195,8 @@ class TreeWrite:
     ``kind`` is ``int`` or ``float``. A value is one of ``choices``, or lies
     within ``within`` (a fixed range LCS keeps to), or lies between the two
     nodes ``between`` names beside it: LCS's own minimum and maximum, read
-    at the moment of the write.
+    at the moment of the write; or it is one of the values in the node
+    ``listed`` names beside it, LCS's own list, read at the write.
     """
 
     path: tuple[str, ...]
@@ -203,6 +204,7 @@ class TreeWrite:
     choices: frozenset = frozenset()
     within: tuple[float, float] | None = None
     between: tuple[str, str] | None = None
+    listed: str | None = None
 
 
 HW_PARAMETER = ("Confocal", "HWParameter")
@@ -231,6 +233,13 @@ STATE_TREE_WRITES = {
     "EmissionWaveLengthForAiryAnddzCalculation": TreeWrite(
         (*HW_PARAMETER, "EmissionWaveLengthForAiryAnddzCalculation"), within=(380, 800)
     ),
+    # The bit depth, one of LCS's list (8, 12, 16 on the simulator); LCS
+    # ignored 10, which is not on it.
+    "Resolution": TreeWrite(("Confocal", "ScanningParameter", "Resolution"), listed="ResolutionList"),
+    # The z-stack's step mode: 2 is System Optimized, where LCS takes its own
+    # optimal step (and may stretch the end to fit whole steps), 1 keeps the
+    # step size. 0, the number of steps, is not written.
+    "StackCalculationMode": TreeWrite(("Acquire", "AcquireZStackInfo", "StackCalculationMode"), choices=frozenset({1, 2})),
 }
 
 #: A write into the state tree, as the writes build it: ``<StateTree Command="name" Value="n"/>``.
@@ -278,6 +287,12 @@ def write_into_state_tree(name: str, text: str) -> str:
 
     entry = STATE_TREE_WRITES[name]
     value = tree_value(name, text)
+    if entry.listed is not None:
+        nodes = state_tree.server_nodes()
+        listed = state_tree.node_value(nodes, state_tree.node_at(nodes, (*entry.path[:-1], entry.listed)))
+        if value not in tuple(listed or ()):
+            shown = ", ".join(str(item) for item in listed or ())
+            return f'<Result Error="1">{name} {text} is not one LAS X offers ({shown}); not written</Result>'
     if entry.between is not None:
         nodes = state_tree.server_nodes()
         low, high = (

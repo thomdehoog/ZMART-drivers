@@ -74,6 +74,7 @@ READS = (
     "optimal_format",
     "bidirectional",
     "phase_x",
+    "system_optimized_step",
     "laser_lines",
     "scan_field_rotation",
     "sequential_mode",
@@ -613,6 +614,14 @@ def get_pixel_size() -> tuple[float, float]:
         metres(found["x"], "ImageSizeX") / found["columns"],
         metres(found["y"], "ImageSizeY") / found["rows"],
     )
+
+
+def get_system_optimized_step() -> bool:
+    """Whether the z-stack's step is System Optimized: LCS's ``UseSystemOptimizedCalculation``."""
+    value = settings("the step mode", {"on": (*Z_STACK, "UseSystemOptimizedCalculation")})["on"]
+    if not isinstance(value, bool):
+        raise HardwareServerUnavailable(f"the state tree answered UseSystemOptimizedCalculation = {value!r}")
+    return value
 
 
 def get_bit_depth() -> int:
