@@ -315,3 +315,11 @@ LAS X's "Optimize XY Format" button sets the format to the one LCS holds as opti
 `Acquire/ATL/CurrentBlock/ConfocalSequentialInfo/OptimizedFormatX` and `OptimizedFormatY`
 (2824 x 2824 at zoom 2 with the 10x), valid while `IsOptimizeFormatValid`. The ZMART Driver
 reads them and sets the format with `SetFormat`: 512 x 512 to 2824 x 2824, read back, and back.
+
+## 18. Phase X
+
+Shown with Bidirectional X on. Typed in LAS X's window as -40: LCS's
+`Confocal/HWParameter/PhaseX` went from -49.99 to -39.976 (LCS keeps it in steps, so -40
+became -39.98), with no command in LCS's log. Written as -20 in the master and Setting 1 of a
+saved setting and loaded: LCS stayed at -39.976. Phase X can be read, not set: like the other
+scan parameters.
