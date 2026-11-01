@@ -110,7 +110,8 @@ def change(client, name: str, value, *, max_retries=None, tolerance=None) -> dic
 
     *name* is a row of the table of numbers (``writes.SETTINGS``: zoom,
     scan_speed, ...) or a setting with a write of its own
-    (``writes.NAMED_SETTINGS``: scan_mode, autofocus, format, resonant_scanner). A wrong name or a
+    (``writes.NAMED_SETTINGS``: scan_mode, autofocus, format, resonant_scanner,
+    bidirectional, phase_x, pinhole_um, pinhole_unit, emission_wavelength). A wrong name or a
     value of the wrong kind raises ``ValueError``. The limits gate is
     shown the new value first, and nothing is sent if it refuses.
     *tolerance* overrides how close a number's read-back must come.

@@ -215,6 +215,10 @@ SETTER_LIMIT_KEYS = (
     "set_filter_wheel",
     "set_detector_gain",
     "set_bidirectional",
+    "set_phase_x",
+    "set_pinhole_um",
+    "set_pinhole_unit",
+    "set_emission_wavelength",
 )
 
 

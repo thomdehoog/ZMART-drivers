@@ -177,10 +177,20 @@ class TestADialogInTheWay:
 
 
 
-def test_only_bidirectional_may_be_written_into_the_state_tree_and_only_as_1_or_2(server):
-    with pytest.raises(send_command.NotAllowed, match="PhaseX"):
-        send_command.send('<StateTree Command="PhaseX" Value="-20"/>')
-    with pytest.raises(send_command.NotAllowed, match="3"):
-        send_command.send('<StateTree Command="ScanDirectionX" Value="3"/>')
+@pytest.mark.parametrize(
+    ("xml", "why"),
+    [
+        ('<StateTree Command="PinholeMax" Value="0.002"/>', "PinholeMax"),
+        ('<StateTree Command="ScanDirectionX" Value="3"/>', "3"),
+        ('<StateTree Command="PinholeUnit" Value="0"/>', "0"),
+        ('<StateTree Command="PhaseX" Value="nan"/>', "nan"),
+        ('<StateTree Command="PhaseX" Value="minus twenty"/>', "minus twenty"),
+        ('<StateTree Command="EmissionWaveLengthForAiryAnddzCalculation" Value="900"/>', "380"),
+        ('<StateTree Command="EmissionWaveLengthForAiryAnddzCalculation" Value="520.5"/>', "520.5"),
+    ],
+)
+def test_only_the_listed_values_may_be_written_into_the_state_tree_and_only_within_their_range(server, xml, why):
+    with pytest.raises(send_command.NotAllowed, match=why):
+        send_command.send(xml)
 
     assert server.received == []

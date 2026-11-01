@@ -73,6 +73,7 @@ READS = (
     "detection_units",
     "optimal_format",
     "bidirectional",
+    "phase_x",
     "laser_lines",
     "scan_field_rotation",
     "sequential_mode",
@@ -277,8 +278,14 @@ def get_averaging() -> dict:
     )
 
 
+#: How LCS names the unit LAS X shows the pinhole in (``PinholeUnit``).
+PINHOLE_UNITS = {1: "um", 2: "airy"}
+
+
 def get_pinhole() -> dict:
-    """The pinhole: ``airy`` (as the job settings' ``pinholeAiry``: ``value``, ``min``, ``max``) and ``metres``."""
+    """The pinhole: ``airy`` (as the job settings' ``pinholeAiry``: ``value``, ``min``, ``max``), ``metres``,
+    ``unit`` (``"um"`` or ``"airy"``, as LAS X shows it) and ``emission_nm``, the wavelength the Airy unit is worked out for.
+    """
     found = settings(
         "the pinhole",
         {
@@ -286,10 +293,21 @@ def get_pinhole() -> dict:
             "min": (*HARDWARE, "PinholeAUMin"),
             "max": (*HARDWARE, "PinholeAUMax"),
             "metres": (*HARDWARE, "Pinhole"),
+            "unit": (*HARDWARE, "PinholeUnit"),
+            "emission_nm": (*HARDWARE, "EmissionWaveLengthForAiryAnddzCalculation"),
         },
     )
     metres_open = metres(found.pop("metres"), "Pinhole")
-    return {"airy": found, "metres": metres_open}
+    unit = found.pop("unit")
+    if unit not in PINHOLE_UNITS:
+        raise HardwareServerUnavailable(f"the state tree answered PinholeUnit = {unit!r}")
+    emission_nm = metres(found.pop("emission_nm"), "EmissionWaveLengthForAiryAnddzCalculation")
+    return {"airy": found, "metres": metres_open, "unit": PINHOLE_UNITS[unit], "emission_nm": emission_nm}
+
+
+def get_phase_x() -> float:
+    """Phase X, which lines up the two directions of a bidirectional scan, as LAS X shows it."""
+    return metres(settings("phase X", {"x": (*HARDWARE, "PhaseX")})["x"], "PhaseX")
 
 
 def get_objective() -> dict:

@@ -309,3 +309,11 @@ def test_without_a_valid_optimal_format_nothing_is_changed(scope, lasx):
 def test_bidirectional_is_changed_like_every_setting(scope, lasx):
     assert scope.change_setting("bidirectional", True)["confirmed"] is True
     assert scope.settings()["bidirectional"] is True
+
+
+
+def test_the_pinhole_and_phase_x_are_read_with_the_settings(scope, lasx):
+    assert scope.change_setting("phase_x", 10)["confirmed"] is True
+    shown = scope.settings()
+    assert shown["phase_x"] == pytest.approx(10.0)
+    assert shown["pinhole"]["unit"] == "airy" and shown["pinhole"]["emission_nm"] == 580

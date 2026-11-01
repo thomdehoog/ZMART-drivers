@@ -29,10 +29,12 @@ University of Zurich (thom.dehoog@zmb.uzh.ch, thomdehoog@gmail.com).
 from __future__ import annotations
 
 import logging
+import math
 import queue
 import re
 import threading
 import time
+from dataclasses import dataclass
 from datetime import datetime
 
 from ...dispatcher.write import TransportUnavailable
@@ -134,10 +136,7 @@ class Sender:
             try:
                 tree = STATE_TREE.match(xml)
                 if tree is not None:
-                    from . import state_tree
-
-                    state_tree.change_node(STATE_TREE_WRITES[tree[1]][0], int(tree[2]))
-                    outcome["answer"] = '<Result Error="0"/>'
+                    outcome["answer"] = write_into_state_tree(tree[1], tree[2])
                 else:
                     outcome["answer"] = str(hardware_server.connected_server().SendCommand2(xml, ""))
             except Exception as why:  # noqa: BLE001 -- handed to the caller as it is
@@ -189,13 +188,49 @@ ALLOWED_COMMANDS = frozenset(
     }
 )
 
-#: The values the driver may write straight into LCS's state tree, by name: their
-#: path and the values allowed. LAS X's window changes these with no command LCS
-#: logs, and a loaded setting does not change them; every other node is refused.
-#: Bidirectional X moves nothing and makes no light (simulator, 2026-11-01: the
-#: frame rate halved and doubled with it, so the scan follows the value).
+@dataclass(frozen=True)
+class TreeWrite:
+    """One value the driver may write into LCS's state tree, and the values it may take.
+
+    ``kind`` is ``int`` or ``float``. A value is one of ``choices``, or lies
+    within ``within`` (a fixed range LCS keeps to), or lies between the two
+    nodes ``between`` names beside it: LCS's own minimum and maximum, read
+    at the moment of the write.
+    """
+
+    path: tuple[str, ...]
+    kind: type = int
+    choices: frozenset = frozenset()
+    within: tuple[float, float] | None = None
+    between: tuple[str, str] | None = None
+
+
+HW_PARAMETER = ("Confocal", "HWParameter")
+
+#: The values the driver may write straight into LCS's state tree, by name.
+#: LAS X's window changes these with no command LCS logs, and a loaded setting
+#: does not change them; every other node is refused. None of them moves the
+#: stage or the objective or makes light (simulator, 2026-11-01).
+#:
+#: LCS does not keep to its own range when a value is written here: a pinhole
+#: of 2000 micrometres (its range is 100 to 1000) raised an error and still
+#: opened the pinhole to its maximum, and an emission wavelength of 2000 nm
+#: was kept as 800. So every value is checked here first, and one outside
+#: the range is refused before anything is written.
 STATE_TREE_WRITES = {
-    "ScanDirectionX": (("Confocal", "ScanningParameter", "ScanDirectionX"), frozenset({1, 2})),
+    # Bidirectional X: 1 one way, 2 both ways; the frame rate follows it.
+    "ScanDirectionX": TreeWrite(("Confocal", "ScanningParameter", "ScanDirectionX"), choices=frozenset({1, 2})),
+    # Phase X, which lines up the two directions of a bidirectional scan.
+    "PhaseX": TreeWrite((*HW_PARAMETER, "PhaseX"), float, between=("PhaseXMin", "PhaseXMax")),
+    # The pinhole, in metres; LCS works out its size in Airy units from it.
+    "Pinhole": TreeWrite((*HW_PARAMETER, "Pinhole"), float, between=("PinholeMin", "PinholeMax")),
+    # The unit LAS X shows the pinhole in: 1 micrometres, 2 Airy units.
+    "PinholeUnit": TreeWrite((*HW_PARAMETER, "PinholeUnit"), choices=frozenset({1, 2})),
+    # The emission wavelength the Airy unit is worked out for, in whole nm.
+    # LCS gives no minimum or maximum, but keeps it within 380 to 800 nm.
+    "EmissionWaveLengthForAiryAnddzCalculation": TreeWrite(
+        (*HW_PARAMETER, "EmissionWaveLengthForAiryAnddzCalculation"), within=(380, 800)
+    ),
 }
 
 #: A write into the state tree, as the writes build it: ``<StateTree Command="name" Value="n"/>``.
@@ -210,16 +245,60 @@ class NotAllowed(RuntimeError):
     """An element whose command is not in :data:`ALLOWED_COMMANDS`; it was not sent."""
 
 
+def tree_value(name: str, text: str):
+    """The value *text* to write into the node *name*, when the list allows it; :class:`NotAllowed` otherwise.
+
+    LCS's own range, for a value that has one, is checked at the write
+    (:func:`write_into_state_tree`).
+    """
+    if name not in STATE_TREE_WRITES:
+        raise NotAllowed(f"not written: {name} is not a value this driver writes into the state tree")
+    entry = STATE_TREE_WRITES[name]
+    try:
+        value = entry.kind(text)
+    except ValueError:
+        raise NotAllowed(f"not written: {name} takes a {entry.kind.__name__}, not {text}") from None
+    if entry.kind is float and not math.isfinite(value):
+        raise NotAllowed(f"not written: {name} takes a finite number, not {text}")
+    if entry.choices and value not in entry.choices:
+        raise NotAllowed(f"not written: {name} takes {sorted(entry.choices)}, not {text}")
+    if entry.within is not None and not entry.within[0] <= value <= entry.within[1]:
+        raise NotAllowed(f"not written: {name} takes {entry.within[0]} to {entry.within[1]}, not {text}")
+    return value
+
+
+def write_into_state_tree(name: str, text: str) -> str:
+    """Write one listed value into LCS's state tree; answer as LAS X answers a command.
+
+    A value with a range of LCS's own is first checked against that range,
+    read now; outside it, nothing is written and the answer is a refusal
+    (``Error="1"``) with the reason inside.
+    """
+    from . import state_tree
+
+    entry = STATE_TREE_WRITES[name]
+    value = tree_value(name, text)
+    if entry.between is not None:
+        nodes = state_tree.server_nodes()
+        low, high = (
+            state_tree.node_value(nodes, state_tree.node_at(nodes, (*entry.path[:-1], bound)))
+            for bound in entry.between
+        )
+        # A hair of room, so that a value given in other units (micrometres
+        # for metres) and landing on the edge is not refused by rounding.
+        room = 1e-9 * max(abs(low), abs(high))
+        if not low - room <= value <= high + room:
+            return f'<Result Error="1">{name} {text} is outside the range of LAS X, {low} to {high}; not written</Result>'
+    state_tree.change_node(entry.path, value)
+    return '<Result Error="0"/>'
+
+
 def allowed(xml: str) -> str:
     """The command *xml* carries, when the driver may send it; :class:`NotAllowed` otherwise."""
     tree = STATE_TREE.match(xml or "")
     if tree is not None:
-        name, value = tree[1], tree[2]
-        if name not in STATE_TREE_WRITES:
-            raise NotAllowed(f"not written: {name} is not a value this driver writes into the state tree")
-        if not value.lstrip("-").isdigit() or int(value) not in STATE_TREE_WRITES[name][1]:
-            raise NotAllowed(f"not written: {name} takes {sorted(STATE_TREE_WRITES[name][1])}, not {value}")
-        return name
+        tree_value(tree[1], tree[2])
+        return tree[1]
     found = COMMAND.match(xml or "")
     if found is None:
         raise NotAllowed(f"not sent: no command can be read in {xml[:80]!r}")

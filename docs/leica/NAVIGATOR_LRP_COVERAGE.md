@@ -24,9 +24,9 @@ X's window.
 | `FrameAccumulation` | yes | no | `SetFrameAccu` (seen in the log) |
 | `InDimension`, `OutDimension`, `Lines` (format) | yes | no | `SetFormat` (seen in the log) |
 | `ScanMode` | yes | only inside a tile scan | `ScanMode` (seen in the log) |
-| `ScanDirectionX` (uni- or bidirectional) | no | no | not yet learned |
+| `ScanDirectionX` (uni- or bidirectional) | yes | yes | none: written into LCS's state tree |
 | `PanFirstDim`, `PanSecondDim` (pan) | no | no | not yet learned |
-| `PhaseX` | no | no | not yet learned |
+| `PhaseX` | yes | yes | none: written into LCS's state tree, within LCS's range |
 | `FlipX`, `FlipY`, `SwapXY` | no | no | not yet learned |
 | `BitSize` | yes | no | not yet learned |
 | `IsResonantScanner` | yes | no | `SetScannerToResonant` (seen in the log) |
@@ -58,8 +58,8 @@ X's window.
 | Setting in the template | Reads today | Writes today | LCS command |
 |---|---|---|---|
 | `PinholeAiry` | yes | yes | `SetPinholeAU` |
-| `Pinhole` (in metres) | yes | no | not yet learned |
-| `EmissionWavelengthForPinholeAiryCalculation` | no | no | not yet learned |
+| `Pinhole` (in metres) | yes | yes | none: written into LCS's state tree, within LCS's range |
+| `EmissionWavelengthForPinholeAiryCalculation` | yes | yes | none: written into LCS's state tree, 380 to 800 nm |
 
 ## Lasers
 

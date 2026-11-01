@@ -176,6 +176,11 @@ def get_detection_units(client, **keywords):
     return _routed("detection_units", client, **keywords)
 
 
+def get_phase_x(client, **keywords):
+    """Phase X, as LAS X shows it."""
+    return _routed("phase_x", client, **keywords)
+
+
 def get_bidirectional(client, **keywords):
     """Whether the scan is bidirectional."""
     return _routed("bidirectional", client, **keywords)

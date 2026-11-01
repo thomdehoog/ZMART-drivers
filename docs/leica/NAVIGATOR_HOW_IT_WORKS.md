@@ -101,7 +101,8 @@ The ZMART Driver reads it through `ServerNodes`; LAS X's window reads the same t
 | Scan speed, with its range | `Confocal/ScanningParameter/Speed`, `SpeedMin`, `SpeedMax` | state tree |
 | Scan field rotation, with its range | `Confocal/HWParameter/ScanRotationAngle` (and `Min`, `Max`) | state tree |
 | Line and frame average and accumulation | `Confocal/ScanningParameter/LineAverage`, `LineAccu`, `FrameAverage`, `FrameAccumulation` | state tree |
-| Pinhole | `Confocal/HWParameter/PinholeAU` (and `Min`, `Max`), `Pinhole` | state tree |
+| Pinhole | `Confocal/HWParameter/PinholeAU` (and `Min`, `Max`), `Pinhole` (and `Min`, `Max`), `PinholeUnit`, `EmissionWaveLengthForAiryAnddzCalculation` | state tree |
+| Phase X, with its range | `Confocal/HWParameter/PhaseX` (and `Min`, `Max`) | state tree |
 | Format, pixel size, field of view | `Confocal/ScanningParameter/CurrentFormat`, `FormatX`, `FormatY`; `Acquire/AcquireImageSizeInfo` | state tree |
 | Bit depth | `Confocal/ScanningParameter/Resolution` | state tree |
 | Sequential mode | `Confocal/ScanningParameter/IsSequentialEnabled`, `SequentialMode` | state tree |

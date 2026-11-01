@@ -58,7 +58,8 @@ discovery session in `SCOPE_RUN_2026-11-01_NAVIGATOR_DISCOVERY.md` and the build
 | Scan mode (xyz, xyt, ...) | Works |
 | Resonant scanner on or off | Works |
 | Sequential mode | Tried; not built, because it also rearranges which detectors and shutters are on |
-| Scan direction (uni- or bidirectional) | Works: written into LAS X's state tree, the one value the ZMART Driver writes there |
+| Scan direction (uni- or bidirectional) | Works: written into LAS X's state tree |
+| Phase X | Works: written into LAS X's state tree, within LAS X's own range |
 | Pan | Not yet learned |
 | Bit depth | Not yet learned |
 | Autofocus on or off | Works |
@@ -79,7 +80,9 @@ discovery session in `SCOPE_RUN_2026-11-01_NAVIGATOR_DISCOVERY.md` and the build
 | Setting | State |
 |---|---|
 | Pinhole in Airy units | Works |
-| Pinhole in micrometres | Not yet learned |
+| Pinhole in micrometres | Works: written into LAS X's state tree, within LAS X's own range |
+| Unit LAS X shows the pinhole in (µm or AU) | Works: written into LAS X's state tree |
+| Emission wavelength for the Airy unit | Works: written into LAS X's state tree, 380 to 800 nm |
 
 ## Lasers
 
@@ -143,7 +146,7 @@ service and the person responsible for the instrument.
 
 | State | Settings |
 |---|---|
-| Works | 44 (the objective among them, not yet tried) |
+| Works | 48 (the objective among them, not yet tried) |
 | Tried | 1 |
 | Command known | 0 |
-| Not yet learned | 12 |
+| Not yet learned | 11 |

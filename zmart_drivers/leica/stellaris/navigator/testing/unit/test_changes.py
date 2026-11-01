@@ -484,3 +484,39 @@ class TestBidirectional:
         assert changes.change(client, "bidirectional", False)["confirmed"] is True
         assert lasx.live[(*SCANNING, "ScanDirectionX")] == 1
         assert lasx.commands() == []  # no command: the value is written into the state tree
+
+
+
+HW = ("Confocal", "HWParameter")
+
+
+class TestPinholeAndPhase:
+    def test_phase_x_is_written_and_read_back(self, lasx, client):
+        assert changes.change(client, "phase_x", -20)["confirmed"] is True
+        assert lasx.live[(*HW, "PhaseX")] == -20.0
+        assert lasx.commands() == []
+
+    def test_the_pinhole_is_written_in_metres_and_read_back(self, lasx, client):
+        assert changes.change(client, "pinhole_um", 250)["confirmed"] is True
+        assert lasx.live[(*HW, "Pinhole")] == pytest.approx(0.00025)
+
+    def test_the_unit_and_the_emission_wavelength_are_written_and_read_back(self, lasx, client):
+        assert changes.change(client, "pinhole_unit", "um")["confirmed"] is True
+        assert lasx.live[(*HW, "PinholeUnit")] == 1
+        assert changes.change(client, "emission_wavelength", 520)["confirmed"] is True
+        assert lasx.live[(*HW, "EmissionWaveLengthForAiryAnddzCalculation")] == 520
+
+    @pytest.mark.parametrize(("name", "value", "node"), [("pinhole_um", 2000, "Pinhole"), ("pinhole_um", 50, "Pinhole"), ("phase_x", 150, "PhaseX")])
+    def test_a_value_outside_lcs_own_range_is_refused_and_nothing_is_written(self, lasx, client, name, value, node):
+        before = lasx.live[(*HW, node)]
+
+        result = changes.change(client, name, value)
+
+        assert result["success"] is False and "range" in result["message"]
+        assert lasx.live[(*HW, node)] == before
+
+    def test_the_range_is_lcs_own_read_at_the_write(self, lasx, client):
+        lasx.live[(*HW, "PinholeMax")] = 0.0005
+
+        assert changes.change(client, "pinhole_um", 600)["success"] is False
+        assert changes.change(client, "pinhole_um", 500)["confirmed"] is True

@@ -371,3 +371,36 @@ class TestBidirectional:
         assert elements(write) == ['<StateTree Command="ScanDirectionX" Value="2"/>']
         assert elements(writes.named_setting("bidirectional", False)) == ['<StateTree Command="ScanDirectionX" Value="1"/>']
         assert write.confirm.accept(True) and not write.confirm.accept(False)
+
+
+
+class TestPinholeAndPhase:
+    def test_phase_x_is_written_into_the_state_tree_and_read_back(self):
+        write = writes.named_setting("phase_x", -20)
+        assert elements(write) == ['<StateTree Command="PhaseX" Value="-20.0"/>']
+        assert write.confirm.accept(-20.02) and not write.confirm.accept(-21.0)
+
+    def test_the_pinhole_is_written_in_metres_and_read_back_in_micrometres(self):
+        write = writes.named_setting("pinhole_um", 250)
+        assert elements(write) == ['<StateTree Command="Pinhole" Value="0.00025"/>']
+        assert write.confirm.accept({"metres": 0.0002499}) and not write.confirm.accept({"metres": 0.0003})
+
+    def test_the_pinhole_unit_is_micrometres_or_airy_units(self):
+        assert elements(writes.named_setting("pinhole_unit", "um")) == ['<StateTree Command="PinholeUnit" Value="1"/>']
+        write = writes.named_setting("pinhole_unit", "airy")
+        assert elements(write) == ['<StateTree Command="PinholeUnit" Value="2"/>']
+        assert write.confirm.accept({"unit": "airy"}) and not write.confirm.accept({"unit": "um"})
+        with pytest.raises(ValueError, match="mm"):
+            writes.named_setting("pinhole_unit", "mm")
+
+    def test_the_emission_wavelength_is_whole_nanometres(self):
+        write = writes.named_setting("emission_wavelength", 520)
+        assert elements(write) == ['<StateTree Command="EmissionWaveLengthForAiryAnddzCalculation" Value="520"/>']
+        assert write.confirm.accept({"emission_nm": 520}) and not write.confirm.accept({"emission_nm": 580})
+        with pytest.raises(ValueError, match="520.5"):
+            writes.named_setting("emission_wavelength", 520.5)
+
+    @pytest.mark.parametrize("name", ["phase_x", "pinhole_um"])
+    def test_a_value_that_is_not_a_number_is_refused_before_anything_is_built(self, name):
+        with pytest.raises(ValueError):
+            writes.named_setting(name, "wide")

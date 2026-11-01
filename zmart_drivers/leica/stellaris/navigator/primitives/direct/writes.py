@@ -35,6 +35,7 @@ University of Zurich (thom.dehoog@zmb.uzh.ch, thomdehoog@gmail.com).
 
 from __future__ import annotations
 
+import math
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 
@@ -468,7 +469,7 @@ def channel_colour(route, colour: str) -> Write:
 def bidirectional(on: bool) -> Write:
     """Scan both ways (True) or one way (False): written into LCS's state tree, as LAS X's window does; read back.
 
-    The one value the driver writes there (``transfer.STATE_TREE_WRITES``):
+    One of the few values the driver writes there (``transfer.STATE_TREE_WRITES``):
     LAS X's window changes it with no command LCS logs, and a loaded setting
     does not change it (simulator, 2026-11-01).
     """
@@ -489,6 +490,84 @@ def bidirectional(on: bool) -> Write:
     )
 
 
+def number(name: str, value) -> float:
+    """*value* as a finite number; ValueError for anything else."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
+        raise ValueError(f"{name} takes a number, not {value!r}")
+    return float(value)
+
+
+def tree_write(command: str, node: str, written, values: dict, description: str, confirm: Expect) -> Write:
+    """A change written into LCS's state tree, as LAS X's window does: one value, read back.
+
+    The transfer allows only the nodes on its list (``transfer.STATE_TREE_WRITES``)
+    and checks the value against LCS's own range before it writes.
+    """
+
+    def fill(request: Request) -> None:
+        request.elements = [f'<StateTree Command="{node}" Value="{written}"/>']
+
+    return Write(
+        command=command,
+        values=values,
+        request=node,
+        fill=fill,
+        description=description,
+        ready=idle(),
+        confirm=confirm,
+    )
+
+
+#: How close Phase X must read back; LCS keeps it in steps of about 0.05.
+PHASE_X_TOLERANCE = 0.1
+#: How close the pinhole must read back, in micrometres (200 read back as 199.9).
+PINHOLE_TOLERANCE_UM = 0.5
+
+
+def phase_x(value) -> Write:
+    """Phase X, which lines up the two directions of a bidirectional scan; LAS X's range is -100 to 100."""
+    target = number("phase_x", value)
+    return tree_write(
+        "set_phase_x", "PhaseX", repr(target), {"value": target}, f"Phase X -> {target}",
+        Expect("phase_x", lambda shown: abs(shown - target) <= PHASE_X_TOLERANCE),
+    )
+
+
+def pinhole_um(value) -> Write:
+    """The pinhole's size in micrometres, written in metres; LAS X's range (100 to 1000 on the simulator) is read at the write."""
+    target = number("pinhole_um", value)
+    return tree_write(
+        "set_pinhole_um", "Pinhole", repr(target / 1_000_000), {"value": target}, f"Pinhole -> {target} um",
+        Expect("pinhole", lambda shown: abs(shown["metres"] * 1_000_000 - target) <= PINHOLE_TOLERANCE_UM),
+    )
+
+
+def pinhole_unit(unit: str) -> Write:
+    """The unit LAS X shows the pinhole in: ``"um"`` (micrometres) or ``"airy"`` (Airy units). The pinhole itself stays."""
+    codes = {name: code for code, name in direct_reader.PINHOLE_UNITS.items()}
+    if unit not in codes:
+        raise ValueError(f"pinhole_unit takes {sorted(codes)}, not {unit!r}")
+    return tree_write(
+        "set_pinhole_unit", "PinholeUnit", codes[unit], {"value": unit}, f"Pinhole unit -> {unit}",
+        Expect("pinhole", lambda shown: shown["unit"] == unit),
+    )
+
+
+def emission_wavelength(nm) -> Write:
+    """The emission wavelength, in whole nanometres, that LAS X works the Airy unit out for (380 to 800).
+
+    The pinhole stays as it is; its size in Airy units changes with the wavelength.
+    """
+    if isinstance(nm, bool) or not isinstance(nm, (int, float)) or nm != int(nm):
+        raise ValueError(f"emission_wavelength takes whole nanometres, not {nm!r}")
+    target = int(nm)
+    return tree_write(
+        "set_emission_wavelength", "EmissionWaveLengthForAiryAnddzCalculation", target, {"value": target},
+        f"Emission for the Airy unit -> {target} nm",
+        Expect("pinhole", lambda shown: shown["emission_nm"] == target),
+    )
+
+
 #: The settings with a write of their own, by name, beside the table of numbers (:data:`SETTINGS`).
 NAMED_SETTINGS = {
     "scan_mode": scan_mode,
@@ -496,6 +575,10 @@ NAMED_SETTINGS = {
     "format": image_format,
     "resonant_scanner": resonant_scanner,
     "bidirectional": bidirectional,
+    "phase_x": phase_x,
+    "pinhole_um": pinhole_um,
+    "pinhole_unit": pinhole_unit,
+    "emission_wavelength": emission_wavelength,
 }
 
 

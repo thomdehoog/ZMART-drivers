@@ -277,7 +277,9 @@ class Microscope:
         ``pinhole_airy``, ``frame_average``, ``line_accumulation``,
         ``frame_accumulation``), the scan mode (``scan_mode``, LAS X's name,
         such as ``"xyz"``), ``autofocus`` and ``resonant_scanner`` (True or
-        False), ``bidirectional`` (True or False) and ``format`` (``(x, y)`` pixels). The limits are asked
+        False), ``bidirectional`` (True or False), ``format`` (``(x, y)`` pixels),
+        ``phase_x``, ``pinhole_um`` (micrometres), ``pinhole_unit`` (``"um"`` or ``"airy"``)
+        and ``emission_wavelength`` (whole nanometres, for the Airy unit). The limits are asked
         first. Answers the change's result, with ``confirmed`` True when the
         read-back showed the new value; a change that was never seen is
         recorded and does not raise.

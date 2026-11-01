@@ -127,10 +127,23 @@ with no command in LCS's log). The ZMART Driver never does, because:
 
 Every change goes through a command (`SendCommand2`), which LCS checks and answers.
 
-**One decided exception (Thom, 1 November 2026):** Bidirectional X, which neither a command
-nor a loaded setting reaches. Only `Confocal/ScanningParameter/ScanDirectionX`, only the
-values 1 and 2, the node looked up by its path at each write, and read back; the transfer
-refuses every other node. It moves nothing and makes no light.
+**Decided exceptions (Thom, 1 November 2026):** five values that neither a command nor a
+loaded setting reaches. The transfer refuses every other node; each node is looked up by its
+path at each write, and each value is read back. None of them moves the stage or the objective
+or makes light.
+
+| Value | Node | What may be written |
+|---|---|---|
+| Bidirectional X | `Confocal/ScanningParameter/ScanDirectionX` | 1 or 2 |
+| Phase X | `Confocal/HWParameter/PhaseX` | within `PhaseXMin` to `PhaseXMax`, read at the write |
+| Pinhole (metres) | `Confocal/HWParameter/Pinhole` | within `PinholeMin` to `PinholeMax`, read at the write |
+| Pinhole unit | `Confocal/HWParameter/PinholeUnit` | 1 (µm) or 2 (AU) |
+| Emission for the Airy unit | `Confocal/HWParameter/EmissionWaveLengthForAiryAnddzCalculation` | whole nm, 380 to 800 |
+
+Point 1 above is why the ranges are checked by the driver: LCS does not keep to its own range
+for a written value. A pinhole of 2000 µm raised an error from the pinhole's motor and still
+opened the pinhole to its maximum; an emission of 2000 nm was kept as 800 (simulator, 1 November
+2026). A value outside its range is refused by the driver, and nothing is written.
 
 ## One more thing the driver does on its own
 

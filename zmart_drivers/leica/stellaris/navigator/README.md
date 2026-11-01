@@ -150,7 +150,17 @@ confirmed, with what LAS X set instead.
 | `frame_accumulation` | 1, 2, 3, ... | exact |
 | `format` | `(x, y)` pixels, such as `(512, 512)` | exact |
 | `resonant_scanner` | `True` or `False` | exact |
-| `bidirectional` | `True` or `False`; written into LAS X's state tree, as its window does, the one value the driver writes there | exact |
+| `bidirectional` | `True` or `False`; written into LAS X's state tree, as its window does | exact |
+| `phase_x` | Phase X, which lines up the two directions of a bidirectional scan, within LAS X's range (-100 to 100); written into the state tree | 0.1 |
+| `pinhole_um` | the pinhole in micrometres, within LAS X's range (100 to 1000 on the simulator); written into the state tree | 0.5 µm |
+| `pinhole_unit` | `"um"` or `"airy"`: the unit LAS X shows the pinhole in; the pinhole itself stays | exact |
+| `emission_wavelength` | whole nanometres, 380 to 800: the wavelength LAS X works the Airy unit out for | exact |
+
+The last five have no command LAS X's window sends; the window writes them straight into
+LAS X's state tree, and so does the driver, for these five values only. LAS X does not keep to its
+own range there: a pinhole written beyond it opens to the maximum. So the driver reads LAS X's own
+minimum and maximum at each write and refuses a value outside them; nothing is written then.
+`pinhole_airy` sets the pinhole in Airy units through LAS X's command, which keeps to the range itself.
 
 ## Setting up the driver
 

@@ -22,12 +22,13 @@ Walking the tree by name costs about 270 ms; a node read by its id about
 node still carries the name it had (one ``GetNode``); a node that does not is
 looked up afresh, which is what an experiment load or a LAS X restart needs.
 
-This module reads, with one exception. ``RegisterNode`` also subscribes the
+This module reads, with a few exceptions. ``RegisterNode`` also subscribes the
 connection to the node's updates; nothing listens, and the subscription ends
 with the connection. ``ChangeNodes``, which writes a node, is called by
-:func:`change_node` only, and only for the one value the transfer allows
-(``transfer.STATE_TREE_WRITES``): LAS X's window changes Bidirectional X
-there, with no command LCS logs (simulator, 2026-11-01).
+:func:`change_node` only, and only for the values the transfer allows
+(``transfer.STATE_TREE_WRITES``: Bidirectional X, Phase X, the pinhole, its
+unit and the emission wavelength): LAS X's window changes them there, with no
+command LCS logs (simulator, 2026-11-01).
 """
 
 from __future__ import annotations

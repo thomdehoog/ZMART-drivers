@@ -321,8 +321,8 @@ reads them and sets the format with `SetFormat`: 512 x 512 to 2824 x 2824, read 
 Shown with Bidirectional X on. Typed in LAS X's window as -40: LCS's
 `Confocal/HWParameter/PhaseX` went from -49.99 to -39.976 (LCS keeps it in steps, so -40
 became -39.98), with no command in LCS's log. Written as -20 in the master and Setting 1 of a
-saved setting and loaded: LCS stayed at -39.976. Phase X can be read, not set: like the other
-scan parameters.
+saved setting and loaded: LCS stayed at -39.976. Like the other scan parameters, neither a
+command nor a loaded setting sets it; it is written into the state tree instead (section 20).
 
 ## 19. Bidirectional X, written into the state tree (a decided exception)
 
@@ -332,3 +332,29 @@ tree is read, never written": Bidirectional X only. Written with `ServerNodes.Ch
 looked up by its path at each write. LCS read back the value, the frame rate halved and doubled
 with it (0.78 and 1.56 per second), so the scan follows, and LAS X's window showed the switch.
 Every other node is refused by the transfer, and only 1 or 2 is written.
+
+## 20. Phase X and the pinhole, written into the state tree (decided exceptions)
+
+Thom extended the exception of section 19 to Phase X and the pinhole. All under
+`Confocal/HWParameter`, written with `ChangeNodes` and read back, then put back:
+
+- `PhaseX` -20: read back -20 exactly. Its range is `PhaseXMin` -100 to `PhaseXMax` 100.
+- `Pinhole` 0.0002 m: read back 0.0001999 m, and LCS worked out `PinholeAU` 0.502 from it.
+  Its range is `PinholeMin` 0.0001 to `PinholeMax` 0.001 m (100 to 1000 µm; 0.25 to 2.51 AU
+  at 580 nm).
+- `EmissionWaveLengthForAiryAnddzCalculation` 520: the same 100 µm pinhole read 0.280 AU
+  instead of 0.251. LCS gives it no minimum or maximum node.
+- `PinholeUnit`: 1 shows the pinhole in µm in LAS X's window, 2 in AU; the pinhole stays.
+
+Outside the range, LCS does not keep to it. `Pinhole` 0.002 m raised
+`Pinhole (Sim)::Position = 16888: Value has to be between 0 and 8000 !` from the pinhole's
+motor, and the pinhole still went to its maximum (2.51 AU in LAS X's window); it was put back to
+100 µm. `EmissionWaveLengthForAiryAnddzCalculation` 2000 was kept as 800, and 50 as 380. So the
+ZMART Driver checks each value itself: Phase X and the pinhole against LCS's own minimum and
+maximum, read at the write; the emission against 380 to 800 nm. Outside, nothing is written.
+
+Through the ZMART Driver (`change_setting`), each confirmed by its read-back: `phase_x` -20
+(read -20.0), `pinhole_um` 200 (read 199.9 µm, 0.502 AU), `emission_wavelength` 520 (0.560 AU),
+`pinhole_unit` "um". Refused, with nothing written and every value unchanged: `pinhole_um`
+2000 and 50, `phase_x` 150, `emission_wavelength` 900. All put back: Phase X -39.976, 100 µm,
+580 nm, AU.
