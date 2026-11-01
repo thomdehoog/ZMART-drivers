@@ -225,6 +225,7 @@ SETTER_LIMIT_KEYS = (
     "set_smartcorr_range",
     "set_collar_reference",
     "set_sequential_mode",
+    "set_laser_wavelength",
 )
 
 
@@ -428,6 +429,10 @@ MUTATING_COMMANDS = {
     "delete_setting": "delete_setting",
     # a detector and its line kept from LAS X's Dye Assistant
     "lock_detector": "lock_detector",
+    # a white-light line switched on, at LCS's starting power; its power is set and checked after
+    "set_laser_lines": "set_laser_lines",
+    # a laser line taken away: less light, never more
+    "remove_laser_line": "remove_laser_line",
 }
 
 

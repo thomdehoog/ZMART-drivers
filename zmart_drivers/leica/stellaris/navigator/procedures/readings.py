@@ -181,6 +181,11 @@ def get_laser_lines(client, **keywords):
     return _routed("laser_lines", client, **keywords)
 
 
+def any_laser_line_locked(client, **keywords):
+    """Whether any laser line is locked for LAS X's Dye Assistant."""
+    return _routed("laser_line_locked", client, **keywords)
+
+
 def get_light_sources(client, **keywords):
     """Every light source: its name, its route and its laser lines, on or not."""
     return _routed("light_sources", client, **keywords)

@@ -535,3 +535,26 @@ class TestSequentialMode:
     def test_another_mode_is_refused(self):
         with pytest.raises(ValueError, match="column"):
             writes.named_setting("sequential_mode", "column")
+
+
+
+class TestWhiteLightLaser:
+    def test_a_line_is_tuned_with_the_window_s_command_and_read_back(self):
+        write = writes.laser_wavelength((10, 10), 0, 510.0)
+        assert elements(write) == [
+            '<Scanner Command="SetLightSourceWavelength" LineIndex="0" Wavelength="510" SetMode="2" SingleSettingIndex="0" DoAsync="1">'
+            '<BeamRoute Version="0"><BeamPosition BeamPositionLevel="0" BeamPosition="10"/>'
+            '<BeamPosition BeamPositionLevel="1" BeamPosition="10"/></BeamRoute></Scanner>'
+        ]
+        line = {"beamRoute": "10;10", "lineIndex": 0}
+        assert write.confirm.accept([{**line, "wavelength": 510.0}]) and not write.confirm.accept([{**line, "wavelength": 497.0}])
+
+
+
+class TestLaserLinesDefinition:
+    def test_the_lines_in_use_are_sent_as_the_window_s_definition(self):
+        write = writes.laser_lines_definition([((30,), 0, 405.0), ((10, 10), 0, 497.0), ((10, 10), 1, 600.0)], 600.0)
+        (element,) = elements(write)
+        assert element.startswith('<Scanner IsBleachPointDefinition="0" IsAutoFocusDefinition="0" Command="SetConfocalLaserLinesDefinition">')
+        assert element.count("<LightSource>") == 3 and "<LineIndex>1</LineIndex><WaveLength>600</WaveLength><Locked>0</Locked>" in element
+        assert write.confirm is None  # a new line has no power yet; the power set after is read back

@@ -538,3 +538,60 @@ tree, codes 0 to 2 only, read back; `settings()["sequential_mode"]`. Through the
 stack and line, each confirmed, and LAS X's window showed Line pressed afterwards. Back to line,
 and Setting 2 deleted.
 
+## 30. The white-light laser: a line tuned, and its power
+
+The white-light line that was on at 497 nm, changed to 510 nm in the window: LCS was sent
+`<Scanner Command="SetLightSourceWavelength" LineIndex="0" Wavelength="510" SetMode="2"
+SingleSettingIndex="0" DoAsync="1">` with the laser's route (10;10). `LightSource[2]/AOTF/AotfLine[0]/
+WaveLength` went 497 to 510, and the AOBS's line followed by itself (`AOBSLineList/AOBSLine/
+LaserLine`). In October a white-light command held LCS 33 hours behind the warning "Please keep
+minimum distance of 8nm", so the driver checks the range and the distance before it sends.
+
+Built: `tune_laser_line(from_nm, to_nm)`, for a white-light line that is on, refused outside the
+laser's range (485 to 685 nm) or within 8 nm of its other lines that are on; `set_laser_power` now
+finds a white-light line that is on at its wavelength. Through the driver: 510 to 520 nm, its power
+5 % and 2 %, each confirmed; 700 nm refused; back to 497 nm at 2 %. Switching on a white-light line
+that is off (it has no wavelength while off) is not yet learned.
+
+## 31. A white-light line added and removed; its shutter
+
+Thom added a white-light line with the window's Add Laser and set it to 600 nm. LCS was sent
+`<Scanner IsBleachPointDefinition="0" IsAutoFocusDefinition="0" Command="SetConfocalLaserLinesDefinition">`
+holding every line in use (route, `LineIndex`, `WaveLength`, `Locked`) with the new one on the
+laser's next free line (1), and `SetLightSourceWavelength` while the line was moved to 600 nm.
+The new line came on at 2 % with no power command in the log.
+
+The same definition sent by the driver listed the new line at its wavelength but with no power, so
+the driver sets its power after (`SetLaserLineIntensity`, through the limits). A line set to 0 %
+stays listed in the window, dark; the definition sent without a line removes it
+(`IsLineVisible` False).
+
+Built: `add_laser_line(wavelength_nm, percent=2)` and `remove_laser_line(wavelength_nm)`, both
+refused while a line is locked for the Dye Assistant (the definition carries each line's lock);
+`add_laser_line` also outside the laser's range, within 8 nm of its other lines, or without a free
+line. Through the driver: 650 nm added at 2 %; 600 nm added and removed, 497 and 650 staying on.
+The white-light laser's shutter, one per light source, closed and opened by `set_laser_shutter(650,
+...)`, 497 and 650 with it, 405 not.
+
+## 32. A change for "setting index 0" lands in the first setting (a safety finding)
+
+With Setting 2 added and current, three white-light lines were added through the driver for it.
+They went into Setting 1: each `SetConfocalLaserLinesDefinition` (`<Sequence Index="0">`) and
+`SetLaserLineIntensity` (`SingleSettingIndex="0"`) changed the job's first setting, and since the
+definition held only Setting 2's lines, each one also took away Setting 1's others (its eight
+white-light lines and the 405 line). Setting 2 got none. The readings show the current setting,
+so they did not show it; LCS's per-setting entries (`SequentialSettingParameter[0]` and `[1]`) did.
+
+The detector button had seemed to say index 0 means the current setting (section 28); for these
+commands it is the first. So every change whose commands are addressed to index 0
+(`SingleSettingIndex="0"`, `SequentialSettingIndex="0"`, `<Sequence Index="0">`: the laser lines,
+powers and shutters, the averages, the pinhole in AU, the channel colour, the detector lock, the
+collar) is now refused by the driver, with nothing sent, while another setting than the first is
+current. With the first setting current, or with one setting, nothing changes. Through the driver:
+`add_laser_line` refused with Setting 2 current; Setting 2 deleted; Setting 1's lines put back
+(405 at 1.96 %, the eight white-light lines at 2 %).
+
+How LAS X's window addresses a change to Setting 2 is still to be learned: a laser line added by
+hand with Setting 2 current, watched in LCS's log. Until then, changes to a second setting are
+refused rather than sent to the first.
+

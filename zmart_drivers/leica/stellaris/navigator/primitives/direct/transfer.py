@@ -175,6 +175,8 @@ ALLOWED_COMMANDS = frozenset(
         "SetZStackDefinition",
         "SetStackStepSize",
         "SetLaserLineIntensity",
+        "SetLightSourceWavelength",
+        "SetConfocalLaserLinesDefinition",
         "ActivateShutter",
         "SetFrameAverage",
         "SetLineAccu",

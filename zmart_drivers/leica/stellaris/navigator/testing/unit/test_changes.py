@@ -665,3 +665,127 @@ class TestSequentialMode:
         assert changes.change(client, "sequential_mode", "line")["confirmed"] is True
         assert lasx.live[(*SCANNING, "SequentialMode")] == 0
         assert lasx.commands() == []
+
+
+
+WLL = ("10;10", 0)
+
+
+def wll_line(lasx, index):
+    source = next(s for s in lasx.nodes.light_sources if s["LightSourceName"] == "SuperContVisible Light")
+    return next(a for a in source["AOTF"]["AotfLine"] if a["LineIndex"] == index)
+
+
+class TestWhiteLightLaser:
+    def test_a_line_that_is_on_is_tuned_and_read_back(self, lasx, client):
+        result = changes.tune_laser_line(client, 497, 510)
+
+        assert result["confirmed"] is True
+        assert wll_line(lasx, 0)["WaveLength"] == 510.0
+        assert lasx.commands() == ["SetLightSourceWavelength"]
+
+    @pytest.mark.parametrize(("to_nm", "why"), [(480, "485"), (700, "685")])
+    def test_a_wavelength_outside_the_laser_s_range_is_refused(self, lasx, client, to_nm, why):
+        result = changes.tune_laser_line(client, 497, to_nm)
+
+        assert result["success"] is False and why in result["message"]
+        assert lasx.commands() == []
+
+    def test_a_wavelength_within_8_nm_of_another_line_that_is_on_is_refused(self, lasx, client):
+        wll_line(lasx, 1)["Intensity"] = 1.0  # the 681 nm line on
+
+        result = changes.tune_laser_line(client, 497, 676)
+
+        assert result["success"] is False and "8 nm" in result["message"]
+        assert lasx.commands() == []
+
+    def test_a_line_that_is_not_on_or_not_tunable_is_refused(self, lasx, client):
+        assert changes.tune_laser_line(client, 520, 530)["success"] is False
+        assert changes.tune_laser_line(client, 405, 410)["success"] is False  # the 405 line does not tune
+        assert lasx.commands() == []
+
+    def test_a_tunable_line_that_is_on_gets_its_power_by_its_wavelength(self, lasx, client):
+        assert changes.set_laser_power(client, 497, 5)["confirmed"] is True
+        assert wll_line(lasx, 0)["Intensity"] == pytest.approx(5.0, abs=0.4)
+
+
+
+class TestWhiteLightLineAdded:
+    def test_a_line_is_switched_on_at_the_next_free_index_and_tuned(self, lasx, client):
+        result = changes.add_laser_line(client, 600, 3)
+
+        assert result["confirmed"] is True
+        assert wll_line(lasx, 1)["WaveLength"] == 600.0 and wll_line(lasx, 1)["Intensity"] == pytest.approx(3.0, abs=0.4)
+        assert wll_line(lasx, 0)["WaveLength"] == 497.0 and wll_line(lasx, 0)["Intensity"] > 0  # the line that was on stays on
+        assert lasx.commands() == ["SetConfocalLaserLinesDefinition", "SetLaserLineIntensity"]
+
+    def test_a_power_outside_0_to_100_percent_is_refused_before_anything_is_sent(self, lasx, client):
+        result = changes.add_laser_line(client, 600, 150)
+
+        assert result["success"] is False
+        assert lasx.commands() == []
+
+    def test_a_wavelength_too_near_a_line_that_is_on_is_refused(self, lasx, client):
+        result = changes.add_laser_line(client, 501)
+
+        assert result["success"] is False and "8 nm" in result["message"]
+        assert lasx.commands() == []
+
+    def test_without_a_free_line_nothing_is_sent(self, lasx, client):
+        wll_line(lasx, 1)["Intensity"] = 1.0
+        wll_line(lasx, 1)["WaveLength"] = 640.0
+
+        result = changes.add_laser_line(client, 600)
+
+        assert result["success"] is False and "free" in result["message"]
+        assert lasx.commands() == []
+
+
+
+class TestLaserLineRemoved:
+    def test_a_line_is_removed_by_sending_the_others(self, lasx, client):
+        assert changes.add_laser_line(client, 600)["confirmed"] is True
+
+        result = changes.remove_laser_line(client, 600)
+
+        assert result["confirmed"] is True
+        assert wll_line(lasx, 1)["Intensity"] == 0
+        assert wll_line(lasx, 0)["Intensity"] > 0  # the 497 line stays on
+        sent = lasx.sent[-1]
+        assert "<WaveLength>600</WaveLength>" not in sent and "<WaveLength>497</WaveLength>" in sent
+
+    def test_a_line_that_is_not_on_is_refused_and_nothing_is_sent(self, lasx, client):
+        result = changes.remove_laser_line(client, 600)
+
+        assert result["success"] is False and "600" in result["message"]
+        assert lasx.commands() == []
+
+
+
+class TestTheFirstSettingOnly:
+    """LCS takes a change addressed to setting index 0 into the job's first setting, whichever is current (simulator, 2026-11-01)."""
+
+    def test_a_change_for_the_first_setting_is_refused_while_another_is_current(self, lasx, client):
+        assert changes.add_setting(client)["confirmed"] is True
+        sent = len(lasx.sent)
+
+        for result in (
+            changes.set_laser_power(client, 497, 5),
+            changes.add_laser_line(client, 600),
+            changes.change(client, "line_average", 2),
+            changes.change(client, "collar", 30),
+        ):
+            assert result["success"] is False and "Setting 1" in result["message"]
+        assert len(lasx.sent) == sent
+
+    def test_a_change_for_every_setting_or_none_still_goes_through(self, lasx, client):
+        assert changes.add_setting(client)["confirmed"] is True
+
+        assert changes.change(client, "zoom", 2.0)["confirmed"] is True
+        assert changes.change(client, "bidirectional", True)["confirmed"] is True
+
+    def test_with_the_first_setting_current_everything_goes_through(self, lasx, client):
+        assert changes.add_setting(client)["confirmed"] is True
+        assert changes.delete_setting(client, "Setting 2")["confirmed"] is True
+
+        assert changes.set_laser_power(client, 497, 5)["confirmed"] is True

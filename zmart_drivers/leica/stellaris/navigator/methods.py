@@ -493,6 +493,36 @@ class Microscope:
         result = changes.set_laser_power(self.handle.client, wavelength_nm, percent)
         return checked(self.handle, result, f"set_laser_power({wavelength_nm!r}, {percent!r})")
 
+    def add_laser_line(self, wavelength_nm: float, percent: float = 2.0) -> dict:
+        """Switch on a white-light line at *wavelength_nm* with *percent* power (the window's 2 % unless given); read back.
+
+        As the window's Add Laser: the lines in use are sent with the new one,
+        then its power is set, through the limits. Refused before anything is sent outside the
+        laser's range, within 8 nm of its lines that are on, without a free
+        line, or while a line is locked for the Dye Assistant.
+        """
+        self.handle.require_open()
+        result = changes.add_laser_line(self.handle.client, wavelength_nm, percent)
+        return checked(self.handle, result, f"add_laser_line({wavelength_nm!r}, {percent!r})")
+
+    def remove_laser_line(self, wavelength_nm: float) -> dict:
+        """Remove the laser line that is on at *wavelength_nm* from the setting, as the window does; read back.
+
+        ``set_laser_power(wavelength_nm, 0)`` switches a line off but leaves it
+        listed; this takes it away. Refused while a line is locked for the Dye Assistant.
+        """
+        self.handle.require_open()
+        return checked(self.handle, changes.remove_laser_line(self.handle.client, wavelength_nm), f"remove_laser_line({wavelength_nm!r})")
+
+    def tune_laser_line(self, from_nm: float, to_nm: float) -> dict:
+        """Tune the white-light laser's line that is on at *from_nm* to *to_nm*, as the window does; read back.
+
+        Refused before anything is sent outside the laser's range, or within
+        8 nm of another of its lines that is on (LAS X would hold a warning open).
+        """
+        self.handle.require_open()
+        return checked(self.handle, changes.tune_laser_line(self.handle.client, from_nm, to_nm), f"tune_laser_line({from_nm!r}, {to_nm!r})")
+
     def set_laser_shutter(self, wavelength_nm: float, open_: bool) -> dict:
         """Open (True) or close (False) the shutter of the light source the line at *wavelength_nm* comes from; read back."""
         self.handle.require_open()

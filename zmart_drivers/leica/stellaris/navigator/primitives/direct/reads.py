@@ -82,7 +82,7 @@ READS = (
     "sequential_mode",
     "laser_lines",
     "scan_field_rotation",
-    "sequential_mode",
+    "laser_line_locked",
     "pixel_size",
     "bit_depth",
     "serial_number",
@@ -577,29 +577,6 @@ def get_scan_field_rotation() -> dict:
     )
 
 
-#: ``SequentialMode`` values seen, by the name the job settings' ``sequentialMode`` gives them.
-SEQUENTIAL_MODES = {0: "Line"}
-
-
-def get_sequential_mode() -> str | None:
-    """How sequential scanning switches settings, as the job settings' ``sequentialMode`` (``"Line"``).
-
-    None when sequential scanning is off. Only line by line (0) has been
-    seen on the simulator; another value is ``"unknown (<value>)"`` until
-    one is read beside the log.
-    """
-    found = settings(
-        "the sequential mode",
-        {
-            "enabled": (*SCANNING, "IsSequentialEnabled"),
-            "mode": (*SCANNING, "SequentialMode"),
-        },
-    )
-    if not found["enabled"]:
-        return None
-    return SEQUENTIAL_MODES.get(found["mode"], f"unknown ({found['mode']})")
-
-
 def get_pixel_size() -> tuple[float, float]:
     """A pixel's width and height in metres: the field of view over the format, as the job settings' ``pixelSize``."""
     found = settings(
@@ -966,6 +943,20 @@ def get_filter_wheels() -> list[dict]:
         }
         for wheel, slot in zip(installed_filter_wheels(), slots, strict=True)
     ]
+
+
+def any_laser_line_locked() -> bool:
+    """Whether any laser line is locked for LAS X's Dye Assistant (a light source's ``LightSourceLineUsage/IsBlocked``)."""
+
+    def reading(nodes):
+        for source in of_name(nodes, children(nodes, node_at(nodes, ("Confocal", "LightSourceList"))), "LightSource"):
+            for usage in of_name(nodes, children(nodes, source), "LightSourceLineUsage"):
+                blocked = child_named(nodes, usage, "IsBlocked")
+                if blocked is not None and node_value(nodes, blocked):
+                    return True
+        return False
+
+    return read("the laser lines' locks", reading)
 
 
 def get_light_sources() -> list[dict]:

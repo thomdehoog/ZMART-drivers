@@ -44,9 +44,42 @@ from .save_data.product import AcquisitionResult
 log = logging.getLogger(__name__)
 
 
+#: How a command names the setting it changes. LCS takes index 0 as the job's
+#: first setting, whichever is current: with Setting 2 current, laser lines
+#: sent with these went into Setting 1 (simulator, 2026-11-01).
+FIRST_SETTING = ('SingleSettingIndex="0"', 'SequentialSettingIndex="0"', '<Sequence Index="0">')
+
+
 def run(client, change, *, max_retries=None):
-    """One change through the dispatcher, with LAS X's dialogs answered around every send."""
+    """One change through the dispatcher, with LAS X's dialogs answered around every send.
+
+    Refused, with nothing sent, when its commands are addressed to the job's
+    first setting while another setting is the current one: LCS would change
+    the first, not the one LAS X shows.
+    """
+    wrong = another_setting_current(client, change)
+    if wrong:
+        return dispatch.refused(wrong)
     return dispatch.run(direct_profile, client, change, max_retries=max_retries, dialogs=answer_dialogs)
+
+
+def another_setting_current(client, change) -> str | None:
+    """Why *change* would land in another setting than the current one; None when it would not."""
+    request = writes.Request(change.request)
+    try:
+        change.fill(request)
+    except Exception:  # noqa: BLE001 -- a change that cannot fill itself fails in the dispatcher, as before
+        return None
+    if not any(marker in element for element in request.elements or [] for marker in FIRST_SETTING):
+        return None
+    shown = readers.get_setting(client)
+    listed = shown.get("all") or []
+    if not listed or listed[0]["id"] == shown["id"]:
+        return None
+    return (
+        f"{change.description}: LAS X would change {listed[0]['name']}, the job's first setting, not {shown['name']}, "
+        f"the current one; delete the other settings or make {listed[0]['name']} current first. Nothing was sent"
+    )
 
 
 # =============================================================================
@@ -125,17 +158,130 @@ def change(client, name: str, value, *, max_retries=None, tolerance=None) -> dic
 
 
 def laser_line(client, wavelength_nm):
-    """``(route, line_index)`` of the laser line at *wavelength_nm*, in use or not; RuntimeError when there is none.
+    """``(route, line_index)`` of the laser line at *wavelength_nm*; RuntimeError when there is none.
 
-    A tunable line (the white-light laser's) is not found: how to tune it
-    has not been learned.
+    A fixed line is found whether it is on or not; a tunable line (the
+    white-light laser's) only when it is on, at that wavelength, since an off
+    one has none.
     """
     for source in readers.get_light_sources(client) or []:
-        route = tuple(int(part) for part in str(source.get("BeamRoute", "")).split(";") if part)
+        route = writes.route_of(source.get("BeamRoute"))
         for line in source.get("LaserLines", []):
             if line.get("MinWavelength") == line.get("MaxWavelength") == float(wavelength_nm):
                 return route, int(line["Index"])
-    raise RuntimeError(f"no laser line at {wavelength_nm:g} nm (tunable lines are not set by this driver)")
+    tuned = tunable_line_on(client, wavelength_nm)
+    if tuned is not None:
+        return tuned[0], tuned[1]
+    raise RuntimeError(f"no laser line at {wavelength_nm:g} nm (a white-light line must be on at that wavelength)")
+
+
+#: The least distance, in nm, between two lines of the white-light laser that are on: LAS X
+#: holds a warning open otherwise ("Please keep minimum distance of 8nm"), and with it every command.
+WLL_MIN_DISTANCE_NM = 8.0
+
+
+def tunable_line_on(client, wavelength_nm):
+    """``(route, line_index, (min_nm, max_nm), other_wavelengths)`` of the tunable line on at *wavelength_nm*, or None."""
+    sources = {writes.route_of(s.get("BeamRoute")): s for s in readers.get_light_sources(client) or []}
+    on = readers.get_laser_lines(client) or []
+    for line in on:
+        route = writes.route_of(line["beamRoute"])
+        ranges = [(l["MinWavelength"], l["MaxWavelength"]) for l in sources.get(route, {}).get("LaserLines", [])]
+        tunable = [r for r in ranges if r[0] != r[1]]
+        if tunable and abs(line["wavelength"] - float(wavelength_nm)) < 0.5:
+            others = [o["wavelength"] for o in on if writes.route_of(o["beamRoute"]) == route and o["lineIndex"] != line["lineIndex"]]
+            return route, int(line["lineIndex"]), (min(r[0] for r in tunable), max(r[1] for r in tunable)), others
+    return None
+
+
+def add_laser_line(client, wavelength_nm, percent=2.0, *, max_retries=None) -> dict:
+    """Switch on a line of the white-light laser at *wavelength_nm* with *percent* power, as the window's Add Laser does; read back.
+
+    The lines on now are sent again with the new one, on the laser's next
+    free line, as one definition; LCS lists it with no power (simulator,
+    2026-11-01), so its power is then set like any line's, through the
+    limits (2 % is the window's own starting power). Refused, with nothing
+    sent, outside the laser's range, within :data:`WLL_MIN_DISTANCE_NM` of
+    its lines that are on, without a free line, or while a line is locked
+    for the Dye Assistant (the definition would unlock it), or with a power
+    outside 0 to 100 %. The limits are asked for the power when it is set.
+    """
+    try:
+        writes.laser_power((0,), 0, float(wavelength_nm), percent)
+    except (ValueError, TypeError) as why:
+        return dispatch.refused(f"the line cannot be switched on: {why}")
+    on = readers.get_laser_lines(client) or []
+    tunable = [
+        s for s in readers.get_light_sources(client) or []
+        if any(line["MinWavelength"] != line["MaxWavelength"] for line in s.get("LaserLines", []))
+    ]
+    if not tunable:
+        return dispatch.refused("this microscope has no tunable laser; nothing was sent")
+    source = tunable[0]
+    route = writes.route_of(source["BeamRoute"])
+    low = min(line["MinWavelength"] for line in source["LaserLines"])
+    high = max(line["MaxWavelength"] for line in source["LaserLines"])
+    if not low <= float(wavelength_nm) <= high:
+        return dispatch.refused(f"{wavelength_nm:g} nm is outside the laser's range, {low:g} to {high:g} nm; nothing was sent")
+    mine = [line for line in on if writes.route_of(line["beamRoute"]) == route]
+    near = [line["wavelength"] for line in mine if abs(line["wavelength"] - float(wavelength_nm)) < WLL_MIN_DISTANCE_NM]
+    if near:
+        return dispatch.refused(f"{wavelength_nm:g} nm is within {WLL_MIN_DISTANCE_NM:g} nm of the line at {near[0]:g} nm; nothing was sent")
+    used = {line["lineIndex"] for line in mine}
+    free = [line["Index"] for line in source["LaserLines"] if line["Index"] not in used]
+    if not free:
+        return dispatch.refused("the laser has no free line; switch one off first; nothing was sent")
+    if readers.any_laser_line_locked(client):
+        return dispatch.refused("a laser line is locked for the Dye Assistant; unlock it first; nothing was sent")
+    lines = [(writes.route_of(line["beamRoute"]), line["lineIndex"], line["wavelength"]) for line in on]
+    lines.append((route, min(free), float(wavelength_nm)))
+    listed = run(client, writes.laser_lines_definition(lines, float(wavelength_nm)), max_retries=max_retries)
+    if not listed.get("success"):
+        return listed
+    return run(client, writes.laser_power(route, min(free), float(wavelength_nm), percent), max_retries=max_retries)
+
+
+def remove_laser_line(client, wavelength_nm, *, max_retries=None) -> dict:
+    """Remove the laser line that is on at *wavelength_nm* from the setting, as the window does; read back.
+
+    The other lines that are on are sent as the definition, without it. A
+    line set to 0 % stays listed in the window, dark; this takes it away.
+    Refused, with nothing sent, when no line is on at *wavelength_nm*, or
+    while a line is locked for the Dye Assistant (the definition would unlock it).
+    """
+    on = readers.get_laser_lines(client) or []
+    gone = [line for line in on if abs(line["wavelength"] - float(wavelength_nm)) < 0.5]
+    if not gone:
+        return dispatch.refused(f"no laser line is on at {wavelength_nm:g} nm; nothing was sent")
+    if readers.any_laser_line_locked(client):
+        return dispatch.refused("a laser line is locked for the Dye Assistant; unlock it first; nothing was sent")
+    lines = [(writes.route_of(line["beamRoute"]), line["lineIndex"], line["wavelength"]) for line in on if line not in gone]
+    return run(client, writes.laser_line_removed(lines, float(wavelength_nm)), max_retries=max_retries)
+
+
+def tune_laser_line(client, from_nm, to_nm, *, max_retries=None) -> dict:
+    """Tune the white-light line that is on at *from_nm* to *to_nm*, as the window does; read back.
+
+    Refused, with nothing sent, when no tunable line is on at *from_nm*, when
+    *to_nm* lies outside the laser's range, or when it comes within
+    :data:`WLL_MIN_DISTANCE_NM` of another of its lines that is on.
+    """
+    found = tunable_line_on(client, from_nm)
+    if found is None:
+        return dispatch.refused(f"no white-light line is on at {from_nm:g} nm; nothing was sent")
+    route, index, (low, high), others = found
+    if not low <= float(to_nm) <= high:
+        return dispatch.refused(f"{to_nm:g} nm is outside the laser's range, {low:g} to {high:g} nm; nothing was sent")
+    near = [o for o in others if abs(o - float(to_nm)) < WLL_MIN_DISTANCE_NM]
+    if near:
+        return dispatch.refused(
+            f"{to_nm:g} nm is within {WLL_MIN_DISTANCE_NM:g} nm of the line at {near[0]:g} nm; nothing was sent"
+        )
+    try:
+        change = writes.laser_wavelength(route, index, float(to_nm))
+    except ValueError as why:
+        return dispatch.refused(str(why))
+    return run(client, change, max_retries=max_retries)
 
 
 def set_laser_power(client, wavelength_nm, percent, *, max_retries=None) -> dict:

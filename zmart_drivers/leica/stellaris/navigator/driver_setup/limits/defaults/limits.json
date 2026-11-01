@@ -35,5 +35,6 @@
   "set_collar": [],
   "set_smartcorr_range": [],
   "set_collar_reference": [],
-  "set_sequential_mode": []
+  "set_sequential_mode": [],
+  "set_laser_wavelength": []
 }

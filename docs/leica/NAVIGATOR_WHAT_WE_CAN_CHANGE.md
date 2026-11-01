@@ -99,7 +99,10 @@ discovery session in `SCOPE_RUN_2026-11-01_NAVIGATOR_DISCOVERY.md` and the build
 
 | Setting | State |
 |---|---|
-| Laser power per line | Works (at most 10 % unless the limits say otherwise; the white-light laser's tunable lines not) |
+| Laser power per line | Works (at most 10 % unless the limits say otherwise; a white-light line when it is on) |
+| White-light laser: a line tuned to another wavelength | Works, with LAS X's command; within the laser's range, at least 8 nm from its other lines that are on |
+| White-light laser: a line added (the window's Add Laser) | Works, with LAS X's commands; within its range, 8 nm from its other lines |
+| A laser line removed from the setting | Works, with LAS X's command |
 | Shutter per light source | Works |
 | A line on or off | Works: a power above 0 switches it on, 0 off |
 
@@ -157,7 +160,7 @@ service and the person responsible for the instrument.
 
 | State | Settings |
 |---|---|
-| Works | 64 (the objective among them, not yet tried) |
+| Works | 67 (the objective among them, not yet tried) |
 | Tried | 0 |
 | Command known | 0 |
 | Not yet learned | 6 |

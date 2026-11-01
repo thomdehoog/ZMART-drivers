@@ -415,3 +415,19 @@ def test_the_sequential_mode_is_changed_and_read(scope, lasx):
     assert scope.settings()["sequential_mode"] == "line"
     assert scope.change_setting("sequential_mode", "stack")["confirmed"] is True
     assert scope.settings()["sequential_mode"] == "stack"
+
+
+
+def test_a_white_light_line_is_tuned(scope, lasx):
+    assert scope.tune_laser_line(497, 510)["confirmed"] is True
+
+
+
+def test_a_white_light_line_is_added(scope, lasx):
+    assert scope.add_laser_line(600)["confirmed"] is True
+
+
+
+def test_a_laser_line_is_removed(scope, lasx):
+    assert scope.add_laser_line(600)["confirmed"] is True
+    assert scope.remove_laser_line(600)["confirmed"] is True

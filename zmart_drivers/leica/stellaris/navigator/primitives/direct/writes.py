@@ -38,7 +38,7 @@ from __future__ import annotations
 import math
 import re
 from collections.abc import Callable, Iterable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from . import reads as direct_reader
 
@@ -342,6 +342,88 @@ def laser_power(route, line_index: int, wavelength_nm: float, percent: float) ->
         description=f"Laser {wavelength_nm:g} nm -> {percent:g} %",
         ready=idle(),
         confirm=Expect("laser_lines", shows),
+    )
+
+
+def laser_wavelength(route, line_index: int, wavelength_nm: float) -> Write:
+    """Tune the line *line_index* of the tunable light source on *route* (the white-light laser) to *wavelength_nm*; read back.
+
+    As the window sends it when a line's wavelength is changed (simulator,
+    2026-11-01); the AOBS follows by itself. The range and the distance to
+    the other lines are checked before this is built (``changes.tune_laser_line``).
+    """
+    if isinstance(wavelength_nm, bool) or not isinstance(wavelength_nm, (int, float)):
+        raise ValueError(f"a wavelength is a number of nanometres, not {wavelength_nm!r}")
+    element = (
+        f'<Scanner Command="SetLightSourceWavelength" LineIndex="{int(line_index)}" Wavelength="{value(wavelength_nm)}" '
+        f'SetMode="2" SingleSettingIndex="0" DoAsync="1">{beam_route(route)}</Scanner>'
+    )
+
+    def fill(request: Request) -> None:
+        request.elements = [element]
+
+    def shows(lines) -> bool:
+        return any(
+            route_of(line.get("beamRoute")) == tuple(route) and line.get("lineIndex") == int(line_index)
+            and abs(line.get("wavelength", 0) - wavelength_nm) < 0.5
+            for line in lines or []
+        )
+
+    return Write(
+        command="set_laser_wavelength",
+        values={"value": float(wavelength_nm)},
+        request="SetLightSourceWavelength",
+        fill=fill,
+        description=f"Laser line {line_index} on {route} -> {wavelength_nm:g} nm",
+        ready=idle(),
+        confirm=Expect("laser_lines", shows),
+    )
+
+
+def laser_line_removed(lines, removed_nm: float) -> Write:
+    """The laser lines in use without the one at *removed_nm*, sent as one definition, as removing a line in the window does; read back.
+
+    LCS drops a line left out of the definition: it is off and no longer
+    shown (simulator, 2026-11-01). Confirmed when no line is on at *removed_nm*.
+    """
+    return replace(
+        laser_lines_definition(lines, removed_nm),
+        command="remove_laser_line",
+        values={"value": float(removed_nm)},
+        description=f"Laser line at {removed_nm:g} nm removed",
+        confirm=Expect("laser_lines", lambda on: not any(abs(line.get("wavelength", 0) - removed_nm) < 0.5 for line in on or [])),
+    )
+
+
+def laser_lines_definition(lines, new_wavelength_nm: float) -> Write:
+    """The laser lines in use, ``[(route, line_index, wavelength_nm), ...]``, sent as the window's Add Laser sends them; read back.
+
+    LCS lists a new line at its wavelength with no power (simulator,
+    2026-11-01), so nothing can be read back here: the power set after is.
+    ``Locked`` 0 for every line: the caller refuses while a line is locked
+    for the Dye Assistant.
+    """
+    listed = "".join(
+        f"<LightSource>{beam_route(route)}<LineIndex>{int(index)}</LineIndex>"
+        f"<WaveLength>{value(wavelength)}</WaveLength><Locked>0</Locked></LightSource>"
+        for route, index, wavelength in lines
+    )
+    element = (
+        '<Scanner IsBleachPointDefinition="0" IsAutoFocusDefinition="0" Command="SetConfocalLaserLinesDefinition">'
+        f'<Sequences><Sequence Index="0">{listed}</Sequence></Sequences></Scanner>'
+    )
+
+    def fill(request: Request) -> None:
+        request.elements = [element]
+
+    return Write(
+        command="set_laser_lines",
+        values={"value": float(new_wavelength_nm)},
+        request="SetConfocalLaserLinesDefinition",
+        fill=fill,
+        description=f"Laser line switched on at {new_wavelength_nm:g} nm",
+        ready=idle(),
+        confirm=None,
     )
 
 

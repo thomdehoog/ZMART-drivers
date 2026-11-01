@@ -214,6 +214,27 @@ class PlainNavigator:
         # LCS sets a line's power in steps of 1/255 (5 % became 5.098 %).
         line["Intensity"] = round(float(e.get("LineIntensity")) * 255) / 255 * 100
 
+    def take_SetConfocalLaserLinesDefinition(self, e):
+        """The lines listed are kept at their wavelength; a new one gets no power, one left out is off, as on the simulator."""
+        kept = set()
+        for listed in e.iter("LightSource"):
+            kept.add((tuple(int(p.get("BeamPosition")) for p in listed.iter("BeamPosition")), int(listed.findtext("LineIndex"))))
+            route = tuple(int(p.get("BeamPosition")) for p in listed.iter("BeamPosition"))
+            source = next(s for s in self.nodes.light_sources if tuple(s["BeamRoute"]) == route)
+            line = next(a for a in source["AOTF"]["AotfLine"] if a["LineIndex"] == int(listed.findtext("LineIndex")))
+            line["WaveLength"] = float(listed.findtext("WaveLength"))
+        for source in self.nodes.light_sources:
+            for line in source["AOTF"]["AotfLine"]:
+                if (tuple(source["BeamRoute"]), line["LineIndex"]) not in kept:
+                    line["Intensity"] = 0.0
+        return "<Result/>"
+
+    def take_SetLightSourceWavelength(self, e):
+        source = self.light_source(e)
+        line = next(a for a in source["AOTF"]["AotfLine"] if a["LineIndex"] == int(e.get("LineIndex")))
+        line["WaveLength"] = float(e.get("Wavelength"))
+        return "<Result/>"
+
     def take_ActivateShutter(self, e):
         self.light_source(e)["Shutter"]["IsShutterActive"] = e.get("Activate") == "1"
 

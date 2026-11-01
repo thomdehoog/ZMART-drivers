@@ -116,7 +116,7 @@ class TestTheFiveSettings:
         bundled = json.loads((DRIVER_ROOT / "driver_setup" / "limits" / "defaults" / "limits.json").read_text())
         assert set(limit_rules.SETTER_LIMIT_KEYS) <= set(bundled)
         # The settings table, and the settings with a write of their own.
-        assert set(limit_rules.SETTER_LIMIT_KEYS) == {f"set_{name}" for name in writes.SETTINGS} | {"set_z_stack_step", "set_scan_mode", "set_autofocus", "set_laser_power", "set_laser_shutter", "set_format", "set_resonant_scanner", "set_filter_wheel", "set_detector_gain", "set_bidirectional", "set_phase_x", "set_pinhole_um", "set_pinhole_unit", "set_emission_wavelength", "set_bit_depth", "set_system_optimized_step", "set_collar", "set_smartcorr_range", "set_collar_reference", "set_sequential_mode"}
+        assert set(limit_rules.SETTER_LIMIT_KEYS) == {f"set_{name}" for name in writes.SETTINGS} | {"set_z_stack_step", "set_scan_mode", "set_autofocus", "set_laser_power", "set_laser_shutter", "set_format", "set_resonant_scanner", "set_filter_wheel", "set_detector_gain", "set_bidirectional", "set_phase_x", "set_pinhole_um", "set_pinhole_unit", "set_emission_wavelength", "set_bit_depth", "set_system_optimized_step", "set_collar", "set_smartcorr_range", "set_collar_reference", "set_sequential_mode", "set_laser_wavelength"}
 
     @pytest.mark.parametrize("name", list(writes.SETTINGS))
     def test_a_ranged_setting_is_refused_outside_its_range_and_passed_inside(self, name):
