@@ -53,7 +53,7 @@ _REQUIRED_FILE_KEYS = (*_AXIS_FILE_KEYS.values(), *STEP_LIMIT_KEYS, "objective_s
 # Entries added after limits files were first saved. A file saved before an
 # entry existed still counts: the entry is taken from the bundled defaults,
 # and the log says so. Every other missing entry makes the file invalid.
-_ADDED_LATER = (*STEP_LIMIT_KEYS, "set_z_stack_step")
+_ADDED_LATER = (*STEP_LIMIT_KEYS, "set_z_stack_step", "set_scan_mode", "set_autofocus")
 
 
 def _driver_root() -> Path:

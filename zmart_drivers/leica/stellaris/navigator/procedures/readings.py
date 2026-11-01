@@ -146,6 +146,11 @@ def get_z_drive_in_use(client, **keywords):
     return _routed("z_drive_in_use", client, **keywords)
 
 
+def get_autofocus(client, **keywords):
+    """Whether autofocus is switched on."""
+    return _routed("autofocus", client, **keywords)
+
+
 def get_serial_number(client, **keywords):
     """The instrument's serial number."""
     return _routed("serial_number", client, **keywords)

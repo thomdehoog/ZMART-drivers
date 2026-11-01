@@ -119,9 +119,9 @@ mic.connect("stellaris-navigator")                                              
 
 ### The settings `change_setting` can change
 
-These are the settings LAS X's Navigator window takes from outside; each is sent to the current scan
-and read back from LAS X's state tree. A value outside the range in this microscope's limits file is
-refused before it is sent; a value LAS X adjusts (a pinhole above its maximum, say) is reported as not
+Each is sent to the current scan with the command LAS X's own software sends (learned in LCS's log),
+and read back from LAS X's state tree. A value outside the range or the list in this microscope's
+limits file is refused before it is sent; a value LAS X adjusts (a pinhole above its maximum, say) is reported as not
 confirmed, with what LAS X set instead.
 
 | Name | Value | Read back within |
@@ -131,6 +131,8 @@ confirmed, with what LAS X set instead.
 | `scan_field_rotation` | degrees | 0.5° |
 | `line_average` | 1, 2, 4, ... | exact |
 | `pinhole_airy` | Airy units | 0.05 AU |
+| `scan_mode` | LAS X's name of the scan mode, such as `"xyz"` or `"xyt"` | exact (LAS X shows xyz as xyzN) |
+| `autofocus` | `True` or `False` | exact |
 
 ## Setting up the driver
 

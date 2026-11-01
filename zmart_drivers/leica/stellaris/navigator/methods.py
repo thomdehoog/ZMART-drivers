@@ -59,7 +59,7 @@ from .driver_setup.origin import saved_origin
 from .driver_setup.origin import set_origin as origin_step
 from .driver_setup.store import MACHINE, use_configuration
 from .primitives.direct import client as hardware_server
-from .primitives.direct.writes import SETTINGS
+from .primitives.direct.writes import NAMED_SETTINGS, SETTINGS
 from .procedures import (
     absolute_coordinate_system,
     answer_dialogs,
@@ -262,23 +262,25 @@ class Microscope:
     # --- the settings and the objective ---------------------------------------------------
 
     def settings(self) -> dict:
-        """What LAS X is set to now: ``zoom``, ``scan_speed``, ``scan_field_rotation``, ``averaging``, ``pinhole``, ``format``, ``scan_mode``, ``objective``, ``z_stack``."""
+        """What LAS X is set to now: ``zoom``, ``scan_speed``, ``scan_field_rotation``, ``averaging``, ``pinhole``, ``format``, ``scan_mode``, ``objective``, ``z_stack``, ``autofocus``."""
         self.handle.require_open()
         found = acquire_step.current_settings(self.handle)
         return {name: found[name] for name in found if name not in ("fov_m", "bit_depth")}
 
-    def change_setting(self, name: str, value: float) -> dict:
+    def change_setting(self, name: str, value) -> dict:
         """Change the setting *name* to *value*, and read it back.
 
-        *name* is one of the settings the plain Navigator route can change
+        *name* is one of the settings the driver can change: the numbers
         (``zoom``, ``scan_speed``, ``scan_field_rotation``, ``line_average``,
-        ``pinhole_airy``). The limits are asked first. Answers the change's
-        result, with ``confirmed`` True when the read-back showed the new
-        value; a change that was never seen is recorded and does not raise.
+        ``pinhole_airy``), the scan mode (``scan_mode``, LAS X's name, such
+        as ``"xyz"``) and ``autofocus`` (True or False). The limits are asked
+        first. Answers the change's result, with ``confirmed`` True when the
+        read-back showed the new value; a change that was never seen is
+        recorded and does not raise.
         """
         self.handle.require_open()
-        if name not in SETTINGS:
-            raise ValueError(f"no setting {name!r}; the settings are {sorted(SETTINGS)}")
+        if name not in SETTINGS and name not in NAMED_SETTINGS:
+            raise ValueError(f"no setting {name!r}; the settings are {sorted([*SETTINGS, *NAMED_SETTINGS])}")
         result = changes.change(self.handle.client, name, value)
         return checked(self.handle, result, f"change_setting({name!r}, {value!r})")
 

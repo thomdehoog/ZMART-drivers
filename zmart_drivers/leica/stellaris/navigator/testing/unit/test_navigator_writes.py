@@ -252,3 +252,27 @@ class TestTheZStack:
             '<AcquireControl Command="StartAcquiring" DCParentElementID="2518"/>',
         ]
         assert write.never_resend is True
+
+
+
+class TestScanModeAndAutofocus:
+    def test_the_scan_mode_is_sent_to_the_current_settings_and_read_back_without_las_x_s_n(self):
+        write = writes.named_setting("scan_mode", "xyt")
+        assert elements(write) == ['<Scanner Command="ScanMode" ScanMode="xyt" BlockId="0"/>']
+        assert write.command == "set_scan_mode" and write.values == {"value": "xyt"}
+        # LAS X shows xyz as xyzN and xyt as xyNt (simulator, 2026-10-30).
+        assert write.confirm.accept("xyNt") and not write.confirm.accept("xyzN")
+
+    def test_autofocus_is_switched_on_or_off_and_read_back(self):
+        write = writes.named_setting("autofocus", False)
+        assert elements(write) == ['<Scanner Command="ActivateAutoFocus" Activate="0" InitNew="0"/>']
+        assert write.confirm.reading == "autofocus"
+        assert write.confirm.accept(False) and not write.confirm.accept(True)
+
+    def test_a_setting_of_the_wrong_kind_is_refused(self):
+        with pytest.raises(ValueError):
+            writes.named_setting("autofocus", "yes")
+        with pytest.raises(ValueError):
+            writes.named_setting("scan_mode", 3)
+        with pytest.raises(ValueError):
+            writes.named_setting("contrast", 1)

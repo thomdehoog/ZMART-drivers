@@ -203,6 +203,8 @@ SETTER_LIMIT_KEYS = (
     "set_line_average",
     "set_pinhole_airy",
     "set_z_stack_step",
+    "set_scan_mode",
+    "set_autofocus",
 )
 
 

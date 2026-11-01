@@ -65,6 +65,7 @@ READS = (
     "fov",
     "z_stack",
     "z_drive_in_use",
+    "autofocus",
     "laser_lines",
     "scan_field_rotation",
     "sequential_mode",
@@ -383,6 +384,18 @@ def get_z_drive_in_use() -> str:
     if mode not in drives:
         raise HardwareServerUnavailable(f"the state tree names z-stack drive {mode!r}")
     return drives[mode]
+
+
+def get_autofocus() -> bool:
+    """Whether autofocus is switched on, as LAS X's Autofocus button shows it.
+
+    ``Acquire/AutoFocusInfo/IsSeriesScanAutofocusActive``, which followed
+    ``ActivateAutoFocus`` on the simulator (2026-11-01).
+    """
+    value = settings("autofocus", {"on": ("Acquire", "AutoFocusInfo", "IsSeriesScanAutofocusActive")})["on"]
+    if not isinstance(value, bool):
+        raise HardwareServerUnavailable(f"the state tree answered autofocus = {value!r}")
+    return value
 
 
 def light_layout(nodes, node, kids):

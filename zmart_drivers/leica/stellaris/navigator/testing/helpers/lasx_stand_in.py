@@ -196,6 +196,9 @@ class PlainNavigator:
     def take_SetZUseMode(self, e):
         self.live[("Acquire", "ZPositionMode")] = int(e.get("UseMode"))
 
+    def take_ActivateAutoFocus(self, e):
+        self.live[("Acquire", "AutoFocusInfo", "IsSeriesScanAutofocusActive")] = e.get("Activate") == "1"
+
     def take_ScanMode(self, e):
         self.live[("Acquire", "ScanDimensionList", "ScanModeName")] = e.get("ScanMode")
 

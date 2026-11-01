@@ -109,6 +109,7 @@ def current_settings(handle) -> dict:
             ("scan_mode", _readers.get_scan_mode),
             ("objective", _readers.get_objective),
             ("z_stack", _readers.get_z_stack),
+            ("autofocus", _readers.get_autofocus),
             ("fov_m", _readers.get_fov),
             ("bit_depth", _readers.get_bit_depth),
         )

@@ -229,6 +229,63 @@ def setting(name: str, number: float, *, tolerance=None) -> Write:
 
 
 # =============================================================================
+# The settings that are not a number: each a write of its own, by name
+# =============================================================================
+
+
+def scan_mode(mode: str) -> Write:
+    """Set the scan mode (``xyz``, ``xyt`` ...), as the Scanmode panel does; read back as LAS X names it."""
+    if not isinstance(mode, str) or not mode.strip():
+        raise ValueError(f"scan_mode takes LAS X's name of a scan mode, such as 'xyz', not {mode!r}")
+
+    def fill(request: Request) -> None:
+        request.elements = [f'<Scanner Command="ScanMode" ScanMode="{mode}" {CURRENT}/>']
+
+    return Write(
+        command="set_scan_mode",
+        values={"value": mode},
+        request="ScanMode",
+        fill=fill,
+        description=f"ScanMode -> {mode}",
+        ready=idle(),
+        # LAS X shows xyz as xyzN and xyt as xyNt (simulator, 2026-10-30).
+        confirm=Expect("scan_mode", lambda shown: isinstance(shown, str) and shown.replace("N", "") == mode),
+    )
+
+
+def autofocus(on: bool) -> Write:
+    """Switch autofocus on or off, as the Autofocus button does; read back from the state tree."""
+    if not isinstance(on, bool):
+        raise ValueError(f"autofocus takes True or False, not {on!r}")
+
+    def fill(request: Request) -> None:
+        request.elements = [f'<Scanner Command="ActivateAutoFocus" Activate="{int(on)}" InitNew="0"/>']
+
+    return Write(
+        command="set_autofocus",
+        values={"value": on},
+        request="ActivateAutoFocus",
+        fill=fill,
+        description=f"Autofocus -> {'on' if on else 'off'}",
+        ready=idle(),
+        confirm=Expect("autofocus", lambda shown: shown is on),
+    )
+
+
+#: The settings with a write of their own, by name, beside the table of numbers (:data:`SETTINGS`).
+NAMED_SETTINGS = {"scan_mode": scan_mode, "autofocus": autofocus}
+
+
+def named_setting(name: str, value) -> Write:
+    """The change of the setting *name* to *value*, from the table or from :data:`NAMED_SETTINGS`; ValueError otherwise."""
+    if name in NAMED_SETTINGS:
+        return NAMED_SETTINGS[name](value)
+    if name in SETTINGS:
+        return setting(name, value)
+    raise ValueError(f"no setting {name!r}; the settings are {sorted([*SETTINGS, *NAMED_SETTINGS])}")
+
+
+# =============================================================================
 # The stage and the z drives
 # =============================================================================
 

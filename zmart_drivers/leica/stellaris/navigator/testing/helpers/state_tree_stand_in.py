@@ -36,6 +36,7 @@ SIMULATOR_SETTINGS = {
     ("Acquire", "AcquireZStackInfo", "StepSize"): 0.0,
     ("Acquire", "ZStackUseMode"): 1,
     ("Acquire", "ZPositionMode"): 1,
+    ("Acquire", "AutoFocusInfo", "IsSeriesScanAutofocusActive"): True,
     ("Confocal", "ScanningParameter", "IsResonantConfocalScanner"): False,
     ("Confocal", "ScanningParameter", "Speed"): 400,
     ("Confocal", "ScanningParameter", "SpeedUnit"): "Hz",

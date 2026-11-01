@@ -246,3 +246,10 @@ def test_a_z_stack_far_from_the_focus_is_refused(scope, lasx):
         scope.set_z_stack("z-wide", 3000.0, 3010.0, 2.5)
 
     assert "SetZStackDefinition" not in lasx.commands()
+
+
+
+def test_scan_mode_and_autofocus_are_changed_like_every_setting(scope, lasx):
+    assert scope.change_setting("autofocus", False)["confirmed"] is True
+    assert scope.settings()["autofocus"] is False
+    assert scope.change_setting("scan_mode", "xyz")["confirmed"] is True

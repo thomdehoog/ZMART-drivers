@@ -116,7 +116,7 @@ class TestTheFiveSettings:
         bundled = json.loads((DRIVER_ROOT / "driver_setup" / "limits" / "defaults" / "limits.json").read_text())
         assert set(limit_rules.SETTER_LIMIT_KEYS) <= set(bundled)
         # The settings table, and the settings with a write of their own.
-        assert set(limit_rules.SETTER_LIMIT_KEYS) == {f"set_{name}" for name in writes.SETTINGS} | {"set_z_stack_step"}
+        assert set(limit_rules.SETTER_LIMIT_KEYS) == {f"set_{name}" for name in writes.SETTINGS} | {"set_z_stack_step", "set_scan_mode", "set_autofocus"}
 
     @pytest.mark.parametrize("name", list(writes.SETTINGS))
     def test_a_ranged_setting_is_refused_outside_its_range_and_passed_inside(self, name):
@@ -280,3 +280,19 @@ class TestTheZStack:
     def test_the_step_size_has_a_limits_entry_of_its_own(self):
         assert "set_z_stack_step" in limit_rules.SETTER_LIMIT_KEYS
         assert limit_rules.MUTATING_COMMANDS["set_z_stack_step"] == "set_z_stack_step"
+
+
+
+class TestTheTextAndOnOffSettings:
+    def test_a_scan_mode_outside_the_allowed_list_is_refused(self):
+        payload = merged_limits_payload(dict(DEFAULT_STAGE_UM), functions={"set_scan_mode": {"allowed": ["xyz"]}})
+        limits = limit_rules.LeicaLimits(payload, source="test", path=None, is_fallback=False)
+        limits.check_command("set_scan_mode", {"value": "xyz"})
+        with pytest.raises(limit_rule_violation()):
+            limits.check_command("set_scan_mode", {"value": "xyt"})
+
+
+def limit_rule_violation():
+    from zmart_drivers.leica.stellaris.navigator.dispatcher.limits import LimitViolation
+
+    return LimitViolation

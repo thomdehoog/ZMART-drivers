@@ -360,3 +360,18 @@ class TestTheZStack:
 
         assert acq.picture == "capture"
         assert lasx.commands()[-1] == "CaptureSingleFrame"
+
+
+
+class TestScanModeAndAutofocus:
+    def test_the_scan_mode_is_changed_and_read_back(self, lasx, client):
+        result = changes.change(client, "scan_mode", "xyt")
+
+        assert result["confirmed"] is True
+        assert lasx.live[("Acquire", "ScanDimensionList", "ScanModeName")] == "xyt"
+
+    def test_autofocus_is_switched_off_and_read_back(self, lasx, client):
+        result = changes.change(client, "autofocus", False)
+
+        assert result["confirmed"] is True
+        assert lasx.live[("Acquire", "AutoFocusInfo", "IsSeriesScanAutofocusActive")] is False

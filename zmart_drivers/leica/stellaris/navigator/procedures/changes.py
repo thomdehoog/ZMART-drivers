@@ -105,14 +105,21 @@ def move_z(client, drive, z_um, *, max_retries=None, tolerance=None):
 # =============================================================================
 
 
-def change(client, name: str, value: float, *, max_retries=None, tolerance=None) -> dict:
-    """Change the setting *name* (``writes.SETTINGS``: zoom, scan_speed, ...) to *value*, and read it back.
+def change(client, name: str, value, *, max_retries=None, tolerance=None) -> dict:
+    """Change the setting *name* to *value*, and read it back.
 
-    A wrong name or a value that is not a number raises ``ValueError``. The
-    limits gate is shown the new value first, and nothing is sent if it
-    refuses. *tolerance* overrides how close the read-back must come.
+    *name* is a row of the table of numbers (``writes.SETTINGS``: zoom,
+    scan_speed, ...) or a setting with a write of its own
+    (``writes.NAMED_SETTINGS``: scan_mode, autofocus). A wrong name or a
+    value of the wrong kind raises ``ValueError``. The limits gate is
+    shown the new value first, and nothing is sent if it refuses.
+    *tolerance* overrides how close a number's read-back must come.
     """
-    return run(client, writes.setting(name, value, tolerance=tolerance), max_retries=max_retries)
+    if name in writes.SETTINGS:
+        change = writes.setting(name, value, tolerance=tolerance)
+    else:
+        change = writes.named_setting(name, value)
+    return run(client, change, max_retries=max_retries)
 
 
 def objective_by_slot(objectives) -> dict[int, dict[str, Any]]:
