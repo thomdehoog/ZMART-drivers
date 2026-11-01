@@ -24,6 +24,7 @@ driver - so it is not resolved here.
 from __future__ import annotations
 
 import json
+import logging
 import math
 from datetime import UTC, datetime
 from pathlib import Path
@@ -31,6 +32,8 @@ from tempfile import TemporaryDirectory
 from typing import Any
 
 from . import limit_rules as checks
+
+log = logging.getLogger(__name__)
 
 _REQUIRED_AXES = ("x", "y", "z_galvo", "z_wide")
 _AXIS_FILE_KEYS = {
@@ -43,9 +46,14 @@ _AXIS_FILE_KEYS = {
 # These are visible in the file even while unrestricted. Each entry is either
 # ``[]`` or one typed constraint, and the command wrapper with the same name
 # enforces a typed constraint immediately before its native CAM call.
-from .limit_rules import SETTER_LIMIT_KEYS
+from .limit_rules import SETTER_LIMIT_KEYS, STEP_LIMIT_KEYS
 
-_REQUIRED_FILE_KEYS = (*_AXIS_FILE_KEYS.values(), "objective_slot", *SETTER_LIMIT_KEYS)
+_REQUIRED_FILE_KEYS = (*_AXIS_FILE_KEYS.values(), *STEP_LIMIT_KEYS, "objective_slot", *SETTER_LIMIT_KEYS)
+
+# Entries added after limits files were first saved. A file saved before an
+# entry existed still counts: the entry is taken from the bundled defaults,
+# and the log says so. Every other missing entry makes the file invalid.
+_ADDED_LATER = (*STEP_LIMIT_KEYS,)
 
 
 def _driver_root() -> Path:
@@ -146,6 +154,11 @@ def validate_payload(
     """Validate and normalize the complete flat limits document."""
     if not isinstance(payload, dict):
         raise ValueError(f"{path} limits must be an object, got {payload!r}")
+    later = [key for key in _ADDED_LATER if key not in payload]
+    if later and Path(path) != defaults_path():
+        defaults = _read_json(defaults_path())
+        payload = {**payload, **{key: defaults[key] for key in later}}
+        log.warning("%s has no %s yet; taken from the driver's defaults", path, later)
     missing = sorted(set(_REQUIRED_FILE_KEYS) - set(payload))
     unknown = sorted(set(payload) - set(_REQUIRED_FILE_KEYS))
     if missing:
@@ -175,6 +188,12 @@ def validate_payload(
                 f"{path} objective_slot.allowed must contain non-negative integers "
                 f"(turret slots count from 0), got {slots!r}"
             )
+    steps: dict[str, Any] = {}
+    for name in STEP_LIMIT_KEYS:
+        entry = payload[name]
+        steps[name] = [] if entry == [] else _normalize_typed_limit(name, entry, path=path, required_kind="range")
+        if steps[name] and steps[name]["range"][0] < 0:
+            raise ValueError(f"{path} {name} is a distance and cannot start below 0: {entry!r}")
     setters: dict[str, Any] = {}
     for name in SETTER_LIMIT_KEYS:
         entry = payload[name]
@@ -184,6 +203,7 @@ def validate_payload(
 
     normalized = {
         **axes,
+        **steps,
         "objective_slot": objective,
         **setters,
     }
@@ -204,6 +224,7 @@ def build_limits_payload(stage_um: dict[str, Any]) -> dict[str, Any]:
     stage = _validate_limits(stage_um, path=Path("limits.json"))
     payload = {
         **{_AXIS_FILE_KEYS[axis]: {"range": bounds} for axis, bounds in stage.items()},
+        **{key: _read_json(defaults_path())[key] for key in STEP_LIMIT_KEYS},
         "objective_slot": [],
         **{name: [] for name in SETTER_LIMIT_KEYS},
     }

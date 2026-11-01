@@ -336,6 +336,7 @@ def test_disconnect_closes_the_connection_and_connect_is_to_do_again(connected):
 def test_the_limits_document_is_every_entry_of_the_file(connected):
     from zmart_drivers.leica.stellaris.navigator.driver_setup.limits.limit_rules import (
         SETTER_LIMIT_KEYS,
+        STEP_LIMIT_KEYS,
     )
 
     doc = connected.call("limits", "document")["result"]
@@ -346,6 +347,7 @@ def test_the_limits_document_is_every_entry_of_the_file(connected):
         "y_um",
         "z_galvo_um",
         "z_wide_um",
+        *STEP_LIMIT_KEYS,
         "objective_slot",
         *SETTER_LIMIT_KEYS,
     }

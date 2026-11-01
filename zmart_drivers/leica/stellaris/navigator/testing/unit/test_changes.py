@@ -290,3 +290,40 @@ class TestPictures:
             changes.take_tile_scan(client, [(63500.0, 41500.0, 0.0), (500_000.0, 41500.0, 0.0)])
 
         assert lasx.commands() == []
+
+
+class TestTheLargestStepOnTheWay:
+    """The changes hand the gate where each drive stands, so the step is checked before anything is sent."""
+
+    @pytest.fixture
+    def stepped(self, lasx):
+        from limits_fixtures import DEFAULT_STAGE_UM, merged_limits_payload
+
+        from zmart_drivers.leica.stellaris.navigator.driver_setup.limits import limit_rules
+
+        client = hardware_server.Client("test")
+        payload = merged_limits_payload(dict(DEFAULT_STAGE_UM))
+        gate.install(client, gate.GateState(
+            limits=limit_rules.LeicaLimits(payload, source="test", path=None, is_fallback=False),
+            stage_cfg=None, error=None))
+        limit_rules.set_stage_limits(
+            x_min=1000.0, x_max=130000.0, y_min=1000.0, y_max=100000.0,
+            z_galvo_min=-250.0, z_galvo_max=250.0, z_wide_min=0.0, z_wide_max=8000.0,
+        )
+        yield client
+        gate.uninstall(client)
+
+    def test_a_large_z_wide_move_is_refused_and_nothing_is_sent(self, lasx, stepped):
+        result = changes.move_z(stepped, "z-wide", 600.0)
+
+        assert result["success"] is False and "step_z_wide_um" in result["message"]
+        assert lasx.commands() == []
+
+    def test_a_small_z_wide_move_goes_through(self, lasx, stepped):
+        result = changes.move_z(stepped, "z-wide", 150.0, tolerance=0.1)
+
+        assert result["confirmed"] is True
+        assert lasx.z_um[2] == pytest.approx(150.0)
+
+    def test_a_stage_move_hands_the_gate_where_the_stage_stands(self, lasx, stepped):
+        assert changes.move_xy(stepped, 64000.0, 41500.0, tolerance=1)["confirmed"] is True

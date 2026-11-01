@@ -145,7 +145,7 @@ class TestTheFiveSettings:
 
     def test_the_limits_file_keys_are_exactly_what_the_rulebook_knows(self):
         loaded = limits_config.load()
-        assert set(loaded["policy"]) == {"x_um", "y_um", "z_galvo_um", "z_wide_um", "objective_slot", *limit_rules.SETTER_LIMIT_KEYS}
+        assert set(loaded["policy"]) == {"x_um", "y_um", "z_galvo_um", "z_wide_um", *limit_rules.STEP_LIMIT_KEYS, "objective_slot", *limit_rules.SETTER_LIMIT_KEYS}
 
 
 class TestEveryChangeIsKnown:
@@ -181,3 +181,60 @@ class TestEveryChangeIsKnown:
         limits = gate.state_of(client).limits
         with pytest.raises(KeyError):
             limits.check_command("open_shutter", {})
+
+
+class TestTheLargestStep:
+    """A move is limited by how far it goes, as well as by where it ends (simulator, 2026-10-30:
+    z-wide went from -7200 to +1000 um in one step, because the target was inside the limits)."""
+
+    @pytest.fixture
+    def stepped(self):
+        client = object()
+        payload = merged_limits_payload(dict(DEFAULT_STAGE_UM))
+        gate.install(client, gate.GateState(
+            limits=limit_rules.LeicaLimits(payload, source="test", path=None, is_fallback=False),
+            stage_cfg=None, error=None))
+        limit_rules.set_stage_limits(
+            x_min=1000.0, x_max=130000.0, y_min=1000.0, y_max=100000.0,
+            z_galvo_min=-250.0, z_galvo_max=250.0, z_wide_min=0.0, z_wide_max=8000.0,
+        )
+        yield client
+        gate.uninstall(client)
+
+    def test_the_defaults_limit_each_z_step_and_leave_x_and_y_to_the_stage_area(self):
+        payload = merged_limits_payload(dict(DEFAULT_STAGE_UM))
+        assert payload["step_z_galvo_um"] == {"range": [0.0, 50.0]}
+        assert payload["step_z_wide_um"] == {"range": [0.0, 100.0]}
+        assert payload["step_x_um"] == {"range": [0.0, 130000.0]}
+
+    def test_a_z_step_larger_than_the_largest_is_refused_with_its_target_inside_the_limits(self, stepped):
+        refusal = gate.check_refusal(stepped, "move_z", {"z_wide_um": 1000.0, "from_z_wide_um": 0.0})
+        assert refusal is not None and "step_z_wide_um" in refusal
+        assert gate.check_refusal(stepped, "move_z", {"z_wide_um": 1000.0, "from_z_wide_um": 950.0}) is None
+
+    def test_a_move_whose_start_is_not_known_is_refused_where_a_step_is_limited(self, stepped):
+        refusal = gate.check_refusal(stepped, "move_z", {"z_wide_um": 1000.0})
+        assert refusal is not None and "from" in refusal
+
+    def test_a_tile_scan_is_checked_from_where_the_stage_stands_and_from_field_to_field(self, stepped):
+        values = {"positions_um": [(63500.0, 41500.0, 0.0), (64800.0, 41500.0, 0.0)],
+                  "from_x_um": 63500.0, "from_y_um": 41500.0, "from_z_galvo_um": 0.0}
+        assert gate.check_refusal(stepped, "tile_scan", values) is None
+        values["positions_um"] = [(63500.0, 41500.0, 0.0), (64800.0, 41500.0, 80.0)]
+        refusal = gate.check_refusal(stepped, "tile_scan", values)
+        assert refusal is not None and "step_z_galvo_um" in refusal
+
+    def test_an_empty_entry_leaves_the_step_unlimited(self, client):
+        assert gate.check_refusal(client, "move_z", {"z_wide_um": 5000.0}) is None
+
+    def test_a_limits_file_saved_before_the_steps_existed_still_counts_with_the_default_steps(self, tmp_path):
+        older = merged_limits_payload(dict(DEFAULT_STAGE_UM))
+        for key in limit_rules.STEP_LIMIT_KEYS:
+            older.pop(key)
+        path = tmp_path / "limits.json"
+        path.write_text(json.dumps(older), encoding="utf-8")
+
+        loaded = limits_config.load(path)
+
+        assert loaded["policy"]["step_z_wide_um"] == {"range": [0.0, 100.0]}
+        assert loaded["stage_um"]["x"] == [1000.0, 130000.0]

@@ -77,6 +77,7 @@ def permissive_function_limits(**set_xyz_constraints) -> object:
     payload = _limits_config.build_limits_payload(
         {"x": [-1e12, 1e12], "y": [-1e12, 1e12], "z_galvo": [-1e12, 1e12], "z_wide": [-1e12, 1e12]}
     )
+    payload.update({key: [] for key in limit_rules.STEP_LIMIT_KEYS})
     for param, bounds in set_xyz_constraints.items():
         payload[param] = {"range": [bounds["min"], bounds["max"]]}
     return limit_rules.LeicaLimits(payload, source="test", path=None, is_fallback=False)

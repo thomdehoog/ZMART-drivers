@@ -295,6 +295,7 @@ class LeicaLimits:
             for param in ("x_um", "y_um", "z_galvo_um", "z_wide_um"):
                 if param in place:
                     self._check_one(param, self._policy[param], place[param])
+        for place in places:
             # The stage envelope and the physical backstop, after the file's
             # limits: even a hand-widened envelope cannot pass the travel.
             try:
@@ -305,6 +306,24 @@ class LeicaLimits:
                         check_z(place[param], z_mode)
             except RuntimeError as exc:
                 raise LimitViolation(str(exc)) from exc
+        # Then how far each move goes: a second guard, against an unexpected jump.
+        self._check_steps(values, places)
+
+    def _check_steps(self, values: Mapping[str, Any], places: list) -> None:
+        """Each step against its largest: from where the drive stands (``from_<axis>``) to the first place, then place to place."""
+        steps = {param: self._policy.get(f"step_{param}") for param in ("x_um", "y_um", "z_galvo_um", "z_wide_um")}
+        here = {param: values[f"from_{param}"] for param in steps if f"from_{param}" in values}
+        for place in places:
+            for param, spec in steps.items():
+                if spec is None or param not in place:
+                    continue
+                if param not in here:
+                    raise LimitViolation(
+                        f"step_{param}: where the drive stands (from_{param}) is not known, so the "
+                        f"step cannot be checked ({self._origin()})"
+                    )
+                self._check_one(f"step_{param}", spec, abs(float(place[param]) - float(here[param])))
+            here.update({param: place[param] for param in steps if param in place})
 
     def status(self) -> LimitsStatus:
         return LimitsStatus(
@@ -315,6 +334,15 @@ class LeicaLimits:
 
     def describe(self) -> dict:
         return self.status().describe()
+
+
+# The largest step of each axis, in micrometres: how far one move may go from
+# where the drive stands, beside where it ends. Each key appears in limits.json
+# as ``[]`` (no step limit) or ``{"range": [0, largest]}``. It guards against
+# an unexpected jump only; it does not keep the objective off the sample, which
+# is the z range's work (simulator, 2026-10-30: z-wide went from -7200 to
+# +1000 um in one step because only the target was checked).
+STEP_LIMIT_KEYS = ("step_x_um", "step_y_um", "step_z_galvo_um", "step_z_wide_um")
 
 
 # =============================================================================

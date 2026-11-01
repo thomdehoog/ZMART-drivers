@@ -260,12 +260,13 @@ def within_xy(x_um, y_um, tolerance):
     return check
 
 
-def move_xy(x_um: float, y_um: float, *, tolerance=None) -> Write:
+def move_xy(x_um: float, y_um: float, *, tolerance=None, start: dict | None = None) -> Write:
     """Move the stage to (*x_um*, *y_um*), in micrometres of the stage's own coordinates.
 
     Sent once the scanner is idle, and read back until the stage is within
     *tolerance* (``XY_TOLERANCE_UM`` when None); an unconfirmed move is sent
-    again, it is the same move.
+    again, it is the same move. *start* (``from_x_um``, ``from_y_um``: where
+    the stage stands) goes to the limits with the target, for the step.
     """
     tolerance = XY_TOLERANCE_UM if tolerance is None else tolerance
 
@@ -274,7 +275,7 @@ def move_xy(x_um: float, y_um: float, *, tolerance=None) -> Write:
 
     return Write(
         command="move_xy",
-        values={"x_um": x_um, "y_um": y_um},
+        values={"x_um": x_um, "y_um": y_um, **(start or {})},
         request="SetStagePositionInHwOnly",
         fill=fill,
         description=f"MoveXY -> ({x_um:g}, {y_um:g}) um",
@@ -303,7 +304,7 @@ def z_within(target_um, tolerance):
     return check
 
 
-def move_z(drive: str, target_um: float, *, tolerance=None, now=None) -> Write:
+def move_z(drive: str, target_um: float, *, tolerance=None, now=None, start: dict | None = None) -> Write:
     """Move the z drive *drive* (``"z-galvo"`` or ``"z-wide"``) to *target_um*.
 
     LAS X's plain Navigator took a z move as a step from where the drive
@@ -311,7 +312,8 @@ def move_z(drive: str, target_um: float, *, tolerance=None, now=None) -> Write:
     element is built just before every send from the drive's position then
     (*now*, a function answering it in micrometres; the direct reader when
     None). Read back until the drive is within *tolerance*
-    (``Z_TOLERANCE_UM`` when None).
+    (``Z_TOLERANCE_UM`` when None). *start* (``from_z_galvo_um`` or
+    ``from_z_wide_um``) goes to the limits with the target, for the step.
     """
     if drive not in Z_DRIVES:
         raise ValueError(f"no z drive {drive!r}; the drives are {sorted(Z_DRIVES)}")
@@ -324,7 +326,7 @@ def move_z(drive: str, target_um: float, *, tolerance=None, now=None) -> Write:
     axis = "z_galvo_um" if drive == "z-galvo" else "z_wide_um"
     return Write(
         command="move_z",
-        values={axis: target_um},
+        values={axis: target_um, **(start or {})},
         request="SetZPosition",
         fill=fill,
         description=f"Z -> {target_um:g} um ({drive})",
@@ -466,7 +468,9 @@ def tile_scan_elements(
     ]
 
 
-def tile_scan(positions_um: list[tuple[float, float, float]], project: int, *, tile_z_um: float | None = None) -> Write:
+def tile_scan(
+    positions_um: list[tuple[float, float, float]], project: int, *, tile_z_um: float | None = None, start: dict | None = None
+) -> Write:
     """Take a tile scan over *positions_um* (x, y, z-galvo in micrometres) into the LAS X project *project*.
 
     Every position is shown to the limits first, with its z-galvo. With
@@ -482,7 +486,7 @@ def tile_scan(positions_um: list[tuple[float, float, float]], project: int, *, t
 
     return Write(
         command="tile_scan",
-        values={"positions_um": positions, "project": project},
+        values={"positions_um": positions, "project": project, **(start or {})},
         request="StartAcquiring",
         fill=fill,
         description=f"Tile scan over {len(positions)} positions into project {project}",
@@ -503,7 +507,9 @@ def after_tile_scan_elements(x_um: float, y_um: float, z_um: float) -> list[str]
     ]
 
 
-def after_tile_scan(x_um: float, y_um: float, z_um: float, *, tolerance=None, tile_z_um: float | None = None) -> Write:
+def after_tile_scan(
+    x_um: float, y_um: float, z_um: float, *, tolerance=None, tile_z_um: float | None = None, start: dict | None = None
+) -> Write:
     """Put back what a tile scan changed, and the stage to (*x_um*, *y_um*, *z_um*).
 
     *z_um* is z-galvo, shown to the limits; with *tile_z_um* the element
@@ -519,7 +525,7 @@ def after_tile_scan(x_um: float, y_um: float, z_um: float, *, tolerance=None, ti
 
     return Write(
         command="after_tile_scan",
-        values={"x_um": x_um, "y_um": y_um, "z_galvo_um": z_um},
+        values={"x_um": x_um, "y_um": y_um, "z_galvo_um": z_um, **(start or {})},
         request="StageMoveToCoordinates",
         fill=fill,
         description=f"After the tile scan: the stage back to ({x_um:g}, {y_um:g}) um, scan mode xyz",

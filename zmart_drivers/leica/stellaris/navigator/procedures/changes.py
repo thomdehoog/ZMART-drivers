@@ -61,14 +61,22 @@ def move_xy(client, x_um, y_um, *, max_retries=None, tolerance=None):
     read-back: ``confirmed`` says whether the stage was seen there. It is
     None when nothing was sent.
     """
+    here = readers.get_xy(client)
+    if not here:
+        return dispatch.refused(
+            "where the stage stands could not be read, so the step of the move cannot be checked", position=None
+        )
     try:
-        change = writes.move_xy(float(x_um), float(y_um), tolerance=tolerance)
+        change = writes.move_xy(
+            float(x_um), float(y_um), tolerance=tolerance,
+            start={"from_x_um": here["x_um"], "from_y_um": here["y_um"]},
+        )
     except (TypeError, ValueError) as why:
         return dispatch.refused(f"a stage move takes two numbers: {why}", position=None)
     result = run(client, change, max_retries=max_retries)
     sent = result["timing"].get("attempts", 0) > 0
     result["position"] = (
-        {"x": change.values["x_um"] * 1e-6, "y": change.values["y_um"] * 1e-6, **change.values}
+        {"x": change.values["x_um"] * 1e-6, "y": change.values["y_um"] * 1e-6, "x_um": change.values["x_um"], "y_um": change.values["y_um"]}
         if sent
         else None
     )
@@ -81,8 +89,12 @@ def move_z(client, drive, z_um, *, max_retries=None, tolerance=None):
     LAS X's plain Navigator moves z by a step, so the step is worked out
     from where the drive stands just before every send (``writes.move_z``).
     """
+    axis = {"z-galvo": "z_galvo_um", "z-wide": "z_wide_um"}.get(drive)
+    now = readers.read_z_um(client, drive) if axis else None
+    if axis and now is None:
+        return dispatch.refused(f"where {drive} stands could not be read, so the step of the move cannot be checked")
     try:
-        change = writes.move_z(drive, float(z_um), tolerance=tolerance)
+        change = writes.move_z(drive, float(z_um), tolerance=tolerance, start={f"from_{axis}": now} if axis else None)
     except (TypeError, ValueError) as why:
         return dispatch.refused(str(why))
     return run(client, change, max_retries=max_retries)
@@ -260,8 +272,14 @@ def tile_scan(client, positions_um, project=None, **watching) -> dict:
     """
     try:
         tile_z = tile_z_um(client, positions_um)
+        here, galvo = readers.get_xy(client), readers.read_z_um(client, "z-galvo")
+        if not here or galvo is None:
+            raise RuntimeError("where the stage and z-galvo stand could not be read, so the steps cannot be checked")
         into = project if project is not None else data_container.experiment_for_capture()
-        change = writes.tile_scan(positions_um, into, tile_z_um=tile_z)
+        change = writes.tile_scan(
+            positions_um, into, tile_z_um=tile_z,
+            start={"from_x_um": here["x_um"], "from_y_um": here["y_um"], "from_z_galvo_um": galvo},
+        )
     except (RuntimeError, ValueError, TypeError) as why:
         return dispatch.refused(f"the tile scan cannot be made: {why}", logged=True)
     result = picture(client, change, **watching)
@@ -269,14 +287,16 @@ def tile_scan(client, positions_um, project=None, **watching) -> dict:
     return result
 
 
-def after_tile_scan(client, x_um, y_um, z_um, *, max_retries=None, tile_z_um=None) -> dict:
+def after_tile_scan(client, x_um, y_um, z_um, *, max_retries=None, tile_z_um=None, last=None) -> dict:
     """Put back what a tile scan changed: the stage to (*x_um*, *y_um*, *z_um*), scan mode xyz, autofocus on.
 
-    *tile_z_um* is the z the tile scan sent its tiles with, sent again here.
+    *tile_z_um* is the z the tile scan sent its tiles with, sent again here;
+    *last* is the last field ``(x, y, z-galvo)``, where the stage stands, for the step.
     """
+    start = None if last is None else {"from_x_um": last[0], "from_y_um": last[1], "from_z_galvo_um": last[2]}
     return run(
         client,
-        writes.after_tile_scan(float(x_um), float(y_um), float(z_um), tile_z_um=tile_z_um),
+        writes.after_tile_scan(float(x_um), float(y_um), float(z_um), tile_z_um=tile_z_um, start=start),
         max_retries=max_retries,
     )
 
@@ -306,7 +326,7 @@ def take_tile_scan(client: Any, positions_um, project=None, **watching) -> Acqui
     result = tile_scan(client, positions, project, **watching)
     finished_at = time.time()
     if result.get("timing", {}).get("attempts", 0) > 0:
-        result["put_back"] = after_tile_scan(client, *positions[0], tile_z_um=result.get("tile_z_um"))
+        result["put_back"] = after_tile_scan(client, *positions[0], tile_z_um=result.get("tile_z_um"), last=positions[-1])
     if not result.get("success"):
         put_back = result.get("put_back")
         undone = "" if put_back is None else f"; put back: {put_back.get('message')}"
