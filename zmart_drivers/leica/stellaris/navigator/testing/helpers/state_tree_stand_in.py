@@ -287,6 +287,7 @@ class StandInNodes:
         self.live = dict(
             SIMULATOR_SETTINGS
         )  # path -> value (or a function giving it), the current setting's nodes
+        self.settings = [{"SettingID": 3, "Name": "Setting 1", "IsEnabledForScanning": True}]  # Acquire/ATL/CurrentBlock/SettingInfo
         self.objectives = [
             dict(o, MotCorrRefPos=-1.0) for o in SIMULATOR_OBJECTIVES
         ]  # Microscope/ObjectiveList, by slot
@@ -413,6 +414,16 @@ class StandInNodes:
         graft(child(1, "Acquire"), "LUT", {"LUT_Entry": self.luts})
         graft(confocal, "SpectralDetection", self.detection)
         graft(child(confocal, "HWParameter"), "FilterWheelList", self.filter_wheels)
+        current = self.live[("Acquire", "ATL", "CurrentSetting", "SettingID")]
+        graft(child(child(child(1, "Acquire"), "ATL"), "CurrentBlock"), "SettingInfo", [
+            {
+                "SettingID": each["SettingID"],
+                "Name": self.live[("Acquire", "ATL", "CurrentSetting", "Name")] if each["SettingID"] == current else each["Name"],
+                "IsEnabledForScanning": self.live[("Acquire", "ATL", "CurrentSetting", "IsEnabledForScanning")]
+                if each["SettingID"] == current else each["IsEnabledForScanning"],
+            }
+            for each in self.settings
+        ])
         objective_list = child(child(1, "Microscope"), "ObjectiveList")
         for objective in self.objectives:
             info = next(fresh)

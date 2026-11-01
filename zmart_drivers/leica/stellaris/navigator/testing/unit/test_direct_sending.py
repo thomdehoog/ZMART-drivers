@@ -183,6 +183,7 @@ class TestADialogInTheWay:
         ('<StateTree Command="PinholeMax" Value="0.002"/>', "PinholeMax"),
         ('<StateTree Command="StackCalculationMode" Value="0"/>', "0"),
         ('<StateTree Command="MotCorrRefPos" Value="-0.5"/>', "-0.5"),
+        ('<StateTree Command="SequentialMode" Value="3"/>', "3"),
         ('<StateTree Command="Name" Value="a&lt;b"/>', "a&lt;b"),
         ('<StateTree Command="MotCorrRefPos" Value="101"/>', "101"),
         ('<StateTree Command="Resolution" Value="twelve"/>', "twelve"),

@@ -112,7 +112,7 @@ def change(client, name: str, value, *, max_retries=None, tolerance=None) -> dic
     scan_speed, ...) or a setting with a write of its own
     (``writes.NAMED_SETTINGS``: scan_mode, autofocus, format, resonant_scanner,
     bidirectional, phase_x, pinhole_um, pinhole_unit, emission_wavelength, bit_depth,
-    system_optimized_step, collar, smartcorr_range, setting_name). A wrong name or a
+    system_optimized_step, collar, smartcorr_range, setting_name, sequential_mode). A wrong name or a
     value of the wrong kind raises ``ValueError``. The limits gate is
     shown the new value first, and nothing is sent if it refuses.
     *tolerance* overrides how close a number's read-back must come.
@@ -378,6 +378,31 @@ def smartcorr(client, project=None, **watching) -> dict:
     if result["success"]:
         result["collar"] = readers.get_collar(client)
     return result
+
+
+def add_setting(client, copy=False, *, max_retries=None) -> dict:
+    """Add a setting to the current job, new or a copy of the current one, as the window's "Add new Setting" does; read back.
+
+    LCS makes the new setting the current one. With more than one setting,
+    the changes through a saved setting (``set_detector`` and the like) are
+    refused, because which setting is meant cannot be told.
+    """
+    try:
+        change = writes.add_setting(copy, len(readers.get_setting(client)["all"]))
+    except ValueError as why:
+        return dispatch.refused(str(why))
+    return run(client, change, max_retries=max_retries)
+
+
+def delete_setting(client, name, *, max_retries=None) -> dict:
+    """Delete the setting called *name* from the current job; read back. The last setting is never deleted."""
+    listed = readers.get_setting(client)["all"]
+    chosen = [s for s in listed if s["name"] == name]
+    if not chosen:
+        return dispatch.refused(f"no setting {name!r}; the settings are {[s['name'] for s in listed]}")
+    if len(listed) == 1:
+        return dispatch.refused(f"{name!r} is the job's only setting; it is not deleted")
+    return run(client, writes.delete_setting(chosen[0]["id"]), max_retries=max_retries)
 
 
 def enable_setting(client, on, *, max_retries=None) -> dict:

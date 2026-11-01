@@ -119,6 +119,11 @@ def get_collar(client, **keywords):
     return _routed("collar", client, **keywords)
 
 
+def get_sequential_mode(client, **keywords):
+    """How several settings are taken in turn: ``"line"``, ``"frame"`` or ``"stack"``."""
+    return _routed("sequential_mode", client, **keywords)
+
+
 def get_setting(client, **keywords):
     """The current setting: ``id``, ``name`` and ``enabled``."""
     return _routed("setting", client, **keywords)

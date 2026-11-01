@@ -324,6 +324,26 @@ class PlainNavigator:
             unit["WaveLengthBegin"], unit["WaveLengthEnd"] = float(band.get("LeftWorld")), float(band.get("RightWorld"))
         return "<Result/>"
 
+    def take_ATL_Setting_Create(self, e):
+        """A new setting after the others, made the current one, as LCS did on the simulator."""
+        current = ("Acquire", "ATL", "CurrentSetting")
+        for each in self.nodes.settings:
+            if each["SettingID"] == self.live[(*current, "SettingID")]:
+                each["Name"], each["IsEnabledForScanning"] = self.live[(*current, "Name")], self.live[(*current, "IsEnabledForScanning")]
+        new = {"SettingID": 110 + len(self.nodes.settings), "Name": f"Setting {len(self.nodes.settings) + 1}", "IsEnabledForScanning": True}
+        self.nodes.settings.append(new)
+        self.live[(*current, "SettingID")], self.live[(*current, "Name")] = new["SettingID"], new["Name"]
+        self.live[(*current, "IsEnabledForScanning")] = True
+        return '<Result Error="0"/>'
+
+    def take_ATL_Setting_Delete(self, e):
+        """The setting deleted; the first one becomes the current one."""
+        self.nodes.settings = [s for s in self.nodes.settings if s["SettingID"] != int(e.get("SettingID"))]
+        first, current = self.nodes.settings[0], ("Acquire", "ATL", "CurrentSetting")
+        self.live[(*current, "SettingID")], self.live[(*current, "Name")] = first["SettingID"], first["Name"]
+        self.live[(*current, "IsEnabledForScanning")] = first["IsEnabledForScanning"]
+        return "<Result/>"
+
     def take_ATL_Setting_EnableDisableForScanning(self, e):
         if int(e.get("SettingID")) == self.live[("Acquire", "ATL", "CurrentSetting", "SettingID")]:
             self.live[("Acquire", "ATL", "CurrentSetting", "IsEnabledForScanning")] = e.get("EnableForScanning") == "1"

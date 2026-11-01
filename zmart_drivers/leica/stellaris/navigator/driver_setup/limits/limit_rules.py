@@ -224,6 +224,7 @@ SETTER_LIMIT_KEYS = (
     "set_collar",
     "set_smartcorr_range",
     "set_collar_reference",
+    "set_sequential_mode",
 )
 
 
@@ -423,6 +424,8 @@ MUTATING_COMMANDS = {
     # the setting switched on or off for scanning, and its name
     "set_setting_enabled": "set_setting_enabled",
     "set_setting_name": "set_setting_name",
+    "add_setting": "add_setting",
+    "delete_setting": "delete_setting",
     # a detector and its line kept from LAS X's Dye Assistant
     "lock_detector": "lock_detector",
 }

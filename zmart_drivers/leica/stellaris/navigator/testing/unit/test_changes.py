@@ -637,3 +637,31 @@ class TestTheDetectorLock:
 
         assert result["success"] is False and "in use" in result["message"]
         assert lasx.commands() == []
+
+
+
+class TestSettingsAddedAndDeleted:
+    def test_a_setting_is_added_becomes_the_current_one_and_is_deleted_again(self, lasx, client):
+        result = changes.add_setting(client)
+        assert result["confirmed"] is True
+        shown = direct_reader.get_setting()
+        assert [s["name"] for s in shown["all"]] == ["Setting 1", "Setting 2"] and shown["name"] == "Setting 2"
+
+        assert changes.delete_setting(client, "Setting 2")["confirmed"] is True
+        shown = direct_reader.get_setting()
+        assert [s["name"] for s in shown["all"]] == ["Setting 1"] and shown["name"] == "Setting 1"
+
+    def test_the_last_setting_and_an_unknown_one_are_not_deleted(self, lasx, client):
+        assert changes.delete_setting(client, "Setting 1")["success"] is False
+        assert changes.delete_setting(client, "Setting 9")["success"] is False
+        assert lasx.commands() == []
+
+
+
+class TestSequentialMode:
+    def test_the_mode_is_written_into_the_state_tree_and_read_back(self, lasx, client):
+        assert changes.change(client, "sequential_mode", "frame")["confirmed"] is True
+        assert lasx.live[(*SCANNING, "SequentialMode")] == 1
+        assert changes.change(client, "sequential_mode", "line")["confirmed"] is True
+        assert lasx.live[(*SCANNING, "SequentialMode")] == 0
+        assert lasx.commands() == []

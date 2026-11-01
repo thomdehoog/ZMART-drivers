@@ -79,6 +79,7 @@ READS = (
     "collar",
     "smartcorr",
     "setting",
+    "sequential_mode",
     "laser_lines",
     "scan_field_rotation",
     "sequential_mode",
@@ -648,13 +649,36 @@ def get_collar() -> dict:
     return read("the collar", reading)
 
 
+#: The sequential mode, by LCS's code: settings taken in turn between lines, frames or stacks.
+SEQUENTIAL_MODES = {0: "line", 1: "frame", 2: "stack"}
+
+
+def get_sequential_mode() -> str:
+    """How several settings are taken in turn: ``"line"``, ``"frame"`` or ``"stack"`` (``ScanningParameter/SequentialMode``)."""
+    code = settings("the sequential mode", {"m": (*SCANNING, "SequentialMode")})["m"]
+    if code not in SEQUENTIAL_MODES:
+        raise HardwareServerUnavailable(f"the state tree answered SequentialMode = {code!r}")
+    return SEQUENTIAL_MODES[code]
+
+
 def get_setting() -> dict:
-    """The current setting: its ``id``, its ``name`` and whether it is ``enabled`` for scanning (the window's checkbox)."""
-    found = settings(
-        "the setting",
-        {key: ("Acquire", "ATL", "CurrentSetting", node) for key, node in (("id", "SettingID"), ("name", "Name"), ("enabled", "IsEnabledForScanning"))},
-    )
-    return {"id": found["id"], "name": found["name"], "enabled": bool(found["enabled"])}
+    """The current setting: its ``id``, its ``name``, whether it is ``enabled`` for scanning (the window's checkbox),
+    and ``all``, every setting of the current job in order, each with its ``id``, ``name`` and ``enabled``.
+
+    A deleted setting's entry stays in the state tree with no values; it is left out.
+    """
+    fields = (("id", "SettingID"), ("name", "Name"), ("enabled", "IsEnabledForScanning"))
+
+    def reading(nodes):
+        current = {key: node_value(nodes, node_at(nodes, ("Acquire", "ATL", "CurrentSetting", node))) for key, node in fields}
+        listed = []
+        for info in of_name(nodes, children(nodes, node_at(nodes, ("Acquire", "ATL", "CurrentBlock"))), "SettingInfo"):
+            each = {key: node_value(nodes, named(nodes, info, node)) for key, node in fields}
+            if each["id"] is not None:
+                listed.append({"id": each["id"], "name": each["name"], "enabled": bool(each["enabled"])})
+        return {"id": current["id"], "name": current["name"], "enabled": bool(current["enabled"]), "all": listed}
+
+    return read("the setting", reading)
 
 
 def get_smartcorr() -> dict:

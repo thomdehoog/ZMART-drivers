@@ -116,6 +116,7 @@ def current_settings(handle) -> dict:
             ("collar", _readers.get_collar),
             ("smartcorr", _readers.get_smartcorr),
             ("setting", _readers.get_setting),
+            ("sequential_mode", _readers.get_sequential_mode),
             ("fov_m", _readers.get_fov),
             ("bit_depth", _readers.get_bit_depth),
         )

@@ -112,6 +112,8 @@ mic.connect("stellaris-navigator")                                              
 | `dye(name)` | One dye of the library: its full name, its excitation, emission and multiphoton peaks, and its spectra as `(nm, intensity)` pairs. Its `setting_name` is what `set_detector(..., dye=...)` takes. |
 | `set_excitation_line(line)` | Choose the excitation line, the wavelength of a line that is on, or `"auto"`; read back. With one detector on, because LAS X keeps one line per setting. |
 | `show_spectra(excitation=None, emission=None)` | Show or hide the dyes' excitation and emission spectra in LAS X's setting panel; read back. |
+| `add_setting(copy=False)` | Add a setting to the current job, new or a copy of the current one, as the window's "Add new Setting" does; LAS X makes it the current setting. With more than one setting, the changes through a saved setting (`set_detector` and the like) are refused, because which setting is meant cannot be told. |
+| `delete_setting(name)` | Delete a setting by its name; the job's last setting is never deleted. |
 | `enable_setting(on)` | Switch the current setting on or off for scanning, as the window's checkbox does, and read it back. Off, LAS X takes no picture with it. |
 | `lock_detector(name, locked=True)` | Keep a detector in use and its setting's excitation line from LAS X's Dye Assistant, or free them, as the window's detector lock does; read back. |
 | `lock_channel_colour(locked=True)` | Lock or free the colour of the channel LAS X's detector panel shows, as the window's colour lock does. The lock sends LAS X's hardware server nothing, so the driver presses it in LAS X's window and reads it back from there; it holds the window, not `set_channel_colour`. |
@@ -161,6 +163,7 @@ confirmed, with what LAS X set instead.
 | `format` | `(x, y)` pixels, such as `(512, 512)` | exact |
 | `resonant_scanner` | `True` or `False` | exact |
 | `collar` | the objective's correction collar (motCORR), 0 to 100 %, as the window's box sends it | 0.1 % |
+| `sequential_mode` | `"line"`, `"frame"` or `"stack"`: how several settings are taken in turn, as the window's three buttons; written into LAS X's state tree, as the window does; LAS X rearranges the detectors' channels itself | exact |
 | `setting_name` | the current setting's name, 1 to 64 letters, digits, spaces or `_ - . , ( ) / + #`; written into LAS X's state tree, as the window does when the name is edited | exact |
 | `smartcorr_range` | `(begin, end, steps)`: the collar positions SmartCORR scans through, 0 to 100 %, and how many (2 to 100); written into LAS X's state tree, as its window does | exact |
 | `bidirectional` | `True` or `False`; written into LAS X's state tree, as its window does | exact |

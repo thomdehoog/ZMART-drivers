@@ -188,6 +188,8 @@ ALLOWED_COMMANDS = frozenset(
         "SetMotCorrPosition",
         "StartMotCorrAutomation",
         "ATL_Setting_EnableDisableForScanning",
+        "ATL_Setting_Create",
+        "ATL_Setting_Delete",
         "BlockLightSinkDetectorForDyeAssistant",
         "BlockLightSourceLineForDyeAssistant",
     }
@@ -247,6 +249,10 @@ STATE_TREE_WRITES = {
     # The z-stack's step mode: 2 is System Optimized, where LCS takes its own
     # optimal step (and may stretch the end to fit whole steps), 1 keeps the
     # step size. 0, the number of steps, is not written.
+    # The sequential mode: settings taken in turn between lines (0), frames
+    # (1) or stacks (2). The window writes it here, and LCS rearranges the
+    # detectors' channels itself, as for the window (simulator, 2026-11-01).
+    "SequentialMode": TreeWrite(("Confocal", "ScanningParameter", "SequentialMode"), choices=frozenset({0, 1, 2})),
     "StackCalculationMode": TreeWrite(("Acquire", "AcquireZStackInfo", "StackCalculationMode"), choices=frozenset({1, 2})),
     # SmartCORR's range: the collar positions it scans through, in percent,
     # and how many. The window writes them here (simulator, 2026-11-01); LCS

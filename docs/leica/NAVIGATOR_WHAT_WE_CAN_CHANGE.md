@@ -36,6 +36,8 @@ discovery session in `SCOPE_RUN_2026-11-01_NAVIGATOR_DISCOVERY.md` and the build
 | SmartCORR range (Begin, End, Steps) | Works: written into LAS X's state tree |
 | SmartCORR (automatic collar scan) | Works, with LAS X's command |
 | Collar reference stored or cleared (Set, Reset) | Works: written into LAS X's state tree, for the objective in the light path only |
+| Setting added (new, or a copy of the current one) | Works, with LAS X's command |
+| Setting deleted | Works, with LAS X's command; the last one never |
 | Setting switched on or off for scanning | Works, with LAS X's command |
 | Setting's name | Works: written into LAS X's state tree |
 | Detector lock (kept from the Dye Assistant) | Works, with LAS X's commands |
@@ -66,7 +68,7 @@ discovery session in `SCOPE_RUN_2026-11-01_NAVIGATOR_DISCOVERY.md` and the build
 | Optimize XY Format (LAS X's optimal format) | Works |
 | Scan mode (xyz, xyt, ...) | Works |
 | Resonant scanner on or off | Works |
-| Sequential mode | Tried; not built, because it also rearranges which detectors and shutters are on |
+| Sequential mode (between lines, frames or stacks) | Works: written into LAS X's state tree; LAS X rearranges the detectors' channels itself, as for its window |
 | Scan direction (uni- or bidirectional) | Works: written into LAS X's state tree |
 | Phase X | Works: written into LAS X's state tree, within LAS X's own range |
 | Pan | Works: read in micrometres, moved by a distance in micrometres (the window's pan arrows pressed by the ZMART Driver), and set back to the centre (through the smallest zoom) |
@@ -155,7 +157,7 @@ service and the person responsible for the instrument.
 
 | State | Settings |
 |---|---|
-| Works | 61 (the objective among them, not yet tried) |
-| Tried | 1 |
+| Works | 64 (the objective among them, not yet tried) |
+| Tried | 0 |
 | Command known | 0 |
 | Not yet learned | 6 |

@@ -493,6 +493,70 @@ def collar_reference(percent) -> Write:
     )
 
 
+def sequential_mode(mode: str) -> Write:
+    """How several settings are taken in turn: ``"line"``, ``"frame"`` or ``"stack"``, as the window's three buttons; read back.
+
+    Written into LCS's state tree, as the window does; LCS rearranges the
+    detectors' channels itself (simulator, 2026-11-01).
+    """
+    codes = {name: code for code, name in direct_reader.SEQUENTIAL_MODES.items()}
+    if mode not in codes:
+        raise ValueError(f"sequential_mode takes {sorted(codes)}, not {mode!r}")
+
+    def fill(request: Request) -> None:
+        request.elements = [f'<StateTree Command="SequentialMode" Value="{codes[mode]}"/>']
+
+    return Write(
+        command="set_sequential_mode",
+        values={"value": mode},
+        request="SequentialMode",
+        fill=fill,
+        description=f"Sequential between {mode}s",
+        ready=idle(),
+        confirm=Expect("sequential_mode", lambda shown: shown == mode),
+    )
+
+
+def add_setting(copy: bool, now: int) -> Write:
+    """Add a setting to the current job, as the window's "Add new Setting" does: new, or a copy of the current one.
+
+    LCS makes it the current setting. Confirmed when the job holds one more
+    setting than the *now* it held.
+    """
+    if not isinstance(copy, bool):
+        raise ValueError(f"a setting is added new (False) or as a copy (True), not {copy!r}")
+
+    def fill(request: Request) -> None:
+        request.elements = [f'<ATL CloneSetting="{int(copy)}" Command="ATL_Setting_Create" Attribute="2"/>']
+
+    return Write(
+        command="add_setting",
+        values={"value": copy},
+        request="ATL_Setting_Create",
+        fill=fill,
+        description=f"Setting added{' as a copy' if copy else ''}",
+        ready=idle(),
+        confirm=Expect("setting", lambda shown: len(shown["all"]) == now + 1),
+    )
+
+
+def delete_setting(setting_id: int) -> Write:
+    """Delete the setting *setting_id* from the current job, as deleting it in the window does; confirmed when it is gone."""
+
+    def fill(request: Request) -> None:
+        request.elements = [f'<ATL SettingID="{int(setting_id)}" Command="ATL_Setting_Delete" Attribute="2"/>']
+
+    return Write(
+        command="delete_setting",
+        values={"value": int(setting_id)},
+        request="ATL_Setting_Delete",
+        fill=fill,
+        description=f"Setting {setting_id} deleted",
+        ready=idle(),
+        confirm=Expect("setting", lambda shown: all(s["id"] != setting_id for s in shown["all"])),
+    )
+
+
 def setting_enabled(setting_id: int, on: bool) -> Write:
     """Switch the current setting on or off for scanning, as the window's checkbox does; read back.
 
@@ -819,6 +883,7 @@ NAMED_SETTINGS = {
     "collar": collar,
     "smartcorr_range": smartcorr_range,
     "setting_name": setting_name,
+    "sequential_mode": sequential_mode,
 }
 
 

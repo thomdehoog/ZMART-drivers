@@ -391,11 +391,27 @@ def test_the_channel_colour_lock_is_pressed_in_las_x_s_window(scope, monkeypatch
 
 
 def test_the_setting_is_switched_renamed_and_read(scope, lasx):
-    assert scope.settings()["setting"] == {"id": 3, "name": "Setting 1", "enabled": True}
+    one = [{"id": 3, "name": "Setting 1", "enabled": True}]
+    assert scope.settings()["setting"] == {"id": 3, "name": "Setting 1", "enabled": True, "all": one}
     assert scope.enable_setting(False)["confirmed"] is True
     assert scope.change_setting("setting_name", "ZMART test")["confirmed"] is True
-    assert scope.settings()["setting"] == {"id": 3, "name": "ZMART test", "enabled": False}
+    shown = scope.settings()["setting"]
+    assert (shown["id"], shown["name"], shown["enabled"]) == (3, "ZMART test", False)
+    assert shown["all"] == [{"id": 3, "name": "ZMART test", "enabled": False}]
+
+
+def test_a_setting_is_added_and_deleted(scope, lasx):
+    assert scope.add_setting()["confirmed"] is True
+    assert len(scope.settings()["setting"]["all"]) == 2
+    assert scope.delete_setting("Setting 2")["confirmed"] is True
 
 
 def test_a_detector_is_locked_for_the_dye_assistant(scope, lasx):
     assert scope.lock_detector("HyD S 3", True)["confirmed"] is True
+
+
+
+def test_the_sequential_mode_is_changed_and_read(scope, lasx):
+    assert scope.settings()["sequential_mode"] == "line"
+    assert scope.change_setting("sequential_mode", "stack")["confirmed"] is True
+    assert scope.settings()["sequential_mode"] == "stack"

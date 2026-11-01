@@ -34,5 +34,6 @@
   "set_system_optimized_step": [],
   "set_collar": [],
   "set_smartcorr_range": [],
-  "set_collar_reference": []
+  "set_collar_reference": [],
+  "set_sequential_mode": []
 }

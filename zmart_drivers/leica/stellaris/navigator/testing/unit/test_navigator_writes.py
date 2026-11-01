@@ -508,3 +508,30 @@ class TestSettingAndLocks:
             '<BeamRoute Version="0"><BeamPosition BeamPositionLevel="0" BeamPosition="10"/>'
             '<BeamPosition BeamPositionLevel="1" BeamPosition="10"/></BeamRoute></Scanner>',
         ]
+
+
+
+class TestSettingsAddedAndDeleted:
+    def test_a_setting_is_added_new_or_as_a_copy_with_the_window_s_command(self):
+        assert elements(writes.add_setting(False, 1)) == ['<ATL CloneSetting="0" Command="ATL_Setting_Create" Attribute="2"/>']
+        write = writes.add_setting(True, 1)
+        assert elements(write) == ['<ATL CloneSetting="1" Command="ATL_Setting_Create" Attribute="2"/>']
+        assert write.confirm.accept({"all": [{}, {}]}) and not write.confirm.accept({"all": [{}]})
+
+    def test_a_setting_is_deleted_by_its_id(self):
+        write = writes.delete_setting(113)
+        assert elements(write) == ['<ATL SettingID="113" Command="ATL_Setting_Delete" Attribute="2"/>']
+        assert write.confirm.accept({"all": [{"id": 3}]}) and not write.confirm.accept({"all": [{"id": 3}, {"id": 113}]})
+
+
+
+class TestSequentialMode:
+    @pytest.mark.parametrize(("mode", "code"), [("line", 0), ("frame", 1), ("stack", 2)])
+    def test_each_mode_is_its_code_in_the_state_tree_and_read_back(self, mode, code):
+        write = writes.named_setting("sequential_mode", mode)
+        assert elements(write) == [f'<StateTree Command="SequentialMode" Value="{code}"/>']
+        assert write.confirm.accept(mode) and not write.confirm.accept("other")
+
+    def test_another_mode_is_refused(self):
+        with pytest.raises(ValueError, match="column"):
+            writes.named_setting("sequential_mode", "column")

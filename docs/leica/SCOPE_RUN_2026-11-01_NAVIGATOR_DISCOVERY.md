@@ -511,3 +511,30 @@ locked)`, with the line the setting excites at, among the lines that are on;
 the detector lock on and off, the colour lock on and off, each confirmed; the Trans PMT on and off,
 each confirmed, with nothing else changed.
 
+## 28. Settings added and deleted
+
+| Control | What LCS was sent | What changed |
+|---|---|---|
+| Add new Setting (`AddSettingButton`) | `<ATL CloneSetting="0" Command="ATL_Setting_Create" Attribute="2"/>`, answered `Error="0"` | "Setting 2" (id 113) in `CurrentBlock/SettingInfo`, and made the current setting |
+| Delete active element (`DeleteActiveElementButton`), with Setting 2 current | `SetDetectorActive SetActive="0"` for HyD S 3 (40;3) | the button deletes the active *element*, here the detector selected in Setting 2, not the setting |
+| Setting 2 deleted by hand | `<ATL SettingID="113" Command="ATL_Setting_Delete" Attribute="2"/>` | Setting 2 gone; Setting 1 current again. Its `SettingInfo` entry stays, with no values |
+
+Built: `add_setting(copy=False)` (`CloneSetting` 1 for a copy) and `delete_setting(name)`, refused for
+the job's last setting; `settings()["setting"]["all"]` lists every setting. With more than one
+setting, the changes through a saved setting stay refused. Through the driver: a new setting added
+(no detectors in use) and deleted; a copy added (HyD 2 and HyD S 3, as Setting 1) and deleted; the
+last setting's deletion refused. Back to Setting 1 alone.
+
+## 29. The sequential mode
+
+With two settings (a copy of Setting 1 added), each of the window's three buttons pressed once:
+LCS was sent no command; `Confocal/ScanningParameter/SequentialMode` went 0 to 1 (Between Frames),
+1 to 0 (Between Lines) and 0 to 2 (Between Stacks), and LCS rearranged the detectors' channels in
+both settings itself (`ChannelCount`, `IsEnabled`). That is what was seen in October and taken
+then for the driver's doing: it is LCS's own answer to the mode, the same for the window.
+
+Built: `change_setting("sequential_mode", "line" | "frame" | "stack")`, written into the state
+tree, codes 0 to 2 only, read back; `settings()["sequential_mode"]`. Through the driver: frame,
+stack and line, each confirmed, and LAS X's window showed Line pressed afterwards. Back to line,
+and Setting 2 deleted.
+

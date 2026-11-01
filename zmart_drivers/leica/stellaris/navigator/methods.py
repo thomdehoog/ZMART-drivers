@@ -267,7 +267,7 @@ class Microscope:
 
     def settings(self) -> dict:
         """What LAS X is set to now: ``zoom``, ``scan_speed``, ``scan_field_rotation``, ``averaging``, ``pinhole``, ``format``, ``scan_mode``, ``objective``, ``z_stack``, ``autofocus``,
-        ``bidirectional``, ``phase_x``, ``system_optimized_step``, ``collar``, ``smartcorr``, ``setting`` and ``bit_depth``."""
+        ``bidirectional``, ``phase_x``, ``system_optimized_step``, ``collar``, ``smartcorr``, ``setting``, ``sequential_mode`` and ``bit_depth``."""
         self.handle.require_open()
         found = acquire_step.current_settings(self.handle)
         return {name: found[name] for name in found if name != "fov_m"}
@@ -286,7 +286,8 @@ class Microscope:
         (8, 12 or 16), ``system_optimized_step`` (True or False) and ``collar``
         (the objective's correction collar, 0 to 100 percent) and ``smartcorr_range``
         (``(begin, end, steps)``, the collar positions SmartCORR scans through) and
-        ``setting_name`` (the current setting's name, plain text). The limits are asked
+        ``setting_name`` (the current setting's name, plain text) and ``sequential_mode``
+        (``"line"``, ``"frame"`` or ``"stack"``: how several settings are taken in turn). The limits are asked
         first. Answers the change's result, with ``confirmed`` True when the
         read-back showed the new value; a change that was never seen is
         recorded and does not raise.
@@ -366,6 +367,20 @@ class Microscope:
         self.handle.require_open()
         result = changes.set_channel_colour(self.handle.client, detector, colour)
         return checked(self.handle, result, f"set_channel_colour({detector!r}, {colour!r})")
+
+    def add_setting(self, copy: bool = False) -> dict:
+        """Add a setting to the current job, new or a copy of the current one, as the window's "Add new Setting" does.
+
+        LAS X makes it the current setting. With more than one setting, the
+        changes through a saved setting (``set_detector`` and the like) are refused.
+        """
+        self.handle.require_open()
+        return checked(self.handle, changes.add_setting(self.handle.client, copy), f"add_setting({copy!r})")
+
+    def delete_setting(self, name: str) -> dict:
+        """Delete the setting called *name* from the current job; the last one is never deleted."""
+        self.handle.require_open()
+        return checked(self.handle, changes.delete_setting(self.handle.client, name), f"delete_setting({name!r})")
 
     def enable_setting(self, on: bool) -> dict:
         """Switch the current setting on or off for scanning, as the window's checkbox does; read back.
