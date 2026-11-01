@@ -112,6 +112,8 @@ mic.connect("stellaris-navigator")                                              
 | `dye(name)` | One dye of the library: its full name, its excitation, emission and multiphoton peaks, and its spectra as `(nm, intensity)` pairs. Its `setting_name` is what `set_detector(..., dye=...)` takes. |
 | `set_excitation_line(line)` | Choose the excitation line, the wavelength of a line that is on, or `"auto"`; read back. With one detector on, because LAS X keeps one line per setting. |
 | `show_spectra(excitation=None, emission=None)` | Show or hide the dyes' excitation and emission spectra in LAS X's setting panel; read back. |
+| `pan()` | Where the galvo has moved the scan field: `x` and `y` as LAS X holds them, and `x_um` and `y_um`, the shift in micrometres. Read from LAS X's setting, saved for the purpose: the pan has no value in LAS X's hardware server. |
+| `center_pan()` | Set the pan back to the centre. LAS X's window moves the pan without a command the driver can send, and a loaded setting does not set it, but at the smallest zoom LAS X pulls it to the centre; so the driver sets the smallest zoom and then the zoom it had, both read back, and reads the pan. |
 | `save_setting(path)` | Save LAS X's current setting to a file, as its Setting panel does. |
 | `load_setting(path)` | Load a setting file, one saved in LAS X, say. Its laser powers and detector gains are checked against the limits first; the answer's `changed` lists what changed. |
 | `set_filter_wheel(wheel, filter_name)` | Turn the filter wheel of that type (LAS X's number) to the filter of that name, and read it back. LAS X's own galvo and scanner wheels are never turned. |

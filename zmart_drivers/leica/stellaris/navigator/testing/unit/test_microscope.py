@@ -330,3 +330,10 @@ def test_the_bit_depth_is_read_with_the_settings(scope, lasx):
     assert scope.settings()["bit_depth"] == 8
     assert scope.change_setting("bit_depth", 12)["confirmed"] is True
     assert scope.settings()["bit_depth"] == 12
+
+
+def test_the_pan_is_read_and_centred(scope, lasx):
+    lasx.pan = [0.0001743713507108436, 0.0]
+    assert scope.pan()["x_um"] == pytest.approx(17.44, abs=0.01)
+    assert scope.center_pan()["confirmed"] is True
+    assert scope.pan()["x_um"] == pytest.approx(0.0, abs=0.01)

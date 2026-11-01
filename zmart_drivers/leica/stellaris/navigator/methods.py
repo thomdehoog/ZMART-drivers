@@ -70,6 +70,7 @@ from .procedures import (
     setting_files,
 )
 from .procedures import acquire as acquire_step
+from .procedures import pan as pan_step
 from .procedures import state as state_step
 from .procedures.clear_cache import clear as clear_step
 from .procedures.save_data import save_waiting as save_step
@@ -361,6 +362,20 @@ class Microscope:
         self.handle.require_open()
         result = changes.set_channel_colour(self.handle.client, detector, colour)
         return checked(self.handle, result, f"set_channel_colour({detector!r}, {colour!r})")
+
+    def pan(self) -> dict:
+        """Where the galvo has moved the scan field: ``x`` and ``y`` as LAS X holds them, ``x_um`` and ``y_um`` in micrometres.
+
+        Read from LAS X's setting, saved now; the pan has no value in LCS.
+        """
+        self.handle.require_open()
+        return pan_step.read(self.handle.client, setting_files.folder_for(self.handle))
+
+    def center_pan(self) -> dict:
+        """Set the pan back to the centre, through LAS X's smallest zoom and back to the zoom it had; read back."""
+        self.handle.require_open()
+        result = pan_step.center(self.handle.client, setting_files.folder_for(self.handle))
+        return checked(self.handle, result, "center_pan()")
 
     def save_setting(self, path) -> dict:
         """Save LAS X's current setting to the file *path*, as its Setting panel does."""

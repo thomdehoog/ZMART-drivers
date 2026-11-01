@@ -25,7 +25,7 @@ X's window.
 | `InDimension`, `OutDimension`, `Lines` (format) | yes | no | `SetFormat` (seen in the log) |
 | `ScanMode` | yes | only inside a tile scan | `ScanMode` (seen in the log) |
 | `ScanDirectionX` (uni- or bidirectional) | yes | yes | none: written into LCS's state tree |
-| `PanFirstDim`, `PanSecondDim` (pan) | no | no | not yet learned |
+| `PanFirstDim`, `PanSecondDim` (pan) | yes, from a saved setting | back to the centre only | none: the smallest zoom (`SetZoom`) pulls it to the centre |
 | `PhaseX` | yes | yes | none: written into LCS's state tree, within LCS's range |
 | `FlipX`, `FlipY`, `SwapXY` | no | no | not yet learned |
 | `BitSize` | yes | yes | none: written into LCS's state tree, one of LCS's list |

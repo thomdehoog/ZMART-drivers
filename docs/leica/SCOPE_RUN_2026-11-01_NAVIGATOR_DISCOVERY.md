@@ -414,3 +414,24 @@ Expert template and loading it through Navigator Expert. In the plain Navigator,
 setting (`ATL_Block_Load_From_XML`) does not apply the pan in any of its modes (above), so it
 stays read-only here.
 
+## 23. The pan set back to the centre, and read in micrometres
+
+Two more ways were tried. Zoom In on a rectangle drawn on the image, then Live: LCS was sent
+`StartLiveAcquiring` and `StopAcquiring` only; LAS X had kept the rectangle as an ROI in its data
+container (`Confocal/ZoomIn/CurrentDCROISetID` 346, `EnableZoomIn` True), and at the scan LCS set
+the zoom (2.0 to 4.177) and the pan itself, then `EnableZoomIn` went False and
+`CanDoUndoLastZoomIn` True. And a load with the pan at 0, followed by one click of Thom's: the pan
+came out at the old value plus one click, so the load had not reached the pan the window uses.
+
+The zoom does reach it. Set through the driver (`SetZoom`), zoom 1.0 left the pan as it was;
+zoom 0.75, LAS X's smallest, pulled it from -0.000754 to -0.00000004, where it stayed when the
+zoom went back to 4.177. One click at zoom 4.177 was 0.0000835, half of one at zoom 2: a click is
+3 % of the field shown, and the conversion of section 22 gave 8.35 µm, 3 % of the 278.28 µm field.
+
+Built: `pan()` reads it from a setting saved now, in LAS X's values and in micrometres;
+`center_pan()` sets the smallest zoom and then the zoom it had, both read back, and reads the pan.
+Through the driver, after Thom clicked 3 right and 2 down: 25.05 µm across and -16.71 µm down
+(down is negative), then `center_pan()` confirmed, the zoom back at 4.177, the pan 0.00 and
+-0.004 µm. That the smallest zoom centres the pan is seen on the simulator only; one check on the
+STELLARIS is still to do.
+

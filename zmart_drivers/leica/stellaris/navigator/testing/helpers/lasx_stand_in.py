@@ -71,6 +71,8 @@ class PlainNavigator:
         self.scan_s = scan_s  # how long a scan lasts
         self.captures = 0
         self.loaded: list[str] = []  # the setting files loaded
+        self.pan = [0.0, 0.0]  # the pan, as LAS X saves it in the master setting
+        self.keeps_pan = False  # True: the smallest zoom does not pull the pan to the centre
         self.nodes = StandInNodes(
             dict,
             stage=lambda: (self.x_um * 1e-6, self.y_um * 1e-6),
@@ -115,6 +117,8 @@ class PlainNavigator:
         if not self.live[(*SCANNING, "ZoomMin")] <= zoom <= self.live[(*SCANNING, "ZoomMax")]:
             return f'<Result Error="1">Zoom {zoom:g} is out of range</Result>'
         self.live[(*SCANNING, "Zoom")] = zoom
+        if zoom <= self.live[(*SCANNING, "ZoomMin")] and not self.keeps_pan:
+            self.pan = [0.0, 0.0]  # the simulator pulled the pan to the centre at the smallest zoom
 
     def take_SetScanSpeed(self, e):
         self.live[(*SCANNING, "Speed")] = int(float(e.get("Speed")))
@@ -261,8 +265,9 @@ class PlainNavigator:
             f'TargetWaveLengthEnd="{u["WaveLengthEnd"]:g}"/>'
             for u in units
         )
+        pan = f'PanFirstDim="{self.pan[0]!r}" PanSecondDim="{self.pan[1]!r}" ' if name == "S2" else ""
         return (
-            f'<ATLConfocalSettingDefinition UserSettingName="{name}" ScanDirectionX="1" '
+            f'<ATLConfocalSettingDefinition UserSettingName="{name}" {pan}ScanDirectionX="1" '
             f'IsShowDyeEmissionSpectrum="{show[1]}" IsShowDyeExcitationSpectrum="{show[0]}">'
             f"<LaserArray>{lasers}</LaserArray><DetectorList>{detectors}</DetectorList><Spectro>{bands}</Spectro>"
             f"{reference}</ATLConfocalSettingDefinition>"
