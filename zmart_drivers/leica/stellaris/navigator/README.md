@@ -112,6 +112,8 @@ mic.connect("stellaris-navigator")                                              
 | `dye(name)` | One dye of the library: its full name, its excitation, emission and multiphoton peaks, and its spectra as `(nm, intensity)` pairs. Its `setting_name` is what `set_detector(..., dye=...)` takes. |
 | `set_excitation_line(line)` | Choose the excitation line, the wavelength of a line that is on, or `"auto"`; read back. With one detector on, because LAS X keeps one line per setting. |
 | `show_spectra(excitation=None, emission=None)` | Show or hide the dyes' excitation and emission spectra in LAS X's setting panel; read back. |
+| `smartcorr(project=None)` | Run SmartCORR, as the window's Start SmartCORR: a scan through the collar positions of its range, after which LAS X leaves the collar where the picture was best. The answer's `collar` says where. |
+| `collar_to_reference()` | Turn the collar to the position stored for this objective, as the window's GoTo does, and read it back. Refused when none is stored. |
 | `pan()` | Where the galvo has moved the scan field: `x` and `y` as LAS X holds them, and `x_um` and `y_um`, the shift in micrometres. Read from LAS X's setting, saved for the purpose: the pan has no value in LAS X's hardware server. |
 | `move_pan(x_um, y_um)` | Move the pan by that many micrometres, to the right and up (negative: left and down), and read it back. The driver presses the arrows of LAS X's pan pad, as the operator does, at a zoom raised just enough that whole presses land on the distance, and then sets the zoom back. Refused before anything is pressed when the pan would go beyond LAS X's largest. LAS X's XY panel must be open. |
 | `center_pan()` | Set the pan back to the centre. LAS X's window moves the pan without a command the driver can send, and a loaded setting does not set it, but at the smallest zoom LAS X pulls it to the centre; so the driver sets the smallest zoom and then the zoom it had, both read back, and reads the pan. |
@@ -153,6 +155,8 @@ confirmed, with what LAS X set instead.
 | `frame_accumulation` | 1, 2, 3, ... | exact |
 | `format` | `(x, y)` pixels, such as `(512, 512)` | exact |
 | `resonant_scanner` | `True` or `False` | exact |
+| `collar` | the objective's correction collar (motCORR), 0 to 100 %, as the window's box sends it | 0.1 % |
+| `smartcorr_range` | `(begin, end, steps)`: the collar positions SmartCORR scans through, 0 to 100 %, and how many (2 to 100); written into LAS X's state tree, as its window does | exact |
 | `bidirectional` | `True` or `False`; written into LAS X's state tree, as its window does | exact |
 | `phase_x` | Phase X, which lines up the two directions of a bidirectional scan, within LAS X's range (-100 to 100); written into the state tree | 0.1 |
 | `pinhole_um` | the pinhole in micrometres, within LAS X's range (100 to 1000 on the simulator); written into the state tree | 0.5 µm |

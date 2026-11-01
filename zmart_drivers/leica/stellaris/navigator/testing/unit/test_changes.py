@@ -544,3 +544,43 @@ class TestBitDepthAndOptimizedStep:
         assert lasx.live[(*ZSTACK, "StepSize")] == lasx.live[(*ZSTACK, "OptimalStepSize")]
         assert changes.change(client, "system_optimized_step", False)["confirmed"] is True
         assert lasx.live[(*ZSTACK, "StackCalculationMode")] == 1
+
+
+
+class TestCollar:
+    def test_the_collar_is_moved_and_read_back(self, lasx, client):
+        assert changes.change(client, "collar", 50)["confirmed"] is True
+        assert lasx.live[("Microscope", "CurrentMotCorrPos")] == 50.0
+        assert lasx.commands() == ["SetMotCorrPosition"]
+
+
+
+MOTCORR = ("Microscope", "MotCorrAutomationInfo")
+
+
+class TestSmartCorr:
+    def test_the_range_is_written_into_the_state_tree_and_read_back(self, lasx, client):
+        assert changes.change(client, "smartcorr_range", (20, 80, 5))["confirmed"] is True
+        assert (lasx.live[(*MOTCORR, "AutomationBegin")], lasx.live[(*MOTCORR, "AutomationEnd")], lasx.live[(*MOTCORR, "AutomationSteps")]) == (20.0, 80.0, 5)
+        assert lasx.commands() == []
+
+    def test_smartcorr_runs_and_answers_where_the_collar_went(self, lasx, client):
+        lasx.smartcorr_finds = 40.0
+
+        result = changes.smartcorr(client, project=24)
+
+        assert result["success"] is True and result["confirmed"] is True
+        assert result["collar"]["percent"] == 40.0
+        assert lasx.commands() == ["StopAcquiring", "StartMotCorrAutomation"]
+
+    def test_the_collar_goes_to_the_objective_s_reference_as_goto_does(self, lasx, client):
+        lasx.nodes.objectives[0]["MotCorrRefPos"] = 30.0
+
+        assert changes.collar_to_reference(client)["confirmed"] is True
+        assert lasx.live[("Microscope", "CurrentMotCorrPos")] == 30.0
+
+    def test_without_a_reference_nothing_is_sent(self, lasx, client):
+        result = changes.collar_to_reference(client)
+
+        assert result["success"] is False and "reference" in result["message"]
+        assert lasx.commands() == []

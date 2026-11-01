@@ -76,6 +76,8 @@ READS = (
     "phase_x",
     "system_optimized_step",
     "pane_percentage",
+    "collar",
+    "smartcorr",
     "laser_lines",
     "scan_field_rotation",
     "sequential_mode",
@@ -623,6 +625,35 @@ def get_system_optimized_step() -> bool:
     if not isinstance(value, bool):
         raise HardwareServerUnavailable(f"the state tree answered UseSystemOptimizedCalculation = {value!r}")
     return value
+
+
+def get_collar() -> dict:
+    """The objective's correction collar (motCORR): ``percent`` where it stands, ``motorised`` whether LAS X can turn it,
+    and ``reference``, the position the window's Set stored for the objective in the light path (None when none is).
+    """
+
+    def reading(nodes):
+        slot = node_value(nodes, node_at(nodes, ("Microscope", "SlotPosition")))
+        infos = of_name(nodes, children(nodes, node_at(nodes, OBJECTIVES)), "ObjectiveInfo")
+        if not isinstance(slot, int) or not 0 <= slot < len(infos):
+            raise HardwareServerUnavailable(f"the state tree has no objective in slot {slot} ({len(infos)} listed)")
+        reference = node_value(nodes, named(nodes, infos[slot], "MotCorrRefPos"))
+        return {
+            "percent": metres(node_value(nodes, node_at(nodes, ("Microscope", "CurrentMotCorrPos"))), "CurrentMotCorrPos"),
+            "motorised": bool(node_value(nodes, node_at(nodes, ("Microscope", "CanDoMotCorr")))),
+            "reference": None if reference is None or reference < 0 else float(reference),
+        }
+
+    return read("the collar", reading)
+
+
+def get_smartcorr() -> dict:
+    """SmartCORR's range: ``begin`` and ``end`` in percent of the collar, and ``steps``."""
+    found = settings(
+        "SmartCORR's range",
+        {name: ("Microscope", "MotCorrAutomationInfo", f"Automation{name.title()}") for name in ("begin", "end", "steps")},
+    )
+    return {"begin": float(found["begin"]), "end": float(found["end"]), "steps": found["steps"]}
 
 
 def get_pane_percentage() -> float:

@@ -65,6 +65,11 @@ SIMULATOR_SETTINGS = {
     ("Confocal", "HWParameter", "PhaseXMin"): -100.0,
     ("Confocal", "HWParameter", "PhaseXMax"): 100.0,
     ("Microscope", "SlotPosition"): 0,
+    ("Microscope", "CurrentMotCorrPos"): 0.0,
+    ("Microscope", "CanDoMotCorr"): True,
+    ("Microscope", "MotCorrAutomationInfo", "AutomationBegin"): 0.0,
+    ("Microscope", "MotCorrAutomationInfo", "AutomationEnd"): 100.0,
+    ("Microscope", "MotCorrAutomationInfo", "AutomationSteps"): 10,
     ("Microscope", "CurrentMicStandName"): "DM Manual-6",
     ("Confocal", "ScanningParameter", "Resolution"): 8,
     ("Confocal", "ScanningParameter", "ResolutionList"): (8, 12, 16),
@@ -279,7 +284,7 @@ class StandInNodes:
             SIMULATOR_SETTINGS
         )  # path -> value (or a function giving it), the current setting's nodes
         self.objectives = [
-            dict(o) for o in SIMULATOR_OBJECTIVES
+            dict(o, MotCorrRefPos=-1.0) for o in SIMULATOR_OBJECTIVES
         ]  # Microscope/ObjectiveList, by slot
         self.light_sources = copy.deepcopy(
             SIMULATOR_LIGHT_SOURCES

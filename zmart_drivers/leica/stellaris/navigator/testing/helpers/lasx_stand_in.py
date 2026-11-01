@@ -231,6 +231,15 @@ class PlainNavigator:
         self.live[(*SCANNING, "FormatX")], self.live[(*SCANNING, "FormatY")] = x, y
         self.live[(*SCANNING, "CurrentFormat")] = f"{x} x {y}"
 
+    def take_StartMotCorrAutomation(self, e):
+        """A scan through the collar positions, leaving the collar where the picture was best."""
+        self.captures += 1
+        self.scanning_until = time.monotonic() + self.scan_s
+        self.live[("Microscope", "CurrentMotCorrPos")] = getattr(self, "smartcorr_finds", 0.0)
+
+    def take_SetMotCorrPosition(self, e):
+        self.live[("Microscope", "CurrentMotCorrPos")] = float(e.get("MotCorrPosition"))
+
     def take_SetScannerToResonant(self, e):
         self.live[(*SCANNING, "IsResonantConfocalScanner")] = e.get("Enable") == "1"
 

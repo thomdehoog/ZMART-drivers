@@ -49,7 +49,7 @@ X's window.
 | Setting in the template | Reads today | Writes today | LCS command |
 |---|---|---|---|
 | `ObjectivePos`, `ObjectiveName`, `Immersion`, `NumericalAperture` | yes | yes (the slot) | `SetSlotPosition` (from the code, not yet sent) |
-| `MotCorrPosition` (correction collar) | yes | no | not yet learned |
+| `MotCorrPosition` (correction collar) | yes | yes | `SetMotCorrPosition` (seen in the log) |
 | `StagePosX`, `StagePosY` | yes | yes | `SetStagePositionInHwOnly` |
 | `IsAutofocusActive` | no | only inside a tile scan | `ActivateAutoFocus` (seen in the log) |
 

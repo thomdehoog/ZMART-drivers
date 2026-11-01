@@ -127,7 +127,7 @@ with no command in LCS's log). The ZMART Driver never does, because:
 
 Every change goes through a command (`SendCommand2`), which LCS checks and answers.
 
-**Decided exceptions (Thom, 1 November 2026):** seven values that neither a command nor a
+**Decided exceptions (Thom, 1 November 2026):** ten values that neither a command nor a
 loaded setting reaches. The transfer refuses every other node; each node is looked up by its
 path at each write, and each value is read back. None of them moves the stage or the objective
 or makes light.
@@ -141,6 +141,7 @@ or makes light.
 | Emission for the Airy unit | `Confocal/HWParameter/EmissionWaveLengthForAiryAnddzCalculation` | whole nm, 380 to 800 |
 | Bit depth | `Confocal/ScanningParameter/Resolution` | one of `ResolutionList` (8, 12, 16), read at the write |
 | Z-stack step mode | `Acquire/AcquireZStackInfo/StackCalculationMode` | 1 (step size kept) or 2 (System Optimized) |
+| SmartCORR's range | `Microscope/MotCorrAutomationInfo/AutomationBegin`, `AutomationEnd`, `AutomationSteps` | 0 to 100 %; 2 to 100 steps |
 
 Point 1 above is why the ranges are checked by the driver: LCS does not keep to its own range
 for a written value. A pinhole of 2000 µm raised an error from the pinhole's motor and still

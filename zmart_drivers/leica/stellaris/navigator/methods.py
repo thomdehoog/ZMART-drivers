@@ -266,7 +266,7 @@ class Microscope:
 
     def settings(self) -> dict:
         """What LAS X is set to now: ``zoom``, ``scan_speed``, ``scan_field_rotation``, ``averaging``, ``pinhole``, ``format``, ``scan_mode``, ``objective``, ``z_stack``, ``autofocus``,
-        ``bidirectional``, ``phase_x``, ``system_optimized_step`` and ``bit_depth``."""
+        ``bidirectional``, ``phase_x``, ``system_optimized_step``, ``collar``, ``smartcorr`` and ``bit_depth``."""
         self.handle.require_open()
         found = acquire_step.current_settings(self.handle)
         return {name: found[name] for name in found if name != "fov_m"}
@@ -282,7 +282,9 @@ class Microscope:
         False), ``bidirectional`` (True or False), ``format`` (``(x, y)`` pixels),
         ``phase_x``, ``pinhole_um`` (micrometres), ``pinhole_unit`` (``"um"`` or ``"airy"``)
         ``emission_wavelength`` (whole nanometres, for the Airy unit), ``bit_depth``
-        (8, 12 or 16) and ``system_optimized_step`` (True or False). The limits are asked
+        (8, 12 or 16), ``system_optimized_step`` (True or False) and ``collar``
+        (the objective's correction collar, 0 to 100 percent) and ``smartcorr_range``
+        (``(begin, end, steps)``, the collar positions SmartCORR scans through). The limits are asked
         first. Answers the change's result, with ``confirmed`` True when the
         read-back showed the new value; a change that was never seen is
         recorded and does not raise.
@@ -362,6 +364,21 @@ class Microscope:
         self.handle.require_open()
         result = changes.set_channel_colour(self.handle.client, detector, colour)
         return checked(self.handle, result, f"set_channel_colour({detector!r}, {colour!r})")
+
+    def smartcorr(self, project=None) -> dict:
+        """Run SmartCORR, as the window's Start SmartCORR: a scan through the collar positions of its range.
+
+        LAS X leaves the collar where the picture was best; the answer's
+        ``collar`` says where. The range is set with
+        ``change_setting("smartcorr_range", (begin, end, steps))``.
+        """
+        self.handle.require_open()
+        return checked(self.handle, changes.smartcorr(self.handle.client, project), "smartcorr()")
+
+    def collar_to_reference(self) -> dict:
+        """Turn the collar to the position stored for this objective, as the window's GoTo does; read back."""
+        self.handle.require_open()
+        return checked(self.handle, changes.collar_to_reference(self.handle.client), "collar_to_reference()")
 
     def pan(self) -> dict:
         """Where the galvo has moved the scan field: ``x`` and ``y`` as LAS X holds them, ``x_um`` and ``y_um`` in micrometres.

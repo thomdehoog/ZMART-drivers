@@ -422,3 +422,42 @@ class TestBitDepthAndOptimizedStep:
         assert write.confirm.accept(True) and not write.confirm.accept(False)
         with pytest.raises(ValueError):
             writes.named_setting("system_optimized_step", "yes")
+
+
+
+class TestCollar:
+    def test_the_collar_is_set_with_the_window_s_command_and_read_back(self):
+        write = writes.named_setting("collar", 50)
+        assert elements(write) == [
+            '<Microscope Command="SetMotCorrPosition" MotCorrPosition="50" SetMode="1" SingleSettingIndex="0" BlockId="0"/>'
+        ]
+        assert write.confirm.accept({"percent": 50.04}) and not write.confirm.accept({"percent": 26.0})
+
+    @pytest.mark.parametrize("percent", [-1, 100.5, "half", True])
+    def test_a_collar_outside_0_to_100_percent_is_refused_before_anything_is_built(self, percent):
+        with pytest.raises(ValueError):
+            writes.named_setting("collar", percent)
+
+
+
+class TestSmartCorr:
+    def test_the_range_is_written_into_the_state_tree_and_read_back(self):
+        write = writes.named_setting("smartcorr_range", (20, 80, 5))
+        assert elements(write) == [
+            '<StateTree Command="AutomationBegin" Value="20.0"/>',
+            '<StateTree Command="AutomationEnd" Value="80.0"/>',
+            '<StateTree Command="AutomationSteps" Value="5"/>',
+        ]
+        assert write.confirm.accept({"begin": 20.0, "end": 80.0, "steps": 5})
+        assert not write.confirm.accept({"begin": 0.0, "end": 100.0, "steps": 10})
+
+    @pytest.mark.parametrize("value", [(20, 120, 5), (-5, 80, 5), (20, 80, 1), (20, 80, 2.5), (20, 80)])
+    def test_a_range_outside_the_collar_or_without_whole_steps_is_refused(self, value):
+        with pytest.raises(ValueError):
+            writes.named_setting("smartcorr_range", value)
+
+    def test_smartcorr_is_the_window_s_start_into_a_project(self):
+        assert elements(writes.smartcorr(24)) == [
+            '<AcquireControl Command="StopAcquiring" DCParentElementID="0"/>',
+            '<AcquireControl Command="StartMotCorrAutomation" DCParentElementID="24"/>',
+        ]

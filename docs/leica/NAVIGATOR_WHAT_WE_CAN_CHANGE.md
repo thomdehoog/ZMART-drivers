@@ -31,7 +31,11 @@ discovery session in `SCOPE_RUN_2026-11-01_NAVIGATOR_DISCOVERY.md` and the build
 | Focus (z-wide) | Works |
 | z-galvo | Works |
 | Objective | Works in the code; another command for it (by slot index) tried |
-| Correction collar | Not yet learned |
+| Correction collar (motCORR) | Works, with LAS X's command |
+| Collar to the stored reference (GoTo) | Works, with LAS X's command |
+| SmartCORR range (Begin, End, Steps) | Works: written into LAS X's state tree |
+| SmartCORR (automatic collar scan) | Works, with LAS X's command |
+| Collar reference stored or cleared (Set, Reset) | Learned, not built: it writes into LAS X's objective list |
 
 ## Taking pictures
 
@@ -146,7 +150,7 @@ service and the person responsible for the instrument.
 
 | State | Settings |
 |---|---|
-| Works | 51 (the objective among them, not yet tried) |
+| Works | 55 (the objective among them, not yet tried) |
 | Tried | 1 |
 | Command known | 0 |
-| Not yet learned | 8 |
+| Not yet learned | 7 |

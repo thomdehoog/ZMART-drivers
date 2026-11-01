@@ -31,5 +31,7 @@
   "set_pinhole_unit": [],
   "set_emission_wavelength": [],
   "set_bit_depth": [],
-  "set_system_optimized_step": []
+  "set_system_optimized_step": [],
+  "set_collar": [],
+  "set_smartcorr_range": []
 }

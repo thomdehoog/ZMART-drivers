@@ -112,7 +112,7 @@ def change(client, name: str, value, *, max_retries=None, tolerance=None) -> dic
     scan_speed, ...) or a setting with a write of its own
     (``writes.NAMED_SETTINGS``: scan_mode, autofocus, format, resonant_scanner,
     bidirectional, phase_x, pinhole_um, pinhole_unit, emission_wavelength, bit_depth,
-    system_optimized_step). A wrong name or a
+    system_optimized_step, collar, smartcorr_range). A wrong name or a
     value of the wrong kind raises ``ValueError``. The limits gate is
     shown the new value first, and nothing is sent if it refuses.
     *tolerance* overrides how close a number's read-back must come.
@@ -362,6 +362,34 @@ def capture(client, project=None, **watching) -> dict:
     result = picture(client, change, **watching)
     result["picture"] = "z_stack" if stack else "capture"
     return result
+
+
+def smartcorr(client, project=None, **watching) -> dict:
+    """Run SmartCORR, the window's Start SmartCORR, into *project*; the result's ``collar`` is where LAS X left it.
+
+    *project* as for :func:`capture`. The scan is watched to its end.
+    """
+    try:
+        into = project if project is not None else data_container.experiment_for_capture()
+        change = writes.smartcorr(into)
+    except (RuntimeError, ValueError) as why:
+        return dispatch.refused(f"SmartCORR cannot be started: {why}", logged=True)
+    result = picture(client, change, **watching)
+    if result["success"]:
+        result["collar"] = readers.get_collar(client)
+    return result
+
+
+def collar_to_reference(client) -> dict:
+    """Turn the collar to the position stored for the objective in the light path, as the window's GoTo does; read back.
+
+    Refused, with nothing sent, when no position is stored (the window's
+    Set stores one).
+    """
+    reference = readers.get_collar(client)["reference"]
+    if reference is None:
+        return dispatch.refused("the objective has no stored reference position for the collar; nothing was sent")
+    return change(client, "collar", reference)
 
 
 def set_z_stack(client, drive, begin_um, end_um, step_um, *, max_retries=None) -> dict:

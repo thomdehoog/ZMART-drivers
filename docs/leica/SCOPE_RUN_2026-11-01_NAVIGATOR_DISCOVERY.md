@@ -450,3 +450,29 @@ pressed, and the zoom is set back. Through the driver: (20, -12) moved 20.00 and
 (2000, 0) was refused before any press: beyond the largest pan, 775 µm with the 10x.
 `center_pan()` then set it to 0.00 and 0.00 µm.
 
+## 25. The correction collar (motCORR) and SmartCORR
+
+Learned with the window's motCORR panel, one control at a time, each marked and compared:
+
+| Control | What LCS was sent | What changed |
+|---|---|---|
+| A value entered in the motCORR box (Enter) | `<Microscope Command="SetMotCorrPosition" MotCorrPosition="50" SetMode="1" SingleSettingIndex="0" BlockId="0"/>`, answered `<Result/>` | `Microscope/CurrentMotCorrPos` 0 to 50 |
+| Set | nothing | the objective's `ObjectiveInfo/MotCorrRefPos` -1 (none) to the collar's position; the button then reads Reset |
+| Reset | nothing | `MotCorrRefPos` back to -1 |
+| GoTo | `SetMotCorrPosition` with the stored reference | `CurrentMotCorrPos` 30 to 0, the reference |
+| Begin, End, Steps (Enter) | nothing | `Microscope/MotCorrAutomationInfo/AutomationBegin` 0 to 20, `AutomationEnd` 100 to 80, `AutomationSteps` 10 to 5 |
+| Start SmartCORR | `<AcquireControl Command="StartMotCorrAutomation" DCParentElementID="24"/>` | a scan of about a second; LCS's event "motCorr Position found", with no message box |
+
+Through UI Automation the box took a value (and its arrows changed it) without LAS X sending
+anything, and the Start SmartCORR checkbox did nothing; a value entered by hand did. So these are
+built with LCS's own commands, and the range as state-tree writes, as for Bidirectional X.
+
+Built: `change_setting("collar", percent)`, 0 to 100; `change_setting("smartcorr_range", (begin,
+end, steps))`; `smartcorr(project=None)`; `collar_to_reference()`, which reads `MotCorrRefPos` of
+the objective in the light path and is refused when none is stored. Set and Reset are not built:
+they write into LAS X's objective list. Through the driver: the collar 25 confirmed, 150 refused,
+0 confirmed; the range (10, 90, 5) confirmed; SmartCORR confirmed, the collar left at 10; GoTo
+refused without a reference; the range put back to (0, 100, 10) and the collar to 0. The Set
+pressed during the learning was cleared with Reset, so the simulator's objective has no stored
+reference, as before.
+

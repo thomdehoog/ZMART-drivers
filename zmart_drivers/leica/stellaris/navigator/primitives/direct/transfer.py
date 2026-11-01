@@ -185,6 +185,8 @@ ALLOWED_COMMANDS = frozenset(
         "ATL_Block_Save_To_XML",
         "ATL_Block_Load_From_XML",
         "SetLut",
+        "SetMotCorrPosition",
+        "StartMotCorrAutomation",
     }
 )
 
@@ -240,6 +242,12 @@ STATE_TREE_WRITES = {
     # optimal step (and may stretch the end to fit whole steps), 1 keeps the
     # step size. 0, the number of steps, is not written.
     "StackCalculationMode": TreeWrite(("Acquire", "AcquireZStackInfo", "StackCalculationMode"), choices=frozenset({1, 2})),
+    # SmartCORR's range: the collar positions it scans through, in percent,
+    # and how many. The window writes them here (simulator, 2026-11-01); LCS
+    # gives them no range, the collar's is 0 to 100 percent.
+    "AutomationBegin": TreeWrite(("Microscope", "MotCorrAutomationInfo", "AutomationBegin"), float, within=(0, 100)),
+    "AutomationEnd": TreeWrite(("Microscope", "MotCorrAutomationInfo", "AutomationEnd"), float, within=(0, 100)),
+    "AutomationSteps": TreeWrite(("Microscope", "MotCorrAutomationInfo", "AutomationSteps"), within=(2, 100)),
 }
 
 #: A write into the state tree, as the writes build it: ``<StateTree Command="name" Value="n"/>``.

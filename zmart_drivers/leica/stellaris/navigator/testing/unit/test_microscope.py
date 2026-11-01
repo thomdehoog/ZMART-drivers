@@ -347,3 +347,21 @@ def test_the_pan_is_moved_by_micrometres(scope, lasx, monkeypatch):
     monkeypatch.setattr(pan, "WindowPad", lambda: Pad(lasx))
     assert scope.move_pan(15.0, 0.0)["confirmed"] is True
     assert scope.pan()["x_um"] == pytest.approx(15.0, abs=0.01)
+
+
+
+def test_the_collar_is_read_with_the_settings(scope, lasx):
+    assert scope.settings()["collar"] == {"percent": 0.0, "motorised": True, "reference": None}
+    assert scope.change_setting("collar", 25)["confirmed"] is True
+    assert scope.settings()["collar"]["percent"] == 25.0
+
+
+
+def test_smartcorr_and_the_collar_s_reference(scope, lasx):
+    assert scope.change_setting("smartcorr_range", (20, 80, 5))["confirmed"] is True
+    assert scope.settings()["smartcorr"] == {"begin": 20.0, "end": 80.0, "steps": 5}
+    lasx.smartcorr_finds = 55.0
+    assert scope.smartcorr(project=24)["collar"]["percent"] == 55.0
+    lasx.nodes.objectives[0]["MotCorrRefPos"] = 10.0
+    assert scope.collar_to_reference()["confirmed"] is True
+    assert scope.settings()["collar"]["reference"] == 10.0

@@ -221,6 +221,8 @@ SETTER_LIMIT_KEYS = (
     "set_emission_wavelength",
     "set_bit_depth",
     "set_system_optimized_step",
+    "set_collar",
+    "set_smartcorr_range",
 )
 
 
@@ -406,6 +408,8 @@ MUTATING_COMMANDS = {
     "after_tile_scan": "set_xyz",
     # a picture
     "capture": "capture",
+    # a scan through the collar's positions, within the range just set
+    "smartcorr": "capture",
     # the z-stack: its ends are z positions the scan moves through
     "set_z_stack_drive": "set_z_stack_drive",
     "set_z_stack_range": "z_stack",

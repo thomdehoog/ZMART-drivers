@@ -391,6 +391,98 @@ def image_format(pixels) -> Write:
     )
 
 
+#: How close the collar must read back, in percent.
+COLLAR_TOLERANCE_PERCENT = 0.1
+
+
+def collar(percent) -> Write:
+    """Turn the objective's correction collar (motCORR) to *percent*, 0 to 100, as the window's box does; read back.
+
+    LAS X's window sends this when a value is entered in its motCORR box,
+    without its Set button, which stores a reference position instead
+    (simulator, 2026-11-01).
+    """
+    if isinstance(percent, bool) or not isinstance(percent, (int, float)) or not 0 <= percent <= 100:
+        raise ValueError(f"collar takes 0 to 100 percent, not {percent!r}")
+
+    def fill(request: Request) -> None:
+        request.elements = [
+            f'<Microscope Command="SetMotCorrPosition" MotCorrPosition="{value(percent)}" '
+            f'SetMode="1" SingleSettingIndex="0" {CURRENT}/>'
+        ]
+
+    return Write(
+        command="set_collar",
+        values={"value": percent},
+        request="SetMotCorrPosition",
+        fill=fill,
+        description=f"Collar -> {percent:g} %",
+        ready=idle(),
+        confirm=Expect("collar", lambda shown: abs(shown["percent"] - percent) <= COLLAR_TOLERANCE_PERCENT),
+    )
+
+
+def smartcorr_range(value) -> Write:
+    """SmartCORR's range: ``(begin, end, steps)``, the collar positions in percent and how many; written into the state tree.
+
+    The window writes Begin, End and Steps there, with no command
+    (simulator, 2026-11-01).
+    """
+    try:
+        begin, end, steps = value
+    except (TypeError, ValueError):
+        raise ValueError(f"smartcorr_range takes (begin, end, steps), not {value!r}") from None
+    for name, percent in (("begin", begin), ("end", end)):
+        if isinstance(percent, bool) or not isinstance(percent, (int, float)) or not 0 <= percent <= 100:
+            raise ValueError(f"smartcorr_range's {name} takes 0 to 100 percent, not {percent!r}")
+    if isinstance(steps, bool) or not isinstance(steps, int) or not 2 <= steps <= 100:
+        raise ValueError(f"smartcorr_range's steps takes a whole number from 2 to 100, not {steps!r}")
+    wanted = {"begin": float(begin), "end": float(end), "steps": steps}
+
+    def fill(request: Request) -> None:
+        request.elements = [
+            f'<StateTree Command="AutomationBegin" Value="{float(begin)!r}"/>',
+            f'<StateTree Command="AutomationEnd" Value="{float(end)!r}"/>',
+            f'<StateTree Command="AutomationSteps" Value="{steps}"/>',
+        ]
+
+    return Write(
+        command="set_smartcorr_range",
+        values={"values": [float(begin), float(end)]},
+        request="SmartCorrRange",
+        fill=fill,
+        description=f"SmartCORR range -> {begin:g} to {end:g} %, {steps} steps",
+        ready=idle(),
+        confirm=Expect("smartcorr", lambda shown: shown == wanted),
+    )
+
+
+def smartcorr(project: int) -> Write:
+    """SmartCORR, the window's Start SmartCORR: a scan through the collar positions of its range, into *project*.
+
+    LAS X leaves the collar where the picture was best. Never sent again,
+    like a capture.
+    """
+    parent = checked_project(project)
+    elements = [
+        '<AcquireControl Command="StopAcquiring" DCParentElementID="0"/>',
+        f'<AcquireControl Command="StartMotCorrAutomation" DCParentElementID="{parent}"/>',
+    ]
+
+    def fill(request: Request) -> None:
+        request.elements = list(elements)
+
+    return Write(
+        command="smartcorr",
+        values={"project": project},
+        request="StartMotCorrAutomation",
+        fill=fill,
+        description=f"SmartCORR into project {project}",
+        ready=idle(without_limit=True),
+        never_resend=True,
+    )
+
+
 def resonant_scanner(on: bool) -> Write:
     """Switch the resonant scanner on or off; read back from the scan speed's ``isResonant``."""
     if not isinstance(on, bool):
@@ -606,6 +698,8 @@ NAMED_SETTINGS = {
     "emission_wavelength": emission_wavelength,
     "bit_depth": bit_depth,
     "system_optimized_step": system_optimized_step,
+    "collar": collar,
+    "smartcorr_range": smartcorr_range,
 }
 
 
