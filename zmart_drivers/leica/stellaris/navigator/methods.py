@@ -614,6 +614,17 @@ class Microscope:
         lines = readings.get_aobs_lines(self.handle.client) or []
         return next(line for line in lines if abs(line["wavelength"] - float(wavelength_nm)) < 0.5)
 
+    def set_z_drive(self, drive: str) -> str:
+        """Choose the z drive the z-stack uses, ``"z-galvo"`` or ``"z-wide"``, as the z-stack panel's drive list.
+
+        With z-galvo, LAS X also offers the xz scan modes (``xzy``, ``xzt``, ``xzλ`` ...), set with
+        ``change_setting("scan_mode", ...)``. Answers the drive as LAS X holds it.
+        """
+        self.handle.require_open()
+        result = changes.set_z_drive(self.handle.client, drive)
+        checked(self.handle, result, f"set_z_drive({drive!r})")
+        return result["z_drive"]
+
     def set_lambda_scan(self, begin_nm: int | None = None, end_nm: int | None = None, step_nm: int | None = None,
                         bandwidth_nm: int | None = None) -> dict:
         """Set the λ scan's detection as LAS X's λ panel: begin and end (380 to 800 nm), step and bandwidth, in whole

@@ -140,6 +140,7 @@ mic.connect("stellaris-navigator")                                              
 | `set_tau_channel_colour(detector, channel, colour)` | The colour of TauSeparation's channel 1 or 2 of a detector, as the window's colour pick; only while the detector is in TauSeparation. |
 | `set_tau_channel_lifetime(detector, channel, ns)` | The lifetime of TauSeparation's channel 1 or 2, in nanoseconds, as the window's slider; within its scale, 0.07 to 9.37 ns. |
 | `find_tau_lifetimes(detector)` | TauSeparation's Find: LAS X looks for the two lifetimes in the data it has; answers whether it found them and the lifetimes now. |
+| `set_z_drive(drive)` | The z drive the z-stack uses, `"z-galvo"` or `"z-wide"`, as the z-stack panel's list. With z-galvo, LAS X also offers the xz scan modes (`xzy`, `xzt`, `xzλ` ...). |
 | `set_lambda_scan(begin_nm=, end_nm=, step_nm=, bandwidth_nm=)` | The λ scan's detection, as LAS X's λ panel: range (380 to 800 nm), step and bandwidth, in whole nanometres; the scan mode (`xyλ`, ...) is set apart. |
 | `set_auto_sync(on)`, `set_auto_sync_options(scanner, format=, scan_frequency=, overview_zoom=, bidirectional=, no_average=)` | Auto Sync (the autofocus uses the current setting's light and detectors) on or off, and its scan options, as the Best Focus Scan Options window; a number ticks an option's box, False unticks it. |
 | `set_autofocus_in_time_series(when)` | When the autofocus runs in a time series, as its Timelapse tab: `"first"`, `"every"`, or n for every n-th cycle. |

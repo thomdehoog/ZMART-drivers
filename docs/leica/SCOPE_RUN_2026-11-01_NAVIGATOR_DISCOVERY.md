@@ -952,3 +952,11 @@ in other states (and through the driver just after switching to xyλ) it moved b
 checked first, the result unconfirmed with what LAS X holds when it moved a value. Left at 385 to 775 nm, 30, 30;
 the scan mode back at xyz.
 
+## 54. The scan modes with z-galvo (2 November 2026)
+
+Thom's hint. With z-wide, the Acquisition Mode list offered 12 scan modes (xyz, xyt, xt, xyzt, xyλ, xyλt, xyλz,
+xyzλt, xyΛ, xyzΛ, xyΛt, xyΛλ); with z-galvo (`SetZUseMode UseMode="1"`) 19, the xz ones added: xzy, xzt, xzyt,
+xzλ, xzλt, xzΛ, xzΛλ. Through the driver: z-galvo, `change_setting("scan_mode", "xzy")` and `"xzt"` taken; with
+z-wide, LCS refused xzy ("invalid scan mode: xzy"), and the driver passed the refusal on. Built: `set_z_drive(drive)`,
+the drive alone (before only with a whole z-stack). Left at z-wide, xyz.
+

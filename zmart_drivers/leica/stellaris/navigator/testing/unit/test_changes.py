@@ -1031,6 +1031,18 @@ class TestFastLive:
         assert changes.set_fast_live(client, "galvo", format=256)["success"] is False
 
 
+class TestZDrive:
+    def test_the_drive_is_chosen_as_the_z_stack_panel_does(self, lasx, client):
+        result = changes.set_z_drive(client, "z-galvo")
+
+        assert result["confirmed"] is True and result["z_drive"] == "z-galvo"
+        assert lasx.commands()[-1] == "SetZUseMode"
+        assert changes.set_z_drive(client, "z-wide")["z_drive"] == "z-wide"
+
+    def test_a_drive_las_x_does_not_have_is_refused(self, lasx, client):
+        assert changes.set_z_drive(client, "z-piezo")["success"] is False
+
+
 class TestLambdaScan:
     def test_the_detection_range_step_and_bandwidth_are_set_with_the_window_s_commands(self, lasx, client):
         result = changes.set_lambda_scan(client, begin_nm=400, end_nm=700, step_nm=10, bandwidth_nm=20)

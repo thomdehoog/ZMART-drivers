@@ -776,6 +776,19 @@ def start_live(client, project=None, *, fast=False) -> dict:
     return run(client, change)
 
 
+def set_z_drive(client, drive, *, max_retries=None) -> dict:
+    """Choose the z drive the z-stack (and a tile's z) uses, ``"z-galvo"`` or ``"z-wide"``, as the z-stack panel's drive
+    list; the result's ``z_drive`` is read back. With z-galvo, LAS X also offers the xz scan modes (xzy, xzt, ...)."""
+    try:
+        change = writes.z_stack_drive(drive)
+    except ValueError as why:
+        return dispatch.refused(str(why))
+    result = run(client, change, max_retries=max_retries)
+    if result["success"]:
+        result["z_drive"] = readers.get_z_drive_in_use(client)
+    return result
+
+
 def set_lambda_scan(client, *, begin_nm=None, end_nm=None, step_nm=None, bandwidth_nm=None, max_retries=None) -> dict:
     """Set the λ scan's detection as LAS X's λ panel does: its begin and end (380 to 800 nm), its step and its
     bandwidth, in whole nanometres; the result's ``lambda_scan`` is read back. Checked before anything is sent."""
