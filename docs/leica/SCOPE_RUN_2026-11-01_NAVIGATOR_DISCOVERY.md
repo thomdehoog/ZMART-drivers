@@ -1008,3 +1008,26 @@ Built: `set_time_series(minimize=True/False)`; minimize with an interval refused
 (1.28 s), not minimized; frames put back to 1 and the scan mode to xyz. Dynamic Signal Enhancement, which the help
 places in the XY panel, was not among the window's controls in xyt on the simulator.
 
+## 59. TauGating's channels and gates (3 November 2026)
+
+With HyD 2 in TauGating (set by the driver), its TauModes button opened "TauGating - HyD 2": one channel with one gate,
+0.3 to 8.0 ns, on a scale from -1 to 11.5 ns. Pressed and dragged by the driver's mouse:
+
+| Window | Command (with the detector's beam route) |
+|---|---|
+| A gate's handle dragged | `SetDigitalGateConfig ChannelIndex="0" SetMode="0" SingleSettingIndex="0" GateIndex1="0" GateBegin1="3E-10" GateEnd1="7.92E-09"` (seconds; sent while dragging) |
+| + (a gate) | `AddDigitalGate ChannelIndex="0" GateBegin="8.125E-09" GateEnd="1.125E-08" SetMode="0" SingleSettingIndex="0"` |
+| - (a gate) | `RemoveDigitalGate ChannelIndex="0" GateIndex="1" SetMode="0" SingleSettingIndex="0"` |
+| Add Channel | `AddDetectorImageChannel IsChannelDigital="1"`, then `AddDigitalGate ChannelIndex="1" ...` |
+| Remove Channel | `RemoveDetectorImageChannel ChannelIndex="1"` |
+
+LCS holds them in the setting's entry: `DetectorChannelList_SeqInfo/DetectorChannel[i]/Gate[j]/GateBegin|GateEnd`,
+`IsChannelActive`, and `FreeGatingChannelCount`. A click on the gate's track moved nothing (two handles share it),
+and the only channel's on/off did not switch.
+
+Built: `set_tau_gate`, `add_tau_gate` (at most three per channel), `remove_tau_gate` (a channel keeps one),
+`add_tau_gate_channel`, `remove_tau_gate_channel` (one channel stays), only in TauGating, gates within -1 to 11.5 ns,
+read back from the channels' gates (`get_detector_modes()[name]["gates"]`). Through the driver on HyD 2: the gate to
+0.3 to 8.0, a gate 9 to 11 added, a channel 1 to 3 added and removed, the added gate removed, 20 ns refused; HyD 2
+then back in TauSeparation (Cyan, Magenta).
+

@@ -1036,6 +1036,21 @@ def get_detector_modes() -> dict:
             entries = of_name(nodes, children(nodes, holder), entry_name) if holder else []
             return [node_value(nodes, named(nodes, entry, code_name)) for entry in entries]
 
+        def tau_gates(unit):
+            """TauGating's channels: each ``on`` and its ``gates`` as (begin, end) in nanoseconds; empty in another tau mode."""
+            if node_value(nodes, named(nodes, unit, "DigitalGatingMode")) != 3:
+                return []
+            holder = child_named(nodes, unit, "DetectorChannelList_SeqInfo")
+            found = []
+            for channel in of_name(nodes, children(nodes, holder), "DetectorChannel") if holder else []:
+                gates = [
+                    (node_value(nodes, named(nodes, gate, "GateBegin")) * 1e9, node_value(nodes, named(nodes, gate, "GateEnd")) * 1e9)
+                    for gate in of_name(nodes, children(nodes, channel), "Gate")
+                    if node_value(nodes, named(nodes, gate, "GateBegin")) is not None
+                ]
+                found.append({"on": bool(node_value(nodes, named(nodes, channel, "IsChannelActive"))), "gates": gates})
+            return found
+
         def tau_channels(unit):
             holder = child_named(nodes, unit, "TauSeparationDefinition_SeqInfo")
             return of_name(nodes, children(nodes, holder), "TauSeparationChannel") if holder else []
@@ -1049,6 +1064,7 @@ def get_detector_modes() -> dict:
                 "operating": node_value(nodes, operating) if operating is not None else None,
                 "operating_offered": listed_codes(unit, "DetectionUnitOperatingModeList_SeqInfo", "DetectionUnitOperatingMode", "OperatingMode"),
                 "tau_colours": listed_codes(unit, "TauSeparationDefinition_SeqInfo", "TauSeparationChannel", "LutName"),
+                "gates": tau_gates(unit),
                 "tau_lifetimes_ns": [
                     node_value(nodes, named(nodes, child_named(nodes, channel, "TauSeparationLine"), "TauLinePosition")) * 1e9
                     for channel in tau_channels(unit)

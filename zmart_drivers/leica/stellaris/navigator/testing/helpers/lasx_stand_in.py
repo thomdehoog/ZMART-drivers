@@ -390,6 +390,8 @@ class PlainNavigator:
     def take_SetDigitalGatingModeIndex(self, e):
         unit = self.detector_at(e)
         unit["DigitalGatingMode"] = TAU_LIST[int(e.get("GatingModeIndex"))]
+        if unit["DigitalGatingMode"] == 3 and not unit.get("Gates"):
+            unit["Gates"] = [[[3e-10, 8e-09]]]  # LAS X's first channel and gate in TauGating
         if unit["DigitalGatingMode"] == 6 and not unit.get("TauColours"):
             unit["TauColours"] = ["Cyan", "Magenta"]  # LAS X's first colours for the two channels
 
@@ -405,6 +407,26 @@ class PlainNavigator:
             path.write_text((path.read_text(encoding="utf-8") if path.is_file() else "") + line, encoding="utf-8")
         if success and found:
             self.detector_at(e)["TauLifetimes"] = list(found)
+
+    def take_SetDigitalGateConfig(self, e):
+        gates = self.detector_at(e)["Gates"]
+        gates[int(e.get("ChannelIndex"))][int(e.get("GateIndex1"))] = [float(e.get("GateBegin1")), float(e.get("GateEnd1"))]
+
+    def take_AddDigitalGate(self, e):
+        gates = self.detector_at(e)["Gates"]
+        channel = int(e.get("ChannelIndex"))
+        while len(gates) <= channel:
+            gates.append([])
+        gates[channel].append([float(e.get("GateBegin")), float(e.get("GateEnd"))])
+
+    def take_RemoveDigitalGate(self, e):
+        del self.detector_at(e)["Gates"][int(e.get("ChannelIndex"))][int(e.get("GateIndex"))]
+
+    def take_AddDetectorImageChannel(self, e):
+        pass  # the channel's gate follows with AddDigitalGate, as the window sends it
+
+    def take_RemoveDetectorImageChannel(self, e):
+        del self.detector_at(e)["Gates"][int(e.get("ChannelIndex"))]
 
     def take_SetDetectorTauSeparationLut(self, e):
         self.detector_at(e)["TauColours"][int(e.get("TauChannelIndex"))] = e.get("LutName")

@@ -466,6 +466,12 @@ MUTATING_COMMANDS = {
     "set_tau_channel_colour": "set_tau_channel_colour",
     # which photons a tau channel takes: not the light, not the detector's gain
     "set_tau_channel_lifetime": "set_tau_channel_lifetime",
+    # TauGating's channels and gates: which photons a channel takes, not the light
+    "set_tau_gate": "set_tau_gate",
+    "add_tau_gate": "add_tau_gate",
+    "remove_tau_gate": "remove_tau_gate",
+    "add_tau_gate_channel": "add_tau_gate_channel",
+    "remove_tau_gate_channel": "remove_tau_gate_channel",
     "find_tau_lifetimes": "find_tau_lifetimes",
     # the AOBS: which share of a line goes on, not the light's power
     "set_aobs_reflection": "set_aobs_reflection",

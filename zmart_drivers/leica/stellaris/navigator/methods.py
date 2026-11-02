@@ -379,6 +379,33 @@ class Microscope:
         checked(self.handle, result, f"find_tau_lifetimes({detector!r})")
         return {"found": result["found"], "lifetimes_ns": result["lifetimes_ns"]}
 
+    def set_tau_gate(self, detector: str, channel: int, gate: int, begin_ns: float, end_ns: float) -> dict:
+        """Move TauGating's *gate* of *channel* (both counted from 1) to *begin_ns* .. *end_ns*, as its window's handles;
+        within -1 to 11.5 ns. Only while the detector is in TauGating."""
+        self.handle.require_open()
+        return checked(self.handle, changes.set_tau_gate(self.handle.client, detector, channel, gate, begin_ns, end_ns),
+                       f"set_tau_gate({detector!r}, {channel!r}, {gate!r})")
+
+    def add_tau_gate(self, detector: str, channel: int, begin_ns: float, end_ns: float) -> dict:
+        """Add a gate to TauGating's *channel*, as its window's + (at most three per channel)."""
+        self.handle.require_open()
+        return checked(self.handle, changes.add_tau_gate(self.handle.client, detector, channel, begin_ns, end_ns), f"add_tau_gate({detector!r})")
+
+    def remove_tau_gate(self, detector: str, channel: int, gate: int) -> dict:
+        """Remove TauGating's *gate* of *channel*, as its window's - (a channel keeps one)."""
+        self.handle.require_open()
+        return checked(self.handle, changes.remove_tau_gate(self.handle.client, detector, channel, gate), f"remove_tau_gate({detector!r})")
+
+    def add_tau_gate_channel(self, detector: str, begin_ns: float, end_ns: float) -> dict:
+        """Add a TauGating channel with one gate, as its window's Add Channel."""
+        self.handle.require_open()
+        return checked(self.handle, changes.add_tau_gate_channel(self.handle.client, detector, begin_ns, end_ns), f"add_tau_gate_channel({detector!r})")
+
+    def remove_tau_gate_channel(self, detector: str, channel: int) -> dict:
+        """Remove TauGating's *channel*, as its window's Remove Channel (one channel always stays)."""
+        self.handle.require_open()
+        return checked(self.handle, changes.remove_tau_gate_channel(self.handle.client, detector, channel), f"remove_tau_gate_channel({detector!r})")
+
     def set_tau_channel_lifetime(self, detector: str, channel: int, ns: float) -> dict:
         """Set the lifetime of TauSeparation's channel 1 or 2 of *detector*, in nanoseconds, as the window's slider.
 

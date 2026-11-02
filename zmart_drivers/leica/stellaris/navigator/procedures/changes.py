@@ -460,6 +460,85 @@ def find_tau_lifetimes(client, detector) -> dict:
     return result
 
 
+def tau_gating(client, detector):
+    """``(route, gates, refusal)``: the beam route and TauGating's channels of *detector*, or why not."""
+    units = {unit.get("Name"): unit for unit in readers.get_detection_units(client) or []}
+    if detector not in units:
+        return None, None, f"no detector {detector!r}; LAS X's are {sorted(units)}"
+    modes = (readers.get_detector_modes(client) or {}).get(detector, {})
+    if modes.get("tau") != 3:
+        return None, None, f"{detector} is not in TauGating"
+    return writes.route_of(units[detector]["BeamRoute"]), modes.get("gates") or [], None
+
+
+def tau_gate_run(client, detector, build, max_retries=None) -> dict:
+    route, gates, refusal = tau_gating(client, detector)
+    if refusal:
+        return dispatch.refused(refusal)
+    try:
+        change = build(route, gates)
+    except (ValueError, IndexError) as why:
+        return dispatch.refused(str(why))
+    return run(client, change, max_retries=max_retries)
+
+
+def channel_gates(gates, channel, gate=None):
+    """TauGating's *channel* (1 the first) and, given, its *gate*; IndexError when not there."""
+    if not isinstance(channel, int) or not 1 <= channel <= len(gates):
+        raise IndexError(f"TauGating has the channels 1 to {len(gates)}, not {channel!r}")
+    found = gates[channel - 1]["gates"]
+    if gate is not None and (not isinstance(gate, int) or not 1 <= gate <= len(found)):
+        raise IndexError(f"channel {channel} has the gates 1 to {len(found)}, not {gate!r}")
+    return found
+
+
+def set_tau_gate(client, detector, channel, gate, begin_ns, end_ns, *, max_retries=None) -> dict:
+    """Move TauGating's *gate* of *channel* (both counted from 1) of *detector* to *begin_ns* .. *end_ns*, as its handles."""
+    return tau_gate_run(client, detector, lambda route, gates: (channel_gates(gates, channel, gate),
+                        writes.tau_gate(route, detector, channel, gate, begin_ns, end_ns))[1], max_retries)
+
+
+def add_tau_gate(client, detector, channel, begin_ns, end_ns, *, max_retries=None) -> dict:
+    """Add a gate to TauGating's *channel* of *detector*, as the window's +; at most three per channel."""
+
+    def build(route, gates):
+        if len(channel_gates(gates, channel)) >= writes.MOST_TAU_GATES:
+            raise ValueError(f"channel {channel} has {writes.MOST_TAU_GATES} gates, the most the window allows")
+        return writes.tau_gate_added(route, detector, channel, begin_ns, end_ns)
+
+    return tau_gate_run(client, detector, build, max_retries)
+
+
+def remove_tau_gate(client, detector, channel, gate, *, max_retries=None) -> dict:
+    """Remove TauGating's *gate* of *channel* of *detector*, as the window's -; a channel keeps at least one."""
+
+    def build(route, gates):
+        found = channel_gates(gates, channel, gate)
+        if len(found) < 2:
+            raise ValueError(f"channel {channel} has one gate; remove the channel instead")
+        return writes.tau_gate_removed(route, detector, channel, gate, len(found))
+
+    return tau_gate_run(client, detector, build, max_retries)
+
+
+def add_tau_gate_channel(client, detector, begin_ns, end_ns, *, max_retries=None) -> dict:
+    """Add a TauGating channel with one gate to *detector*, as the window's Add Channel."""
+    return tau_gate_run(client, detector, lambda route, gates: writes.tau_gate_channel_added(route, detector, len(gates), begin_ns, end_ns),
+                        max_retries)
+
+
+def remove_tau_gate_channel(client, detector, channel, *, max_retries=None) -> dict:
+    """Remove TauGating's *channel* of *detector*, as the window's Remove Channel; one channel always stays."""
+
+    def build(route, gates):
+        channel_gates(gates, channel)
+        if len(gates) < 2:
+            raise ValueError("TauGating keeps at least one channel")
+        return writes.tau_gate_channel_removed(route, detector, channel, len(gates))
+
+    return tau_gate_run(client, detector, build, max_retries)
+
+
 def set_tau_channel_lifetime(client, detector, channel, ns, *, max_retries=None) -> dict:
     """Set the lifetime of TauSeparation's *channel* (1 or 2) of *detector*, in nanoseconds, as the window's slider; read back."""
     route, refusal = tau_channel(client, detector, channel)

@@ -141,6 +141,52 @@ def test_each_operating_mode_is_written_as_las_x_writes_it_and_read_back(lasx, c
     assert direct_reader.get_detector_modes()["HyD S 3"]["operating"] == {"Fast Mode": 4, "Counting": 1, "Analog": 10, "Reflection": 11}[mode]
 
 
+class TestTauGating:
+    @pytest.fixture
+    def gating(self, lasx, client, tmp_path):
+        setting_files.set_detector(client, tmp_path, "HyD S 3", tau_mode="TauGating")
+        return client
+
+    def test_the_channels_and_gates_are_read(self, lasx, gating):
+        assert direct_reader.get_detector_modes()["HyD S 3"]["gates"] == [{"on": True, "gates": [pytest.approx((0.3, 8.0))]}]
+
+    def test_a_gate_is_moved_as_the_window_s_handles_do(self, lasx, gating):
+        from zmart_drivers.leica.stellaris.navigator.procedures import changes
+
+        result = changes.set_tau_gate(gating, "HyD S 3", 1, 1, 0.5, 6.0)
+
+        assert result["confirmed"] is True
+        assert lasx.sent[-1].startswith('<Scanner Command="SetDigitalGateConfig" ChannelIndex="0" SetMode="0" SingleSettingIndex="0" '
+                                        'GateIndex1="0" GateBegin1="5e-10" GateEnd1="6e-09">')
+
+    def test_gates_and_channels_are_added_and_removed(self, lasx, gating):
+        from zmart_drivers.leica.stellaris.navigator.procedures import changes
+
+        assert changes.add_tau_gate(gating, "HyD S 3", 1, 9.0, 11.0)["confirmed"] is True
+        assert changes.add_tau_gate_channel(gating, "HyD S 3", 1.0, 3.0)["confirmed"] is True
+        gates = direct_reader.get_detector_modes()["HyD S 3"]["gates"]
+        assert [len(channel["gates"]) for channel in gates] == [2, 1]
+        assert changes.remove_tau_gate_channel(gating, "HyD S 3", 2)["confirmed"] is True
+        assert changes.remove_tau_gate(gating, "HyD S 3", 1, 2)["confirmed"] is True
+        assert [len(channel["gates"]) for channel in direct_reader.get_detector_modes()["HyD S 3"]["gates"]] == [1]
+
+    @pytest.mark.parametrize(("begin", "end"), [(-2.0, 3.0), (1.0, 12.0), (5.0, 4.0)])
+    def test_a_gate_off_the_window_s_scale_is_refused(self, lasx, gating, begin, end):
+        from zmart_drivers.leica.stellaris.navigator.procedures import changes
+
+        sent = len(lasx.sent)
+        assert changes.set_tau_gate(gating, "HyD S 3", 1, 1, begin, end)["success"] is False
+        assert len(lasx.sent) == sent
+
+    def test_gates_outside_tau_gating_or_not_there_are_refused(self, lasx, client, tmp_path):
+        from zmart_drivers.leica.stellaris.navigator.procedures import changes
+
+        assert changes.set_tau_gate(client, "HyD S 3", 1, 1, 0.5, 6.0)["success"] is False
+        setting_files.set_detector(client, tmp_path, "HyD S 3", tau_mode="TauGating")
+        assert changes.set_tau_gate(client, "HyD S 3", 1, 2, 0.5, 6.0)["success"] is False
+        assert changes.remove_tau_gate_channel(client, "HyD S 3", 1)["success"] is False
+
+
 def test_a_tau_separation_channel_s_colour_is_set_as_the_window_sets_it(lasx, client, tmp_path):
     from zmart_drivers.leica.stellaris.navigator.procedures import changes
 

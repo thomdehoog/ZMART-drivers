@@ -899,6 +899,81 @@ def detector_tau(route, name: str, place: int, mode: str) -> Write:
 TAU_LIFETIME_NS = (0.07, 9.37)
 
 
+#: TauGating's scale in the window, in nanoseconds (simulator, 2026-11-02).
+TAU_GATE_NS = (-1.0, 11.5)
+#: The most gates a TauGating channel takes, as the window allows.
+MOST_TAU_GATES = 3
+
+
+def tau_gate_change(command: str, route, name: str, elements: list[str], description: str, shows) -> Write:
+    """One change of TauGating's channels or gates of the detector *name*, as the TauGating window sends it; read back."""
+
+    def fill(request: Request) -> None:
+        request.elements = [element.replace("{setting}", str(request.setting)).replace("{route}", beam_route(route)) for element in elements]
+
+    return Write(command=command, values={"value": description}, request=elements[0].split('"')[1], fill=fill,
+                 description=f"Detector {name} {description}", ready=idle(),
+                 confirm=Expect("detector_modes", lambda modes: shows(((modes or {}).get(name) or {}).get("gates") or [])))
+
+
+def checked_gate(begin_ns, end_ns) -> tuple[float, float]:
+    """``(begin, end)`` in nanoseconds, within TauGating's scale, begin before end; ValueError otherwise."""
+    low, high = TAU_GATE_NS
+    if any(isinstance(n, bool) or not isinstance(n, (int, float)) for n in (begin_ns, end_ns)) or not low <= begin_ns < end_ns <= high:
+        raise ValueError(f"a gate runs from {low} to {high} ns, begin before end; not {begin_ns!r} to {end_ns!r}")
+    return float(begin_ns), float(end_ns)
+
+
+def near(gate, begin, end) -> bool:
+    return abs(gate[0] - begin) <= 0.01 and abs(gate[1] - end) <= 0.01
+
+
+def tau_gate(route, name: str, channel: int, gate: int, begin_ns: float, end_ns: float) -> Write:
+    """TauGating's *gate* (1 the first) of *channel* (1 the first) moved to *begin_ns* .. *end_ns*, as its handles do."""
+    begin, end = checked_gate(begin_ns, end_ns)
+    element = (f'<Scanner Command="SetDigitalGateConfig" ChannelIndex="{channel - 1}" SetMode="0" SingleSettingIndex="{{setting}}" '
+               f'GateIndex1="{gate - 1}" GateBegin1="{begin / 1e9!r}" GateEnd1="{end / 1e9!r}">{{route}}</Scanner>')
+    return tau_gate_change("set_tau_gate", route, name, [element], f"channel {channel} gate {gate} -> {begin:g} to {end:g} ns",
+                           lambda gates: len(gates) >= channel and len(gates[channel - 1]["gates"]) >= gate
+                           and near(gates[channel - 1]["gates"][gate - 1], begin, end))
+
+
+def tau_gate_added(route, name: str, channel: int, begin_ns: float, end_ns: float) -> Write:
+    """A gate added to TauGating's *channel*, as the window's +."""
+    begin, end = checked_gate(begin_ns, end_ns)
+    element = (f'<Scanner Command="AddDigitalGate" ChannelIndex="{channel - 1}" GateBegin="{begin / 1e9!r}" GateEnd="{end / 1e9!r}" '
+               f'SetMode="0" SingleSettingIndex="{{setting}}">{{route}}</Scanner>')
+    return tau_gate_change("add_tau_gate", route, name, [element], f"channel {channel} gate added, {begin:g} to {end:g} ns",
+                           lambda gates: len(gates) >= channel and any(near(g, begin, end) for g in gates[channel - 1]["gates"]))
+
+
+def tau_gate_removed(route, name: str, channel: int, gate: int, count: int) -> Write:
+    """TauGating's *gate* of *channel* removed, as the window's -."""
+    element = (f'<Scanner Command="RemoveDigitalGate" ChannelIndex="{channel - 1}" GateIndex="{gate - 1}" SetMode="0" '
+               f'SingleSettingIndex="{{setting}}">{{route}}</Scanner>')
+    return tau_gate_change("remove_tau_gate", route, name, [element], f"channel {channel} gate {gate} removed",
+                           lambda gates: len(gates) >= channel and len(gates[channel - 1]["gates"]) == count - 1)
+
+
+def tau_gate_channel_added(route, name: str, count: int, begin_ns: float, end_ns: float) -> Write:
+    """A TauGating channel added with one gate, as the window's Add Channel sends it."""
+    begin, end = checked_gate(begin_ns, end_ns)
+    elements = [
+        '<Scanner Command="AddDetectorImageChannel" IsChannelDigital="1">{route}</Scanner>',
+        (f'<Scanner Command="AddDigitalGate" ChannelIndex="{count}" GateBegin="{begin / 1e9!r}" GateEnd="{end / 1e9!r}" '
+         f'SetMode="0" SingleSettingIndex="{{setting}}">{{route}}</Scanner>'),
+    ]
+    return tau_gate_change("add_tau_gate_channel", route, name, elements, f"channel added, {begin:g} to {end:g} ns",
+                           lambda gates: len(gates) == count + 1)
+
+
+def tau_gate_channel_removed(route, name: str, channel: int, count: int) -> Write:
+    """TauGating's *channel* removed, as the window's Remove Channel."""
+    element = f'<Scanner Command="RemoveDetectorImageChannel" ChannelIndex="{channel - 1}">{{route}}</Scanner>'
+    return tau_gate_change("remove_tau_gate_channel", route, name, [element], f"channel {channel} removed",
+                           lambda gates: len(gates) == count - 1)
+
+
 def tau_channel_lifetime(route, name: str, channel: int, ns: float) -> Write:
     """The lifetime of TauSeparation's *channel* (1 or 2) of the detector *name*, in nanoseconds, as the window's slider sends it.
 
