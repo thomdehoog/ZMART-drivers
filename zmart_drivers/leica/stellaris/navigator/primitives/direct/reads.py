@@ -98,6 +98,7 @@ READS = (
     "lambda_scan",
     "laser_output_power",
     "coverslip_offset",
+    "fluorifier",
     "autofocus_optics",
     "pixel_size",
     "bit_depth",
@@ -1117,6 +1118,17 @@ def get_autofocus_optics() -> dict:
         return {"lines": lines}
 
     return read("the Best Focus Setting's optics", reading)
+
+
+def get_fluorifier() -> dict:
+    """The Fluorifier disc: ``auto_select`` (the notch filters follow the laser lines) and ``polarizer_deg`` (the left
+    wheel's angle when it is turned as a polarizer; None when it holds a notch filter). The filters themselves are
+    filter wheels 130 and 131 (:func:`get_filter_wheels`)."""
+    w = ("Confocal", "HWParameter", "FilterWheelList", "PolarizationFW")
+    found = settings("the Fluorifier disc", {
+        "auto": ("Confocal", "HWParameter", "IsNotchFilterAutoSelectionEnabled"), "turn": (*w, "IsSpectrumTurnMode"), "angle": (*w, "FilterSpectrumPos"),
+    })
+    return {"auto_select": bool(found["auto"]), "polarizer_deg": float(found["angle"]) if found["turn"] else None}
 
 
 def get_coverslip_offset() -> float:

@@ -1269,6 +1269,36 @@ def start_live(project: int, *, fast: bool = False) -> Write:
     )
 
 
+def fluorifier_change(command: str, elements: list[str], description: str, shows) -> Write:
+    """A change of the Fluorifier disc written into LCS's state tree, as its window does; read back."""
+
+    def fill(request: Request) -> None:
+        request.elements = list(elements)
+
+    return Write(command=command, values={"value": description}, request=elements[0].split('"')[1], fill=fill,
+                 description=description, ready=idle(), confirm=Expect("fluorifier", lambda found: bool(found) and shows(found)))
+
+
+def notch_auto_select(on: bool) -> Write:
+    """The notch filters chosen with the laser lines (Auto Select) on or off, as the Fluorifier Disc Settings' box."""
+    return fluorifier_change("set_notch_auto_select", [f'<StateTree Command="IsNotchFilterAutoSelectionEnabled" Value="{int(bool(on))}"/>'],
+                             f"Notch Auto Select -> {'on' if on else 'off'}", lambda found: found["auto_select"] is bool(on))
+
+
+def polarizer(angle_deg) -> Write:
+    """The Fluorifier disc's left wheel turned as a polarizer to *angle_deg*, or, with None, back to holding a notch filter."""
+    if angle_deg is None:
+        return fluorifier_change("set_polarizer", ['<StateTree Command="IsSpectrumTurnMode" Value="0"/>'], "Polarizer -> off (notch filters)",
+                                 lambda found: found["polarizer_deg"] is None)
+    if isinstance(angle_deg, bool) or not isinstance(angle_deg, (int, float)):
+        raise ValueError(f"the polarizer takes an angle in degrees, or None, not {angle_deg!r}")
+    angle = float(angle_deg)
+    return fluorifier_change(
+        "set_polarizer", ['<StateTree Command="IsSpectrumTurnMode" Value="1"/>', f'<StateTree Command="FilterSpectrumPos" Value="{angle!r}"/>'],
+        f"Polarizer -> {angle:g} deg", lambda found: found["polarizer_deg"] is not None and abs(found["polarizer_deg"] - angle) <= 0.1,
+    )
+
+
 def coverslip_offset(um: float) -> Write:
     """The Reflection autofocus's coverslip offset, in micrometres, written in metres as the window does; read back."""
 

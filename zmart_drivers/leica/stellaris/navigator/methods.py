@@ -677,6 +677,22 @@ class Microscope:
         checked(self.handle, result, "set_lambda_scan()")
         return result["lambda_scan"]
 
+    def set_notch_auto_select(self, on: bool) -> dict:
+        """The notch filters chosen with the laser lines (Auto Select) on or off, as LAS X's Fluorifier Disc Settings;
+        off, choose them with :meth:`set_filter_wheel` (wheels 130 and 131). Answers ``auto_select`` and ``polarizer_deg``."""
+        self.handle.require_open()
+        result = changes.set_notch_auto_select(self.handle.client, on)
+        checked(self.handle, result, f"set_notch_auto_select({on!r})")
+        return result["fluorifier"]
+
+    def set_polarizer(self, angle_deg: float | None) -> dict:
+        """Turn the Fluorifier disc's left wheel as a polarizer to *angle_deg* (-90 to 90), or with None give it back to
+        the notch filters, as LAS X's Fluorifier Disc Settings. Answers ``auto_select`` and ``polarizer_deg``."""
+        self.handle.require_open()
+        result = changes.set_polarizer(self.handle.client, angle_deg)
+        checked(self.handle, result, f"set_polarizer({angle_deg!r})")
+        return result["fluorifier"]
+
     def set_coverslip_offset(self, um: float) -> float:
         """Set the Reflection autofocus's coverslip offset, in micrometres, as its window; answers it as LAS X holds it."""
         self.handle.require_open()

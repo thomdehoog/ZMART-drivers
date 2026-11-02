@@ -42,6 +42,8 @@ SIMULATOR_SETTINGS = {
     ("Acquire", "AcquireTStackInfo", "RepeatCount"): 1,
     # ROI scan and bleaching, as LCS keeps them (simulator, 2026-11-02).
     ("Confocal", "ROIScan", "CanDoROIScan"): True,
+    # The Fluorifier disc's notch filters chosen with the laser (simulator, 2026-11-03); its polarizer is on the wheel below.
+    ("Confocal", "HWParameter", "IsNotchFilterAutoSelectionEnabled"): True,
     # The λ scan's detection (simulator, 2026-11-02).
     ("Confocal", "LambdaDefinition", "DetectionBegin"): 380.0,
     ("Confocal", "LambdaDefinition", "DetectionEnd"): 800.0,
@@ -316,7 +318,9 @@ SIMULATOR_FILTER_WHEELS = {
         wheel(200, 0, ["Galvo X Pan Center ", "Galvo X Pan Mirror "]),
         wheel(140, 2, ["--- ", "Substrate ", "Mirror "]),
     ],
-    "PolarizationFW": [wheel(130, 0, ["Empty", "NF 448/514/561"])],
+    # The Fluorifier disc's left wheel: a notch filter, or turned as a polarizer (simulator, 2026-11-03).
+    "PolarizationFW": [{**wheel(130, 0, ["Empty", "NF 448/514/561"]), "IsSpectrumTurnMode": False, "FilterSpectrumPos": 0.0,
+                        "FilterSpectrumPosMin": -90.0, "FilterSpectrumPosMax": 90.0}],
 }
 
 #: The first two of the simulator's six objectives (Microscope/ObjectiveList), in slot order.
@@ -608,6 +612,9 @@ class StandInNodes:
                 info = nodes[change.NodeID][1]
                 infos = [n for n in nodes[nodes[info][1]][2] if nodes[n][0] == "ObjectiveInfo"]
                 self.objectives[infos.index(info)][path[-1]] = change.Value
+                continue
+            if path[:4] == ["Confocal", "HWParameter", "FilterWheelList", "PolarizationFW"] and path[-1] in ("IsSpectrumTurnMode", "FilterSpectrumPos"):
+                self.filter_wheels["PolarizationFW"][0][path[-1]] = change.Value
                 continue
             if path[-1] == "LaserTargetOutputPower" and "SequentialSettingParameter" in path:
                 # A light source's output power: LCS sets it on every line of the source.

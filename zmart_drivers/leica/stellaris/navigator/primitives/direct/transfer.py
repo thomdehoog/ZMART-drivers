@@ -411,6 +411,12 @@ STATE_TREE_WRITES = {
     # The Reflection autofocus's coverslip offset, in metres; the window writes it here (simulator, 2026-11-02).
     # Kept within the autofocus's largest capture range, 5000 micrometres either way.
     "ReflectionOffset": TreeWrite(("Acquire", "AutoFocusInfo", "ReflectionOffset"), float, within=(-0.005, 0.005)),
+    # The Fluorifier disc: the notch filters chosen with the laser (Auto Select), and its left wheel turned as a
+    # polarizer (in degrees, within LCS's range beside it) instead of holding a notch filter (simulator, 2026-11-03).
+    "IsNotchFilterAutoSelectionEnabled": TreeWrite(("Confocal", "HWParameter", "IsNotchFilterAutoSelectionEnabled"), bool),
+    "IsSpectrumTurnMode": TreeWrite(("Confocal", "HWParameter", "FilterWheelList", "PolarizationFW", "IsSpectrumTurnMode"), bool),
+    "FilterSpectrumPos": TreeWrite(("Confocal", "HWParameter", "FilterWheelList", "PolarizationFW", "FilterSpectrumPos"), float,
+                                   between=("FilterSpectrumPosMin", "FilterSpectrumPosMax")),
     "MotCorrRefPos": TreeWrite(
         ("Microscope", "ObjectiveList", "ObjectiveInfo", "MotCorrRefPos"), float,
         choices=frozenset({-1.0}), within=(0, 100), of_objective=True,

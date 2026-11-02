@@ -1042,3 +1042,17 @@ Built: "None" added to the driver's tau modes (one list, `writes.TAU_CODES`; `se
 `get_detector_modes()[name]["tau_available"]`; `set_detector(tau_mode=...)` refuses a greyed-out mode with nothing
 sent. Through the driver: HyD 4's TauScan refused (only Intensity available).
 
+## 61. The Fluorifier disc: notch filters and the polarizer (3 November 2026)
+
+The beam path's Fluorifier button opened "Fluorifier Disc Settings": two notch filter wheels (left: Empty, NF 448/514/561,
+NF 488/561/730, NF 448/514, NF 488/561/638; right: Empty, NF 685, NF 638, NF 488/638, NF 775, NF 660, NF 594), greyed out
+while Auto Select is on, and the left wheel's other use as a polarizer, -90 to 90 degrees. Pressed by the driver's mouse,
+no command: Auto Select `Confocal/HWParameter/IsNotchFilterAutoSelectionEnabled`; a notch filter the wheel's
+`CurrentSlotPosition` (`PolarizationFW`, type 130; the right wheel type 131); the polarizer `PolarizationFW/IsSpectrumTurnMode`
+and its angle `FilterSpectrumPos` (between `FilterSpectrumPosMin` and `Max`). Written into the state tree, each was taken
+and the window followed.
+
+The notch filters were already settable: `set_filter_wheel(130, "Empty")`, `set_filter_wheel(131, "NF 638")` confirmed.
+Built: `set_notch_auto_select(on)` and `set_polarizer(angle_deg)` (None: the notch filters again). Through the driver:
+Auto Select off, polarizer 45 degrees, 100 refused, back to the notch filters, Auto Select on (as found).
+

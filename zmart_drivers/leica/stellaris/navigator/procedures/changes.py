@@ -773,6 +773,30 @@ def autofocus(client, project=None, **watching) -> dict:
     return result
 
 
+def fluorifier_result(client, change, max_retries=None) -> dict:
+    result = run(client, change, max_retries=max_retries)
+    if result["success"]:
+        result["fluorifier"] = readers.get_fluorifier(client)
+    return result
+
+
+def set_notch_auto_select(client, on, *, max_retries=None) -> dict:
+    """The notch filters chosen with the laser lines (Auto Select) on or off, as the Fluorifier Disc Settings' box; off,
+    choose them with ``set_filter_wheel`` (wheels 130 and 131). The result's ``fluorifier`` is read back."""
+    if not isinstance(on, bool):
+        return dispatch.refused(f"set_notch_auto_select takes True or False, not {on!r}")
+    return fluorifier_result(client, writes.notch_auto_select(on), max_retries)
+
+
+def set_polarizer(client, angle_deg, *, max_retries=None) -> dict:
+    """Turn the Fluorifier disc's left wheel as a polarizer to *angle_deg* (within LAS X's range, -90 to 90 on the
+    simulator), or with None give it back to the notch filters; the result's ``fluorifier`` is read back."""
+    if angle_deg is not None:
+        if isinstance(angle_deg, bool) or not isinstance(angle_deg, (int, float)) or not -90 <= angle_deg <= 90:
+            return dispatch.refused(f"the polarizer turns -90 to 90 degrees, not {angle_deg!r}")
+    return fluorifier_result(client, writes.polarizer(angle_deg), max_retries)
+
+
 #: The autofocus's largest capture range: the coverslip offset is kept within it, either way.
 COVERSLIP_OFFSET_UM = 5000.0
 

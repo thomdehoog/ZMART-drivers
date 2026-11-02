@@ -206,6 +206,11 @@ def get_autofocus_settings(client, **keywords):
     return _routed("autofocus_settings", client, **keywords)
 
 
+def get_fluorifier(client, **keywords):
+    """The Fluorifier disc: ``auto_select`` and ``polarizer_deg`` (None when the left wheel holds a notch filter)."""
+    return _routed("fluorifier", client, **keywords)
+
+
 def get_coverslip_offset(client, **keywords):
     """The Reflection autofocus's coverslip offset, in micrometres."""
     return _routed("coverslip_offset", client, **keywords)

@@ -1070,6 +1070,21 @@ class TestFastLive:
         assert changes.set_fast_live(client, "galvo", format=256)["success"] is False
 
 
+class TestFluorifierDisc:
+    def test_the_notch_auto_select_is_switched(self, lasx, client):
+        assert changes.set_notch_auto_select(client, False)["fluorifier"]["auto_select"] is False
+        assert changes.set_notch_auto_select(client, True)["fluorifier"]["auto_select"] is True
+
+    def test_the_polarizer_is_turned_and_given_back_to_the_notch_filters(self, lasx, client):
+        assert changes.set_polarizer(client, -30.0)["fluorifier"]["polarizer_deg"] == -30.0
+        assert changes.set_polarizer(client, None)["fluorifier"]["polarizer_deg"] is None
+
+    @pytest.mark.parametrize("angle", [-91.0, 120.0, "45", True])
+    def test_an_angle_off_the_polarizer_s_scale_is_refused(self, lasx, client, angle):
+        assert changes.set_polarizer(client, angle)["success"] is False
+        assert direct_reader.get_fluorifier()["polarizer_deg"] is None
+
+
 class TestApplyToAllSettings:
     @pytest.mark.parametrize(("name", "element"), [
         ("line_average", '<Scanner Command="SetLineAverage" LineAverage="1" SetMode="1" SingleSettingIndex="0" BlockId="0"/>'),

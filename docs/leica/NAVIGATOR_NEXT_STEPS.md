@@ -65,7 +65,7 @@ checked by the driver either way (`transfer.CHECKED_COMMANDS`, `transfer.STATE_T
 - The mounting medium (`ATL_HyVolution_SetMountingMedium`).
 
 **Other**
-- The notch filter, the Dye Assistant, "Apply to hardware", Bulk Options.
+- The Dye Assistant, "Apply to hardware", Bulk Options.
 - A dye of one's own in LAS X's library; the dye bar's "+".
 - The changes through a saved setting (`set_detector` and the like) with several settings: still refused.
 
