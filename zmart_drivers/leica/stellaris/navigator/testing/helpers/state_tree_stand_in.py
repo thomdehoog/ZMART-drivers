@@ -42,6 +42,9 @@ SIMULATOR_SETTINGS = {
     ("Acquire", "AcquireTStackInfo", "RepeatCount"): 1,
     # ROI scan and bleaching, as LCS keeps them (simulator, 2026-11-02).
     ("Confocal", "ROIScan", "CanDoROIScan"): True,
+    # Linear Z-compensation (simulator, 2026-11-02): no mode, the reference at the stack's begin.
+    ("Confocal", "ZCompensation", "CurrentMode"): 0,
+    ("Confocal", "ZCompensation", "ReferencePosition"): 0.000995,
     ("Confocal", "ROIScan", "EnableRoiScan"): False,
     ("Confocal", "ROIScan", "CanDoBleach"): True,
     ("Confocal", "ROIScan", "EnableBleachScan"): False,
@@ -337,6 +340,8 @@ class StandInNodes:
             SIMULATOR_SETTINGS
         )  # path -> value (or a function giving it), the current setting's nodes
         self.settings = [{"SettingID": 3, "Name": "Setting 1", "IsEnabledForScanning": True}]  # Acquire/ATL/CurrentBlock/SettingInfo
+        # The current setting's Z-compensation support points: z from the reference (metres) and the values held there.
+        self.zcomp_points = []
         # The AOBS's eight lines (Confocal/AOBSLineList), as on the simulator, 2026-11-02: 497 in use.
         self.aobs_lines = [{"IsUsed": True, "LaserLine": 497.0, "Intensity": 100.0, "IsDoubleModeEnabled": True, "IsReflection": False}] + [
             {"IsUsed": False, "LaserLine": 0.0, "Intensity": 0.0, "IsDoubleModeEnabled": False, "IsReflection": False} for _ in range(7)
@@ -490,7 +495,10 @@ class StandInNodes:
         ]})
         # Each detector's tau modes in the current setting, as LCS lists them there.
         sequence = child(child(child(child(1, "Acquire"), "ATL"), "CurrentBlock"), "ConfocalSequentialInfo")
-        graft(sequence, "SequentialSettingParameter", {"SpectralDetection_SequentialInfo": {"Spectrophotometer_SequentialInfo": [
+        graft(sequence, "SequentialSettingParameter", {"ZCompensation_SeqInfo": {"ZCompensationPosition": [
+            {"ZPosition": point["z"], "ZCompensationValue": [{"Name": name, "Value": value} for name, value in point["values"]]}
+            for point in self.zcomp_points
+        ]}, "SpectralDetection_SequentialInfo": {"Spectrophotometer_SequentialInfo": [
             {"DetectionUnitList_SequentialInfo": {"DetectorHWInfo_SequentialInfo": [
                 {"DigitalGatingMode": unit.get("DigitalGatingMode", 2), "DigitalGatingModeList_SeqInfo": {"DigitalGatingMode": [
                     {"DigitalGatingMode": code, "IsEnabled": True} for code in (0, 2, 3, 5, 6, 10)]},

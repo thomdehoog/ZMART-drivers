@@ -427,6 +427,11 @@ MUTATING_COMMANDS = {
     "set_time_series": "set_time_series",
     # ROI scan and the bleach mode: switches; the light in a region is set as any laser power
     "set_roi_scan": "set_roi_scan",
+    # linear Z-compensation: its modes and points hold powers and gains already set; Move To is a z move
+    "set_z_compensation": "set_z_compensation",
+    "add_z_compensation_point": "add_z_compensation_point",
+    "remove_z_compensation_point": "remove_z_compensation_point",
+    "move_to_z_compensation_point": "set_xyz",
     "set_bleach_mode": "set_bleach_mode",
     # the z-stack: its ends are z positions the scan moves through
     "set_z_stack_drive": "set_z_stack_drive",

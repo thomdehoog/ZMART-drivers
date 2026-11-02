@@ -226,6 +226,38 @@ class PlainNavigator:
         self.live[(*stack, "BeginValue")], self.live[(*stack, "EndValue")] = (here + half, here - half) if begin > end else (here - half, here + half)
         self.stack_sections()
 
+    # Linear Z-compensation, as LCS answered the window's commands (simulator, 2026-11-02).
+    ZCOMP = ("Confocal", "ZCompensation")
+
+    def zcomp_values(self):
+        return [("AOTF 499", 2.0), ("HyD S 3", 100.0)]
+
+    def take_ActivateZCompensationMode(self, e):
+        mode, bit = self.live[(*self.ZCOMP, "CurrentMode")], int(e.get("Mode"))
+        mode = mode | bit if e.get("Activate") == "1" else mode & ~bit
+        if mode and not self.live[(*self.ZCOMP, "CurrentMode")] and not self.nodes.zcomp_points:
+            # Switched on with no points: LCS puts one at each end of the stack.
+            stack = ("Acquire", "AcquireZStackInfo")
+            size = abs(self.live[(*stack, "EndValue")] - self.live[(*stack, "BeginValue")])
+            self.nodes.zcomp_points = [{"z": size, "values": self.zcomp_values()}, {"z": 0.0, "values": self.zcomp_values()}]
+        self.live[(*self.ZCOMP, "CurrentMode")] = mode
+
+    def take_AddIntensityCompensationInterpolationPoint(self, e):
+        here = self.z_um[self.live[("Acquire", "ZPositionMode")]] * 1e-6 - self.live[(*self.ZCOMP, "ReferencePosition")]
+        kept = [p for p in self.nodes.zcomp_points if abs(p["z"] - here) > 1e-9]  # a point at that height is not doubled
+        self.nodes.zcomp_points = sorted([*kept, {"z": here, "values": self.zcomp_values()}], key=lambda p: -p["z"])
+
+    def take_RemoveIntensityCompensationInterpolationPointAt(self, e):
+        z = float(e.get("ZPosition"))
+        self.nodes.zcomp_points = [p for p in self.nodes.zcomp_points if abs(p["z"] - z) > 1e-9]
+
+    def take_RemoveAllIntensityCompensationInterpolationPoints(self, e):
+        self.nodes.zcomp_points = []
+
+    def take_ActivateIntensityCompensationPositions(self, e):
+        drive = self.live[("Acquire", "ZPositionMode")]
+        self.z_um[drive] = (self.live[(*self.ZCOMP, "ReferencePosition")] + float(e.get("ZPosition"))) * 1e6
+
     def take_SetStackStepSize(self, e):
         self.live[("Acquire", "AcquireZStackInfo", "StepSize")] = float(e.get("StepSizeInMeter"))
         self.stack_sections()

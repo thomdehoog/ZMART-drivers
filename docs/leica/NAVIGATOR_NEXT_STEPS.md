@@ -53,12 +53,13 @@ checked by the driver either way (`transfer.CHECKED_COMMANDS`, `transfer.STATE_T
 - The regions of an ROI scan and the bleach points: drawn in LAS X's viewer and kept in its data container
   (`Confocal/ROIScan/CurrentDCROISetID`), not in LCS; the laser lines per region (ROI Configuration).
 - Bleaching and FRAP (LCS has `SequentialBleachPointParameter`).
-- Z-compensation: laser and gain along depth.
+- Z-compensation's "Move to and Apply" (`WithAotfAndPMTSetting="1"`, not seen from the window) and Set to Begin
+  (sent nothing when the reference was the begin already).
 - The carrier: slide, dish, well plate (the Navigator Expert sent `StageSetCarrierAttachment`).
 
 **Commands seen in LCS's log but not built**
 - The z-stack's Set Focus (no logged command; the state tree ignored it; only the window, perhaps by UI
-  automation), Z-Compensation, and the Number of Steps mode as such (the count is set through the step).
+  automation), and the Number of Steps mode as such (the count is set through the step).
 - `ResetConfocalSetting`, `ResetAutoFocusToAutoSync`.
 - The mounting medium (`ATL_HyVolution_SetMountingMedium`).
 

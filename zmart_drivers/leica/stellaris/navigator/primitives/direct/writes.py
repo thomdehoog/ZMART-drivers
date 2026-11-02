@@ -1171,6 +1171,70 @@ def start_live(project: int, *, fast: bool = False) -> Write:
     )
 
 
+def z_compensation_change(command: str, element: str, description: str, shows, values=None) -> Write:
+    """One command of the Linear Z-Compensation window, as it sends it; read back from the Z-compensation."""
+
+    def fill(request: Request) -> None:
+        request.elements = [element]
+
+    return Write(command=command, values=values or {"value": description}, request=element.split('"')[1], fill=fill,
+                 description=description, ready=idle(), confirm=Expect("z_compensation", lambda z: bool(z) and shows(z)))
+
+
+def z_compensation_mode(name: str, on: bool) -> Write:
+    """A Z-compensation mode (``excitation``, ``detector``, ``motcorr``) on or off, as the window's checkbox."""
+    bit = direct_reader.Z_COMPENSATION_MODES[name]
+    return z_compensation_change(
+        "set_z_compensation", f'<Scanner Command="ActivateZCompensationMode" Mode="{bit}" Activate="{int(bool(on))}"/>',
+        f"Z-compensation {name} -> {'on' if on else 'off'}", lambda z: (name in z["modes"]) is bool(on),
+    )
+
+
+def z_compensation_reference(um: float) -> Write:
+    """Z-compensation's reference position, written into LCS's state tree in metres, as the window does."""
+
+    def fill(request: Request) -> None:
+        request.elements = [f'<StateTree Command="ReferencePosition" Value="{um / 1e6!r}"/>']
+
+    return Write(command="set_z_compensation", values={"value": um}, request="ReferencePosition", fill=fill,
+                 description=f"Z-compensation reference -> {um:g} um", ready=idle(),
+                 confirm=Expect("z_compensation", lambda z: bool(z) and abs(z["reference_um"] - um) <= 0.01))
+
+
+def z_compensation_add(z_um: float) -> Write:
+    """A support point where the focus is (*z_um*), holding the current powers and gains, as the window's Add.
+
+    A point already at that height is not doubled (simulator, 2026-11-02);
+    read back as a point at *z_um*.
+    """
+    return z_compensation_change("add_z_compensation_point", '<Scanner Command="AddIntensityCompensationInterpolationPoint"/>',
+                                 f"Z-compensation point -> added at {z_um:g} um", lambda z: any(abs(p["z_um"] - z_um) <= 0.05 for p in z["points"]))
+
+
+def z_compensation_remove(offset_m, count: int) -> Write:
+    """The support point at *offset_m* from the reference removed (Delete), or all with None (Remove All)."""
+    if offset_m is None:
+        return z_compensation_change("remove_z_compensation_point", '<Scanner Command="RemoveAllIntensityCompensationInterpolationPoints"/>',
+                                     "Z-compensation points -> all removed", lambda z: z["points"] == [])
+    return z_compensation_change(
+        "remove_z_compensation_point", f'<Scanner Command="RemoveIntensityCompensationInterpolationPointAt" ZPosition="{offset_m!r}"/>',
+        "Z-compensation point -> removed", lambda z: len(z["points"]) == count - 1,
+    )
+
+
+def z_compensation_move_to(drive: str, offset_m: float, z_um: float, *, start: dict | None = None) -> Write:
+    """The focus to a support point, as the window's Move To (the powers and gains left as they are); a z move for the limits."""
+    axis = "z_galvo_um" if drive == "z-galvo" else "z_wide_um"
+    element = f'<Scanner Command="ActivateIntensityCompensationPositions" ZPosition="{offset_m!r}" WithAotfAndPMTSetting="0"/>'
+
+    def fill(request: Request) -> None:
+        request.elements = [element]
+
+    return Write(command="move_to_z_compensation_point", values={axis: z_um, **(start or {})}, request="ActivateIntensityCompensationPositions",
+                 fill=fill, description=f"Z -> {z_um:g} um, a Z-compensation point ({drive})", ready=idle(),
+                 confirm=Expect("z", z_within(z_um, Z_TOLERANCE_UM), about=drive))
+
+
 def roi_change(command: str, node: str, written, description: str, shows) -> Write:
     """One value of the ROI scan or bleach mode written into LCS's state tree, as the window's buttons do; read back."""
 

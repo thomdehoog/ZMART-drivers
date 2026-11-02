@@ -92,6 +92,7 @@ READS = (
     "fast_live",
     "time_series",
     "roi_scan",
+    "z_compensation",
     "autofocus_optics",
     "pixel_size",
     "bit_depth",
@@ -1088,6 +1089,51 @@ def get_autofocus_optics() -> dict:
         return {"lines": lines}
 
     return read("the Best Focus Setting's optics", reading)
+
+
+#: Linear Z-compensation's modes by name and LCS's bit for them.
+Z_COMPENSATION_MODES = {"excitation": 1, "detector": 2, "motcorr": 4}
+
+
+def get_z_compensation() -> dict:
+    """Linear Z-compensation in the current setting: ``modes`` on (``excitation``, ``detector``, ``motcorr``),
+    ``reference_um``, and ``points``, each with ``z_um`` (the reference plus the point's offset) and ``values``
+    (each laser line's power and detector's gain held there, by LAS X's name).
+
+    ``Confocal/ZCompensation`` (``CurrentMode``, a sum of the modes' bits;
+    ``ReferencePosition``) and the setting's ``ZCompensation_SeqInfo``
+    (simulator, 2026-11-02).
+    """
+
+    def reading(nodes):
+        mode = node_value(nodes, node_at(nodes, ("Confocal", "ZCompensation", "CurrentMode"))) or 0
+        reference = node_value(nodes, node_at(nodes, ("Confocal", "ZCompensation", "ReferencePosition")))
+        current = node_value(nodes, node_at(nodes, ("Acquire", "ATL", "CurrentSetting", "SettingID")))
+        ids = [
+            node_value(nodes, named(nodes, info, "SettingID"))
+            for info in of_name(nodes, children(nodes, node_at(nodes, ("Acquire", "ATL", "CurrentBlock"))), "SettingInfo")
+            if node_value(nodes, named(nodes, info, "SettingID")) is not None
+        ]
+        place = ids.index(current) if current in ids else 0
+        params = of_name(nodes, children(nodes, node_at(nodes, ("Acquire", "ATL", "CurrentBlock", "ConfocalSequentialInfo"))), "SequentialSettingParameter")
+        holder = child_named(nodes, params[place], "ZCompensation_SeqInfo") if place < len(params) else None
+        points = []
+        for position in of_name(nodes, children(nodes, holder), "ZCompensationPosition") if holder else []:
+            offset = node_value(nodes, named(nodes, position, "ZPosition"))
+            if offset is None:
+                continue
+            values = {
+                node_value(nodes, named(nodes, value, "Name")): node_value(nodes, named(nodes, value, "Value"))
+                for value in of_name(nodes, children(nodes, position), "ZCompensationValue")
+            }
+            points.append({"z_um": (reference + offset) * 1e6, "offset_m": offset, "values": values})
+        return {
+            "modes": [name for name, bit in Z_COMPENSATION_MODES.items() if mode & bit],
+            "reference_um": reference * 1e6,
+            "points": points,
+        }
+
+    return read("the Z-compensation", reading)
 
 
 def get_roi_scan() -> dict:

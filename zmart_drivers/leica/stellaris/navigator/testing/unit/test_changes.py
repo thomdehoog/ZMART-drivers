@@ -1031,6 +1031,55 @@ class TestFastLive:
         assert changes.set_fast_live(client, "galvo", format=256)["success"] is False
 
 
+class TestZCompensation:
+    @pytest.fixture
+    def stacked(self, lasx, client):
+        lasx.z_um = {1: 0.0, 2: 1000.0}
+        changes.set_z_stack(client, "z-wide", 995.0, 1005.0, 2.5)
+        return client
+
+    def test_the_modes_are_switched_on_and_off_with_the_window_s_command(self, lasx, stacked):
+        result = changes.set_z_compensation(stacked, excitation=True, detector=True)
+
+        assert result["confirmed"] is True and result["z_compensation"]["modes"] == ["excitation", "detector"]
+        assert lasx.sent[-1] == '<Scanner Command="ActivateZCompensationMode" Mode="2" Activate="1"/>'
+        assert result["z_compensation"]["points"][0]["z_um"] == pytest.approx(1005.0)
+        assert changes.set_z_compensation(stacked, excitation=False, detector=False)["z_compensation"]["modes"] == []
+
+    def test_a_point_is_added_where_the_focus_is_and_removed(self, lasx, stacked):
+        changes.set_z_compensation(stacked, excitation=True)
+        lasx.z_um[2] = 1001.0
+
+        added = changes.add_z_compensation_point(stacked)
+
+        assert [p["z_um"] for p in added["z_compensation"]["points"]] == pytest.approx([1005.0, 1001.0, 995.0])
+        assert added["z_compensation"]["points"][1]["values"] == {"AOTF 499": 2.0, "HyD S 3": 100.0}
+        removed = changes.remove_z_compensation_point(stacked, 1001.0)
+        assert [p["z_um"] for p in removed["z_compensation"]["points"]] == pytest.approx([1005.0, 995.0])
+        assert changes.remove_z_compensation_point(stacked, None)["z_compensation"]["points"] == []
+
+    def test_the_focus_moves_to_a_point(self, lasx, stacked):
+        changes.set_z_compensation(stacked, excitation=True)
+
+        assert changes.move_to_z_compensation_point(stacked, 1005.0)["confirmed"] is True
+        assert lasx.z_um[2] == pytest.approx(1005.0)
+
+    def test_a_point_that_is_not_there_is_refused(self, lasx, stacked):
+        changes.set_z_compensation(stacked, excitation=True)
+
+        assert changes.remove_z_compensation_point(stacked, 1002.0)["success"] is False
+        assert changes.move_to_z_compensation_point(stacked, 1002.0)["success"] is False
+
+    def test_the_reference_is_written_and_read_back(self, lasx, stacked):
+        result = changes.set_z_compensation(stacked, reference_um=998.0)
+
+        assert result["z_compensation"]["reference_um"] == pytest.approx(998.0)
+
+    def test_nothing_asked_or_not_a_switch_is_refused(self, lasx, stacked):
+        assert changes.set_z_compensation(stacked)["success"] is False
+        assert changes.set_z_compensation(stacked, excitation="yes")["success"] is False
+
+
 class TestRoiScanAndBleachMode:
     def test_roi_scan_is_switched_on_and_off(self, lasx, client):
         assert changes.set_roi_scan(client, True)["roi"] == {"on": True, "sections": None, "bleach_mode": False}

@@ -882,3 +882,26 @@ out, the sections checked against the stack first. Through the driver: ROI scan 
 every section, then off; the bleach mode refused while ROI scan was on; then on and off; the window's buttons
 following each time.
 
+## 50. Linear Z-compensation, learned by the driver's own clicks (2 November 2026)
+
+The z-stack panel's Z-Compensation button opened the Linear Z-Compensation window (on the right monitor). Its
+controls, each pressed by the driver's mouse:
+
+| Window | LCS |
+|---|---|
+| Excitation Gain, Detector Gain, motCORR | `<Scanner Command="ActivateZCompensationMode" Mode="1" Activate="1"/>` (2, 4; `Activate="0"` off); `Confocal/ZCompensation/CurrentMode` the sum, 7 with all three |
+| Add | `AddIntensityCompensationInterpolationPoint`: a point at the focus, holding every laser line's power, every detector's gain and the collar |
+| Delete (a row selected) | `RemoveIntensityCompensationInterpolationPointAt ZPosition="1.98E-05"` |
+| Remove All | `RemoveAllIntensityCompensationInterpolationPoints` |
+| Move To (a row selected) | `ActivateIntensityCompensationPositions ZPosition="1.98E-05" WithAotfAndPMTSetting="0"`: the focus to 992.8 um |
+| Reference Position | no command; `Confocal/ZCompensation/ReferencePosition` (metres) taken when written into the state tree |
+
+A point's `ZPosition` is its offset from the reference (973 um, the stack's begin). Switched on with no points,
+LCS put one at each end of the stack; while a mode is on, LCS offers no autofocus (`CanDoAutoFocus` False). A
+point added at the height of another is not doubled. LCS lists the modes it has in `CompensationModeList` (0, 1, 2, 4).
+
+Built: `set_z_compensation(excitation=, detector=, motcorr=, reference_um=)`, `add_z_compensation_point()`,
+`remove_z_compensation_point(z_um)` (all with None), `move_to_z_compensation_point(z_um)` (a z move for the limits);
+points named by their absolute z. Through the driver: excitation and detector on (points at 992.8 and 973.0), a point
+added at 982.9, moved to 973.0, a point not there refused, all removed, the modes off, the focus put back at 982.9.
+

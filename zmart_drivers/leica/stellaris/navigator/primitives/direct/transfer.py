@@ -187,6 +187,11 @@ ALLOWED_COMMANDS = frozenset(
         "SetDetectorTauSeparationLut",
         "SetDetectorTauSeparationConfig",
         "FindTauSeparationLifeTimes",
+        "ActivateZCompensationMode",
+        "AddIntensityCompensationInterpolationPoint",
+        "RemoveIntensityCompensationInterpolationPointAt",
+        "RemoveAllIntensityCompensationInterpolationPoints",
+        "ActivateIntensityCompensationPositions",
         "SetLightSourceWavelength",
         "SetConfocalLaserLinesDefinition",
         "ActivateShutter",
@@ -358,6 +363,8 @@ STATE_TREE_WRITES = {
     "Is3DLimitedRoiScanEnabled": TreeWrite(("Confocal", "ROIScan", "Is3DLimitedRoiScanEnabled"), bool),
     "First3DRoiSection": TreeWrite(("Confocal", "ROIScan", "First3DRoiSection"), within=(1, 100000)),
     "Last3DRoiSection": TreeWrite(("Confocal", "ROIScan", "Last3DRoiSection"), within=(1, 100000)),
+    # Linear Z-compensation's reference position, in metres: the window writes it here (simulator, 2026-11-02).
+    "ReferencePosition": TreeWrite(("Confocal", "ZCompensation", "ReferencePosition"), float, within=(-1, 1)),
     "MotCorrRefPos": TreeWrite(
         ("Microscope", "ObjectiveList", "ObjectiveInfo", "MotCorrRefPos"), float,
         choices=frozenset({-1.0}), within=(0, 100), of_objective=True,

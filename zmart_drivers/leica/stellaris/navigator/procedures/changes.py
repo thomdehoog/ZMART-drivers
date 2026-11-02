@@ -776,6 +776,81 @@ def start_live(client, project=None, *, fast=False) -> dict:
     return run(client, change)
 
 
+def z_compensation_result(client, planned, max_retries=None) -> dict:
+    result = None
+    for change in planned:
+        result = run(client, change, max_retries=max_retries)
+        if not result["success"]:
+            return result
+    result["z_compensation"] = readers.get_z_compensation(client)
+    return result
+
+
+def set_z_compensation(client, *, excitation=None, detector=None, motcorr=None, reference_um=None, max_retries=None) -> dict:
+    """Switch linear Z-compensation's modes on or off, as the window's checkboxes, and set its reference position;
+    the result's ``z_compensation`` is read back.
+
+    Switched on with no support points, LAS X puts one at each end of the
+    stack, holding the current powers and gains. While a mode is on, LAS X
+    offers no autofocus.
+    """
+    asked = {"excitation": excitation, "detector": detector, "motcorr": motcorr}
+    if all(value is None for value in asked.values()) and reference_um is None:
+        return dispatch.refused("set_z_compensation needs excitation, detector, motcorr or reference_um")
+    if any(value is not None and not isinstance(value, bool) for value in asked.values()):
+        return dispatch.refused(f"the Z-compensation modes take True or False, not {asked}")
+    if reference_um is not None and (isinstance(reference_um, bool) or not isinstance(reference_um, (int, float))):
+        return dispatch.refused(f"reference_um is a number of micrometres, not {reference_um!r}")
+    planned = [writes.z_compensation_reference(float(reference_um))] if reference_um is not None else []
+    planned += [writes.z_compensation_mode(name, on) for name, on in asked.items() if on is not None]
+    return z_compensation_result(client, planned, max_retries)
+
+
+def z_compensation_point(client, z_um):
+    """``(now, point, refusal)``: the Z-compensation, and its support point at *z_um* (within 0.05 um), or why not."""
+    now = readers.get_z_compensation(client)
+    if isinstance(z_um, bool) or not isinstance(z_um, (int, float)):
+        return now, None, f"a support point is named by its z in micrometres, not {z_um!r}"
+    point = next((p for p in now["points"] if abs(p["z_um"] - z_um) <= 0.05), None)
+    if point is None:
+        return now, None, f"there is no Z-compensation point at {z_um:g} um; there are {[round(p['z_um'], 2) for p in now['points']]}"
+    return now, point, None
+
+
+def add_z_compensation_point(client, *, max_retries=None) -> dict:
+    """Add a Z-compensation support point where the focus is, holding the current powers and gains, as the window's Add."""
+    now = readers.get_z_compensation(client)
+    if not now["modes"]:
+        return dispatch.refused("switch a Z-compensation mode on first")
+    here = readers.read_z_um(client, readers.get_z_drive_in_use(client))
+    if here is None:
+        return dispatch.refused("where the focus is could not be read")
+    return z_compensation_result(client, [writes.z_compensation_add(here)], max_retries)
+
+
+def remove_z_compensation_point(client, z_um, *, max_retries=None) -> dict:
+    """Remove the support point at *z_um*, as the window's Delete, or every point with None, as Remove All."""
+    if z_um is None:
+        return z_compensation_result(client, [writes.z_compensation_remove(None, 0)], max_retries)
+    now, point, refusal = z_compensation_point(client, z_um)
+    if refusal:
+        return dispatch.refused(refusal)
+    return z_compensation_result(client, [writes.z_compensation_remove(point["offset_m"], len(now["points"]))], max_retries)
+
+
+def move_to_z_compensation_point(client, z_um, *, max_retries=None) -> dict:
+    """Move the focus to the support point at *z_um*, as the window's Move To; checked against the z limits like any z move."""
+    _, point, refusal = z_compensation_point(client, z_um)
+    if refusal:
+        return dispatch.refused(refusal)
+    drive = readers.get_z_drive_in_use(client)
+    here = readers.read_z_um(client, drive)
+    if here is None:
+        return dispatch.refused(f"where {drive} stands could not be read")
+    axis = "z_galvo_um" if drive == "z-galvo" else "z_wide_um"
+    return run(client, writes.z_compensation_move_to(drive, point["offset_m"], point["z_um"], start={f"from_{axis}": here}), max_retries=max_retries)
+
+
 def roi_result(client, planned, max_retries=None) -> dict:
     result = None
     for change in planned:

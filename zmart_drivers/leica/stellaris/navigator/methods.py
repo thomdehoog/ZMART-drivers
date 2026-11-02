@@ -614,6 +614,39 @@ class Microscope:
         lines = readings.get_aobs_lines(self.handle.client) or []
         return next(line for line in lines if abs(line["wavelength"] - float(wavelength_nm)) < 0.5)
 
+    def set_z_compensation(self, excitation: bool | None = None, detector: bool | None = None, motcorr: bool | None = None,
+                           reference_um: float | None = None) -> dict:
+        """Switch linear Z-compensation's modes (laser power, detector gain, collar along z) on or off, and set its
+        reference position, as LAS X's Linear Z-Compensation window. Answers ``modes``, ``reference_um``, ``points``.
+
+        Switched on with no support points, LAS X puts one at each end of the
+        z-stack. Change the powers and gains at a point with the usual setters
+        after moving there, then :meth:`add_z_compensation_point`.
+        """
+        self.handle.require_open()
+        result = changes.set_z_compensation(self.handle.client, excitation=excitation, detector=detector, motcorr=motcorr, reference_um=reference_um)
+        checked(self.handle, result, "set_z_compensation()")
+        return result["z_compensation"]
+
+    def add_z_compensation_point(self) -> dict:
+        """Add a support point where the focus is, holding the current powers and gains, as the window's Add."""
+        self.handle.require_open()
+        result = changes.add_z_compensation_point(self.handle.client)
+        checked(self.handle, result, "add_z_compensation_point()")
+        return result["z_compensation"]
+
+    def remove_z_compensation_point(self, z_um: float | None) -> dict:
+        """Remove the support point at *z_um* (micrometres, as listed), or every point with None (Remove All)."""
+        self.handle.require_open()
+        result = changes.remove_z_compensation_point(self.handle.client, z_um)
+        checked(self.handle, result, f"remove_z_compensation_point({z_um!r})")
+        return result["z_compensation"]
+
+    def move_to_z_compensation_point(self, z_um: float) -> dict:
+        """Move the focus to the support point at *z_um*, as the window's Move To; checked against the z limits."""
+        self.handle.require_open()
+        return checked(self.handle, changes.move_to_z_compensation_point(self.handle.client, z_um), f"move_to_z_compensation_point({z_um!r})")
+
     def set_roi_scan(self, on: bool, sections: tuple[int, int] | None = None) -> dict:
         """ROI scan on or off, as the Acquisition Mode panel's ROI button; *sections* ``(first, last)`` limits it to those
         sections of the z-stack. Answers ``on``, ``sections``, ``bleach_mode`` as LAS X holds them.

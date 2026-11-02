@@ -206,6 +206,11 @@ def get_autofocus_settings(client, **keywords):
     return _routed("autofocus_settings", client, **keywords)
 
 
+def get_z_compensation(client, **keywords):
+    """Linear Z-compensation: ``modes``, ``reference_um``, ``points`` (``z_um``, ``values``)."""
+    return _routed("z_compensation", client, **keywords)
+
+
 def get_roi_scan(client, **keywords):
     """ROI scan and the bleach mode: ``on``, ``sections``, ``bleach_mode``, ``roi_possible``, ``bleach_possible``."""
     return _routed("roi_scan", client, **keywords)
