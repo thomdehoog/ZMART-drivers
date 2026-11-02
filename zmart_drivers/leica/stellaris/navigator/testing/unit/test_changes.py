@@ -1031,6 +1031,40 @@ class TestFastLive:
         assert changes.set_fast_live(client, "galvo", format=256)["success"] is False
 
 
+class TestRoiScanAndBleachMode:
+    def test_roi_scan_is_switched_on_and_off(self, lasx, client):
+        assert changes.set_roi_scan(client, True)["roi"] == {"on": True, "sections": None, "bleach_mode": False}
+        assert changes.set_roi_scan(client, False)["roi"]["on"] is False
+
+    def test_the_roi_scan_is_limited_to_sections_of_the_stack(self, lasx, client):
+        lasx.z_um = {1: 0.0, 2: 1000.0}
+        changes.set_z_stack(client, "z-wide", 995.0, 1005.0, 2.5)
+
+        result = changes.set_roi_scan(client, True, sections=(2, 4))
+
+        assert result["confirmed"] is True and result["roi"]["sections"] == (2, 4)
+
+    @pytest.mark.parametrize("sections", [(0, 2), (3, 2), (2, 99), (1.5, 3)])
+    def test_sections_outside_the_stack_are_refused(self, lasx, client, sections):
+        lasx.z_um = {1: 0.0, 2: 1000.0}
+        changes.set_z_stack(client, "z-wide", 995.0, 1005.0, 2.5)
+
+        assert changes.set_roi_scan(client, True, sections=sections)["success"] is False
+        assert direct_reader.get_roi_scan()["on"] is False
+
+    def test_sections_without_a_stack_are_refused(self, lasx, client):
+        assert changes.set_roi_scan(client, True, sections=(1, 2))["success"] is False
+
+    def test_the_bleach_mode_is_switched_on_and_off(self, lasx, client):
+        assert changes.set_bleach_mode(client, True)["roi"]["bleach_mode"] is True
+        assert changes.set_bleach_mode(client, False)["roi"]["bleach_mode"] is False
+
+    def test_roi_scan_and_bleach_mode_exclude_each_other_as_in_the_window(self, lasx, client):
+        changes.set_roi_scan(client, True)
+
+        assert changes.set_bleach_mode(client, True)["success"] is False
+
+
 class TestTimeSeries:
     @pytest.fixture
     def timed(self, lasx, client):

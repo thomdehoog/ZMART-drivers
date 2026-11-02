@@ -350,6 +350,14 @@ STATE_TREE_WRITES = {
     "DelayTime": TreeWrite(("Acquire", "AcquireTStackInfo", "DelayTime"), float, within=(0, 1e9)),
     "Duration": TreeWrite(("Acquire", "AcquireTStackInfo", "Duration"), float, within=(0, 1e15)),
     "IsEnableAutomaticTSectionsCalculation": TreeWrite(("Acquire", "AcquireTStackInfo", "IsEnableAutomaticTSectionsCalculation"), bool),
+    # ROI scan and the bleach mode (the Acquisition Mode panel's ROI and bleach buttons), and the ROI scan's
+    # sections of a stack (ROI 3D). The window writes them here with no command (simulator, 2026-11-02);
+    # LCS keeps the sections within the stack. The regions themselves are in LAS X's data container.
+    "EnableRoiScan": TreeWrite(("Confocal", "ROIScan", "EnableRoiScan"), bool),
+    "EnableBleachScan": TreeWrite(("Confocal", "ROIScan", "EnableBleachScan"), bool),
+    "Is3DLimitedRoiScanEnabled": TreeWrite(("Confocal", "ROIScan", "Is3DLimitedRoiScanEnabled"), bool),
+    "First3DRoiSection": TreeWrite(("Confocal", "ROIScan", "First3DRoiSection"), within=(1, 100000)),
+    "Last3DRoiSection": TreeWrite(("Confocal", "ROIScan", "Last3DRoiSection"), within=(1, 100000)),
     "MotCorrRefPos": TreeWrite(
         ("Microscope", "ObjectiveList", "ObjectiveInfo", "MotCorrRefPos"), float,
         choices=frozenset({-1.0}), within=(0, 100), of_objective=True,

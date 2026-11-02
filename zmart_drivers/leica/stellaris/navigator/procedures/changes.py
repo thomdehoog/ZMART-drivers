@@ -776,6 +776,58 @@ def start_live(client, project=None, *, fast=False) -> dict:
     return run(client, change)
 
 
+def roi_result(client, planned, max_retries=None) -> dict:
+    result = None
+    for change in planned:
+        result = run(client, change, max_retries=max_retries)
+        if not result["success"]:
+            return result
+    result["roi"] = {key: value for key, value in readers.get_roi_scan(client).items() if key in ("on", "sections", "bleach_mode")}
+    return result
+
+
+def set_roi_scan(client, on, *, sections=None, max_retries=None) -> dict:
+    """ROI scan on or off, as the Acquisition Mode panel's ROI button; with *sections* ``(first, last)``, limited to
+    those sections of the z-stack (ROI 3D). The result's ``roi`` is read back.
+
+    The regions themselves are drawn in LAS X's viewer and kept in its data
+    container; they do not pass through LCS. Refused when the window greys
+    the button out (in the bleach mode).
+    """
+    if not isinstance(on, bool):
+        return dispatch.refused(f"set_roi_scan takes True or False, not {on!r}")
+    now = readers.get_roi_scan(client)
+    if on and not now["on"] and not now["roi_possible"]:
+        return dispatch.refused("LAS X offers no ROI scan now (is the bleach mode on?)")
+    planned = [writes.roi_scan(on)]
+    if on:
+        if sections is not None:
+            stack = readers.get_z_stack(client)
+            if not stack:
+                return dispatch.refused("ROI scan sections need a z-stack")
+            first, last = (sections + (None, None))[:2] if isinstance(sections, tuple) else (None, None)
+            if not all(isinstance(n, int) and not isinstance(n, bool) for n in (first, last)) or not 1 <= first <= last <= stack["sections"]:
+                return dispatch.refused(f"sections are (first, last), whole, 1 to {stack['sections']}, first not after last; not {sections!r}")
+            planned += writes.roi_sections(first, last)
+        elif now["sections"] is not None:
+            planned += writes.roi_sections(None, None)
+    return roi_result(client, planned, max_retries)
+
+
+def set_bleach_mode(client, on, *, max_retries=None) -> dict:
+    """The bleach mode on or off, as the Acquisition Mode panel's bleach button; the result's ``roi`` is read back.
+
+    The bleach points are set in LAS X's window and kept in its data
+    container. Refused when the window greys the button out (with ROI scan on).
+    """
+    if not isinstance(on, bool):
+        return dispatch.refused(f"set_bleach_mode takes True or False, not {on!r}")
+    now = readers.get_roi_scan(client)
+    if on and not now["bleach_mode"] and not now["bleach_possible"]:
+        return dispatch.refused("LAS X offers no bleach mode now (is ROI scan on?)")
+    return roi_result(client, [writes.bleach_mode(on)], max_retries)
+
+
 #: The most frames LAS X's t panel takes.
 MOST_FRAMES = 1_000_000_000
 

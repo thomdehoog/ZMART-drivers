@@ -50,7 +50,8 @@ checked by the driver either way (`transfer.CHECKED_COMMANDS`, `transfer.STATE_T
   which values the window's slider offers.
 
 **Region and experiment types**
-- ROI scan: scanning only inside a region (the Zoom In rectangle is an ROI in LAS X's data container).
+- The regions of an ROI scan and the bleach points: drawn in LAS X's viewer and kept in its data container
+  (`Confocal/ROIScan/CurrentDCROISetID`), not in LCS; the laser lines per region (ROI Configuration).
 - Bleaching and FRAP (LCS has `SequentialBleachPointParameter`).
 - Z-compensation: laser and gain along depth.
 - The carrier: slide, dish, well plate (the Navigator Expert sent `StageSetCarrierAttachment`).

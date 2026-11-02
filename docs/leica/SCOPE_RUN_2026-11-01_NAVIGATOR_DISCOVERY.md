@@ -867,3 +867,18 @@ window showed 5), until stopped, 12 frames (until stopped off, the window showed
 put back to 1 frame, xyz. A 3-frame series taken with `acquire()` (LAS X's Start) was not saved: the files are
 written for x, y and z only.
 
+## 49. ROI scan and the bleach mode (2 November 2026)
+
+The Acquisition Mode panel's ROI button (pressed by the driver's own mouse click) sent LCS no command:
+`Confocal/ROIScan/EnableRoiScan` went True, and LCS made `CanDoBleach` False, `CanDo3DLimitedRoiScan` and
+`CanDoROIZoomIn` True, and Zoom In's `CanDoZoomIn` False. Written into the state tree, `EnableRoiScan` switched
+ROI scan on and off, the window's button following; `EnableBleachScan` did the same for the bleach mode;
+`Is3DLimitedRoiScanEnabled` with `First3DRoiSection` and `Last3DRoiSection` limited the ROI scan to sections of
+the stack, LCS keeping them within it (50 became 7, the stack's last). The regions and the bleach points are
+not in LCS: they are kept in LAS X's data container (`CurrentDCROISetID`, `CurrentDCBleachPointROISetID`).
+
+Built: `set_roi_scan(on, sections=None)` and `set_bleach_mode(on)`, refused when the window greys the button
+out, the sections checked against the stack first. Through the driver: ROI scan on with sections 2 to 5, then
+every section, then off; the bleach mode refused while ROI scan was on; then on and off; the window's buttons
+following each time.
+

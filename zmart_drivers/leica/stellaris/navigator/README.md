@@ -140,6 +140,7 @@ mic.connect("stellaris-navigator")                                              
 | `set_tau_channel_colour(detector, channel, colour)` | The colour of TauSeparation's channel 1 or 2 of a detector, as the window's colour pick; only while the detector is in TauSeparation. |
 | `set_tau_channel_lifetime(detector, channel, ns)` | The lifetime of TauSeparation's channel 1 or 2, in nanoseconds, as the window's slider; within its scale, 0.07 to 9.37 ns. |
 | `find_tau_lifetimes(detector)` | TauSeparation's Find: LAS X looks for the two lifetimes in the data it has; answers whether it found them and the lifetimes now. |
+| `set_roi_scan(on, sections=None)`, `set_bleach_mode(on)` | ROI scan and the bleach mode on or off, as the Acquisition Mode panel's buttons; *sections* `(first, last)` limits the ROI scan to those sections of the z-stack. The regions are drawn in LAS X's viewer. |
 | `set_time_series(frames=, interval_s=, until_stopped=)` | The time series, as LAS X's t panel: the number of frames, the interval between them (at least one frame), or Acquire Until Stopped. The scan mode must have time (xyt, ...). Answers the series as LAS X holds it. |
 | `start_live()`, `stop_live()` | Start and stop Live, as LAS X's Live button. While Live runs, the lasers are on; stop it before taking pictures. |
 | `start_fast_live()` | Start Fast Live, as LAS X's Fast Live button; `stop_live()` stops it. |

@@ -206,6 +206,11 @@ def get_autofocus_settings(client, **keywords):
     return _routed("autofocus_settings", client, **keywords)
 
 
+def get_roi_scan(client, **keywords):
+    """ROI scan and the bleach mode: ``on``, ``sections``, ``bleach_mode``, ``roi_possible``, ``bleach_possible``."""
+    return _routed("roi_scan", client, **keywords)
+
+
 def get_time_series(client, **keywords):
     """The time series: ``frames``, ``interval_s``, ``duration_s``, ``until_stopped``, ``shortest_interval_s``."""
     return _routed("time_series", client, **keywords)

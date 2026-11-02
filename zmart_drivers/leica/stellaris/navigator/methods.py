@@ -614,6 +614,24 @@ class Microscope:
         lines = readings.get_aobs_lines(self.handle.client) or []
         return next(line for line in lines if abs(line["wavelength"] - float(wavelength_nm)) < 0.5)
 
+    def set_roi_scan(self, on: bool, sections: tuple[int, int] | None = None) -> dict:
+        """ROI scan on or off, as the Acquisition Mode panel's ROI button; *sections* ``(first, last)`` limits it to those
+        sections of the z-stack. Answers ``on``, ``sections``, ``bleach_mode`` as LAS X holds them.
+
+        The regions are drawn in LAS X's viewer; the driver does not draw them.
+        """
+        self.handle.require_open()
+        result = changes.set_roi_scan(self.handle.client, on, sections=sections)
+        checked(self.handle, result, f"set_roi_scan({on!r}, sections={sections!r})")
+        return result["roi"]
+
+    def set_bleach_mode(self, on: bool) -> dict:
+        """The bleach mode on or off, as the Acquisition Mode panel's bleach button. Answers as :meth:`set_roi_scan`."""
+        self.handle.require_open()
+        result = changes.set_bleach_mode(self.handle.client, on)
+        checked(self.handle, result, f"set_bleach_mode({on!r})")
+        return result["roi"]
+
     def set_time_series(self, frames: int | None = None, interval_s: float | None = None, until_stopped: bool | None = None) -> dict:
         """Set the time series as LAS X's t panel does: the number of *frames*, the *interval_s* between them,
         or *until_stopped* (Acquire Until Stopped). Answers the time series as LAS X holds it.

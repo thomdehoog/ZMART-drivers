@@ -1171,6 +1171,38 @@ def start_live(project: int, *, fast: bool = False) -> Write:
     )
 
 
+def roi_change(command: str, node: str, written, description: str, shows) -> Write:
+    """One value of the ROI scan or bleach mode written into LCS's state tree, as the window's buttons do; read back."""
+
+    def fill(request: Request) -> None:
+        request.elements = [f'<StateTree Command="{node}" Value="{written}"/>']
+
+    return Write(command=command, values={"value": description}, request=node, fill=fill, description=description,
+                 ready=idle(), confirm=Expect("roi_scan", lambda r: bool(r) and shows(r)))
+
+
+def roi_scan(on: bool) -> Write:
+    """ROI scan on or off, as the Acquisition Mode panel's ROI button."""
+    return roi_change("set_roi_scan", "EnableRoiScan", int(bool(on)), f"ROI scan -> {'on' if on else 'off'}", lambda r: r["on"] is bool(on))
+
+
+def roi_sections(first: int, last: int) -> list[Write]:
+    """The ROI scan limited to sections *first* to *last* of the stack (ROI 3D), or to all with None."""
+    if first is None:
+        return [roi_change("set_roi_scan", "Is3DLimitedRoiScanEnabled", 0, "ROI scan -> every section", lambda r: r["sections"] is None)]
+    return [
+        roi_change("set_roi_scan", "Is3DLimitedRoiScanEnabled", 1, "ROI scan -> some sections", lambda r: r["sections"] is not None),
+        roi_change("set_roi_scan", "First3DRoiSection", int(first), f"ROI scan first section -> {first}", lambda r: r["sections"][0] == first),
+        roi_change("set_roi_scan", "Last3DRoiSection", int(last), f"ROI scan last section -> {last}", lambda r: r["sections"] == (first, last)),
+    ]
+
+
+def bleach_mode(on: bool) -> Write:
+    """The bleach mode on or off, as the Acquisition Mode panel's bleach button."""
+    return roi_change("set_bleach_mode", "EnableBleachScan", int(bool(on)), f"Bleach mode -> {'on' if on else 'off'}",
+                      lambda r: r["bleach_mode"] is bool(on))
+
+
 def time_series_change(name: str, node: str, written, description: str, shows) -> Write:
     """One value of the time series written into LCS's state tree, as the t panel does; read back."""
 

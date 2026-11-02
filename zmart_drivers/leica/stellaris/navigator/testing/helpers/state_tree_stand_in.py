@@ -40,6 +40,15 @@ SIMULATOR_SETTINGS = {
     ("Acquire", "ZStackUseMode"): 1,
     # The time series, as LCS keeps it (simulator, 2026-11-02): one frame, as fast as it goes.
     ("Acquire", "AcquireTStackInfo", "RepeatCount"): 1,
+    # ROI scan and bleaching, as LCS keeps them (simulator, 2026-11-02).
+    ("Confocal", "ROIScan", "CanDoROIScan"): True,
+    ("Confocal", "ROIScan", "EnableRoiScan"): False,
+    ("Confocal", "ROIScan", "CanDoBleach"): True,
+    ("Confocal", "ROIScan", "EnableBleachScan"): False,
+    ("Confocal", "ROIScan", "CanDo3DLimitedRoiScan"): False,
+    ("Confocal", "ROIScan", "Is3DLimitedRoiScanEnabled"): False,
+    ("Confocal", "ROIScan", "First3DRoiSection"): 1,
+    ("Confocal", "ROIScan", "Last3DRoiSection"): 1,
     ("Acquire", "AcquireTStackInfo", "DelayTime"): 1.28,
     ("Acquire", "AcquireTStackInfo", "Duration"): 0.0,
     ("Acquire", "AcquireTStackInfo", "CalculationMode"): 3,
@@ -557,6 +566,26 @@ class StandInNodes:
                 info = nodes[change.NodeID][1]
                 infos = [n for n in nodes[nodes[info][1]][2] if nodes[n][0] == "ObjectiveInfo"]
                 self.objectives[infos.index(info)][path[-1]] = change.Value
+                continue
+            if path[:2] == ["Confocal", "ROIScan"]:
+                # ROI scan and bleaching exclude each other; the 3D sections stay within the stack, first before last.
+                r = ("Confocal", "ROIScan")
+                name = path[-1]
+                if name in ("First3DRoiSection", "Last3DRoiSection"):
+                    count = max(1, int(self.live.get(("Acquire", "AcquireZStackInfo", "SectionsCount"), 1)))
+                    value = min(max(1, int(change.Value)), count)
+                    if name == "Last3DRoiSection":
+                        value = max(value, self.live[(*r, "First3DRoiSection")])
+                    self.live[(*r, name)] = value
+                    if name == "First3DRoiSection":
+                        self.live[(*r, "Last3DRoiSection")] = max(self.live[(*r, "Last3DRoiSection")], value)
+                    continue
+                self.live[(*r, name)] = bool(change.Value)
+                if name == "EnableRoiScan":
+                    self.live[(*r, "CanDoBleach")] = not change.Value
+                    self.live[(*r, "CanDo3DLimitedRoiScan")] = bool(change.Value)
+                if name == "EnableBleachScan":
+                    self.live[(*r, "CanDoROIScan")] = not change.Value
                 continue
             if path[:2] == ["Acquire", "AcquireTStackInfo"]:
                 # The time series as LCS keeps it: the frames follow from the duration, the interval

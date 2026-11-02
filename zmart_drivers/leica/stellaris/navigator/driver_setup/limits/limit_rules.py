@@ -425,6 +425,9 @@ MUTATING_COMMANDS = {
     "set_fast_live": "set_fast_live",
     # the time series: how many frames and how often, not the light
     "set_time_series": "set_time_series",
+    # ROI scan and the bleach mode: switches; the light in a region is set as any laser power
+    "set_roi_scan": "set_roi_scan",
+    "set_bleach_mode": "set_bleach_mode",
     # the z-stack: its ends are z positions the scan moves through
     "set_z_stack_drive": "set_z_stack_drive",
     "set_z_stack_range": "z_stack",

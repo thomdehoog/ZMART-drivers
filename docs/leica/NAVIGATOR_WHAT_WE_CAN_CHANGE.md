@@ -55,6 +55,8 @@ discovery session in `SCOPE_RUN_2026-11-01_NAVIGATOR_DISCOVERY.md` and the build
 | Letting go of saved pictures in LAS X | Works |
 | Live, started and stopped | Works, with LAS X's commands; stop it before taking pictures |
 | Time series: frames, interval, Acquire Until Stopped | Works: written into LAS X's state tree, as its t panel does; saving a series is not yet possible |
+| ROI scan on or off, and the sections of a stack it is limited to (ROI 3D) | Works: written into LAS X's state tree, as its button does; the regions themselves are drawn in LAS X's viewer |
+| The bleach mode on or off | Works: written into LAS X's state tree, as its button does; the bleach points are set in LAS X's window |
 | Fast Live, started and stopped | Works, with LAS X's commands |
 | Fast Live's Scan Settings, both scanners | Works: written into LAS X's state tree, as its window does; each range checked first, since LAS X does not hold the format to it |
 
@@ -184,7 +186,7 @@ service and the person responsible for the instrument.
 
 | State | Settings |
 |---|---|
-| Works | 87 (the objective among them, not yet tried) |
+| Works | 89 (the objective among them, not yet tried) |
 | Tried | 0 |
 | Command known | 0 |
 | Not yet learned | 8 |

@@ -91,6 +91,7 @@ READS = (
     "aobs_lines",
     "fast_live",
     "time_series",
+    "roi_scan",
     "autofocus_optics",
     "pixel_size",
     "bit_depth",
@@ -1087,6 +1088,26 @@ def get_autofocus_optics() -> dict:
         return {"lines": lines}
 
     return read("the Best Focus Setting's optics", reading)
+
+
+def get_roi_scan() -> dict:
+    """ROI scan and the bleach mode, as the Acquisition Mode panel's buttons show them: ``on`` (ROI scan),
+    ``sections`` (first and last section of the stack it is limited to, or None), ``bleach_mode``; and
+    ``roi_possible`` and ``bleach_possible``, whether the window offers each now (``Confocal/ROIScan``).
+    """
+    r = ("Confocal", "ROIScan")
+    found = settings("the ROI scan", {
+        "on": (*r, "EnableRoiScan"), "limited": (*r, "Is3DLimitedRoiScanEnabled"), "first": (*r, "First3DRoiSection"),
+        "last": (*r, "Last3DRoiSection"), "bleach": (*r, "EnableBleachScan"), "can_roi": (*r, "CanDoROIScan"),
+        "can_bleach": (*r, "CanDoBleach"),
+    })
+    return {
+        "on": bool(found["on"]),
+        "sections": (found["first"], found["last"]) if found["on"] and found["limited"] else None,
+        "bleach_mode": bool(found["bleach"]),
+        "roi_possible": bool(found["can_roi"]),
+        "bleach_possible": bool(found["can_bleach"]),
+    }
 
 
 def get_time_series() -> dict:
