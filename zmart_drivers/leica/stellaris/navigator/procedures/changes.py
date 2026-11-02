@@ -460,6 +460,33 @@ def find_tau_lifetimes(client, detector) -> dict:
     return result
 
 
+def set_tau_scan(client, detector, *, images=None, range_ns=None, max_retries=None) -> dict:
+    """Set TauScan's number of images (1 to the detector's most) and lifetime range ``(begin_ns, end_ns)`` (0.05 to
+    11.5 ns) of *detector*, as its TauScan window; only while the detector is in TauScan. Checked before anything is sent."""
+    if images is None and range_ns is None:
+        return dispatch.refused("set_tau_scan needs images or range_ns")
+    units = {unit.get("Name"): unit for unit in readers.get_detection_units(client) or []}
+    if detector not in units:
+        return dispatch.refused(f"no detector {detector!r}; LAS X's are {sorted(units)}")
+    found = ((readers.get_detector_modes(client) or {}).get(detector) or {}).get("tau_scan")
+    if not found:
+        return dispatch.refused(f"{detector} is not in TauScan")
+    most = found.get("most_images") or 1
+    if images is not None and (isinstance(images, bool) or not isinstance(images, int) or not 1 <= images <= most):
+        return dispatch.refused(f"{detector}'s TauScan takes 1 to {most} images, not {images!r}")
+    if range_ns is not None:
+        low, high = writes.TAU_SCAN_NS
+        ok = isinstance(range_ns, tuple) and len(range_ns) == 2 and all(isinstance(n, (int, float)) and not isinstance(n, bool) for n in range_ns)
+        if not ok or not low <= range_ns[0] < range_ns[1] <= high:
+            return dispatch.refused(f"TauScan's range runs within {low} to {high} ns, begin before end; not {range_ns!r}")
+    result = None
+    for change in writes.tau_scan(writes.route_of(units[detector]["BeamRoute"]), detector, images, range_ns):
+        result = run(client, change, max_retries=max_retries)
+        if not result["success"]:
+            return result
+    return result
+
+
 def tau_gating(client, detector):
     """``(route, gates, refusal)``: the beam route and TauGating's channels of *detector*, or why not."""
     units = {unit.get("Name"): unit for unit in readers.get_detection_units(client) or []}

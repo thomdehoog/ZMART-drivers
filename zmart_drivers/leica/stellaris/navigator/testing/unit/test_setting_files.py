@@ -152,6 +152,39 @@ def test_a_tau_mode_las_x_greys_out_is_refused_and_nothing_is_sent(lasx, client,
     assert len(lasx.sent) == sent
 
 
+class TestTauScan:
+    @pytest.fixture
+    def scanning(self, lasx, client, tmp_path):
+        setting_files.set_detector(client, tmp_path, "HyD S 3", tau_mode="TauScan")
+        return client
+
+    def test_the_images_and_range_are_read(self, lasx, scanning):
+        assert direct_reader.get_detector_modes()["HyD S 3"]["tau_scan"] == {"images": 3, "range_ns": pytest.approx((0.1, 10.0)), "most_images": 7}
+
+    def test_they_are_set_with_the_window_s_commands(self, lasx, scanning):
+        from zmart_drivers.leica.stellaris.navigator.procedures import changes
+
+        result = changes.set_tau_scan(scanning, "HyD S 3", images=5, range_ns=(0.5, 8.0))
+
+        assert result["confirmed"] is True
+        assert direct_reader.get_detector_modes()["HyD S 3"]["tau_scan"]["images"] == 5
+        assert [x.split('"')[1] for x in lasx.sent[-2:]] == ["SetDetectorTauScanCount", "SetDetectorTauScanRange"]
+
+    @pytest.mark.parametrize("keywords", [{"images": 8}, {"images": 0}, {"range_ns": (0.01, 5.0)}, {"range_ns": (1.0, 20.0)},
+                                          {"range_ns": (5.0, 2.0)}, {}])
+    def test_what_the_window_does_not_offer_is_refused(self, lasx, scanning, keywords):
+        from zmart_drivers.leica.stellaris.navigator.procedures import changes
+
+        sent = len(lasx.sent)
+        assert changes.set_tau_scan(scanning, "HyD S 3", **keywords)["success"] is False
+        assert len(lasx.sent) == sent
+
+    def test_outside_tau_scan_it_is_refused(self, lasx, client):
+        from zmart_drivers.leica.stellaris.navigator.procedures import changes
+
+        assert changes.set_tau_scan(client, "HyD S 3", images=4)["success"] is False
+
+
 class TestTauGating:
     @pytest.fixture
     def gating(self, lasx, client, tmp_path):

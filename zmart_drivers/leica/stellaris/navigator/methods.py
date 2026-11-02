@@ -380,6 +380,12 @@ class Microscope:
         checked(self.handle, result, f"find_tau_lifetimes({detector!r})")
         return {"found": result["found"], "lifetimes_ns": result["lifetimes_ns"]}
 
+    def set_tau_scan(self, detector: str, images: int | None = None, range_ns: tuple[float, float] | None = None) -> dict:
+        """Set TauScan's number of images (1 to the detector's most, 7 on the simulator) and its lifetime range
+        ``(begin_ns, end_ns)`` (0.05 to 11.5 ns), as its window; only while the detector is in TauScan."""
+        self.handle.require_open()
+        return checked(self.handle, changes.set_tau_scan(self.handle.client, detector, images=images, range_ns=range_ns), f"set_tau_scan({detector!r})")
+
     def set_tau_gate(self, detector: str, channel: int, gate: int, begin_ns: float, end_ns: float) -> dict:
         """Move TauGating's *gate* of *channel* (both counted from 1) to *begin_ns* .. *end_ns*, as its window's handles;
         within -1 to 11.5 ns. Only while the detector is in TauGating."""

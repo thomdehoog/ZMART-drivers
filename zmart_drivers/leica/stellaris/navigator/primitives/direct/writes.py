@@ -899,6 +899,37 @@ def detector_tau(route, name: str, place: int, mode: str) -> Write:
 TAU_LIFETIME_NS = (0.07, 9.37)
 
 
+#: TauScan's lifetime range as LCS keeps it, in nanoseconds (simulator, 2026-11-03).
+TAU_SCAN_NS = (0.05, 11.5)
+
+
+def tau_scan(route, name: str, images=None, range_ns=None) -> list[Write]:
+    """TauScan's number of images and lifetime range ``(begin_ns, end_ns)`` of the detector *name*, with the TauScan
+    window's own commands; read back."""
+    planned = []
+
+    def write(command, element, description, shows):
+        def fill(request: Request) -> None:
+            request.elements = [element.replace("{route}", beam_route(route))]
+
+        return Write(command="set_tau_scan", values={"value": description}, request=command, fill=fill,
+                     description=f"Detector {name} TauScan {description}", ready=idle(),
+                     confirm=Expect("detector_modes", lambda modes: shows(((modes or {}).get(name) or {}).get("tau_scan") or {})))
+
+    if images is not None:
+        planned.append(write("SetDetectorTauScanCount", f'<Scanner Command="SetDetectorTauScanCount" ImageCount="{int(images)}">{{route}}</Scanner>',
+                             f"images -> {images}", lambda found: found.get("images") == images))
+    if range_ns is not None:
+        begin, end = range_ns
+        planned.append(write(
+            "SetDetectorTauScanRange",
+            f'<Scanner Command="SetDetectorTauScanRange" GateRangeBegin="{begin / 1e9!r}" GateRangeEnd="{end / 1e9!r}">{{route}}</Scanner>',
+            f"range -> {begin:g} to {end:g} ns",
+            lambda found: bool(found.get("range_ns")) and abs(found["range_ns"][0] - begin) <= 0.01 and abs(found["range_ns"][1] - end) <= 0.01,
+        ))
+    return planned
+
+
 #: TauGating's scale in the window, in nanoseconds (simulator, 2026-11-02).
 TAU_GATE_NS = (-1.0, 11.5)
 #: The most gates a TauGating channel takes, as the window allows.

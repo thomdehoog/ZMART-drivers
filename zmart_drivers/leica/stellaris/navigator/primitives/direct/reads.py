@@ -1038,6 +1038,21 @@ def get_detector_modes() -> dict:
             entries = of_name(nodes, children(nodes, holder), entry_name) if holder else []
             return [node_value(nodes, named(nodes, entry, code_name)) for entry in entries]
 
+        # Each detector's most TauScan images, from the detector itself (it follows the mode; simulator, 2026-11-03).
+        most = {}
+        for spectro in of_name(nodes, children(nodes, node_at(nodes, DETECTION)), "Spectrophotometer"):
+            for hw in of_name(nodes, children(nodes, child_named(nodes, spectro, "DetectionUnitList")), "DetectorHWInfo"):
+                found_most = child_named(nodes, hw, "TauScanMaxImageCount")
+                most[node_value(nodes, named(nodes, hw, "Name"))] = node_value(nodes, found_most) if found_most is not None else None
+
+        def tau_scan(unit, most_images):
+            """TauScan's ``images``, ``range_ns`` (begin, end) and ``most_images``; None in another tau mode."""
+            if node_value(nodes, named(nodes, unit, "DigitalGatingMode")) != 5:
+                return None
+            begin, end = (node_value(nodes, named(nodes, unit, n)) for n in ("TauScanRangeBegin", "TauScanRangeEnd"))
+            return {"images": node_value(nodes, named(nodes, unit, "TauScanImageCount")), "range_ns": (begin * 1e9, end * 1e9),
+                    "most_images": most_images}
+
         def tau_gates(unit):
             """TauGating's channels: each ``on`` and its ``gates`` as (begin, end) in nanoseconds; empty in another tau mode."""
             if node_value(nodes, named(nodes, unit, "DigitalGatingMode")) != 3:
@@ -1073,6 +1088,7 @@ def get_detector_modes() -> dict:
                 "operating_offered": listed_codes(unit, "DetectionUnitOperatingModeList_SeqInfo", "DetectionUnitOperatingMode", "OperatingMode"),
                 "tau_colours": listed_codes(unit, "TauSeparationDefinition_SeqInfo", "TauSeparationChannel", "LutName"),
                 "gates": tau_gates(unit),
+                "tau_scan": tau_scan(unit, most.get(name)),
                 "tau_lifetimes_ns": [
                     node_value(nodes, named(nodes, child_named(nodes, channel, "TauSeparationLine"), "TauLinePosition")) * 1e9
                     for channel in tau_channels(unit)

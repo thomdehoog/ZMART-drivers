@@ -188,6 +188,8 @@ ALLOWED_COMMANDS = frozenset(
         "SetDetectorTauSeparationConfig",
         "FindTauSeparationLifeTimes",
         "SetDigitalGateConfig",
+        "SetDetectorTauScanCount",
+        "SetDetectorTauScanRange",
         "AddDigitalGate",
         "RemoveDigitalGate",
         "AddDetectorImageChannel",

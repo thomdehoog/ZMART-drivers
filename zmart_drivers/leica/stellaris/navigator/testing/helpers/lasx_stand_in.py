@@ -408,6 +408,16 @@ class PlainNavigator:
         if success and found:
             self.detector_at(e)["TauLifetimes"] = list(found)
 
+    def take_SetDetectorTauScanCount(self, e):
+        unit = self.detector_at(e)
+        if int(e.get("ImageCount")) <= unit.get("TauScanMaxImageCount", 7):  # more is ignored, as by LCS
+            unit["TauScanImageCount"] = int(e.get("ImageCount"))
+
+    def take_SetDetectorTauScanRange(self, e):
+        unit = self.detector_at(e)
+        unit["TauScanRangeBegin"] = max(5e-11, float(e.get("GateRangeBegin")))  # LCS keeps it to 0.05 to 11.5 ns
+        unit["TauScanRangeEnd"] = min(1.15e-08, float(e.get("GateRangeEnd")))
+
     def take_SetDigitalGateConfig(self, e):
         gates = self.detector_at(e)["Gates"]
         gates[int(e.get("ChannelIndex"))][int(e.get("GateIndex1"))] = [float(e.get("GateBegin1")), float(e.get("GateEnd1"))]

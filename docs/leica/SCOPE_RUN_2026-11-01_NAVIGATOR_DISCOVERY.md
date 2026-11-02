@@ -1056,3 +1056,16 @@ The notch filters were already settable: `set_filter_wheel(130, "Empty")`, `set_
 Built: `set_notch_auto_select(on)` and `set_polarizer(angle_deg)` (None: the notch filters again). Through the driver:
 Auto Select off, polarizer 45 degrees, 100 refused, back to the notch filters, Auto Select on (as found).
 
+## 62. TauScan's images and range (3 November 2026)
+
+With HyD 2 in TauScan, "TauScan - HyD 2" shows "No of Images" (1 to 7) and a lifetime range on a log scale. Its arrows
+sent `<Scanner Command="SetDetectorTauScanCount" ImageCount="4">` (and 3); dragging the range's handle sent
+`SetDetectorTauScanRange GateRangeBegin="2.11E-10" GateRangeEnd="9.366E-09"` (seconds), each with the detector's beam route.
+LCS keeps them in the setting's entry (`TauScanImageCount`, `TauScanRangeBegin`, `TauScanRangeEnd`) and the most images in
+the detector itself (`TauScanMaxImageCount`, 7 for HyD 2). Sent by hand: 10 images were ignored (3 kept), a range of 0.01 to
+50 ns was clamped to 0.05 to 11.5 ns.
+
+Built: `set_tau_scan(detector, images=, range_ns=)`, refused outside TauScan, above the detector's most, or outside 0.05 to
+11.5 ns; `get_detector_modes()[name]["tau_scan"]`. Through the driver on HyD 2: 5 images, 0.5 to 8 ns; 9 refused; back to
+3 and 0.1 to 10 ns; HyD 2 back in TauSeparation.
+

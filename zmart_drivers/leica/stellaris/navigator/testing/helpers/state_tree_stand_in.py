@@ -256,6 +256,7 @@ def detector(route, name, kind, begin, end, active, dye, gain, *, photon_countin
         "IsBlockedForDyeAssistant": False,
         "DigitalGatingMode": 2,
         "CanDoPhotonCounting": photon_counting,
+        "TauScanMaxImageCount": 7,
     }
 
 
@@ -537,6 +538,9 @@ class StandInNodes:
                 {"DigitalGatingMode": unit.get("DigitalGatingMode", 2), "DigitalGatingModeList_SeqInfo": {"DigitalGatingMode": [
                     {"DigitalGatingMode": code, "IsEnabled": code not in unit.get("TauDisabled", ())} for code in (0, 2, 3, 5, 6, 10)]},
                  "OperatingModeIndex": unit.get("OperatingModeIndex", 1), "OperatingMode": unit.get("OperatingMode", 1),
+                 # TauScan's number of images and lifetime range (seconds), as LCS keeps them in the setting.
+                 "TauScanImageCount": unit.get("TauScanImageCount", 3), "TauScanRangeBegin": unit.get("TauScanRangeBegin", 1e-10),
+                 "TauScanRangeEnd": unit.get("TauScanRangeEnd", 1e-08),
                  # TauGating's channels and their gates (seconds), as LCS lists them in TauGating.
                  **({"DetectorChannelList_SeqInfo": {"FreeGatingChannelCount": 2 - len(unit["Gates"]), "DetectorChannel": [
                      {"IsChannelActive": True, "Gate": [{"GateBegin": b, "GateEnd": e} for b, e in gates]} for gates in unit["Gates"]]}}
