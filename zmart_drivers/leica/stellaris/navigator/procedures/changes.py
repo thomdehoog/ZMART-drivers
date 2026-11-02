@@ -685,14 +685,45 @@ def set_aobs_line(client, wavelength_nm, *, reflection=None, enhanced_dynamics=N
     return result
 
 
-def start_live(client, project=None) -> dict:
-    """Start Live, as the window's Live button, into *project* (as for :func:`capture`); LAS X scans until :func:`stop_live`."""
+def start_live(client, project=None, *, fast=False) -> dict:
+    """Start Live, as the window's Live button, into *project* (as for :func:`capture`); LAS X scans until :func:`stop_live`.
+
+    With *fast*, Fast Live, with its own Scan Settings (:func:`set_fast_live`).
+    """
     try:
         into = project if project is not None else data_container.experiment_for_capture()
-        change = writes.start_live(into)
+        change = writes.start_live(into, fast=fast)
     except (RuntimeError, ValueError) as why:
         return dispatch.refused(f"Live cannot be started: {why}", logged=True)
     return run(client, change)
+
+
+def set_fast_live(client, scanner="fov", *, max_retries=None, **options) -> dict:
+    """Set Fast Live's Scan Settings for *scanner* (``"fov"`` or ``"resonant"``), as its window does; the result's
+    ``fast_live`` is all of them read back.
+
+    *options*: ``format``, ``scan_frequency``, ``overview_zoom`` (a zoom, or
+    False), ``bidirectional``, ``no_average``, ``no_dynamic_signal_enhancement``,
+    ``selected_setting_only``, ``no_tau_sted_xtend``. All are checked before
+    the first is written; each is checked against LCS's range beside it.
+    """
+    if not options:
+        return dispatch.refused("set_fast_live needs at least one setting")
+    try:
+        planned = [change for option, value in options.items() for change in writes.fast_live_setting(scanner, option, value)]
+    except (ValueError, TypeError) as why:
+        return dispatch.refused(f"Fast Live's settings cannot be set: {why}")
+    found = readers.get_fast_live(client) or {}
+    scanner_now = found.get(scanner, {})
+    if "scan_frequency" in options and scanner == "resonant" and options["scan_frequency"] != scanner_now.get("scan_frequency"):
+        return dispatch.refused("the resonant scanner's Minimal Scan Frequency is fixed")
+    result = None
+    for change in planned:
+        result = run(client, change, max_retries=max_retries)
+        if not result["success"]:
+            return result
+    result["fast_live"] = readers.get_fast_live(client)
+    return result
 
 
 def stop_live(client, *, max_retries=None) -> dict:

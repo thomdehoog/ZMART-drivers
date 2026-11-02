@@ -24,8 +24,9 @@ checked by the driver either way (`transfer.CHECKED_COMMANDS`, `transfer.STATE_T
 
 **Acquisition**
 - Time series (xyt): number of frames and interval. The scan mode can be set; these two are not learned.
-- Fast Live and Spiral: not learned; Fast Live has its own Scan Settings window (maximal format, minimal
-  scan frequency, overview zoom, bidirectional, no averaging, ... for the FOV scanner and the resonant one).
+- Spiral: not learned.
+- Fast Live's Maximal Format: the driver takes 16, 32, ... 512 (powers of two within LAS X's range); check
+  which values the window's slider offers.
 
 **Region and experiment types**
 - ROI scan: scanning only inside a region (the Zoom In rectangle is an ROI in LAS X's data container).

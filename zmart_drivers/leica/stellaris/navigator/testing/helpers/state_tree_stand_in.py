@@ -38,6 +38,18 @@ SIMULATOR_SETTINGS = {
     ("Acquire", "AcquireZStackInfo", "AFPlanePosition"): 0.0,
     ("Acquire", "AcquireZStackInfo", "IsAFPlanePosition"): False,
     ("Acquire", "ZStackUseMode"): 1,
+    # Fast Live's Scan Settings, the FOV scanner's and the resonant one's (simulator, 2026-11-02).
+    **{
+        ("Confocal", parent, name): value
+        for parent, speed, zoom in (("FastLiveParameters", (100, 2600, 600), (0.75, 1.0)), ("FastLiveParametersResonant", (12000, 12000, 12000), (2.0, 2.0)))
+        for name, value in {
+            "ScanFormatMin": 16, "ScanFormatMax": 512, "ScanFormat": 256,
+            "ScanSpeedMin": speed[0], "ScanSpeedMax": speed[1], "ScanSpeed": speed[2],
+            "AdjustZoom": False, "ZoomMin": zoom[0], "ZoomMax": 48.0, "Zoom": zoom[1],
+            "Bidirectional": False, "NoAccumulationAverage": True, "NoRollingAverage": False,
+            "NoTauSTEDDeconvolution": True, "SelectedSettingOnly": True,
+        }.items()
+    },
     ("Acquire", "ZPositionMode"): 1,
     ("Confocal", "ScanningParameter", "ScanDirectionX"): 1,
     ("Acquire", "AutoFocusInfo", "IsSeriesScanAutofocusActive"): True,

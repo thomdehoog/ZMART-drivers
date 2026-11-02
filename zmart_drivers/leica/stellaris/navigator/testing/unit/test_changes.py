@@ -981,6 +981,56 @@ class TestTheAobs:
         assert changes.set_aobs_line(client, 497)["success"] is False
 
 
+class TestFastLive:
+    def test_fast_live_starts_as_the_window_starts_it(self, lasx, client):
+        assert changes.start_live(client, project=24, fast=True)["confirmed"] is True
+        assert lasx.sent[-1] == '<AcquireControl Mode="6" Command="StartLiveAcquiring" DCParentElementID="24"/>'
+        assert changes.stop_live(client)["confirmed"] is True
+
+    def test_the_settings_are_read_as_the_window_shows_them(self, lasx, client):
+        fov = direct_reader.get_fast_live()["fov"]
+
+        assert fov == {
+            "format": 256, "scan_frequency": 600, "overview_zoom": None, "bidirectional": False, "no_average": True,
+            "no_dynamic_signal_enhancement": False, "selected_setting_only": True, "no_tau_sted_xtend": True,
+        }
+
+    def test_each_setting_is_written_and_read_back(self, lasx, client):
+        result = changes.set_fast_live(
+            client, "fov", format=512, scan_frequency=400, overview_zoom=2.0, bidirectional=True, no_average=False,
+            no_dynamic_signal_enhancement=True, selected_setting_only=False, no_tau_sted_xtend=False,
+        )
+
+        assert result["confirmed"] is True
+        assert result["fast_live"]["fov"] == {
+            "format": 512, "scan_frequency": 400, "overview_zoom": 2.0, "bidirectional": True, "no_average": False,
+            "no_dynamic_signal_enhancement": True, "selected_setting_only": False, "no_tau_sted_xtend": False,
+        }
+        assert result["fast_live"]["resonant"]["format"] == 256
+
+    def test_the_overview_zoom_is_switched_off(self, lasx, client):
+        changes.set_fast_live(client, "fov", overview_zoom=2.0)
+
+        assert changes.set_fast_live(client, "fov", overview_zoom=False)["fast_live"]["fov"]["overview_zoom"] is None
+
+    @pytest.mark.parametrize(("option", "value"), [
+        ("format", 300), ("format", 1024), ("scan_frequency", 3000), ("overview_zoom", 100.0), ("bidirectional", "yes"), ("speed", 1),
+    ])
+    def test_what_the_window_does_not_offer_is_refused_and_nothing_is_written(self, lasx, client, option, value):
+        before = direct_reader.get_fast_live()
+
+        result = changes.set_fast_live(client, "fov", **{option: value})
+
+        assert result["success"] is False
+        assert direct_reader.get_fast_live() == before
+
+    def test_the_resonant_scanner_s_fixed_frequency_cannot_be_changed(self, lasx, client):
+        assert changes.set_fast_live(client, "resonant", scan_frequency=8000)["success"] is False
+
+    def test_a_scanner_the_window_does_not_have_is_refused(self, lasx, client):
+        assert changes.set_fast_live(client, "galvo", format=256)["success"] is False
+
+
 class TestLive:
     def test_live_starts_as_the_window_starts_it_and_stops(self, lasx, client):
         started = changes.start_live(client, project=24)

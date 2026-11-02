@@ -592,6 +592,25 @@ class Microscope:
         self.handle.require_open()
         checked(self.handle, changes.start_live(self.handle.client), "start_live()")
 
+    def start_fast_live(self) -> None:
+        """Start Fast Live, as LAS X's Fast Live button, with its own Scan Settings (:meth:`set_fast_live`); stop it with :meth:`stop_live`."""
+        self.handle.require_open()
+        checked(self.handle, changes.start_live(self.handle.client, fast=True), "start_fast_live()")
+
+    def set_fast_live(self, scanner: str = "fov", **settings) -> dict:
+        """Set Fast Live's Scan Settings for ``"fov"`` (the FOV scanner) or ``"resonant"``, as its window does.
+
+        *settings*: ``format`` (Maximal Format: 16, 32, ... 512), ``scan_frequency``
+        (Minimal Scan Frequency, Hz), ``overview_zoom`` (a zoom, or False),
+        ``bidirectional``, ``no_average``, ``no_dynamic_signal_enhancement``,
+        ``selected_setting_only``, ``no_tau_sted_xtend``. Each is checked against
+        LAS X's range first. Answers all of Fast Live's settings as LAS X holds them.
+        """
+        self.handle.require_open()
+        result = changes.set_fast_live(self.handle.client, scanner, **settings)
+        checked(self.handle, result, f"set_fast_live({scanner!r}, {settings!r})")
+        return result["fast_live"]
+
     def stop_live(self) -> None:
         """Stop Live, as LAS X's Live button; the scanner is idle afterwards."""
         self.handle.require_open()

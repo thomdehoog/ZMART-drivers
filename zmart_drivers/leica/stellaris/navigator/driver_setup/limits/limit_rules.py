@@ -421,6 +421,8 @@ MUTATING_COMMANDS = {
     # Live: a scan like a picture's, on until it is stopped
     "start_live": "capture",
     "stop_live": "capture",
+    # Fast Live's Scan Settings: how it scans, not the light
+    "set_fast_live": "set_fast_live",
     # the z-stack: its ends are z positions the scan moves through
     "set_z_stack_drive": "set_z_stack_drive",
     "set_z_stack_range": "z_stack",

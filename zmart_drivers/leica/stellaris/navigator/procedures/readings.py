@@ -206,6 +206,11 @@ def get_autofocus_settings(client, **keywords):
     return _routed("autofocus_settings", client, **keywords)
 
 
+def get_fast_live(client, **keywords):
+    """Fast Live's Scan Settings, by scanner (``"fov"``, ``"resonant"``)."""
+    return _routed("fast_live", client, **keywords)
+
+
 def get_aobs_lines(client, **keywords):
     """The AOBS's lines in use: ``wavelength``, ``reflection``, ``enhanced_dynamics``, ``percent``, ``at``."""
     return _routed("aobs_lines", client, **keywords)

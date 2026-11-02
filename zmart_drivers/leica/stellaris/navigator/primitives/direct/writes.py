@@ -1084,26 +1084,83 @@ def smartcorr(project: int) -> Write:
     )
 
 
-def start_live(project: int) -> Write:
+def start_live(project: int, *, fast: bool = False) -> Write:
     """Live, as the window's Live button starts it, into *project*: LAS X scans on until it is stopped.
 
-    Read back as the scanner no longer idle. Never sent again, like a capture.
+    With *fast*, Fast Live (``Mode="6"``), with its own Scan Settings. Read
+    back as the scanner no longer idle. Never sent again, like a capture.
     """
     parent = checked_project(project)
+    mode = 6 if fast else 0
 
     def fill(request: Request) -> None:
-        request.elements = [f'<AcquireControl Mode="0" Command="StartLiveAcquiring" DCParentElementID="{parent}"/>']
+        request.elements = [f'<AcquireControl Mode="{mode}" Command="StartLiveAcquiring" DCParentElementID="{parent}"/>']
 
     return Write(
         command="start_live",
         values={"project": project},
         request="StartLiveAcquiring",
         fill=fill,
-        description=f"Live -> on, into project {project}",
+        description=f"{'Fast Live' if fast else 'Live'} -> on, into project {project}",
         ready=idle(),
         confirm=Expect("scan_status", lambda status: isinstance(status, str) and not is_idle(status) and status != "Unknown"),
         never_resend=True,
     )
+
+
+#: Fast Live's Maximal Format: the window's slider stops at these, within LCS's own range.
+FAST_LIVE_FORMATS = (16, 32, 64, 128, 256, 512, 1024, 2048)
+#: Fast Live's Scan Settings by the driver's name: the end of the state-tree name, and its kind.
+FAST_LIVE_OPTIONS = {
+    "format": ("Format", int),
+    "scan_frequency": ("Frequency", int),
+    "bidirectional": ("Bidirectional", bool),
+    "no_average": ("NoAverage", bool),
+    "no_dynamic_signal_enhancement": ("NoDynamicSignalEnhancement", bool),
+    "selected_setting_only": ("SelectedSettingOnly", bool),
+    "no_tau_sted_xtend": ("NoTauStedXtend", bool),
+}
+
+
+def fast_live_setting(scanner: str, option: str, value) -> list[Write]:
+    """One of Fast Live's Scan Settings for *scanner* (``"fov"`` or ``"resonant"``), as its window writes it; read back.
+
+    ``overview_zoom`` takes a zoom (the box ticked) or False (unticked). A
+    value of the wrong kind or a format the slider does not offer raises
+    ``ValueError``; the range beside each value is checked as it is written.
+    """
+    if scanner not in ("fov", "resonant"):
+        raise ValueError(f"Fast Live has the scanners 'fov' and 'resonant', not {scanner!r}")
+    suffix = "Resonant" if scanner == "resonant" else ""
+
+    def write(name, text, key, expected, shown):
+        def fill(request: Request) -> None:
+            request.elements = [f'<StateTree Command="FastLive{name}{suffix}" Value="{text}"/>']
+
+        return Write(command="set_fast_live", values={"value": shown}, request=f"FastLive{name}{suffix}", fill=fill,
+                     description=f"Fast Live ({scanner}) {option.replace('_', ' ')} -> {shown}", ready=idle(),
+                     confirm=Expect("fast_live", lambda found: (found or {}).get(scanner, {}).get(key) == expected))
+
+    if option == "overview_zoom":
+        if value is False:
+            return [write("OverviewZoom", 0, "overview_zoom", None, "off")]
+        zoom = float(number(option, value))
+        return [
+            replace(write("Zoom", repr(zoom), "overview_zoom", zoom, zoom), confirm=None),
+            write("OverviewZoom", 1, "overview_zoom", zoom, f"on, {zoom:g}"),
+        ]
+    if option not in FAST_LIVE_OPTIONS:
+        raise ValueError(f"Fast Live's settings are {sorted([*FAST_LIVE_OPTIONS, 'overview_zoom'])}, not {option!r}")
+    name, kind = FAST_LIVE_OPTIONS[option]
+    if kind is bool:
+        if not isinstance(value, bool):
+            raise ValueError(f"{option} takes True or False, not {value!r}")
+        return [write(name, int(value), option, value, value)]
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise ValueError(f"{option} takes a whole number, not {value!r}")
+    if option == "format" and value not in FAST_LIVE_FORMATS:
+        raise ValueError(f"Fast Live's Maximal Format is one of {FAST_LIVE_FORMATS}, not {value}")
+    return [write(name, value, option, value, value)]
 
 
 def stop_live() -> Write:

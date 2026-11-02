@@ -785,3 +785,31 @@ and Enhanced Dynamics on a microscope without it are refused. Through the driver
 Dynamics off, Reflection, Enhanced Dynamics on, each confirmed; 561 nm and Reflection with Enhanced
 Dynamics refused. Left as found: Fluorescence, Enhanced Dynamics on.
 
+## 44. Fast Live and its Scan Settings (2 November 2026)
+
+The window's Fast Live button sent `<AcquireControl Mode="6" Command="StartLiveAcquiring" DCParentElementID="191"/>`
+(Live is `Mode="0"`), and its stop the same `StopAcquiring` as Live. Its Scan Settings window sent no command;
+the state tree holds them for each scanner, `Confocal/FastLiveParameters` (FOV scanner) and
+`FastLiveParametersResonant`, with LCS's range beside the numbers:
+
+| Window | Node | Range (FOV / resonant) |
+|---|---|---|
+| Maximal Format | `ScanFormat` | 16 to 512 / 16 to 512 |
+| Minimal Scan Frequency | `ScanSpeed` | 100 to 2600 / 12000 fixed |
+| Overview Zoom, box and value | `AdjustZoom`, `Zoom` | 0.75 to 48 / 2 to 48 |
+| Bi-Directional | `Bidirectional` | |
+| No Average/Accumulation | `NoAccumulationAverage` | |
+| No Dynamic Signal Enhancement | `NoRollingAverage` | |
+| Selected Setting Only (Between Lines Mode) | `SelectedSettingOnly` | |
+| No τ-STED Xtend | `NoTauSTEDDeconvolution` | |
+
+Written into the state tree by hand, LCS took each value, and the window showed them after reopening (Thom).
+LCS does not hold the format to its range (300 and 1024 were taken) but held the frequency (3000 became 2600).
+In the same minutes the autofocus's `FixSliceCount` went from 61 to 801 without Thom touching it; not explained.
+
+Built: `start_fast_live()`; `set_fast_live(scanner, ...)` for all eight, every value checked before the first is
+written (the format one of 16, 32, ... 512, each number against LCS's range beside it; the resonant scanner's
+fixed frequency not changed), read back. Through the driver: format 128, 1000 Hz, bidirectional, overview zoom off,
+dynamic signal enhancement on, each confirmed; 1024, 300, 3000 Hz and zoom 100 refused; Fast Live ran
+(`eScanContinuous`) and stopped; the settings put back as Thom left them.
+

@@ -323,6 +323,24 @@ STATE_TREE_WRITES = {
     # Which line is the element's At.
     "IsReflection": TreeWrite(("Confocal", "AOBSLineList", "AOBSLine", "IsReflection"), bool, numbered=("AOBSLine",)),
     "IsDoubleModeEnabled": TreeWrite(("Confocal", "AOBSLineList", "AOBSLine", "IsDoubleModeEnabled"), bool, numbered=("AOBSLine",)),
+    # Fast Live's Scan Settings, for the FOV scanner and the resonant one ("Resonant" at the end of
+    # the name). The window writes them here with no command (simulator, 2026-11-02); LCS keeps the
+    # format and the zoom to no range of its own, so the range beside each is checked here.
+    **{
+        f"FastLive{name}{suffix}": TreeWrite(("Confocal", parent, node), kind, between=between)
+        for suffix, parent in (("", "FastLiveParameters"), ("Resonant", "FastLiveParametersResonant"))
+        for name, node, kind, between in (
+            ("Format", "ScanFormat", int, ("ScanFormatMin", "ScanFormatMax")),
+            ("Frequency", "ScanSpeed", int, ("ScanSpeedMin", "ScanSpeedMax")),
+            ("OverviewZoom", "AdjustZoom", bool, None),
+            ("Zoom", "Zoom", float, ("ZoomMin", "ZoomMax")),
+            ("Bidirectional", "Bidirectional", bool, None),
+            ("NoAverage", "NoAccumulationAverage", bool, None),
+            ("NoDynamicSignalEnhancement", "NoRollingAverage", bool, None),
+            ("SelectedSettingOnly", "SelectedSettingOnly", bool, None),
+            ("NoTauStedXtend", "NoTauSTEDDeconvolution", bool, None),
+        )
+    },
     "MotCorrRefPos": TreeWrite(
         ("Microscope", "ObjectiveList", "ObjectiveInfo", "MotCorrRefPos"), float,
         choices=frozenset({-1.0}), within=(0, 100), of_objective=True,

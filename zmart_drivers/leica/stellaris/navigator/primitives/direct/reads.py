@@ -89,6 +89,7 @@ READS = (
     "autofocus_scan",
     "detector_modes",
     "aobs_lines",
+    "fast_live",
     "autofocus_optics",
     "pixel_size",
     "bit_depth",
@@ -1075,6 +1076,37 @@ def get_autofocus_optics() -> dict:
         return {"lines": lines}
 
     return read("the Best Focus Setting's optics", reading)
+
+
+#: Fast Live's two scanners and where LCS keeps their Scan Settings.
+FAST_LIVE = {"fov": "FastLiveParameters", "resonant": "FastLiveParametersResonant"}
+
+
+def get_fast_live() -> dict:
+    """Fast Live's Scan Settings, by scanner (``"fov"``, ``"resonant"``), as its window shows them.
+
+    ``format`` (Maximal Format), ``scan_frequency`` (Minimal Scan Frequency),
+    ``overview_zoom`` (its zoom, None when off), ``bidirectional``,
+    ``no_average``, ``no_dynamic_signal_enhancement``, ``selected_setting_only``
+    and ``no_tau_sted_xtend``; from ``Confocal/FastLiveParameters`` and
+    ``FastLiveParametersResonant`` (simulator, 2026-11-02).
+    """
+    found = {}
+    for scanner, parent in FAST_LIVE.items():
+        nodes = {
+            "format": "ScanFormat", "scan_frequency": "ScanSpeed", "adjust": "AdjustZoom", "zoom": "Zoom",
+            "bidirectional": "Bidirectional", "no_average": "NoAccumulationAverage",
+            "no_dynamic_signal_enhancement": "NoRollingAverage", "selected_setting_only": "SelectedSettingOnly",
+            "no_tau_sted_xtend": "NoTauSTEDDeconvolution",
+        }
+        values = settings(f"Fast Live's {scanner} settings", {key: ("Confocal", parent, node) for key, node in nodes.items()})
+        adjust, zoom = values.pop("adjust"), values.pop("zoom")
+        found[scanner] = {
+            "format": values["format"], "scan_frequency": values["scan_frequency"],
+            "overview_zoom": float(zoom) if adjust else None,
+            **{key: bool(values[key]) for key in ("bidirectional", "no_average", "no_dynamic_signal_enhancement", "selected_setting_only", "no_tau_sted_xtend")},
+        }
+    return found
 
 
 def get_aobs_lines() -> list[dict]:
