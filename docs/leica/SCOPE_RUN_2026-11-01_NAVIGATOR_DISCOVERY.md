@@ -618,3 +618,13 @@ slot another setting uses; a ninth line in a setting is refused. Through the dri
 current, 600 nm went onto slot 2, Setting 2 untouched; 497 to 520 nm refused, slot 0 being in use in
 Setting 2.
 
+## 34. The objective change on the simulator (2 November 2026)
+
+The turret: slot 0 10x/0.40 dry (in the light path), 1 20x/0.70 dry, 2 40x/0.75 dry, 3 40x/1.25
+oil, 4 63x/1.40 oil, 5 100x/1.40 oil. Through the driver: 10x to 20x was refused before the turret
+turned, because no adopted calibration covers the pair 0 to 1; 10x to the 40x oil was refused
+before the turret turned, the immersion being another; to slot 0, where it already was, confirmed.
+The turn itself and the stage following it need an objective-pair calibration
+(`driver_setup/optical_calibration/notebooks/calibrate_objective_pair.ipynb`); Thom chose not to
+run it yet.
+

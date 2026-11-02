@@ -49,7 +49,9 @@ put back.
 
 The simulator cannot show these; each needs one careful run on the real microscope.
 
-- The objective change: built, never tried live.
+- The objective change: its two refusals tried on the simulator (an uncalibrated pair, another
+  immersion; 2 November 2026). The turn itself needs an objective-pair calibration first, on the
+  simulator and then on the STELLARIS.
 - The pan: that one click is 3 % of the field and the conversion to micrometres (Thom's 0.667 of
   the field at zoom 1 for the largest pan) holds; that the smallest zoom centres it; `move_pan`
   landing on a real sample.
