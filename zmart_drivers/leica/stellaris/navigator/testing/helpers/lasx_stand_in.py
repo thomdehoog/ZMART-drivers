@@ -201,6 +201,23 @@ class PlainNavigator:
             self.live[(*stack, "EndValue")] = float(e.get("EndValue"))
         self.stack_sections()
 
+    def take_SetZStackSize(self, e):
+        """The stack's size around its middle, as LCS does (simulator, 2026-11-02)."""
+        stack = ("Acquire", "AcquireZStackInfo")
+        begin, end = self.live[(*stack, "BeginValue")], self.live[(*stack, "EndValue")]
+        middle, half = (begin + end) / 2, float(e.get("ZStackSize")) / 2
+        down = begin > end
+        self.live[(*stack, "BeginValue")], self.live[(*stack, "EndValue")] = (middle + half, middle - half) if down else (middle - half, middle + half)
+        self.stack_sections()
+
+    def take_ReCenterStackAroundCurrentZ(self, e):
+        """The stack moved, its size kept, around where its drive stands."""
+        stack = ("Acquire", "AcquireZStackInfo")
+        begin, end = self.live[(*stack, "BeginValue")], self.live[(*stack, "EndValue")]
+        here, half = self.z_um[self.live[("Acquire", "ZPositionMode")]] * 1e-6, abs(end - begin) / 2
+        self.live[(*stack, "BeginValue")], self.live[(*stack, "EndValue")] = (here + half, here - half) if begin > end else (here - half, here + half)
+        self.stack_sections()
+
     def take_SetStackStepSize(self, e):
         self.live[("Acquire", "AcquireZStackInfo", "StepSize")] = float(e.get("StepSizeInMeter"))
         self.stack_sections()

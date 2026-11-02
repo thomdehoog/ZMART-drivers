@@ -728,3 +728,19 @@ Built: `set_detector(..., operating_mode=...)` writes the mode's place for the c
 route is gone for it. Through the driver: Counting (gain fixed at 2.5), Analog with gain 100, Fast Mode, Analog
 with gain 100 again, each confirmed with the running detector following.
 
+## 40. The z-stack panel: size, Begin and End, Re-Center, number of steps (2 November 2026)
+
+With the window: Begin sent `BeforeBeginOrEndOfStackIsSet IsBegin="1"` (LCS set the begin at the focus);
+End sent `IsBegin="0"` and `SetZStackDefinition SetBegin="2" SetEnd="1" EndValue="0.0009834"` (the focus);
+Z Size sent `SetZStackSize ZStackSize="2E-05"`; Re-Center sent `ReCenterStackAroundCurrentZ`; Number of
+Steps 7 sent nothing, `StackCalculationMode` going 2 to 0 and `SectionsCount` 1 to 7. By hand:
+`SetZStackSize` 10 µm took 973.0 to 993.4 to 978.2 to 987.8 (around the middle), 20 µm back to 973.0 to
+992.8; `SectionsCount` written into the state tree (1, 2, 50, 100000) was ignored. The focus was moved by
+the driver (`SetZPosition`), the window not moving it on the simulator.
+
+Built: `set_z_stack_size`, `set_z_stack_begin_here`, `set_z_stack_end_here`, `recenter_z_stack`, each with
+the window's commands and the stack's new ends checked against the z limits first; `set_z_stack_sections`
+by the step that gives the count (`SetStackStepSize`). Through the driver: size 10 and 20, 11 sections (2 µm),
+re-centred to 973.4 to 993.4, the end set at the focus (983.4); the begin set there too left one section, no
+stack, as the window's Begin would. Put back to 973.0 to 992.8, 7 sections.
+

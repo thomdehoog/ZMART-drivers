@@ -769,6 +769,84 @@ def set_z_stack(client, drive, begin_um, end_um, step_um, *, max_retries=None) -
     return result
 
 
+def the_stack(client):
+    """``(stack, drive, z_um, start)``: the z-stack, its drive, where that drive stands, and that as the limits take it."""
+    stack = readers.get_z_stack(client)
+    if not stack:
+        raise RuntimeError("LAS X has no z-stack set")
+    drive = stack["mode"]
+    here = readers.read_z_um(client, drive)
+    if here is None:
+        raise RuntimeError(f"where {drive} stands could not be read")
+    axis = "z_galvo_um" if drive == "z-galvo" else "z_wide_um"
+    return stack, drive, here, {f"from_{axis}": here}
+
+
+def around(stack, middle, size):
+    """``(begin, end)`` of a stack of *size* around *middle*, running the way *stack* runs."""
+    half = size / 2
+    return (middle + half, middle - half) if stack["begin"] > stack["end"] else (middle - half, middle + half)
+
+
+def stack_result(client, change, max_retries=None):
+    result = run(client, change, max_retries=max_retries)
+    if result["success"]:
+        result["z_stack"] = readers.get_z_stack(client)
+    return result
+
+
+def set_z_stack_size(client, size_um, *, max_retries=None) -> dict:
+    """Set the z-stack's size around its middle, as the window's Z Size; its new ends checked against the limits first."""
+    try:
+        stack, drive, _, start = the_stack(client)
+        begin, end = around(stack, (stack["begin"] + stack["end"]) / 2, float(size_um))
+        change = writes.z_stack_size(drive, float(size_um), begin, end, start=start)
+    except (RuntimeError, ValueError, TypeError) as why:
+        return dispatch.refused(f"the z-stack's size cannot be set: {why}")
+    return stack_result(client, change, max_retries)
+
+
+def set_z_stack_here(client, which, *, max_retries=None) -> dict:
+    """Set the z-stack's begin or end where its drive stands, as the window's Begin and End buttons."""
+    try:
+        stack, drive, here, start = the_stack(client)
+        begin, end = (here, stack["end"]) if which == "begin" else (stack["begin"], here)
+        change = writes.z_stack_here(which, drive, here, begin, end, start=start)
+    except (RuntimeError, ValueError) as why:
+        return dispatch.refused(f"the z-stack's {which} cannot be set: {why}")
+    return stack_result(client, change, max_retries)
+
+
+def recenter_z_stack(client, *, max_retries=None) -> dict:
+    """Move the z-stack, its size kept, around where its drive stands, as the window's Re-Center; its new ends checked first."""
+    try:
+        stack, drive, here, start = the_stack(client)
+        begin, end = around(stack, here, abs(stack["end"] - stack["begin"]))
+        change = writes.z_stack_recenter(drive, begin, end, start=start)
+    except RuntimeError as why:
+        return dispatch.refused(f"the z-stack cannot be re-centred: {why}")
+    return stack_result(client, change, max_retries)
+
+
+def set_z_stack_sections(client, sections, *, max_retries=None) -> dict:
+    """Set the z-stack's number of sections, by the step that gives it over the stack's size (``SetStackStepSize``).
+
+    The window's Number of Steps has no command, and the count written into
+    LCS's state tree was ignored (simulator, 2026-11-02); the step does it.
+    ``confirmed`` when the stack has that many sections.
+    """
+    if isinstance(sections, bool) or not isinstance(sections, int) or sections < 2:
+        return dispatch.refused(f"a z-stack has 2 or more sections, not {sections!r}")
+    try:
+        stack, _, _, _ = the_stack(client)
+    except RuntimeError as why:
+        return dispatch.refused(f"the z-stack's sections cannot be set: {why}")
+    result = stack_result(client, writes.z_stack_step(abs(stack["end"] - stack["begin"]) / (sections - 1)), max_retries)
+    if result["success"]:
+        result["confirmed"] = bool(result.get("confirmed")) and result["z_stack"]["sections"] == sections
+    return result
+
+
 def tile_z_um(client, positions_um) -> float | None:
     """The z every tile is sent with, or None to send each position's own z-galvo.
 

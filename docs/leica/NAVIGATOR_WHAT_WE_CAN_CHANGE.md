@@ -92,7 +92,10 @@ discovery session in `SCOPE_RUN_2026-11-01_NAVIGATOR_DISCOVERY.md` and the build
 | Which drive carries it (z-galvo or z-wide) | Works |
 | Begin and end | Works |
 | Step size | Works |
-| Number of sections | Works: it follows from the range and the step |
+| Number of sections | Works: `set_z_stack_sections`, by the step that gives it |
+| Size (around the middle) | Works, with LAS X's command |
+| Begin and End where the focus is (the window's buttons) | Works, with LAS X's commands |
+| Re-Center | Works, with LAS X's command |
 | System-optimized step | Works: written into LAS X's state tree; LAS X takes its optimal step and may stretch the end |
 | Direction | Works: begin above end runs the stack downwards |
 
@@ -170,7 +173,7 @@ service and the person responsible for the instrument.
 
 | State | Settings |
 |---|---|
-| Works | 74 (the objective among them, not yet tried) |
+| Works | 77 (the objective among them, not yet tried) |
 | Tried | 0 |
 | Command known | 0 |
 | Not yet learned | 8 |

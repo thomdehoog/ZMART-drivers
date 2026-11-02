@@ -935,3 +935,53 @@ class TestBestFocusLaserPower:
 
         assert changes.set_autofocus_laser_power(client, 405, 50)["success"] is False
         assert len(lasx.sent) == sent
+
+
+
+class TestTheZStackPanel:
+    @pytest.fixture
+    def stacked(self, lasx, client):
+        lasx.z_um = {1: 0.0, 2: 1000.0}
+        assert changes.set_z_stack(client, "z-wide", 995.0, 1005.0, 2.5)["confirmed"] is True
+        return client
+
+    def test_the_size_grows_around_the_middle(self, lasx, stacked):
+        result = changes.set_z_stack_size(stacked, 20.0)
+
+        assert result["confirmed"] is True
+        assert (result["z_stack"]["begin"], result["z_stack"]["end"]) == (pytest.approx(990.0), pytest.approx(1010.0))
+        assert lasx.commands()[-1] == "SetZStackSize"
+
+    def test_a_size_whose_ends_leave_the_limits_is_refused_and_nothing_is_sent(self, lasx, stacked):
+        sent = len(lasx.sent)
+
+        assert changes.set_z_stack_size(stacked, 100000.0)["success"] is False
+        assert len(lasx.sent) == sent
+
+    def test_begin_and_end_are_set_where_the_focus_is(self, lasx, stacked):
+        lasx.z_um[2] = 1001.0
+        assert changes.set_z_stack_here(stacked, "end")["confirmed"] is True
+        lasx.z_um[2] = 998.0
+        result = changes.set_z_stack_here(stacked, "begin")
+
+        assert result["confirmed"] is True
+        assert (result["z_stack"]["begin"], result["z_stack"]["end"]) == (pytest.approx(998.0), pytest.approx(1001.0))
+        assert lasx.commands()[-2:] == ["BeforeBeginOrEndOfStackIsSet", "SetZStackDefinition"]
+
+    def test_re_center_puts_the_stack_around_the_focus(self, lasx, stacked):
+        lasx.z_um[2] = 1020.0
+
+        result = changes.recenter_z_stack(stacked)
+
+        assert result["confirmed"] is True
+        assert (result["z_stack"]["begin"], result["z_stack"]["end"]) == (pytest.approx(1015.0), pytest.approx(1025.0))
+
+    def test_the_number_of_sections_sets_the_step(self, lasx, stacked):
+        result = changes.set_z_stack_sections(stacked, 11)
+
+        assert result["confirmed"] is True and result["z_stack"]["sections"] == 11
+        assert result["z_stack"]["stepSize"] == pytest.approx(1.0)
+
+    def test_without_a_stack_these_are_refused(self, lasx, client):
+        assert changes.set_z_stack_size(client, 20.0)["success"] is False
+        assert changes.recenter_z_stack(client)["success"] is False

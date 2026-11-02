@@ -422,6 +422,9 @@ MUTATING_COMMANDS = {
     "set_z_stack_drive": "set_z_stack_drive",
     "set_z_stack_range": "z_stack",
     "z_stack_picture": "z_stack",
+    "set_z_stack_size": "z_stack",
+    "set_z_stack_here": "z_stack",
+    "recenter_z_stack": "z_stack",
     # the autofocus's search: its two ends, as a z-stack's
     "autofocus_run": "z_stack",
     # a whole setting as a file: saving changes nothing; a file's values are checked before it is loaded

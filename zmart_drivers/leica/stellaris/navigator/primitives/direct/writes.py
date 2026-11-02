@@ -1511,6 +1511,61 @@ def z_stack_range(drive: str, begin_um: float, end_um: float, *, start: dict | N
     )
 
 
+def z_stack_change(command: str, drive: str, elements: list[str], begin_um: float, end_um: float,
+                   description: str, start: dict | None = None) -> Write:
+    """A change of the z-stack that leaves it from *begin_um* to *end_um* on *drive*; both ends go to the limits; read back.
+
+    The ends are read back within one step, as LCS stretches them to whole steps.
+    """
+    axis = "z_galvo_um" if drive == "z-galvo" else "z_wide_um"
+
+    def fill(request: Request) -> None:
+        request.elements = list(elements)
+
+    def shows(reading) -> bool:
+        stack = unwrapped(reading)
+        try:
+            room = stack["stepSize"] + STACK_TOLERANCE_UM
+            return abs(stack["begin"] - begin_um) <= room and abs(stack["end"] - end_um) <= room
+        except (KeyError, TypeError):
+            return False
+
+    return Write(
+        command=command, values={"drive": drive, "axis": axis, "begin_um": begin_um, "end_um": end_um, **(start or {})},
+        request=command, fill=fill, description=description, ready=idle(), confirm=Expect("z_stack", shows),
+    )
+
+
+def z_stack_size(drive: str, size_um: float, begin_um: float, end_um: float, *, start: dict | None = None) -> Write:
+    """The z-stack's size, as the window's Z Size: LCS grows or shrinks it around its middle (simulator, 2026-11-02).
+
+    *begin_um* and *end_um* are where its ends will be, for the limits and the read-back.
+    """
+    if isinstance(size_um, bool) or not isinstance(size_um, (int, float)) or size_um <= 0:
+        raise ValueError(f"a z-stack's size is a positive number of micrometres, not {size_um!r}")
+    return z_stack_change("set_z_stack_size", drive, [f'<Scanner Command="SetZStackSize" ZStackSize="{metres(size_um)}" {CURRENT}/>'],
+                          begin_um, end_um, f"Z-stack size -> {size_um:g} um", start)
+
+
+def z_stack_here(which: str, drive: str, z_um: float, begin_um: float, end_um: float, *, start: dict | None = None) -> Write:
+    """The z-stack's begin or end where its drive stands, as the window's Begin and End buttons send it."""
+    if which not in ("begin", "end"):
+        raise ValueError(f"a z-stack has a begin and an end, not {which!r}")
+    is_begin = which == "begin"
+    elements = [
+        f'<Scanner Command="BeforeBeginOrEndOfStackIsSet" IsBegin="{int(is_begin)}"/>',
+        (f'<Scanner Command="SetZStackDefinition" SetBegin="{1 if is_begin else 2}" SetEnd="{2 if is_begin else 1}" '
+         f'BeginValue="{metres(z_um) if is_begin else 0}" EndValue="{0 if is_begin else metres(z_um)}" {CURRENT}/>'),
+    ]
+    return z_stack_change("set_z_stack_here", drive, elements, begin_um, end_um, f"Z-stack {which} -> here, {z_um:g} um", start)
+
+
+def z_stack_recenter(drive: str, begin_um: float, end_um: float, *, start: dict | None = None) -> Write:
+    """The z-stack moved, its size kept, around where its drive stands, as the window's Re-Center."""
+    return z_stack_change("recenter_z_stack", drive, ['<Scanner Command="ReCenterStackAroundCurrentZ"/>'],
+                          begin_um, end_um, "Z-stack -> re-centred here", start)
+
+
 def z_stack_step(step_um: float) -> Write:
     """Set the z-stack's step to *step_um*; the number of sections follows from the range. Read back within 0.05 um."""
     if isinstance(step_um, bool) or not isinstance(step_um, (int, float)) or not step_um > 0:

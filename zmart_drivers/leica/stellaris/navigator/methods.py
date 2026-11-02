@@ -586,6 +586,41 @@ class Microscope:
         checked(self.handle, result, f"set_z_stack({drive!r}, {begin_um!r}, {end_um!r}, {step_um!r})")
         return result["z_stack"]
 
+    def set_z_stack_size(self, size_um: float) -> dict:
+        """Set the z-stack's size around its middle, as the window's Z Size; answers the stack. Its new ends are checked first."""
+        self.handle.require_open()
+        result = changes.set_z_stack_size(self.handle.client, size_um)
+        checked(self.handle, result, f"set_z_stack_size({size_um!r})")
+        return result["z_stack"]
+
+    def set_z_stack_begin_here(self) -> dict:
+        """Set the z-stack's begin where its drive stands, as the window's Begin button; answers the stack."""
+        self.handle.require_open()
+        result = changes.set_z_stack_here(self.handle.client, "begin")
+        checked(self.handle, result, "set_z_stack_begin_here()")
+        return result["z_stack"]
+
+    def set_z_stack_end_here(self) -> dict:
+        """Set the z-stack's end where its drive stands, as the window's End button; answers the stack."""
+        self.handle.require_open()
+        result = changes.set_z_stack_here(self.handle.client, "end")
+        checked(self.handle, result, "set_z_stack_end_here()")
+        return result["z_stack"]
+
+    def recenter_z_stack(self) -> dict:
+        """Move the z-stack, its size kept, around where its drive stands, as the window's Re-Center; answers the stack."""
+        self.handle.require_open()
+        result = changes.recenter_z_stack(self.handle.client)
+        checked(self.handle, result, "recenter_z_stack()")
+        return result["z_stack"]
+
+    def set_z_stack_sections(self, sections: int) -> dict:
+        """Set the z-stack's number of sections over its size (by the step that gives it); answers the stack."""
+        self.handle.require_open()
+        result = changes.set_z_stack_sections(self.handle.client, sections)
+        checked(self.handle, result, f"set_z_stack_sections({sections!r})")
+        return result["z_stack"]
+
     def change_objective(self, slot: int | None = None, name: str | None = None, magnification: float | None = None) -> dict:
         """Change the objective, by its slot, name or magnification, and keep the same spot in view.
 
