@@ -53,6 +53,7 @@ discovery session in `SCOPE_RUN_2026-11-01_NAVIGATOR_DISCOVERY.md` and the build
 | A tile scan over several fields (Preview) | Works |
 | The whole z-stack in one picture | Works: `acquire()` takes it when a stack is set |
 | Letting go of saved pictures in LAS X | Works |
+| Live, started and stopped | Works, with LAS X's commands; stop it before taking pictures |
 
 ## Scan
 
@@ -176,7 +177,7 @@ service and the person responsible for the instrument.
 
 | State | Settings |
 |---|---|
-| Works | 79 (the objective among them, not yet tried) |
+| Works | 80 (the objective among them, not yet tried) |
 | Tried | 0 |
 | Command known | 0 |
 | Not yet learned | 8 |

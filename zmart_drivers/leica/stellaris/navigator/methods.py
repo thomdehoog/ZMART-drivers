@@ -570,6 +570,19 @@ class Microscope:
         result = changes.set_laser_shutter(self.handle.client, wavelength_nm, open_)
         return checked(self.handle, result, f"set_laser_shutter({wavelength_nm!r}, {open_!r})")
 
+    def start_live(self) -> None:
+        """Start Live, as LAS X's Live button: the microscope scans on, the lasers on, until :meth:`stop_live`.
+
+        Stop it before :meth:`acquire` and the other pictures, which wait for the scanner to be idle.
+        """
+        self.handle.require_open()
+        checked(self.handle, changes.start_live(self.handle.client), "start_live()")
+
+    def stop_live(self) -> None:
+        """Stop Live, as LAS X's Live button; the scanner is idle afterwards."""
+        self.handle.require_open()
+        checked(self.handle, changes.stop_live(self.handle.client), "stop_live()")
+
     def set_z_stack(self, drive: str, begin_um: float, end_um: float, step_um: float) -> dict:
         """Set LAS X's z-stack and answer it as LAS X holds it, as :meth:`settings` gives ``z_stack``.
 

@@ -1067,6 +1067,44 @@ def smartcorr(project: int) -> Write:
     )
 
 
+def start_live(project: int) -> Write:
+    """Live, as the window's Live button starts it, into *project*: LAS X scans on until it is stopped.
+
+    Read back as the scanner no longer idle. Never sent again, like a capture.
+    """
+    parent = checked_project(project)
+
+    def fill(request: Request) -> None:
+        request.elements = [f'<AcquireControl Mode="0" Command="StartLiveAcquiring" DCParentElementID="{parent}"/>']
+
+    return Write(
+        command="start_live",
+        values={"project": project},
+        request="StartLiveAcquiring",
+        fill=fill,
+        description=f"Live -> on, into project {project}",
+        ready=idle(),
+        confirm=Expect("scan_status", lambda status: isinstance(status, str) and not is_idle(status) and status != "Unknown"),
+        never_resend=True,
+    )
+
+
+def stop_live() -> Write:
+    """Stop the scan, as the window's Live button stops it; read back as the scanner idle."""
+
+    def fill(request: Request) -> None:
+        request.elements = ['<AcquireControl Command="StopAcquiring" DCParentElementID="0"/>']
+
+    return Write(
+        command="stop_live",
+        values={},
+        request="StopAcquiring",
+        fill=fill,
+        description="Live -> off",
+        confirm=idle(),
+    )
+
+
 def resonant_scanner(on: bool) -> Write:
     """Switch the resonant scanner on or off; read back from the scan speed's ``isResonant``."""
     if not isinstance(on, bool):

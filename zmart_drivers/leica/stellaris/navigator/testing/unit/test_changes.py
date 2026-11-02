@@ -938,6 +938,23 @@ class TestBestFocusLaserPower:
 
 
 
+class TestLive:
+    def test_live_starts_as_the_window_starts_it_and_stops(self, lasx, client):
+        started = changes.start_live(client, project=24)
+
+        assert started["confirmed"] is True
+        assert lasx.sent[-1] == '<AcquireControl Mode="0" Command="StartLiveAcquiring" DCParentElementID="24"/>'
+
+        stopped = changes.stop_live(client)
+
+        assert stopped["confirmed"] is True
+        assert lasx.commands()[-1] == "StopAcquiring"
+        assert direct_reader.get_scan_status() == "eScanIdle"
+
+    def test_stop_when_nothing_runs_is_harmless(self, lasx, client):
+        assert changes.stop_live(client)["confirmed"] is True
+
+
 class TestTheZStackPanel:
     @pytest.fixture
     def stacked(self, lasx, client):

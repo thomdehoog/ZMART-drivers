@@ -163,6 +163,7 @@ ALLOWED_COMMANDS = frozenset(
         "SetZPosition",
         "SetSlotPosition",
         "StopAcquiring",
+        "StartLiveAcquiring",
         "CaptureSingleFrame",
         "StartAcquiring",
         "SetStageUseMode",

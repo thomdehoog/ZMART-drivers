@@ -759,3 +759,11 @@ z move, within the z limits; "focus" goes to the plane set in the window and is 
 does. Through the driver: begin 973.0, end 992.8, center 982.9, from the begin to the focus 982.9; cleared,
 no stack; put back to 973.0 to 992.8, 7 sections. Set Focus not built.
 
+## 42. Live, started and stopped (2 November 2026)
+
+The window's Live button sent `<AcquireControl Mode="0" Command="StartLiveAcquiring" DCParentElementID="24"/>`
+and, pressed again, `<AcquireControl Command="StopAcquiring" DCParentElementID="0"/>` (1 November, section 23).
+Built: `start_live()` and `stop_live()` with these commands, read back from `Acquire/AcquisitionState`.
+Through the driver: idle; started (busy, then `eScanContinuous` after 3 s); stopped, idle again in 1.1 s.
+While Live runs, a picture waits for the scanner to be idle, so Live is stopped first.
+

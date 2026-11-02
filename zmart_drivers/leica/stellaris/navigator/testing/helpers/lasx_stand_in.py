@@ -90,7 +90,15 @@ class PlainNavigator:
     # --- what the reads see ----------------------------------------------------------
 
     def scan_state(self):
+        if getattr(self, "live_on", False):
+            return 1  # eScanContinuous
         return 2 if time.monotonic() < self.scanning_until else 0  # eScanSingle, or idle
+
+    def take_StartLiveAcquiring(self, e):
+        self.live_on = True
+
+    def take_StopAcquiring(self, e):
+        self.live_on = False
 
     @property
     def live(self):

@@ -418,6 +418,9 @@ MUTATING_COMMANDS = {
     "capture": "capture",
     # a scan through the collar's positions, within the range just set
     "smartcorr": "capture",
+    # Live: a scan like a picture's, on until it is stopped
+    "start_live": "capture",
+    "stop_live": "capture",
     # the z-stack: its ends are z positions the scan moves through
     "set_z_stack_drive": "set_z_stack_drive",
     "set_z_stack_range": "z_stack",

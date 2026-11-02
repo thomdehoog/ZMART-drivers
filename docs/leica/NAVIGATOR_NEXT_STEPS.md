@@ -24,8 +24,6 @@ checked by the driver either way (`transfer.CHECKED_COMMANDS`, `transfer.STATE_T
 
 **Acquisition**
 - Time series (xyt): number of frames and interval. The scan mode can be set; these two are not learned.
-- Live start and stop: learned (`<AcquireControl Mode="0" Command="StartLiveAcquiring" .../>`,
-  `StopAcquiring`), not built.
 - Fast Live and Spiral: not learned.
 
 **Region and experiment types**

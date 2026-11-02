@@ -656,6 +656,21 @@ def smartcorr(client, project=None, **watching) -> dict:
     return result
 
 
+def start_live(client, project=None) -> dict:
+    """Start Live, as the window's Live button, into *project* (as for :func:`capture`); LAS X scans until :func:`stop_live`."""
+    try:
+        into = project if project is not None else data_container.experiment_for_capture()
+        change = writes.start_live(into)
+    except (RuntimeError, ValueError) as why:
+        return dispatch.refused(f"Live cannot be started: {why}", logged=True)
+    return run(client, change)
+
+
+def stop_live(client, *, max_retries=None) -> dict:
+    """Stop Live, as the window's Live button; read back as the scanner idle."""
+    return run(client, writes.stop_live(), max_retries=max_retries)
+
+
 def add_setting(client, copy=False, *, max_retries=None) -> dict:
     """Add a setting to the current job, new or a copy of the current one, as the window's "Add new Setting" does; read back.
 
