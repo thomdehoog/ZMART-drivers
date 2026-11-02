@@ -973,3 +973,16 @@ Built: `set_laser_output_power(percent, source=None)`, the WLL unless another tu
 limits entry `set_laser_output_power` (bundled default 0 to 85 %, LAS X's own value). Through the driver: 70 %
 (the slider showed 0.7), 95 % refused by the limits, back to 85 %.
 
+## 56. The Reflection autofocus's coverslip offset and its Find (2 November 2026)
+
+With the method Reflection, the Best Focus Scan Options window shows "Coverslip offset [µm]" and "Find Coverslip
+Reflection". The offset's arrows (the driver's mouse) sent no command: `Acquire/AutoFocusInfo/ReflectionOffset`
+0 to 1e-06 and back (metres). Find sent `<AcquireControl Command="StartFindCoverSlipReflection" DCParentElementID="191"/>`;
+LCS told LAS X "Cover glass reflex was not found (step 1)" (an information event in LAS X.log, no message box), and
+the offset stayed.
+
+Built: `set_coverslip_offset(um)` (within 5000 um either way, the autofocus's largest capture range) and
+`find_coverslip_reflection()`, its search range checked against the z limits as the autofocus's, `found` read from
+LAS X's log (option A: what LAS X did). Through the driver: 12.5 um, 9000 refused, Find not found (offset kept), back
+to 0 and the method back to contrast 1.
+

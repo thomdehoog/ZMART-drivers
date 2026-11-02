@@ -189,6 +189,7 @@ ALLOWED_COMMANDS = frozenset(
         "FindTauSeparationLifeTimes",
         "ActivateZCompensationMode",
         "ResetAutoFocusToAutoSync",
+        "StartFindCoverSlipReflection",
         "SetLambdaDetectionBegin",
         "SetLambdaDetectionEnd",
         "SetLambdaDetectionStepsize",
@@ -401,6 +402,9 @@ STATE_TREE_WRITES = {
          "LightSource_SequentialInfo", "UnifiedLaser_SequentialInfo", "UnifiedLaserLine_SequentialInfo", "LaserTargetOutputPower"),
         float, within=(0, 100), numbered=("SequentialSettingParameter", "LightSource_SequentialInfo"),
     ),
+    # The Reflection autofocus's coverslip offset, in metres; the window writes it here (simulator, 2026-11-02).
+    # Kept within the autofocus's largest capture range, 5000 micrometres either way.
+    "ReflectionOffset": TreeWrite(("Acquire", "AutoFocusInfo", "ReflectionOffset"), float, within=(-0.005, 0.005)),
     "MotCorrRefPos": TreeWrite(
         ("Microscope", "ObjectiveList", "ObjectiveInfo", "MotCorrRefPos"), float,
         choices=frozenset({-1.0}), within=(0, 100), of_objective=True,

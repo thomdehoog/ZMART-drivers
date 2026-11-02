@@ -355,6 +355,17 @@ class PlainNavigator:
             drive = self.live[("Acquire", "AutoFocusInfo", "ZUseMode")]
             self.z_um[drive] += getattr(self, "autofocus_finds_um", 0.0)
 
+    def take_StartFindCoverSlipReflection(self, e):
+        """A search for the coverslip's reflection: found, the offset is set; not, LAS X's log says so (simulator, 2026-11-02)."""
+        self.captures += 1
+        self.scanning_until = time.monotonic() + self.scan_s
+        path, found_um = getattr(self, "coverslip", (None, None))
+        if found_um is not None:
+            self.live[("Acquire", "AutoFocusInfo", "ReflectionOffset")] = found_um * 1e-6
+        elif path is not None:
+            line = "2026-11-02 23:26:56.793 0029  Info LCSCom.Inter 'Async Server Message: <AsyncEvents><GenericInformationEvent Text=\"Cover glass reflex was not found (step 1)\" Caption=\"Information\" Type=\"64\"/></AsyncEvents>'\n"
+            path.write_text((path.read_text(encoding="utf-8") if path.is_file() else "") + line, encoding="utf-8")
+
     def take_StartMotCorrAutomation(self, e):
         """A scan through the collar positions, leaving the collar where the picture was best."""
         self.captures += 1

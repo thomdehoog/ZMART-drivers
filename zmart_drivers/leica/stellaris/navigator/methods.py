@@ -643,6 +643,21 @@ class Microscope:
         checked(self.handle, result, "set_lambda_scan()")
         return result["lambda_scan"]
 
+    def set_coverslip_offset(self, um: float) -> float:
+        """Set the Reflection autofocus's coverslip offset, in micrometres, as its window; answers it as LAS X holds it."""
+        self.handle.require_open()
+        result = changes.set_coverslip_offset(self.handle.client, um)
+        checked(self.handle, result, f"set_coverslip_offset({um!r})")
+        return result["coverslip_offset_um"]
+
+    def find_coverslip_reflection(self) -> dict:
+        """Press "Find Coverslip Reflection", as the Reflection autofocus's window: LAS X searches for the coverslip over
+        the autofocus's capture range (checked against the z limits first). Answers ``found`` and ``coverslip_offset_um``."""
+        self.handle.require_open()
+        result = changes.find_coverslip_reflection(self.handle.client)
+        checked(self.handle, result, "find_coverslip_reflection()")
+        return {"found": result["found"], "coverslip_offset_um": result["coverslip_offset_um"]}
+
     def set_auto_sync(self, on: bool) -> dict:
         """Auto Sync on or off: the autofocus then uses the current setting's light and detectors. On, Series Scan
         Autofocus goes off (as closing the Best Focus Setting in the window does); off, LAS X copies the current

@@ -1171,6 +1171,33 @@ def start_live(project: int, *, fast: bool = False) -> Write:
     )
 
 
+def coverslip_offset(um: float) -> Write:
+    """The Reflection autofocus's coverslip offset, in micrometres, written in metres as the window does; read back."""
+
+    def fill(request: Request) -> None:
+        request.elements = [f'<StateTree Command="ReflectionOffset" Value="{um / 1e6!r}"/>']
+
+    return Write(command="set_coverslip_offset", values={"value": float(um)}, request="ReflectionOffset", fill=fill,
+                 description=f"Coverslip offset -> {um:g} um", ready=idle(),
+                 confirm=Expect("coverslip_offset", lambda shown: isinstance(shown, float) and abs(shown - um) <= 0.01))
+
+
+def find_coverslip(project: int, drive: str, begin_um: float, end_um: float, *, start: dict | None = None) -> Write:
+    """The Reflection autofocus's "Find Coverslip Reflection", as the window sends it, into *project*: a search on *drive*
+    over the autofocus's capture range, both ends to the limits, as an autofocus's. Never sent again."""
+    parent = checked_project(project)
+    axis = "z_galvo_um" if drive == "z-galvo" else "z_wide_um"
+
+    def fill(request: Request) -> None:
+        request.elements = [f'<AcquireControl Command="StartFindCoverSlipReflection" DCParentElementID="{parent}"/>']
+
+    return Write(
+        command="find_coverslip", values={"project": project, "drive": drive, "axis": axis, "begin_um": begin_um, "end_um": end_um, **(start or {})},
+        request="StartFindCoverSlipReflection", fill=fill, description=f"Find coverslip reflection over {begin_um:g} to {end_um:g} um ({drive})",
+        ready=idle(without_limit=True), never_resend=True,
+    )
+
+
 def laser_output_power(setting_place: int, source_place: int, name: str, percent: float) -> Write:
     """The light source *name*'s own output power in percent, written into the setting at *setting_place*, as the Laser
     Overview's slider does; the power goes to the limits; read back."""

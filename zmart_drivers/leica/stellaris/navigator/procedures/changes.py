@@ -677,6 +677,53 @@ def autofocus(client, project=None, **watching) -> dict:
     return result
 
 
+#: The autofocus's largest capture range: the coverslip offset is kept within it, either way.
+COVERSLIP_OFFSET_UM = 5000.0
+
+
+def set_coverslip_offset(client, um, *, max_retries=None) -> dict:
+    """Set the Reflection autofocus's coverslip offset, in micrometres, as the window does; ``coverslip_offset_um`` read back."""
+    if isinstance(um, bool) or not isinstance(um, (int, float)) or not -COVERSLIP_OFFSET_UM <= um <= COVERSLIP_OFFSET_UM:
+        return dispatch.refused(f"the coverslip offset is within {COVERSLIP_OFFSET_UM:g} um either way, not {um!r}")
+    result = run(client, writes.coverslip_offset(float(um)), max_retries=max_retries)
+    if result["success"]:
+        result["coverslip_offset_um"] = readers.get_coverslip_offset(client)
+    return result
+
+
+def find_coverslip_reflection(client, project=None, **watching) -> dict:
+    """Press "Find Coverslip Reflection" (the Reflection autofocus's window), into *project*; report what LAS X did.
+
+    The search runs on the autofocus's drive over its capture range, both ends
+    checked against the limits first. ``found`` is False when LAS X logged
+    "Cover glass reflex was not found" during it (simulator, 2026-11-02), else
+    True; ``coverslip_offset_um`` is the offset afterwards.
+    """
+    try:
+        used = readers.get_autofocus_settings(client)
+        drive = used["drive"]
+        before = readers.read_z_um(client, drive)
+        if before is None:
+            raise RuntimeError(f"where {drive} stands could not be read")
+        axis = "z_galvo_um" if drive == "z-galvo" else "z_wide_um"
+        half = used["range_um"] / 2
+        into = project if project is not None else data_container.experiment_for_capture()
+        change = writes.find_coverslip(into, drive, before - half, before + half, start={f"from_{axis}": before})
+    except (RuntimeError, ValueError) as why:
+        return dispatch.refused(f"the coverslip search cannot be started: {why}", logged=True)
+    seen = LASX_LOG.stat().st_size if LASX_LOG.is_file() else 0
+    result = picture(client, change, **watching)
+    if not result["success"]:
+        return result
+    missed = False
+    if LASX_LOG.is_file():
+        with LASX_LOG.open("rb") as log:
+            log.seek(seen)
+            missed = b"Cover glass reflex was not found" in log.read()
+    result.update(found=not missed, coverslip_offset_um=readers.get_coverslip_offset(client))
+    return result
+
+
 def set_autofocus_optics(client, laser_nm, percent, detector, band, dye, *, max_retries=None) -> dict:
     """Give the Best Focus Setting the laser line at *laser_nm* with *percent* power, and *detector* with *band* and *dye*; read back.
 

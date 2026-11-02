@@ -206,6 +206,11 @@ def get_autofocus_settings(client, **keywords):
     return _routed("autofocus_settings", client, **keywords)
 
 
+def get_coverslip_offset(client, **keywords):
+    """The Reflection autofocus's coverslip offset, in micrometres."""
+    return _routed("coverslip_offset", client, **keywords)
+
+
 def get_laser_output_power(client, **keywords):
     """Each light source's own output power in the current setting, in percent, by name."""
     return _routed("laser_output_power", client, **keywords)

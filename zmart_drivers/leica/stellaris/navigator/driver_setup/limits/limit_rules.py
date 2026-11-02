@@ -451,6 +451,9 @@ MUTATING_COMMANDS = {
     "clear_z_stack": "z_stack",
     # the autofocus's search: its two ends, as a z-stack's
     "autofocus_run": "z_stack",
+    # the coverslip search: its two ends, as an autofocus's; the offset is a number the autofocus uses
+    "find_coverslip": "z_stack",
+    "set_coverslip_offset": "set_coverslip_offset",
     # a whole setting as a file: saving changes nothing; a file's values are checked before it is loaded
     "save_setting": "save_setting",
     "load_setting": "setting_file",

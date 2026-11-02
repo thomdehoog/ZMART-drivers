@@ -841,6 +841,45 @@ def test_a_ninth_visible_line_in_a_setting_is_refused_as_las_x_would(lasx, clien
 
 
 
+class TestCoverslipReflection:
+    def test_the_offset_is_written_and_read_back(self, lasx, client):
+        result = changes.set_coverslip_offset(client, 12.5)
+
+        assert result["confirmed"] is True and result["coverslip_offset_um"] == pytest.approx(12.5)
+
+    @pytest.mark.parametrize("um", [6000.0, -6000.0, "5", True])
+    def test_an_offset_beyond_the_capture_range_is_refused(self, lasx, client, um):
+        assert changes.set_coverslip_offset(client, um)["success"] is False
+        assert direct_reader.get_coverslip_offset() == 0.0
+
+    def test_find_reports_the_offset_las_x_found(self, lasx, client, tmp_path, monkeypatch):
+        monkeypatch.setattr(changes, "LASX_LOG", tmp_path / "LAS X.log")
+        lasx.coverslip = (None, 7.0)
+
+        result = changes.find_coverslip_reflection(client, project=24)
+
+        assert result["success"] is True and result["found"] is True
+        assert result["coverslip_offset_um"] == pytest.approx(7.0)
+        assert lasx.commands() == ["StartFindCoverSlipReflection"]
+
+    def test_find_reports_when_las_x_found_no_reflection(self, lasx, client, tmp_path, monkeypatch):
+        log = tmp_path / "LAS X.log"
+        monkeypatch.setattr(changes, "LASX_LOG", log)
+        lasx.coverslip = (log, None)
+
+        result = changes.find_coverslip_reflection(client, project=24)
+
+        assert result["success"] is True and result["found"] is False
+        assert result["coverslip_offset_um"] == 0.0
+
+    def test_a_search_beyond_the_z_limits_is_refused_and_nothing_is_sent(self, lasx, client, tmp_path, monkeypatch):
+        monkeypatch.setattr(changes, "LASX_LOG", tmp_path / "LAS X.log")
+        lasx.live[("Acquire", "AutoFocusInfo", "FocusRange")] = 100000
+
+        assert changes.find_coverslip_reflection(client, project=24)["success"] is False
+        assert lasx.commands() == []
+
+
 class TestAutofocusRun:
     def test_the_autofocus_runs_and_reports_where_the_focus_went(self, lasx, client, tmp_path, monkeypatch):
         monkeypatch.setattr(changes, "LCS_LOG", tmp_path / "LCS.LOG")

@@ -81,6 +81,7 @@ SIMULATOR_SETTINGS = {
     ("Acquire", "AutoFocusInfo", "ZUseMode"): 1,
     # When the autofocus runs in a time series (its Timelapse tab): 1 first cycle, 2 every cycle, 3 every n-th.
     ("Acquire", "AutoFocusInfo", "WorkflowTimelapse"): 1,
+    ("Acquire", "AutoFocusInfo", "ReflectionOffset"): 0.0,
     # Auto Sync and its scan options (simulator, 2026-11-02); the options are taken only while Auto Sync is on.
     ("Acquire", "AutoFocusInfo", "IsAutoSyncActive"): False,
     **{

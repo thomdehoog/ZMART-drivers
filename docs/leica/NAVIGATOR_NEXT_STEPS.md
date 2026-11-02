@@ -36,7 +36,7 @@ The rule: LAS X's own command first; the state tree only when no command does it
 checked by the driver either way (`transfer.CHECKED_COMMANDS`, `transfer.STATE_TREE_WRITES`).
 
 **Autofocus, what is left**
-- The Reflection method's coverslip offset (`ReflectionOffset`) and its "Find Coverslip Reflection" button.
+- "Find Coverslip Reflection" finding the coverslip: only "not found" was seen (the simulator has none).
 - The simulator's Best Focus Setting kept a 499 nm line at 2 % after the Auto Sync trial (Auto Sync off copies
   Setting 1 into it); a line cannot be taken out of it without redefining the whole Best Focus Setting.
 - The hardware autofocus (AFC, `Microscope/AFC`) and its offset.

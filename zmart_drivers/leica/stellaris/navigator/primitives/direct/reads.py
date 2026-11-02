@@ -97,6 +97,7 @@ READS = (
     "auto_sync",
     "lambda_scan",
     "laser_output_power",
+    "coverslip_offset",
     "autofocus_optics",
     "pixel_size",
     "bit_depth",
@@ -1093,6 +1094,11 @@ def get_autofocus_optics() -> dict:
         return {"lines": lines}
 
     return read("the Best Focus Setting's optics", reading)
+
+
+def get_coverslip_offset() -> float:
+    """The Reflection autofocus's coverslip offset, in micrometres (``Acquire/AutoFocusInfo/ReflectionOffset``, metres)."""
+    return metres(settings("the coverslip offset", {"o": ("Acquire", "AutoFocusInfo", "ReflectionOffset")})["o"], "ReflectionOffset") * 1e6
 
 
 def current_setting_place(nodes) -> int:
