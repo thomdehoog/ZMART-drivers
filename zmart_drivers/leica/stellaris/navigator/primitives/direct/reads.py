@@ -93,6 +93,7 @@ READS = (
     "time_series",
     "roi_scan",
     "z_compensation",
+    "autofocus_in_time_series",
     "autofocus_optics",
     "pixel_size",
     "bit_depth",
@@ -1089,6 +1090,16 @@ def get_autofocus_optics() -> dict:
         return {"lines": lines}
 
     return read("the Best Focus Setting's optics", reading)
+
+
+def get_autofocus_in_time_series():
+    """When the autofocus runs in a time series, as its Timelapse tab shows it: ``"first"`` (the first cycle only),
+    ``"every"`` (every cycle), or n (every n-th cycle). ``Acquire/AutoFocusInfo/WorkflowTimelapse`` and its iterator.
+    """
+    found = settings("the autofocus in a time series", {
+        "when": ("Acquire", "AutoFocusInfo", "WorkflowTimelapse"), "n": ("Acquire", "AutoFocusInfo", "WorkflowTimelapseIterator"),
+    })
+    return {1: "first", 2: "every"}.get(found["when"], found["n"])
 
 
 #: Linear Z-compensation's modes by name and LCS's bit for them.

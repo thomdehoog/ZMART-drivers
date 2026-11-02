@@ -58,6 +58,7 @@ discovery session in `SCOPE_RUN_2026-11-01_NAVIGATOR_DISCOVERY.md` and the build
 | ROI scan on or off, and the sections of a stack it is limited to (ROI 3D) | Works: written into LAS X's state tree, as its button does; the regions themselves are drawn in LAS X's viewer |
 | The bleach mode on or off | Works: written into LAS X's state tree, as its button does; the bleach points are set in LAS X's window |
 | Linear Z-compensation: excitation, detector gain, motCORR on or off; support points added, removed, moved to; reference position | Works, with LAS X's commands (the reference written into the state tree) |
+| When the autofocus runs in a time series (first cycle, every cycle, every n-th) | Works: written into LAS X's state tree, as its Timelapse tab does |
 | Fast Live, started and stopped | Works, with LAS X's commands |
 | Fast Live's Scan Settings, both scanners | Works: written into LAS X's state tree, as its window does; each range checked first, since LAS X does not hold the format to it |
 
@@ -187,7 +188,7 @@ service and the person responsible for the instrument.
 
 | State | Settings |
 |---|---|
-| Works | 90 (the objective among them, not yet tried) |
+| Works | 91 (the objective among them, not yet tried) |
 | Tried | 0 |
 | Command known | 0 |
 | Not yet learned | 8 |

@@ -39,8 +39,8 @@ checked by the driver either way (`transfer.CHECKED_COMMANDS`, `transfer.STATE_T
 - The Reflection method's coverslip offset (`ReflectionOffset`) and its "Find Coverslip Reflection" button.
 - Auto Sync and its scan options.
 - The hardware autofocus (AFC, `Microscope/AFC`) and its offset.
-- The Timelapse and Stage tabs: when the autofocus runs in a series (every n time points, at which
-  positions; LCS has `WorkflowTimelapse`, `WorkflowXY`).
+- The autofocus's Stage tab (at which positions: `WorkflowXY`, `WorkflowXYIterator`, `WorkflowXYPositions`);
+  it is greyed out without stage positions, so it comes with the Navigator.
 
 **Acquisition**
 - Saving a time series: `acquire()` takes it (LAS X's Start), but the files are written for x, y and z

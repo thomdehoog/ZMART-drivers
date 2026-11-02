@@ -365,6 +365,10 @@ STATE_TREE_WRITES = {
     "Last3DRoiSection": TreeWrite(("Confocal", "ROIScan", "Last3DRoiSection"), within=(1, 100000)),
     # Linear Z-compensation's reference position, in metres: the window writes it here (simulator, 2026-11-02).
     "ReferencePosition": TreeWrite(("Confocal", "ZCompensation", "ReferencePosition"), float, within=(-1, 1)),
+    # When the autofocus runs in a time series (its Timelapse tab): 1 the first cycle only, 2 every cycle,
+    # 3 every n-th, n in the iterator. The window writes them here (simulator, 2026-11-02).
+    "WorkflowTimelapse": TreeWrite(("Acquire", "AutoFocusInfo", "WorkflowTimelapse"), choices=frozenset({1, 2, 3})),
+    "WorkflowTimelapseIterator": TreeWrite(("Acquire", "AutoFocusInfo", "WorkflowTimelapseIterator"), within=(1, 1_000_000_000)),
     "MotCorrRefPos": TreeWrite(
         ("Microscope", "ObjectiveList", "ObjectiveInfo", "MotCorrRefPos"), float,
         choices=frozenset({-1.0}), within=(0, 100), of_objective=True,

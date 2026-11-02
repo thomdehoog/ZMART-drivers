@@ -776,6 +776,19 @@ def start_live(client, project=None, *, fast=False) -> dict:
     return run(client, change)
 
 
+def set_autofocus_in_time_series(client, when, *, max_retries=None) -> dict:
+    """When the autofocus runs in a time series, as its Timelapse tab: ``"first"``, ``"every"``, or n (every n-th cycle);
+    the result's ``in_time_series`` is read back."""
+    try:
+        change = writes.autofocus_in_time_series(when)
+    except ValueError as why:
+        return dispatch.refused(str(why))
+    result = run(client, change, max_retries=max_retries)
+    if result["success"]:
+        result["in_time_series"] = readers.get_autofocus_in_time_series(client)
+    return result
+
+
 def z_compensation_result(client, planned, max_retries=None) -> dict:
     result = None
     for change in planned:

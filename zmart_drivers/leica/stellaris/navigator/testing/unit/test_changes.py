@@ -1031,6 +1031,19 @@ class TestFastLive:
         assert changes.set_fast_live(client, "galvo", format=256)["success"] is False
 
 
+class TestAutofocusInATimeSeries:
+    @pytest.mark.parametrize(("when", "shown"), [("every", "every"), (4, 4), ("first", "first")])
+    def test_when_the_autofocus_runs_is_written_and_read_back(self, lasx, client, when, shown):
+        result = changes.set_autofocus_in_time_series(client, when)
+
+        assert result["confirmed"] is True and result["in_time_series"] == shown
+
+    @pytest.mark.parametrize("when", ["sometimes", 0, 1, 2.5, True])
+    def test_what_the_tab_does_not_offer_is_refused(self, lasx, client, when):
+        assert changes.set_autofocus_in_time_series(client, when)["success"] is False
+        assert direct_reader.get_autofocus_in_time_series() == "first"
+
+
 class TestZCompensation:
     @pytest.fixture
     def stacked(self, lasx, client):

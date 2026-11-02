@@ -73,6 +73,9 @@ SIMULATOR_SETTINGS = {
     ("Confocal", "ScanningParameter", "ScanDirectionX"): 1,
     ("Acquire", "AutoFocusInfo", "IsSeriesScanAutofocusActive"): True,
     ("Acquire", "AutoFocusInfo", "ZUseMode"): 1,
+    # When the autofocus runs in a time series (its Timelapse tab): 1 first cycle, 2 every cycle, 3 every n-th.
+    ("Acquire", "AutoFocusInfo", "WorkflowTimelapse"): 1,
+    ("Acquire", "AutoFocusInfo", "WorkflowTimelapseIterator"): 1,
     ("Acquire", "AutoFocusInfo", "FocusRange"): 80,
     ("Acquire", "AutoFocusInfo", "AFAnalyseType"): 1,
     ("Acquire", "AutoFocusInfo", "Precision"): 3,

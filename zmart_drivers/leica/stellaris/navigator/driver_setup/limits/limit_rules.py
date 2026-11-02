@@ -429,6 +429,8 @@ MUTATING_COMMANDS = {
     "set_roi_scan": "set_roi_scan",
     # linear Z-compensation: its modes and points hold powers and gains already set; Move To is a z move
     "set_z_compensation": "set_z_compensation",
+    # when the autofocus runs in a time series: its own search is checked when it runs
+    "set_autofocus_in_time_series": "set_autofocus_in_time_series",
     "add_z_compensation_point": "add_z_compensation_point",
     "remove_z_compensation_point": "remove_z_compensation_point",
     "move_to_z_compensation_point": "set_xyz",

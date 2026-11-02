@@ -905,3 +905,14 @@ Built: `set_z_compensation(excitation=, detector=, motcorr=, reference_um=)`, `a
 points named by their absolute z. Through the driver: excitation and detector on (points at 992.8 and 973.0), a point
 added at 982.9, moved to 973.0, a point not there refused, all removed, the modes off, the focus put back at 982.9.
 
+## 51. The autofocus in a time series (2 November 2026)
+
+In xyt, the autofocus panel's Timelapse tab offers "First cycle only", "Every cycle" and "Every n-th cycle". Pressed
+by the driver's mouse, no command: `Acquire/AutoFocusInfo/WorkflowTimelapse` 1, 2 and 3, n in
+`WorkflowTimelapseIterator` (the window's field 1 to 10^9). Written into the state tree, both were taken and the
+window followed. These changes had first been hidden by the record's own filter, which skipped any name with
+"Time" in it (for clocks); the filter now looks at the node's own name and no longer skips "Time".
+
+Built: `set_autofocus_in_time_series(when)`, `"first"`, `"every"` or n >= 2, read back. Through the driver: every,
+5, first; 1 refused (that is "every"). The Stage tab was greyed out (no stage positions).
+

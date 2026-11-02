@@ -1171,6 +1171,26 @@ def start_live(project: int, *, fast: bool = False) -> Write:
     )
 
 
+def autofocus_in_time_series(when) -> Write:
+    """When the autofocus runs in a time series, as its Timelapse tab: ``"first"``, ``"every"``, or n >= 2 (every n-th cycle).
+
+    Written into LCS's state tree, as the tab does (simulator, 2026-11-02); read back.
+    """
+    if when in ("first", "every") and isinstance(when, str):
+        elements = [f'<StateTree Command="WorkflowTimelapse" Value="{1 if when == "first" else 2}"/>']
+    elif isinstance(when, int) and not isinstance(when, bool) and when >= 2:
+        elements = ['<StateTree Command="WorkflowTimelapse" Value="3"/>', f'<StateTree Command="WorkflowTimelapseIterator" Value="{when}"/>']
+    else:
+        raise ValueError(f"the autofocus runs on the 'first' cycle, on 'every' cycle, or every n-th (n of 2 or more), not {when!r}")
+
+    def fill(request: Request) -> None:
+        request.elements = list(elements)
+
+    return Write(command="set_autofocus_in_time_series", values={"value": str(when)}, request="WorkflowTimelapse", fill=fill,
+                 description=f"Autofocus in a time series -> {when}", ready=idle(),
+                 confirm=Expect("autofocus_in_time_series", lambda shown: shown == when))
+
+
 def z_compensation_change(command: str, element: str, description: str, shows, values=None) -> Write:
     """One command of the Linear Z-Compensation window, as it sends it; read back from the Z-compensation."""
 

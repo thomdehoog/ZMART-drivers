@@ -614,6 +614,14 @@ class Microscope:
         lines = readings.get_aobs_lines(self.handle.client) or []
         return next(line for line in lines if abs(line["wavelength"] - float(wavelength_nm)) < 0.5)
 
+    def set_autofocus_in_time_series(self, when) -> str | int:
+        """When LAS X's autofocus runs in a time series, as its Timelapse tab: ``"first"`` (the first cycle only),
+        ``"every"`` (every cycle), or n (every n-th cycle). Answers it as LAS X holds it."""
+        self.handle.require_open()
+        result = changes.set_autofocus_in_time_series(self.handle.client, when)
+        checked(self.handle, result, f"set_autofocus_in_time_series({when!r})")
+        return result["in_time_series"]
+
     def set_z_compensation(self, excitation: bool | None = None, detector: bool | None = None, motcorr: bool | None = None,
                            reference_um: float | None = None) -> dict:
         """Switch linear Z-compensation's modes (laser power, detector gain, collar along z) on or off, and set its
