@@ -1070,6 +1070,25 @@ class TestFastLive:
         assert changes.set_fast_live(client, "galvo", format=256)["success"] is False
 
 
+class TestApplyToAllSettings:
+    @pytest.mark.parametrize(("name", "element"), [
+        ("line_average", '<Scanner Command="SetLineAverage" LineAverage="1" SetMode="1" SingleSettingIndex="0" BlockId="0"/>'),
+        ("frame_accumulation", '<Scanner Command="SetFrameAccu" FrameAccu="1" SetMode="1" SingleSettingIndex="0" BlockId="0"/>'),
+    ])
+    def test_the_current_value_is_sent_to_every_setting_as_the_window_s_box_does(self, lasx, client, name, element):
+        result = changes.apply_to_all_settings(client, name)
+
+        assert result["success"] is True
+        assert lasx.sent[-1] == element
+
+    def test_the_pinhole_is_sent_to_every_setting(self, lasx, client):
+        assert changes.apply_to_all_settings(client, "pinhole_um")["success"] is True
+        assert lasx.sent[-1].startswith('<Scanner Command="SetPinhole"') and 'SetMode="1"' in lasx.sent[-1]
+
+    def test_a_setting_the_window_has_no_box_for_is_refused(self, lasx, client):
+        assert changes.apply_to_all_settings(client, "zoom")["success"] is False
+
+
 class TestLaserOutputPower:
     def test_the_white_light_laser_s_output_power_is_read(self, lasx, client):
         assert direct_reader.get_laser_output_power() == {"SuperContVisible Light": 85.0}

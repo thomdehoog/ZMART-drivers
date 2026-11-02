@@ -614,6 +614,12 @@ class Microscope:
         lines = readings.get_aobs_lines(self.handle.client) or []
         return next(line for line in lines if abs(line["wavelength"] - float(wavelength_nm)) < 0.5)
 
+    def apply_to_all_settings(self, name: str) -> dict:
+        """Give every setting the value *name* has in the current one, as the "apply to all settings" box beside
+        ``line_average``, ``line_accumulation``, ``frame_average``, ``frame_accumulation`` and ``pinhole_um`` does."""
+        self.handle.require_open()
+        return checked(self.handle, changes.apply_to_all_settings(self.handle.client, name), f"apply_to_all_settings({name!r})")
+
     def set_laser_output_power(self, percent: float, source: str | None = None) -> dict:
         """Set a laser's own output power in the current setting, in percent, as LAS X's Laser Overview slider: the
         white-light laser's, unless *source* names another. Each line's power is a share of it. Within the limits

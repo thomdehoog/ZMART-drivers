@@ -986,3 +986,17 @@ Built: `set_coverslip_offset(um)` (within 5000 um either way, the autofocus's la
 LAS X's log (option A: what LAS X did). Through the driver: 12.5 um, 9000 refused, Find not found (offset kept), back
 to 0 and the method back to contrast 1.
 
+## 57. "Apply to all settings", and the pinhole went into every setting (2 November 2026)
+
+The XY panel's small boxes beside Line and Frame (averaging, accumulation) and the pinhole, pressed by the driver's
+mouse: ticking one sent the current value again with `SetMode="1"` (`<Scanner Command="SetLineAverage" LineAverage="1"
+SetMode="1" SingleSettingIndex="0" BlockId="0"/>`, `SetPinhole ... SetMode="1"`); unticking sent nothing. The pinhole's
+arrows with the box unticked sent `SetPinhole ... SetMode="0"`. So `SetMode` 0 is this setting, 1 every setting (2,
+the driver's form for the per-setting values, the setting at `SingleSettingIndex`).
+
+The driver's `pinhole_um` had sent `SetMode="1"`, as an earlier log line (box ticked) showed: with several settings it
+changed the pinhole in all of them. It now sends `SetMode="0"`, the current setting only, as the window. Built:
+`apply_to_all_settings(name)`, the current value sent with `SetMode="1"`, through the limits as the setting's own value.
+Through the driver: the pinhole 100.7 to 100 um (`SetMode="0"`), line average and pinhole applied to all settings.
+The collar's `SetMotCorrPosition` keeps `SetMode="1"`, as the window sends it (it has no such box).
+

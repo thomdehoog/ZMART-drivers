@@ -210,6 +210,28 @@ def setting_element(setting: Setting, number: float, index: int = 0) -> str:
     )
 
 
+#: The settings whose value LAS X's window can apply to every setting with a box beside it.
+TO_ALL_SETTINGS = ("line_average", "line_accumulation", "frame_average", "frame_accumulation", "pinhole_um")
+
+
+def to_all_settings(name: str, number: float) -> Write:
+    """*number*, the value *name* has now, sent to every setting (``SetMode="1"``), as the window's "apply to all
+    settings" box does when ticked (simulator, 2026-11-02); the value goes to the limits as the setting's own."""
+    if name not in TO_ALL_SETTINGS:
+        raise ValueError(f"LAS X's window applies only {', '.join(TO_ALL_SETTINGS)} to all settings, not {name!r}")
+    if name == "pinhole_um":
+        return pinhole_um(number, all_settings=True)
+    setting = SETTINGS[name]
+
+    def fill(request: Request) -> None:
+        request.elements = [f'<Scanner Command="{setting.lasx_command}" {setting.attribute}="{value(number)}" SetMode="1" '
+                            f'SingleSettingIndex="{request.setting}" {CURRENT}/>']
+
+    return Write(command=setting.command, values={"value": number}, request=setting.lasx_command, fill=fill,
+                 description=f"{setting.describe.format(value=value(number))}, in every setting", ready=idle(),
+                 confirm=Expect(setting.reading, setting_shows(setting, number)))
+
+
 def setting_shows(setting: Setting, target: float, tolerance=None):
     """A reading in which *setting* shows *target*, within *tolerance* (None: the setting's own)."""
     tolerance = setting.tolerance if tolerance is None else tolerance
@@ -1643,8 +1665,12 @@ def phase_x(value) -> Write:
     )
 
 
-def pinhole_um(value) -> Write:
+def pinhole_um(value, *, all_settings: bool = False) -> Write:
     """The pinhole's size in micrometres, with the window's own ``SetPinhole`` (in metres); read back.
+
+    Into the current setting only (``SetMode="0"``), as the window sends it; with
+    *all_settings*, into every setting (``SetMode="1"``), as its "apply to all
+    settings" box does (simulator, 2026-11-02).
 
     LCS does not keep this command to its range (simulator, 2026-11-02: 2000
     micrometres, its maximum 1000, raised the motor's error and set 2000), so
@@ -1655,7 +1681,7 @@ def pinhole_um(value) -> Write:
 
     def fill(request: Request) -> None:
         request.elements = [
-            f'<Scanner Command="SetPinhole" PinholeDiameter="{target / 1_000_000!r}" SetMode="1" SingleSettingIndex="{request.setting}"/>'
+            f'<Scanner Command="SetPinhole" PinholeDiameter="{target / 1_000_000!r}" SetMode="{int(all_settings)}" SingleSettingIndex="{request.setting}"/>'
         ]
 
     return Write(

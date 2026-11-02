@@ -157,6 +157,23 @@ def move_z(client, drive, z_um, *, max_retries=None, tolerance=None):
 # =============================================================================
 
 
+def apply_to_all_settings(client, name: str, *, max_retries=None) -> dict:
+    """Give every setting the value *name* has in the current one, as the window's "apply to all settings" box beside
+    line average, line accumulation, frame average, frame accumulation and the pinhole does when ticked."""
+    if name not in writes.TO_ALL_SETTINGS:
+        return dispatch.refused(f"LAS X's window applies only {', '.join(writes.TO_ALL_SETTINGS)} to all settings, not {name!r}")
+    if name == "pinhole_um":
+        now = readers.get_pinhole(client)
+        number = now["metres"] * 1_000_000 if now else None
+    else:
+        setting = writes.SETTINGS[name]
+        shown = readers.get_averaging(client) if setting.reading == "averaging" else None
+        number = setting.read(shown) if shown else None
+    if number is None:
+        return dispatch.refused(f"{name} could not be read, so there is nothing to apply")
+    return run(client, writes.to_all_settings(name, number), max_retries=max_retries)
+
+
 def change(client, name: str, value, *, max_retries=None, tolerance=None) -> dict:
     """Change the setting *name* to *value*, and read it back.
 

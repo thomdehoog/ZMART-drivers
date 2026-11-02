@@ -63,6 +63,7 @@ discovery session in `SCOPE_RUN_2026-11-01_NAVIGATOR_DISCOVERY.md` and the build
 | Auto Sync on or off, and its scan options (format, frequency, overview zoom, bidirectional, no averaging) for both scanners | Works: on with LAS X's command, off and the options written into its state tree, as the Best Focus Scan Options window does |
 | The λ scan's detection: begin, end, step, bandwidth | Works, with LAS X's commands; LAS X sometimes moves begin or end by a few nm, which the driver reports |
 | The z drive on its own (z-galvo or z-wide), and with z-galvo the xz scan modes (xzy, xzt, xzλ ...) | Works, with LAS X's commands |
+| A value given to every setting (the "apply to all settings" boxes beside line and frame averaging and accumulation, and the pinhole) | Works, with LAS X's commands |
 | The white-light laser's own output power (the Laser Overview's slider) | Works: written into LAS X's state tree, as the window does; within the limits (`set_laser_output_power`, by default up to 85 %) |
 | Fast Live, started and stopped | Works, with LAS X's commands |
 | Fast Live's Scan Settings, both scanners | Works: written into LAS X's state tree, as its window does; each range checked first, since LAS X does not hold the format to it |
@@ -193,7 +194,7 @@ service and the person responsible for the instrument.
 
 | State | Settings |
 |---|---|
-| Works | 96 (the objective among them, not yet tried) |
+| Works | 97 (the objective among them, not yet tried) |
 | Tried | 0 |
 | Command known | 0 |
 | Not yet learned | 8 |
