@@ -206,6 +206,11 @@ def get_autofocus_settings(client, **keywords):
     return _routed("autofocus_settings", client, **keywords)
 
 
+def get_time_series(client, **keywords):
+    """The time series: ``frames``, ``interval_s``, ``duration_s``, ``until_stopped``, ``shortest_interval_s``."""
+    return _routed("time_series", client, **keywords)
+
+
 def get_fast_live(client, **keywords):
     """Fast Live's Scan Settings, by scanner (``"fov"``, ``"resonant"``)."""
     return _routed("fast_live", client, **keywords)

@@ -54,6 +54,7 @@ discovery session in `SCOPE_RUN_2026-11-01_NAVIGATOR_DISCOVERY.md` and the build
 | The whole z-stack in one picture | Works: `acquire()` takes it when a stack is set |
 | Letting go of saved pictures in LAS X | Works |
 | Live, started and stopped | Works, with LAS X's commands; stop it before taking pictures |
+| Time series: frames, interval, Acquire Until Stopped | Works: written into LAS X's state tree, as its t panel does; saving a series is not yet possible |
 | Fast Live, started and stopped | Works, with LAS X's commands |
 | Fast Live's Scan Settings, both scanners | Works: written into LAS X's state tree, as its window does; each range checked first, since LAS X does not hold the format to it |
 
@@ -183,7 +184,7 @@ service and the person responsible for the instrument.
 
 | State | Settings |
 |---|---|
-| Works | 86 (the objective among them, not yet tried) |
+| Works | 87 (the objective among them, not yet tried) |
 | Tried | 0 |
 | Command known | 0 |
 | Not yet learned | 8 |

@@ -423,6 +423,8 @@ MUTATING_COMMANDS = {
     "stop_live": "capture",
     # Fast Live's Scan Settings: how it scans, not the light
     "set_fast_live": "set_fast_live",
+    # the time series: how many frames and how often, not the light
+    "set_time_series": "set_time_series",
     # the z-stack: its ends are z positions the scan moves through
     "set_z_stack_drive": "set_z_stack_drive",
     "set_z_stack_range": "z_stack",

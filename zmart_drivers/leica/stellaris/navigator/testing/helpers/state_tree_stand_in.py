@@ -38,6 +38,13 @@ SIMULATOR_SETTINGS = {
     ("Acquire", "AcquireZStackInfo", "AFPlanePosition"): 0.0,
     ("Acquire", "AcquireZStackInfo", "IsAFPlanePosition"): False,
     ("Acquire", "ZStackUseMode"): 1,
+    # The time series, as LCS keeps it (simulator, 2026-11-02): one frame, as fast as it goes.
+    ("Acquire", "AcquireTStackInfo", "RepeatCount"): 1,
+    ("Acquire", "AcquireTStackInfo", "DelayTime"): 1.28,
+    ("Acquire", "AcquireTStackInfo", "Duration"): 0.0,
+    ("Acquire", "AcquireTStackInfo", "CalculationMode"): 3,
+    ("Acquire", "AcquireTStackInfo", "IsEnableAutomaticTSectionsCalculation"): False,
+    ("Acquire", "AcquireTStackInfo", "MaxFrameRate"): 0.78125,
     # Fast Live's Scan Settings, the FOV scanner's and the resonant one's (simulator, 2026-11-02).
     **{
         ("Confocal", parent, name): value
@@ -551,6 +558,24 @@ class StandInNodes:
                 infos = [n for n in nodes[nodes[info][1]][2] if nodes[n][0] == "ObjectiveInfo"]
                 self.objectives[infos.index(info)][path[-1]] = change.Value
                 continue
+            if path[:2] == ["Acquire", "AcquireTStackInfo"]:
+                # The time series as LCS keeps it: the frames follow from the duration, the interval
+                # is at least a frame, and "until stopped" sets the mode (simulator, 2026-11-02).
+                t = ("Acquire", "AcquireTStackInfo")
+                if path[-1] == "RepeatCount" or path[-1] == "CalculationMode":
+                    continue  # ignored by LCS
+                if path[-1] == "Duration":
+                    self.live[(*t, "Duration")] = change.Value
+                    self.live[(*t, "RepeatCount")] = round(change.Value / self.live[(*t, "DelayTime")]) + 1
+                    continue
+                if path[-1] == "DelayTime":
+                    self.live[(*t, "DelayTime")] = max(change.Value, 1 / self.live[(*t, "MaxFrameRate")])
+                    self.live[(*t, "Duration")] = (self.live[(*t, "RepeatCount")] - 1) * self.live[(*t, "DelayTime")]
+                    continue
+                if path[-1] == "IsEnableAutomaticTSectionsCalculation":
+                    self.live[(*t, path[-1])] = bool(change.Value)
+                    self.live[(*t, "CalculationMode")] = 4 if change.Value else 3
+                    continue
             self.live[tuple(path)] = change.Value
             if tuple(path) == ("Acquire", "AcquireZStackInfo", "StackCalculationMode"):
                 # LCS follows step mode 2 with its optimal step, as for the window's System Optimized.

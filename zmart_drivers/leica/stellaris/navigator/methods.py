@@ -614,6 +614,20 @@ class Microscope:
         lines = readings.get_aobs_lines(self.handle.client) or []
         return next(line for line in lines if abs(line["wavelength"] - float(wavelength_nm)) < 0.5)
 
+    def set_time_series(self, frames: int | None = None, interval_s: float | None = None, until_stopped: bool | None = None) -> dict:
+        """Set the time series as LAS X's t panel does: the number of *frames*, the *interval_s* between them,
+        or *until_stopped* (Acquire Until Stopped). Answers the time series as LAS X holds it.
+
+        The scan mode must have time (``change_setting("scan_mode", "xyt")`` first).
+        The interval is at least one frame (``shortest_interval_s``). Saving a
+        series taken with :meth:`acquire` is not yet possible: the files are
+        written for x, y and z only.
+        """
+        self.handle.require_open()
+        result = changes.set_time_series(self.handle.client, frames=frames, interval_s=interval_s, until_stopped=until_stopped)
+        checked(self.handle, result, f"set_time_series(frames={frames!r}, interval_s={interval_s!r}, until_stopped={until_stopped!r})")
+        return result["time_series"]
+
     def start_live(self) -> None:
         """Start Live, as LAS X's Live button: the microscope scans on, the lasers on, until :meth:`stop_live`.
 

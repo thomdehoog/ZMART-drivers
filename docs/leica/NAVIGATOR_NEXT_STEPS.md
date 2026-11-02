@@ -10,6 +10,26 @@ and state tree are compared before and after, then built with LCS's own command 
 only where nothing reaches LCS), tests first, tried on the simulator through the driver, and
 put back.
 
+## The way to parity (from 3 November 2026)
+
+The aim: everything a user can do with the mouse in LAS X's **Acquire** tab, the driver can do through LCS
+(Configuration, Process, Quantify and Analysis are left out for now). The checklist of every Acquire control,
+from LAS X's own help (69 pages, 409 rows: 83 built, 182 to learn, 23 display only, 121 out of scope), is in
+`D:\claude-scratch\navigator-run\help\CONTROL_CHECKLIST.md`; LAS X's window shows 894 controls to UI
+Automation (`help\ui_tree.txt`).
+
+How each is learned, without Thom's clicks, on the simulator: `D:\claude-scratch\navigator-run\auto_learn.py`
+records LCS's state tree and logs, takes a screenshot of the left screen, uses the control (UI Automation; a real
+mouse click where that does not reach LCS; never keypresses), reads the commands and state-tree values that
+changed, and puts it back. Then: LCS's command first, the state tree only when no command does it, the range
+checked by the driver; tests first; tried through the driver; documented; committed. A control that does not
+give way after a few honest tries is noted here and left, not chased. Hard-to-undo controls (deleting, files,
+calibration, the objective) are asked about first.
+
+Order: the checklist's "to learn" items that change what is acquired first (ROI scan, bleach points,
+Z-compensation, autofocus in a series, tile-scan options, the tau gates, the "apply to all settings" boxes,
+Dynamic Signal Enhancement, Online Dye Separation, spectral scans), cosmetic ones last.
+
 ## To learn and build, in order of use (2 November 2026)
 
 The rule: LAS X's own command first; the state tree only when no command does it; LAS X's range
@@ -23,7 +43,8 @@ checked by the driver either way (`transfer.CHECKED_COMMANDS`, `transfer.STATE_T
   positions; LCS has `WorkflowTimelapse`, `WorkflowXY`).
 
 **Acquisition**
-- Time series (xyt): number of frames and interval. The scan mode can be set; these two are not learned.
+- Saving a time series: `acquire()` takes it (LAS X's Start), but the files are written for x, y and z
+  only (`save_data/metadata.py` refuses LAS X dimension 4).
 - Spiral: not learned.
 - Fast Live's Maximal Format: the driver takes 16, 32, ... 512 (powers of two within LAS X's range); check
   which values the window's slider offers.

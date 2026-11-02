@@ -1171,6 +1171,35 @@ def start_live(project: int, *, fast: bool = False) -> Write:
     )
 
 
+def time_series_change(name: str, node: str, written, description: str, shows) -> Write:
+    """One value of the time series written into LCS's state tree, as the t panel does; read back."""
+
+    def fill(request: Request) -> None:
+        request.elements = [f'<StateTree Command="{node}" Value="{written}"/>']
+
+    return Write(command="set_time_series", values={"value": description}, request=node, fill=fill,
+                 description=f"Time series {name} -> {description}", ready=idle(), confirm=Expect("time_series", lambda t: bool(t) and shows(t)))
+
+
+def time_interval(seconds: float) -> Write:
+    """The time series' interval in seconds (the t panel's Time Interval); read back within a millisecond."""
+    return time_series_change("interval", "DelayTime", repr(float(seconds)), f"{seconds:g} s",
+                              lambda t: abs(t["interval_s"] - seconds) <= 0.001)
+
+
+def time_frames(frames: int, interval_s: float) -> Write:
+    """The time series' number of frames, written as the duration that gives it over *interval_s*: LCS works the
+    frames out from the duration, and ignores the frames written themselves (simulator, 2026-11-02)."""
+    return time_series_change("frames", "Duration", repr((frames - 1) * float(interval_s)), f"{frames} frames",
+                              lambda t: t["frames"] == frames)
+
+
+def time_until_stopped(on: bool) -> Write:
+    """The t panel's "Acquire Until Stopped" on or off (off is its Frames); LCS sets the mode itself."""
+    return time_series_change("until stopped", "IsEnableAutomaticTSectionsCalculation", int(bool(on)), "on" if on else "off",
+                              lambda t: t["until_stopped"] is bool(on))
+
+
 #: Fast Live's Maximal Format: the window's slider stops at these, within LCS's own range.
 FAST_LIVE_FORMATS = (16, 32, 64, 128, 256, 512, 1024, 2048)
 #: Fast Live's Scan Settings by the driver's name: the end of the state-tree name, and its kind.

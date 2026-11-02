@@ -344,6 +344,12 @@ STATE_TREE_WRITES = {
             ("NoTauStedXtend", "NoTauSTEDDeconvolution", bool, None),
         )
     },
+    # The time series: its interval, its duration (LCS works the frames out from it: writing the
+    # frames is ignored), and "Acquire Until Stopped". The window writes them here with no command
+    # (simulator, 2026-11-02); LCS keeps the interval at least one frame long.
+    "DelayTime": TreeWrite(("Acquire", "AcquireTStackInfo", "DelayTime"), float, within=(0, 1e9)),
+    "Duration": TreeWrite(("Acquire", "AcquireTStackInfo", "Duration"), float, within=(0, 1e15)),
+    "IsEnableAutomaticTSectionsCalculation": TreeWrite(("Acquire", "AcquireTStackInfo", "IsEnableAutomaticTSectionsCalculation"), bool),
     "MotCorrRefPos": TreeWrite(
         ("Microscope", "ObjectiveList", "ObjectiveInfo", "MotCorrRefPos"), float,
         choices=frozenset({-1.0}), within=(0, 100), of_objective=True,

@@ -90,6 +90,7 @@ READS = (
     "detector_modes",
     "aobs_lines",
     "fast_live",
+    "time_series",
     "autofocus_optics",
     "pixel_size",
     "bit_depth",
@@ -1086,6 +1087,28 @@ def get_autofocus_optics() -> dict:
         return {"lines": lines}
 
     return read("the Best Focus Setting's optics", reading)
+
+
+def get_time_series() -> dict:
+    """The time series, as LAS X's t panel shows it: ``frames``, ``interval_s``, ``duration_s``, ``until_stopped``,
+    and ``shortest_interval_s`` (one frame, at the fastest; LCS keeps the interval at least that long).
+
+    ``Acquire/AcquireTStackInfo`` (simulator, 2026-11-02): ``RepeatCount``,
+    ``DelayTime``, ``Duration``, ``IsEnableAutomaticTSectionsCalculation``
+    ("Acquire Until Stopped"), ``MaxFrameRate``.
+    """
+    t = ("Acquire", "AcquireTStackInfo")
+    found = settings("the time series", {
+        "frames": (*t, "RepeatCount"), "interval": (*t, "DelayTime"), "duration": (*t, "Duration"),
+        "until": (*t, "IsEnableAutomaticTSectionsCalculation"), "rate": (*t, "MaxFrameRate"),
+    })
+    return {
+        "frames": found["frames"],
+        "interval_s": float(found["interval"]),
+        "duration_s": float(found["duration"]),
+        "until_stopped": bool(found["until"]),
+        "shortest_interval_s": round(1 / found["rate"], 6) if found["rate"] else None,
+    }
 
 
 #: Fast Live's two scanners and where LCS keeps their Scan Settings.

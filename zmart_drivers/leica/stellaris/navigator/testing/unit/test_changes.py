@@ -1031,6 +1031,39 @@ class TestFastLive:
         assert changes.set_fast_live(client, "galvo", format=256)["success"] is False
 
 
+class TestTimeSeries:
+    @pytest.fixture
+    def timed(self, lasx, client):
+        lasx.live[("Acquire", "ScanDimensionList", "ScanModeName")] = "xyt"
+        return client
+
+    def test_frames_and_interval_are_set_and_read_back(self, lasx, timed):
+        result = changes.set_time_series(timed, frames=7, interval_s=10.0)
+
+        assert result["confirmed"] is True
+        assert result["time_series"] == {
+            "frames": 7, "interval_s": 10.0, "duration_s": 60.0, "until_stopped": False, "shortest_interval_s": 1.28,
+        }
+
+    def test_until_stopped_is_switched_on_and_off(self, lasx, timed):
+        assert changes.set_time_series(timed, until_stopped=True)["time_series"]["until_stopped"] is True
+        result = changes.set_time_series(timed, frames=3)
+
+        assert result["time_series"]["until_stopped"] is False and result["time_series"]["frames"] == 3
+
+    @pytest.mark.parametrize("keywords", [
+        {"interval_s": 0.5}, {"frames": 0}, {"frames": 2.5}, {"frames": 3, "until_stopped": True}, {},
+    ])
+    def test_what_the_window_does_not_offer_is_refused_and_nothing_is_written(self, lasx, timed, keywords):
+        before = direct_reader.get_time_series()
+
+        assert changes.set_time_series(timed, **keywords)["success"] is False
+        assert direct_reader.get_time_series() == before
+
+    def test_without_a_time_series_in_the_scan_mode_it_is_refused(self, lasx, client):
+        assert changes.set_time_series(client, frames=3)["success"] is False
+
+
 class TestLive:
     def test_live_starts_as_the_window_starts_it_and_stops(self, lasx, client):
         started = changes.start_live(client, project=24)

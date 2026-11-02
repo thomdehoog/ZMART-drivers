@@ -851,3 +851,19 @@ the simulator, which has no lifetime data. Built: `find_tau_lifetimes(detector)`
 lifetimes afterwards (option A: what LAS X did, no lifetimes worked out by the driver). Through the driver: HyD 2, not
 found, 1 and 3 ns kept; HyD 4, not in TauSeparation, refused. A search that finds them is to be seen on the STELLARIS.
 
+## 48. The time series, learned by the driver's own clicks (2 November 2026)
+
+Learned with `auto_learn.py`, no click of Thom's: the t panel sends LCS no command. Its Frames field changed
+`Acquire/AcquireTStackInfo/RepeatCount` (and LCS the `Duration`); Acquire Until Stopped, Duration and Frames
+(real mouse clicks; UI Automation's selection did not reach LCS) set `CalculationMode` 4, 2 and 3, until stopped
+with `IsEnableAutomaticTSectionsCalculation` True and 4000 frames. Written by hand: `RepeatCount` and
+`CalculationMode` were ignored; `DelayTime` (the interval) was taken, at least one frame long (0.5 s became
+1.28 s, the frame time, `1/MaxFrameRate`); `Duration` was taken and LCS worked the frames out from it,
+1 + duration / interval (no ceiling: 100001 frames); `IsEnableAutomaticTSectionsCalculation` switched until
+stopped on and off, LCS setting the mode. The window's Frames field takes 1 to 10^9.
+
+Built: `set_time_series(frames=, interval_s=, until_stopped=)`. Through the driver: 5 frames every 3 s (the
+window showed 5), until stopped, 12 frames (until stopped off, the window showed 12); 0.2 s and 0 frames refused;
+put back to 1 frame, xyz. A 3-frame series taken with `acquire()` (LAS X's Start) was not saved: the files are
+written for x, y and z only.
+

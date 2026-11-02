@@ -776,6 +776,52 @@ def start_live(client, project=None, *, fast=False) -> dict:
     return run(client, change)
 
 
+#: The most frames LAS X's t panel takes.
+MOST_FRAMES = 1_000_000_000
+
+
+def set_time_series(client, *, frames=None, interval_s=None, until_stopped=None, max_retries=None) -> dict:
+    """Set the time series as LAS X's t panel does: *frames*, *interval_s*, or *until_stopped*; the result's
+    ``time_series`` is read back.
+
+    Only with a scan mode that has time (xyt, xyzt, ...). The interval is
+    refused below one frame (``shortest_interval_s``), which LCS would
+    otherwise lengthen quietly. Frames turn "until stopped" off, as choosing
+    Frames does; asking for both is refused. Everything is checked before the
+    first value is written.
+    """
+    if frames is None and interval_s is None and until_stopped is None:
+        return dispatch.refused("set_time_series needs frames, interval_s or until_stopped")
+    if frames is not None and until_stopped:
+        return dispatch.refused("a time series runs either a number of frames or until it is stopped, not both")
+    if frames is not None and (isinstance(frames, bool) or not isinstance(frames, int) or not 1 <= frames <= MOST_FRAMES):
+        return dispatch.refused(f"frames is a whole number from 1 to {MOST_FRAMES}, not {frames!r}")
+    if until_stopped is not None and not isinstance(until_stopped, bool):
+        return dispatch.refused(f"until_stopped takes True or False, not {until_stopped!r}")
+    if "t" not in str(readers.get_scan_mode(client) or ""):
+        return dispatch.refused("the scan mode has no time; choose one with t (xyt, xyzt, ...) first")
+    now = readers.get_time_series(client)
+    if interval_s is not None:
+        if isinstance(interval_s, bool) or not isinstance(interval_s, (int, float)) or interval_s < now["shortest_interval_s"] - 1e-6:
+            return dispatch.refused(f"the interval is at least one frame, {now['shortest_interval_s']:g} s, not {interval_s!r}")
+    planned = []
+    if interval_s is not None:
+        planned.append(writes.time_interval(float(interval_s)))
+    if until_stopped is not None:
+        planned.append(writes.time_until_stopped(until_stopped))
+    elif frames is not None and now["until_stopped"]:
+        planned.append(writes.time_until_stopped(False))
+    if frames is not None:
+        planned.append(writes.time_frames(frames, float(interval_s) if interval_s is not None else now["interval_s"]))
+    result = None
+    for change in planned:
+        result = run(client, change, max_retries=max_retries)
+        if not result["success"]:
+            return result
+    result["time_series"] = readers.get_time_series(client)
+    return result
+
+
 def set_fast_live(client, scanner="fov", *, max_retries=None, **options) -> dict:
     """Set Fast Live's Scan Settings for *scanner* (``"fov"`` or ``"resonant"``), as its window does; the result's
     ``fast_live`` is all of them read back.
