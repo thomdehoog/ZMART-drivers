@@ -377,6 +377,27 @@ def set_channel_colour(client, detector, colour, *, max_retries=None) -> dict:
     return run(client, change, max_retries=max_retries)
 
 
+def set_tau_channel_colour(client, detector, channel, colour, *, max_retries=None) -> dict:
+    """Give TauSeparation's *channel* (1 or 2) of *detector* the colour *colour*, in the current setting; read back.
+
+    Only while the detector is in TauSeparation, which has two channels.
+    """
+    units = {unit.get("Name"): unit for unit in readers.get_detection_units(client) or []}
+    if detector not in units:
+        return dispatch.refused(f"no detector {detector!r}; LAS X's are {sorted(units)}")
+    colours = (readers.get_detector_modes(client) or {}).get(detector, {}).get("tau_colours") or []
+    if not colours:
+        return dispatch.refused(f"{detector} is not in TauSeparation, so it has no tau channels")
+    if channel not in range(1, len(colours) + 1):
+        return dispatch.refused(f"{detector}'s TauSeparation has the channels 1 to {len(colours)}, not {channel!r}")
+    try:
+        change = writes.tau_channel_colour(writes.route_of(units[detector]["BeamRoute"]), detector,
+                                           readers.get_setting(client)["id"], channel, colour)
+    except ValueError as why:
+        return dispatch.refused(str(why))
+    return run(client, change, max_retries=max_retries)
+
+
 #: LAS X's own wheels: the galvo and scanner switches (types 200, 160, 170 on the
 #: simulator) and the multi-function port. They are never turned by this driver.
 INTERNAL_WHEELS = (200, 160, 170)

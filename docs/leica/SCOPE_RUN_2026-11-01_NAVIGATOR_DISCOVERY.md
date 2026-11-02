@@ -813,3 +813,23 @@ fixed frequency not changed), read back. Through the driver: format 128, 1000 Hz
 dynamic signal enhancement on, each confirmed; 1024, 300, 3000 Hz and zoom 100 refused; Fast Live ran
 (`eScanContinuous`) and stopped; the settings put back as Thom left them.
 
+## 45. TauSeparation's channel colours, and a dye dropped onto a detector (2 November 2026)
+
+In TauSeparation a detector has two tau channels, each with a colour (`TauSeparationDefinition_SeqInfo/
+TauSeparationChannel[n]/LutName` in the setting's entry). Choosing TauSeparation sent the tau mode
+(`SetDigitalGatingModeIndex`) and then `SetDetectorTauSeparationLut` for each channel (Cyan, Magenta).
+Thom picked Red for HyD 2's first channel: the window sent `<Scanner Command="SetDetectorTauSeparationLut"
+TauChannelIndex="0" SetMode="2" SingleSettingID="3" IsUserDefined="1" LutName="Red">` with the detector's
+beam route, then moved the other tau channels on (HyD 2's second to Cyan; HyD S 3's to Magenta and Yellow),
+each `IsUserDefined="0"`. The setting is named by its ID, not its place.
+
+Built: `set_tau_channel_colour(detector, channel, colour)`, the one command, read back; refused outside
+TauSeparation and for a third channel. Through the driver: HyD 2's first channel Green, then Cyan; LCS let
+both channels be Cyan, so the second was set to Magenta. HyD 4 (not in TauSeparation) and channel 3 refused.
+
+A dye dropped onto a detector (three times, Alexa 488 onto HyD 2, Alexa 568 and Alexa 532 onto HyD S 3)
+sent `SetConfocalDefinitionFromDyeAssistant` with `MessageSource` DyeDragNDrop and `ActiveSettingIndex="-1"`,
+carrying the whole setting as the window worked it out: each laser line (white-light 499 and 544 nm, at 2 %),
+each detector's band, dye and colour. LAS X switched the 405 line off and HyD S 3 from Analog to Counting.
+Not built yet.
+

@@ -479,6 +479,9 @@ class StandInNodes:
                 {"DigitalGatingMode": unit.get("DigitalGatingMode", 2), "DigitalGatingModeList_SeqInfo": {"DigitalGatingMode": [
                     {"DigitalGatingMode": code, "IsEnabled": True} for code in (0, 2, 3, 5, 6, 10)]},
                  "OperatingModeIndex": unit.get("OperatingModeIndex", 1), "OperatingMode": unit.get("OperatingMode", 1),
+                 # TauSeparation's two channels and their colours, as LCS lists them in TauSeparation.
+                 **({"TauSeparationDefinition_SeqInfo": {"TauSeparationChannel": [{"LutName": colour} for colour in unit["TauColours"]]}}
+                    if unit.get("DigitalGatingMode") == 6 and unit.get("TauColours") else {}),
                  "DetectionUnitOperatingModeList_SeqInfo": {"DetectionUnitOperatingMode": [
                      {"OperatingMode": code, "IsEnabled": True} for code in getattr(self, "operating_offered", (4, 1, 10, 11))]}}
                 for unit in spectro["DetectionUnitList"]["DetectorHWInfo"]

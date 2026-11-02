@@ -873,6 +873,29 @@ def detector_tau(route, name: str, place: int, mode: str) -> Write:
                  confirm=Expect("detector_modes", lambda modes: (modes or {}).get(name, {}).get("tau") == code))
 
 
+def tau_channel_colour(route, name: str, setting_id: int, channel: int, colour: str) -> Write:
+    """The colour of TauSeparation's *channel* (1 or 2) of the detector *name*, as the window's colour pick sends it; read back.
+
+    ``SetDetectorTauSeparationLut`` names the setting by its ID, not its place
+    (simulator, 2026-11-02). When a colour is picked, the window also moves
+    the other tau channels' colours on, to keep them apart; the driver changes
+    only the channel asked.
+    """
+    if not isinstance(colour, str) or not colour.strip():
+        raise ValueError(f"a tau channel's colour is LAS X's name of a colour table, such as 'Red', not {colour!r}")
+
+    def fill(request: Request) -> None:
+        request.elements = [f'<Scanner Command="SetDetectorTauSeparationLut" TauChannelIndex="{channel - 1}" SetMode="2" '
+                            f'SingleSettingID="{int(setting_id)}" IsUserDefined="1" LutName="{colour}">{beam_route(route)}</Scanner>']
+
+    def shows(modes) -> bool:
+        colours = (modes or {}).get(name, {}).get("tau_colours") or []
+        return len(colours) >= channel and colours[channel - 1] == colour
+
+    return Write(command="set_tau_channel_colour", values={"value": colour}, request="SetDetectorTauSeparationLut", fill=fill,
+                 description=f"Detector {name} tau channel {channel} -> {colour}", ready=idle(), confirm=Expect("detector_modes", shows))
+
+
 #: The operating modes by name and LCS's code for them (``OperatingMode``), as the window's Operating Mode list names them.
 OPERATING_CODES = {"Fast Mode": 4, "Counting": 1, "Analog": 10, "Reflection": 11}
 

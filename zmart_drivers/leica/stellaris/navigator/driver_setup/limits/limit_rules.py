@@ -441,6 +441,8 @@ MUTATING_COMMANDS = {
     # the setting switched on or off for scanning, and its name
     "set_setting_enabled": "set_setting_enabled",
     "set_setting_name": "set_setting_name",
+    # how a tau channel is shown: not the light, not the detector
+    "set_tau_channel_colour": "set_tau_channel_colour",
     # the AOBS: which share of a line goes on, not the light's power
     "set_aobs_reflection": "set_aobs_reflection",
     "set_aobs_enhanced_dynamics": "set_aobs_enhanced_dynamics",

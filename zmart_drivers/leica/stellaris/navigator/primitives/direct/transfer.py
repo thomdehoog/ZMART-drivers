@@ -184,6 +184,7 @@ ALLOWED_COMMANDS = frozenset(
         "SetDetectorGain",
         "SetSpectrophotometerMultiBandRange",
         "SetDigitalGatingModeIndex",
+        "SetDetectorTauSeparationLut",
         "SetLightSourceWavelength",
         "SetConfocalLaserLinesDefinition",
         "ActivateShutter",

@@ -321,6 +321,11 @@ class PlainNavigator:
     def take_SetDigitalGatingModeIndex(self, e):
         unit = self.detector_at(e)
         unit["DigitalGatingMode"] = TAU_LIST[int(e.get("GatingModeIndex"))]
+        if unit["DigitalGatingMode"] == 6 and not unit.get("TauColours"):
+            unit["TauColours"] = ["Cyan", "Magenta"]  # LAS X's first colours for the two channels
+
+    def take_SetDetectorTauSeparationLut(self, e):
+        self.detector_at(e)["TauColours"][int(e.get("TauChannelIndex"))] = e.get("LutName")
 
     def take_SetPinhole(self, e):
         """The pinhole set as asked, beyond LCS's own range too, as the simulator did (2026-11-02)."""

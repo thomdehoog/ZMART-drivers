@@ -37,13 +37,12 @@ checked by the driver either way (`transfer.CHECKED_COMMANDS`, `transfer.STATE_T
 **Commands seen in LCS's log but not built**
 - The z-stack's Set Focus (no logged command; the state tree ignored it; only the window, perhaps by UI
   automation), Z-Compensation, and the Number of Steps mode as such (the count is set through the step).
-- `SetDetectorTauSeparationLut`, `ResetConfocalSetting`, `ResetAutoFocusToAutoSync`.
+- `ResetConfocalSetting`, `ResetAutoFocusToAutoSync`.
 - The mounting medium (`ATL_HyVolution_SetMountingMedium`).
 
 **Other**
 - The notch filter, the Dye Assistant, "Apply to hardware", Bulk Options.
 - A dye of one's own in LAS X's library; the dye bar's "+".
-- Removing a laser line in another setting than the first (the window allowed it only in Setting 1).
 - The changes through a saved setting (`set_detector` and the like) with several settings: still refused.
 
 ## To check on the STELLARIS
@@ -64,6 +63,12 @@ The simulator cannot show these; each needs one careful run on the real microsco
 - That the hardware follows the state-tree values (for example, bidirectional halving the frame time).
 
 ## Decided not to do
+
+- Removing a laser line in another setting than the first: the window allowed it only in Setting 1
+  (Thom, 1 November 2026). A line is switched off in any setting by a power of 0.
+- The dye dropped onto a detector (`SetConfocalDefinitionFromDyeAssistant`, `MessageSource` DyeDragNDrop):
+  the command carries the whole setting as LAS X works it out from the dye (each laser line, each
+  detector's band, dye and colour). To learn: whether LCS works it out when given only the dye.
 
 - The detector offset: LCS holds it, but LAS X's window offers no control for it, and the driver
   changes only what the window offers (Thom, 1 November 2026).

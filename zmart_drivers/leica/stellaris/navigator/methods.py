@@ -358,6 +358,16 @@ class Microscope:
         result = setting_files.show_spectra(self.handle.client, setting_files.folder_for(self.handle), excitation=excitation, emission=emission)
         return checked(self.handle, result, "show_spectra")
 
+    def set_tau_channel_colour(self, detector: str, channel: int, colour: str) -> dict:
+        """Give TauSeparation's channel 1 or 2 of *detector* a colour (LAS X's name, such as ``"Red"``), as the window's colour pick.
+
+        Only while the detector is in TauSeparation. Unlike the window, the
+        other tau channels keep their colours.
+        """
+        self.handle.require_open()
+        result = changes.set_tau_channel_colour(self.handle.client, detector, channel, colour)
+        return checked(self.handle, result, f"set_tau_channel_colour({detector!r}, {channel!r}, {colour!r})")
+
     def set_channel_colour(self, detector: str, colour: str) -> dict:
         """Give the channel of *detector* (``"HyD S 3"``) the colour *colour* (LAS X's name, ``"Green"``); read back.
 

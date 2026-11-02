@@ -141,6 +141,29 @@ def test_each_operating_mode_is_written_as_las_x_writes_it_and_read_back(lasx, c
     assert direct_reader.get_detector_modes()["HyD S 3"]["operating"] == {"Fast Mode": 4, "Counting": 1, "Analog": 10, "Reflection": 11}[mode]
 
 
+def test_a_tau_separation_channel_s_colour_is_set_as_the_window_sets_it(lasx, client, tmp_path):
+    from zmart_drivers.leica.stellaris.navigator.procedures import changes
+
+    setting_files.set_detector(client, tmp_path, "HyD S 3", tau_mode="TauSeparation")
+    assert direct_reader.get_detector_modes()["HyD S 3"]["tau_colours"] == ["Cyan", "Magenta"]
+
+    result = changes.set_tau_channel_colour(client, "HyD S 3", 1, "Red")
+
+    assert result["confirmed"] is True
+    assert direct_reader.get_detector_modes()["HyD S 3"]["tau_colours"] == ["Red", "Magenta"]
+    assert lasx.sent[-1].startswith('<Scanner Command="SetDetectorTauSeparationLut" TauChannelIndex="0" SetMode="2" SingleSettingID="3" IsUserDefined="1" LutName="Red">')
+
+
+def test_a_tau_channel_colour_outside_tau_separation_or_channel_1_and_2_is_refused(lasx, client, tmp_path):
+    from zmart_drivers.leica.stellaris.navigator.procedures import changes
+
+    assert changes.set_tau_channel_colour(client, "HyD S 3", 1, "Red")["success"] is False
+    setting_files.set_detector(client, tmp_path, "HyD S 3", tau_mode="TauSeparation")
+    assert changes.set_tau_channel_colour(client, "HyD S 3", 3, "Red")["success"] is False
+    assert changes.set_tau_channel_colour(client, "HyD S 3", 2, "")["success"] is False
+    assert changes.set_tau_channel_colour(client, "HyD 9", 1, "Red")["success"] is False
+
+
 @pytest.mark.parametrize("mode", ["Intensity", "TauGating", "TauScan", "TauSeparation", "TauInteraction"])
 def test_each_tau_mode_is_written_as_las_x_writes_it_and_read_back(lasx, client, tmp_path, mode):
     assert setting_files.set_detector(client, tmp_path, "HyD S 3", tau_mode=mode)["confirmed"] is True

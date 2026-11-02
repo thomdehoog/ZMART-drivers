@@ -996,7 +996,8 @@ AUTOFOCUS_SETTING = ("Acquire", "ATL", "CurrentBlock", "ConfocalSequentialInfo",
 
 def get_detector_modes() -> dict:
     """Each detector's modes in the current setting, by name: ``tau`` and ``operating`` (LCS's codes now),
-    ``tau_offered`` and ``operating_offered`` (codes, by place), and ``at`` (the setting's, the
+    ``tau_offered`` and ``operating_offered`` (codes, by place), ``tau_colours`` (the colours of
+    TauSeparation's two channels; empty in another tau mode), and ``at`` (the setting's, the
     photometer's and the detector's places in LCS's state tree).
 
     LCS keeps them per setting (``SequentialSettingParameter[n]``, the current
@@ -1035,6 +1036,7 @@ def get_detector_modes() -> dict:
                 "tau_offered": listed_codes(unit, "DigitalGatingModeList_SeqInfo", "DigitalGatingMode", "DigitalGatingMode"),
                 "operating": node_value(nodes, operating) if operating is not None else None,
                 "operating_offered": listed_codes(unit, "DetectionUnitOperatingModeList_SeqInfo", "DetectionUnitOperatingMode", "OperatingMode"),
+                "tau_colours": listed_codes(unit, "TauSeparationDefinition_SeqInfo", "TauSeparationChannel", "LutName"),
                 "at": at,
             }
         return found
