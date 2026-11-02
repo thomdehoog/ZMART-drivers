@@ -63,6 +63,7 @@ SIMULATOR_SETTINGS = {
     ("Acquire", "AcquireTStackInfo", "CalculationMode"): 3,
     ("Acquire", "AcquireTStackInfo", "IsEnableAutomaticTSectionsCalculation"): False,
     ("Acquire", "AcquireTStackInfo", "MaxFrameRate"): 0.78125,
+    ("Acquire", "AcquireTStackInfo", "IsMinimized"): False,
     # Fast Live's Scan Settings, the FOV scanner's and the resonant one's (simulator, 2026-11-02).
     **{
         ("Confocal", parent, name): value
@@ -646,6 +647,11 @@ class StandInNodes:
                 if path[-1] == "DelayTime":
                     self.live[(*t, "DelayTime")] = max(change.Value, 1 / self.live[(*t, "MaxFrameRate")])
                     self.live[(*t, "Duration")] = (self.live[(*t, "RepeatCount")] - 1) * self.live[(*t, "DelayTime")]
+                    continue
+                if path[-1] == "IsMinimized":
+                    self.live[(*t, "IsMinimized")] = bool(change.Value)
+                    if change.Value:
+                        self.live[(*t, "DelayTime")] = 1 / self.live[(*t, "MaxFrameRate")]
                     continue
                 if path[-1] == "IsEnableAutomaticTSectionsCalculation":
                     self.live[(*t, path[-1])] = bool(change.Value)

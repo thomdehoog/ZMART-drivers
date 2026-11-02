@@ -1084,7 +1084,7 @@ def set_bleach_mode(client, on, *, max_retries=None) -> dict:
 MOST_FRAMES = 1_000_000_000
 
 
-def set_time_series(client, *, frames=None, interval_s=None, until_stopped=None, max_retries=None) -> dict:
+def set_time_series(client, *, frames=None, interval_s=None, until_stopped=None, minimize=None, max_retries=None) -> dict:
     """Set the time series as LAS X's t panel does: *frames*, *interval_s*, or *until_stopped*; the result's
     ``time_series`` is read back.
 
@@ -1094,8 +1094,12 @@ def set_time_series(client, *, frames=None, interval_s=None, until_stopped=None,
     Frames does; asking for both is refused. Everything is checked before the
     first value is written.
     """
-    if frames is None and interval_s is None and until_stopped is None:
-        return dispatch.refused("set_time_series needs frames, interval_s or until_stopped")
+    if frames is None and interval_s is None and until_stopped is None and minimize is None:
+        return dispatch.refused("set_time_series needs frames, interval_s, until_stopped or minimize")
+    if minimize is not None and not isinstance(minimize, bool):
+        return dispatch.refused(f"minimize takes True or False, not {minimize!r}")
+    if minimize and interval_s is not None:
+        return dispatch.refused("Minimize takes the shortest interval; give either interval_s or minimize=True, not both")
     if frames is not None and until_stopped:
         return dispatch.refused("a time series runs either a number of frames or until it is stopped, not both")
     if frames is not None and (isinstance(frames, bool) or not isinstance(frames, int) or not 1 <= frames <= MOST_FRAMES):
@@ -1109,6 +1113,8 @@ def set_time_series(client, *, frames=None, interval_s=None, until_stopped=None,
         if isinstance(interval_s, bool) or not isinstance(interval_s, (int, float)) or interval_s < now["shortest_interval_s"] - 1e-6:
             return dispatch.refused(f"the interval is at least one frame, {now['shortest_interval_s']:g} s, not {interval_s!r}")
     planned = []
+    if minimize is not None:
+        planned.append(writes.time_minimize(minimize))
     if interval_s is not None:
         planned.append(writes.time_interval(float(interval_s)))
     if until_stopped is not None:
@@ -1116,7 +1122,8 @@ def set_time_series(client, *, frames=None, interval_s=None, until_stopped=None,
     elif frames is not None and now["until_stopped"]:
         planned.append(writes.time_until_stopped(False))
     if frames is not None:
-        planned.append(writes.time_frames(frames, float(interval_s) if interval_s is not None else now["interval_s"]))
+        interval = float(interval_s) if interval_s is not None else (now["shortest_interval_s"] if minimize else now["interval_s"])
+        planned.append(writes.time_frames(frames, interval))
     result = None
     for change in planned:
         result = run(client, change, max_retries=max_retries)

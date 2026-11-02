@@ -1448,6 +1448,12 @@ def time_frames(frames: int, interval_s: float) -> Write:
                               lambda t: t["frames"] == frames)
 
 
+def time_minimize(on: bool) -> Write:
+    """The t panel's Minimize on or off: on, LCS sets the shortest interval, one frame (simulator, 2026-11-02)."""
+    return time_series_change("minimize", "IsMinimized", int(bool(on)), "on" if on else "off",
+                              lambda t: t["minimized"] is bool(on))
+
+
 def time_until_stopped(on: bool) -> Write:
     """The t panel's "Acquire Until Stopped" on or off (off is its Frames); LCS sets the mode itself."""
     return time_series_change("until stopped", "IsEnableAutomaticTSectionsCalculation", int(bool(on)), "on" if on else "off",

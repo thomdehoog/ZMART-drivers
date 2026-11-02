@@ -362,6 +362,7 @@ STATE_TREE_WRITES = {
     # (simulator, 2026-11-02); LCS keeps the interval at least one frame long.
     "DelayTime": TreeWrite(("Acquire", "AcquireTStackInfo", "DelayTime"), float, within=(0, 1e9)),
     "Duration": TreeWrite(("Acquire", "AcquireTStackInfo", "Duration"), float, within=(0, 1e15)),
+    "IsMinimized": TreeWrite(("Acquire", "AcquireTStackInfo", "IsMinimized"), bool),
     "IsEnableAutomaticTSectionsCalculation": TreeWrite(("Acquire", "AcquireTStackInfo", "IsEnableAutomaticTSectionsCalculation"), bool),
     # ROI scan and the bleach mode (the Acquisition Mode panel's ROI and bleach buttons), and the ROI scan's
     # sections of a stack (ROI 3D). The window writes them here with no command (simulator, 2026-11-02);

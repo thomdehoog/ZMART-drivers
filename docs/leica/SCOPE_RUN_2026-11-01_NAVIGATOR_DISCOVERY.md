@@ -1000,3 +1000,11 @@ changed the pinhole in all of them. It now sends `SetMode="0"`, the current sett
 Through the driver: the pinhole 100.7 to 100 um (`SetMode="0"`), line average and pinhole applied to all settings.
 The collar's `SetMotCorrPosition` keeps `SetMode="1"`, as the window sends it (it has no such box).
 
+## 58. The time series' Minimize (2 November 2026)
+
+The t panel's Minimize box (the driver's mouse) sent no command: `Acquire/AcquireTStackInfo/IsMinimized` True, and
+back. Written into the state tree, LCS set the interval to the shortest (10 s to 1.28 s) and the window's box followed.
+Built: `set_time_series(minimize=True/False)`; minimize with an interval refused. Through the driver: 10 s, minimized
+(1.28 s), not minimized; frames put back to 1 and the scan mode to xyz. Dynamic Signal Enhancement, which the help
+places in the XY panel, was not among the window's controls in xyt on the simulator.
+

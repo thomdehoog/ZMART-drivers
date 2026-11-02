@@ -1303,8 +1303,21 @@ class TestTimeSeries:
 
         assert result["confirmed"] is True
         assert result["time_series"] == {
-            "frames": 7, "interval_s": 10.0, "duration_s": 60.0, "until_stopped": False, "shortest_interval_s": 1.28,
+            "frames": 7, "interval_s": 10.0, "duration_s": 60.0, "until_stopped": False, "minimized": False,
+            "shortest_interval_s": 1.28,
         }
+
+    def test_minimize_takes_the_shortest_interval_as_the_t_panel_s_box_does(self, lasx, timed):
+        changes.set_time_series(timed, interval_s=10.0)
+
+        result = changes.set_time_series(timed, minimize=True)
+
+        assert result["confirmed"] is True
+        assert result["time_series"]["minimized"] is True and result["time_series"]["interval_s"] == pytest.approx(1.28)
+        assert changes.set_time_series(timed, minimize=False)["time_series"]["minimized"] is False
+
+    def test_minimize_with_an_interval_is_refused(self, lasx, timed):
+        assert changes.set_time_series(timed, interval_s=10.0, minimize=True)["success"] is False
 
     def test_until_stopped_is_switched_on_and_off(self, lasx, timed):
         assert changes.set_time_series(timed, until_stopped=True)["time_series"]["until_stopped"] is True

@@ -1252,7 +1252,7 @@ def get_roi_scan() -> dict:
 
 
 def get_time_series() -> dict:
-    """The time series, as LAS X's t panel shows it: ``frames``, ``interval_s``, ``duration_s``, ``until_stopped``,
+    """The time series, as LAS X's t panel shows it: ``frames``, ``interval_s``, ``duration_s``, ``until_stopped``, ``minimized``,
     and ``shortest_interval_s`` (one frame, at the fastest; LCS keeps the interval at least that long).
 
     ``Acquire/AcquireTStackInfo`` (simulator, 2026-11-02): ``RepeatCount``,
@@ -1262,13 +1262,14 @@ def get_time_series() -> dict:
     t = ("Acquire", "AcquireTStackInfo")
     found = settings("the time series", {
         "frames": (*t, "RepeatCount"), "interval": (*t, "DelayTime"), "duration": (*t, "Duration"),
-        "until": (*t, "IsEnableAutomaticTSectionsCalculation"), "rate": (*t, "MaxFrameRate"),
+        "until": (*t, "IsEnableAutomaticTSectionsCalculation"), "rate": (*t, "MaxFrameRate"), "minimized": (*t, "IsMinimized"),
     })
     return {
         "frames": found["frames"],
         "interval_s": float(found["interval"]),
         "duration_s": float(found["duration"]),
         "until_stopped": bool(found["until"]),
+        "minimized": bool(found["minimized"]),
         "shortest_interval_s": round(1 / found["rate"], 6) if found["rate"] else None,
     }
 

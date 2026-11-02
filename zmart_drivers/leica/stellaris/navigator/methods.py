@@ -741,9 +741,11 @@ class Microscope:
         checked(self.handle, result, f"set_bleach_mode({on!r})")
         return result["roi"]
 
-    def set_time_series(self, frames: int | None = None, interval_s: float | None = None, until_stopped: bool | None = None) -> dict:
+    def set_time_series(self, frames: int | None = None, interval_s: float | None = None, until_stopped: bool | None = None,
+                        minimize: bool | None = None) -> dict:
         """Set the time series as LAS X's t panel does: the number of *frames*, the *interval_s* between them,
-        or *until_stopped* (Acquire Until Stopped). Answers the time series as LAS X holds it.
+        or *until_stopped* (Acquire Until Stopped), or *minimize* (the shortest interval, its Minimize box).
+        Answers the time series as LAS X holds it.
 
         The scan mode must have time (``change_setting("scan_mode", "xyt")`` first).
         The interval is at least one frame (``shortest_interval_s``). Saving a
@@ -751,7 +753,7 @@ class Microscope:
         written for x, y and z only.
         """
         self.handle.require_open()
-        result = changes.set_time_series(self.handle.client, frames=frames, interval_s=interval_s, until_stopped=until_stopped)
+        result = changes.set_time_series(self.handle.client, frames=frames, interval_s=interval_s, until_stopped=until_stopped, minimize=minimize)
         checked(self.handle, result, f"set_time_series(frames={frames!r}, interval_s={interval_s!r}, until_stopped={until_stopped!r})")
         return result["time_series"]
 
