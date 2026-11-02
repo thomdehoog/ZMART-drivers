@@ -17,7 +17,9 @@ put back.
 2. **Autofocus, what is left.** Running it once and its settings are built (2 November 2026).
    Still to learn: the Reflection method's coverslip offset (`ReflectionOffset`) and its "Find
    Coverslip Reflection" button, "Auto Sync" with its scan options, and the hardware autofocus
-   (AFC, `Microscope/AFC`, its offset). On the STELLARIS: an autofocus that finds a focus (only the
+   (AFC, `Microscope/AFC`, its offset), and the autofocus panel's Timelapse and Stage tabs (when the
+   autofocus runs in a series; LCS has `WorkflowTimelapse`, `WorkflowXY`). The Best Focus Setting's
+   scan, optics and power are built. On the STELLARIS: an autofocus that finds a focus (only the
    failing case, "ValidateFocus failed", has been seen).
 3. **ROIs.** Drawing a region and scanning only inside it. The window's Zoom In keeps its
    rectangle as an ROI in LAS X's data container (`Confocal/ZoomIn/CurrentDCROISetID`); a way to

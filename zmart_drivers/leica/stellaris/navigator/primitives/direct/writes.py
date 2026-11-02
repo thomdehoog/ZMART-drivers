@@ -803,6 +803,124 @@ def autofocus_drive(drive: str) -> Write:
                             lambda shown: shown["drive"] == drive)
 
 
+def autofocus_scan_change(name: str, elements: list[str], description: str, shows) -> Write:
+    """A change of the Best Focus Setting's own scan; read back from it."""
+
+    def fill(request: Request) -> None:
+        request.elements = list(elements)
+
+    return Write(
+        command=f"set_{name}", values={"value": description}, request=name, fill=fill,
+        description=f"{name.replace('_', ' ').capitalize()} -> {description}", ready=idle(),
+        confirm=Expect("autofocus_scan", shows),
+    )
+
+
+def autofocus_format(pixels) -> Write:
+    """The Best Focus Setting's format, ``(x, y)`` pixels, with the scan's own command for the autofocus (``IsAutoFocusDefinition`` 1)."""
+    try:
+        x, y = (int(n) for n in pixels)
+    except (TypeError, ValueError):
+        raise ValueError(f"autofocus_format takes (x, y) pixels, not {pixels!r}") from None
+    if x <= 0 or y <= 0:
+        raise ValueError(f"autofocus_format takes (x, y) pixels, not {pixels!r}")
+    return autofocus_scan_change(
+        "autofocus_format",
+        [f'<Scanner Command="SetFormat" FormatX="{x}" FormatY="{y}" {CURRENT} IsAutoFocusDefinition="1"/>'],
+        f"{x} x {y}", lambda shown: shown["format"] == (x, y),
+    )
+
+
+def autofocus_speed(speed) -> Write:
+    """The Best Focus Setting's scan speed, within LCS's own range for it (read at the write); written into the state tree."""
+    if isinstance(speed, bool) or not isinstance(speed, int):
+        raise ValueError(f"autofocus_speed takes a whole speed, not {speed!r}")
+    return autofocus_scan_change("autofocus_speed", [f'<StateTree Command="AutofocusSpeed" Value="{speed}"/>'],
+                                 str(speed), lambda shown: shown["speed"] == speed)
+
+
+def autofocus_bidirectional(on: bool) -> Write:
+    """The Best Focus Setting's scan both ways (True) or one way (False); written into the state tree."""
+    if not isinstance(on, bool):
+        raise ValueError(f"autofocus_bidirectional takes True or False, not {on!r}")
+    return autofocus_scan_change("autofocus_bidirectional", [f'<StateTree Command="AutofocusScanDirectionX" Value="{2 if on else 1}"/>'],
+                                 "on" if on else "off", lambda shown: shown["bidirectional"] is on)
+
+
+def autofocus_zoom(zoom) -> Write:
+    """The Best Focus Setting's zoom, within LCS's own range for it (read at the write); written into the state tree."""
+    if isinstance(zoom, bool) or not isinstance(zoom, (int, float)):
+        raise ValueError(f"autofocus_zoom takes a number, not {zoom!r}")
+    return autofocus_scan_change("autofocus_zoom", [f'<StateTree Command="AutofocusZoom" Value="{float(zoom)!r}"/>'],
+                                 f"{zoom:g}", lambda shown: abs(shown["zoom"] - zoom) <= 0.01)
+
+
+def autofocus_optics(line_route, line_index: int, wavelength_nm: float, percent: float, detector_route,
+                     begin_nm: float, end_nm: float, dye: str, colour: str = "Gray") -> Write:
+    """The Best Focus Setting's laser line with its power, and its detector with its band and dye, as the window's drag-in sends them.
+
+    One command, ``SetConfocalDefinitionFromDyeAssistant`` with
+    ``IsAutoFocusDefinition`` 1 (simulator, 2026-11-02). Read back from the
+    Best Focus Setting's lines. The power goes to the limits as a laser
+    power. It sets the power of a line it brings in; a line already there
+    keeps its power (simulator, 2026-11-02): :func:`autofocus_laser_power`
+    changes that.
+    """
+    if isinstance(percent, bool) or not isinstance(percent, (int, float)) or not 0 < percent <= 100:
+        raise ValueError(f"the autofocus's laser power is above 0 and at most 100 percent, not {percent!r}")
+    if not begin_nm < end_nm:
+        raise ValueError(f"a detector's band runs from a lower to a higher wavelength, not {begin_nm!r} to {end_nm!r}")
+    if not isinstance(dye, str) or not dye or any(c in dye for c in '<>&"'):
+        raise ValueError(f"a dye is named as LAS X names it, such as 'Leica/ALEXA 405', not {dye!r}")
+    element = (
+        '<Scanner IsAutoFocusDefinition="1" ActiveSettingIndex="-1" Command="SetConfocalDefinitionFromDyeAssistant">'
+        "<Sequences><DoAdjustSequenceCount>1</DoAdjustSequenceCount><MessageSource>DyeDragNDrop</MessageSource>"
+        '<SequentialMode>0</SequentialMode><Sequence Index="0">'
+        f"<LightSource>{beam_route(line_route)}<LineIndex>{int(line_index)}</LineIndex><WaveLength>{value(wavelength_nm)}</WaveLength>"
+        f"<Locked>0</Locked><Intensity>{value(percent / 100)}</Intensity></LightSource>"
+        f"<Detector>{beam_route(detector_route)}<Begin>{value(begin_nm)}</Begin><End>{value(end_nm)}</End><Dye>{dye}</Dye>"
+        "<DetectorDyeRelation>0</DetectorDyeRelation><DyeWasAdded>1</DyeWasAdded><DyeExcitationMode>0</DyeExcitationMode>"
+        f"<Locked>0</Locked><LutName>{colour}</LutName><IsLutUserDefined>0</IsLutUserDefined></Detector>"
+        "</Sequence></Sequences></Scanner>"
+    )
+
+    def fill(request: Request) -> None:
+        request.elements = [element]
+
+    def shows(optics) -> bool:
+        return any(abs(line["wavelength"] - wavelength_nm) < 0.5 and abs(line["percent"] - percent) <= LASER_TOLERANCE_PERCENT
+                   for line in (optics or {}).get("lines", []))
+
+    return Write(
+        command="set_autofocus_optics", values={"laser_power": [percent]}, request="SetConfocalDefinitionFromDyeAssistant",
+        fill=fill, description=f"Best Focus Setting -> {wavelength_nm:g} nm at {percent:g} %, {dye}", ready=idle(),
+        confirm=Expect("autofocus_optics", shows),
+    )
+
+
+def autofocus_laser_power(place: int, line_index: int, wavelength_nm: float, percent: float) -> Write:
+    """The power of the Best Focus Setting's line *line_index* of light source *place*, written into the state tree as the window does; read back.
+
+    The window writes it there with no command (simulator, 2026-11-02); the
+    power goes to the limits as a laser power.
+    """
+    if isinstance(percent, bool) or not isinstance(percent, (int, float)) or not 0 < percent <= 100:
+        raise ValueError(f"the autofocus's laser power is above 0 and at most 100 percent, not {percent!r}")
+
+    def fill(request: Request) -> None:
+        request.elements = [f'<StateTree Command="AutofocusLaserPower" Value="{float(percent)!r}" At="{int(place)},{int(line_index)}"/>']
+
+    def shows(optics) -> bool:
+        return any(abs(line["wavelength"] - wavelength_nm) < 0.5 and abs(line["percent"] - percent) <= LASER_TOLERANCE_PERCENT
+                   for line in (optics or {}).get("lines", []))
+
+    return Write(
+        command="set_autofocus_laser_power", values={"laser_power": [percent]}, request="AutofocusLaserPower", fill=fill,
+        description=f"Best Focus Setting's {wavelength_nm:g} nm line -> {percent:g} %", ready=idle(),
+        confirm=Expect("autofocus_optics", shows),
+    )
+
+
 def start_autofocus(project: int, drive: str, begin_um: float, end_um: float, *, start: dict | None = None) -> Write:
     """LAS X's autofocus, once, as the window's Autofocus button starts it: a focus search into *project*.
 
@@ -1075,6 +1193,10 @@ NAMED_SETTINGS = {
     "autofocus_steps": autofocus_steps,
     "autofocus_range_um": autofocus_range_um,
     "autofocus_drive": autofocus_drive,
+    "autofocus_format": autofocus_format,
+    "autofocus_speed": autofocus_speed,
+    "autofocus_bidirectional": autofocus_bidirectional,
+    "autofocus_zoom": autofocus_zoom,
 }
 
 

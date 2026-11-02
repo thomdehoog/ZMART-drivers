@@ -145,6 +145,8 @@ or makes light.
 | The collar's reference (Set, Reset) | `Microscope/ObjectiveList/ObjectiveInfo/MotCorrRefPos` of the objective in the light path, found at the write | 0 to 100 %, or -1 (none) |
 | The setting's name | `Acquire/ATL/CurrentSetting/Name` | plain text, 1 to 64 letters, digits, spaces or `_ - . , ( ) / + #` |
 | The autofocus's settings | `Acquire/AutoFocusInfo/AFAnalyseType`, `Precision`, `UseFixSliceCount`, `FixSliceCount`, `FocusRange`, `ZUseMode` | method 1 to 5; precision 1 to 5; steps odd, 3 to 1001; range whole µm, 1 to 5000; drive 1 or 2 |
+| The Best Focus Setting's scan | `.../SequentialAutofocusSetting/Speed`, `Zoom`, `ScanDirectionX` | speed and zoom within `SpeedMin`/`SpeedMax`, `ZoomMin`/`ZoomMax` beside them, read at the write; direction 1 or 2 |
+| The Best Focus Setting's laser power | `.../SequentialAutofocusSetting/.../UnifiedLaserLine_SequentialInfo/Intensity`, the light source and line given by place | 0 to 100 %, and checked against the laser limits (10 % by default) |
 | Sequential mode | `Confocal/ScanningParameter/SequentialMode` | 0 (lines), 1 (frames) or 2 (stacks) |
 
 Point 1 above is why the ranges are checked by the driver: LCS does not keep to its own range

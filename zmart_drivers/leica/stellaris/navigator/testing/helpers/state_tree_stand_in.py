@@ -74,6 +74,17 @@ SIMULATOR_SETTINGS = {
     ("Microscope", "CurrentMotCorrPos"): 0.0,
     ("Microscope", "CanDoMotCorr"): True,
     ("Acquire", "ATL", "CurrentSetting", "SettingID"): 3,
+    (*("Acquire", "ATL", "CurrentBlock", "ConfocalSequentialInfo", "SequentialAutofocusSetting"), "SettingId"): 4,
+    (*("Acquire", "ATL", "CurrentBlock", "ConfocalSequentialInfo", "SequentialAutofocusSetting"), "IsEnabledForScanning"): True,
+    (*("Acquire", "ATL", "CurrentBlock", "ConfocalSequentialInfo", "SequentialAutofocusSetting"), "FormatX"): 64,
+    (*("Acquire", "ATL", "CurrentBlock", "ConfocalSequentialInfo", "SequentialAutofocusSetting"), "FormatY"): 64,
+    (*("Acquire", "ATL", "CurrentBlock", "ConfocalSequentialInfo", "SequentialAutofocusSetting"), "Speed"): 600,
+    (*("Acquire", "ATL", "CurrentBlock", "ConfocalSequentialInfo", "SequentialAutofocusSetting"), "SpeedMin"): 1,
+    (*("Acquire", "ATL", "CurrentBlock", "ConfocalSequentialInfo", "SequentialAutofocusSetting"), "SpeedMax"): 2600,
+    (*("Acquire", "ATL", "CurrentBlock", "ConfocalSequentialInfo", "SequentialAutofocusSetting"), "Zoom"): 1.0,
+    (*("Acquire", "ATL", "CurrentBlock", "ConfocalSequentialInfo", "SequentialAutofocusSetting"), "ZoomMin"): 0.75,
+    (*("Acquire", "ATL", "CurrentBlock", "ConfocalSequentialInfo", "SequentialAutofocusSetting"), "ZoomMax"): 48.0,
+    (*("Acquire", "ATL", "CurrentBlock", "ConfocalSequentialInfo", "SequentialAutofocusSetting"), "ScanDirectionX"): 2,
     ("Acquire", "ATL", "CurrentSetting", "Name"): "Setting 1",
     ("Acquire", "ATL", "CurrentSetting", "IsEnabledForScanning"): True,
     ("Microscope", "MotCorrAutomationInfo", "AutomationBegin"): 0.0,
@@ -430,6 +441,15 @@ class StandInNodes:
             }
             for each in self.settings
         ])
+        # The Best Focus Setting's lines with power, by light source, as LCS keeps them.
+        autofocus = child(child(child(child(child(1, "Acquire"), "ATL"), "CurrentBlock"), "ConfocalSequentialInfo"), "SequentialAutofocusSetting")
+        graft(autofocus, "LightSourceList_SequentialInfo", {"LightSource_SequentialInfo": [
+            {"UnifiedLaser_SequentialInfo": {"UnifiedLaserLine_SequentialInfo": [
+                {"LineIndex": line["lineIndex"], "WaveLength": line["wavelength"], "Intensity": line["percent"]}
+                for line in getattr(self, "autofocus_lines", []) if line["beamRoute"] == ";".join(str(p) for p in source["BeamRoute"])
+            ] or [{"LineIndex": 0, "WaveLength": 0.0, "Intensity": 0.0}]}}
+            for source in self.light_sources
+        ]})
         objective_list = child(child(1, "Microscope"), "ObjectiveList")
         for objective in self.objectives:
             info = next(fresh)
@@ -442,13 +462,25 @@ class StandInNodes:
 
     def ChangeNodes(self, changes):
         """Write each ``(NodeID, Value)`` into the node it names, as LCS does for its window."""
-        nodes, _ = self.tree()
+        nodes, values = self.tree()
         for change in changes:
             path, node = [], change.NodeID
             while node and node != 1:
                 name, parent, _kids = nodes[node]
                 path.insert(0, name)
                 node = parent
+            if "SequentialAutofocusSetting" in path and path[-1] == "Intensity":
+                # One of the Best Focus Setting's lines: its light source and line by their places.
+                line_node = nodes[change.NodeID][1]
+                laser_node = nodes[line_node][1]
+                source_node = nodes[laser_node][1]
+                places = [n for n in nodes[nodes[source_node][1]][2] if nodes[n][0] == "LightSource_SequentialInfo"]
+                route = ";".join(str(p) for p in self.light_sources[places.index(source_node)]["BeamRoute"])
+                index = next(v for k, v in values.items() if nodes.get(k, ("",))[0] == "LineIndex" and nodes[k][1] == line_node)
+                for line in self.autofocus_lines:
+                    if line["beamRoute"] == route and line["lineIndex"] == index:
+                        line["percent"] = change.Value
+                continue
             if path[:3] == ["Microscope", "ObjectiveList", "ObjectiveInfo"]:
                 # An objective's own value: the n-th ObjectiveInfo is the n-th objective.
                 info = nodes[change.NodeID][1]

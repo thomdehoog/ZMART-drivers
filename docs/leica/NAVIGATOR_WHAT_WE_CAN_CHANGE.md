@@ -77,7 +77,13 @@ discovery session in `SCOPE_RUN_2026-11-01_NAVIGATOR_DISCOVERY.md` and the build
 | Autofocus on or off | Works |
 | Autofocus run once now (the window's Autofocus button) | Works, with LAS X's command; reports whether LAS X found a focus and z before and after |
 | Autofocus method, precision or steps, capture range, drive | Works: written into LAS X's state tree, as its Best Focus Scan Options do |
+| Best Focus Setting: format | Works, with LAS X's command |
+| Best Focus Setting: speed, bidirectional, zoom | Works: written into LAS X's state tree, speed and zoom within LAS X's own range |
+| Best Focus Setting: its laser line and detector (band, dye) | Works, with LAS X's command (the window's drag-in) |
+| Best Focus Setting: a line's power | Works: written into LAS X's state tree; within the laser limits |
+| Best Focus Setting switched off | Not possible: LAS X accepts the command and keeps it on while the autofocus is on |
 | Autofocus coverslip offset and Find Coverslip Reflection (Reflection method) | Not yet learned |
+| Autofocus in a series: every n time points, at which positions (Timelapse, Stage tabs) | Not yet learned |
 
 ## Z-stack
 
@@ -164,7 +170,7 @@ service and the person responsible for the instrument.
 
 | State | Settings |
 |---|---|
-| Works | 70 (the objective among them, not yet tried) |
+| Works | 74 (the objective among them, not yet tried) |
 | Tried | 0 |
 | Command known | 0 |
-| Not yet learned | 7 |
+| Not yet learned | 8 |

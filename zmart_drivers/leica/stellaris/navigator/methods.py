@@ -267,7 +267,7 @@ class Microscope:
 
     def settings(self) -> dict:
         """What LAS X is set to now: ``zoom``, ``scan_speed``, ``scan_field_rotation``, ``averaging``, ``pinhole``, ``format``, ``scan_mode``, ``objective``, ``z_stack``, ``autofocus``,
-        ``bidirectional``, ``phase_x``, ``system_optimized_step``, ``collar``, ``smartcorr``, ``setting``, ``sequential_mode``, ``autofocus_settings`` and ``bit_depth``."""
+        ``bidirectional``, ``phase_x``, ``system_optimized_step``, ``collar``, ``smartcorr``, ``setting``, ``sequential_mode``, ``autofocus_settings``, ``autofocus_scan`` and ``bit_depth``."""
         self.handle.require_open()
         found = acquire_step.current_settings(self.handle)
         return {name: found[name] for name in found if name != "fov_m"}
@@ -424,6 +424,27 @@ class Microscope:
         """
         self.handle.require_open()
         return checked(self.handle, changes.autofocus(self.handle.client, project), "autofocus()")
+
+    def set_autofocus_optics(self, laser_nm: float, percent: float, detector: str, band, dye: str) -> dict:
+        """Give the Best Focus Setting a laser line with its power, and a detector with its band ``(begin_nm, end_nm)`` and dye; read back.
+
+        As the window's drag-in for the autofocus, one command. The power is
+        checked against the laser limits (at most 10 % unless they say
+        otherwise). A line already there keeps its power: change that with
+        ``set_autofocus_laser_power``.
+        """
+        self.handle.require_open()
+        result = changes.set_autofocus_optics(self.handle.client, laser_nm, percent, detector, band, dye)
+        return checked(self.handle, result, f"set_autofocus_optics({laser_nm!r}, {percent!r}, {detector!r})")
+
+    def set_autofocus_laser_power(self, laser_nm: float, percent: float) -> dict:
+        """Change the power of the Best Focus Setting's line at *laser_nm*, as the window does; read back.
+
+        The line must be in the Best Focus Setting already (``set_autofocus_optics``);
+        the power is checked against the laser limits.
+        """
+        self.handle.require_open()
+        return checked(self.handle, changes.set_autofocus_laser_power(self.handle.client, laser_nm, percent), f"set_autofocus_laser_power({laser_nm!r}, {percent!r})")
 
     def smartcorr(self, project=None) -> dict:
         """Run SmartCORR, as the window's Start SmartCORR: a scan through the collar positions of its range.

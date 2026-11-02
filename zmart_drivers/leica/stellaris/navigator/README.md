@@ -119,6 +119,8 @@ mic.connect("stellaris-navigator")                                              
 | `lock_detector(name, locked=True)` | Keep a detector in use and its setting's excitation line from LAS X's Dye Assistant, or free them, as the window's detector lock does; read back. |
 | `lock_channel_colour(locked=True)` | Lock or free the colour of the channel LAS X's detector panel shows, as the window's colour lock does. The lock sends LAS X's hardware server nothing, so the driver presses it in LAS X's window and reads it back from there; it holds the window, not `set_channel_colour`. |
 | `autofocus(project=None)` | Run LAS X's autofocus once, with the settings in its Best Focus Scan Options, as the window's Autofocus button does. The answer's `found` says whether LAS X found a focus, with z before and after on the autofocus's drive; the search's two ends are checked against the limits first. `settings()["autofocus_settings"]` shows the drive, the capture range, the method and the precision or steps. |
+| `set_autofocus_optics(laser_nm, percent, detector, band, dye)` | Give the Best Focus Setting a laser line with its power, and a detector with its band and dye, as the window's drag-in does, in one command; read back. The power is checked against the laser limits. A line already there keeps its power: see the next. |
+| `set_autofocus_laser_power(laser_nm, percent)` | Change the power of a line in the Best Focus Setting, as the window does (written into LAS X's state tree), and read it back; checked against the laser limits. |
 | `smartcorr(project=None)` | Run SmartCORR, as the window's Start SmartCORR: a scan through the collar positions of its range, after which LAS X leaves the collar where the picture was best. The answer's `collar` says where. |
 | `set_collar_reference()` | Store where the collar stands as this objective's reference, as the window's Set does, and read it back. Written into LAS X's state tree, for the objective in the light path only. |
 | `reset_collar_reference()` | Clear this objective's collar reference, as the window's Reset does, and read it back. |
@@ -168,6 +170,10 @@ confirmed, with what LAS X set instead.
 | `format` | `(x, y)` pixels, such as `(512, 512)` | exact |
 | `resonant_scanner` | `True` or `False` | exact |
 | `collar` | the objective's correction collar (motCORR), 0 to 100 %, as the window's box sends it | 0.1 % |
+| `autofocus_format` | the Best Focus Setting's format, `(x, y)` pixels, with the scan's command for the autofocus | exact |
+| `autofocus_speed` | its scan speed, within LAS X's range for it; written into LAS X's state tree, as the window does | exact |
+| `autofocus_bidirectional` | `True` or `False`: its scan both ways; written into the state tree | exact |
+| `autofocus_zoom` | its zoom, within LAS X's range for it; written into the state tree | 0.01 |
 | `autofocus_method` | `"contrast 1"`, `"intensity"`, `"noise"`, `"contrast 2"` or `"reflection"`, as the autofocus's "Optimized for" | exact |
 | `autofocus_precision` | 1 (speed) to 5 (accuracy), as its slider; LAS X works out the steps | exact |
 | `autofocus_steps` | a fixed number of steps instead, odd, 3 to 1001, as its "Number of Steps" | exact |

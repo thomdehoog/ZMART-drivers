@@ -181,6 +181,16 @@ def get_laser_lines(client, **keywords):
     return _routed("laser_lines", client, **keywords)
 
 
+def get_autofocus_scan(client, **keywords):
+    """The Best Focus Setting's own scan: ``format``, ``speed``, ``bidirectional``, ``zoom``, ``enabled``, ``id``."""
+    return _routed("autofocus_scan", client, **keywords)
+
+
+def get_autofocus_optics(client, **keywords):
+    """The Best Focus Setting's laser lines with power."""
+    return _routed("autofocus_optics", client, **keywords)
+
+
 def get_autofocus_settings(client, **keywords):
     """The autofocus's settings: ``drive``, ``range_um``, ``method``, ``precision``, ``steps``."""
     return _routed("autofocus_settings", client, **keywords)

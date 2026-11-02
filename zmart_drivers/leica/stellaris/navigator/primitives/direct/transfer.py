@@ -136,7 +136,7 @@ class Sender:
             try:
                 tree = STATE_TREE.match(xml)
                 if tree is not None:
-                    outcome["answer"] = write_into_state_tree(tree[1], tree[2])
+                    outcome["answer"] = write_into_state_tree(tree[1], tree[2], tree[3])
                 else:
                     outcome["answer"] = str(hardware_server.connected_server().SendCommand2(xml, ""))
             except Exception as why:  # noqa: BLE001 -- handed to the caller as it is
@@ -190,6 +190,7 @@ ALLOWED_COMMANDS = frozenset(
         "SetMotCorrPosition",
         "StartMotCorrAutomation",
         "StartAutoFocus",
+        "SetConfocalDefinitionFromDyeAssistant",
         "ATL_Setting_EnableDisableForScanning",
         "ATL_Setting_Create",
         "ATL_Setting_Delete",
@@ -209,7 +210,8 @@ class TreeWrite:
     it: LCS's own minimum and maximum, read at the moment of the write; or
     it is one of the values in the node ``listed`` names beside it, LCS's
     own list, read at the write. ``of_objective``: the node belongs to the
-    objective in the light path, found at the write.
+    objective in the light path, found at the write. ``numbered``: the names
+    in *path* that repeat; the element's ``At`` gives which of each, in order.
     """
 
     path: tuple[str, ...]
@@ -219,9 +221,12 @@ class TreeWrite:
     between: tuple[str, str] | None = None
     listed: str | None = None
     of_objective: bool = False
+    numbered: tuple[str, ...] = ()
 
 
 HW_PARAMETER = ("Confocal", "HWParameter")
+#: The autofocus's own setting, the Best Focus Setting, in LCS's state tree.
+AUTOFOCUS_SETTING = ("Acquire", "ATL", "CurrentBlock", "ConfocalSequentialInfo", "SequentialAutofocusSetting")
 
 #: The values the driver may write straight into LCS's state tree, by name.
 #: LAS X's window changes these with no command LCS logs, and a loaded setting
@@ -283,6 +288,20 @@ STATE_TREE_WRITES = {
     "FixSliceCount": TreeWrite(("Acquire", "AutoFocusInfo", "FixSliceCount"), within=(3, 1001)),
     "FocusRange": TreeWrite(("Acquire", "AutoFocusInfo", "FocusRange"), within=(1, 5000)),
     "ZUseMode": TreeWrite(("Acquire", "AutoFocusInfo", "ZUseMode"), choices=frozenset({1, 2})),
+    # The Best Focus Setting's own scan: speed and zoom within LCS's own range
+    # beside them, read at the write, and the direction (1 one way, 2 both);
+    # the window writes these there (simulator, 2026-11-02).
+    "AutofocusSpeed": TreeWrite((*AUTOFOCUS_SETTING, "Speed"), between=("SpeedMin", "SpeedMax")),
+    "AutofocusZoom": TreeWrite((*AUTOFOCUS_SETTING, "Zoom"), float, between=("ZoomMin", "ZoomMax")),
+    "AutofocusScanDirectionX": TreeWrite((*AUTOFOCUS_SETTING, "ScanDirectionX"), choices=frozenset({1, 2})),
+    # The power of one of the Best Focus Setting's lines, in percent: the
+    # window writes it there with no command (simulator, 2026-11-02). Which
+    # light source and line is the element's At; the power goes to the limits.
+    "AutofocusLaserPower": TreeWrite(
+        (*AUTOFOCUS_SETTING, "LightSourceList_SequentialInfo", "LightSource_SequentialInfo", "UnifiedLaser_SequentialInfo",
+         "UnifiedLaserLine_SequentialInfo", "Intensity"),
+        float, within=(0, 100), numbered=("LightSource_SequentialInfo", "UnifiedLaserLine_SequentialInfo"),
+    ),
     "MotCorrRefPos": TreeWrite(
         ("Microscope", "ObjectiveList", "ObjectiveInfo", "MotCorrRefPos"), float,
         choices=frozenset({-1.0}), within=(0, 100), of_objective=True,
@@ -294,7 +313,7 @@ STATE_TREE_WRITES = {
 PLAIN_TEXT = re.compile(r"^[\w ._,()/+#-]{1,64}$")
 
 #: A write into the state tree, as the writes build it: ``<StateTree Command="name" Value="n"/>``.
-STATE_TREE = re.compile(r'^\s*<StateTree\s+Command="([^"]+)"\s+Value="([^"]+)"\s*/>\s*$')
+STATE_TREE = re.compile(r'^\s*<StateTree\s+Command="([^"]+)"\s+Value="([^"]+)"(?:\s+At="([0-9,]+)")?\s*/>\s*$')
 
 #: An element's command, wherever it stands among the attributes (LAS X's window
 #: writes ``FileName`` before ``Command`` in its setting commands).
@@ -339,7 +358,18 @@ def tree_value(name: str, text: str):
     return value
 
 
-def write_into_state_tree(name: str, text: str) -> str:
+def tree_places(name: str, at: str | None) -> dict:
+    """Which of each repeated node the value *name* goes into, from the element's ``At``; :class:`NotAllowed` when it does not fit."""
+    numbered = STATE_TREE_WRITES[name].numbered
+    if not numbered and at is None:
+        return {}
+    given = [int(part) for part in at.split(",") if part] if at else []
+    if len(given) != len(numbered):
+        raise NotAllowed(f"not written: {name} takes a place for each of {list(numbered)} in At, not {at!r}")
+    return dict(zip(numbered, given))
+
+
+def write_into_state_tree(name: str, text: str, at: str | None = None) -> str:
     """Write one listed value into LCS's state tree; answer as LAS X answers a command.
 
     A value with a range of LCS's own is first checked against that range,
@@ -350,6 +380,7 @@ def write_into_state_tree(name: str, text: str) -> str:
 
     entry = STATE_TREE_WRITES[name]
     value = tree_value(name, text)
+    places = tree_places(name, at)
     if entry.listed is not None:
         nodes = state_tree.server_nodes()
         listed = state_tree.node_value(nodes, state_tree.node_at(nodes, (*entry.path[:-1], entry.listed)))
@@ -367,7 +398,7 @@ def write_into_state_tree(name: str, text: str) -> str:
         room = 1e-9 * max(abs(low), abs(high))
         if not low - room <= value <= high + room:
             return f'<Result Error="1">{name} {text} is outside the range of LAS X, {low} to {high}; not written</Result>'
-    state_tree.change_node(entry.path, value, of_objective=entry.of_objective)
+    state_tree.change_node(entry.path, value, of_objective=entry.of_objective, places=places)
     return '<Result Error="0"/>'
 
 
@@ -376,6 +407,7 @@ def allowed(xml: str) -> str:
     tree = STATE_TREE.match(xml or "")
     if tree is not None:
         tree_value(tree[1], tree[2])
+        tree_places(tree[1], tree[3])
         return tree[1]
     found = COMMAND.match(xml or "")
     if found is None:

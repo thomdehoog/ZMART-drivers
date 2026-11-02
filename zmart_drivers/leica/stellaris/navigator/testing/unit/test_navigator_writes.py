@@ -596,3 +596,22 @@ class TestAutofocusSettings:
     def test_a_value_the_window_does_not_offer_is_refused(self, name, value):
         with pytest.raises(ValueError):
             writes.named_setting(name, value)
+
+
+
+class TestBestFocusSetting:
+    def test_its_format_is_the_scan_s_command_for_the_autofocus(self):
+        assert elements(writes.named_setting("autofocus_format", (128, 128))) == [
+            '<Scanner Command="SetFormat" FormatX="128" FormatY="128" BlockId="0" IsAutoFocusDefinition="1"/>']
+
+    def test_its_speed_direction_and_zoom_are_written_into_the_state_tree(self):
+        assert elements(writes.named_setting("autofocus_speed", 400)) == ['<StateTree Command="AutofocusSpeed" Value="400"/>']
+        assert elements(writes.named_setting("autofocus_bidirectional", False)) == ['<StateTree Command="AutofocusScanDirectionX" Value="1"/>']
+        assert elements(writes.named_setting("autofocus_zoom", 2)) == ['<StateTree Command="AutofocusZoom" Value="2.0"/>']
+
+    def test_its_optics_are_the_window_s_dye_command_for_the_autofocus(self):
+        (element,) = elements(writes.autofocus_optics((30,), 0, 405.0, 8, (40, 3), 410, 676, "Leica/ALEXA 405"))
+        assert element.startswith('<Scanner IsAutoFocusDefinition="1" ActiveSettingIndex="-1" Command="SetConfocalDefinitionFromDyeAssistant">')
+        assert "<WaveLength>405</WaveLength><Locked>0</Locked><Intensity>0.08</Intensity>" in element
+        assert "<Begin>410</Begin><End>676</End><Dye>Leica/ALEXA 405</Dye>" in element
+        assert '<Sequence Index="0">' in element

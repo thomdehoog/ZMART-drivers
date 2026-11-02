@@ -27,18 +27,17 @@ University of Zurich (thom.dehoog@zmb.uzh.ch, thomdehoog@gmail.com).
 
 from __future__ import annotations
 
-from dataclasses import replace
-
 import logging
 import time
+from dataclasses import replace
 from typing import Any
 
 from ..dispatcher import dispatch
 from ..dispatcher import write as write_loops
 from ..dispatcher.dispatch import make_log_entry
-from ..primitives.direct.client import LASX_LOG
 from ..primitives.direct import profile as direct_profile
 from ..primitives.direct import writes
+from ..primitives.direct.client import LASX_LOG
 from . import answer_dialogs
 from . import readings as readers
 from .clear_cache import data_container
@@ -597,6 +596,48 @@ def autofocus(client, project=None, **watching) -> dict:
             failed = b"ValidateFocus failed" in log.read()
     result.update(found=not failed, drive=drive, z_before_um=before, z_after_um=readers.read_z_um(client, drive), settings=used)
     return result
+
+
+def set_autofocus_optics(client, laser_nm, percent, detector, band, dye, *, max_retries=None) -> dict:
+    """Give the Best Focus Setting the laser line at *laser_nm* with *percent* power, and *detector* with *band* and *dye*; read back.
+
+    As the window's drag-in for the autofocus. The line is found as for
+    ``set_laser_power``; the detector by its name among LAS X's; the power
+    goes to the limits as a laser power.
+    """
+    units = {unit.get("Name"): unit for unit in readers.get_detection_units(client) or []}
+    if detector not in units:
+        return dispatch.refused(f"no detector {detector!r}; LAS X's are {sorted(units)}")
+    try:
+        route, index = laser_line(client, laser_nm)
+        begin, end = band
+        change = writes.autofocus_optics(
+            route, index, float(laser_nm), percent, writes.route_of(units[detector]["BeamRoute"]), float(begin), float(end), dye,
+        )
+    except (RuntimeError, ValueError, TypeError) as why:
+        return dispatch.refused(f"the Best Focus Setting's optics cannot be set: {why}")
+    return run(client, change, max_retries=max_retries)
+
+
+def set_autofocus_laser_power(client, laser_nm, percent, *, max_retries=None) -> dict:
+    """Change the power of the Best Focus Setting's line at *laser_nm*, as the window does; read back.
+
+    The line must already be in the Best Focus Setting (``set_autofocus_optics``
+    brings one in). The power goes to the limits as a laser power.
+    """
+    lines = readers.get_autofocus_optics(client)["lines"]
+    line = next((each for each in lines if abs(each["wavelength"] - float(laser_nm)) < 0.5), None)
+    if line is None:
+        return dispatch.refused(
+            f"the Best Focus Setting has no line at {laser_nm:g} nm; bring one in with set_autofocus_optics; nothing was sent"
+        )
+    routes = [writes.route_of(source.get("BeamRoute")) for source in readers.get_light_sources(client) or []]
+    place = routes.index(writes.route_of(line["beamRoute"]))
+    try:
+        change = writes.autofocus_laser_power(place, line["lineIndex"], float(laser_nm), percent)
+    except ValueError as why:
+        return dispatch.refused(str(why))
+    return run(client, change, max_retries=max_retries)
 
 
 def smartcorr(client, project=None, **watching) -> dict:

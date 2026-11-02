@@ -248,6 +248,10 @@ class PlainNavigator:
         self.live[(*SCANNING, "FrameAccumulation")] = int(e.get("FrameAccu"))
 
     def take_SetFormat(self, e):
+        if e.get("IsAutoFocusDefinition") == "1":
+            af = ("Acquire", "ATL", "CurrentBlock", "ConfocalSequentialInfo", "SequentialAutofocusSetting")
+            self.live[(*af, "FormatX")], self.live[(*af, "FormatY")] = int(e.get("FormatX")), int(e.get("FormatY"))
+            return
         x, y = int(e.get("FormatX")), int(e.get("FormatY"))
         self.live[(*SCANNING, "FormatX")], self.live[(*SCANNING, "FormatY")] = x, y
         self.live[(*SCANNING, "CurrentFormat")] = f"{x} x {y}"
@@ -388,7 +392,20 @@ class PlainNavigator:
         self.live[(*current, "IsEnabledForScanning")] = first["IsEnabledForScanning"]
         return "<Result/>"
 
+    def take_SetConfocalDefinitionFromDyeAssistant(self, e):
+        """The Best Focus Setting's line and its power, as LCS keeps them (only the autofocus's is modelled)."""
+        source = e.find(".//LightSource")
+        route = ";".join(p.get("BeamPosition") for p in source.iter("BeamPosition"))
+        self.nodes.autofocus_lines = [{"beamRoute": route, "lineIndex": int(source.findtext("LineIndex")),
+                                 "wavelength": float(source.findtext("WaveLength")),
+                                 "percent": round(float(source.findtext("Intensity")) * 100, 6)}]
+        return "<Result/>"
+
     def take_ATL_Setting_EnableDisableForScanning(self, e):
+        af = ("Acquire", "ATL", "CurrentBlock", "ConfocalSequentialInfo", "SequentialAutofocusSetting")
+        if int(e.get("SettingID")) == self.live[(*af, "SettingId")]:
+            self.live[(*af, "IsEnabledForScanning")] = e.get("EnableForScanning") == "1"
+            return "<Result/>"
         if int(e.get("SettingID")) == self.live[("Acquire", "ATL", "CurrentSetting", "SettingID")]:
             self.live[("Acquire", "ATL", "CurrentSetting", "IsEnabledForScanning")] = e.get("EnableForScanning") == "1"
         return "<Result/>"

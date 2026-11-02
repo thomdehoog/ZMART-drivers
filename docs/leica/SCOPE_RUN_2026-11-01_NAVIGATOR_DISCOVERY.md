@@ -655,3 +655,25 @@ answer's `found` False when LCS wrote "ValidateFocus failed" during the run, wit
 and read back, 20 steps and an unknown method refused, the autofocus run (found False, z unchanged),
 and the settings put back to z-galvo, 80 µm, Contrast Based Method 1, precision 5.
 
+## 36. The Best Focus Setting: its scan, its optics and its laser power (2 November 2026)
+
+The autofocus's own setting, the Best Focus Setting (`SettingId` 4, `.../SequentialAutofocusSetting`),
+changed in the window: its Format sent `<Scanner Command="SetFormat" FormatX="128" FormatY="128"
+BlockId="0" IsAutoFocusDefinition="1"/>`; its Speed, Bidirectional X and Zoom were written into the
+state tree (`Speed`, `ScanDirectionX`, `Zoom`, with `SpeedMin`/`SpeedMax` 1 to 2600 and
+`ZoomMin`/`ZoomMax` 0.75 to 48 beside them). A laser line and detector were brought in by dragging a
+dye: `<Scanner IsAutoFocusDefinition="1" ActiveSettingIndex="-1"
+Command="SetConfocalDefinitionFromDyeAssistant">` with the line (route, `LineIndex`, `WaveLength`,
+`Intensity`) and the detector (route, `Begin`, `End`, `Dye`, `LutName`). Its power changed in the
+window (8 %) went into the state tree with no command (`.../UnifiedLaserLine_SequentialInfo/Intensity`),
+Setting 1's 405 staying at 2 %. Its checkbox sent `ATL_Setting_EnableDisableForScanning` for
+`SettingID` 4; LCS answered and kept it on.
+
+Built: `change_setting` for `autofocus_format`, `autofocus_speed`, `autofocus_bidirectional` and
+`autofocus_zoom`; `set_autofocus_optics(laser_nm, percent, detector, band, dye)`; and, since that
+command sets the power of a line only as it brings it in (sent again at another power it changed
+nothing), `set_autofocus_laser_power(laser_nm, percent)`, a state-tree write to the line's place
+(`At="source,line"`), checked against the laser limits. Through the driver: the scan set back to
+64 x 64, 600, both ways, zoom 1; zoom 60 refused; the 405 on HyD S 3 brought in at 3 %, then 8 %
+through the power; 50 % refused by the limit; Setting 1's 405 untouched at 1.96 %.
+

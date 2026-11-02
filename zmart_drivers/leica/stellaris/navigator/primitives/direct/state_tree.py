@@ -179,16 +179,34 @@ def objective_node(nodes, name):
     return named(nodes, infos[slot], name)
 
 
-def change_node(path, value, *, of_objective=False):
+def numbered_node(nodes, path, places):
+    """The node at *path*, taking for each name in *places* the one at that place among its siblings of that name."""
+    node = 1
+    for name in path:
+        matches = of_name(nodes, children(nodes, node), name)
+        place = places.get(name, 0)
+        if place >= len(matches):
+            raise HardwareServerUnavailable(f"the state tree has no {name} number {place} ({len(matches)} there)")
+        node = matches[place]
+    return node
+
+
+def change_node(path, value, *, of_objective=False, places=None):
     """Write *value* into the node at *path*, looked up by name now, as LAS X's window does for Bidirectional X.
 
     With *of_objective*, the node is the objective in the light path's own
-    (:func:`objective_node`), looked up now. Called by the transfer only, for
+    (:func:`objective_node`), looked up now; with *places*, the repeated
+    nodes are taken at those places (:func:`numbered_node`). Called by the transfer only, for
     a value on its list. A record of LCS's own type when pywin32 can make
     one; the stand-in takes a plain one.
     """
     nodes = server_nodes()
-    node = objective_node(nodes, path[-1]) if of_objective else node_at(nodes, path)
+    if of_objective:
+        node = objective_node(nodes, path[-1])
+    elif places:
+        node = numbered_node(nodes, path, places)
+    else:
+        node = node_at(nodes, path)
     try:
         import win32com.client
 

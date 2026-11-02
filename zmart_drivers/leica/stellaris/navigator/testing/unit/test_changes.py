@@ -881,3 +881,55 @@ class TestAutofocusSettings:
         shown = direct_reader.get_autofocus_settings()
         assert shown == {"drive": "z-wide", "range_um": 60.0, "method": "noise", "precision": 2, "steps": None}
         assert lasx.commands() == []
+
+
+
+AF_SETTING = ("Acquire", "ATL", "CurrentBlock", "ConfocalSequentialInfo", "SequentialAutofocusSetting")
+
+
+class TestBestFocusSetting:
+    def test_its_scan_is_set_and_read_back(self, lasx, client):
+        for name, value in (("autofocus_format", (128, 128)), ("autofocus_speed", 400),
+                            ("autofocus_bidirectional", False), ("autofocus_zoom", 2.0)):
+            assert changes.change(client, name, value)["confirmed"] is True, name
+        assert direct_reader.get_autofocus_scan() == {
+            "format": (128, 128), "speed": 400, "bidirectional": False, "zoom": 2.0, "enabled": True, "id": 4}
+
+    def test_a_zoom_outside_lcs_own_range_for_it_is_refused(self, lasx, client):
+        result = changes.change(client, "autofocus_zoom", 60.0)
+
+        assert result["success"] is False and "range" in result["message"]
+
+    def test_its_optics_are_set_with_a_power_the_limits_allow(self, lasx, client):
+        result = changes.set_autofocus_optics(client, 405, 8, "HyD 2", (410, 480), "Leica/ALEXA 405")
+
+        assert result["confirmed"] is True
+        assert direct_reader.get_autofocus_optics()["lines"] == [{"beamRoute": "30", "lineIndex": 0, "wavelength": 405.0, "percent": 8.0}]
+
+    def test_a_power_above_the_limits_is_refused_before_anything_is_sent(self, lasx, client):
+        result = changes.set_autofocus_optics(client, 405, 50, "HyD 2", (410, 480), "Leica/ALEXA 405")
+
+        assert result["success"] is False
+        assert lasx.commands() == []
+
+
+
+class TestBestFocusLaserPower:
+    def test_a_line_s_power_in_the_best_focus_setting_is_changed_and_read_back(self, lasx, client):
+        assert changes.set_autofocus_optics(client, 405, 3, "HyD 2", (410, 480), "Leica/ALEXA 405")["confirmed"] is True
+
+        assert changes.set_autofocus_laser_power(client, 405, 6)["confirmed"] is True
+        assert direct_reader.get_autofocus_optics()["lines"][0]["percent"] == 6.0
+        assert client.reply["element"] == '<StateTree Command="AutofocusLaserPower" Value="6.0" At="0,0"/>'
+
+    def test_a_line_not_in_the_best_focus_setting_is_refused(self, lasx, client):
+        result = changes.set_autofocus_laser_power(client, 405, 6)
+
+        assert result["success"] is False and "set_autofocus_optics" in result["message"]
+
+    def test_a_power_above_the_limits_is_refused_before_anything_is_sent(self, lasx, client):
+        assert changes.set_autofocus_optics(client, 405, 3, "HyD 2", (410, 480), "Leica/ALEXA 405")["confirmed"] is True
+        sent = len(lasx.sent)
+
+        assert changes.set_autofocus_laser_power(client, 405, 50)["success"] is False
+        assert len(lasx.sent) == sent

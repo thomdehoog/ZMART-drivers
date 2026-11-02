@@ -439,6 +439,13 @@ MUTATING_COMMANDS = {
     "lock_detector": "lock_detector",
     # a white-light line switched on, at LCS's starting power; its power is set and checked after
     "set_laser_lines": "set_laser_lines",
+    # the Best Focus Setting: its scan, on or off, and its optics (its power checked as a laser power)
+    "set_autofocus_format": "set_autofocus_format",
+    "set_autofocus_speed": "set_autofocus_speed",
+    "set_autofocus_bidirectional": "set_autofocus_bidirectional",
+    "set_autofocus_zoom": "set_autofocus_zoom",
+    "set_autofocus_optics": "setting_file",
+    "set_autofocus_laser_power": "setting_file",
     # a laser line taken away: less light, never more
     "remove_laser_line": "remove_laser_line",
 }

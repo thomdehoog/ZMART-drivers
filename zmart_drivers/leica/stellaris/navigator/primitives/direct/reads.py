@@ -85,6 +85,8 @@ READS = (
     "laser_line_locked",
     "laser_slots",
     "autofocus_settings",
+    "autofocus_scan",
+    "autofocus_optics",
     "pixel_size",
     "bit_depth",
     "serial_number",
@@ -972,6 +974,45 @@ def get_autofocus_settings() -> dict:
         "precision": found["precision"],
         "steps": found["steps"] if found["fixed"] else None,
     }
+
+
+AUTOFOCUS_SETTING = ("Acquire", "ATL", "CurrentBlock", "ConfocalSequentialInfo", "SequentialAutofocusSetting")
+
+
+def get_autofocus_scan() -> dict:
+    """The Best Focus Setting's own scan: ``format`` (x, y), ``speed``, ``bidirectional``, ``zoom``; its ``enabled`` and ``id``."""
+    found = settings(
+        "the Best Focus Setting",
+        {name: (*AUTOFOCUS_SETTING, node) for name, node in (
+            ("x", "FormatX"), ("y", "FormatY"), ("speed", "Speed"), ("direction", "ScanDirectionX"),
+            ("zoom", "Zoom"), ("enabled", "IsEnabledForScanning"), ("id", "SettingId"),
+        )},
+    )
+    return {
+        "format": (found["x"], found["y"]), "speed": found["speed"], "bidirectional": found["direction"] == 2,
+        "zoom": float(found["zoom"]), "enabled": bool(found["enabled"]), "id": found["id"],
+    }
+
+
+def get_autofocus_optics() -> dict:
+    """The Best Focus Setting's laser lines with power: ``lines``, each ``beamRoute``, ``lineIndex``, ``wavelength``, ``percent``."""
+
+    def reading(nodes):
+        sources = [s["route"] for s in layout(nodes, LIGHT_SOURCES, light_layout)]
+        listed = child_named(nodes, node_at(nodes, AUTOFOCUS_SETTING), "LightSourceList_SequentialInfo")
+        lines = []
+        for place, source in enumerate(of_name(nodes, children(nodes, listed), "LightSource_SequentialInfo") if listed else []):
+            laser = child_named(nodes, source, "UnifiedLaser_SequentialInfo")
+            for line in of_name(nodes, children(nodes, laser), "UnifiedLaserLine_SequentialInfo") if laser else []:
+                power = node_value(nodes, named(nodes, line, "Intensity"))
+                if isinstance(power, (int, float)) and power > 0 and place < len(sources):
+                    lines.append({
+                        "beamRoute": sources[place], "lineIndex": node_value(nodes, named(nodes, line, "LineIndex")),
+                        "wavelength": node_value(nodes, named(nodes, line, "WaveLength")), "percent": float(power),
+                    })
+        return {"lines": lines}
+
+    return read("the Best Focus Setting's optics", reading)
 
 
 def get_laser_slots() -> list[dict]:
