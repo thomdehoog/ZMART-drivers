@@ -615,3 +615,19 @@ class TestBestFocusSetting:
         assert "<WaveLength>405</WaveLength><Locked>0</Locked><Intensity>0.08</Intensity>" in element
         assert "<Begin>410</Begin><End>676</End><Dye>Leica/ALEXA 405</Dye>" in element
         assert '<Sequence Index="0">' in element
+
+
+
+class TestDetectorCommands:
+    def test_on_off_gain_band_and_tau_are_the_window_s_commands(self):
+        assert elements(writes.detector_active((40, 2), "HyD 2", False)) == [
+            '<Scanner Command="SetDetectorActive" SetActive="0" SequentialSettingIndex="0" SetMode="0" BlockId="0" SuppressUserInteraction="0">'
+            '<BeamRoute Version="0"><BeamPosition BeamPositionLevel="0" BeamPosition="40"/><BeamPosition BeamPositionLevel="1" BeamPosition="2"/></BeamRoute></Scanner>']
+        assert elements(writes.detector_gain((40, 3), "HyD S 3", 100))[0].startswith(
+            '<Scanner Command="SetDetectorGain" DetectorGain="100" SetMode="2" SingleSettingIndex="0" BlockId="0">')
+        assert elements(writes.detector_band((40, 3), "HyD S 3", 520, 676)) == [
+            '<Scanner Command="SetSpectrophotometerMultiBandRange" DetectorScanType="0" SetterMode="2" SequentialSetMode="2" '
+            'SingleSettingIndex="0" BlockId="0" BandLeft1="520" BandRight1="676"><ActionInitiatorDetector Version="0"/>'
+            '<BandBeamRoute1 Version="0"><BeamPosition BeamPositionLevel="0" BeamPosition="40"/><BeamPosition BeamPositionLevel="1" BeamPosition="3"/></BandBeamRoute1></Scanner>']
+        assert elements(writes.detector_tau((40, 3), "HyD S 3", 3, "TauScan"))[0].startswith(
+            '<Scanner Command="SetDigitalGatingModeIndex" GatingModeIndex="3" SetMode="0" SingleSettingIndex="0">')

@@ -692,3 +692,27 @@ Thom's rule: a command first, the state tree only when no command does it. Built
 write for the pinhole is gone. Through the driver: 200 µm confirmed; 2000 µm refused, not sent (LCS's log
 shows only 0.0002 and 0.0001 from the driver); back to 100 µm. The autofocus's power stays a state-tree write.
 
+## 38. A detector's on/off, gain, band and tau mode with LAS X's commands (2 November 2026)
+
+Thom changed the detector panel in the window: HyD 2 off and on sent `<Scanner Command="SetDetectorActive"
+SetActive="0|1" SequentialSettingIndex="0" SetMode="0" BlockId="0" SuppressUserInteraction="0">` with its
+route; gain 100 sent `<Scanner Command="SetDetectorGain" DetectorGain="100" SetMode="2" SingleSettingIndex="0"
+BlockId="0">`; the band `<Scanner Command="SetSpectrophotometerMultiBandRange" DetectorScanType="0"
+SetterMode="2" SequentialSetMode="2" SingleSettingIndex="0" BlockId="0" BandLeft1="520" BandRight1="676">` with
+`<BandBeamRoute1>`; a dye from the list `SetConfocalDefinitionFromDyeAssistant` (the whole setting, worked out
+by the window). The operating mode (Analog) and the AOBS (Reflection, Enhanced Dynamics) sent no command: the
+window wrote the setting's `OperatingModeIndex`/`OperatingMode` and `Confocal/AOBSLineList/AOBSLine`. The tau
+modes are listed per detector and setting (`DigitalGatingModeList_SeqInfo`: places 1 to 5 hold 2, 3, 5, 6, 10);
+`SetDigitalGatingModeIndex` names a mode by its place.
+
+Built: `set_detector`'s on, gain (within the detector's own range), band and tau mode with these commands, in
+the current setting; operating mode, TauContrast and dye still through a saved setting. Through the driver:
+gain 50 and 100, band 530 to 650 and back, HyD 2 off and on, the Trans PMT on and off, each confirmed.
+
+Two findings. A tau mode chosen in Analog was taken, and LCS switched the detector to Counting, its gain fixed
+at 2.5 (as in the window). And the operating mode set back to Analog through the saved setting changed the
+setting's own entry (`OperatingMode` 10, the gain 100 stored there) but not the detector as it runs
+(`Confocal/.../AcquisitionMode` 1, `IsHighVoltageAllowed` False), so the gain stayed 2.5; making Setting 1
+current again did not change it. The saved-setting route for the operating mode is not reliable; the window's
+way (the state tree) is still to be built and tried.
+

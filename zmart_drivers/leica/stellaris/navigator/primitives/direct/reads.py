@@ -86,6 +86,7 @@ READS = (
     "laser_slots",
     "autofocus_settings",
     "autofocus_scan",
+    "tau_modes",
     "autofocus_optics",
     "pixel_size",
     "bit_depth",
@@ -977,6 +978,42 @@ def get_autofocus_settings() -> dict:
 
 
 AUTOFOCUS_SETTING = ("Acquire", "ATL", "CurrentBlock", "ConfocalSequentialInfo", "SequentialAutofocusSetting")
+
+
+def get_tau_modes() -> dict:
+    """Each detector's tau modes in the current setting, by name: ``now`` (LCS's code) and ``offered`` (codes, by place).
+
+    LCS keeps them per setting (``SequentialSettingParameter[n]``, the current
+    setting's place); the window's ``SetDigitalGatingModeIndex`` names a mode
+    by its place in ``offered`` (simulator, 2026-11-02).
+    """
+
+    def reading(nodes):
+        current = node_value(nodes, node_at(nodes, ("Acquire", "ATL", "CurrentSetting", "SettingID")))
+        ids = [
+            node_value(nodes, named(nodes, info, "SettingID"))
+            for info in of_name(nodes, children(nodes, node_at(nodes, ("Acquire", "ATL", "CurrentBlock"))), "SettingInfo")
+            if node_value(nodes, named(nodes, info, "SettingID")) is not None
+        ]
+        place = ids.index(current) if current in ids else 0
+        params = of_name(nodes, children(nodes, node_at(nodes, ("Acquire", "ATL", "CurrentBlock", "ConfocalSequentialInfo"))), "SequentialSettingParameter")
+        names = [unit["fixed"]["Name"] for unit in layout(nodes, DETECTION, detection_layout)]
+        units = []
+        detection = child_named(nodes, params[place], "SpectralDetection_SequentialInfo") if place < len(params) else None
+        for spectro in of_name(nodes, children(nodes, detection), "Spectrophotometer_SequentialInfo") if detection else []:
+            listed = named(nodes, spectro, "DetectionUnitList_SequentialInfo")
+            units.extend(of_name(nodes, children(nodes, listed), "DetectorHWInfo_SequentialInfo"))
+        found = {}
+        for name, unit in zip(names, units):
+            offered = child_named(nodes, unit, "DigitalGatingModeList_SeqInfo")
+            modes = [
+                node_value(nodes, named(nodes, mode, "DigitalGatingMode"))
+                for mode in (of_name(nodes, children(nodes, offered), "DigitalGatingMode") if offered else [])
+            ]
+            found[name] = {"now": node_value(nodes, named(nodes, unit, "DigitalGatingMode")), "offered": modes}
+        return found
+
+    return read("the detectors' tau modes", reading)
 
 
 def get_autofocus_scan() -> dict:

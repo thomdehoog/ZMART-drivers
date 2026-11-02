@@ -803,6 +803,80 @@ def autofocus_drive(drive: str) -> Write:
                             lambda shown: shown["drive"] == drive)
 
 
+def detector_change(command: str, request_name: str, element, values: dict, description: str, shows) -> Write:
+    """A change of one detector in the current setting, as the window sends it; read back from the detectors in use."""
+
+    def fill(request: Request) -> None:
+        request.elements = [element(request.setting)]
+
+    return Write(command=command, values=values, request=request_name, fill=fill, description=description,
+                 ready=idle(), confirm=Expect("detectors", shows))
+
+
+def in_use(detectors, name):
+    """The detector *name* among the detectors in use, or None."""
+    return next((d for d in detectors or [] if d.get("name") == name), None)
+
+
+def detector_active(route, name: str, on: bool) -> Write:
+    """Switch the detector *name* (on *route*) on or off in the current setting, as the window does; read back."""
+    if not isinstance(on, bool):
+        raise ValueError(f"a detector is switched on with True or off with False, not {on!r}")
+    return detector_change(
+        "set_detector_active", "SetDetectorActive",
+        lambda setting: (f'<Scanner Command="SetDetectorActive" SetActive="{int(on)}" SequentialSettingIndex="{setting}" SetMode="0" '
+                         f'BlockId="0" SuppressUserInteraction="0">{beam_route(route)}</Scanner>'),
+        {"value": on}, f"Detector {name} -> {'on' if on else 'off'}",
+        lambda detectors: (in_use(detectors, name) is not None) is on,
+    )
+
+
+def detector_gain(route, name: str, gain: float) -> Write:
+    """Set the gain of the detector *name* (on *route*) in the current setting, as the window does; read back."""
+    if isinstance(gain, bool) or not isinstance(gain, (int, float)):
+        raise ValueError(f"a detector's gain is a number, not {gain!r}")
+    return detector_change(
+        "set_detector_gain", "SetDetectorGain",
+        lambda setting: (f'<Scanner Command="SetDetectorGain" DetectorGain="{value(gain)}" SetMode="2" SingleSettingIndex="{setting}" '
+                         f'BlockId="0">{beam_route(route)}</Scanner>'),
+        {"value": gain}, f"Detector {name} gain -> {gain:g}",
+        lambda detectors: (unit := in_use(detectors, name)) is not None and abs(unit["gain"]["value"] - gain) <= 0.05,
+    )
+
+
+def detector_band(route, name: str, begin_nm: float, end_nm: float) -> Write:
+    """Set the band of the detector *name* (on *route*) in the current setting, as the window does; read back within 1 nm."""
+    if not begin_nm < end_nm:
+        raise ValueError(f"a detector's band runs from a lower to a higher wavelength, not {begin_nm!r} to {end_nm!r}")
+    positions = "".join(f'<BeamPosition BeamPositionLevel="{level}" BeamPosition="{p}"/>' for level, p in enumerate(route))
+    return detector_change(
+        "set_detector_band", "SetSpectrophotometerMultiBandRange",
+        lambda setting: ('<Scanner Command="SetSpectrophotometerMultiBandRange" DetectorScanType="0" SetterMode="2" SequentialSetMode="2" '
+                         f'SingleSettingIndex="{setting}" BlockId="0" BandLeft1="{value(begin_nm)}" BandRight1="{value(end_nm)}">'
+                         f'<ActionInitiatorDetector Version="0"/><BandBeamRoute1 Version="0">{positions}</BandBeamRoute1></Scanner>'),
+        {"value": [begin_nm, end_nm]}, f"Detector {name} band -> {begin_nm:g} to {end_nm:g} nm",
+        lambda detectors: (unit := in_use(detectors, name)) is not None
+        and abs(unit["detectionBegin"] - begin_nm) <= 1 and abs(unit["detectionEnd"] - end_nm) <= 1,
+    )
+
+
+def detector_tau(route, name: str, place: int, mode: str) -> Write:
+    """Set the tau mode of the detector *name* (on *route*) by its *place* in the detector's list, as the window does; read back."""
+    code = TAU_CODES[mode]
+
+    def fill(request: Request) -> None:
+        request.elements = [f'<Scanner Command="SetDigitalGatingModeIndex" GatingModeIndex="{int(place)}" SetMode="0" '
+                            f'SingleSettingIndex="{request.setting}">{beam_route(route)}</Scanner>']
+
+    return Write(command="set_detector_tau", values={"value": mode}, request="SetDigitalGatingModeIndex", fill=fill,
+                 description=f"Detector {name} tau mode -> {mode}", ready=idle(),
+                 confirm=Expect("tau_modes", lambda modes: (modes or {}).get(name, {}).get("now") == code))
+
+
+#: The tau modes by name and LCS's code for them (``DigitalGatingMode``), as the window's TauModes list names them.
+TAU_CODES = {"Intensity": 2, "TauGating": 3, "TauScan": 5, "TauSeparation": 6, "TauInteraction": 10}
+
+
 def autofocus_scan_change(name: str, elements: list[str], description: str, shows) -> Write:
     """A change of the Best Focus Setting's own scan; read back from it."""
 

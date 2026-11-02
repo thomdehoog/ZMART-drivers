@@ -35,8 +35,9 @@ checked by the driver either way (`transfer.CHECKED_COMMANDS`, `transfer.STATE_T
 - The carrier: slide, dish, well plate (the Navigator Expert sent `StageSetCarrierAttachment`).
 
 **Commands seen in LCS's log but not built**
-- `SetDetectorActive` and `SetDigitalGatingModeIndex`: direct versions of a detector on or off and of
-  the tau mode, now done through a saved setting.
+- The operating mode as the window sets it (the setting's `OperatingModeIndex`): the saved-setting route
+  changes the setting but not the running detector (2 November 2026).
+- The AOBS per line: Reflection and Enhanced Dynamics (`Confocal/AOBSLineList/AOBSLine`, no command).
 - `SetZStackSize`, the z-stack's Begin and End buttons (`BeforeBeginOrEndOfStackIsSet`), Re-Center,
   and the Number of Steps mode (step mode 0).
 - `SetDetectorTauSeparationLut`, `ResetConfocalSetting`, `ResetAutoFocusToAutoSync`.

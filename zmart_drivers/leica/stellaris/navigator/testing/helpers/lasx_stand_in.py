@@ -58,6 +58,10 @@ HARDWARE_INFO = {
 }
 
 
+#: The tau modes a detector offers, by place, as LCS lists them in a setting (simulator, 2026-11-02).
+TAU_LIST = (0, 2, 3, 5, 6, 10)
+
+
 class PlainNavigator:
     """LAS X with its plain Navigator shown: no jobs, a stage, two z drives, the current settings."""
 
@@ -273,6 +277,25 @@ class PlainNavigator:
         self.captures += 1
         self.scanning_until = time.monotonic() + self.scan_s
         self.live[("Microscope", "CurrentMotCorrPos")] = getattr(self, "smartcorr_finds", 0.0)
+
+    def detector_at(self, e, tag="BeamRoute"):
+        route = tuple(int(p.get("BeamPosition")) for p in e.find(tag).iter("BeamPosition"))
+        units = [u for s in self.nodes.detection["Spectrophotometer"] for u in s["DetectionUnitList"]["DetectorHWInfo"]]
+        return next(u for u in units if tuple(u["BeamRoute"]) == route)
+
+    def take_SetDetectorActive(self, e):
+        self.detector_at(e)["IsActive"] = e.get("SetActive") == "1"
+
+    def take_SetDetectorGain(self, e):
+        self.detector_at(e)["HighVoltage"] = float(e.get("DetectorGain"))
+
+    def take_SetSpectrophotometerMultiBandRange(self, e):
+        unit = self.detector_at(e, "BandBeamRoute1")
+        unit["WaveLengthBegin"], unit["WaveLengthEnd"] = float(e.get("BandLeft1")), float(e.get("BandRight1"))
+
+    def take_SetDigitalGatingModeIndex(self, e):
+        unit = self.detector_at(e)
+        unit["DigitalGatingMode"] = TAU_LIST[int(e.get("GatingModeIndex"))]
 
     def take_SetPinhole(self, e):
         """The pinhole set as asked, beyond LCS's own range too, as the simulator did (2026-11-02)."""

@@ -47,22 +47,22 @@ def detectors():
     return {d["name"]: d for d in direct_reader.get_detectors()}
 
 
-def test_a_detector_is_switched_on_through_setting_1_and_read_back(lasx, client, tmp_path):
+def test_a_detector_is_switched_on_with_one_command_and_read_back(lasx, client, tmp_path):
     result = setting_files.set_detector(client, tmp_path, "Trans PMT", on=True)
 
     assert result["confirmed"] is True
     assert "Trans PMT" in detectors()
-    assert lasx.commands() == ["ATL_Block_Save_To_XML", "ATL_Block_Load_From_XML"]
+    assert lasx.commands() == ["SetDetectorActive"]
 
 
 def test_only_setting_1_is_changed_in_the_file_loaded(lasx, client, tmp_path):
-    setting_files.set_detector(client, tmp_path, "HyD S 3", gain=50.0)
+    setting_files.set_detector(client, tmp_path, "HyD S 3", dye="Leica/ALEXA 555")
 
     loaded = (tmp_path / lasx.loaded[-1].split("\\")[-1].split("/")[-1]).read_text(encoding="utf-8")
     best_focus = loaded[loaded.index("Best Focus Setting"):]
     hyd = re.search(r'<Detector [^>]*Name="HyD S 3"[^>]*>', best_focus)[0]
-    assert ' Gain="2.5"' in hyd
-    assert detectors()["HyD S 3"]["gain"]["value"] == pytest.approx(50.0)
+    assert 'DyeName="Leica/ALEXA 555"' not in hyd
+    assert detectors()["HyD S 3"]["dye"] == "Leica/ALEXA 555"
 
 
 def test_a_detector_s_band_is_changed_and_read_back(lasx, client, tmp_path):
@@ -79,13 +79,14 @@ def test_a_detector_the_setting_does_not_have_is_refused_before_anything_is_load
     assert "ATL_Block_Load_From_XML" not in lasx.commands()
 
 
-def test_several_sequential_settings_are_refused(lasx, client, tmp_path):
+def test_with_several_settings_a_dye_is_refused_but_on_off_still_works(lasx, client, tmp_path):
     lasx.sequential = 2
 
-    result = setting_files.set_detector(client, tmp_path, "Trans PMT", on=True)
+    result = setting_files.set_detector(client, tmp_path, "Trans PMT", dye="Leica/ALEXA 488")
 
     assert result["success"] is False and "sequential" in result["message"]
     assert "ATL_Block_Load_From_XML" not in lasx.commands()
+    assert setting_files.set_detector(client, tmp_path, "Trans PMT", on=True)["confirmed"] is True
 
 
 def test_a_file_with_a_laser_above_the_limit_is_refused_before_it_is_loaded(lasx, tmp_path):
@@ -198,3 +199,35 @@ def test_setting_1_is_found_whatever_it_is_called():
     )
     start, end = setting_files.setting_1(text)
     assert text[start:end].startswith('<ATLConfocalSettingDefinition UserSettingName="ZMART test">')
+
+
+
+def test_on_gain_and_band_go_with_las_x_s_commands_not_a_setting_file(lasx, client, tmp_path):
+    result = setting_files.set_detector(client, tmp_path, "HyD S 3", gain=100, band=(520, 676))
+
+    assert result["confirmed"] is True
+    assert lasx.commands() == ["SetDetectorGain", "SetSpectrophotometerMultiBandRange"]
+    shown = detectors()["HyD S 3"]
+    assert shown["gain"]["value"] == 100 and (shown["detectionBegin"], shown["detectionEnd"]) == (520, 676)
+
+
+def test_a_detector_is_switched_off_and_on_with_las_x_s_command(lasx, client, tmp_path):
+    assert setting_files.set_detector(client, tmp_path, "HyD 2", on=False)["confirmed"] is True
+    assert "HyD 2" not in detectors()
+    assert setting_files.set_detector(client, tmp_path, "HyD 2", on=True)["confirmed"] is True
+    assert "HyD 2" in detectors()
+    assert lasx.commands() == ["SetDetectorActive", "SetDetectorActive"]
+
+
+def test_a_gain_outside_the_detector_s_own_range_is_refused(lasx, client, tmp_path):
+    result = setting_files.set_detector(client, tmp_path, "HyD S 3", gain=900)
+
+    assert result["success"] is False and "2.5 to 500" in result["message"]
+    assert lasx.commands() == []
+
+
+def test_the_tau_mode_is_its_place_in_the_detector_s_list(lasx, client, tmp_path):
+    result = setting_files.set_detector(client, tmp_path, "HyD S 3", tau_mode="TauScan")
+
+    assert result["confirmed"] is True
+    assert 'GatingModeIndex="3"' in lasx.sent[-1]

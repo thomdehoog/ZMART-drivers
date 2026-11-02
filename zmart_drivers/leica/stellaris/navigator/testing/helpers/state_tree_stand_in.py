@@ -194,6 +194,7 @@ def detector(route, name, kind, begin, end, active, dye, gain, *, photon_countin
         "HighVoltageMax": 500.0,
         "Offset": 0.0,
         "IsBlockedForDyeAssistant": False,
+        "DigitalGatingMode": 2,
         "CanDoPhotonCounting": photon_counting,
     }
 
@@ -450,6 +451,16 @@ class StandInNodes:
             ] or [{"LineIndex": 0, "WaveLength": 0.0, "Intensity": 0.0}]}}
             for source in self.light_sources
         ]})
+        # Each detector's tau modes in the current setting, as LCS lists them there.
+        sequence = child(child(child(child(1, "Acquire"), "ATL"), "CurrentBlock"), "ConfocalSequentialInfo")
+        graft(sequence, "SequentialSettingParameter", {"SpectralDetection_SequentialInfo": {"Spectrophotometer_SequentialInfo": [
+            {"DetectionUnitList_SequentialInfo": {"DetectorHWInfo_SequentialInfo": [
+                {"DigitalGatingMode": unit.get("DigitalGatingMode", 2), "DigitalGatingModeList_SeqInfo": {"DigitalGatingMode": [
+                    {"DigitalGatingMode": code, "IsEnabled": True} for code in (0, 2, 3, 5, 6, 10)]}}
+                for unit in spectro["DetectionUnitList"]["DetectorHWInfo"]
+            ]}}
+            for spectro in self.detection["Spectrophotometer"]
+        ]}})
         objective_list = child(child(1, "Microscope"), "ObjectiveList")
         for objective in self.objectives:
             info = next(fresh)

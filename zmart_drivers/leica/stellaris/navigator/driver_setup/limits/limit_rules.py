@@ -439,6 +439,10 @@ MUTATING_COMMANDS = {
     "lock_detector": "lock_detector",
     # a white-light line switched on, at LCS's starting power; its power is set and checked after
     "set_laser_lines": "set_laser_lines",
+    # a detector on or off, its band and its tau mode, in the current setting (the gain has its own key)
+    "set_detector_active": "set_detector_active",
+    "set_detector_band": "set_detector_band",
+    "set_detector_tau": "set_detector_tau",
     # the Best Focus Setting: its scan, on or off, and its optics (its power checked as a laser power)
     "set_autofocus_format": "set_autofocus_format",
     "set_autofocus_speed": "set_autofocus_speed",

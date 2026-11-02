@@ -181,6 +181,11 @@ def get_laser_lines(client, **keywords):
     return _routed("laser_lines", client, **keywords)
 
 
+def get_tau_modes(client, **keywords):
+    """Each detector's tau modes in the current setting: ``now`` and ``offered``."""
+    return _routed("tau_modes", client, **keywords)
+
+
 def get_autofocus_scan(client, **keywords):
     """The Best Focus Setting's own scan: ``format``, ``speed``, ``bidirectional``, ``zoom``, ``enabled``, ``id``."""
     return _routed("autofocus_scan", client, **keywords)
