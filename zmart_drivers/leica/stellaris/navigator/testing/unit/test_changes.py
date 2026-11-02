@@ -938,6 +938,49 @@ class TestBestFocusLaserPower:
 
 
 
+class TestTheAobs:
+    def lines(self, lasx):
+        return lasx.nodes.aobs_lines
+
+    def test_the_lines_are_read_as_the_window_shows_them(self, lasx, client):
+        assert direct_reader.get_aobs_lines() == [
+            {"wavelength": 497.0, "reflection": False, "enhanced_dynamics": True, "percent": 100.0, "at": 0}
+        ]
+
+    def test_a_line_is_put_into_reflection_and_back(self, lasx, client):
+        result = changes.set_aobs_line(client, 497, reflection=True)
+
+        assert result["confirmed"] is True
+        assert self.lines(lasx)[0]["IsReflection"] is True and self.lines(lasx)[0]["IsDoubleModeEnabled"] is False
+        assert changes.set_aobs_line(client, 497, reflection=False)["confirmed"] is True
+        assert self.lines(lasx)[0]["IsReflection"] is False
+
+    def test_enhanced_dynamics_is_switched_on_its_own(self, lasx, client):
+        assert changes.set_aobs_line(client, 497, enhanced_dynamics=False)["confirmed"] is True
+        assert self.lines(lasx)[0]["IsDoubleModeEnabled"] is False
+        assert changes.set_aobs_line(client, 497, enhanced_dynamics=True)["confirmed"] is True
+        assert self.lines(lasx)[0]["IsDoubleModeEnabled"] is True
+
+    def test_reflection_with_enhanced_dynamics_is_refused_as_the_window_does_not_have_it(self, lasx, client):
+        result = changes.set_aobs_line(client, 497, reflection=True, enhanced_dynamics=True)
+
+        assert result["success"] is False
+        assert self.lines(lasx)[0]["IsReflection"] is False
+
+    def test_a_line_the_aobs_does_not_carry_is_refused(self, lasx, client):
+        result = changes.set_aobs_line(client, 561, reflection=True)
+
+        assert result["success"] is False and "497" in result["message"]
+
+    def test_enhanced_dynamics_where_the_microscope_has_none_is_refused(self, lasx, client):
+        lasx.nodes.enhanced_dynamics_possible = False
+
+        assert changes.set_aobs_line(client, 497, enhanced_dynamics=True)["success"] is False
+
+    def test_nothing_asked_is_refused(self, lasx, client):
+        assert changes.set_aobs_line(client, 497)["success"] is False
+
+
 class TestLive:
     def test_live_starts_as_the_window_starts_it_and_stops(self, lasx, client):
         started = changes.start_live(client, project=24)

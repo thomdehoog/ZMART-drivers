@@ -767,3 +767,21 @@ Built: `start_live()` and `stop_live()` with these commands, read back from `Acq
 Through the driver: idle; started (busy, then `eScanContinuous` after 3 s); stopped, idle again in 1.1 s.
 While Live runs, a picture waits for the scanner to be idle, so Live is stopped first.
 
+## 43. The AOBS per line: Reflection and Enhanced Dynamics (2 November 2026)
+
+In the AOBS Configuration window, the 497 nm line (the white-light laser's; only its lines go through
+the AOBS) was put into Reflection and Enhanced Dynamics unticked. No LAS X log grew. The state tree:
+`Confocal/AOBSLineList/AOBSLine[0]` `IsReflection` False to True, `IsDoubleModeEnabled` (Enhanced
+Dynamics) True to False, `Intensity` 100 to 49.8 (the share of the line passed on).
+
+Written into the state tree by hand, LCS took each value and kept the two apart as the window does:
+Reflection on switched Enhanced Dynamics off and set 49.8; Reflection off, or Enhanced Dynamics on,
+brought Fluorescence back at 100 with Enhanced Dynamics on; Enhanced Dynamics off alone changed only
+itself. The window showed Reflection after the write (Thom).
+
+Built: `set_aobs_line(wavelength_nm, reflection=, enhanced_dynamics=)`, written with the line's place
+(`At`), read back from the AOBS's lines; a line the AOBS does not carry, Reflection with Enhanced Dynamics,
+and Enhanced Dynamics on a microscope without it are refused. Through the driver: Fluorescence, Enhanced
+Dynamics off, Reflection, Enhanced Dynamics on, each confirmed; 561 nm and Reflection with Enhanced
+Dynamics refused. Left as found: Fluorescence, Enhanced Dynamics on.
+

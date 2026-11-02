@@ -309,6 +309,11 @@ class StandInNodes:
             SIMULATOR_SETTINGS
         )  # path -> value (or a function giving it), the current setting's nodes
         self.settings = [{"SettingID": 3, "Name": "Setting 1", "IsEnabledForScanning": True}]  # Acquire/ATL/CurrentBlock/SettingInfo
+        # The AOBS's eight lines (Confocal/AOBSLineList), as on the simulator, 2026-11-02: 497 in use.
+        self.aobs_lines = [{"IsUsed": True, "LaserLine": 497.0, "Intensity": 100.0, "IsDoubleModeEnabled": True, "IsReflection": False}] + [
+            {"IsUsed": False, "LaserLine": 0.0, "Intensity": 0.0, "IsDoubleModeEnabled": False, "IsReflection": False} for _ in range(7)
+        ]
+        self.enhanced_dynamics_possible = True
         self.objectives = [
             dict(o, MotCorrRefPos=-1.0) for o in SIMULATOR_OBJECTIVES
         ]  # Microscope/ObjectiveList, by slot
@@ -434,6 +439,7 @@ class StandInNodes:
         graft(confocal, "LightSourceList", {"LightSource": self.light_sources})
         graft(child(1, "Acquire"), "LUT", {"LUT_Entry": self.luts})
         graft(confocal, "SpectralDetection", self.detection)
+        graft(confocal, "AOBSLineList", {"CandoEnhancedDynamics": self.enhanced_dynamics_possible, "AOBSLine": self.aobs_lines})
         graft(child(confocal, "HWParameter"), "FilterWheelList", self.filter_wheels)
         current = self.live[("Acquire", "ATL", "CurrentSetting", "SettingID")]
         graft(child(child(child(1, "Acquire"), "ATL"), "CurrentBlock"), "SettingInfo", [
@@ -507,6 +513,20 @@ class StandInNodes:
                 for line in self.autofocus_lines:
                     if line["beamRoute"] == route and line["lineIndex"] == index:
                         line["percent"] = change.Value
+                continue
+            if path[:3] == ["Confocal", "AOBSLineList", "AOBSLine"]:
+                # One AOBS line, by its place. LCS keeps Reflection and Enhanced Dynamics apart, as the
+                # window does: Reflection takes half the line, Enhanced Dynamics brings Fluorescence back.
+                line_node = nodes[change.NodeID][1]
+                places = [n for n in nodes[nodes[line_node][1]][2] if nodes[n][0] == "AOBSLine"]
+                line = self.aobs_lines[places.index(line_node)]
+                if path[-1] == "IsReflection":
+                    line.update(IsReflection=bool(change.Value), IsDoubleModeEnabled=not change.Value,
+                                Intensity=49.80392156862745 if change.Value else 100.0)
+                elif path[-1] == "IsDoubleModeEnabled" and change.Value:
+                    line.update(IsReflection=False, IsDoubleModeEnabled=True, Intensity=100.0)
+                else:
+                    line[path[-1]] = change.Value
                 continue
             if path[:3] == ["Microscope", "ObjectiveList", "ObjectiveInfo"]:
                 # An objective's own value: the n-th ObjectiveInfo is the n-th objective.

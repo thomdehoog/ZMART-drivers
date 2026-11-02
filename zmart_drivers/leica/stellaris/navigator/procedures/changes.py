@@ -36,6 +36,7 @@ from ..dispatcher import dispatch
 from ..dispatcher import write as write_loops
 from ..dispatcher.dispatch import make_log_entry
 from ..primitives.direct import profile as direct_profile
+from ..primitives.direct import reads as direct_reader
 from ..primitives.direct import writes
 from ..primitives.direct.client import LASX_LOG
 from . import answer_dialogs
@@ -653,6 +654,34 @@ def smartcorr(client, project=None, **watching) -> dict:
     result = picture(client, change, **watching)
     if result["success"]:
         result["collar"] = readers.get_collar(client)
+    return result
+
+
+def set_aobs_line(client, wavelength_nm, *, reflection=None, enhanced_dynamics=None, max_retries=None) -> dict:
+    """Set a white-light line's AOBS, as its Configuration window: Fluorescence or Reflection, and Enhanced Dynamics.
+
+    Only the lines the AOBS carries (the white-light laser's) are found. LCS
+    keeps Reflection and Enhanced Dynamics apart: Reflection switches Enhanced
+    Dynamics off, and Enhanced Dynamics brings Fluorescence back (simulator,
+    2026-11-02); asking for both is refused. Reflection is set first.
+    """
+    if reflection is None and enhanced_dynamics is None:
+        return dispatch.refused("set_aobs_line needs reflection, enhanced_dynamics or both")
+    if reflection and enhanced_dynamics:
+        return dispatch.refused("the AOBS has no Enhanced Dynamics in Reflection")
+    lines = readers.get_aobs_lines(client) or []
+    line = next((each for each in lines if abs(each["wavelength"] - float(wavelength_nm)) < 0.5), None)
+    if line is None:
+        return dispatch.refused(f"the AOBS carries no {wavelength_nm} nm line; it carries {[each['wavelength'] for each in lines]}")
+    if enhanced_dynamics and not direct_reader.aobs_offers_enhanced_dynamics():
+        return dispatch.refused("this microscope's AOBS has no Enhanced Dynamics")
+    result = None
+    for node, on in (("IsReflection", reflection), ("IsDoubleModeEnabled", enhanced_dynamics)):
+        if on is None:
+            continue
+        result = run(client, writes.aobs_line(line["at"], line["wavelength"], node, on), max_retries=max_retries)
+        if not result["success"]:
+            return result
     return result
 
 

@@ -24,7 +24,8 @@ checked by the driver either way (`transfer.CHECKED_COMMANDS`, `transfer.STATE_T
 
 **Acquisition**
 - Time series (xyt): number of frames and interval. The scan mode can be set; these two are not learned.
-- Fast Live and Spiral: not learned.
+- Fast Live and Spiral: not learned; Fast Live has its own Scan Settings window (maximal format, minimal
+  scan frequency, overview zoom, bidirectional, no averaging, ... for the FOV scanner and the resonant one).
 
 **Region and experiment types**
 - ROI scan: scanning only inside a region (the Zoom In rectangle is an ROI in LAS X's data container).
@@ -33,14 +34,12 @@ checked by the driver either way (`transfer.CHECKED_COMMANDS`, `transfer.STATE_T
 - The carrier: slide, dish, well plate (the Navigator Expert sent `StageSetCarrierAttachment`).
 
 **Commands seen in LCS's log but not built**
-- The AOBS per line: Reflection and Enhanced Dynamics (`Confocal/AOBSLineList/AOBSLine`, no command).
 - The z-stack's Set Focus (no logged command; the state tree ignored it; only the window, perhaps by UI
   automation), Z-Compensation, and the Number of Steps mode as such (the count is set through the step).
 - `SetDetectorTauSeparationLut`, `ResetConfocalSetting`, `ResetAutoFocusToAutoSync`.
 - The mounting medium (`ATL_HyVolution_SetMountingMedium`).
 
 **Other**
-- The AOBS settings.
 - The notch filter, the Dye Assistant, "Apply to hardware", Bulk Options.
 - A dye of one's own in LAS X's library; the dye bar's "+".
 - Removing a laser line in another setting than the first (the window allowed it only in Setting 1).

@@ -439,6 +439,9 @@ MUTATING_COMMANDS = {
     # the setting switched on or off for scanning, and its name
     "set_setting_enabled": "set_setting_enabled",
     "set_setting_name": "set_setting_name",
+    # the AOBS: which share of a line goes on, not the light's power
+    "set_aobs_reflection": "set_aobs_reflection",
+    "set_aobs_enhanced_dynamics": "set_aobs_enhanced_dynamics",
     "add_setting": "add_setting",
     "delete_setting": "delete_setting",
     "activate_setting": "activate_setting",

@@ -169,6 +169,7 @@ DATUMS = {
         DatumSpec("sequential_mode", direct_reader.get_sequential_mode, lambda v: v in ("line", "frame", "stack")),
         DatumSpec("laser_line_locked", direct_reader.any_laser_line_locked, lambda v: isinstance(v, bool)),
         DatumSpec("laser_slots", direct_reader.get_laser_slots, lambda v: isinstance(v, list)),
+        DatumSpec("aobs_lines", direct_reader.get_aobs_lines, lambda v: isinstance(v, list)),
         DatumSpec("autofocus_settings", direct_reader.get_autofocus_settings, lambda v: isinstance(v, dict) and "drive" in v),
         DatumSpec("autofocus_scan", direct_reader.get_autofocus_scan, lambda v: isinstance(v, dict) and "format" in v),
         DatumSpec("detector_modes", direct_reader.get_detector_modes, lambda v: isinstance(v, dict)),

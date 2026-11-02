@@ -895,6 +895,23 @@ def detector_operating_mode(at, place: int, name: str, mode: str) -> Write:
                  confirm=Expect("detector_modes", lambda modes: (modes or {}).get(name, {}).get("operating") == code))
 
 
+def aobs_line(at: int, wavelength: float, node: str, on: bool) -> Write:
+    """One AOBS line's Reflection (*node* ``IsReflection``) or Enhanced Dynamics (``IsDoubleModeEnabled``),
+    written into LCS's state tree at the line's place *at*, as the AOBS Configuration window does; read back.
+    """
+    what = {"IsReflection": ("reflection", "Reflection"), "IsDoubleModeEnabled": ("enhanced_dynamics", "Enhanced Dynamics")}[node]
+
+    def fill(request: Request) -> None:
+        request.elements = [f'<StateTree Command="{node}" Value="{int(bool(on))}" At="{int(at)}"/>']
+
+    def shows(lines) -> bool:
+        return any(line["at"] == at and line[what[0]] is bool(on) for line in lines or [])
+
+    return Write(command=f"set_aobs_{what[0]}", values={"value": bool(on)}, request=node, fill=fill,
+                 description=f"AOBS {wavelength:g} nm {what[1]} -> {'on' if on else 'off'}", ready=idle(),
+                 confirm=Expect("aobs_lines", shows))
+
+
 #: The tau modes by name and LCS's code for them (``DigitalGatingMode``), as the window's TauModes list names them.
 TAU_CODES = {"Intensity": 2, "TauGating": 3, "TauScan": 5, "TauSeparation": 6, "TauInteraction": 10}
 

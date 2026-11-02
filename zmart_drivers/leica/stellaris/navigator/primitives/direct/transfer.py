@@ -318,6 +318,11 @@ STATE_TREE_WRITES = {
          "Spectrophotometer_SequentialInfo", "DetectionUnitList_SequentialInfo", "DetectorHWInfo_SequentialInfo", "OperatingModeIndex"),
         within=(0, 7), numbered=("SequentialSettingParameter", "Spectrophotometer_SequentialInfo", "DetectorHWInfo_SequentialInfo"),
     ),
+    # The AOBS's lines (white-light lines only): Reflection, and Enhanced Dynamics. The window
+    # writes them here with no command, and LCS keeps the two apart (simulator, 2026-11-02).
+    # Which line is the element's At.
+    "IsReflection": TreeWrite(("Confocal", "AOBSLineList", "AOBSLine", "IsReflection"), bool, numbered=("AOBSLine",)),
+    "IsDoubleModeEnabled": TreeWrite(("Confocal", "AOBSLineList", "AOBSLine", "IsDoubleModeEnabled"), bool, numbered=("AOBSLine",)),
     "MotCorrRefPos": TreeWrite(
         ("Microscope", "ObjectiveList", "ObjectiveInfo", "MotCorrRefPos"), float,
         choices=frozenset({-1.0}), within=(0, 100), of_objective=True,

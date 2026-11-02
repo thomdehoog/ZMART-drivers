@@ -88,6 +88,7 @@ READS = (
     "autofocus_settings",
     "autofocus_scan",
     "detector_modes",
+    "aobs_lines",
     "autofocus_optics",
     "pixel_size",
     "bit_depth",
@@ -1074,6 +1075,38 @@ def get_autofocus_optics() -> dict:
         return {"lines": lines}
 
     return read("the Best Focus Setting's optics", reading)
+
+
+def get_aobs_lines() -> list[dict]:
+    """The AOBS's lines in use, as its Configuration window shows them: ``wavelength``, ``reflection``,
+    ``enhanced_dynamics``, ``percent`` (the share of the line passed on), and ``at``, the line's place.
+
+    ``Confocal/AOBSLineList/AOBSLine``, eight places; only the white-light
+    laser's lines go through it. ``enhanced_dynamics_possible`` is not part of
+    a line; :func:`aobs_offers_enhanced_dynamics` answers it.
+    """
+
+    def reading(nodes):
+        lines = of_name(nodes, children(nodes, node_at(nodes, ("Confocal", "AOBSLineList"))), "AOBSLine")
+        found = []
+        for place, line in enumerate(lines):
+            if not node_value(nodes, named(nodes, line, "IsUsed")):
+                continue
+            found.append({
+                "wavelength": node_value(nodes, named(nodes, line, "LaserLine")),
+                "reflection": bool(node_value(nodes, named(nodes, line, "IsReflection"))),
+                "enhanced_dynamics": bool(node_value(nodes, named(nodes, line, "IsDoubleModeEnabled"))),
+                "percent": node_value(nodes, named(nodes, line, "Intensity")),
+                "at": place,
+            })
+        return found
+
+    return read("the AOBS's lines", reading)
+
+
+def aobs_offers_enhanced_dynamics() -> bool:
+    """Whether this microscope's AOBS has Enhanced Dynamics (``Confocal/AOBSLineList/CandoEnhancedDynamics``)."""
+    return bool(settings("Enhanced Dynamics", {"can": ("Confocal", "AOBSLineList", "CandoEnhancedDynamics")})["can"])
 
 
 def get_laser_slots() -> list[dict]:

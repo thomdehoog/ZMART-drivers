@@ -570,6 +570,20 @@ class Microscope:
         result = changes.set_laser_shutter(self.handle.client, wavelength_nm, open_)
         return checked(self.handle, result, f"set_laser_shutter({wavelength_nm!r}, {open_!r})")
 
+    def set_aobs_line(self, wavelength_nm: float, *, reflection: bool | None = None, enhanced_dynamics: bool | None = None) -> dict:
+        """Set a white-light line's AOBS, as its Configuration window: Fluorescence or Reflection, and Enhanced Dynamics.
+
+        *reflection* True for Reflection, False for Fluorescence; *enhanced_dynamics*
+        on or off. LAS X has no Enhanced Dynamics in Reflection: Reflection
+        switches it off, and switching it on brings Fluorescence back. Only the
+        white-light laser's lines go through the AOBS. Answers the line as LAS X holds it.
+        """
+        self.handle.require_open()
+        result = changes.set_aobs_line(self.handle.client, wavelength_nm, reflection=reflection, enhanced_dynamics=enhanced_dynamics)
+        checked(self.handle, result, f"set_aobs_line({wavelength_nm!r}, reflection={reflection!r}, enhanced_dynamics={enhanced_dynamics!r})")
+        lines = readings.get_aobs_lines(self.handle.client) or []
+        return next(line for line in lines if abs(line["wavelength"] - float(wavelength_nm)) < 0.5)
+
     def start_live(self) -> None:
         """Start Live, as LAS X's Live button: the microscope scans on, the lasers on, until :meth:`stop_live`.
 

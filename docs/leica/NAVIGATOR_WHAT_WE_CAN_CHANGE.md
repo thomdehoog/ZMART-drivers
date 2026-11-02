@@ -122,6 +122,7 @@ discovery session in `SCOPE_RUN_2026-11-01_NAVIGATOR_DISCOVERY.md` and the build
 | A laser line removed from the setting | Works, with LAS X's command |
 | Shutter per light source | Works |
 | A line on or off | Works: a power above 0 switches it on, 0 off |
+| AOBS per white-light line: Fluorescence or Reflection, Enhanced Dynamics | Works: written into LAS X's state tree, as its AOBS Configuration window does; LAS X has no Enhanced Dynamics in Reflection |
 
 ## Detectors
 
@@ -177,7 +178,7 @@ service and the person responsible for the instrument.
 
 | State | Settings |
 |---|---|
-| Works | 80 (the objective among them, not yet tried) |
+| Works | 81 (the objective among them, not yet tried) |
 | Tried | 0 |
 | Command known | 0 |
 | Not yet learned | 8 |
