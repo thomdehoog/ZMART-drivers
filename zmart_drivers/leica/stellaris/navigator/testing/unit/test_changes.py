@@ -836,3 +836,48 @@ def test_a_ninth_visible_line_in_a_setting_is_refused_as_las_x_would(lasx, clien
 
     assert result["success"] is False and "8" in result["message"]
     assert lasx.commands() == []
+
+
+
+class TestAutofocusRun:
+    def test_the_autofocus_runs_and_reports_where_the_focus_went(self, lasx, client, tmp_path, monkeypatch):
+        monkeypatch.setattr(changes, "LCS_LOG", tmp_path / "LCS.LOG")
+        lasx.autofocus_finds_um = 4.0
+
+        result = changes.autofocus(client, project=24)
+
+        assert result["success"] is True and result["found"] is True
+        assert result["drive"] == "z-galvo" and result["settings"]["range_um"] == 80.0
+        assert result["z_after_um"] - result["z_before_um"] == pytest.approx(4.0)
+        assert lasx.commands() == ["StartAutoFocus"]
+
+    def test_lcs_s_validate_failed_is_reported_as_not_found(self, lasx, client, tmp_path, monkeypatch):
+        log = tmp_path / "LCS.LOG"
+        log.write_text("", encoding="utf-8")
+        monkeypatch.setattr(changes, "LCS_LOG", log)
+        lasx.autofocus_log = (log, "2026-11-02 19:16:24.903 FFFFFFFEh WARNING 521 AutoFocus.cpp 'ValidateFocus failed'\n")
+
+        result = changes.autofocus(client, project=24)
+
+        assert result["success"] is True and result["found"] is False
+        assert result["z_after_um"] == result["z_before_um"]
+
+    def test_a_search_beyond_the_z_limits_is_refused_and_nothing_is_sent(self, lasx, client, tmp_path, monkeypatch):
+        monkeypatch.setattr(changes, "LCS_LOG", tmp_path / "LCS.LOG")
+        lasx.live[("Acquire", "AutoFocusInfo", "FocusRange")] = 100000
+
+        result = changes.autofocus(client, project=24)
+
+        assert result["success"] is False
+        assert lasx.commands() == []
+
+
+
+class TestAutofocusSettings:
+    def test_the_settings_are_written_and_read_back(self, lasx, client):
+        for name, value in (("autofocus_method", "noise"), ("autofocus_steps", 21), ("autofocus_range_um", 60.0),
+                            ("autofocus_drive", "z-wide"), ("autofocus_precision", 2)):
+            assert changes.change(client, name, value)["confirmed"] is True, name
+        shown = direct_reader.get_autofocus_settings()
+        assert shown == {"drive": "z-wide", "range_um": 60.0, "method": "noise", "precision": 2, "steps": None}
+        assert lasx.commands() == []

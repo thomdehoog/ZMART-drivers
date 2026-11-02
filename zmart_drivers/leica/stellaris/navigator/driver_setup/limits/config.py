@@ -59,6 +59,7 @@ _ADDED_LATER = (*STEP_LIMIT_KEYS, "set_z_stack_step", "set_scan_mode", "set_auto
     "set_phase_x", "set_pinhole_um", "set_pinhole_unit", "set_emission_wavelength",
     "set_bit_depth", "set_system_optimized_step", "set_collar", "set_smartcorr_range",
     "set_collar_reference", "set_sequential_mode", "set_laser_wavelength",
+    "set_autofocus_method", "set_autofocus_precision", "set_autofocus_steps", "set_autofocus_range_um", "set_autofocus_drive",
 )
 
 

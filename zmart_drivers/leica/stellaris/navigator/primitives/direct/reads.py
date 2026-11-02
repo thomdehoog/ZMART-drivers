@@ -84,6 +84,7 @@ READS = (
     "scan_field_rotation",
     "laser_line_locked",
     "laser_slots",
+    "autofocus_settings",
     "pixel_size",
     "bit_depth",
     "serial_number",
@@ -944,6 +945,33 @@ def get_filter_wheels() -> list[dict]:
         }
         for wheel, slot in zip(installed_filter_wheels(), slots, strict=True)
     ]
+
+
+#: The autofocus's methods, by LCS's ``AFAnalyseType`` (the window's "Optimized for", simulator, 2026-11-02).
+AUTOFOCUS_METHODS = {1: "contrast 1", 2: "intensity", 3: "noise", 4: "contrast 2", 5: "reflection"}
+
+
+def get_autofocus_settings() -> dict:
+    """The autofocus's settings (the window's Best Focus Scan Options): ``drive``, ``range_um``, ``method``,
+    ``precision`` (1 speed to 5 accuracy), and ``steps`` (a fixed number of steps, or None when the precision decides).
+    """
+    found = settings(
+        "the autofocus's settings",
+        {name: ("Acquire", "AutoFocusInfo", node) for name, node in (
+            ("drive", "ZUseMode"), ("range", "FocusRange"), ("method", "AFAnalyseType"),
+            ("precision", "Precision"), ("fixed", "UseFixSliceCount"), ("steps", "FixSliceCount"),
+        )},
+    )
+    drives = {code: drive for drive, code in Z_USE_MODE.items()}
+    if found["drive"] not in drives:
+        raise HardwareServerUnavailable(f"the state tree names autofocus drive {found['drive']!r}")
+    return {
+        "drive": drives[found["drive"]],
+        "range_um": float(found["range"]),
+        "method": AUTOFOCUS_METHODS.get(found["method"], f"unknown ({found['method']})"),
+        "precision": found["precision"],
+        "steps": found["steps"] if found["fixed"] else None,
+    }
 
 
 def get_laser_slots() -> list[dict]:

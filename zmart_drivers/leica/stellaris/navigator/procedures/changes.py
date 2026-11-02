@@ -36,6 +36,7 @@ from typing import Any
 from ..dispatcher import dispatch
 from ..dispatcher import write as write_loops
 from ..dispatcher.dispatch import make_log_entry
+from ..primitives.direct.client import LASX_LOG
 from ..primitives.direct import profile as direct_profile
 from ..primitives.direct import writes
 from . import answer_dialogs
@@ -557,6 +558,44 @@ def capture(client, project=None, **watching) -> dict:
         return dispatch.refused(f"the picture cannot be taken: {why}", logged=True)
     result = picture(client, change, **watching)
     result["picture"] = "z_stack" if stack else "capture"
+    return result
+
+
+#: LCS's own log, where it writes when an autofocus found no focus (``ValidateFocus failed``, simulator, 2026-11-02).
+LCS_LOG = LASX_LOG.with_name("LCS.LOG")
+
+
+def autofocus(client, project=None, **watching) -> dict:
+    """Run LAS X's autofocus once, with its own settings, into *project*; report what it did.
+
+    The search runs on the autofocus's drive over its capture range around
+    where that drive stands; both ends are checked against the limits first.
+    The result's ``found`` is False when LCS wrote "ValidateFocus failed"
+    during the run (the focus then stays where it was), else True; with
+    ``z_before_um`` and ``z_after_um`` on that drive, and the settings used.
+    """
+    try:
+        used = readers.get_autofocus_settings(client)
+        drive = used["drive"]
+        before = readers.read_z_um(client, drive)
+        if before is None:
+            raise RuntimeError(f"where {drive} stands could not be read")
+        axis = "z_galvo_um" if drive == "z-galvo" else "z_wide_um"
+        half = used["range_um"] / 2
+        into = project if project is not None else data_container.experiment_for_capture()
+        change = writes.start_autofocus(into, drive, before - half, before + half, start={f"from_{axis}": before})
+    except (RuntimeError, ValueError) as why:
+        return dispatch.refused(f"the autofocus cannot be started: {why}", logged=True)
+    seen = LCS_LOG.stat().st_size if LCS_LOG.is_file() else 0
+    result = picture(client, change, **watching)
+    if not result["success"]:
+        return result
+    failed = False
+    if LCS_LOG.is_file():
+        with LCS_LOG.open("rb") as log:
+            log.seek(seen)
+            failed = b"ValidateFocus failed" in log.read()
+    result.update(found=not failed, drive=drive, z_before_um=before, z_after_um=readers.read_z_um(client, drive), settings=used)
     return result
 
 

@@ -75,6 +75,9 @@ discovery session in `SCOPE_RUN_2026-11-01_NAVIGATOR_DISCOVERY.md` and the build
 | Pan | Works: read in micrometres, moved by a distance in micrometres (the window's pan arrows pressed by the ZMART Driver), and set back to the centre (through the smallest zoom) |
 | Bit depth | Works: written into LAS X's state tree, one of LAS X's own list (8, 12, 16) |
 | Autofocus on or off | Works |
+| Autofocus run once now (the window's Autofocus button) | Works, with LAS X's command; reports whether LAS X found a focus and z before and after |
+| Autofocus method, precision or steps, capture range, drive | Works: written into LAS X's state tree, as its Best Focus Scan Options do |
+| Autofocus coverslip offset and Find Coverslip Reflection (Reflection method) | Not yet learned |
 
 ## Z-stack
 
@@ -161,7 +164,7 @@ service and the person responsible for the instrument.
 
 | State | Settings |
 |---|---|
-| Works | 68 (the objective among them, not yet tried) |
+| Works | 70 (the objective among them, not yet tried) |
 | Tried | 0 |
 | Command known | 0 |
-| Not yet learned | 6 |
+| Not yet learned | 7 |

@@ -14,10 +14,11 @@ put back.
 
 1. **The AOBS.** LCS has it (`Confocal/AOBSLineList`, up to 8 lines; it follows the white-light
    laser by itself) and the window has "Show AOBS Settings". Not learned.
-2. **Autofocus.** On or off for a series works. Still to learn: its settings (the Best Focus
-   setting: range, steps, method, detector), running one autofocus now (the Autofocus button in
-   the acquisition view; LCS has `CanDoRunSingleAutofocusInLiveOrIdle`), and the hardware
-   autofocus (AFC, `Microscope/AFC`, its offset).
+2. **Autofocus, what is left.** Running it once and its settings are built (2 November 2026).
+   Still to learn: the Reflection method's coverslip offset (`ReflectionOffset`) and its "Find
+   Coverslip Reflection" button, "Auto Sync" with its scan options, and the hardware autofocus
+   (AFC, `Microscope/AFC`, its offset). On the STELLARIS: an autofocus that finds a focus (only the
+   failing case, "ValidateFocus failed", has been seen).
 3. **ROIs.** Drawing a region and scanning only inside it. The window's Zoom In keeps its
    rectangle as an ROI in LAS X's data container (`Confocal/ZoomIn/CurrentDCROISetID`); a way to
    write an ROI there is not learned.

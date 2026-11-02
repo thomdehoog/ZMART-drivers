@@ -144,6 +144,7 @@ or makes light.
 | SmartCORR's range | `Microscope/MotCorrAutomationInfo/AutomationBegin`, `AutomationEnd`, `AutomationSteps` | 0 to 100 %; 2 to 100 steps |
 | The collar's reference (Set, Reset) | `Microscope/ObjectiveList/ObjectiveInfo/MotCorrRefPos` of the objective in the light path, found at the write | 0 to 100 %, or -1 (none) |
 | The setting's name | `Acquire/ATL/CurrentSetting/Name` | plain text, 1 to 64 letters, digits, spaces or `_ - . , ( ) / + #` |
+| The autofocus's settings | `Acquire/AutoFocusInfo/AFAnalyseType`, `Precision`, `UseFixSliceCount`, `FixSliceCount`, `FocusRange`, `ZUseMode` | method 1 to 5; precision 1 to 5; steps odd, 3 to 1001; range whole µm, 1 to 5000; drive 1 or 2 |
 | Sequential mode | `Confocal/ScanningParameter/SequentialMode` | 0 (lines), 1 (frames) or 2 (stacks) |
 
 Point 1 above is why the ranges are checked by the driver: LCS does not keep to its own range

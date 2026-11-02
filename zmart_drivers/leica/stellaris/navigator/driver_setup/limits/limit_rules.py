@@ -226,6 +226,11 @@ SETTER_LIMIT_KEYS = (
     "set_collar_reference",
     "set_sequential_mode",
     "set_laser_wavelength",
+    "set_autofocus_method",
+    "set_autofocus_precision",
+    "set_autofocus_steps",
+    "set_autofocus_range_um",
+    "set_autofocus_drive",
 )
 
 
@@ -417,6 +422,8 @@ MUTATING_COMMANDS = {
     "set_z_stack_drive": "set_z_stack_drive",
     "set_z_stack_range": "z_stack",
     "z_stack_picture": "z_stack",
+    # the autofocus's search: its two ends, as a z-stack's
+    "autofocus_run": "z_stack",
     # a whole setting as a file: saving changes nothing; a file's values are checked before it is loaded
     "save_setting": "save_setting",
     "load_setting": "setting_file",

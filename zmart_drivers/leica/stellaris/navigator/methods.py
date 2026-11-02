@@ -267,7 +267,7 @@ class Microscope:
 
     def settings(self) -> dict:
         """What LAS X is set to now: ``zoom``, ``scan_speed``, ``scan_field_rotation``, ``averaging``, ``pinhole``, ``format``, ``scan_mode``, ``objective``, ``z_stack``, ``autofocus``,
-        ``bidirectional``, ``phase_x``, ``system_optimized_step``, ``collar``, ``smartcorr``, ``setting``, ``sequential_mode`` and ``bit_depth``."""
+        ``bidirectional``, ``phase_x``, ``system_optimized_step``, ``collar``, ``smartcorr``, ``setting``, ``sequential_mode``, ``autofocus_settings`` and ``bit_depth``."""
         self.handle.require_open()
         found = acquire_step.current_settings(self.handle)
         return {name: found[name] for name in found if name != "fov_m"}
@@ -413,6 +413,17 @@ class Microscope:
         """
         self.handle.require_open()
         return checked(self.handle, lasx_window.lock_channel_colour(locked), f"lock_channel_colour({locked!r})")
+
+    def autofocus(self, project=None) -> dict:
+        """Run LAS X's autofocus once, with the settings in its Best Focus Scan Options, as the window's Autofocus button does.
+
+        The answer's ``found`` says whether LAS X found a focus (it keeps z
+        where it was when it did not), with ``z_before_um`` and
+        ``z_after_um`` on the autofocus's drive and the ``settings`` used.
+        The search's two ends are checked against the limits first.
+        """
+        self.handle.require_open()
+        return checked(self.handle, changes.autofocus(self.handle.client, project), "autofocus()")
 
     def smartcorr(self, project=None) -> dict:
         """Run SmartCORR, as the window's Start SmartCORR: a scan through the collar positions of its range.

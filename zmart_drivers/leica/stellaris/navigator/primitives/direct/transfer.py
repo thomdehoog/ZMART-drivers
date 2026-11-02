@@ -189,6 +189,7 @@ ALLOWED_COMMANDS = frozenset(
         "SetLut",
         "SetMotCorrPosition",
         "StartMotCorrAutomation",
+        "StartAutoFocus",
         "ATL_Setting_EnableDisableForScanning",
         "ATL_Setting_Create",
         "ATL_Setting_Delete",
@@ -202,7 +203,7 @@ ALLOWED_COMMANDS = frozenset(
 class TreeWrite:
     """One value the driver may write into LCS's state tree, and the values it may take.
 
-    ``kind`` is ``int``, ``float`` or ``str`` (plain text, see :data:`PLAIN_TEXT`). A value is one of ``choices``, or lies
+    ``kind`` is ``int``, ``float``, ``bool`` (written as 0 or 1) or ``str`` (plain text, see :data:`PLAIN_TEXT`). A value is one of ``choices``, or lies
     within ``within`` (a fixed range LCS keeps to; with ``choices`` too,
     either will do), or lies between the two nodes ``between`` names beside
     it: LCS's own minimum and maximum, read at the moment of the write; or
@@ -269,6 +270,19 @@ STATE_TREE_WRITES = {
     # The current setting's name, as the window writes it when the name is
     # edited; LCS copies it to the setting's other entries (simulator, 2026-11-01).
     "Name": TreeWrite(("Acquire", "ATL", "CurrentSetting", "Name"), str),
+    # The autofocus's settings, as its Best Focus Scan Options write them
+    # (simulator, 2026-11-02): the method (1 Contrast 1, 2 Intensity, 3 Noise,
+    # 4 Contrast 2, 5 Reflection), the precision (1 speed to 5 accuracy) or a
+    # fixed number of steps (odd, 3 to 1001, as the window keeps it), the
+    # capture range in whole micrometres (the window takes 1 to 5000; LCS keeps
+    # a whole number and ignored 40.0; the search's ends are checked against
+    # the z limits when it runs), and the drive.
+    "AFAnalyseType": TreeWrite(("Acquire", "AutoFocusInfo", "AFAnalyseType"), choices=frozenset({1, 2, 3, 4, 5})),
+    "Precision": TreeWrite(("Acquire", "AutoFocusInfo", "Precision"), choices=frozenset({1, 2, 3, 4, 5})),
+    "UseFixSliceCount": TreeWrite(("Acquire", "AutoFocusInfo", "UseFixSliceCount"), bool),
+    "FixSliceCount": TreeWrite(("Acquire", "AutoFocusInfo", "FixSliceCount"), within=(3, 1001)),
+    "FocusRange": TreeWrite(("Acquire", "AutoFocusInfo", "FocusRange"), within=(1, 5000)),
+    "ZUseMode": TreeWrite(("Acquire", "AutoFocusInfo", "ZUseMode"), choices=frozenset({1, 2})),
     "MotCorrRefPos": TreeWrite(
         ("Microscope", "ObjectiveList", "ObjectiveInfo", "MotCorrRefPos"), float,
         choices=frozenset({-1.0}), within=(0, 100), of_objective=True,
@@ -300,6 +314,10 @@ def tree_value(name: str, text: str):
     if name not in STATE_TREE_WRITES:
         raise NotAllowed(f"not written: {name} is not a value this driver writes into the state tree")
     entry = STATE_TREE_WRITES[name]
+    if entry.kind is bool:
+        if text not in ("0", "1"):
+            raise NotAllowed(f"not written: {name} takes 0 or 1, not {text}")
+        return text == "1"
     if entry.kind is str:
         if not PLAIN_TEXT.match(text):
             raise NotAllowed(f"not written: {name} takes plain text of 1 to 64 characters, not {text}")

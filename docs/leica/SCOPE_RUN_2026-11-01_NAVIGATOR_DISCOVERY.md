@@ -628,3 +628,30 @@ The turn itself and the stage following it need an objective-pair calibration
 (`driver_setup/optical_calibration/notebooks/calibrate_objective_pair.ipynb`); Thom chose not to
 run it yet.
 
+## 35. The autofocus: run once, and its settings (2 November 2026)
+
+The "Show autofocus panel" button is the autofocus on or off (`ActivateAutoFocus`); switched on,
+LCS builds the Best Focus Setting itself (`ConfocalSequentialInfo/SequentialAutofocusSetting`,
+64 x 64, bidirectional), edited like Setting 1. The configure button on the bottom bar's Autofocus
+opens Best Focus Scan Options. Its fields are written by the window into LCS's state tree, with no
+command (`Acquire/AutoFocusInfo`): "Focusdrive" `ZUseMode` (1 z-galvo, 2 z-wide); "Optimized for"
+`AFAnalyseType` (1 Contrast Based Method 1, 2 Intensity, 3 Noise, 4 Contrast Based Method 2,
+5 Reflection); "Capture range" `FocusRange` (a whole number of micrometres: 40.0 written was
+ignored, 40 kept; the window took 1 and 5000); the slider `Precision` (1 speed, 5 accuracy; LCS
+works out the steps: 5, 7 ... 25 at 60 µm); "Number of Steps" `UseFixSliceCount` and `FixSliceCount`
+(odd, 3 to 1001: the window turned 1000 into 1001 and 1 into 3). Reflection adds a coverslip offset
+(`ReflectionOffset`) and "Find Coverslip Reflection" (not learned).
+
+The Autofocus button sent `<AcquireControl RestoreCameraRoi="1" Command="StartAutoFocus"
+DCParentElementID="191"/>`: a 64 x 64 x 25 series "AutoFocus" into the experiment in 3.5 s, then
+`ValidateFocus failed` in LCS.LOG and `Acquire/ScanUpdate/AFFoundUpdate` 0, the focus not moved (no
+sample on the simulator). LAS X's per-plane scores are not exposed; the series is in LAS X's cache.
+Thom chose that the driver reports what LAS X did and computes no scores of its own.
+
+Built: `autofocus(project=None)`, the search's two ends checked against the z limits first, the
+answer's `found` False when LCS wrote "ValidateFocus failed" during the run, with z before and after;
+`settings()["autofocus_settings"]`; `change_setting` for `autofocus_method`, `autofocus_precision`,
+`autofocus_steps`, `autofocus_range_um` and `autofocus_drive`. Through the driver: each setting set
+and read back, 20 steps and an unknown method refused, the autofocus run (found False, z unchanged),
+and the settings put back to z-galvo, 80 µm, Contrast Based Method 1, precision 5.
+

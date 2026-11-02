@@ -252,6 +252,18 @@ class PlainNavigator:
         self.live[(*SCANNING, "FormatX")], self.live[(*SCANNING, "FormatY")] = x, y
         self.live[(*SCANNING, "CurrentFormat")] = f"{x} x {y}"
 
+    def take_StartAutoFocus(self, e):
+        """A focus search on the autofocus's drive; it ends where the focus was found, or, failing, where it began."""
+        self.captures += 1
+        self.scanning_until = time.monotonic() + self.scan_s
+        logged = getattr(self, "autofocus_log", None)
+        if logged:
+            path, line = logged
+            path.write_text(path.read_text(encoding="utf-8") + line, encoding="utf-8")
+        else:
+            drive = self.live[("Acquire", "AutoFocusInfo", "ZUseMode")]
+            self.z_um[drive] += getattr(self, "autofocus_finds_um", 0.0)
+
     def take_StartMotCorrAutomation(self, e):
         """A scan through the collar positions, leaving the collar where the picture was best."""
         self.captures += 1

@@ -118,6 +118,7 @@ mic.connect("stellaris-navigator")                                              
 | `enable_setting(on)` | Switch the current setting on or off for scanning, as the window's checkbox does, and read it back. Off, LAS X takes no picture with it. |
 | `lock_detector(name, locked=True)` | Keep a detector in use and its setting's excitation line from LAS X's Dye Assistant, or free them, as the window's detector lock does; read back. |
 | `lock_channel_colour(locked=True)` | Lock or free the colour of the channel LAS X's detector panel shows, as the window's colour lock does. The lock sends LAS X's hardware server nothing, so the driver presses it in LAS X's window and reads it back from there; it holds the window, not `set_channel_colour`. |
+| `autofocus(project=None)` | Run LAS X's autofocus once, with the settings in its Best Focus Scan Options, as the window's Autofocus button does. The answer's `found` says whether LAS X found a focus, with z before and after on the autofocus's drive; the search's two ends are checked against the limits first. `settings()["autofocus_settings"]` shows the drive, the capture range, the method and the precision or steps. |
 | `smartcorr(project=None)` | Run SmartCORR, as the window's Start SmartCORR: a scan through the collar positions of its range, after which LAS X leaves the collar where the picture was best. The answer's `collar` says where. |
 | `set_collar_reference()` | Store where the collar stands as this objective's reference, as the window's Set does, and read it back. Written into LAS X's state tree, for the objective in the light path only. |
 | `reset_collar_reference()` | Clear this objective's collar reference, as the window's Reset does, and read it back. |
@@ -167,6 +168,11 @@ confirmed, with what LAS X set instead.
 | `format` | `(x, y)` pixels, such as `(512, 512)` | exact |
 | `resonant_scanner` | `True` or `False` | exact |
 | `collar` | the objective's correction collar (motCORR), 0 to 100 %, as the window's box sends it | 0.1 % |
+| `autofocus_method` | `"contrast 1"`, `"intensity"`, `"noise"`, `"contrast 2"` or `"reflection"`, as the autofocus's "Optimized for" | exact |
+| `autofocus_precision` | 1 (speed) to 5 (accuracy), as its slider; LAS X works out the steps | exact |
+| `autofocus_steps` | a fixed number of steps instead, odd, 3 to 1001, as its "Number of Steps" | exact |
+| `autofocus_range_um` | its capture range, whole micrometres from 1 to 5000; the search's two ends are checked against the z limits when it runs | 0.01 µm |
+| `autofocus_drive` | `"z-galvo"` or `"z-wide"`, its "Focusdrive" | exact |
 | `sequential_mode` | `"line"`, `"frame"` or `"stack"`: how several settings are taken in turn, as the window's three buttons; written into LAS X's state tree, as the window does; LAS X rearranges the detectors' channels itself | exact |
 | `setting_name` | the current setting's name, 1 to 64 letters, digits, spaces or `_ - . , ( ) / + #`; written into LAS X's state tree, as the window does when the name is edited | exact |
 | `smartcorr_range` | `(begin, end, steps)`: the collar positions SmartCORR scans through, 0 to 100 %, and how many (2 to 100); written into LAS X's state tree, as its window does | exact |
@@ -178,7 +184,7 @@ confirmed, with what LAS X set instead.
 | `bit_depth` | the bits per pixel, one LAS X offers (8, 12 or 16) | exact |
 | `system_optimized_step` | `True` or `False`: the z-stack's step System Optimized, as the window's button; LAS X may stretch the end to fit whole steps | exact |
 
-The last seven have no command LAS X's window sends; the window writes them straight into
+These and the autofocus's settings have no command LAS X's window sends; the window writes them straight into
 LAS X's state tree, and so does the driver, for these seven values only. LAS X does not keep to its
 own range there: a pinhole written beyond it opens to the maximum. So the driver reads LAS X's own
 minimum and maximum at each write and refuses a value outside them; nothing is written then.

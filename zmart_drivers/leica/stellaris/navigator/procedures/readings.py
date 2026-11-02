@@ -181,6 +181,11 @@ def get_laser_lines(client, **keywords):
     return _routed("laser_lines", client, **keywords)
 
 
+def get_autofocus_settings(client, **keywords):
+    """The autofocus's settings: ``drive``, ``range_um``, ``method``, ``precision``, ``steps``."""
+    return _routed("autofocus_settings", client, **keywords)
+
+
 def get_laser_slots(client, **keywords):
     """The laser lines in use in each of the job's settings: ``setting``, ``beamRoute``, ``lineIndex``, ``wavelength``."""
     return _routed("laser_slots", client, **keywords)

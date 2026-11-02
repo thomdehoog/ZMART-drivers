@@ -438,3 +438,11 @@ def test_a_setting_is_made_current(scope, lasx):
     assert scope.add_setting()["confirmed"] is True
     assert scope.activate_setting("Setting 1")["confirmed"] is True
     assert scope.settings()["setting"]["name"] == "Setting 1"
+
+
+
+def test_the_autofocus_is_run(scope, lasx, tmp_path, monkeypatch):
+    from zmart_drivers.leica.stellaris.navigator.procedures import changes
+
+    monkeypatch.setattr(changes, "LCS_LOG", tmp_path / "LCS.LOG")
+    assert scope.autofocus(project=24)["found"] is True

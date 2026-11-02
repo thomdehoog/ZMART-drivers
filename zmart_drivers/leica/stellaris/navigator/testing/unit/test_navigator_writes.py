@@ -568,3 +568,31 @@ class TestAddressedSetting:
         writes.laser_power((10, 10), 0, 497.0, 5).fill(request)
         assert 'SingleSettingIndex="1"' in request.elements[0]
         assert elements(writes.laser_power((10, 10), 0, 497.0, 5))[0].count('SingleSettingIndex="0"') == 1
+
+
+
+class TestAutofocusRun:
+    def test_the_autofocus_is_the_window_s_start_into_a_project(self):
+        write = writes.start_autofocus(191, "z-galvo", 70.0, 130.0, start={"from_z_galvo_um": 100.0})
+        assert elements(write) == ['<AcquireControl RestoreCameraRoi="1" Command="StartAutoFocus" DCParentElementID="191"/>']
+        assert write.values["axis"] == "z_galvo_um" and (write.values["begin_um"], write.values["end_um"]) == (70.0, 130.0)
+
+
+
+class TestAutofocusSettings:
+    def test_each_setting_is_written_into_the_state_tree_as_the_window_does(self):
+        assert elements(writes.named_setting("autofocus_method", "contrast 2")) == ['<StateTree Command="AFAnalyseType" Value="4"/>']
+        assert elements(writes.named_setting("autofocus_precision", 5)) == [
+            '<StateTree Command="UseFixSliceCount" Value="0"/>', '<StateTree Command="Precision" Value="5"/>']
+        assert elements(writes.named_setting("autofocus_steps", 21)) == [
+            '<StateTree Command="UseFixSliceCount" Value="1"/>', '<StateTree Command="FixSliceCount" Value="21"/>']
+        assert elements(writes.named_setting("autofocus_range_um", 60)) == ['<StateTree Command="FocusRange" Value="60"/>']
+        assert elements(writes.named_setting("autofocus_drive", "z-wide")) == ['<StateTree Command="ZUseMode" Value="2"/>']
+
+    @pytest.mark.parametrize(("name", "value"), [
+        ("autofocus_method", "sharpest"), ("autofocus_precision", 6), ("autofocus_steps", 20), ("autofocus_steps", 1),
+        ("autofocus_steps", 1003), ("autofocus_range_um", 0), ("autofocus_range_um", 6000), ("autofocus_range_um", 40.5), ("autofocus_drive", "z-stage"),
+    ])
+    def test_a_value_the_window_does_not_offer_is_refused(self, name, value):
+        with pytest.raises(ValueError):
+            writes.named_setting(name, value)

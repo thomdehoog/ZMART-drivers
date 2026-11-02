@@ -735,6 +735,98 @@ def dye_assistant_lock(detector_route, line_route, line_index: int, locked: bool
     )
 
 
+def autofocus_change(name: str, elements: list[str], description: str, shows) -> Write:
+    """One of the autofocus's settings written into LCS's state tree, as its Best Focus Scan Options do; read back."""
+
+    def fill(request: Request) -> None:
+        request.elements = list(elements)
+
+    return Write(
+        command=f"set_{name}",
+        values={"value": description},
+        request=name,
+        fill=fill,
+        description=f"{name.replace('_', ' ').capitalize()} -> {description}",
+        ready=idle(),
+        confirm=Expect("autofocus_settings", shows),
+    )
+
+
+def autofocus_method(method: str) -> Write:
+    """The autofocus's method, as the window's "Optimized for": ``"contrast 1"``, ``"intensity"``, ``"noise"``, ``"contrast 2"``, ``"reflection"``."""
+    codes = {name: code for code, name in direct_reader.AUTOFOCUS_METHODS.items()}
+    if method not in codes:
+        raise ValueError(f"autofocus_method takes {sorted(codes)}, not {method!r}")
+    return autofocus_change("autofocus_method", [f'<StateTree Command="AFAnalyseType" Value="{codes[method]}"/>'], method,
+                            lambda shown: shown["method"] == method)
+
+
+def autofocus_precision(precision: int) -> Write:
+    """The autofocus's precision, as the window's slider: 1 (speed) to 5 (accuracy); LAS X works out the steps."""
+    if isinstance(precision, bool) or precision not in (1, 2, 3, 4, 5):
+        raise ValueError(f"autofocus_precision takes 1 (speed) to 5 (accuracy), not {precision!r}")
+    return autofocus_change(
+        "autofocus_precision",
+        ['<StateTree Command="UseFixSliceCount" Value="0"/>', f'<StateTree Command="Precision" Value="{precision}"/>'],
+        str(precision), lambda shown: shown["precision"] == precision and shown["steps"] is None,
+    )
+
+
+def autofocus_steps(steps: int) -> Write:
+    """A fixed number of autofocus steps, as the window's "Number of Steps": odd, 3 to 1001 (LAS X turns an even one odd)."""
+    if isinstance(steps, bool) or not isinstance(steps, int) or not 3 <= steps <= 1001 or steps % 2 == 0:
+        raise ValueError(f"autofocus_steps takes an odd number from 3 to 1001, not {steps!r}")
+    return autofocus_change(
+        "autofocus_steps",
+        ['<StateTree Command="UseFixSliceCount" Value="1"/>', f'<StateTree Command="FixSliceCount" Value="{steps}"/>'],
+        str(steps), lambda shown: shown["steps"] == steps,
+    )
+
+
+def autofocus_range_um(range_um) -> Write:
+    """The autofocus's capture range in whole micrometres, 1 to 5000 as the window takes it; checked against the z limits when it runs.
+
+    LCS keeps it as a whole number and ignores one written with decimals
+    (simulator, 2026-11-02), so only whole micrometres are taken.
+    """
+    if isinstance(range_um, bool) or not isinstance(range_um, (int, float)) or range_um != int(range_um) or not 1 <= range_um <= 5000:
+        raise ValueError(f"autofocus_range_um takes whole micrometres from 1 to 5000, not {range_um!r}")
+    return autofocus_change("autofocus_range_um", [f'<StateTree Command="FocusRange" Value="{int(range_um)}"/>'],
+                            f"{range_um:g} um", lambda shown: abs(shown["range_um"] - range_um) < 0.01)
+
+
+def autofocus_drive(drive: str) -> Write:
+    """The z drive the autofocus searches with: ``"z-galvo"`` or ``"z-wide"``."""
+    if drive not in Z_DRIVES:
+        raise ValueError(f"autofocus_drive takes {sorted(Z_DRIVES)}, not {drive!r}")
+    return autofocus_change("autofocus_drive", [f'<StateTree Command="ZUseMode" Value="{Z_DRIVES[drive]}"/>'], drive,
+                            lambda shown: shown["drive"] == drive)
+
+
+def start_autofocus(project: int, drive: str, begin_um: float, end_um: float, *, start: dict | None = None) -> Write:
+    """LAS X's autofocus, once, as the window's Autofocus button starts it: a focus search into *project*.
+
+    It moves *drive* from *begin_um* to *end_um* (its capture range around
+    where it stands), so both ends go to the limits, as a z-stack's do.
+    Never sent again, like a capture.
+    """
+    parent = checked_project(project)
+    axis = "z_galvo_um" if drive == "z-galvo" else "z_wide_um"
+
+    def fill(request: Request) -> None:
+        request.elements = [f'<AcquireControl RestoreCameraRoi="1" Command="StartAutoFocus" DCParentElementID="{parent}"/>']
+
+    return Write(
+        command="autofocus_run",
+        values={"project": project, "drive": drive, "axis": axis, "begin_um": begin_um, "end_um": end_um, **(start or {})},
+        request="StartAutoFocus",
+        fill=fill,
+        description=f"Autofocus over {begin_um:g} to {end_um:g} um ({drive}) into project {project}",
+        ready=idle(without_limit=True),
+        never_resend=True,
+    )
+
+
 def smartcorr(project: int) -> Write:
     """SmartCORR, the window's Start SmartCORR: a scan through the collar positions of its range, into *project*.
 
@@ -978,6 +1070,11 @@ NAMED_SETTINGS = {
     "smartcorr_range": smartcorr_range,
     "setting_name": setting_name,
     "sequential_mode": sequential_mode,
+    "autofocus_method": autofocus_method,
+    "autofocus_precision": autofocus_precision,
+    "autofocus_steps": autofocus_steps,
+    "autofocus_range_um": autofocus_range_um,
+    "autofocus_drive": autofocus_drive,
 }
 
 
