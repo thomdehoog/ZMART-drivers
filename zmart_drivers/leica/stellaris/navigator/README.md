@@ -184,7 +184,7 @@ confirmed, with what LAS X set instead.
 | `smartcorr_range` | `(begin, end, steps)`: the collar positions SmartCORR scans through, 0 to 100 %, and how many (2 to 100); written into LAS X's state tree, as its window does | exact |
 | `bidirectional` | `True` or `False`; written into LAS X's state tree, as its window does | exact |
 | `phase_x` | Phase X, which lines up the two directions of a bidirectional scan, within LAS X's range (-100 to 100); written into the state tree | 0.1 |
-| `pinhole_um` | the pinhole in micrometres, within LAS X's range (100 to 1000 on the simulator); written into the state tree | 0.5 µm |
+| `pinhole_um` | the pinhole in micrometres, with LAS X's command `SetPinhole`; LAS X's range (100 to 1000 on the simulator) is checked first, since LAS X itself does not keep to it | 0.5 µm |
 | `pinhole_unit` | `"um"` or `"airy"`: the unit LAS X shows the pinhole in; the pinhole itself stays | exact |
 | `emission_wavelength` | whole nanometres, 380 to 800: the wavelength LAS X works the Airy unit out for | exact |
 | `bit_depth` | the bits per pixel, one LAS X offers (8, 12 or 16) | exact |

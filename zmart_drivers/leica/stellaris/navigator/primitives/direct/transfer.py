@@ -138,7 +138,7 @@ class Sender:
                 if tree is not None:
                     outcome["answer"] = write_into_state_tree(tree[1], tree[2], tree[3])
                 else:
-                    outcome["answer"] = str(hardware_server.connected_server().SendCommand2(xml, ""))
+                    outcome["answer"] = outside_lcs_range(xml) or str(hardware_server.connected_server().SendCommand2(xml, ""))
             except Exception as why:  # noqa: BLE001 -- handed to the caller as it is
                 hardware_server.forget_connection()
                 outcome["error"] = why
@@ -175,6 +175,7 @@ ALLOWED_COMMANDS = frozenset(
         "SetZStackDefinition",
         "SetStackStepSize",
         "SetLaserLineIntensity",
+        "SetPinhole",
         "SetLightSourceWavelength",
         "SetConfocalLaserLinesDefinition",
         "ActivateShutter",
@@ -243,8 +244,6 @@ STATE_TREE_WRITES = {
     "ScanDirectionX": TreeWrite(("Confocal", "ScanningParameter", "ScanDirectionX"), choices=frozenset({1, 2})),
     # Phase X, which lines up the two directions of a bidirectional scan.
     "PhaseX": TreeWrite((*HW_PARAMETER, "PhaseX"), float, between=("PhaseXMin", "PhaseXMax")),
-    # The pinhole, in metres; LCS works out its size in Airy units from it.
-    "Pinhole": TreeWrite((*HW_PARAMETER, "Pinhole"), float, between=("PinholeMin", "PinholeMax")),
     # The unit LAS X shows the pinhole in: 1 micrometres, 2 Airy units.
     "PinholeUnit": TreeWrite((*HW_PARAMETER, "PinholeUnit"), choices=frozenset({1, 2})),
     # The emission wavelength the Airy unit is worked out for, in whole nm.
@@ -311,6 +310,44 @@ STATE_TREE_WRITES = {
 #: Text the driver writes into the state tree: 1 to 64 characters, letters, digits,
 #: spaces and ``_ - . , ( ) / + #``; nothing that could be read as markup.
 PLAIN_TEXT = re.compile(r"^[\w ._,()/+#-]{1,64}$")
+
+@dataclass(frozen=True)
+class CheckedCommand:
+    """A command LCS does not keep to its own range: its value (``attribute``, in the node's unit) must lie
+    between the two nodes ``between`` names beside ``path``, read just before it is sent."""
+
+    attribute: str
+    path: tuple[str, ...]
+    between: tuple[str, str]
+
+
+#: The commands whose value the driver checks against LCS's own range before sending them.
+#: ``SetPinhole`` with 2000 micrometres (LCS's range 100 to 1000) raised the motor's error and
+#: still set the pinhole to 2000 (simulator, 2026-11-02).
+CHECKED_COMMANDS = {
+    "SetPinhole": CheckedCommand("PinholeDiameter", (*HW_PARAMETER, "Pinhole"), ("PinholeMin", "PinholeMax")),
+}
+
+
+def outside_lcs_range(xml: str) -> str | None:
+    """LCS's refusal, as its answer, when *xml* is a checked command whose value lies outside LCS's own range; None otherwise."""
+    from . import state_tree
+
+    found = COMMAND.match(xml or "")
+    checked = CHECKED_COMMANDS.get(found[1]) if found else None
+    if checked is None:
+        return None
+    given = re.search(rf'\s{checked.attribute}="([^"]+)"', xml)
+    if given is None:
+        return f'<Result Error="1">{found[1]} without {checked.attribute}; not sent</Result>'
+    value = float(given[1])
+    nodes = state_tree.server_nodes()
+    low, high = (state_tree.node_value(nodes, state_tree.node_at(nodes, (*checked.path[:-1], bound))) for bound in checked.between)
+    room = 1e-9 * max(abs(low), abs(high))
+    if not low - room <= value <= high + room:
+        return f'<Result Error="1">{found[1]} {checked.attribute} {given[1]} is outside the range of LAS X, {low} to {high}; not sent</Result>'
+    return None
+
 
 #: A write into the state tree, as the writes build it: ``<StateTree Command="name" Value="n"/>``.
 STATE_TREE = re.compile(r'^\s*<StateTree\s+Command="([^"]+)"\s+Value="([^"]+)"(?:\s+At="([0-9,]+)")?\s*/>\s*$')

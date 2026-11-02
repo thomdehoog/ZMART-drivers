@@ -101,7 +101,7 @@ discovery session in `SCOPE_RUN_2026-11-01_NAVIGATOR_DISCOVERY.md` and the build
 | Setting | State |
 |---|---|
 | Pinhole in Airy units | Works |
-| Pinhole in micrometres | Works: written into LAS X's state tree, within LAS X's own range |
+| Pinhole in micrometres | Works, with LAS X's command (`SetPinhole`); LAS X's own range checked first, since LAS X does not keep to it |
 | Unit LAS X shows the pinhole in (µm or AU) | Works: written into LAS X's state tree |
 | Emission wavelength for the Airy unit | Works: written into LAS X's state tree, 380 to 800 nm |
 

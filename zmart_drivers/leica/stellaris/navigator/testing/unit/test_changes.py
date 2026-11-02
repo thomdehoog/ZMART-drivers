@@ -499,6 +499,7 @@ class TestPinholeAndPhase:
     def test_the_pinhole_is_written_in_metres_and_read_back(self, lasx, client):
         assert changes.change(client, "pinhole_um", 250)["confirmed"] is True
         assert lasx.live[(*HW, "Pinhole")] == pytest.approx(0.00025)
+        assert lasx.commands() == ["SetPinhole"]  # the window's own command, not the state tree
 
     def test_the_unit_and_the_emission_wavelength_are_written_and_read_back(self, lasx, client):
         assert changes.change(client, "pinhole_unit", "um")["confirmed"] is True
@@ -514,6 +515,7 @@ class TestPinholeAndPhase:
 
         assert result["success"] is False and "range" in result["message"]
         assert lasx.live[(*HW, node)] == before
+        assert "SetPinhole" not in lasx.commands()  # refused before it was sent: LCS's command does not keep to its range
 
     def test_the_range_is_lcs_own_read_at_the_write(self, lasx, client):
         lasx.live[(*HW, "PinholeMax")] = 0.0005

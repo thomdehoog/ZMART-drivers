@@ -136,7 +136,6 @@ or makes light.
 |---|---|---|
 | Bidirectional X | `Confocal/ScanningParameter/ScanDirectionX` | 1 or 2 |
 | Phase X | `Confocal/HWParameter/PhaseX` | within `PhaseXMin` to `PhaseXMax`, read at the write |
-| Pinhole (metres) | `Confocal/HWParameter/Pinhole` | within `PinholeMin` to `PinholeMax`, read at the write |
 | Pinhole unit | `Confocal/HWParameter/PinholeUnit` | 1 (µm) or 2 (AU) |
 | Emission for the Airy unit | `Confocal/HWParameter/EmissionWaveLengthForAiryAnddzCalculation` | whole nm, 380 to 800 |
 | Bit depth | `Confocal/ScanningParameter/Resolution` | one of `ResolutionList` (8, 12, 16), read at the write |
@@ -153,6 +152,17 @@ Point 1 above is why the ranges are checked by the driver: LCS does not keep to 
 for a written value. A pinhole of 2000 µm raised an error from the pinhole's motor and still
 opened the pinhole to its maximum; an emission of 2000 nm was kept as 800 (simulator, 1 November
 2026). A value outside its range is refused by the driver, and nothing is written.
+
+## Commands first; LAS X's range checked for commands too
+
+The rule (Thom, 2 November 2026): a change uses LAS X's own command; the state tree only when no command
+does it. But commands do not always keep to LCS's range either: `SetPinhole` with 2000 µm (range 100 to
+1000) raised the motor's error and set 2000 µm, past the maximum; the state-tree write had stopped at
+1000. So the transfer checks such a command against LCS's own range, read just before sending
+(`transfer.CHECKED_COMMANDS`: `SetPinhole` against `PinholeMin`/`PinholeMax`), and refuses it otherwise.
+A command variant LAS X's window was never seen to send (`SetLaserLineIntensity` with
+`IsAutoFocusDefinition="1"`) ignored the flag and changed Setting 1; the autofocus's power stays a
+state-tree write.
 
 ## The pan arrows, pressed in LAS X's window (a decided exception)
 

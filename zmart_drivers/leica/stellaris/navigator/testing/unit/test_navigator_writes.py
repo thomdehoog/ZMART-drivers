@@ -382,7 +382,7 @@ class TestPinholeAndPhase:
 
     def test_the_pinhole_is_written_in_metres_and_read_back_in_micrometres(self):
         write = writes.named_setting("pinhole_um", 250)
-        assert elements(write) == ['<StateTree Command="Pinhole" Value="0.00025"/>']
+        assert elements(write) == ['<Scanner Command="SetPinhole" PinholeDiameter="0.00025" SetMode="1" SingleSettingIndex="0"/>']
         assert write.confirm.accept({"metres": 0.0002499}) and not write.confirm.accept({"metres": 0.0003})
 
     def test_the_pinhole_unit_is_micrometres_or_airy_units(self):

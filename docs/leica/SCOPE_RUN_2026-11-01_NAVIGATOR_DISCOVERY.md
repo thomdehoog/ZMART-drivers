@@ -677,3 +677,18 @@ nothing), `set_autofocus_laser_power(laser_nm, percent)`, a state-tree write to 
 64 x 64, 600, both ways, zoom 1; zoom 60 refused; the 405 on HyD S 3 brought in at 3 %, then 8 %
 through the power; 50 % refused by the limit; Setting 1's 405 untouched at 1.96 %.
 
+## 37. Commands before the state tree: the pinhole, and the autofocus's power (2 November 2026)
+
+A check of LCS's command log since 22 October against the driver's commands found the window's own
+`<Scanner Command="SetPinhole" PinholeDiameter="0.0001" SetMode="1" SingleSettingIndex="0"/>`, while the
+driver wrote the pinhole in micrometres into the state tree. Sent by hand: 0.0002 m was set (199.9 µm,
+0.50 AU, `<Result/>`); 0.002 m, twice LCS's maximum, raised `Pinhole (Sim)::Position = 16888: Value has to
+be between 0 and 8000 !` and still set 0.0019999 m (5.02 AU). Put back to 100 µm. The normal power command
+with `IsAutoFocusDefinition="1"` added (`SetLaserLineIntensity`, 405, 5 %) was answered `Error="0"` and
+changed Setting 1's 405 to 5.1 %, the Best Focus Setting's staying at 8 %; Setting 1 put back to 1.96 %.
+
+Thom's rule: a command first, the state tree only when no command does it. Built: `pinhole_um` with
+`SetPinhole`, checked against `PinholeMin`/`PinholeMax` in the transfer before it is sent; the state-tree
+write for the pinhole is gone. Through the driver: 200 µm confirmed; 2000 µm refused, not sent (LCS's log
+shows only 0.0002 and 0.0001 from the driver); back to 100 µm. The autofocus's power stays a state-tree write.
+

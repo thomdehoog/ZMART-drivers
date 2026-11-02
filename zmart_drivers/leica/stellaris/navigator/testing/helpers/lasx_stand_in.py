@@ -274,6 +274,10 @@ class PlainNavigator:
         self.scanning_until = time.monotonic() + self.scan_s
         self.live[("Microscope", "CurrentMotCorrPos")] = getattr(self, "smartcorr_finds", 0.0)
 
+    def take_SetPinhole(self, e):
+        """The pinhole set as asked, beyond LCS's own range too, as the simulator did (2026-11-02)."""
+        self.live[("Confocal", "HWParameter", "Pinhole")] = float(e.get("PinholeDiameter"))
+
     def take_SetMotCorrPosition(self, e):
         self.live[("Microscope", "CurrentMotCorrPos")] = float(e.get("MotCorrPosition"))
 

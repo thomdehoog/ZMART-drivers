@@ -10,43 +10,44 @@ and state tree are compared before and after, then built with LCS's own command 
 only where nothing reaches LCS), tests first, tried on the simulator through the driver, and
 put back.
 
-## To learn and build in LAS X's window
+## To learn and build, in order of use (2 November 2026)
 
-1. **The AOBS.** LCS has it (`Confocal/AOBSLineList`, up to 8 lines; it follows the white-light
-   laser by itself) and the window has "Show AOBS Settings". Not learned.
-2. **Autofocus, what is left.** Running it once and its settings are built (2 November 2026).
-   Still to learn: the Reflection method's coverslip offset (`ReflectionOffset`) and its "Find
-   Coverslip Reflection" button, "Auto Sync" with its scan options, and the hardware autofocus
-   (AFC, `Microscope/AFC`, its offset), and the autofocus panel's Timelapse and Stage tabs (when the
-   autofocus runs in a series; LCS has `WorkflowTimelapse`, `WorkflowXY`). The Best Focus Setting's
-   scan, optics and power are built. On the STELLARIS: an autofocus that finds a focus (only the
-   failing case, "ValidateFocus failed", has been seen).
-3. **ROIs.** Drawing a region and scanning only inside it. The window's Zoom In keeps its
-   rectangle as an ROI in LAS X's data container (`Confocal/ZoomIn/CurrentDCROISetID`); a way to
-   write an ROI there is not learned.
-4. **Bleaching and FRAP.** LCS has the bleach parameters (`SequentialBleachPointParameter`); the
-   bleach points, regions and the FRAP sequence are not learned.
-5. **The z-stack panel's other controls.** Number of Steps (step mode 0 is not allowed yet), the
-   Begin and End buttons (the same can be done with `set_z_stack`), the bin (remove the stack),
-   Re-Center, the button under the bin, Z-Compensation, and "Same Stack Size for all Regions".
-6. **The Navigator's Stage settings.** Tile overlap, separate images per region, the acquisition
-   order of regions, saving and clearing the overview, merging images (raw data, 3D, blend) and
-   the Fast Scan Settings.
-7. **The carrier.** None, Slide, Dish, Chamber Slide, Multi Slide, Well Plate. The Navigator
-   Expert sent `StageSetCarrierAttachment` in October; the plain Navigator's is to be seen.
-   Choosing a carrier in the window also sent `StageClearAllPoints` and tile positions.
-8. **Live, Fast Live and Spiral.** Live is learned (`<AcquireControl Mode="0"
-   Command="StartLiveAcquiring" DCParentElementID="..."/>`, stopped with `StopAcquiring`), not
-   built. Fast Live and Spiral are not learned in the plain Navigator.
-9. **The notch filter** (`Confocal/HWParameter/IsNotchFilterAutoSelectionEnabled`) and the
-   window's Dye Assistant, "Apply to hardware" and Bulk Options buttons.
-10. **The dye library.** Reading it and putting a dye on a detector work. Creating a dye of one's
-    own in LAS X's library, and the window's "+" above the dye bar, are not learned.
-11. **Removing a line in another setting than the first.** The window let lines be deleted only
-    in Setting 1; how LAS X removes one in Setting 2 is not known.
-12. **The changes through a saved setting** (`set_detector`, the excitation line, the spectra
-    shown) are refused with several settings. With the current setting now known by its place,
-    they could change that setting in the file.
+The rule: LAS X's own command first; the state tree only when no command does it; LAS X's range
+checked by the driver either way (`transfer.CHECKED_COMMANDS`, `transfer.STATE_TREE_WRITES`).
+
+**Autofocus, what is left**
+- The Reflection method's coverslip offset (`ReflectionOffset`) and its "Find Coverslip Reflection" button.
+- Auto Sync and its scan options.
+- The hardware autofocus (AFC, `Microscope/AFC`) and its offset.
+- The Timelapse and Stage tabs: when the autofocus runs in a series (every n time points, at which
+  positions; LCS has `WorkflowTimelapse`, `WorkflowXY`).
+
+**Acquisition**
+- Time series (xyt): number of frames and interval. The scan mode can be set; these two are not learned.
+- Live start and stop: learned (`<AcquireControl Mode="0" Command="StartLiveAcquiring" .../>`,
+  `StopAcquiring`), not built.
+- Fast Live and Spiral: not learned.
+
+**Region and experiment types**
+- ROI scan: scanning only inside a region (the Zoom In rectangle is an ROI in LAS X's data container).
+- Bleaching and FRAP (LCS has `SequentialBleachPointParameter`).
+- Z-compensation: laser and gain along depth.
+- The carrier: slide, dish, well plate (the Navigator Expert sent `StageSetCarrierAttachment`).
+
+**Commands seen in LCS's log but not built**
+- `SetDetectorActive` and `SetDigitalGatingModeIndex`: direct versions of a detector on or off and of
+  the tau mode, now done through a saved setting.
+- `SetZStackSize`, the z-stack's Begin and End buttons (`BeforeBeginOrEndOfStackIsSet`), Re-Center,
+  and the Number of Steps mode (step mode 0).
+- `SetDetectorTauSeparationLut`, `ResetConfocalSetting`, `ResetAutoFocusToAutoSync`.
+- The mounting medium (`ATL_HyVolution_SetMountingMedium`).
+
+**Other**
+- The AOBS settings.
+- The notch filter, the Dye Assistant, "Apply to hardware", Bulk Options.
+- A dye of one's own in LAS X's library; the dye bar's "+".
+- Removing a laser line in another setting than the first (the window allowed it only in Setting 1).
+- The changes through a saved setting (`set_detector` and the like) with several settings: still refused.
 
 ## To check on the STELLARIS
 
@@ -62,6 +63,8 @@ The simulator cannot show these; each needs one careful run on the real microsco
 - The white-light laser: tuning, adding and removing lines, and the 8 nm and 8-line limits.
 - That a change goes into the current setting with several settings, and that the white-light
   slots are shared between settings as on the simulator.
+- An autofocus that finds a focus (only the failing case has been seen), and the Best Focus Setting.
+- That the hardware follows the state-tree values (for example, bidirectional halving the frame time).
 
 ## Decided not to do
 

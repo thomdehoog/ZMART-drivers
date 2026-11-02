@@ -1112,11 +1112,28 @@ def phase_x(value) -> Write:
 
 
 def pinhole_um(value) -> Write:
-    """The pinhole's size in micrometres, written in metres; LAS X's range (100 to 1000 on the simulator) is read at the write."""
+    """The pinhole's size in micrometres, with the window's own ``SetPinhole`` (in metres); read back.
+
+    LCS does not keep this command to its range (simulator, 2026-11-02: 2000
+    micrometres, its maximum 1000, raised the motor's error and set 2000), so
+    the transfer checks LCS's own range before it sends it
+    (``transfer.CHECKED_COMMANDS``).
+    """
     target = number("pinhole_um", value)
-    return tree_write(
-        "set_pinhole_um", "Pinhole", repr(target / 1_000_000), {"value": target}, f"Pinhole -> {target} um",
-        Expect("pinhole", lambda shown: abs(shown["metres"] * 1_000_000 - target) <= PINHOLE_TOLERANCE_UM),
+
+    def fill(request: Request) -> None:
+        request.elements = [
+            f'<Scanner Command="SetPinhole" PinholeDiameter="{target / 1_000_000!r}" SetMode="1" SingleSettingIndex="{request.setting}"/>'
+        ]
+
+    return Write(
+        command="set_pinhole_um",
+        values={"value": target},
+        request="SetPinhole",
+        fill=fill,
+        description=f"Pinhole -> {target} um",
+        ready=idle(),
+        confirm=Expect("pinhole", lambda shown: abs(shown["metres"] * 1_000_000 - target) <= PINHOLE_TOLERANCE_UM),
     )
 
 
