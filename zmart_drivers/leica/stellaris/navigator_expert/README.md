@@ -76,8 +76,8 @@ mic.register_driver(r"C:\ZMART-drivers\zmart_drivers\leica\stellaris\navigator_e
 mic.connect("stellaris")                                                                 # every session
 ```
 
-A driver installed with `pip` has no folder of its own to point at; this finds it and registers it,
-and prints `stellaris`:
+A driver installed with `pip` lives in the environment's `site-packages`. This finds that folder,
+registers it, and prints `stellaris`:
 
 ```bash
 python -c "from pathlib import Path; import zmart_drivers.leica.stellaris.navigator_expert as d; from zmart_controller import mic; print(mic.register_driver(Path(d.__file__).parent))"
