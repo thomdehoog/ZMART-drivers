@@ -138,6 +138,7 @@ mic.connect("stellaris-navigator")                                              
 | `set_laser_shutter(wavelength_nm, open_)` | Open or close the shutter of the light source that line comes from, and read it back. |
 | `set_aobs_line(wavelength_nm, reflection=, enhanced_dynamics=)` | Set a white-light line's AOBS, as its Configuration window: Fluorescence or Reflection, and Enhanced Dynamics. LAS X has no Enhanced Dynamics in Reflection. Written into LAS X's state tree, as the window does, and read back. |
 | `set_tau_channel_colour(detector, channel, colour)` | The colour of TauSeparation's channel 1 or 2 of a detector, as the window's colour pick; only while the detector is in TauSeparation. |
+| `set_tau_channel_lifetime(detector, channel, ns)` | The lifetime of TauSeparation's channel 1 or 2, in nanoseconds, as the window's slider; within its scale, 0.07 to 9.37 ns. |
 | `start_live()`, `stop_live()` | Start and stop Live, as LAS X's Live button. While Live runs, the lasers are on; stop it before taking pictures. |
 | `start_fast_live()` | Start Fast Live, as LAS X's Fast Live button; `stop_live()` stops it. |
 | `set_fast_live(scanner, format=, scan_frequency=, overview_zoom=, bidirectional=, no_average=, no_dynamic_signal_enhancement=, selected_setting_only=, no_tau_sted_xtend=)` | Fast Live's Scan Settings for the FOV scanner (`"fov"`) or the resonant one, as its window. Each is checked against LAS X's range first, since LAS X does not hold the format to it. |

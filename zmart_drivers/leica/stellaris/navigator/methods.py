@@ -368,6 +368,15 @@ class Microscope:
         result = changes.set_tau_channel_colour(self.handle.client, detector, channel, colour)
         return checked(self.handle, result, f"set_tau_channel_colour({detector!r}, {channel!r}, {colour!r})")
 
+    def set_tau_channel_lifetime(self, detector: str, channel: int, ns: float) -> dict:
+        """Set the lifetime of TauSeparation's channel 1 or 2 of *detector*, in nanoseconds, as the window's slider.
+
+        Within the window's scale, 0.07 to 9.37 ns; only while the detector is in TauSeparation.
+        """
+        self.handle.require_open()
+        result = changes.set_tau_channel_lifetime(self.handle.client, detector, channel, ns)
+        return checked(self.handle, result, f"set_tau_channel_lifetime({detector!r}, {channel!r}, {ns!r})")
+
     def set_channel_colour(self, detector: str, colour: str) -> dict:
         """Give the channel of *detector* (``"HyD S 3"``) the colour *colour* (LAS X's name, ``"Green"``); read back.
 

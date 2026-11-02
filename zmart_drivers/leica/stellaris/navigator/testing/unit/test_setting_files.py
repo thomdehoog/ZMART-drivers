@@ -154,6 +154,30 @@ def test_a_tau_separation_channel_s_colour_is_set_as_the_window_sets_it(lasx, cl
     assert lasx.sent[-1].startswith('<Scanner Command="SetDetectorTauSeparationLut" TauChannelIndex="0" SetMode="2" SingleSettingID="3" IsUserDefined="1" LutName="Red">')
 
 
+def test_a_tau_separation_channel_s_lifetime_is_set_as_the_window_s_slider_sets_it(lasx, client, tmp_path):
+    from zmart_drivers.leica.stellaris.navigator.procedures import changes
+
+    setting_files.set_detector(client, tmp_path, "HyD S 3", tau_mode="TauSeparation")
+    assert direct_reader.get_detector_modes()["HyD S 3"]["tau_lifetimes_ns"] == pytest.approx([1.0, 3.0])
+
+    result = changes.set_tau_channel_lifetime(client, "HyD S 3", 2, 4.5)
+
+    assert result["confirmed"] is True
+    assert direct_reader.get_detector_modes()["HyD S 3"]["tau_lifetimes_ns"] == pytest.approx([1.0, 4.5])
+    assert lasx.sent[-1].startswith('<Scanner Command="SetDetectorTauSeparationConfig" TauChannelIndex="1" SeparationLine1="4.5e-09">')
+
+
+@pytest.mark.parametrize("ns", [0.01, 20.0, "3"])
+def test_a_tau_lifetime_off_the_window_s_scale_is_refused(lasx, client, tmp_path, ns):
+    from zmart_drivers.leica.stellaris.navigator.procedures import changes
+
+    setting_files.set_detector(client, tmp_path, "HyD S 3", tau_mode="TauSeparation")
+    sent = len(lasx.sent)
+
+    assert changes.set_tau_channel_lifetime(client, "HyD S 3", 1, ns)["success"] is False
+    assert len(lasx.sent) == sent
+
+
 def test_a_tau_channel_colour_outside_tau_separation_or_channel_1_and_2_is_refused(lasx, client, tmp_path):
     from zmart_drivers.leica.stellaris.navigator.procedures import changes
 

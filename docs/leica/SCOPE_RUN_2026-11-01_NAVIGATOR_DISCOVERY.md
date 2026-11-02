@@ -833,3 +833,13 @@ carrying the whole setting as the window worked it out: each laser line (white-l
 each detector's band, dye and colour. LAS X switched the 405 line off and HyD S 3 from Analog to Counting.
 Not built yet.
 
+## 46. TauSeparation's lifetime sliders (2 November 2026)
+
+In the TauSeparation window, dragging HyD 2's second (magenta) slider sent `<Scanner Command="SetDetectorTauSeparationConfig"
+TauChannelIndex="1" SeparationLine1="9.1266033279719E-09">` with the detector's beam route, 20 times while dragging. The
+channel's `TauSeparationLine/TauLinePosition` went from 3 to 9.13 ns, and LCS moved the gate between the two channels
+itself (`DetectorChannel[1]/Gate/GateEnd` 1.62 to 2.88 ns). LCS keeps no range for it; the window's scale runs 0.07 to 9.37 ns.
+
+Built: `set_tau_channel_lifetime(detector, channel, ns)`, within that scale, read back within 0.01 ns. Through the driver:
+HyD 2's channels 0.5, 3.0 and 1.0 ns, each confirmed; 20 ns refused. Left at 1 and 3 ns, LAS X's first values.
+

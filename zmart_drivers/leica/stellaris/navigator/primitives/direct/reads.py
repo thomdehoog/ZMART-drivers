@@ -996,8 +996,8 @@ AUTOFOCUS_SETTING = ("Acquire", "ATL", "CurrentBlock", "ConfocalSequentialInfo",
 
 def get_detector_modes() -> dict:
     """Each detector's modes in the current setting, by name: ``tau`` and ``operating`` (LCS's codes now),
-    ``tau_offered`` and ``operating_offered`` (codes, by place), ``tau_colours`` (the colours of
-    TauSeparation's two channels; empty in another tau mode), and ``at`` (the setting's, the
+    ``tau_offered`` and ``operating_offered`` (codes, by place), ``tau_colours`` and ``tau_lifetimes_ns``
+    (TauSeparation's two channels' colours and lifetimes; empty in another tau mode), and ``at`` (the setting's, the
     photometer's and the detector's places in LCS's state tree).
 
     LCS keeps them per setting (``SequentialSettingParameter[n]``, the current
@@ -1028,6 +1028,10 @@ def get_detector_modes() -> dict:
             entries = of_name(nodes, children(nodes, holder), entry_name) if holder else []
             return [node_value(nodes, named(nodes, entry, code_name)) for entry in entries]
 
+        def tau_channels(unit):
+            holder = child_named(nodes, unit, "TauSeparationDefinition_SeqInfo")
+            return of_name(nodes, children(nodes, holder), "TauSeparationChannel") if holder else []
+
         found = {}
         for name, (at, unit) in zip(names, units):
             operating = child_named(nodes, unit, "OperatingMode")
@@ -1037,6 +1041,10 @@ def get_detector_modes() -> dict:
                 "operating": node_value(nodes, operating) if operating is not None else None,
                 "operating_offered": listed_codes(unit, "DetectionUnitOperatingModeList_SeqInfo", "DetectionUnitOperatingMode", "OperatingMode"),
                 "tau_colours": listed_codes(unit, "TauSeparationDefinition_SeqInfo", "TauSeparationChannel", "LutName"),
+                "tau_lifetimes_ns": [
+                    node_value(nodes, named(nodes, child_named(nodes, channel, "TauSeparationLine"), "TauLinePosition")) * 1e9
+                    for channel in tau_channels(unit)
+                ],
                 "at": at,
             }
         return found

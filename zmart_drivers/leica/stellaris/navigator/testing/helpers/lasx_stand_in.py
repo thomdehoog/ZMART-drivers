@@ -324,6 +324,10 @@ class PlainNavigator:
         if unit["DigitalGatingMode"] == 6 and not unit.get("TauColours"):
             unit["TauColours"] = ["Cyan", "Magenta"]  # LAS X's first colours for the two channels
 
+    def take_SetDetectorTauSeparationConfig(self, e):
+        unit = self.detector_at(e)
+        unit.setdefault("TauLifetimes", [1e-09, 3e-09])[int(e.get("TauChannelIndex"))] = float(e.get("SeparationLine1"))
+
     def take_SetDetectorTauSeparationLut(self, e):
         self.detector_at(e)["TauColours"][int(e.get("TauChannelIndex"))] = e.get("LutName")
 

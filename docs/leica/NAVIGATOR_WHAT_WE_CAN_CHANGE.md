@@ -138,6 +138,7 @@ discovery session in `SCOPE_RUN_2026-11-01_NAVIGATOR_DISCOVERY.md` and the build
 | Tau mode (Intensity, TauGating, TauScan, TauSeparation, TauInteraction; with a pulsed WLL line) | Works (through a saved setting) |
 | TauContrast | Works (through a saved setting) |
 | A TauSeparation channel's colour | Works, with LAS X's command; the other tau channels keep theirs (the window moves them on) |
+| A TauSeparation channel's lifetime (the slider) | Works, with LAS X's command; within the window's scale, 0.07 to 9.37 ns |
 | Dye | Works (through a saved setting) |
 | Excitation line (a line, or Auto) | Works with one detector on (through a saved setting) |
 | Channel colour | Works |
@@ -181,7 +182,7 @@ service and the person responsible for the instrument.
 
 | State | Settings |
 |---|---|
-| Works | 84 (the objective among them, not yet tried) |
+| Works | 85 (the objective among them, not yet tried) |
 | Tried | 0 |
 | Command known | 0 |
 | Not yet learned | 8 |
