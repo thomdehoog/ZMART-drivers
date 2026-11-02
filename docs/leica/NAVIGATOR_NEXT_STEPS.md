@@ -36,8 +36,8 @@ checked by the driver either way (`transfer.CHECKED_COMMANDS`, `transfer.STATE_T
 
 **Commands seen in LCS's log but not built**
 - The AOBS per line: Reflection and Enhanced Dynamics (`Confocal/AOBSLineList/AOBSLine`, no command).
-- The z-stack's bin (remove the stack), Move to Begin/End/Center/Focus, Z-Compensation, and the
-  Number of Steps mode as such (the count is set through the step instead).
+- The z-stack's Set Focus (no logged command; the state tree ignored it; only the window, perhaps by UI
+  automation), Z-Compensation, and the Number of Steps mode as such (the count is set through the step).
 - `SetDetectorTauSeparationLut`, `ResetConfocalSetting`, `ResetAutoFocusToAutoSync`.
 - The mounting medium (`ATL_HyVolution_SetMountingMedium`).
 

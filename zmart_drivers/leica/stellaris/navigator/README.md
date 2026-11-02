@@ -141,6 +141,8 @@ mic.connect("stellaris-navigator")                                              
 | `set_z_stack_begin_here()`, `set_z_stack_end_here()` | Set the z-stack's begin or end where its drive stands, as the window's Begin and End buttons. |
 | `recenter_z_stack()` | Move the z-stack, its size kept, around where its drive stands, as the window's Re-Center; its new ends are checked first. |
 | `set_z_stack_sections(sections)` | Set the z-stack's number of sections over its size, by the step that gives it. |
+| `move_to_z_stack(place)` | Move the focus to the z-stack's `"begin"`, `"end"` or `"center"`, or to its `"focus"` plane (set with Set Focus in LAS X's window), as the window's Move to buttons. Checked against the z limits like any z move. |
+| `clear_z_stack()` | Leave no z-stack, as the window's bin: its begin and end both go where the focus is. |
 | `change_objective(slot=None, name=None, magnification=None)` | Turn to another objective, and move the stage by the measured offset so the same spot stays in view. Refused before the turret turns when the objective has another immersion, or the calibration does not cover the change. |
 | `acquisition_settings()` | How a capture is triggered: `full`, one picture with the current settings. |
 | `acquire(position_label=None, acquisition_type="acquisition", output_folder=None)` | Take one picture with the current settings: one plane with the window's Capture Image, or, when LAS X has a z-stack set, the whole stack with its Start. It stays in LAS X's cache, with a note of how it was taken. Nothing is written yet. |

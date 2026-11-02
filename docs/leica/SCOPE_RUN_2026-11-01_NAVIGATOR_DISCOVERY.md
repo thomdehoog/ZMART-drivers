@@ -744,3 +744,18 @@ by the step that gives the count (`SetStackStepSize`). Through the driver: size 
 re-centred to 973.4 to 993.4, the end set at the focus (983.4); the begin set there too left one section, no
 stack, as the window's Begin would. Put back to 973.0 to 992.8, 7 sections.
 
+## 41. The z-stack panel's Move to buttons, Set Focus and the bin (2 November 2026)
+
+Pressed in the window, in this order: Move to Begin, Move to End, Move to Center, Set Focus, Move to Focus
+(it can only be pressed once a focus is set), the bin. No LAS X log grew: none of them sends a command LCS
+logs. The state tree afterwards: the focus at 982.9 µm (the middle of 973.0 to 992.8); the focus plane
+`AcquireZStackInfo/AFPlanePosition` 0 to 0.0009829 with `IsAFPlanePosition` False to True (Set Focus); the
+bin left `BeginValue` and `EndValue` both at the focus, one section, `IsBeginSet` and `IsEndSet` False.
+Writing `AFPlanePosition` (980 µm) into the state tree was ignored by LCS, as `SectionsCount` was.
+
+Built: `move_to_z_stack("begin" | "end" | "center" | "focus")`, the focus moved with `SetZPosition` as any
+z move, within the z limits; "focus" goes to the plane set in the window and is refused when none is set.
+`clear_z_stack()`, the End and Begin buttons' commands at the focus, which leaves one section as the bin
+does. Through the driver: begin 973.0, end 992.8, center 982.9, from the begin to the focus 982.9; cleared,
+no stack; put back to 973.0 to 992.8, 7 sections. Set Focus not built.
+

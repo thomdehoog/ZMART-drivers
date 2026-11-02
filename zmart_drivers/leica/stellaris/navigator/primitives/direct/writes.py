@@ -1566,6 +1566,31 @@ def z_stack_recenter(drive: str, begin_um: float, end_um: float, *, start: dict 
                           begin_um, end_um, "Z-stack -> re-centred here", start)
 
 
+def z_stack_clear(drive: str, z_um: float, *, start: dict | None = None) -> Write:
+    """No z-stack, as the window's bin leaves it: its end and then its begin set where its drive stands.
+
+    The bin sends no command LCS logs (simulator, 2026-11-02); it left the begin
+    and the end at the focus, one section. The End and Begin buttons' commands
+    do the same. Read back as no stack.
+    """
+    axis = "z_galvo_um" if drive == "z-galvo" else "z_wide_um"
+    elements = [
+        '<Scanner Command="BeforeBeginOrEndOfStackIsSet" IsBegin="0"/>',
+        f'<Scanner Command="SetZStackDefinition" SetBegin="2" SetEnd="1" BeginValue="0" EndValue="{metres(z_um)}" {CURRENT}/>',
+        '<Scanner Command="BeforeBeginOrEndOfStackIsSet" IsBegin="1"/>',
+        f'<Scanner Command="SetZStackDefinition" SetBegin="1" SetEnd="2" BeginValue="{metres(z_um)}" EndValue="0" {CURRENT}/>',
+    ]
+
+    def fill(request: Request) -> None:
+        request.elements = list(elements)
+
+    return Write(
+        command="clear_z_stack", values={"drive": drive, "axis": axis, "begin_um": z_um, "end_um": z_um, **(start or {})},
+        request="clear_z_stack", fill=fill, description=f"Z-stack -> cleared, at {z_um:g} um", ready=idle(),
+        confirm=Expect("z_stack", lambda reading: unwrapped(reading) is None),
+    )
+
+
 def z_stack_step(step_um: float) -> Write:
     """Set the z-stack's step to *step_um*; the number of sections follows from the range. Read back within 0.05 um."""
     if isinstance(step_um, bool) or not isinstance(step_um, (int, float)) or not step_um > 0:

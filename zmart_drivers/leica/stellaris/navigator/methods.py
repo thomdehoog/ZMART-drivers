@@ -614,6 +614,23 @@ class Microscope:
         checked(self.handle, result, "recenter_z_stack()")
         return result["z_stack"]
 
+    def move_to_z_stack(self, place: str) -> dict:
+        """Move the focus to the z-stack's ``"begin"``, ``"end"`` or ``"center"``, or to its ``"focus"`` plane, as the window's Move to buttons.
+
+        The focus plane is the one set with Set Focus in LAS X's z-stack panel.
+        The move is checked against the z limits like any z move. Answers the
+        change's result, as the other changes do.
+        """
+        self.handle.require_open()
+        result = changes.move_to_z_stack(self.handle.client, place)
+        return checked(self.handle, result, f"move_to_z_stack({place!r})")
+
+    def clear_z_stack(self) -> None:
+        """Leave no z-stack, as the window's bin: its begin and end both go where the focus is."""
+        self.handle.require_open()
+        result = changes.clear_z_stack(self.handle.client)
+        checked(self.handle, result, "clear_z_stack()")
+
     def set_z_stack_sections(self, sections: int) -> dict:
         """Set the z-stack's number of sections over its size (by the step that gives it); answers the stack."""
         self.handle.require_open()

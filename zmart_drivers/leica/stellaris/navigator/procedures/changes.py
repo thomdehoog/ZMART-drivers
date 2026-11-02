@@ -828,6 +828,41 @@ def recenter_z_stack(client, *, max_retries=None) -> dict:
     return stack_result(client, change, max_retries)
 
 
+#: The places of the z-stack panel's Move to buttons.
+STACK_PLACES = ("begin", "end", "center", "focus")
+
+
+def move_to_z_stack(client, place, *, max_retries=None) -> dict:
+    """Move the stack's drive to its begin, end or center, or to the focus plane, as the window's Move to buttons.
+
+    The buttons send no command LCS logs (simulator, 2026-11-02), so the drive
+    moves as any z move does, checked against the z limits. ``"focus"`` is the
+    plane set with the window's Set Focus, which only the window sets.
+    """
+    if place not in STACK_PLACES:
+        return dispatch.refused(f"the z-stack panel moves to {', '.join(STACK_PLACES)}, not {place!r}")
+    if place == "focus":
+        focus = readers.get_z_stack_focus(client)
+        if not focus or not focus["set"]:
+            return dispatch.refused("no focus plane is set; set it with Set Focus in LAS X's z-stack panel")
+        return move_z(client, readers.get_z_drive_in_use(client), focus["z_um"], max_retries=max_retries)
+    try:
+        stack, drive, _, _ = the_stack(client)
+    except RuntimeError as why:
+        return dispatch.refused(f"the focus cannot move to the z-stack's {place}: {why}")
+    target = {"begin": stack["begin"], "end": stack["end"], "center": (stack["begin"] + stack["end"]) / 2}[place]
+    return move_z(client, drive, target, max_retries=max_retries)
+
+
+def clear_z_stack(client, *, max_retries=None) -> dict:
+    """Leave no z-stack, as the window's bin: its begin and end both set where its drive stands."""
+    try:
+        _, drive, here, start = the_stack(client)
+    except RuntimeError as why:
+        return dispatch.refused(f"the z-stack cannot be cleared: {why}")
+    return stack_result(client, writes.z_stack_clear(drive, here, start=start), max_retries)
+
+
 def set_z_stack_sections(client, sections, *, max_retries=None) -> dict:
     """Set the z-stack's number of sections, by the step that gives it over the stack's size (``SetStackStepSize``).
 

@@ -152,6 +152,7 @@ DATUMS = {
         DatumSpec("bit_depth", direct_reader.get_bit_depth, number_present),
         DatumSpec("z_stack", z_stack_read, z_stack_present),
         DatumSpec("z_drive_in_use", direct_reader.get_z_drive_in_use, text_present),
+        DatumSpec("z_stack_focus", direct_reader.get_z_stack_focus, lambda v: isinstance(v, dict) and "set" in v),
         DatumSpec("autofocus", direct_reader.get_autofocus, lambda v: isinstance(v, bool)),
         DatumSpec("laser_lines", direct_reader.get_laser_lines, listed),
         DatumSpec("light_sources", direct_reader.get_light_sources, listed),

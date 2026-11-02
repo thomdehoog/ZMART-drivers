@@ -985,3 +985,41 @@ class TestTheZStackPanel:
     def test_without_a_stack_these_are_refused(self, lasx, client):
         assert changes.set_z_stack_size(client, 20.0)["success"] is False
         assert changes.recenter_z_stack(client)["success"] is False
+        assert changes.move_to_z_stack(client, "begin")["success"] is False
+        assert changes.clear_z_stack(client)["success"] is False
+
+    @pytest.mark.parametrize(("place", "z"), [("begin", 995.0), ("end", 1005.0), ("center", 1000.0)])
+    def test_the_focus_moves_to_the_stack_s_begin_end_and_center(self, lasx, stacked, place, z):
+        lasx.z_um[2] = 1002.0
+
+        result = changes.move_to_z_stack(stacked, place)
+
+        assert result["confirmed"] is True
+        assert lasx.z_um[2] == pytest.approx(z)
+        assert lasx.commands()[-1] == "SetZPosition"
+
+    def test_the_focus_moves_to_the_focus_plane_set_in_the_window(self, lasx, stacked):
+        lasx.live[("Acquire", "AcquireZStackInfo", "AFPlanePosition")] = 0.001003
+        lasx.live[("Acquire", "AcquireZStackInfo", "IsAFPlanePosition")] = True
+
+        assert changes.move_to_z_stack(stacked, "focus")["confirmed"] is True
+        assert lasx.z_um[2] == pytest.approx(1003.0)
+
+    def test_without_a_focus_plane_move_to_focus_is_refused(self, lasx, stacked):
+        sent = len(lasx.sent)
+
+        result = changes.move_to_z_stack(stacked, "focus")
+
+        assert result["success"] is False and "Set Focus" in result["message"]
+        assert len(lasx.sent) == sent
+
+    def test_a_place_the_panel_does_not_have_is_refused(self, lasx, stacked):
+        assert changes.move_to_z_stack(stacked, "middle")["success"] is False
+
+    def test_clear_leaves_no_stack(self, lasx, stacked):
+        lasx.z_um[2] = 1001.0
+
+        result = changes.clear_z_stack(stacked)
+
+        assert result["confirmed"] is True and result["z_stack"] is None
+        assert lasx.commands()[-4:] == ["BeforeBeginOrEndOfStackIsSet", "SetZStackDefinition"] * 2

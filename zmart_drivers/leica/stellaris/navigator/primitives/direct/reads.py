@@ -65,6 +65,7 @@ READS = (
     "fov",
     "z_stack",
     "z_drive_in_use",
+    "z_stack_focus",
     "autofocus",
     "light_sources",
     "filter_wheels",
@@ -406,6 +407,17 @@ def get_z_stack() -> dict | None:
         "sections": found["sections"],
         "mode": drives[found["mode"]],
     }
+
+
+def get_z_stack_focus() -> dict:
+    """The z-stack's focus plane, set with the window's Set Focus: ``z_um`` and whether it is ``set``.
+
+    ``Acquire/AcquireZStackInfo/AFPlanePosition`` and ``IsAFPlanePosition``
+    (simulator, 2026-11-02). Only the window sets it: written into the state
+    tree, LCS ignored it.
+    """
+    found = settings("the z-stack's focus plane", {"at": (*Z_STACK, "AFPlanePosition"), "set": (*Z_STACK, "IsAFPlanePosition")})
+    return {"z_um": metres(found["at"], "AFPlanePosition") * 1e6, "set": bool(found["set"])}
 
 
 def get_z_drive_in_use() -> str:

@@ -34,6 +34,9 @@ SIMULATOR_SETTINGS = {
     ("Acquire", "AcquireZStackInfo", "EndValue"): -2.384185222837308e-10,
     ("Acquire", "AcquireZStackInfo", "SectionsCount"): 1,
     ("Acquire", "AcquireZStackInfo", "StepSize"): 0.0,
+    # The z-stack's focus plane, the window's Set Focus (simulator, 2026-11-02).
+    ("Acquire", "AcquireZStackInfo", "AFPlanePosition"): 0.0,
+    ("Acquire", "AcquireZStackInfo", "IsAFPlanePosition"): False,
     ("Acquire", "ZStackUseMode"): 1,
     ("Acquire", "ZPositionMode"): 1,
     ("Confocal", "ScanningParameter", "ScanDirectionX"): 1,

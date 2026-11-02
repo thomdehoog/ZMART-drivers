@@ -171,6 +171,11 @@ def get_z_drive_in_use(client, **keywords):
     return _routed("z_drive_in_use", client, **keywords)
 
 
+def get_z_stack_focus(client, **keywords):
+    """The z-stack's focus plane, set with the window's Set Focus: ``z_um`` and whether it is ``set``."""
+    return _routed("z_stack_focus", client, **keywords)
+
+
 def get_autofocus(client, **keywords):
     """Whether autofocus is switched on."""
     return _routed("autofocus", client, **keywords)

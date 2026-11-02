@@ -96,6 +96,9 @@ discovery session in `SCOPE_RUN_2026-11-01_NAVIGATOR_DISCOVERY.md` and the build
 | Size (around the middle) | Works, with LAS X's command |
 | Begin and End where the focus is (the window's buttons) | Works, with LAS X's commands |
 | Re-Center | Works, with LAS X's command |
+| Move to Begin, End, Center, Focus | Works: the window's buttons send no logged command, so the focus moves as any z move does, within the z limits |
+| The bin (Clear) | Works, with the End and Begin buttons' commands at the focus |
+| Set Focus (the focus plane) | Not yet: no logged command, and LCS ignored the plane written into the state tree |
 | System-optimized step | Works: written into LAS X's state tree; LAS X takes its optimal step and may stretch the end |
 | Direction | Works: begin above end runs the stack downwards |
 
@@ -173,7 +176,7 @@ service and the person responsible for the instrument.
 
 | State | Settings |
 |---|---|
-| Works | 77 (the objective among them, not yet tried) |
+| Works | 79 (the objective among them, not yet tried) |
 | Tried | 0 |
 | Command known | 0 |
 | Not yet learned | 8 |
