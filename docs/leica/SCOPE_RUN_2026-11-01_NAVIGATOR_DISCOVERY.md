@@ -843,3 +843,11 @@ itself (`DetectorChannel[1]/Gate/GateEnd` 1.62 to 2.88 ns). LCS keeps no range f
 Built: `set_tau_channel_lifetime(detector, channel, ns)`, within that scale, read back within 0.01 ns. Through the driver:
 HyD 2's channels 0.5, 3.0 and 1.0 ns, each confirmed; 20 ns refused. Left at 1 and 3 ns, LAS X's first values.
 
+## 47. TauSeparation's Find (2 November 2026)
+
+The Find button sent `<Scanner Command="FindTauSeparationLifeTimes">` with the detector's beam route, answered `<Result/>`.
+LCS logged the outcome in `LifeTimeProcessTransfer.log`: "FindLifetimes seq 0 det 2, success 0", and nothing changed on
+the simulator, which has no lifetime data. Built: `find_tau_lifetimes(detector)`, reporting `found` from that line and the
+lifetimes afterwards (option A: what LAS X did, no lifetimes worked out by the driver). Through the driver: HyD 2, not
+found, 1 and 3 ns kept; HyD 4, not in TauSeparation, refused. A search that finds them is to be seen on the STELLARIS.
+

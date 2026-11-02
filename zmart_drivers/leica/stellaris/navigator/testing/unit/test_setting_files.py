@@ -167,6 +167,41 @@ def test_a_tau_separation_channel_s_lifetime_is_set_as_the_window_s_slider_sets_
     assert lasx.sent[-1].startswith('<Scanner Command="SetDetectorTauSeparationConfig" TauChannelIndex="1" SeparationLine1="4.5e-09">')
 
 
+def test_find_reports_that_las_x_found_no_lifetimes(lasx, client, tmp_path, monkeypatch):
+    from zmart_drivers.leica.stellaris.navigator.procedures import changes
+
+    log = tmp_path / "LifeTimeProcessTransfer.log"
+    monkeypatch.setattr(changes, "LIFETIME_LOG", log)
+    lasx.lifetime_log = (log, 0, None)
+    setting_files.set_detector(client, tmp_path, "HyD S 3", tau_mode="TauSeparation")
+
+    result = changes.find_tau_lifetimes(client, "HyD S 3")
+
+    assert result["success"] is True and result["found"] is False
+    assert result["lifetimes_ns"] == pytest.approx([1.0, 3.0])
+    assert lasx.commands()[-1] == "FindTauSeparationLifeTimes"
+
+
+def test_find_reports_the_lifetimes_las_x_found(lasx, client, tmp_path, monkeypatch):
+    from zmart_drivers.leica.stellaris.navigator.procedures import changes
+
+    log = tmp_path / "LifeTimeProcessTransfer.log"
+    monkeypatch.setattr(changes, "LIFETIME_LOG", log)
+    lasx.lifetime_log = (log, 1, (0.8e-09, 4.2e-09))
+    setting_files.set_detector(client, tmp_path, "HyD S 3", tau_mode="TauSeparation")
+
+    result = changes.find_tau_lifetimes(client, "HyD S 3")
+
+    assert result["found"] is True
+    assert result["lifetimes_ns"] == pytest.approx([0.8, 4.2])
+
+
+def test_find_outside_tau_separation_is_refused(lasx, client):
+    from zmart_drivers.leica.stellaris.navigator.procedures import changes
+
+    assert changes.find_tau_lifetimes(client, "HyD S 3")["success"] is False
+
+
 @pytest.mark.parametrize("ns", [0.01, 20.0, "3"])
 def test_a_tau_lifetime_off_the_window_s_scale_is_refused(lasx, client, tmp_path, ns):
     from zmart_drivers.leica.stellaris.navigator.procedures import changes

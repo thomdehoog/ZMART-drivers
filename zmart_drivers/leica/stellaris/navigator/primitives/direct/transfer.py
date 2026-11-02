@@ -186,6 +186,7 @@ ALLOWED_COMMANDS = frozenset(
         "SetDigitalGatingModeIndex",
         "SetDetectorTauSeparationLut",
         "SetDetectorTauSeparationConfig",
+        "FindTauSeparationLifeTimes",
         "SetLightSourceWavelength",
         "SetConfocalLaserLinesDefinition",
         "ActivateShutter",

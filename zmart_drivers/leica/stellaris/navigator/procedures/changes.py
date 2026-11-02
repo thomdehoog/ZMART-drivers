@@ -28,6 +28,7 @@ University of Zurich (thom.dehoog@zmb.uzh.ch, thomdehoog@gmail.com).
 from __future__ import annotations
 
 import logging
+import re
 import time
 from dataclasses import replace
 from typing import Any
@@ -403,6 +404,43 @@ def set_tau_channel_colour(client, detector, channel, colour, *, max_retries=Non
     except ValueError as why:
         return dispatch.refused(str(why))
     return run(client, change, max_retries=max_retries)
+
+
+#: Where LCS logs its search for TauSeparation's lifetimes ("FindLifetimes seq 0 det 2, success 0").
+LIFETIME_LOG = LASX_LOG.with_name("LifeTimeProcessTransfer.log")
+
+
+def find_tau_lifetimes(client, detector) -> dict:
+    """Press TauSeparation's Find for *detector*: LAS X looks for its two lifetimes in the data it has; report what it did.
+
+    The result's ``found`` is what LCS logged ("success" other than 0), and
+    ``lifetimes_ns`` the channels' lifetimes afterwards, found or left as
+    they were. On the simulator, with no lifetime data, LCS found none
+    (2026-11-02); a search that finds them has not been seen yet.
+    """
+    route, refusal = tau_channel(client, detector, 1)
+    if refusal:
+        return dispatch.refused(refusal)
+    seen = LIFETIME_LOG.stat().st_size if LIFETIME_LOG.is_file() else 0
+    result = run(client, writes.find_tau_lifetimes(route, detector))
+    if not result["success"]:
+        return result
+    verdicts = []
+    deadline = time.monotonic() + 2.0
+    while not verdicts and time.monotonic() < deadline:
+        if LIFETIME_LOG.is_file():
+            with LIFETIME_LOG.open("rb") as log:
+                log.seek(seen)
+                verdicts = re.findall(rb"FindLifetimes seq \d+ det \d+, success (\d+)", log.read())
+        if not verdicts:
+            time.sleep(0.1)
+    result.update(
+        found=bool(verdicts) and int(verdicts[-1]) != 0,
+        lifetimes_ns=(readers.get_detector_modes(client) or {}).get(detector, {}).get("tau_lifetimes_ns"),
+    )
+    if not verdicts:
+        result["message"] = f"{result.get('message', '')} | LAS X logged no outcome of the search".strip(" |")
+    return result
 
 
 def set_tau_channel_lifetime(client, detector, channel, ns, *, max_retries=None) -> dict:

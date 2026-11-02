@@ -368,6 +368,17 @@ class Microscope:
         result = changes.set_tau_channel_colour(self.handle.client, detector, channel, colour)
         return checked(self.handle, result, f"set_tau_channel_colour({detector!r}, {channel!r}, {colour!r})")
 
+    def find_tau_lifetimes(self, detector: str) -> dict:
+        """Press TauSeparation's Find for *detector*: LAS X looks for its two lifetimes; answers ``found`` and ``lifetimes_ns``.
+
+        Only while the detector is in TauSeparation. LAS X looks in the data it
+        has, so take a picture first. When it finds none, the lifetimes stay as they were.
+        """
+        self.handle.require_open()
+        result = changes.find_tau_lifetimes(self.handle.client, detector)
+        checked(self.handle, result, f"find_tau_lifetimes({detector!r})")
+        return {"found": result["found"], "lifetimes_ns": result["lifetimes_ns"]}
+
     def set_tau_channel_lifetime(self, detector: str, channel: int, ns: float) -> dict:
         """Set the lifetime of TauSeparation's channel 1 or 2 of *detector*, in nanoseconds, as the window's slider.
 

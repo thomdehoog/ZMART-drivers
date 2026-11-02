@@ -328,6 +328,15 @@ class PlainNavigator:
         unit = self.detector_at(e)
         unit.setdefault("TauLifetimes", [1e-09, 3e-09])[int(e.get("TauChannelIndex"))] = float(e.get("SeparationLine1"))
 
+    def take_FindTauSeparationLifeTimes(self, e):
+        """LCS's search for the two lifetimes: logged as LCS logs it; found ones replace the channels'."""
+        path, success, found = getattr(self, "lifetime_log", (None, 0, None))
+        if path is not None:
+            line = f"2026-11-02 21:35:57.572 20000012h  INFO 5653 ScanSettingsResponder.cpp 'General message:==> FindLifetimes seq 0 det 2, success {success}'\n"
+            path.write_text((path.read_text(encoding="utf-8") if path.is_file() else "") + line, encoding="utf-8")
+        if success and found:
+            self.detector_at(e)["TauLifetimes"] = list(found)
+
     def take_SetDetectorTauSeparationLut(self, e):
         self.detector_at(e)["TauColours"][int(e.get("TauChannelIndex"))] = e.get("LutName")
 

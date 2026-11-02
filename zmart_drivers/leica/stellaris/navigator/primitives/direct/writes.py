@@ -899,6 +899,20 @@ def tau_channel_lifetime(route, name: str, channel: int, ns: float) -> Write:
                  description=f"Detector {name} tau channel {channel} -> {ns:g} ns", ready=idle(), confirm=Expect("detector_modes", shows))
 
 
+def find_tau_lifetimes(route, name: str) -> Write:
+    """TauSeparation's Find for the detector *name*, as the window's button sends it: LCS looks for the two lifetimes.
+
+    LCS answers it with no verdict; whether it found them, it logs
+    (``changes.find_tau_lifetimes`` reads it). Never sent again.
+    """
+
+    def fill(request: Request) -> None:
+        request.elements = [f'<Scanner Command="FindTauSeparationLifeTimes">{beam_route(route)}</Scanner>']
+
+    return Write(command="find_tau_lifetimes", values={}, request="FindTauSeparationLifeTimes", fill=fill,
+                 description=f"Detector {name} tau lifetimes -> found by LAS X", ready=idle(), never_resend=True)
+
+
 def tau_channel_colour(route, name: str, setting_id: int, channel: int, colour: str) -> Write:
     """The colour of TauSeparation's *channel* (1 or 2) of the detector *name*, as the window's colour pick sends it; read back.
 
