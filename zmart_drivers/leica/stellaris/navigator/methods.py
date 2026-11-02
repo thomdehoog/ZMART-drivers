@@ -614,6 +614,15 @@ class Microscope:
         lines = readings.get_aobs_lines(self.handle.client) or []
         return next(line for line in lines if abs(line["wavelength"] - float(wavelength_nm)) < 0.5)
 
+    def set_lambda_scan(self, begin_nm: int | None = None, end_nm: int | None = None, step_nm: int | None = None,
+                        bandwidth_nm: int | None = None) -> dict:
+        """Set the λ scan's detection as LAS X's λ panel: begin and end (380 to 800 nm), step and bandwidth, in whole
+        nanometres. Answers the λ scan with its number of steps. The scan mode is set apart (``xyλ``, ...)."""
+        self.handle.require_open()
+        result = changes.set_lambda_scan(self.handle.client, begin_nm=begin_nm, end_nm=end_nm, step_nm=step_nm, bandwidth_nm=bandwidth_nm)
+        checked(self.handle, result, "set_lambda_scan()")
+        return result["lambda_scan"]
+
     def set_auto_sync(self, on: bool) -> dict:
         """Auto Sync on or off: the autofocus then uses the current setting's light and detectors. On, Series Scan
         Autofocus goes off (as closing the Best Focus Setting in the window does); off, LAS X copies the current

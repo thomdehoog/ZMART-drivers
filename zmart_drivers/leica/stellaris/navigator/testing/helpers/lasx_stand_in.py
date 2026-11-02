@@ -263,6 +263,27 @@ class PlainNavigator:
         self.live[("Acquire", "AutoFocusInfo", "IsAutoSyncActive")] = True
         self.live[("Acquire", "AutoFocusInfo", "IsSeriesScanAutofocusActive")] = False
 
+    LAMBDA = ("Confocal", "LambdaDefinition")
+
+    def lambda_steps(self):
+        begin, end, step = (self.live[(*self.LAMBDA, k)] for k in ("DetectionBegin", "DetectionEnd", "DetectionStepSize"))
+        self.live[(*self.LAMBDA, "DetectionStepCount")] = int((end - begin) // step) + 1 if step else 1
+
+    def take_SetLambdaDetectionBegin(self, e):
+        self.live[(*self.LAMBDA, "DetectionBegin")] = float(e.get("Begin"))
+        self.lambda_steps()
+
+    def take_SetLambdaDetectionEnd(self, e):
+        self.live[(*self.LAMBDA, "DetectionEnd")] = float(e.get("End"))
+        self.lambda_steps()
+
+    def take_SetLambdaDetectionStepsize(self, e):
+        self.live[(*self.LAMBDA, "DetectionStepSize")] = float(e.get("Stepsize"))
+        self.lambda_steps()
+
+    def take_SetLambdaDetectionBandwidth(self, e):
+        self.live[(*self.LAMBDA, "DetectionBandWidth")] = float(e.get("Bandwidth"))
+
     def take_SetStackStepSize(self, e):
         self.live[("Acquire", "AcquireZStackInfo", "StepSize")] = float(e.get("StepSizeInMeter"))
         self.stack_sections()

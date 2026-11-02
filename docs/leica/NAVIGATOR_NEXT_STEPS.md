@@ -86,6 +86,9 @@ The simulator cannot show these; each needs one careful run on the real microsco
 - An autofocus that finds a focus (only the failing case has been seen), and the Best Focus Setting.
 - That the hardware follows the state-tree values (for example, bidirectional halving the frame time).
 
+- The λ scan: why LCS sometimes moves begin and end by a few nm (380 to 385, 650 to 655, 800 to 775) and
+  sometimes keeps them; the Λ (excitation) and Λλ scans, and the λ scan's gaps and direction.
+
 ## Decided not to do
 
 - Removing a laser line in another setting than the first: the window allowed it only in Setting 1

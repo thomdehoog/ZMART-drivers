@@ -1031,6 +1031,28 @@ class TestFastLive:
         assert changes.set_fast_live(client, "galvo", format=256)["success"] is False
 
 
+class TestLambdaScan:
+    def test_the_detection_range_step_and_bandwidth_are_set_with_the_window_s_commands(self, lasx, client):
+        result = changes.set_lambda_scan(client, begin_nm=400, end_nm=700, step_nm=10, bandwidth_nm=20)
+
+        assert result["confirmed"] is True
+        assert result["lambda_scan"] == {"begin_nm": 400.0, "end_nm": 700.0, "step_nm": 10.0, "bandwidth_nm": 20.0}
+        assert lasx.sent[-4:] == [  # step and bandwidth first: a later change of either moved the end
+            '<Scanner Command="SetLambdaDetectionStepsize" Stepsize="10"/>', '<Scanner Command="SetLambdaDetectionBandwidth" Bandwidth="20"/>',
+            '<Scanner Command="SetLambdaDetectionBegin" Begin="400"/>', '<Scanner Command="SetLambdaDetectionEnd" End="700"/>',
+        ]
+
+    @pytest.mark.parametrize("keywords", [
+        {"begin_nm": 370}, {"end_nm": 900}, {"begin_nm": 700, "end_nm": 600}, {"step_nm": 0}, {"bandwidth_nm": -5},
+        {"begin_nm": 400.5}, {},
+    ])
+    def test_what_the_window_does_not_offer_is_refused_and_nothing_is_sent(self, lasx, client, keywords):
+        sent = len(lasx.sent)
+
+        assert changes.set_lambda_scan(client, **keywords)["success"] is False
+        assert len(lasx.sent) == sent
+
+
 class TestAutoSync:
     def test_auto_sync_goes_on_with_the_window_s_command_and_off(self, lasx, client):
         on = changes.set_auto_sync(client, True)

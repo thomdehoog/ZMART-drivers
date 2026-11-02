@@ -937,3 +937,18 @@ a number ticking an option's box, False unticking it, refused while Auto Sync is
 format 128, 1000 Hz, zoom 2 (the window showed 128); 1024 and 5000 Hz refused; back to 64 and 600, zoom off;
 off; Series Scan Autofocus on again (`change_setting("autofocus", True)`).
 
+## 53. The λ scan's detection (2 November 2026)
+
+In xyλ, the λ panel's number fields took a value set through UI Automation only in the window; their arrows,
+clicked by the driver's mouse, sent LCS commands: `<Scanner Command="SetLambdaDetectionBegin" Begin="390"/>`,
+`SetLambdaDetectionEnd End=`, `SetLambdaDetectionStepsize Stepsize=`, `SetLambdaDetectionBandwidth Bandwidth=`,
+whole nanometres. LCS keeps the values in `Confocal/LambdaDefinition` (`DetectionBegin`, `DetectionEnd`,
+`DetectionStepSize`, `DetectionBandWidth`; `DetectionStepCount` did not follow). The window's begin and end run
+380 to 800 nm.
+
+Sent in the order step, bandwidth, begin, end, LCS kept 420 to 650 nm, 10, 15, and 380 to 800, 30, 30 exactly;
+in other states (and through the driver just after switching to xyλ) it moved begin or end a few nm (650 to 655,
+380 to 385, 800 to 775). Built: `set_lambda_scan(begin_nm=, end_nm=, step_nm=, bandwidth_nm=)`, in that order,
+checked first, the result unconfirmed with what LAS X holds when it moved a value. Left at 385 to 775 nm, 30, 30;
+the scan mode back at xyz.
+

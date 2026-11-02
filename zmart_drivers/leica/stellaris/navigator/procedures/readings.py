@@ -206,6 +206,11 @@ def get_autofocus_settings(client, **keywords):
     return _routed("autofocus_settings", client, **keywords)
 
 
+def get_lambda_scan(client, **keywords):
+    """The λ scan's detection: ``begin_nm``, ``end_nm``, ``step_nm``, ``bandwidth_nm``, ``steps``."""
+    return _routed("lambda_scan", client, **keywords)
+
+
 def get_auto_sync(client, **keywords):
     """Auto Sync and its scan options: ``on``, and by scanner ``format``, ``scan_frequency``, ``overview_zoom``, ``bidirectional``, ``no_average``."""
     return _routed("auto_sync", client, **keywords)

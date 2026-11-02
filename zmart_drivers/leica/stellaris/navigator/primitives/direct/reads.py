@@ -95,6 +95,7 @@ READS = (
     "z_compensation",
     "autofocus_in_time_series",
     "auto_sync",
+    "lambda_scan",
     "autofocus_optics",
     "pixel_size",
     "bit_depth",
@@ -1091,6 +1092,17 @@ def get_autofocus_optics() -> dict:
         return {"lines": lines}
 
     return read("the Best Focus Setting's optics", reading)
+
+
+def get_lambda_scan() -> dict:
+    """The λ scan's detection, as LAS X's λ panel shows it: ``begin_nm``, ``end_nm``, ``step_nm``, ``bandwidth_nm``
+    (``Confocal/LambdaDefinition``). LCS's count of steps beside them did not follow the changes on the simulator
+    (2026-11-02), so it is not given."""
+    l = ("Confocal", "LambdaDefinition")
+    found = settings("the λ scan", {k: (*l, n) for k, n in (
+        ("begin_nm", "DetectionBegin"), ("end_nm", "DetectionEnd"), ("step_nm", "DetectionStepSize"),
+        ("bandwidth_nm", "DetectionBandWidth"))})
+    return {k: float(v) for k, v in found.items()}
 
 
 #: Auto Sync's scan options, by scanner, where LCS keeps them.

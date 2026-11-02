@@ -42,6 +42,12 @@ SIMULATOR_SETTINGS = {
     ("Acquire", "AcquireTStackInfo", "RepeatCount"): 1,
     # ROI scan and bleaching, as LCS keeps them (simulator, 2026-11-02).
     ("Confocal", "ROIScan", "CanDoROIScan"): True,
+    # The λ scan's detection (simulator, 2026-11-02).
+    ("Confocal", "LambdaDefinition", "DetectionBegin"): 380.0,
+    ("Confocal", "LambdaDefinition", "DetectionEnd"): 800.0,
+    ("Confocal", "LambdaDefinition", "DetectionStepSize"): 30.0,
+    ("Confocal", "LambdaDefinition", "DetectionStepCount"): 15,
+    ("Confocal", "LambdaDefinition", "DetectionBandWidth"): 30.0,
     # Linear Z-compensation (simulator, 2026-11-02): no mode, the reference at the stack's begin.
     ("Confocal", "ZCompensation", "CurrentMode"): 0,
     ("Confocal", "ZCompensation", "ReferencePosition"): 0.000995,

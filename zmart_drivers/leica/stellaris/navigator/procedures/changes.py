@@ -776,6 +776,38 @@ def start_live(client, project=None, *, fast=False) -> dict:
     return run(client, change)
 
 
+def set_lambda_scan(client, *, begin_nm=None, end_nm=None, step_nm=None, bandwidth_nm=None, max_retries=None) -> dict:
+    """Set the λ scan's detection as LAS X's λ panel does: its begin and end (380 to 800 nm), its step and its
+    bandwidth, in whole nanometres; the result's ``lambda_scan`` is read back. Checked before anything is sent."""
+    asked = {"begin_nm": begin_nm, "end_nm": end_nm, "step_nm": step_nm, "bandwidth_nm": bandwidth_nm}
+    given = {k: v for k, v in asked.items() if v is not None}
+    if not given:
+        return dispatch.refused("set_lambda_scan needs begin_nm, end_nm, step_nm or bandwidth_nm")
+    if any(isinstance(v, bool) or not isinstance(v, int) for v in given.values()):
+        return dispatch.refused(f"the λ scan takes whole nanometres, not {given}")
+    now = readers.get_lambda_scan(client)
+    begin, end = given.get("begin_nm", now["begin_nm"]), given.get("end_nm", now["end_nm"])
+    low, high = writes.LAMBDA_RANGE_NM
+    if not low <= begin < end <= high:
+        return dispatch.refused(f"the λ scan's begin and end lie within {low} to {high} nm, begin before end; not {begin} to {end}")
+    for key in ("step_nm", "bandwidth_nm"):
+        if key in given and not 0 < given[key] <= high - low:
+            return dispatch.refused(f"{key} is above 0 and at most {high - low} nm, not {given[key]}")
+    result = None
+    # Step and bandwidth first: a later change of either moved the end (simulator, 2026-11-02).
+    for name in ("step_nm", "bandwidth_nm", "begin_nm", "end_nm"):
+        if name in given:
+            result = run(client, writes.lambda_scan(name, given[name]), max_retries=max_retries)
+            if not result["success"]:
+                return result
+    result["lambda_scan"] = readers.get_lambda_scan(client)
+    moved = {k: result["lambda_scan"][k] for k, v in given.items() if abs(result["lambda_scan"][k] - v) >= 0.5}
+    if moved:
+        result["confirmed"] = False
+        result["message"] = f"LAS X holds {moved}, not what was asked"
+    return result
+
+
 def set_auto_sync(client, on, *, max_retries=None) -> dict:
     """Auto Sync on or off; the result's ``auto_sync`` is read back. On, Series Scan Autofocus goes off, as the
     window's X on the Best Focus Setting does; off, LCS copies the current setting's light and detectors into

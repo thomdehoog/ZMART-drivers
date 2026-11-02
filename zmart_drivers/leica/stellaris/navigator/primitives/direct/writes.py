@@ -1171,6 +1171,29 @@ def start_live(project: int, *, fast: bool = False) -> Write:
     )
 
 
+#: The λ scan's detection: the driver's name, LAS X's command and its attribute, and the reading's key.
+LAMBDA_SCAN = {
+    "begin_nm": ("SetLambdaDetectionBegin", "Begin"),
+    "end_nm": ("SetLambdaDetectionEnd", "End"),
+    "step_nm": ("SetLambdaDetectionStepsize", "Stepsize"),
+    "bandwidth_nm": ("SetLambdaDetectionBandwidth", "Bandwidth"),
+}
+#: The λ panel's range for the detection's begin and end, in nanometres (simulator, 2026-11-02).
+LAMBDA_RANGE_NM = (380, 800)
+
+
+def lambda_scan(name: str, nm: int) -> Write:
+    """One of the λ scan's detection values, in whole nanometres, with the λ panel's own command; read back."""
+    command, attribute = LAMBDA_SCAN[name]
+
+    def fill(request: Request) -> None:
+        request.elements = [f'<Scanner Command="{command}" {attribute}="{int(nm)}"/>']
+
+    return Write(command="set_lambda_scan", values={"value": int(nm)}, request=command, fill=fill,
+                 description=f"λ scan {name[:-3]} -> {nm} nm", ready=idle(),
+                 confirm=Expect("lambda_scan", lambda found: bool(found) and abs(found[name] - nm) < 0.5))
+
+
 def auto_sync(on: bool) -> Write:
     """Auto Sync on, as the Best Focus Setting's X sends it (``ResetAutoFocusToAutoSync``; Series Scan Autofocus goes
     off with it), or off, as the Best Focus Scan Options' Auto Sync box writes it (LCS then copies the current
