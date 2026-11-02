@@ -443,6 +443,7 @@ MUTATING_COMMANDS = {
     "set_detector_active": "set_detector_active",
     "set_detector_band": "set_detector_band",
     "set_detector_tau": "set_detector_tau",
+    "set_detector_operating_mode": "set_detector_operating_mode",
     # the Best Focus Setting: its scan, on or off, and its optics (its power checked as a laser power)
     "set_autofocus_format": "set_autofocus_format",
     "set_autofocus_speed": "set_autofocus_speed",

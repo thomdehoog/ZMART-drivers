@@ -870,7 +870,29 @@ def detector_tau(route, name: str, place: int, mode: str) -> Write:
 
     return Write(command="set_detector_tau", values={"value": mode}, request="SetDigitalGatingModeIndex", fill=fill,
                  description=f"Detector {name} tau mode -> {mode}", ready=idle(),
-                 confirm=Expect("tau_modes", lambda modes: (modes or {}).get(name, {}).get("now") == code))
+                 confirm=Expect("detector_modes", lambda modes: (modes or {}).get(name, {}).get("tau") == code))
+
+
+#: The operating modes by name and LCS's code for them (``OperatingMode``), as the window's Operating Mode list names them.
+OPERATING_CODES = {"Fast Mode": 4, "Counting": 1, "Analog": 10, "Reflection": 11}
+
+
+def detector_operating_mode(at, place: int, name: str, mode: str) -> Write:
+    """The operating mode of the detector *name*, written as its *place* in the detector's list into its setting's entry
+    (*at*: the setting's, photometer's and detector's places), as the window does; read back.
+
+    LCS sets the mode itself from the place and applies it to the detector
+    (simulator, 2026-11-02: from Counting to Analog, the gain stored in the
+    setting came back).
+    """
+    code = OPERATING_CODES[mode]
+
+    def fill(request: Request) -> None:
+        request.elements = [f'<StateTree Command="OperatingModeIndex" Value="{int(place)}" At="{",".join(str(int(n)) for n in at)}"/>']
+
+    return Write(command="set_detector_operating_mode", values={"value": mode}, request="OperatingModeIndex", fill=fill,
+                 description=f"Detector {name} operating mode -> {mode}", ready=idle(),
+                 confirm=Expect("detector_modes", lambda modes: (modes or {}).get(name, {}).get("operating") == code))
 
 
 #: The tau modes by name and LCS's code for them (``DigitalGatingMode``), as the window's TauModes list names them.

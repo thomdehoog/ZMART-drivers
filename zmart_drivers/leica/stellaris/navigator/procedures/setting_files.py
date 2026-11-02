@@ -87,8 +87,12 @@ def load(client, path) -> dict:
     return result
 
 
-def by_command(client, name, *, on=None, gain=None, band=None, tau_mode=None) -> list:
-    """The changes of detector *name* LAS X's window makes with a command of its own; refused ones as text."""
+def by_command(client, name, *, operating_mode=None, on=None, gain=None, band=None, tau_mode=None) -> list:
+    """The changes of detector *name* LAS X's window makes itself, in the current setting; refused ones as text.
+
+    The operating mode first, written as the window writes it, since a mode
+    can fix the gain; then on, gain, band and tau mode with their commands.
+    """
     from . import changes
 
     units = {unit.get("Name"): unit for unit in readers.get_detection_units(client) or []}
@@ -96,6 +100,12 @@ def by_command(client, name, *, on=None, gain=None, band=None, tau_mode=None) ->
         return [f"no detector {name!r}; LAS X's are {sorted(units)}"]
     route = writes.route_of(units[name]["BeamRoute"])
     planned = []
+    modes = readers.get_detector_modes(client).get(name, {})
+    if operating_mode is not None:
+        code = writes.OPERATING_CODES.get(operating_mode)
+        if code is None or code not in modes.get("operating_offered", []):
+            return [f"{name} does not offer the operating mode {operating_mode} in this setting"]
+        planned.append(writes.detector_operating_mode(modes["at"], modes["operating_offered"].index(code), name, operating_mode))
     if on is not None:
         planned.append(writes.detector_active(route, name, on))
     if gain is not None:
@@ -109,7 +119,7 @@ def by_command(client, name, *, on=None, gain=None, band=None, tau_mode=None) ->
     if tau_mode is not None:
         if tau_mode not in writes.TAU_CODES:
             return [f"tau_mode takes {sorted(writes.TAU_CODES)}, not {tau_mode!r}"]
-        offered = readers.get_tau_modes(client).get(name, {}).get("offered", [])
+        offered = modes.get("tau_offered", [])
         if writes.TAU_CODES[tau_mode] not in offered:
             return [f"{name} does not offer the tau mode {tau_mode} in this setting"]
         planned.append(writes.detector_tau(route, name, offered.index(writes.TAU_CODES[tau_mode]), tau_mode))
@@ -122,33 +132,34 @@ def set_detector(
 ) -> dict:
     """Change the detector *name* in the current setting, and read it back; any of its fields at once.
 
-    *on*, *gain*, *band* ``(begin_nm, end_nm)`` and *tau_mode* go with LAS X's
-    own commands, as its window sends them (simulator, 2026-11-02), and work in
-    any setting; the gain within the detector's own range. *operating_mode*
-    (:data:`OPERATING_MODES`), *tau_contrast* and *dye* (LAS X's name, such as
-    ``"Leica/ALEXA 488"``) have no command of the window's: they go through a
-    saved setting first, Setting 1 only, read back from the setting LAS X saves
-    again. *folder* is where the setting files are kept.
+    *operating_mode* (:data:`OPERATING_MODES`) is written into the setting as
+    the window writes it, first; *on*, *gain*, *band* ``(begin_nm, end_nm)`` and
+    *tau_mode* go with LAS X's own commands, as its window sends them
+    (simulator, 2026-11-02); all of these work in any setting, the gain within
+    the detector's own range. *tau_contrast* and *dye* (LAS X's name, such as
+    ``"Leica/ALEXA 488"``) have no such way: they go through a saved setting
+    first, Setting 1 only, read back from the setting LAS X saves again.
+    *folder* is where the setting files are kept.
     """
     if operating_mode is not None and operating_mode not in OPERATING_MODES:
         return dispatch.refused(f"no operating mode {operating_mode!r}; LAS X offers {list(OPERATING_MODES)}")
     if tau_mode is not None and tau_mode not in TAU_MODES:
         return dispatch.refused(f"no tau mode {tau_mode!r}; LAS X offers {list(TAU_MODES)}")
     results = []
-    if any(value is not None for value in (operating_mode, tau_contrast, dye)):
-        # No command of the window's for these: through the setting, first, since a mode can fix the gain.
+    if any(value is not None for value in (tau_contrast, dye)):
+        # No command of the window's for these: through the setting, first.
         def change(part):
-            return with_detector(part, name, operating_mode=operating_mode, tau_contrast=tau_contrast, dye=dye)
+            return with_detector(part, name, tau_contrast=tau_contrast, dye=dye)
 
         def shows(client_, folder_):
-            asked = {"operating_mode": operating_mode, "tau_contrast": tau_contrast, "dye": dye}
+            asked = {"tau_contrast": tau_contrast, "dye": dye}
             found = saved_now(client_, folder_)["detectors"].get(name, {})
             return all(found.get(key) == value for key, value in asked.items() if value is not None)
 
         results.append(through_setting_1(client, folder, change, shows))
         if not results[-1].get("success"):
             return results[-1]
-    for done in by_command(client, name, on=on, gain=gain, band=band, tau_mode=tau_mode):
+    for done in by_command(client, name, operating_mode=operating_mode, on=on, gain=gain, band=band, tau_mode=tau_mode):
         if isinstance(done, str):
             return dispatch.refused(done)
         results.append(done)

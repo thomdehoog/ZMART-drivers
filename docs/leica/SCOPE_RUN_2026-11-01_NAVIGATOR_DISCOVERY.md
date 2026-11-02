@@ -716,3 +716,15 @@ setting's own entry (`OperatingMode` 10, the gain 100 stored there) but not the 
 current again did not change it. The saved-setting route for the operating mode is not reliable; the window's
 way (the state tree) is still to be built and tried.
 
+## 39. The operating mode as the window sets it (2 November 2026)
+
+HyD S 3's `OperatingModeIndex` in Setting 1's entry (`SequentialSettingParameter[0]/.../DetectorHWInfo_SequentialInfo[2]`)
+written as the window writes it: 1 set Counting (`OperatingMode` 1), 2 set Analog (10), and the detector as it runs
+followed: its gain went from 2.5 back to the 100 stored in the setting. The detector's list for the setting
+(`DetectionUnitOperatingModeList_SeqInfo`) offers 4 Fast Mode, 1 Counting, 10 Analog, 11 Reflection by place.
+
+Built: `set_detector(..., operating_mode=...)` writes the mode's place for the current setting and detector
+(`At="setting,photometer,detector"`), before the gain; read back from LCS's per-setting entry. The saved-setting
+route is gone for it. Through the driver: Counting (gain fixed at 2.5), Analog with gain 100, Fast Mode, Analog
+with gain 100 again, each confirmed with the running detector following.
+

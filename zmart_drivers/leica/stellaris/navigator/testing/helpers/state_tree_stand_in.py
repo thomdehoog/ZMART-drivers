@@ -456,7 +456,10 @@ class StandInNodes:
         graft(sequence, "SequentialSettingParameter", {"SpectralDetection_SequentialInfo": {"Spectrophotometer_SequentialInfo": [
             {"DetectionUnitList_SequentialInfo": {"DetectorHWInfo_SequentialInfo": [
                 {"DigitalGatingMode": unit.get("DigitalGatingMode", 2), "DigitalGatingModeList_SeqInfo": {"DigitalGatingMode": [
-                    {"DigitalGatingMode": code, "IsEnabled": True} for code in (0, 2, 3, 5, 6, 10)]}}
+                    {"DigitalGatingMode": code, "IsEnabled": True} for code in (0, 2, 3, 5, 6, 10)]},
+                 "OperatingModeIndex": unit.get("OperatingModeIndex", 1), "OperatingMode": unit.get("OperatingMode", 1),
+                 "DetectionUnitOperatingModeList_SeqInfo": {"DetectionUnitOperatingMode": [
+                     {"OperatingMode": code, "IsEnabled": True} for code in getattr(self, "operating_offered", (4, 1, 10, 11))]}}
                 for unit in spectro["DetectionUnitList"]["DetectorHWInfo"]
             ]}}
             for spectro in self.detection["Spectrophotometer"]
@@ -480,6 +483,16 @@ class StandInNodes:
                 name, parent, _kids = nodes[node]
                 path.insert(0, name)
                 node = parent
+            if path[-1] == "OperatingModeIndex":
+                # A detector's operating mode in the setting, by place: LCS sets the mode from its list.
+                unit_node = nodes[change.NodeID][1]
+                spectro_node = nodes[nodes[unit_node][1]][1]
+                units = [n for n in nodes[nodes[unit_node][1]][2] if nodes[n][0] == "DetectorHWInfo_SequentialInfo"]
+                spectros = [n for n in nodes[nodes[spectro_node][1]][2] if nodes[n][0] == "Spectrophotometer_SequentialInfo"]
+                unit = self.detection["Spectrophotometer"][spectros.index(spectro_node)]["DetectionUnitList"]["DetectorHWInfo"][units.index(unit_node)]
+                unit["OperatingModeIndex"] = change.Value
+                unit["OperatingMode"] = getattr(self, "operating_offered", (4, 1, 10, 11))[change.Value]
+                continue
             if "SequentialAutofocusSetting" in path and path[-1] == "Intensity":
                 # One of the Best Focus Setting's lines: its light source and line by their places.
                 line_node = nodes[change.NodeID][1]

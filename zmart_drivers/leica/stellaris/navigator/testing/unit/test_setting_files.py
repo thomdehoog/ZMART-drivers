@@ -138,13 +138,13 @@ def test_each_operating_mode_is_written_as_las_x_writes_it_and_read_back(lasx, c
     result = setting_files.set_detector(client, tmp_path, "HyD S 3", operating_mode=mode)
 
     assert result["confirmed"] is True
-    assert setting_1(tmp_path, lasx)["detectors"]["HyD S 3"]["operating_mode"] == mode
+    assert direct_reader.get_detector_modes()["HyD S 3"]["operating"] == {"Fast Mode": 4, "Counting": 1, "Analog": 10, "Reflection": 11}[mode]
 
 
 @pytest.mark.parametrize("mode", ["Intensity", "TauGating", "TauScan", "TauSeparation", "TauInteraction"])
 def test_each_tau_mode_is_written_as_las_x_writes_it_and_read_back(lasx, client, tmp_path, mode):
     assert setting_files.set_detector(client, tmp_path, "HyD S 3", tau_mode=mode)["confirmed"] is True
-    assert setting_1(tmp_path, lasx)["detectors"]["HyD S 3"]["tau_mode"] == mode
+    assert direct_reader.get_detector_modes()["HyD S 3"]["tau"] == {"Intensity": 2, "TauGating": 3, "TauScan": 5, "TauSeparation": 6, "TauInteraction": 10}[mode]
 
 
 def test_tau_contrast_and_the_dye_are_set_and_read_back(lasx, client, tmp_path):
@@ -231,3 +231,21 @@ def test_the_tau_mode_is_its_place_in_the_detector_s_list(lasx, client, tmp_path
 
     assert result["confirmed"] is True
     assert 'GatingModeIndex="3"' in lasx.sent[-1]
+
+
+
+def test_the_operating_mode_is_written_as_the_window_does_and_read_back(lasx, client, tmp_path):
+    result = setting_files.set_detector(client, tmp_path, "HyD S 3", operating_mode="Analog", gain=100)
+
+    assert result["confirmed"] is True
+    assert client.reply["element"].startswith('<Scanner Command="SetDetectorGain"')  # the mode first, the gain after it
+    assert direct_reader.get_detector_modes()["HyD S 3"]["operating"] == 10
+    assert "ATL_Block_Load_From_XML" not in lasx.commands()
+
+
+def test_an_operating_mode_the_detector_does_not_offer_is_refused(lasx, client, tmp_path):
+    lasx.nodes.operating_offered = (4, 1)
+
+    result = setting_files.set_detector(client, tmp_path, "HyD S 3", operating_mode="Analog")
+
+    assert result["success"] is False and "Analog" in result["message"]

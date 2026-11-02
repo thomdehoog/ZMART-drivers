@@ -305,6 +305,15 @@ STATE_TREE_WRITES = {
          "UnifiedLaserLine_SequentialInfo", "Intensity"),
         float, within=(0, 100), numbered=("LightSource_SequentialInfo", "UnifiedLaserLine_SequentialInfo"),
     ),
+    # A detector's operating mode in a setting, as the window writes it: the
+    # mode's place in the detector's list (Fast Mode, Counting, Analog,
+    # Reflection on the simulator, 2026-11-02); LCS sets the mode itself and
+    # applies it to the detector. Which setting, photometer and detector is At.
+    "OperatingModeIndex": TreeWrite(
+        ("Acquire", "ATL", "CurrentBlock", "ConfocalSequentialInfo", "SequentialSettingParameter", "SpectralDetection_SequentialInfo",
+         "Spectrophotometer_SequentialInfo", "DetectionUnitList_SequentialInfo", "DetectorHWInfo_SequentialInfo", "OperatingModeIndex"),
+        within=(0, 7), numbered=("SequentialSettingParameter", "Spectrophotometer_SequentialInfo", "DetectorHWInfo_SequentialInfo"),
+    ),
     "MotCorrRefPos": TreeWrite(
         ("Microscope", "ObjectiveList", "ObjectiveInfo", "MotCorrRefPos"), float,
         choices=frozenset({-1.0}), within=(0, 100), of_objective=True,
