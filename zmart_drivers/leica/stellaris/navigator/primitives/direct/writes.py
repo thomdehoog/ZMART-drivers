@@ -1072,8 +1072,9 @@ def aobs_line(at: int, wavelength: float, node: str, on: bool) -> Write:
                  confirm=Expect("aobs_lines", shows))
 
 
-#: The tau modes by name and LCS's code for them (``DigitalGatingMode``), as the window's TauModes list names them.
-TAU_CODES = {"Intensity": 2, "TauGating": 3, "TauScan": 5, "TauSeparation": 6, "TauInteraction": 10}
+#: The tau modes by name and LCS's code for them (``DigitalGatingMode``), as the window's TauModes list names them
+#: (None, Intensity, TauGating, TauScan, TauSeparation, TauInteraction on the simulator, 2026-11-03; GateScan was not offered).
+TAU_CODES = {"None": 0, "Intensity": 2, "TauGating": 3, "TauScan": 5, "TauSeparation": 6, "TauInteraction": 10}
 
 
 def autofocus_scan_change(name: str, elements: list[str], description: str, shows) -> Write:

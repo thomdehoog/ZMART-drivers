@@ -43,8 +43,8 @@ OPERATING_MODES = {
     "Reflection": {"OperatingType": "1", "IsReflectionModeActive": "1"},
 }
 
-#: The TauModes list, as ``DigitalGatingMode`` (offered with a pulsed WLL line, in counting).
-TAU_MODES = {"Intensity": "2", "TauGating": "3", "TauScan": "5", "TauSeparation": "6", "TauInteraction": "10"}
+#: The TauModes list, as ``DigitalGatingMode`` (offered with a pulsed WLL line, in counting): the driver's one list.
+TAU_MODES = {name: str(code) for name, code in writes.TAU_CODES.items()}
 #: How close a detector's gain must come when read back.
 GAIN_TOLERANCE = 0.05
 
@@ -122,6 +122,8 @@ def by_command(client, name, *, operating_mode=None, on=None, gain=None, band=No
         offered = modes.get("tau_offered", [])
         if writes.TAU_CODES[tau_mode] not in offered:
             return [f"{name} does not offer the tau mode {tau_mode} in this setting"]
+        if "tau_available" in modes and writes.TAU_CODES[tau_mode] not in modes["tau_available"]:
+            return [f"LAS X greys the tau mode {tau_mode} out for {name} now (it needs a pulsed line, photon counting, or TauContrast for None)"]
         planned.append(writes.detector_tau(route, name, offered.index(writes.TAU_CODES[tau_mode]), tau_mode))
     return [changes.run(client, change) for change in planned]
 

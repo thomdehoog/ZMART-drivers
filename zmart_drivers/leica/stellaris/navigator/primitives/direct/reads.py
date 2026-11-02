@@ -1004,7 +1004,8 @@ AUTOFOCUS_SETTING = ("Acquire", "ATL", "CurrentBlock", "ConfocalSequentialInfo",
 
 def get_detector_modes() -> dict:
     """Each detector's modes in the current setting, by name: ``tau`` and ``operating`` (LCS's codes now),
-    ``tau_offered`` and ``operating_offered`` (codes, by place), ``tau_colours`` and ``tau_lifetimes_ns``
+    ``tau_offered`` and ``operating_offered`` (codes, by place), ``tau_available`` (the tau
+    modes the window does not grey out now), ``tau_colours`` and ``tau_lifetimes_ns``
     (TauSeparation's two channels' colours and lifetimes; empty in another tau mode), and ``at`` (the setting's, the
     photometer's and the detector's places in LCS's state tree).
 
@@ -1061,6 +1062,12 @@ def get_detector_modes() -> dict:
             found[name] = {
                 "tau": node_value(nodes, named(nodes, unit, "DigitalGatingMode")),
                 "tau_offered": listed_codes(unit, "DigitalGatingModeList_SeqInfo", "DigitalGatingMode", "DigitalGatingMode"),
+                "tau_available": [
+                    code for code, enabled in zip(
+                        listed_codes(unit, "DigitalGatingModeList_SeqInfo", "DigitalGatingMode", "DigitalGatingMode"),
+                        listed_codes(unit, "DigitalGatingModeList_SeqInfo", "DigitalGatingMode", "IsEnabled"),
+                    ) if enabled
+                ],
                 "operating": node_value(nodes, operating) if operating is not None else None,
                 "operating_offered": listed_codes(unit, "DetectionUnitOperatingModeList_SeqInfo", "DetectionUnitOperatingMode", "OperatingMode"),
                 "tau_colours": listed_codes(unit, "TauSeparationDefinition_SeqInfo", "TauSeparationChannel", "LutName"),

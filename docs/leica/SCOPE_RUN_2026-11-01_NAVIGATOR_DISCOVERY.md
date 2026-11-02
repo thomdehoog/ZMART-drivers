@@ -1031,3 +1031,14 @@ read back from the channels' gates (`get_detector_modes()[name]["gates"]`). Thro
 0.3 to 8.0, a gate 9 to 11 added, a channel 1 to 3 added and removed, the added gate removed, 20 ns refused; HyD 2
 then back in TauSeparation (Cyan, Magenta).
 
+## 60. The tau mode None, and greyed-out tau modes (3 November 2026)
+
+The detector panel's TauModes list names, by place, exactly LCS's codes in `DigitalGatingModeList_SeqInfo`: None 0,
+Intensity 2, TauGating 3, TauScan 5, TauSeparation 6, TauInteraction 10 (GateScan was not offered on the simulator).
+Each entry has `IsEnabled`: for HyD 4 only Intensity was enabled; None needs TauContrast, the others a pulsed line in
+counting. `SetDigitalGatingModeIndex` with a greyed-out place was answered `<Result/>` and changed nothing.
+
+Built: "None" added to the driver's tau modes (one list, `writes.TAU_CODES`; `setting_files` derives its own from it);
+`get_detector_modes()[name]["tau_available"]`; `set_detector(tau_mode=...)` refuses a greyed-out mode with nothing
+sent. Through the driver: HyD 4's TauScan refused (only Intensity available).
+

@@ -316,16 +316,17 @@ class Microscope:
         """Change the detector *name*, any of its fields at once, and read it back.
 
         *on*, *gain*, *band* ``(begin_nm, end_nm)``, *operating_mode* (Fast
-        Mode, Counting, Analog, Reflection), *tau_mode* (Intensity, TauGating,
+        Mode, Counting, Analog, Reflection), *tau_mode* (None, Intensity, TauGating,
         TauScan, TauSeparation, TauInteraction; with a pulsed WLL line),
         *tau_contrast* and *dye* (LAS X's name, such as ``"Leica/ALEXA 488"``).
 
-        LAS X takes these through a whole setting: the current setting is
-        saved, only Setting 1 is changed in a copy, its laser powers and gains
-        are checked against the limits, and the copy is loaded. The result's
-        ``changed`` lists everything else LAS X changed with it. Refused when
-        LAS X has several sequential settings. In photon counting LAS X keeps
-        the gain fixed.
+        On/off, gain, band, operating mode and tau mode go into the current
+        setting with LAS X's own commands. TauContrast and the dye go through a
+        whole setting: the current setting is saved, only Setting 1 is changed
+        in a copy, its laser powers and gains are checked against the limits,
+        and the copy is loaded; the result's ``changed`` lists everything else
+        LAS X changed with it, and this is refused when LAS X has several
+        settings. In photon counting LAS X keeps the gain fixed.
         """
         self.handle.require_open()
         result = setting_files.set_detector(

@@ -531,7 +531,7 @@ class StandInNodes:
         ]}, "SpectralDetection_SequentialInfo": {"Spectrophotometer_SequentialInfo": [
             {"DetectionUnitList_SequentialInfo": {"DetectorHWInfo_SequentialInfo": [
                 {"DigitalGatingMode": unit.get("DigitalGatingMode", 2), "DigitalGatingModeList_SeqInfo": {"DigitalGatingMode": [
-                    {"DigitalGatingMode": code, "IsEnabled": True} for code in (0, 2, 3, 5, 6, 10)]},
+                    {"DigitalGatingMode": code, "IsEnabled": code not in unit.get("TauDisabled", ())} for code in (0, 2, 3, 5, 6, 10)]},
                  "OperatingModeIndex": unit.get("OperatingModeIndex", 1), "OperatingMode": unit.get("OperatingMode", 1),
                  # TauGating's channels and their gates (seconds), as LCS lists them in TauGating.
                  **({"DetectorChannelList_SeqInfo": {"FreeGatingChannelCount": 2 - len(unit["Gates"]), "DetectorChannel": [

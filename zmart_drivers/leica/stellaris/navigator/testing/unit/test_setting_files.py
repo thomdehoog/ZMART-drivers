@@ -141,6 +141,17 @@ def test_each_operating_mode_is_written_as_las_x_writes_it_and_read_back(lasx, c
     assert direct_reader.get_detector_modes()["HyD S 3"]["operating"] == {"Fast Mode": 4, "Counting": 1, "Analog": 10, "Reflection": 11}[mode]
 
 
+def test_a_tau_mode_las_x_greys_out_is_refused_and_nothing_is_sent(lasx, client, tmp_path):
+    units = [u for spectro in lasx.nodes.detection["Spectrophotometer"] for u in spectro["DetectionUnitList"]["DetectorHWInfo"]]
+    next(u for u in units if tuple(u["BeamRoute"]) == (40, 3))["TauDisabled"] = (0,)  # HyD S 3: None greyed out
+    sent = len(lasx.sent)
+
+    result = setting_files.set_detector(client, tmp_path, "HyD S 3", tau_mode="None")
+
+    assert result["success"] is False and "greys" in result["message"]
+    assert len(lasx.sent) == sent
+
+
 class TestTauGating:
     @pytest.fixture
     def gating(self, lasx, client, tmp_path):
@@ -269,10 +280,10 @@ def test_a_tau_channel_colour_outside_tau_separation_or_channel_1_and_2_is_refus
     assert changes.set_tau_channel_colour(client, "HyD 9", 1, "Red")["success"] is False
 
 
-@pytest.mark.parametrize("mode", ["Intensity", "TauGating", "TauScan", "TauSeparation", "TauInteraction"])
+@pytest.mark.parametrize("mode", ["None", "Intensity", "TauGating", "TauScan", "TauSeparation", "TauInteraction"])
 def test_each_tau_mode_is_written_as_las_x_writes_it_and_read_back(lasx, client, tmp_path, mode):
     assert setting_files.set_detector(client, tmp_path, "HyD S 3", tau_mode=mode)["confirmed"] is True
-    assert direct_reader.get_detector_modes()["HyD S 3"]["tau"] == {"Intensity": 2, "TauGating": 3, "TauScan": 5, "TauSeparation": 6, "TauInteraction": 10}[mode]
+    assert direct_reader.get_detector_modes()["HyD S 3"]["tau"] == {"None": 0, "Intensity": 2, "TauGating": 3, "TauScan": 5, "TauSeparation": 6, "TauInteraction": 10}[mode]
 
 
 def test_tau_contrast_and_the_dye_are_set_and_read_back(lasx, client, tmp_path):
