@@ -1031,6 +1031,43 @@ class TestFastLive:
         assert changes.set_fast_live(client, "galvo", format=256)["success"] is False
 
 
+class TestLaserOutputPower:
+    def test_the_white_light_laser_s_output_power_is_read(self, lasx, client):
+        assert direct_reader.get_laser_output_power() == {"SuperContVisible Light": 85.0}
+
+    def test_it_is_set_as_the_laser_overview_s_slider_does_and_read_back(self, lasx, client):
+        result = changes.set_laser_output_power(client, 60.0)
+
+        assert result["confirmed"] is True and result["output_power"] == {"SuperContVisible Light": 60.0}
+        assert lasx.nodes.output_power[2] == 60.0
+
+    @pytest.mark.parametrize("percent", [-1.0, 101.0, "85", True])
+    def test_a_power_outside_0_to_100_is_refused(self, lasx, client, percent):
+        assert changes.set_laser_output_power(client, percent)["success"] is False
+        assert direct_reader.get_laser_output_power() == {"SuperContVisible Light": 85.0}
+
+    def test_a_light_source_without_an_output_power_is_refused(self, lasx, client):
+        assert changes.set_laser_output_power(client, 50.0, source="UV")["success"] is False
+
+    def test_the_limits_gate_sees_the_power(self, lasx, client):
+        from limits_fixtures import DEFAULT_STAGE_UM, merged_limits_payload
+
+        from zmart_drivers.leica.stellaris.navigator.driver_setup.limits import limit_rules
+
+        limited = hardware_server.Client("test")
+        payload = merged_limits_payload(dict(DEFAULT_STAGE_UM), functions={"set_laser_output_power": {"range": [0, 50]}})
+        gate.install(limited, gate.GateState(
+            limits=limit_rules.LeicaLimits(payload, source="test", path=None, is_fallback=False),
+            stage_cfg=None, error=None))
+        try:
+            result = changes.set_laser_output_power(limited, 60.0)
+        finally:
+            gate.uninstall(limited)
+
+        assert result["success"] is False
+        assert direct_reader.get_laser_output_power() == {"SuperContVisible Light": 85.0}
+
+
 class TestZDrive:
     def test_the_drive_is_chosen_as_the_z_stack_panel_does(self, lasx, client):
         result = changes.set_z_drive(client, "z-galvo")

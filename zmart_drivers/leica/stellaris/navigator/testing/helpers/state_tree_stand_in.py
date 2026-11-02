@@ -362,6 +362,9 @@ class StandInNodes:
             SIMULATOR_SETTINGS
         )  # path -> value (or a function giving it), the current setting's nodes
         self.settings = [{"SettingID": 3, "Name": "Setting 1", "IsEnabledForScanning": True}]  # Acquire/ATL/CurrentBlock/SettingInfo
+        # Each light source's own output power in the current setting (percent; -1 for a laser without one),
+        # as LCS keeps it on every line of the source (simulator, 2026-11-02): the white-light laser at 85.
+        self.output_power = {i: (85.0 if "SuperCont" in source["LightSourceName"] else -1.0) for i, source in enumerate(SIMULATOR_LIGHT_SOURCES)}
         # The current setting's Z-compensation support points: z from the reference (metres) and the values held there.
         self.zcomp_points = []
         # The AOBS's eight lines (Confocal/AOBSLineList), as on the simulator, 2026-11-02: 497 in use.
@@ -517,7 +520,10 @@ class StandInNodes:
         ]})
         # Each detector's tau modes in the current setting, as LCS lists them there.
         sequence = child(child(child(child(1, "Acquire"), "ATL"), "CurrentBlock"), "ConfocalSequentialInfo")
-        graft(sequence, "SequentialSettingParameter", {"ZCompensation_SeqInfo": {"ZCompensationPosition": [
+        graft(sequence, "SequentialSettingParameter", {"LightSourceList_SequentialInfo": {"LightSource_SequentialInfo": [
+            {"UnifiedLaser_SequentialInfo": {"UnifiedLaserLine_SequentialInfo": [{"LaserTargetOutputPower": self.output_power[i]}] * 2}}
+            for i in range(len(self.light_sources))
+        ]}, "ZCompensation_SeqInfo": {"ZCompensationPosition": [
             {"ZPosition": point["z"], "ZCompensationValue": [{"Name": name, "Value": value} for name, value in point["values"]]}
             for point in self.zcomp_points
         ]}, "SpectralDetection_SequentialInfo": {"Spectrophotometer_SequentialInfo": [
@@ -596,6 +602,13 @@ class StandInNodes:
                 info = nodes[change.NodeID][1]
                 infos = [n for n in nodes[nodes[info][1]][2] if nodes[n][0] == "ObjectiveInfo"]
                 self.objectives[infos.index(info)][path[-1]] = change.Value
+                continue
+            if path[-1] == "LaserTargetOutputPower" and "SequentialSettingParameter" in path:
+                # A light source's output power: LCS sets it on every line of the source.
+                line_node = nodes[change.NodeID][1]
+                source_node = nodes[nodes[line_node][1]][1]
+                sources = [n for n in nodes[nodes[source_node][1]][2] if nodes[n][0] == "LightSource_SequentialInfo"]
+                self.output_power[sources.index(source_node)] = float(change.Value)
                 continue
             if path[1].startswith("AutoFocusSettingConfocalScanOptions") and not self.live[("Acquire", "AutoFocusInfo", "IsAutoSyncActive")]:
                 continue  # ignored by LCS while Auto Sync is off

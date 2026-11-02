@@ -206,6 +206,11 @@ def get_autofocus_settings(client, **keywords):
     return _routed("autofocus_settings", client, **keywords)
 
 
+def get_laser_output_power(client, **keywords):
+    """Each light source's own output power in the current setting, in percent, by name."""
+    return _routed("laser_output_power", client, **keywords)
+
+
 def get_lambda_scan(client, **keywords):
     """The λ scan's detection: ``begin_nm``, ``end_nm``, ``step_nm``, ``bandwidth_nm``, ``steps``."""
     return _routed("lambda_scan", client, **keywords)

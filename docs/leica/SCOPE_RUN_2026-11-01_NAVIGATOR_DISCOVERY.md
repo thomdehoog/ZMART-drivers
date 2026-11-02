@@ -960,3 +960,16 @@ xzλ, xzλt, xzΛ, xzΛλ. Through the driver: z-galvo, `change_setting("scan_mo
 z-wide, LCS refused xzy ("invalid scan mode: xzy"), and the driver passed the refusal on. Built: `set_z_drive(drive)`,
 the drive alone (before only with a whole z-stack). Left at z-wide, xyz.
 
+## 55. The Laser Overview's output power (2 November 2026)
+
+The Laser Overview (the beam path's laser button) lists Laser 405, the WLL, 488, 638 and 730; only the WLL's power
+switch and slider are offered (85 %). Its slider set through UI Automation stayed in the window; a click of the
+driver's mouse on its track (at the middle) set 49.4 % with no command: `LaserTargetOutputPower` on every WLL line
+of the current setting's entry (`SequentialSettingParameter[n]/.../UnifiedLaserLine_SequentialInfo`). Written into
+the state tree on one line, LCS set it on all eight and the window's slider followed (back to 85). The fixed lasers
+read 0 there and are not offered.
+
+Built: `set_laser_output_power(percent, source=None)`, the WLL unless another tunable source is named, with a new
+limits entry `set_laser_output_power` (bundled default 0 to 85 %, LAS X's own value). Through the driver: 70 %
+(the slider showed 0.7), 95 % refused by the limits, back to 85 %.
+

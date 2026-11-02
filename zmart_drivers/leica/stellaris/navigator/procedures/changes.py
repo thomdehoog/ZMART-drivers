@@ -776,6 +776,29 @@ def start_live(client, project=None, *, fast=False) -> dict:
     return run(client, change)
 
 
+def set_laser_output_power(client, percent, *, source=None, max_retries=None) -> dict:
+    """Set a light source's own output power in the current setting, in percent, as the Laser Overview's slider; the
+    result's ``output_power`` is read back. *source* is LAS X's name for it; None, the only one with an output power
+    (the white-light laser). Each line's power is a share of it. The limits gate sees the power first."""
+    if isinstance(percent, bool) or not isinstance(percent, (int, float)) or not 0 <= percent <= 100:
+        return dispatch.refused(f"an output power is 0 to 100 percent, not {percent!r}")
+    now = readers.get_laser_output_power(client) or {}
+    if source is None:
+        if len(now) != 1:
+            return dispatch.refused(f"name the light source; these have an output power: {sorted(now)}")
+        source = next(iter(now))
+    if source not in now:
+        return dispatch.refused(f"{source!r} has no output power to set; these have: {sorted(now)}")
+    names = [s.get("name") for s in readers.get_light_sources(client) or []]
+    place = readers.get_setting(client)
+    setting_place = [s["id"] for s in place["all"]].index(place["id"]) if place["id"] in [s["id"] for s in place["all"]] else 0
+    change = writes.laser_output_power(setting_place, names.index(source), source, float(percent))
+    result = run(client, change, max_retries=max_retries)
+    if result["success"]:
+        result["output_power"] = readers.get_laser_output_power(client)
+    return result
+
+
 def set_z_drive(client, drive, *, max_retries=None) -> dict:
     """Choose the z drive the z-stack (and a tile's z) uses, ``"z-galvo"`` or ``"z-wide"``, as the z-stack panel's drive
     list; the result's ``z_drive`` is read back. With z-galvo, LAS X also offers the xz scan modes (xzy, xzt, ...)."""

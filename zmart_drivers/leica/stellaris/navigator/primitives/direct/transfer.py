@@ -394,6 +394,13 @@ STATE_TREE_WRITES = {
             ("NoAverage", "NoAccuAndOrAverage", bool, None, None, False),
         )
     },
+    # A light source's own output power in a setting (the Laser Overview's slider), percent; LCS sets it on every
+    # line of the source when one is written (simulator, 2026-11-02). Which setting and source is the element's At.
+    "LaserTargetOutputPower": TreeWrite(
+        ("Acquire", "ATL", "CurrentBlock", "ConfocalSequentialInfo", "SequentialSettingParameter", "LightSourceList_SequentialInfo",
+         "LightSource_SequentialInfo", "UnifiedLaser_SequentialInfo", "UnifiedLaserLine_SequentialInfo", "LaserTargetOutputPower"),
+        float, within=(0, 100), numbered=("SequentialSettingParameter", "LightSource_SequentialInfo"),
+    ),
     "MotCorrRefPos": TreeWrite(
         ("Microscope", "ObjectiveList", "ObjectiveInfo", "MotCorrRefPos"), float,
         choices=frozenset({-1.0}), within=(0, 100), of_objective=True,

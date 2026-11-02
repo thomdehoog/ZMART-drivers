@@ -1171,6 +1171,18 @@ def start_live(project: int, *, fast: bool = False) -> Write:
     )
 
 
+def laser_output_power(setting_place: int, source_place: int, name: str, percent: float) -> Write:
+    """The light source *name*'s own output power in percent, written into the setting at *setting_place*, as the Laser
+    Overview's slider does; the power goes to the limits; read back."""
+
+    def fill(request: Request) -> None:
+        request.elements = [f'<StateTree Command="LaserTargetOutputPower" Value="{float(percent)!r}" At="{int(setting_place)},{int(source_place)}"/>']
+
+    return Write(command="set_laser_output_power", values={"value": float(percent)}, request="LaserTargetOutputPower", fill=fill,
+                 description=f"{name} output power -> {percent:g} %", ready=idle(),
+                 confirm=Expect("laser_output_power", lambda found: abs((found or {}).get(name, -1) - percent) <= 0.05))
+
+
 #: The λ scan's detection: the driver's name, LAS X's command and its attribute, and the reading's key.
 LAMBDA_SCAN = {
     "begin_nm": ("SetLambdaDetectionBegin", "Begin"),

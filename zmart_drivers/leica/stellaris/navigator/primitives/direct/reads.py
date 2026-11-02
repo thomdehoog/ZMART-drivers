@@ -96,6 +96,7 @@ READS = (
     "autofocus_in_time_series",
     "auto_sync",
     "lambda_scan",
+    "laser_output_power",
     "autofocus_optics",
     "pixel_size",
     "bit_depth",
@@ -1092,6 +1093,45 @@ def get_autofocus_optics() -> dict:
         return {"lines": lines}
 
     return read("the Best Focus Setting's optics", reading)
+
+
+def current_setting_place(nodes) -> int:
+    """The current setting's place among the job's settings, 0 the first, as LCS orders ``SequentialSettingParameter``."""
+    current = node_value(nodes, node_at(nodes, ("Acquire", "ATL", "CurrentSetting", "SettingID")))
+    ids = [
+        node_value(nodes, named(nodes, info, "SettingID"))
+        for info in of_name(nodes, children(nodes, node_at(nodes, ("Acquire", "ATL", "CurrentBlock"))), "SettingInfo")
+        if node_value(nodes, named(nodes, info, "SettingID")) is not None
+    ]
+    return ids.index(current) if current in ids else 0
+
+
+def get_laser_output_power() -> dict:
+    """Each tunable light source's own output power in the current setting, in percent, by LAS X's name for the
+    source: the Laser Overview's slider, which the window offers for the white-light laser only (85 on the
+    simulator; the fixed lasers read 0 or -1 there and are left out).
+
+    ``SequentialSettingParameter[n]/.../UnifiedLaserLine_SequentialInfo/LaserTargetOutputPower``, the same on
+    every line of a source (-1 for a laser without one; simulator, 2026-11-02).
+    """
+
+    def reading(nodes):
+        sources = layout(nodes, LIGHT_SOURCES, light_layout)
+        names = [source["name"] for source in sources]
+        tunable = [any(low != high for _name, low, high in source["lasers"]) for source in sources]
+        params = of_name(nodes, children(nodes, node_at(nodes, ("Acquire", "ATL", "CurrentBlock", "ConfocalSequentialInfo"))), "SequentialSettingParameter")
+        place = current_setting_place(nodes)
+        listed = child_named(nodes, params[place], "LightSourceList_SequentialInfo") if place < len(params) else None
+        found = {}
+        for i, source in enumerate(of_name(nodes, children(nodes, listed), "LightSource_SequentialInfo") if listed else []):
+            laser = child_named(nodes, source, "UnifiedLaser_SequentialInfo")
+            lines = of_name(nodes, children(nodes, laser), "UnifiedLaserLine_SequentialInfo") if laser else []
+            power = node_value(nodes, named(nodes, lines[0], "LaserTargetOutputPower")) if lines else None
+            if isinstance(power, (int, float)) and power >= 0 and i < len(names) and tunable[i]:
+                found[names[i]] = float(power)
+        return found
+
+    return read("the lasers' output power", reading)
 
 
 def get_lambda_scan() -> dict:

@@ -614,6 +614,15 @@ class Microscope:
         lines = readings.get_aobs_lines(self.handle.client) or []
         return next(line for line in lines if abs(line["wavelength"] - float(wavelength_nm)) < 0.5)
 
+    def set_laser_output_power(self, percent: float, source: str | None = None) -> dict:
+        """Set a laser's own output power in the current setting, in percent, as LAS X's Laser Overview slider: the
+        white-light laser's, unless *source* names another. Each line's power is a share of it. Within the limits
+        (by default up to 85 %, LAS X's own value). Answers each source's output power."""
+        self.handle.require_open()
+        result = changes.set_laser_output_power(self.handle.client, percent, source=source)
+        checked(self.handle, result, f"set_laser_output_power({percent!r})")
+        return result["output_power"]
+
     def set_z_drive(self, drive: str) -> str:
         """Choose the z drive the z-stack uses, ``"z-galvo"`` or ``"z-wide"``, as the z-stack panel's drive list.
 

@@ -230,6 +230,7 @@ SETTER_LIMIT_KEYS = (
     "set_autofocus_precision",
     "set_autofocus_steps",
     "set_autofocus_range_um",
+    "set_laser_output_power",
     "set_autofocus_drive",
 )
 
