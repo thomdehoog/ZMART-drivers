@@ -75,6 +75,19 @@ SIMULATOR_SETTINGS = {
     ("Acquire", "AutoFocusInfo", "ZUseMode"): 1,
     # When the autofocus runs in a time series (its Timelapse tab): 1 first cycle, 2 every cycle, 3 every n-th.
     ("Acquire", "AutoFocusInfo", "WorkflowTimelapse"): 1,
+    # Auto Sync and its scan options (simulator, 2026-11-02); the options are taken only while Auto Sync is on.
+    ("Acquire", "AutoFocusInfo", "IsAutoSyncActive"): False,
+    **{
+        ("Acquire", parent, name): value
+        for parent, speed, zoom in (("AutoFocusSettingConfocalScanOptions", (100, 2600, 600), (0.75, 1.0)),
+                                    ("AutoFocusSettingConfocalScanOptionsResonant", (12000, 12000, 12000), (2.0, 2.0)))
+        for name, value in {
+            "ChangeFormat": True, "WantedPixelSizeX": 64, "ChangeSpeed": parent.endswith("Options"),
+            "WantedSpeed": speed[2], "SpeedMin": speed[0], "SpeedMax": speed[1],
+            "ChangeFieldOfView": False, "SuggestedZoomReduction": zoom[1], "ZoomMin": zoom[0], "ZoomMax": 48.0,
+            "UseBiDir": True, "NoAccuAndOrAverage": True,
+        }.items()
+    },
     ("Acquire", "AutoFocusInfo", "WorkflowTimelapseIterator"): 1,
     ("Acquire", "AutoFocusInfo", "FocusRange"): 80,
     ("Acquire", "AutoFocusInfo", "AFAnalyseType"): 1,
@@ -578,6 +591,8 @@ class StandInNodes:
                 infos = [n for n in nodes[nodes[info][1]][2] if nodes[n][0] == "ObjectiveInfo"]
                 self.objectives[infos.index(info)][path[-1]] = change.Value
                 continue
+            if path[1].startswith("AutoFocusSettingConfocalScanOptions") and not self.live[("Acquire", "AutoFocusInfo", "IsAutoSyncActive")]:
+                continue  # ignored by LCS while Auto Sync is off
             if path[:2] == ["Confocal", "ROIScan"]:
                 # ROI scan and bleaching exclude each other; the 3D sections stay within the stack, first before last.
                 r = ("Confocal", "ROIScan")

@@ -1171,6 +1171,60 @@ def start_live(project: int, *, fast: bool = False) -> Write:
     )
 
 
+def auto_sync(on: bool) -> Write:
+    """Auto Sync on, as the Best Focus Setting's X sends it (``ResetAutoFocusToAutoSync``; Series Scan Autofocus goes
+    off with it), or off, as the Best Focus Scan Options' Auto Sync box writes it (LCS then copies the current
+    setting's light and detectors into the Best Focus Setting). Read back."""
+    element = '<Scanner Command="ResetAutoFocusToAutoSync"/>' if on else '<StateTree Command="IsAutoSyncActive" Value="0"/>'
+
+    def fill(request: Request) -> None:
+        request.elements = [element]
+
+    return Write(command="set_auto_sync", values={"value": bool(on)}, request=element.split('"')[1], fill=fill,
+                 description=f"Auto Sync -> {'on' if on else 'off'}", ready=idle(),
+                 confirm=Expect("auto_sync", lambda found: bool(found) and found["on"] is bool(on)))
+
+
+#: Auto Sync's options by the driver's name: the state-tree name, its own on/off (None: always on), the kind.
+AUTO_SYNC_OPTIONS = {
+    "format": ("Format", "ChangeFormat", int),
+    "scan_frequency": ("Speed", "ChangeSpeed", int),
+    "overview_zoom": ("Zoom", "ChangeZoom", float),
+    "bidirectional": ("Bidirectional", None, bool),
+    "no_average": ("NoAverage", None, bool),
+}
+
+
+def auto_sync_option(scanner: str, option: str, value) -> list[Write]:
+    """One of Auto Sync's scan options for *scanner* (``"fov"``, ``"resonant"``), as the Best Focus Scan Options window
+    writes it: a number ticks its box and sets it, False unticks it; bidirectional and no_average take True or False."""
+    if scanner not in ("fov", "resonant"):
+        raise ValueError(f"Auto Sync has the scanners 'fov' and 'resonant', not {scanner!r}")
+    if option not in AUTO_SYNC_OPTIONS:
+        raise ValueError(f"Auto Sync's options are {sorted(AUTO_SYNC_OPTIONS)}, not {option!r}")
+    name, box, kind = AUTO_SYNC_OPTIONS[option]
+    suffix = "Resonant" if scanner == "resonant" else ""
+
+    def write(node, text, expected, shown):
+        def fill(request: Request) -> None:
+            request.elements = [f'<StateTree Command="AutoSync{node}{suffix}" Value="{text}"/>']
+
+        return Write(command="set_auto_sync_options", values={"value": shown}, request=f"AutoSync{node}{suffix}", fill=fill,
+                     description=f"Auto Sync ({scanner}) {option.replace('_', ' ')} -> {shown}", ready=idle(),
+                     confirm=Expect("auto_sync", lambda found: (found or {}).get(scanner, {}).get(option) == expected))
+
+    if kind is bool:
+        if not isinstance(value, bool):
+            raise ValueError(f"{option} takes True or False, not {value!r}")
+        return [write(name, int(value), value, value)]
+    if value is False:
+        return [write(box, 0, None, "off")]
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or (kind is int and value != int(value)):
+        raise ValueError(f"{option} takes {'a whole number' if kind is int else 'a number'} or False, not {value!r}")
+    shown = kind(value)
+    return [replace(write(name, repr(shown), shown, shown), confirm=None), write(box, 1, shown, shown)]
+
+
 def autofocus_in_time_series(when) -> Write:
     """When the autofocus runs in a time series, as its Timelapse tab: ``"first"``, ``"every"``, or n >= 2 (every n-th cycle).
 

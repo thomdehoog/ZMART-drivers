@@ -614,6 +614,24 @@ class Microscope:
         lines = readings.get_aobs_lines(self.handle.client) or []
         return next(line for line in lines if abs(line["wavelength"] - float(wavelength_nm)) < 0.5)
 
+    def set_auto_sync(self, on: bool) -> dict:
+        """Auto Sync on or off: the autofocus then uses the current setting's light and detectors. On, Series Scan
+        Autofocus goes off (as closing the Best Focus Setting in the window does); off, LAS X copies the current
+        setting into the Best Focus Setting. Answers Auto Sync and its options."""
+        self.handle.require_open()
+        result = changes.set_auto_sync(self.handle.client, on)
+        checked(self.handle, result, f"set_auto_sync({on!r})")
+        return result["auto_sync"]
+
+    def set_auto_sync_options(self, scanner: str = "fov", **options) -> dict:
+        """Auto Sync's scan options for ``"fov"`` or ``"resonant"``, as the Best Focus Scan Options window, while Auto
+        Sync is on: ``format`` (16 to 512), ``scan_frequency``, ``overview_zoom`` (a number ticks the box, False
+        unticks it), ``bidirectional``, ``no_average``. Each is checked against LAS X's range first."""
+        self.handle.require_open()
+        result = changes.set_auto_sync_options(self.handle.client, scanner, **options)
+        checked(self.handle, result, f"set_auto_sync_options({scanner!r}, {options!r})")
+        return result["auto_sync"]
+
     def set_autofocus_in_time_series(self, when) -> str | int:
         """When LAS X's autofocus runs in a time series, as its Timelapse tab: ``"first"`` (the first cycle only),
         ``"every"`` (every cycle), or n (every n-th cycle). Answers it as LAS X holds it."""

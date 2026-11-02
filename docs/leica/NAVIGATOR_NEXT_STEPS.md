@@ -37,7 +37,8 @@ checked by the driver either way (`transfer.CHECKED_COMMANDS`, `transfer.STATE_T
 
 **Autofocus, what is left**
 - The Reflection method's coverslip offset (`ReflectionOffset`) and its "Find Coverslip Reflection" button.
-- Auto Sync and its scan options.
+- The simulator's Best Focus Setting kept a 499 nm line at 2 % after the Auto Sync trial (Auto Sync off copies
+  Setting 1 into it); a line cannot be taken out of it without redefining the whole Best Focus Setting.
 - The hardware autofocus (AFC, `Microscope/AFC`) and its offset.
 - The autofocus's Stage tab (at which positions: `WorkflowXY`, `WorkflowXYIterator`, `WorkflowXYPositions`);
   it is greyed out without stage positions, so it comes with the Navigator.

@@ -191,14 +191,16 @@ def numbered_node(nodes, path, places):
     return node
 
 
-def change_node(path, value, *, of_objective=False, places=None):
+def change_node(path, value, *, of_objective=False, places=None, unsigned=False):
     """Write *value* into the node at *path*, looked up by name now, as LAS X's window does for Bidirectional X.
 
     With *of_objective*, the node is the objective in the light path's own
     (:func:`objective_node`), looked up now; with *places*, the repeated
     nodes are taken at those places (:func:`numbered_node`). Called by the transfer only, for
     a value on its list. A record of LCS's own type when pywin32 can make
-    one; the stand-in takes a plain one.
+    one; the stand-in takes a plain one. With *unsigned*, the value is written
+    as LCS's unsigned number, which some nodes take and others ignore as a
+    plain one (simulator, 2026-11-02).
     """
     nodes = server_nodes()
     if of_objective:
@@ -211,6 +213,10 @@ def change_node(path, value, *, of_objective=False, places=None):
         import win32com.client
 
         change = win32com.client.Record("UDT_SERVERNODE_CHANGE", nodes)
+        if unsigned:
+            import pythoncom
+
+            value = win32com.client.VARIANT(pythoncom.VT_UI4, int(value))
     except Exception:  # noqa: BLE001 -- not LCS's COM object: the stand-in
         from types import SimpleNamespace
 

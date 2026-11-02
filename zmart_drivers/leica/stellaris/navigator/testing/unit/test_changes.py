@@ -1031,6 +1031,42 @@ class TestFastLive:
         assert changes.set_fast_live(client, "galvo", format=256)["success"] is False
 
 
+class TestAutoSync:
+    def test_auto_sync_goes_on_with_the_window_s_command_and_off(self, lasx, client):
+        on = changes.set_auto_sync(client, True)
+
+        assert on["confirmed"] is True and on["auto_sync"]["on"] is True
+        assert lasx.commands()[-1] == "ResetAutoFocusToAutoSync"
+        assert changes.set_auto_sync(client, False)["auto_sync"]["on"] is False
+
+    def test_the_options_are_written_and_read_back(self, lasx, client):
+        changes.set_auto_sync(client, True)
+
+        result = changes.set_auto_sync_options(client, "fov", format=128, scan_frequency=1000, overview_zoom=2.0,
+                                               bidirectional=False, no_average=False)
+
+        assert result["confirmed"] is True
+        assert result["auto_sync"]["fov"] == {"format": 128, "scan_frequency": 1000, "overview_zoom": 2.0,
+                                              "bidirectional": False, "no_average": False}
+
+    def test_an_option_is_switched_off_with_false(self, lasx, client):
+        changes.set_auto_sync(client, True)
+
+        assert changes.set_auto_sync_options(client, "fov", format=False)["auto_sync"]["fov"]["format"] is None
+
+    @pytest.mark.parametrize(("option", "value"), [("format", 8), ("format", 1024), ("scan_frequency", 3000), ("overview_zoom", 100.0),
+                                                   ("bidirectional", "yes"), ("speed", 1)])
+    def test_what_the_window_does_not_offer_is_refused(self, lasx, client, option, value):
+        changes.set_auto_sync(client, True)
+        before = direct_reader.get_auto_sync()
+
+        assert changes.set_auto_sync_options(client, "fov", **{option: value})["success"] is False
+        assert direct_reader.get_auto_sync() == before
+
+    def test_the_options_are_refused_while_auto_sync_is_off(self, lasx, client):
+        assert changes.set_auto_sync_options(client, "fov", format=128)["success"] is False
+
+
 class TestAutofocusInATimeSeries:
     @pytest.mark.parametrize(("when", "shown"), [("every", "every"), (4, 4), ("first", "first")])
     def test_when_the_autofocus_runs_is_written_and_read_back(self, lasx, client, when, shown):

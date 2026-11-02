@@ -776,6 +776,38 @@ def start_live(client, project=None, *, fast=False) -> dict:
     return run(client, change)
 
 
+def set_auto_sync(client, on, *, max_retries=None) -> dict:
+    """Auto Sync on or off; the result's ``auto_sync`` is read back. On, Series Scan Autofocus goes off, as the
+    window's X on the Best Focus Setting does; off, LCS copies the current setting's light and detectors into
+    the Best Focus Setting, as the window's Auto Sync box does."""
+    if not isinstance(on, bool):
+        return dispatch.refused(f"set_auto_sync takes True or False, not {on!r}")
+    result = run(client, writes.auto_sync(on), max_retries=max_retries)
+    if result["success"]:
+        result["auto_sync"] = readers.get_auto_sync(client)
+    return result
+
+
+def set_auto_sync_options(client, scanner="fov", *, max_retries=None, **options) -> dict:
+    """Set Auto Sync's scan options for *scanner*, as the Best Focus Scan Options window; only while Auto Sync is on,
+    as the window greys them out otherwise. All are checked before the first is written; read back."""
+    if not options:
+        return dispatch.refused("set_auto_sync_options needs at least one option")
+    try:
+        planned = [change for option, value in options.items() for change in writes.auto_sync_option(scanner, option, value)]
+    except (ValueError, TypeError) as why:
+        return dispatch.refused(f"Auto Sync's options cannot be set: {why}")
+    if not readers.get_auto_sync(client)["on"]:
+        return dispatch.refused("Auto Sync is off; its options are greyed out (set_auto_sync(True) first)")
+    result = None
+    for change in planned:
+        result = run(client, change, max_retries=max_retries)
+        if not result["success"]:
+            return result
+    result["auto_sync"] = readers.get_auto_sync(client)
+    return result
+
+
 def set_autofocus_in_time_series(client, when, *, max_retries=None) -> dict:
     """When the autofocus runs in a time series, as its Timelapse tab: ``"first"``, ``"every"``, or n (every n-th cycle);
     the result's ``in_time_series`` is read back."""

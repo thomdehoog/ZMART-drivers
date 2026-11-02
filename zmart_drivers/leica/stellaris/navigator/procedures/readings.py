@@ -206,6 +206,11 @@ def get_autofocus_settings(client, **keywords):
     return _routed("autofocus_settings", client, **keywords)
 
 
+def get_auto_sync(client, **keywords):
+    """Auto Sync and its scan options: ``on``, and by scanner ``format``, ``scan_frequency``, ``overview_zoom``, ``bidirectional``, ``no_average``."""
+    return _routed("auto_sync", client, **keywords)
+
+
 def get_autofocus_in_time_series(client, **keywords):
     """When the autofocus runs in a time series: ``"first"``, ``"every"``, or n (every n-th cycle)."""
     return _routed("autofocus_in_time_series", client, **keywords)

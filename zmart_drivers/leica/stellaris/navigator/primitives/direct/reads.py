@@ -94,6 +94,7 @@ READS = (
     "roi_scan",
     "z_compensation",
     "autofocus_in_time_series",
+    "auto_sync",
     "autofocus_optics",
     "pixel_size",
     "bit_depth",
@@ -1090,6 +1091,31 @@ def get_autofocus_optics() -> dict:
         return {"lines": lines}
 
     return read("the Best Focus Setting's optics", reading)
+
+
+#: Auto Sync's scan options, by scanner, where LCS keeps them.
+AUTO_SYNC = {"fov": "AutoFocusSettingConfocalScanOptions", "resonant": "AutoFocusSettingConfocalScanOptionsResonant"}
+
+
+def get_auto_sync() -> dict:
+    """Auto Sync (the autofocus using the current setting's light and detectors) and its scan options:
+    ``on``, and by scanner (``"fov"``, ``"resonant"``) ``format``, ``scan_frequency``, ``overview_zoom`` (each
+    None when its box is unticked), ``bidirectional``, ``no_average``. ``Acquire/AutoFocusInfo/IsAutoSyncActive``
+    and ``Acquire/AutoFocusSettingConfocalScanOptions`` (simulator, 2026-11-02).
+    """
+    found = {"on": bool(settings("Auto Sync", {"on": ("Acquire", "AutoFocusInfo", "IsAutoSyncActive")})["on"])}
+    for scanner, parent in AUTO_SYNC.items():
+        v = settings(f"Auto Sync's {scanner} options", {k: ("Acquire", parent, k) for k in (
+            "ChangeFormat", "WantedPixelSizeX", "ChangeSpeed", "WantedSpeed", "ChangeFieldOfView", "SuggestedZoomReduction",
+            "UseBiDir", "NoAccuAndOrAverage")})
+        found[scanner] = {
+            "format": v["WantedPixelSizeX"] if v["ChangeFormat"] else None,
+            "scan_frequency": v["WantedSpeed"] if v["ChangeSpeed"] else None,
+            "overview_zoom": float(v["SuggestedZoomReduction"]) if v["ChangeFieldOfView"] else None,
+            "bidirectional": bool(v["UseBiDir"]),
+            "no_average": bool(v["NoAccuAndOrAverage"]),
+        }
+    return found
 
 
 def get_autofocus_in_time_series():

@@ -188,6 +188,7 @@ ALLOWED_COMMANDS = frozenset(
         "SetDetectorTauSeparationConfig",
         "FindTauSeparationLifeTimes",
         "ActivateZCompensationMode",
+        "ResetAutoFocusToAutoSync",
         "AddIntensityCompensationInterpolationPoint",
         "RemoveIntensityCompensationInterpolationPointAt",
         "RemoveAllIntensityCompensationInterpolationPoints",
@@ -222,13 +223,14 @@ class TreeWrite:
     """One value the driver may write into LCS's state tree, and the values it may take.
 
     ``kind`` is ``int``, ``float``, ``bool`` (written as 0 or 1) or ``str`` (plain text, see :data:`PLAIN_TEXT`). A value is one of ``choices``, or lies
-    within ``within`` (a fixed range LCS keeps to; with ``choices`` too,
+    within ``within`` (a fixed range; with ``choices`` too,
     either will do), or lies between the two nodes ``between`` names beside
     it: LCS's own minimum and maximum, read at the moment of the write; or
     it is one of the values in the node ``listed`` names beside it, LCS's
     own list, read at the write. ``of_objective``: the node belongs to the
     objective in the light path, found at the write. ``numbered``: the names
     in *path* that repeat; the element's ``At`` gives which of each, in order.
+    ``unsigned``: written as LCS's unsigned number; these nodes ignore a plain one.
     """
 
     path: tuple[str, ...]
@@ -239,6 +241,7 @@ class TreeWrite:
     listed: str | None = None
     of_objective: bool = False
     numbered: tuple[str, ...] = ()
+    unsigned: bool = False
 
 
 HW_PARAMETER = ("Confocal", "HWParameter")
@@ -369,6 +372,24 @@ STATE_TREE_WRITES = {
     # 3 every n-th, n in the iterator. The window writes them here (simulator, 2026-11-02).
     "WorkflowTimelapse": TreeWrite(("Acquire", "AutoFocusInfo", "WorkflowTimelapse"), choices=frozenset({1, 2, 3})),
     "WorkflowTimelapseIterator": TreeWrite(("Acquire", "AutoFocusInfo", "WorkflowTimelapseIterator"), within=(1, 1_000_000_000)),
+    # Auto Sync off (on is the window's command), and its scan options for the FOV scanner and the resonant one
+    # ("Resonant" at the end): each with its own on/off. The window writes them here, taken only while Auto Sync
+    # is on; the format and the speed only as unsigned numbers (simulator, 2026-11-02).
+    "IsAutoSyncActive": TreeWrite(("Acquire", "AutoFocusInfo", "IsAutoSyncActive"), bool),
+    **{
+        f"AutoSync{name}{suffix}": TreeWrite(("Acquire", parent, node), kind, within=within, between=between, unsigned=unsigned)
+        for suffix, parent in (("", "AutoFocusSettingConfocalScanOptions"), ("Resonant", "AutoFocusSettingConfocalScanOptionsResonant"))
+        for name, node, kind, within, between, unsigned in (
+            ("ChangeFormat", "ChangeFormat", bool, None, None, False),
+            ("Format", "WantedPixelSizeX", int, (16, 512), None, True),
+            ("ChangeSpeed", "ChangeSpeed", bool, None, None, False),
+            ("Speed", "WantedSpeed", int, None, ("SpeedMin", "SpeedMax"), True),
+            ("ChangeZoom", "ChangeFieldOfView", bool, None, None, False),
+            ("Zoom", "SuggestedZoomReduction", float, None, ("ZoomMin", "ZoomMax"), False),
+            ("Bidirectional", "UseBiDir", bool, None, None, False),
+            ("NoAverage", "NoAccuAndOrAverage", bool, None, None, False),
+        )
+    },
     "MotCorrRefPos": TreeWrite(
         ("Microscope", "ObjectiveList", "ObjectiveInfo", "MotCorrRefPos"), float,
         choices=frozenset({-1.0}), within=(0, 100), of_objective=True,
@@ -503,7 +524,7 @@ def write_into_state_tree(name: str, text: str, at: str | None = None) -> str:
         room = 1e-9 * max(abs(low), abs(high))
         if not low - room <= value <= high + room:
             return f'<Result Error="1">{name} {text} is outside the range of LAS X, {low} to {high}; not written</Result>'
-    state_tree.change_node(entry.path, value, of_objective=entry.of_objective, places=places)
+    state_tree.change_node(entry.path, value, of_objective=entry.of_objective, places=places, unsigned=entry.unsigned)
     return '<Result Error="0"/>'
 
 

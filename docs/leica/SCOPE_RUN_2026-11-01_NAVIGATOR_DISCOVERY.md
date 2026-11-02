@@ -916,3 +916,24 @@ window followed. These changes had first been hidden by the record's own filter,
 Built: `set_autofocus_in_time_series(when)`, `"first"`, `"every"` or n >= 2, read back. Through the driver: every,
 5, first; 1 refused (that is "every"). The Stage tab was greyed out (no stage positions).
 
+## 52. Auto Sync and its scan options; unsigned values in the state tree (2 November 2026)
+
+The Best Focus Setting's X (`DeleteSetting`, pressed by the driver's mouse) sent `<Scanner Command="ResetAutoFocusToAutoSync"/>`:
+`Acquire/AutoFocusInfo/IsAutoSyncActive` True, `IsSeriesScanAutofocusActive` False (as the help says). The
+Autofocus button's own small button opened the Best Focus Scan Options window (inner window). Its Auto Sync box,
+unticked, sent no command: `IsAutoSyncActive` False, and LCS copied Setting 1's light and detectors into the Best
+Focus Setting. Auto Sync's options are in `Acquire/AutoFocusSettingConfocalScanOptions` (and `...Resonant`), each
+with its own box: `ChangeFormat`/`WantedPixelSizeX` (the window's 16 to 512), `ChangeSpeed`/`WantedSpeed`
+(`SpeedMin` to `SpeedMax`), `ChangeFieldOfView`/`SuggestedZoomReduction` (`ZoomMin` to `ZoomMax`), `UseBiDir`,
+`NoAccuAndOrAverage`; LCS takes them only while Auto Sync is on.
+
+Written into the state tree, the boxes, zoom and bidirectional were taken, but `WantedPixelSizeX` and `WantedSpeed`
+were ignored as plain numbers and taken as LCS's unsigned number (`VT_UI4`). The z-stack's `SectionsCount` was
+taken the same way (11, then back to 7); the time series' `RepeatCount` was ignored either way (the frames follow
+the duration). State-tree writes can now be marked unsigned (`TreeWrite.unsigned`).
+
+Built: `set_auto_sync(on)` (on with the window's command, off written), `set_auto_sync_options(scanner, ...)`,
+a number ticking an option's box, False unticking it, refused while Auto Sync is off. Through the driver: on;
+format 128, 1000 Hz, zoom 2 (the window showed 128); 1024 and 5000 Hz refused; back to 64 and 600, zoom off;
+off; Series Scan Autofocus on again (`change_setting("autofocus", True)`).
+

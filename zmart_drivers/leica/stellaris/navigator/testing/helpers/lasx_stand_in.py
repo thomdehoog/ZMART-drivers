@@ -258,6 +258,11 @@ class PlainNavigator:
         drive = self.live[("Acquire", "ZPositionMode")]
         self.z_um[drive] = (self.live[(*self.ZCOMP, "ReferencePosition")] + float(e.get("ZPosition"))) * 1e6
 
+    def take_ResetAutoFocusToAutoSync(self, e):
+        """The Best Focus Setting closed: Auto Sync on, Series Scan Autofocus off (simulator, 2026-11-02)."""
+        self.live[("Acquire", "AutoFocusInfo", "IsAutoSyncActive")] = True
+        self.live[("Acquire", "AutoFocusInfo", "IsSeriesScanAutofocusActive")] = False
+
     def take_SetStackStepSize(self, e):
         self.live[("Acquire", "AcquireZStackInfo", "StepSize")] = float(e.get("StepSizeInMeter"))
         self.stack_sections()
