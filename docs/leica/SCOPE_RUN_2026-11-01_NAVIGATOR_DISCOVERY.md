@@ -1277,3 +1277,17 @@ Built: `set_z_stack_focus(on=True)` in `lasx_window`, beside the colour lock: on
 plane is pressed off first), off clears it; the plane is read back from LCS. The button was greyed out only before the
 y-stack's begin was set; after a stack is cleared LAS X keeps it enabled. Through the driver: the formula's step (1.3 µm),
 the plane cleared, set, and set again at 982.9 µm; the stack cleared after.
+
+## 82. The Laser Overview's options; an image's settings applied (3 November 2026)
+
+The Laser Overview (`ShowLaserOverviewButton`) lists the 405, 488, 638 and 730 nm lasers with their power switches greyed
+out, and the white-light laser with its switch, its power (built: `set_laser_output_power`) and its options: Excitation
+Control (built: `set_excitation_control`) and Excitation Curves (greyed out). The power switch was not pressed: whether the
+driver switches a laser on or off is Thom's decision.
+
+In the Projects tab, with Image001 of Project2 selected, the toolbar's Apply (`ButtonApply`, "Apply instrument parameters")
+sent `<Scanner Command="ApplyImageSettings" DCImageID="194" RelightMode="0" WaitForSilenceHandle="0"/>`: the image's whole
+setting came back (HyD S 3, 405 nm, 270 values changed). Not built: it would load laser powers and gains the driver cannot
+check against the limits before they reach the microscope, and the driver clears LAS X's image cache after collecting its
+pictures, so their IDs do not last. `save_setting` and `load_setting` (limits checked first) do the same. The setting saved
+before was loaded again after (HyD 2, 499 nm).
