@@ -656,7 +656,8 @@ LASX_VERSION = ("Acquire", "LASAFversion")
 #: checked there and added on its own, one at a time.
 CHECKED_WRITES = {
     "4.9.0.30051": frozenset(STATE_TREE_WRITES),  # the simulator, every write (2026-11-01 to 2026-11-03)
-    "4.9.2.31016": frozenset({"ScanDirectionX", "PhaseX"}),  # the STELLARIS, each checked against the window (2026-11-04)
+    # The STELLARIS, each checked against the window (2026-11-04).
+    "4.9.2.31016": frozenset({"ScanDirectionX", "PhaseX", "Resolution", "PinholeUnit", "SequentialMode"}),
 }
 
 #: LCS's two switches for whether LAS X takes input for its settings now: both on while it is idle; Live turned the
