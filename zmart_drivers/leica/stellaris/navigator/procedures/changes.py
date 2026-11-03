@@ -1768,6 +1768,16 @@ def clear_z_stack(client, *, max_retries=None) -> dict:
     return stack_result(client, writes.z_stack_clear(drive, here, start=start), max_retries)
 
 
+def apply_optical_section_step(client, *, max_retries=None) -> dict:
+    """Set the z-stack's step from LAS X's formula of the optical section, as the formula's Apply to Step Size does; the
+    result's ``z_stack`` is read back. The formula takes the emission wavelength (``emission_wavelength``)."""
+    try:
+        stack, drive, _, start = the_stack(client)
+    except RuntimeError as why:
+        return dispatch.refused(f"the z-stack's step cannot be set: {why}")
+    return stack_result(client, writes.z_stack_optical_section_step(drive, stack["begin"], stack["end"], start=start), max_retries)
+
+
 def set_z_stack_sections(client, sections, *, max_retries=None) -> dict:
     """Set the z-stack's number of sections, by the step that gives it over the stack's size (``SetStackStepSize``).
 

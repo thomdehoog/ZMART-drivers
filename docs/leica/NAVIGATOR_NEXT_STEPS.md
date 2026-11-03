@@ -57,13 +57,14 @@ checked by the driver either way (`transfer.CHECKED_COMMANDS`, `transfer.STATE_T
 - The carrier: slide, dish, well plate (the Navigator Expert sent `StageSetCarrierAttachment`).
 
 **Commands seen in LCS's log but not built**
-- The z-stack's Set Focus (no logged command; the state tree ignored it; only the window, perhaps by UI
-  automation), and the Number of Steps mode as such (the count is set through the step).
+- The Number of Steps mode as such (the count is set through the step).
 - `ResetConfocalSetting`, `ResetAutoFocusToAutoSync`.
 - The mounting medium (`ATL_HyVolution_SetMountingMedium`).
 
 **Other**
-- The Dye Assistant, "Apply to hardware"; Bulk Options' Reset System and Reset ImageCompass (hard to undo: Thom decides).
+- Bulk Options' Reset System and Reset ImageCompass (hard to undo: Thom decides). The Dye Assistant's Apply is
+  `set_dyes`'s command (section 80).
+- Saving a time series: how its pictures are laid out in OME-Zarr is Thom's decision.
 - A dye of one's own in LAS X's library; the dye bar's "+".
 - The Best Focus Setting changed during the dye trials (its scan zoom to 48, a 488 nm line at 1 %); the zoom was put back.
 

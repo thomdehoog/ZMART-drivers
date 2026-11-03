@@ -450,6 +450,7 @@ MUTATING_COMMANDS = {
     "set_z_stack_size": "z_stack",
     "set_z_stack_here": "z_stack",
     "recenter_z_stack": "z_stack",
+    "apply_optical_section_step": "z_stack",
     "clear_z_stack": "z_stack",
     # the autofocus's search: its two ends, as a z-stack's
     "autofocus_run": "z_stack",

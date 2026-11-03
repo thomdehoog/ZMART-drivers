@@ -1673,7 +1673,15 @@ class TestTheZStackPanel:
         assert result["confirmed"] is True and result["z_stack"]["sections"] == 11
         assert result["z_stack"]["stepSize"] == pytest.approx(1.0)
 
+    def test_the_formula_s_apply_to_step_size_takes_las_x_s_step(self, lasx, stacked):
+        result = changes.apply_optical_section_step(stacked)
+
+        assert result["confirmed"] is True
+        assert lasx.sent[-1] == '<Scanner Command="SetOptimalStackStepSize" SamplingFactor="3"/>'
+        assert result["z_stack"]["stepSize"] == pytest.approx(2.4)
+
     def test_without_a_stack_these_are_refused(self, lasx, client):
+        assert changes.apply_optical_section_step(client)["success"] is False
         assert changes.set_z_stack_size(client, 20.0)["success"] is False
         assert changes.recenter_z_stack(client)["success"] is False
         assert changes.move_to_z_stack(client, "begin")["success"] is False

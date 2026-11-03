@@ -2,8 +2,10 @@
 
 Almost everything the driver changes goes to LCS, LAS X's hardware server,
 as a command or a state-tree value. A few of the window's controls send
-LCS nothing: the pan pad's arrows, and the colour lock on the detector
-panel's colour button (``LockLut``; simulator, 2026-11-01). For these the
+LCS nothing: the pan pad's arrows, the colour lock on the detector panel's
+colour button (``LockLut``; simulator, 2026-11-01), and the z-stack panel's
+Set Focus (``ButtonSetFocus``: LCS ignores the focus plane written into its
+state tree, but holds the one the button sets; 2026-11-03). For these the
 driver presses the control in LAS X's window, as the operator does, through
 Windows UI Automation, as it presses OK on LAS X's message boxes; and it
 reads the control's state back from the window.
@@ -93,4 +95,34 @@ def lock_channel_colour(locked: bool, *, window=None) -> dict:
     result = {"success": True, "confirmed": shown is locked, "locked": shown}
     if shown is not locked:
         result["message"] = f"the colour lock was pressed, but LAS X shows it {'locked' if shown else 'free'}"
+    return result
+
+
+#: The z-stack panel's Set Focus.
+SET_FOCUS = "ButtonSetFocus"
+
+
+def set_z_stack_focus(on: bool, *, window=None) -> dict:
+    """Set the z-stack's focus plane where the focus is now, or clear it, as the z-stack panel's Set Focus does; read back.
+
+    When a plane is set already, the button is pressed twice, off and on, so
+    the plane moves to where the focus is now. Refused, with nothing pressed,
+    when LAS X greys the button out (before a stack's begin is set). ``confirmed`` when the
+    window shows the button as asked afterwards.
+    """
+    if not isinstance(on, bool):
+        raise ValueError(f"Set Focus takes True (set it here) or False (clear it), not {on!r}")
+    window = window if window is not None else MainWindow()
+    button = window.control(SET_FOCUS)
+    if not window.is_enabled(button):
+        return {"success": False, "confirmed": False,
+                "message": "LAS X has Set Focus greyed out (is the z-stack's begin set?); nothing was pressed"}
+    if window.is_on(button):
+        window.toggle(button)
+    if on:
+        window.toggle(button)
+    shown = window.is_on(button)
+    result = {"success": True, "confirmed": shown is on}
+    if shown is not on:
+        result["message"] = f"Set Focus was pressed, but LAS X shows the focus plane {'set' if shown else 'cleared'}"
     return result

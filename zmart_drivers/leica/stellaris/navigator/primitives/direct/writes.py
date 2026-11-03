@@ -2459,6 +2459,13 @@ def z_stack_here(which: str, drive: str, z_um: float, begin_um: float, end_um: f
     return z_stack_change("set_z_stack_here", drive, elements, begin_um, end_um, f"Z-stack {which} -> here, {z_um:g} um", start)
 
 
+def z_stack_optical_section_step(drive: str, begin_um: float, end_um: float, *, start: dict | None = None) -> Write:
+    """The z-stack's step from the formula of the optical section, as its Apply to Step Size sends it (``SamplingFactor``
+    3, simulator 2026-11-03); LCS fits the end to whole steps, as for any stack, so the ends go to the limits as they are."""
+    return z_stack_change("apply_optical_section_step", drive, ['<Scanner Command="SetOptimalStackStepSize" SamplingFactor="3"/>'],
+                          begin_um, end_um, "Z-stack step -> the optical section's", start)
+
+
 def z_stack_recenter(drive: str, begin_um: float, end_um: float, *, start: dict | None = None) -> Write:
     """The z-stack moved, its size kept, around where its drive stands, as the window's Re-Center."""
     return z_stack_change("recenter_z_stack", drive, ['<Scanner Command="ReCenterStackAroundCurrentZ"/>'],

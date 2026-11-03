@@ -1227,3 +1227,53 @@ two; it now takes the slider's steps of 8 within LCS's range (264 accepted, 260 
 Auto Sync's Maximal Format, in the Best Focus Scan Options window (a right-click on the Autofocus button opens it), reads the
 same through UI Automation, 16 to 512 in steps of 8, and the driver now takes it the same way. Both windows' Minimal Scan
 Frequency sliders step by 100 (100 to 2600 Hz); the driver checks the frequency against LCS's range only.
+
+## 78. The y-stack of the xz scan modes; the zoom goes to 48 (3 November 2026)
+
+With z-galvo, the scan mode xzy shows a Y-Stack panel instead of the Z-Stack panel, with the same controls. Its Begin and End
+(the driver's mouse) sent the z-stack's own `BeforeBeginOrEndOfStackIsSet` and `SetZStackDefinition`, into `AcquireZStackInfo`.
+Its Y-Position arrow and its Move to Begin sent no command: they wrote `Acquire/ZPosition` (the scan line, in metres;
+`Confocal/YLineSelection/CurrentYLevel` followed), within `ZPositionMin` and `ZPositionMax` (±968.7 µm, the panel's Travel
+Range of 1937.5 µm). Written into the state tree, LCS took it. The driver's size, sections and clear already worked on the
+y-stack; its begin and end here and its moves used z-galvo instead of the line ("The current scan mode (xzy) do not support
+a z positioning").
+
+Built: `move_y_line(y_um)`, the Y-Position box, only in an xz scan mode (in the others the node is the focus), within LCS's
+range; in an xz scan mode the stack's "here" is the line, and `move_to_z_stack` moves the line. The stack's ends still go
+to the limits as z-galvo's, which is stricter than the line's range. Through the driver: the line to -8 and 6 µm, begin
+and end set there, 8 sections, moved to the begin and the center; 2000 µm refused by LCS's range.
+
+Choosing xzy set the zoom to 48, LCS's maximum, and back in xyz it stayed 48 (repeated once through the driver: 1, then 48
+on xzy). This explains the zoom of 48 found earlier the same day. The stack was cleared, the line put at 0, xyz and z-wide
+chosen again, and the zoom set back to 1.
+
+## 79. The formula of the optical section; the autofocus's step count explained (3 November 2026)
+
+The "+" beside the XY panel's Optical Section (`ToolbarButtonOptimizedMore`; the z-stack panel has the same) opens the
+Formula of Optical Section Thickness. Its Emission λ arrow (the driver's mouse) wrote
+`HWParameter/EmissionWaveLengthForAiryAnddzCalculation` 580 to 581, the node `change_setting("emission_wavelength")` already
+writes; with it the pinhole's Airy range moved, and the autofocus's `FixSliceCount` went from 61 to 19047 and stayed there
+when 580 was written back. That count is LCS's own, used only with the Best Focus "Number of Steps" box ticked
+(`UseFixSliceCount`, off here: the autofocus runs by Precision), which explains the 61 to 801 seen on 2 November (section 44).
+Its Apply to Step Size sent `<Scanner Command="SetOptimalStackStepSize" SamplingFactor="3"/>`: with no stack nothing changed;
+with a z-wide stack of 980 to 986 µm in 1 µm steps the step became 1.3 µm, 6 sections, the end fitted to 986.5 µm. Built:
+`apply_optical_section_step()`, its ends checked as the stack's. Refractive index, NA and Airy units are greyed out with
+"Use from System" ticked, and only feed the window's own computation.
+
+## 80. The Dye Assistant (3 November 2026)
+
+The dye bar's `ButtonDyeAssistant` opened the Dye Assistant (on the right screen), with ALEXA 488 and one suggestion,
+"None sequential". Its Apply sent `SetConfocalDefinitionFromDyeAssistant` with `MessageSource` FullDyeAssistant: the
+command `set_dyes` sends for the dye drop, here with a 491 nm line and HyD S 3 from 496 to 738 nm. The suggestions
+(Yield, Crosstalk) are the window's own computation, so the driver reaches the same result with `set_dyes`. The setting
+was saved before and loaded again after (HyD 2, 499 nm).
+
+## 81. The z-stack's Set Focus, pressed in the window (3 November 2026)
+
+Set Focus sends LCS nothing, and LCS ignored the focus plane written into its state tree (section 50). Pressed in LAS X's
+window through UI Automation (it is a toggle button, `ButtonSetFocus`), it cleared the plane that was set
+(`AcquireZStackInfo/AFPlanePosition` and `IsAFPlanePosition`), and pressed again it set it where z-wide stood (982.9 µm).
+Built: `set_z_stack_focus(on=True)` in `lasx_window`, beside the colour lock: on sets the plane where the focus is (a set
+plane is pressed off first), off clears it; the plane is read back from LCS. The button was greyed out only before the
+y-stack's begin was set; after a stack is cleared LAS X keeps it enabled. Through the driver: the formula's step (1.3 µm),
+the plane cleared, set, and set again at 982.9 µm; the stack cleared after.

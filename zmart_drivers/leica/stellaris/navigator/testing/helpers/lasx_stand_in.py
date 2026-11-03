@@ -209,6 +209,12 @@ class PlainNavigator:
             self.live[(*stack, "EndValue")] = float(e.get("EndValue"))
         self.stack_sections()
 
+    def take_SetOptimalStackStepSize(self, e):
+        """The stack's step to LCS's optimal one, the sections following (simulator, 2026-11-03)."""
+        stack = ("Acquire", "AcquireZStackInfo")
+        self.live[(*stack, "StepSize")] = self.live[(*stack, "OptimalStepSize")]
+        self.stack_sections()
+
     def take_SetZStackSize(self, e):
         """The stack's size around its middle, as LCS does (simulator, 2026-11-02)."""
         stack = ("Acquire", "AcquireZStackInfo")

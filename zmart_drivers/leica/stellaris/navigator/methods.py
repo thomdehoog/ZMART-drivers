@@ -498,6 +498,18 @@ class Microscope:
         self.handle.require_open()
         return checked(self.handle, lasx_window.lock_channel_colour(locked), f"lock_channel_colour({locked!r})")
 
+    def set_z_stack_focus(self, on: bool = True) -> dict:
+        """Set the z-stack's focus plane where the focus is now, or clear it with *on* False, as the z-stack panel's Set Focus.
+
+        Set Focus sends LAS X's hardware server nothing, so the driver presses
+        it in LAS X's window. The result's ``focus`` is the plane as LAS X holds
+        it (``z_um``, ``set``); :meth:`move_to_z_stack` moves back to it.
+        """
+        self.handle.require_open()
+        result = checked(self.handle, lasx_window.set_z_stack_focus(on), f"set_z_stack_focus({on!r})")
+        result["focus"] = readings.get_z_stack_focus(self.handle.client)
+        return result
+
     def autofocus(self, project=None) -> dict:
         """Run LAS X's autofocus once, with the settings in its Best Focus Scan Options, as the window's Autofocus button does.
 
@@ -946,6 +958,18 @@ class Microscope:
         self.handle.require_open()
         result = changes.set_z_stack_here(self.handle.client, "end")
         checked(self.handle, result, "set_z_stack_end_here()")
+        return result["z_stack"]
+
+    def apply_optical_section_step(self) -> dict:
+        """Set the z-stack's step from LAS X's formula of the optical section, as the formula's Apply to Step Size does.
+
+        The formula uses the emission wavelength set with
+        ``change_setting("emission_wavelength", ...)``, and the objective and
+        pinhole in use. LAS X fits the stack's end to whole steps. Answers the stack.
+        """
+        self.handle.require_open()
+        result = changes.apply_optical_section_step(self.handle.client)
+        checked(self.handle, result, "apply_optical_section_step()")
         return result["z_stack"]
 
     def recenter_z_stack(self) -> dict:

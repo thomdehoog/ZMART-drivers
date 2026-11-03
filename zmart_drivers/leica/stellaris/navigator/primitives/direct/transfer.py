@@ -175,6 +175,7 @@ ALLOWED_COMMANDS = frozenset(
         "SetZUseMode",
         "SetZStackDefinition",
         "SetZStackSize",
+        "SetOptimalStackStepSize",
         "ReCenterStackAroundCurrentZ",
         "BeforeBeginOrEndOfStackIsSet",
         "SetStackStepSize",

@@ -171,6 +171,8 @@ mic.connect("stellaris-navigator")                                              
 | `recenter_z_stack()` | Move the z-stack, its size kept, around where its drive stands, as the window's Re-Center; its new ends are checked first. |
 | `set_z_stack_sections(sections)` | Set the z-stack's number of sections over its size, by the step that gives it. |
 | `move_to_z_stack(place)` | Move the focus to the z-stack's `"begin"`, `"end"` or `"center"`, or to its `"focus"` plane (set with Set Focus in LAS X's window), as the window's Move to buttons. Checked against the z limits like any z move. In an xz scan mode the scan line moves instead. |
+| `set_z_stack_focus(on=True)` | Set the z-stack's focus plane where the focus is now, or clear it, as the z-stack panel's Set Focus. It sends LAS X's hardware server nothing, so the driver presses it in LAS X's window; the plane is read back from LAS X. |
+| `apply_optical_section_step()` | Set the z-stack's step from LAS X's formula of the optical section (emission wavelength, objective, pinhole), as the formula's Apply to Step Size; answers the stack. |
 | `move_y_line(y_um)` | In an xz scan mode (xzy ...), move the y-stack's scan line, as the y-stack panel's Y-Position box; within LAS X's range; read back. In these modes the z-stack functions work on the y-stack. |
 | `clear_z_stack()` | Leave no z-stack, as the window's bin: its begin and end both go where the focus is. |
 | `change_objective(slot=None, name=None, magnification=None)` | Turn to another objective, and move the stage by the measured offset so the same spot stays in view. Refused before the turret turns when the objective has another immersion, or the calibration does not cover the change. |
