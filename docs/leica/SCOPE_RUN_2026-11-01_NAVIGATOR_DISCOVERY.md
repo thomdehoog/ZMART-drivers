@@ -2002,6 +2002,16 @@ stopped; the white-light laser switched off and on (its lines kept); one autofoc
 `found` and left z exactly where it was (no sample: to check with one). `lock_detector` was refused with the excitation
 line on Auto and three lines on, as it should be; HyD X 4's gain is fixed at 10 in Counting (LAS X: 10 to 10).
 
+**The last writes.** Auto Sync off and on (`IsAutoSyncActive`; it read off before, and the Best Focus Setting's light
+stayed at 405 nm, 2 %); SmartCORR's range written and read back (`Automation*`; 0, 0, 0 cannot be written back, the
+driver takes 2 to 100 steps, so it stays at 10 to 90 % in 5 steps); with the data container wrapper 2.65.0.1 allowed,
+a rectangle, an ellipse, a polygon and a range added as ROI regions, read back and cleared, and a bleach point added,
+chosen (`CurrentBleachPoint`), its 405 nm power set and put back (`BleachPointLaserPower`) and cleared, all seen in the
+window; ROI scan and the bleach mode exclude each other. Thom then turned to the 40x/1.10 WATER himself (z-wide went
+from 6019.71 to 6012.28 um by itself); its collar moved 65 to 70 % and back, Set, GoTo and Reset (`MotCorrRefPos`),
+each read back, no z move. **91 of 93** writes are listed for 4.9.2.31016; `IsDoubleModeEnabled` and
+`CurrentMultiFunctionPortPos` cannot be checked on this STELLARIS.
+
 **Left open:** the autofocus's drive (`ZUseMode`) was z-galvo before these runs and reads z-wide after them; writing
 z-galvo again was answered without an error and did not take. `set_z_drive` (the z-stack panel's drive) went z-galvo
 and back to z-wide in between, which is the likely cause; not proven. Thom sets it back in LAS X's window.

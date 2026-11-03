@@ -684,6 +684,8 @@ CHECKED_WRITES = {
         # Auto Sync's own switch (off and on; the Best Focus Setting's light stayed), SmartCORR's range (written and read
         # back with the 10x; its run waits for an objective with a collar), and the bleach point's choice and power.
         "IsAutoSyncActive", "AutomationBegin", "AutomationEnd", "AutomationSteps", "CurrentBleachPoint", "BleachPointLaserPower",
+        # The collar's reference, with the 40x/1.10 WATER: Set, GoTo and Reset, the collar moved and put back.
+        "MotCorrRefPos",
     }),
 }
 
