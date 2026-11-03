@@ -80,6 +80,8 @@ checked by the driver either way (`transfer.CHECKED_COMMANDS`, `transfer.STATE_T
   (0.00775 on the simulator, a number in the code). The COM scanner route, allowed on the microscope (Thom, 3 November
   2026): first one step right, read back, compared with one press of the window's arrow, centred; then
   `measure_pan_window(route="scanner")` (section 101).
+- ROI Configuration: the laser lines per region and the background (Set Background), which lists no regions on the
+  simulator (sections 89, 109).
 - Drawn regions across an objective change (after the pair's calibration): whether LAS X keeps a region's size in
   micrometres, and how far it lands from its place on the sample; the driver refuses the change while regions are drawn
   until this is measured (section 96).

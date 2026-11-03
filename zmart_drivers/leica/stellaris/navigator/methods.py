@@ -1225,9 +1225,10 @@ class Microscope:
         return result["line_scan"]
 
     def set_time_series(self, frames: int | None = None, interval_s: float | None = None, until_stopped: bool | None = None,
-                        minimize: bool | None = None) -> dict:
+                        minimize: bool | None = None, duration_s: float | None = None) -> dict:
         """Set the time series as LAS X's t panel does: the number of *frames*, the *interval_s* between them,
-        or *until_stopped* (Acquire Until Stopped), or *minimize* (the shortest interval, its Minimize box).
+        or *until_stopped* (Acquire Until Stopped), or *minimize* (the shortest interval, its Minimize box), or the
+        *duration_s* (its Duration: the frames that fill it at the interval, in place of *frames*).
         Answers the time series as LAS X holds it.
 
         The scan mode must have time (``change_setting("scan_mode", "xyt")`` first).
@@ -1237,7 +1238,7 @@ class Microscope:
         between frames as its scale. A series "until stopped" is not taken.
         """
         self.handle.require_open()
-        result = changes.set_time_series(self.handle.client, frames=frames, interval_s=interval_s, until_stopped=until_stopped, minimize=minimize)
+        result = changes.set_time_series(self.handle.client, frames=frames, interval_s=interval_s, until_stopped=until_stopped, minimize=minimize, duration_s=duration_s)
         checked(self.handle, result, f"set_time_series(frames={frames!r}, interval_s={interval_s!r}, until_stopped={until_stopped!r})")
         return result["time_series"]
 

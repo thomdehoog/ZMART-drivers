@@ -2078,8 +2078,10 @@ def time_interval(seconds: float) -> Write:
 
 def time_frames(frames: int, interval_s: float) -> Write:
     """The time series' number of frames, written as the duration that gives it over *interval_s*: LCS works the
-    frames out from the duration, and ignores the frames written themselves (simulator, 2026-11-02)."""
-    return time_series_change("frames", "Duration", repr((frames - 1) * float(interval_s)), f"{frames} frames",
+    frames out from the duration, and ignores the frames written themselves (simulator, 2026-11-02). LCS rounds the
+    intervals up (249 written gave 251 frames, 248.9 gave 250; 2026-11-03), so the duration is written half an interval
+    short, which lands on *frames* whichever way the last digit falls."""
+    return time_series_change("frames", "Duration", repr(max(0.0, frames - 1.5) * float(interval_s)), f"{frames} frames",
                               lambda t: t["frames"] == frames)
 
 

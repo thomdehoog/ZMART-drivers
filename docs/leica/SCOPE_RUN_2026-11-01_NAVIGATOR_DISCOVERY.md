@@ -1753,3 +1753,18 @@ nothing and changed nothing in the state tree. With it on, `set_line_scan(page_i
 30 s in, and True brought the shortest, 20.48 s, back: LCS keeps the shortest page interval while it is on. Built:
 `set_line_scan(minimize=)`, as `set_time_series` has it, written into the state tree; a page interval refused while
 Minimize is on, as LCS would keep the shortest. Through the driver: refused; off with 30 s; on, 20.48 s; then xyz.
+
+## 109. ROI Background, TauGating's channel box, the t panel's Duration, and how LCS rounds frames (3 November 2026)
+
+- ROI scan's Set Background (`CheckBoxBackground`, with a region drawn): switched on and off through UI Automation, LCS got
+  nothing and the state tree did not change. The background is a row of the ROI Configuration, which lists no regions on
+  the simulator (section 89): learned with the laser lines per region, on the STELLARIS.
+- TauGating's channel on/off (in the help): with two gate channels (HyD 2, set by the driver), the "TauGating - HyD 2"
+  window shows each channel's gates with + and -, Add Channel and Remove Channel, and no on/off box. Not in LAS X 4.9's
+  window; nothing to build. (A click meant for its close button opened the help page "TauGating" in the browser.)
+- The t panel's Duration: LCS works the frames out from a written `Duration`, and rounds the intervals up: 249 intervals
+  written gave 251 frames, 248.9 gave 250 (the arithmetic lands a hair above 249). So `set_time_series(frames=250)` at the
+  shortest interval had given 251. Fixed: the duration is written half an interval short, which lands on the frames
+  whichever way the last digit falls. Built: `set_time_series(duration_s=)`, the frames that fill it at the interval,
+  in place of frames. And an interval is now refused while Minimize is on (LCS kept the shortest, 1.28 s, for 10 s asked).
+  Through the driver: refused; Minimize off, 10 s, 60 s: 7 frames; 7 frames; back to 250 frames at the shortest.

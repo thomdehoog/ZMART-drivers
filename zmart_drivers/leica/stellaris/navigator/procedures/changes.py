@@ -1803,18 +1803,27 @@ def set_line_scan(client, *, lines=None, max_lines_per_page=None, lines_per_page
 MOST_FRAMES = 1_000_000_000
 
 
-def set_time_series(client, *, frames=None, interval_s=None, until_stopped=None, minimize=None, max_retries=None) -> dict:
+def set_time_series(client, *, frames=None, interval_s=None, until_stopped=None, minimize=None, duration_s=None,
+                    max_retries=None) -> dict:
     """Set the time series as LAS X's t panel does: *frames*, *interval_s*, or *until_stopped*; the result's
     ``time_series`` is read back.
 
     Only with a scan mode that has time (xyt, xyzt, ...). The interval is
     refused below one frame (``shortest_interval_s``), which LCS would
     otherwise lengthen quietly. Frames turn "until stopped" off, as choosing
-    Frames does; asking for both is refused. Everything is checked before the
-    first value is written.
+    Frames does; asking for both is refused. *duration_s* is the panel's
+    Duration: LCS works the frames out from it over the interval, as it does
+    for frames (one more than the duration over the interval); it stands
+    for the frames, so not both. Everything is checked before the first
+    value is written.
     """
-    if frames is None and interval_s is None and until_stopped is None and minimize is None:
-        return dispatch.refused("set_time_series needs frames, interval_s, until_stopped or minimize")
+    if frames is None and interval_s is None and until_stopped is None and minimize is None and duration_s is None:
+        return dispatch.refused("set_time_series needs frames, interval_s, until_stopped, minimize or duration_s")
+    if duration_s is not None:
+        if isinstance(duration_s, bool) or not isinstance(duration_s, (int, float)) or duration_s < 0:
+            return dispatch.refused(f"the duration is a number of seconds, 0 or more, not {duration_s!r}")
+        if frames is not None or until_stopped:
+            return dispatch.refused("the duration stands for the frames: give duration_s, frames or until_stopped, one of them")
     if minimize is not None and not isinstance(minimize, bool):
         return dispatch.refused(f"minimize takes True or False, not {minimize!r}")
     if minimize and interval_s is not None:
@@ -1831,6 +1840,8 @@ def set_time_series(client, *, frames=None, interval_s=None, until_stopped=None,
     if interval_s is not None:
         if isinstance(interval_s, bool) or not isinstance(interval_s, (int, float)) or interval_s < now["shortest_interval_s"] - 1e-6:
             return dispatch.refused(f"the interval is at least one frame, {now['shortest_interval_s']:g} s, not {interval_s!r}")
+        if minimize is None and now["minimized"]:
+            return dispatch.refused("Minimize is on: LCS keeps the shortest interval; give minimize=False with the interval")
     planned = []
     if minimize is not None:
         planned.append(writes.time_minimize(minimize))
@@ -1838,8 +1849,11 @@ def set_time_series(client, *, frames=None, interval_s=None, until_stopped=None,
         planned.append(writes.time_interval(float(interval_s)))
     if until_stopped is not None:
         planned.append(writes.time_until_stopped(until_stopped))
-    elif frames is not None and now["until_stopped"]:
+    elif (frames is not None or duration_s is not None) and now["until_stopped"]:
         planned.append(writes.time_until_stopped(False))
+    if duration_s is not None:
+        interval = float(interval_s) if interval_s is not None else (now["shortest_interval_s"] if minimize else now["interval_s"])
+        planned.append(writes.time_frames(round(float(duration_s) / interval) + 1, interval))
     if frames is not None:
         interval = float(interval_s) if interval_s is not None else (now["shortest_interval_s"] if minimize else now["interval_s"])
         planned.append(writes.time_frames(frames, interval))

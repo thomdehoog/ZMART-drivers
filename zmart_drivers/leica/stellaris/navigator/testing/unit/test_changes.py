@@ -1867,6 +1867,34 @@ class TestZCompensation:
         assert changes.set_z_compensation(stacked, excitation="yes")["success"] is False
 
 
+class TestTimeSeriesDuration:
+    @pytest.fixture
+    def xyt(self, lasx, client):
+        lasx.live[("Acquire", "ScanDimensionList", "ScanModeName")] = "xyt"
+        return client
+
+    @pytest.mark.parametrize("frames", [1, 2, 7, 250])
+    def test_the_frames_land_on_the_count_although_lcs_rounds_the_duration_up(self, lasx, xyt, frames):
+        assert changes.set_time_series(xyt, frames=frames)["time_series"]["frames"] == frames
+
+    def test_an_interval_while_minimize_is_on_is_refused(self, lasx, xyt):
+        changes.set_time_series(xyt, minimize=True)
+
+        assert "minimize=False" in changes.set_time_series(xyt, interval_s=10.0)["message"]
+        assert changes.set_time_series(xyt, minimize=False, interval_s=10.0)["time_series"]["interval_s"] == pytest.approx(10.0)
+
+    def test_the_duration_gives_the_frames_over_the_interval_as_the_t_panel_does(self, lasx, xyt):
+        result = changes.set_time_series(xyt, interval_s=10.0, duration_s=60.0)
+
+        assert result["confirmed"] is True
+        assert result["time_series"]["frames"] == 7 and result["time_series"]["duration_s"] == pytest.approx(60.0)
+
+    @pytest.mark.parametrize("keywords", [{"duration_s": -1.0}, {"duration_s": "60"}, {"duration_s": 60.0, "frames": 3},
+                                          {"duration_s": 60.0, "until_stopped": True}])
+    def test_what_the_panel_does_not_offer_is_refused(self, lasx, xyt, keywords):
+        assert changes.set_time_series(xyt, **keywords)["success"] is False
+
+
 class TestLineScan:
     @pytest.fixture
     def xt(self, lasx, client):

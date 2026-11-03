@@ -22,6 +22,7 @@ loaded. ``node_calls`` counts ``GetNode`` calls, to see whether a reader walks.
 
 import copy
 import json
+import math
 import re
 
 #: The current setting's nodes as read on the LAS X simulator, 2026-10-13
@@ -754,8 +755,10 @@ class StandInNodes:
                 if path[-1] == "RepeatCount" or path[-1] == "CalculationMode":
                     continue  # ignored by LCS
                 if path[-1] == "Duration":
-                    self.live[(*t, "Duration")] = change.Value
-                    self.live[(*t, "RepeatCount")] = round(change.Value / self.live[(*t, "DelayTime")]) + 1
+                    # LCS rounds the intervals up: 249 intervals written gave 251 frames, 248.9 gave 250 (simulator,
+                    # 2026-11-03); a hair is added here, as LCS's own arithmetic does, so 0 stays 0.
+                    self.live[(*t, "RepeatCount")] = math.ceil(change.Value / self.live[(*t, "DelayTime")] * (1 + 1e-12)) + 1
+                    self.live[(*t, "Duration")] = (self.live[(*t, "RepeatCount")] - 1) * self.live[(*t, "DelayTime")]
                     continue
                 if path[-1] == "DelayTime":
                     # With Minimize on, LCS keeps the shortest interval (simulator, 2026-11-03: 30 s written, 20.48 s kept).
