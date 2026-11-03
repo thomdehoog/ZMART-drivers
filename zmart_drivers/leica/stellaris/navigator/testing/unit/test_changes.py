@@ -1380,12 +1380,17 @@ class TestAutoSync:
         assert result["auto_sync"]["fov"] == {"format": 128, "scan_frequency": 1000, "overview_zoom": 2.0,
                                               "bidirectional": False, "no_average": False}
 
+    def test_the_format_takes_the_slider_s_steps_of_8(self, lasx, client):
+        changes.set_auto_sync(client, True)
+
+        assert changes.set_auto_sync_options(client, "fov", format=264)["auto_sync"]["fov"]["format"] == 264
+
     def test_an_option_is_switched_off_with_false(self, lasx, client):
         changes.set_auto_sync(client, True)
 
         assert changes.set_auto_sync_options(client, "fov", format=False)["auto_sync"]["fov"]["format"] is None
 
-    @pytest.mark.parametrize(("option", "value"), [("format", 8), ("format", 1024), ("scan_frequency", 3000), ("overview_zoom", 100.0),
+    @pytest.mark.parametrize(("option", "value"), [("format", 8), ("format", 260), ("format", 1024), ("scan_frequency", 3000), ("overview_zoom", 100.0),
                                                    ("bidirectional", "yes"), ("speed", 1)])
     def test_what_the_window_does_not_offer_is_refused(self, lasx, client, option, value):
         changes.set_auto_sync(client, True)

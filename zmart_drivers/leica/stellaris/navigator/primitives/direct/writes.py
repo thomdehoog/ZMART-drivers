@@ -1690,6 +1690,8 @@ def auto_sync_option(scanner: str, option: str, value) -> list[Write]:
     if isinstance(value, bool) or not isinstance(value, (int, float)) or (kind is int and value != int(value)):
         raise ValueError(f"{option} takes {'a whole number' if kind is int else 'a number'} or False, not {value!r}")
     shown = kind(value)
+    if option == "format" and shown % FAST_LIVE_FORMAT_STEP:
+        raise ValueError(f"Auto Sync's Maximal Format goes in steps of {FAST_LIVE_FORMAT_STEP}, as its slider, not {shown}")
     return [replace(write(name, repr(shown), shown, shown), confirm=None), write(box, 1, shown, shown)]
 
 
@@ -1865,7 +1867,7 @@ def time_until_stopped(on: bool) -> Write:
                               lambda t: t["until_stopped"] is bool(on))
 
 
-#: Fast Live's Maximal Format: the window's slider and arrows step by 8 (simulator, 2026-11-03), within LCS's own range.
+#: Fast Live's and Auto Sync's Maximal Format: the windows' sliders and arrows step by 8 (simulator, 2026-11-03), within LCS's own range.
 FAST_LIVE_FORMAT_STEP = 8
 #: Fast Live's Scan Settings by the driver's name: the end of the state-tree name, and its kind.
 FAST_LIVE_OPTIONS = {

@@ -1223,3 +1223,7 @@ Fast Live's Scan Settings open with a right-click on the Fast Live button. The F
 read, through UI Automation, 16 to 512 in steps of 8; two clicks on the box's up arrow (the driver's mouse) wrote
 `FastLiveParameters/ScanFormat` 256, 264, 272, and two on the down arrow put it back to 256. The driver took only powers of
 two; it now takes the slider's steps of 8 within LCS's range (264 accepted, 260 refused). The window was closed.
+
+Auto Sync's Maximal Format, in the Best Focus Scan Options window (a right-click on the Autofocus button opens it), reads the
+same through UI Automation, 16 to 512 in steps of 8, and the driver now takes it the same way. Both windows' Minimal Scan
+Frequency sliders step by 100 (100 to 2600 Hz); the driver checks the frequency against LCS's range only.
