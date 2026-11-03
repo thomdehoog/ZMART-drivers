@@ -108,6 +108,7 @@ READS = (
     "fluorifier",
     "mfp_auto_select",
     "autofocus_optics",
+    "bleach_point",
     "pixel_size",
     "bit_depth",
     "serial_number",
@@ -1143,25 +1144,45 @@ def get_autofocus_scan() -> dict:
     }
 
 
+def powered_lines(nodes, parent) -> list[dict]:
+    """The laser lines with power under a sequential setting node *parent* (the Best Focus Setting, the bleach point):
+    each ``beamRoute``, ``lineIndex``, ``wavelength``, ``percent``, the light sources taken by their places."""
+    sources = [s["route"] for s in layout(nodes, LIGHT_SOURCES, light_layout)]
+    listed = child_named(nodes, parent, "LightSourceList_SequentialInfo")
+    lines = []
+    for place, source in enumerate(of_name(nodes, children(nodes, listed), "LightSource_SequentialInfo") if listed else []):
+        laser = child_named(nodes, source, "UnifiedLaser_SequentialInfo")
+        for line in of_name(nodes, children(nodes, laser), "UnifiedLaserLine_SequentialInfo") if laser else []:
+            power = node_value(nodes, named(nodes, line, "Intensity"))
+            if isinstance(power, (int, float)) and power > 0 and place < len(sources):
+                lines.append({
+                    "beamRoute": sources[place], "lineIndex": node_value(nodes, named(nodes, line, "LineIndex")),
+                    "wavelength": node_value(nodes, named(nodes, line, "WaveLength")), "percent": float(power),
+                })
+    return lines
+
+
 def get_autofocus_optics() -> dict:
     """The Best Focus Setting's laser lines with power: ``lines``, each ``beamRoute``, ``lineIndex``, ``wavelength``, ``percent``."""
+    return read("the Best Focus Setting's optics", lambda nodes: {"lines": powered_lines(nodes, node_at(nodes, AUTOFOCUS_SETTING))})
+
+
+#: The bleach point the Bleach Point panel shows, where LCS keeps its settings.
+BLEACH_POINT = ("Acquire", "ATL", "CurrentBlock", "ConfocalSequentialInfo", "SequentialBleachPointParameter")
+
+
+def get_bleach_point() -> dict:
+    """The bleach point the Bleach Point panel shows: its ``name``, ``point`` (its place; None while no point is drawn,
+    ``Confocal/ROIScan/CurrentBleachPoint`` -1) and ``lines`` with power, as for the Best Focus Setting (simulator,
+    2026-11-03). Where the point is, and its bleaching time, LAS X keeps in its data container, not in LCS."""
 
     def reading(nodes):
-        sources = [s["route"] for s in layout(nodes, LIGHT_SOURCES, light_layout)]
-        listed = child_named(nodes, node_at(nodes, AUTOFOCUS_SETTING), "LightSourceList_SequentialInfo")
-        lines = []
-        for place, source in enumerate(of_name(nodes, children(nodes, listed), "LightSource_SequentialInfo") if listed else []):
-            laser = child_named(nodes, source, "UnifiedLaser_SequentialInfo")
-            for line in of_name(nodes, children(nodes, laser), "UnifiedLaserLine_SequentialInfo") if laser else []:
-                power = node_value(nodes, named(nodes, line, "Intensity"))
-                if isinstance(power, (int, float)) and power > 0 and place < len(sources):
-                    lines.append({
-                        "beamRoute": sources[place], "lineIndex": node_value(nodes, named(nodes, line, "LineIndex")),
-                        "wavelength": node_value(nodes, named(nodes, line, "WaveLength")), "percent": float(power),
-                    })
-        return {"lines": lines}
+        parent = node_at(nodes, BLEACH_POINT)
+        point = node_value(nodes, node_at(nodes, ("Confocal", "ROIScan", "CurrentBleachPoint")))
+        return {"name": node_value(nodes, named(nodes, parent, "Name")), "point": int(point) if point >= 0 else None,
+                "lines": powered_lines(nodes, parent)}
 
-    return read("the Best Focus Setting's optics", reading)
+    return read("the bleach point", reading)
 
 
 def get_mfp_auto_select() -> bool:

@@ -519,6 +519,7 @@ MUTATING_COMMANDS = {
     # a setting's dyes, as the window's dye drop: its laser powers checked as any
     "set_dyes": "setting_file",
     "set_autofocus_laser_power": "setting_file",
+    "set_bleach_laser_power": "setting_file",
     # a laser line taken away: less light, never more
     "remove_laser_line": "remove_laser_line",
 }

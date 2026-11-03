@@ -1049,6 +1049,31 @@ def set_autofocus_laser_power(client, laser_nm, percent, *, max_retries=None) ->
     return run(client, change, max_retries=max_retries)
 
 
+def set_bleach_laser_power(client, laser_nm, percent, *, max_retries=None) -> dict:
+    """Change the power of the bleach point's line at *laser_nm*, as the Bleach Point panel's Intensity does; read back.
+
+    The bleach mode must be on and a point drawn in LAS X's viewer; the point
+    takes the setting's lines when it is drawn. The power goes to the limits
+    as a laser power.
+    """
+    if not readers.get_roi_scan(client)["bleach_mode"]:
+        return dispatch.refused("the bleach mode is off; switch it on with set_bleach_mode first; nothing was sent")
+    bleach = readers.get_bleach_point(client)
+    if bleach["point"] is None:
+        return dispatch.refused("no bleach point is drawn; draw one in LAS X's viewer first; nothing was sent")
+    line = next((each for each in bleach["lines"] if isinstance(laser_nm, (int, float)) and abs(each["wavelength"] - laser_nm) < 0.5), None)
+    if line is None:
+        has = ", ".join(f"{each['wavelength']:g}" for each in bleach["lines"]) or "none"
+        return dispatch.refused(f"the bleach point has no line at {laser_nm!r} nm; its lines are {has} nm; nothing was sent")
+    routes = [writes.route_of(source.get("BeamRoute")) for source in readers.get_light_sources(client) or []]
+    place = routes.index(writes.route_of(line["beamRoute"]))
+    try:
+        change = writes.bleach_laser_power(place, line["lineIndex"], float(laser_nm), percent)
+    except ValueError as why:
+        return dispatch.refused(str(why))
+    return run(client, change, max_retries=max_retries)
+
+
 def smartcorr(client, project=None, **watching) -> dict:
     """Run SmartCORR, the window's Start SmartCORR, into *project*; the result's ``collar`` is where LAS X left it.
 

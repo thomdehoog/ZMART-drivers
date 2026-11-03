@@ -1065,6 +1065,52 @@ class TestBestFocusLaserPower:
 
 
 
+class TestBleachPointLaserPower:
+    """The bleach point's laser power, as the Bleach Point panel's Intensity writes it; the point is drawn in LAS X's viewer."""
+
+    @pytest.fixture
+    def drawn(self, lasx, client):
+        lasx.live[("Confocal", "ROIScan", "EnableBleachScan")] = True
+        lasx.live[("Confocal", "ROIScan", "CurrentBleachPoint")] = 0
+        lasx.nodes.bleach_name = "ROI 1"
+        lasx.nodes.bleach_lines = [{"beamRoute": "10;10", "lineIndex": 0, "wavelength": 497.0, "percent": 2.0}]
+        return client
+
+    def test_the_power_is_written_and_read_back(self, lasx, drawn):
+        result = changes.set_bleach_laser_power(drawn, 497, 5)
+
+        assert result["confirmed"] is True
+        assert client_element(drawn) == '<StateTree Command="BleachPointLaserPower" Value="5.0" At="2,0"/>'
+        assert direct_reader.get_bleach_point() == {"name": "ROI 1", "point": 0,
+                                                    "lines": [{"beamRoute": "10;10", "lineIndex": 0, "wavelength": 497.0, "percent": 5.0}]}
+
+    def test_a_power_above_the_limits_is_refused_before_anything_is_sent(self, lasx, drawn):
+        assert changes.set_bleach_laser_power(drawn, 497, 50)["success"] is False
+        assert not any("BleachPointLaserPower" in each for each in lasx.sent)
+
+    def test_a_line_the_point_does_not_have_is_refused(self, lasx, drawn):
+        result = changes.set_bleach_laser_power(drawn, 405, 5)
+
+        assert result["success"] is False and "497" in result["message"]
+        assert not any("BleachPointLaserPower" in each for each in lasx.sent)
+
+    def test_without_a_drawn_point_it_is_refused(self, lasx, drawn):
+        lasx.live[("Confocal", "ROIScan", "CurrentBleachPoint")] = -1
+
+        assert "draw" in changes.set_bleach_laser_power(drawn, 497, 5)["message"]
+        assert not any("BleachPointLaserPower" in each for each in lasx.sent)
+
+    def test_with_the_bleach_mode_off_it_is_refused(self, lasx, drawn):
+        lasx.live[("Confocal", "ROIScan", "EnableBleachScan")] = False
+
+        assert "set_bleach_mode" in changes.set_bleach_laser_power(drawn, 497, 5)["message"]
+        assert not any("BleachPointLaserPower" in each for each in lasx.sent)
+
+
+def client_element(client):
+    return client.reply["element"]
+
+
 class TestTheAobs:
     def lines(self, lasx):
         return lasx.nodes.aobs_lines

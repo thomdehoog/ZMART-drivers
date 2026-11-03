@@ -1447,6 +1447,26 @@ def autofocus_laser_power(place: int, line_index: int, wavelength_nm: float, per
     )
 
 
+def bleach_laser_power(place: int, line_index: int, wavelength_nm: float, percent: float) -> Write:
+    """The power of the bleach point's line *line_index* of light source *place*, written into the state tree as the
+    Bleach Point panel's Intensity does with no command (simulator, 2026-11-03); the power goes to the limits; read back."""
+    if isinstance(percent, bool) or not isinstance(percent, (int, float)) or not 0 < percent <= 100:
+        raise ValueError(f"the bleach point's laser power is above 0 and at most 100 percent, not {percent!r}")
+
+    def fill(request: Request) -> None:
+        request.elements = [f'<StateTree Command="BleachPointLaserPower" Value="{float(percent)!r}" At="{int(place)},{int(line_index)}"/>']
+
+    def shows(bleach) -> bool:
+        return any(abs(line["wavelength"] - wavelength_nm) < 0.5 and abs(line["percent"] - percent) <= LASER_TOLERANCE_PERCENT
+                   for line in (bleach or {}).get("lines", []))
+
+    return Write(
+        command="set_bleach_laser_power", values={"laser_power": [percent]}, request="BleachPointLaserPower", fill=fill,
+        description=f"Bleach point's {wavelength_nm:g} nm line -> {percent:g} %", ready=idle(),
+        confirm=Expect("bleach_point", shows),
+    )
+
+
 def start_autofocus(project: int, drive: str, begin_um: float, end_um: float, *, start: dict | None = None) -> Write:
     """LAS X's autofocus, once, as the window's Autofocus button starts it: a focus search into *project*.
 

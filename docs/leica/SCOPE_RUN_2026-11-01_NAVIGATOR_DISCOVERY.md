@@ -1346,10 +1346,10 @@ Every control LAS X's Acquire window shows to UI Automation was compared with wh
 
 With the bleach mode on (`set_bleach_mode(True)`), the Bleach Point panel showed Load, Save, Calibrate, the list of
 points (empty), the bleaching time (days to milliseconds), Add Laser and its own spectrum, and the viewer's toolbar gained
-Draw point. Draw point was switched on through UI Automation and the image clicked with the driver's mouse, three times:
-on the stored image, then with Live running, and with the pointer moved in before the click. No point appeared, the list
-stayed empty, and LCS got nothing. The ROI regions and the Zoom In rectangle are drawn in the same viewer, so they wait
-too. Live was stopped, Draw point and the bleach mode switched off again.
+Draw point. Draw point was switched on through UI Automation and the image clicked with the driver's mouse, three times,
+and no point appeared. Those clicks went to the wrong screen: LAS X's screen lies left of the main one, at negative
+screen positions, and the clicks were placed as if it started at 0. Section 88 has the point drawn where it belongs.
+Live was stopped, Draw point and the bleach mode switched off again.
 
 ## 87. Z-compensation's Set to Begin; no Move to and Apply (3 November 2026)
 
@@ -1359,3 +1359,33 @@ stack's begin; the points kept their offsets (7.9 and -2.1 µm), so they moved w
 writes the same node, so nothing new is built. The window in LAS X 4.9 has Add, Delete, Move To, Remove All, the reference
 and Set to Begin; the "Move to and Apply" that LAS X's help describes is not in it, so it is not built. The table only shows
 each point's values. Put back: the points removed, the modes off, the stack cleared, the reference at 980 µm.
+
+## 88. The Navigator's Stage, Carrier and Mark; a bleach point drawn, and its power (3 November 2026)
+
+The clicks by screen position now take LAS X's screen where it is (left of the main screen, at x -1920 to 0). With them
+the Navigator answered.
+
+The Navigator's **Stage** tab opened its options: Tile Overlap (10 %), Acquire Separate Images per Region, Optimize
+Acquisition Order of Regions, Save Overview, Clear Overview and Hide Region Shapes on Start of Acquisition, Load previous
+experiment on startup, Merge Images during Acquisition with Keep Raw Data, 3D and Blend, and Fast Scan Settings. Each
+switch, clicked and clicked back, sent LCS nothing and changed nothing in its state tree, except Optimize Acquisition Order,
+which sent the tile positions again. They govern how the Navigator tiles, merges and saves its own pictures; the driver
+places its fields itself (`tile_scan(positions)`), so they are not built. The **Carrier** tab offered None, Slide and Dish
+(Chamber Slide, Multi Slide and Well Plate greyed out); a 75 x 25 mm glass slide drew the slide and offered Align, and sent
+LCS nothing; put back to None. **Mark** put P1 in the Task List and sent `SetStageIrregularTileScanPositions` with the
+stage's place, as `tile_scan` does with its positions. With the Navigator open, the scan mode was `xyzN` and LCS offered
+the autofocus at the first position only (`CanDoFirstPositionOnly`); closing it cleared the points and put both back, so
+the autofocus's Stage tab is not reached in the plain application: `tile_scan` and `autofocus()` per position do it.
+Spiral, Preview, Start and the capture buttons acquire, and were not pressed (section 9).
+
+In the Acquire window, with the bleach mode on, Draw point and one click in the image drew a bleach point ("ROI 0"; the
+viewer marks it ROI 1). LCS got no command: `Confocal/ROIScan/CurrentBleachPoint` went from -1 to 0, and the bleach point's
+setting (`SequentialBleachPointParameter`) took Setting 1's line, the white-light laser's 499 nm at 2 %. Its place and its
+bleaching time (the panel's days to milliseconds: 2 s typed in sent nothing) LAS X keeps in its data container. The
+panel's Intensity, one step up, wrote the line's `Intensity` 2.0 to 2.1 there with no command. Built:
+`set_bleach_laser_power(laser_nm, percent)`, written into that node as the window does, checked against the laser limits,
+refused with the bleach mode off or no point drawn; through the driver 4 % was taken and read back, 60 % refused by the
+limits, and the power put back. The panel's bin removes the point's laser line (`SetConfocalLaserLinesDefinition` with
+`IsBleachPointDefinition="1"` and no line); the viewer's Select All and bin removed the point. While the bleach panel is
+in front, the light source's current values are the bleach point's. Put back: the point removed, Setting 1's 499 nm at 2 %,
+Draw point and the bleach mode off.

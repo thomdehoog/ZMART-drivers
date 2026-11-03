@@ -274,6 +274,7 @@ class TreeWrite:
 HW_PARAMETER = ("Confocal", "HWParameter")
 #: The autofocus's own setting, the Best Focus Setting, in LCS's state tree.
 AUTOFOCUS_SETTING = ("Acquire", "ATL", "CurrentBlock", "ConfocalSequentialInfo", "SequentialAutofocusSetting")
+BLEACH_POINT = ("Acquire", "ATL", "CurrentBlock", "ConfocalSequentialInfo", "SequentialBleachPointParameter")
 
 #: The values the driver may write straight into LCS's state tree, by name.
 #: LAS X's window changes these with no command LCS logs, and a loaded setting
@@ -344,6 +345,13 @@ STATE_TREE_WRITES = {
     # light source and line is the element's At; the power goes to the limits.
     "AutofocusLaserPower": TreeWrite(
         (*AUTOFOCUS_SETTING, "LightSourceList_SequentialInfo", "LightSource_SequentialInfo", "UnifiedLaser_SequentialInfo",
+         "UnifiedLaserLine_SequentialInfo", "Intensity"),
+        float, within=(0, 100), numbered=("LightSource_SequentialInfo", "UnifiedLaserLine_SequentialInfo"),
+    ),
+    # The power of a line of the bleach point the Bleach Point panel shows, as its Intensity writes it with no command
+    # (simulator, 2026-11-03). Which light source and line is the element's At; the power goes to the limits.
+    "BleachPointLaserPower": TreeWrite(
+        (*BLEACH_POINT, "LightSourceList_SequentialInfo", "LightSource_SequentialInfo", "UnifiedLaser_SequentialInfo",
          "UnifiedLaserLine_SequentialInfo", "Intensity"),
         float, within=(0, 100), numbered=("LightSource_SequentialInfo", "UnifiedLaserLine_SequentialInfo"),
     ),

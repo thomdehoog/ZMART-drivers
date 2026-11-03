@@ -68,6 +68,8 @@ SIMULATOR_SETTINGS = {
     ("Confocal", "ROIScan", "EnableRoiScan"): False,
     ("Confocal", "ROIScan", "CanDoBleach"): True,
     ("Confocal", "ROIScan", "EnableBleachScan"): False,
+    # The bleach point the Bleach Point panel shows: -1 while none is drawn (simulator, 2026-11-03).
+    ("Confocal", "ROIScan", "CurrentBleachPoint"): -1,
     ("Confocal", "ROIScan", "CanDo3DLimitedRoiScan"): False,
     ("Confocal", "ROIScan", "Is3DLimitedRoiScanEnabled"): False,
     ("Confocal", "ROIScan", "First3DRoiSection"): 1,
@@ -553,6 +555,15 @@ class StandInNodes:
         ]})
         # Each detector's tau modes in the current setting, as LCS lists them there.
         sequence = child(child(child(child(1, "Acquire"), "ATL"), "CurrentBlock"), "ConfocalSequentialInfo")
+        # The bleach point's lines with power, by light source, as LCS keeps them (simulator, 2026-11-03).
+        graft(sequence, "SequentialBleachPointParameter", {"Name": getattr(self, "bleach_name", "Bleach Point"),
+                                                           "LightSourceList_SequentialInfo": {"LightSource_SequentialInfo": [
+            {"UnifiedLaser_SequentialInfo": {"UnifiedLaserLine_SequentialInfo": [
+                {"LineIndex": line["lineIndex"], "WaveLength": line["wavelength"], "Intensity": line["percent"]}
+                for line in getattr(self, "bleach_lines", []) if line["beamRoute"] == ";".join(str(p) for p in source["BeamRoute"])
+            ] or [{"LineIndex": 0, "WaveLength": 0.0, "Intensity": 0.0}]}}
+            for source in self.light_sources
+        ]}})
         graft(sequence, "SequentialSettingParameter", {"ShowExcitationSpectrum": self.spectra["excitation"],
                                                        "ShowEmissionSpectrum": self.spectra["emission"],
                                                        "LightSourceList_SequentialInfo": {"LightSource_SequentialInfo": [
@@ -647,6 +658,17 @@ class StandInNodes:
                 unit = self.detection["Spectrophotometer"][spectros.index(spectro_node)]["DetectionUnitList"]["DetectorHWInfo"][units.index(unit_node)]
                 unit["OperatingModeIndex"] = change.Value
                 unit["OperatingMode"] = getattr(self, "operating_offered", (4, 1, 10, 11))[change.Value]
+                continue
+            if "SequentialBleachPointParameter" in path and path[-1] == "Intensity":
+                # One of the bleach point's lines: its light source and line by their places.
+                line_node = nodes[change.NodeID][1]
+                source_node = nodes[nodes[line_node][1]][1]
+                places = [n for n in nodes[nodes[source_node][1]][2] if nodes[n][0] == "LightSource_SequentialInfo"]
+                route = ";".join(str(p) for p in self.light_sources[places.index(source_node)]["BeamRoute"])
+                index = next(v for k, v in values.items() if nodes.get(k, ("",))[0] == "LineIndex" and nodes[k][1] == line_node)
+                for line in self.bleach_lines:
+                    if line["beamRoute"] == route and line["lineIndex"] == index:
+                        line["percent"] = change.Value
                 continue
             if "SequentialAutofocusSetting" in path and path[-1] == "Intensity":
                 # One of the Best Focus Setting's lines: its light source and line by their places.

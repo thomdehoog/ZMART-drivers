@@ -192,6 +192,7 @@ DATUMS = {
         DatumSpec("autofocus_scan", direct_reader.get_autofocus_scan, lambda v: isinstance(v, dict) and "format" in v),
         DatumSpec("detector_modes", direct_reader.get_detector_modes, lambda v: isinstance(v, dict)),
         DatumSpec("autofocus_optics", direct_reader.get_autofocus_optics, lambda v: isinstance(v, dict) and "lines" in v),
+        DatumSpec("bleach_point", direct_reader.get_bleach_point, lambda v: isinstance(v, dict) and "lines" in v),
         DatumSpec("optimal_format", lambda: {"format": direct_reader.get_optimal_format()}, lambda v: isinstance(v, dict) and "format" in v),
         DatumSpec("channel_colours", direct_reader.get_channel_colours, lambda v: isinstance(v, dict) and bool(v)),
         DatumSpec("serial_number", direct_reader.get_serial_number, text_present),

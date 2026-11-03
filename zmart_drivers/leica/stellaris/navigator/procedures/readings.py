@@ -201,6 +201,11 @@ def get_autofocus_scan(client, **keywords):
     return _routed("autofocus_scan", client, **keywords)
 
 
+def get_bleach_point(client, **keywords):
+    """The bleach point the Bleach Point panel shows: ``name``, ``point`` (None while none is drawn), ``lines`` with power."""
+    return _routed("bleach_point", client, **keywords)
+
+
 def get_autofocus_optics(client, **keywords):
     """The Best Focus Setting's laser lines with power."""
     return _routed("autofocus_optics", client, **keywords)

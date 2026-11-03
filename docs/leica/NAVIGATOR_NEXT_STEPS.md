@@ -51,9 +51,11 @@ checked by the driver either way (`transfer.CHECKED_COMMANDS`, `transfer.STATE_T
 **Region and experiment types**
 - The regions of an ROI scan, the bleach points and the Zoom In rectangle: drawn in LAS X's viewer and kept in its
   data container (`Confocal/ROIScan/CurrentDCROISetID`), not in LCS; the laser lines per region (ROI Configuration).
-  The viewer took no point from the driver's mouse, with the Draw point tool on and Live running (section 86), so
-  these wait for a way to place them that LAS X offers. The Zoom In rectangle's result, a zoom and a pan, the driver
-  sets with `change_setting("zoom", ...)` and `move_pan`.
+  A bleach point is drawn with Draw point and one click in the image; LCS gets nothing, and its place and bleaching
+  time stay in LAS X's data container (section 88). Its laser power is built (`set_bleach_laser_power`). Placing
+  points and regions would need the driver's mouse at positions in the image: Thom decides whether the driver should
+  draw. The Zoom In rectangle's result, a zoom and a pan, the driver sets with `change_setting("zoom", ...)` and
+  `move_pan`.
 - Bleaching and FRAP (LCS has `SequentialBleachPointParameter`); the FRAP and FRET applications are LAS X's other
   wizards (section 86), outside the plain Acquire tab.
 - The carrier: slide, dish, well plate (the Navigator Expert sent `StageSetCarrierAttachment`).

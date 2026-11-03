@@ -554,6 +554,18 @@ class Microscope:
         result = changes.set_autofocus_optics(self.handle.client, laser_nm, percent, detector, band, dye)
         return checked(self.handle, result, f"set_autofocus_optics({laser_nm!r}, {percent!r}, {detector!r})")
 
+    def set_bleach_laser_power(self, laser_nm: float, percent: float) -> dict:
+        """Change the power of the bleach point's line at *laser_nm*, as the Bleach Point panel's Intensity does; read back.
+
+        The bleach mode must be on (:meth:`set_bleach_mode`) and a point drawn in
+        LAS X's viewer: where the point is, and how long it bleaches, LAS X keeps
+        outside its hardware server, so they are set in its window. The power is
+        checked against the laser limits.
+        """
+        self.handle.require_open()
+        result = changes.set_bleach_laser_power(self.handle.client, laser_nm, percent)
+        return checked(self.handle, result, f"set_bleach_laser_power({laser_nm!r}, {percent!r})")
+
     def set_autofocus_laser_power(self, laser_nm: float, percent: float) -> dict:
         """Change the power of the Best Focus Setting's line at *laser_nm*, as the window does; read back.
 
