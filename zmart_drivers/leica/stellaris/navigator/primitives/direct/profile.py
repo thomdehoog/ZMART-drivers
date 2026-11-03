@@ -179,6 +179,7 @@ DATUMS = {
         DatumSpec("lambda_scan", direct_reader.get_lambda_scan, lambda v: isinstance(v, dict) and "begin_nm" in v),
         DatumSpec("excitation_scan", direct_reader.get_excitation_scan, lambda v: isinstance(v, dict) and "begin_nm" in v),
         DatumSpec("laser_output_power", direct_reader.get_laser_output_power, lambda v: isinstance(v, dict)),
+        DatumSpec("excitation_control", direct_reader.get_excitation_control, lambda v: isinstance(v, dict)),
         DatumSpec("coverslip_offset", direct_reader.get_coverslip_offset, lambda v: isinstance(v, float)),
         DatumSpec("fluorifier", direct_reader.get_fluorifier, lambda v: isinstance(v, dict) and "auto_select" in v),
         DatumSpec("mfp_auto_select", direct_reader.get_mfp_auto_select, lambda v: isinstance(v, bool)),

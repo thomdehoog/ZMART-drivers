@@ -221,6 +221,11 @@ def get_coverslip_offset(client, **keywords):
     return _routed("coverslip_offset", client, **keywords)
 
 
+def get_excitation_control(client, **keywords):
+    """Each tunable laser's Excitation Control, "maximum power" or "constant power", by name."""
+    return _routed("excitation_control", client, **keywords)
+
+
 def get_laser_output_power(client, **keywords):
     """Each light source's own output power in the current setting, in percent, by name."""
     return _routed("laser_output_power", client, **keywords)

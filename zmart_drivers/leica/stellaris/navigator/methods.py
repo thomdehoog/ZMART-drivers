@@ -669,6 +669,14 @@ class Microscope:
         self.handle.require_open()
         return checked(self.handle, changes.apply_to_all_settings(self.handle.client, name), f"apply_to_all_settings({name!r})")
 
+    def set_excitation_control(self, mode: str, source: str | None = None) -> dict:
+        """Set a tunable laser's Excitation Control, "maximum power" or "constant power", as LAS X's Laser Overview: the
+        white-light laser's unless *source* names another. Answers each tunable laser's."""
+        self.handle.require_open()
+        result = changes.set_excitation_control(self.handle.client, mode, source=source)
+        checked(self.handle, result, f"set_excitation_control({mode!r})")
+        return result["excitation_control"]
+
     def set_laser_output_power(self, percent: float, source: str | None = None) -> dict:
         """Set a laser's own output power in the current setting, in percent, as LAS X's Laser Overview slider: the
         white-light laser's, unless *source* names another. Each line's power is a share of it. Within the limits

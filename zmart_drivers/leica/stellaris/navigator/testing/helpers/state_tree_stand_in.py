@@ -636,6 +636,12 @@ class StandInNodes:
                 infos = [n for n in nodes[nodes[info][1]][2] if nodes[n][0] == "ObjectiveInfo"]
                 self.objectives[infos.index(info)][path[-1]] = change.Value
                 continue
+            if path[:4] == ["Confocal", "LightSourceList", "LightSource", "AOTF"] and path[-1] == "CurrentExcitationControlMode":
+                aotf_node = nodes[change.NodeID][1]
+                source_node = nodes[aotf_node][1]
+                sources = [n for n in nodes[nodes[source_node][1]][2] if nodes[n][0] == "LightSource"]
+                self.light_sources[sources.index(source_node)]["AOTF"]["CurrentExcitationControlMode"] = int(change.Value)
+                continue
             if path[:4] == ["Confocal", "HWParameter", "FilterWheelList", "PolarizationFW"] and path[-1] in ("IsSpectrumTurnMode", "FilterSpectrumPos"):
                 self.filter_wheels["PolarizationFW"][0][path[-1]] = change.Value
                 continue

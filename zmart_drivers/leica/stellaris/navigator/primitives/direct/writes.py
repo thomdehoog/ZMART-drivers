@@ -1410,6 +1410,19 @@ def find_coverslip(project: int, drive: str, begin_um: float, end_um: float, *, 
     )
 
 
+def excitation_control(source_place: int, name: str, mode: str) -> Write:
+    """The light source *name*'s Excitation Control ("maximum power" or "constant power"), written into LCS's state tree as the
+    Laser Overview does; read back."""
+    code = {b: a for a, b in direct_reader.EXCITATION_CONTROL.items()}[mode]
+
+    def fill(request: Request) -> None:
+        request.elements = [f'<StateTree Command="CurrentExcitationControlMode" Value="{code}" At="{int(source_place)}"/>']
+
+    return Write(command="set_excitation_control", values={"value": mode}, request="CurrentExcitationControlMode", fill=fill,
+                 description=f"{name} Excitation Control -> {mode}", ready=idle(),
+                 confirm=Expect("excitation_control", lambda found: (found or {}).get(name) == mode))
+
+
 def laser_output_power(setting_place: int, source_place: int, name: str, percent: float) -> Write:
     """The light source *name*'s own output power in percent, written into the setting at *setting_place*, as the Laser
     Overview's slider does; the power goes to the limits; read back."""

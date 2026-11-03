@@ -1136,3 +1136,10 @@ in xyzt), the Fluo Turret (its list greyed out), Environmental Control (no such 
 and 5 outputs and `Confocal/TriggerConfiguration`, but the plain Navigator shows no triggering window; the help says it needs the
 Sequencer Advanced board, set in the Project Settings).
 
+## 69. The white-light laser's Excitation Control (3 November 2026)
+
+The Laser Overview's Excitation Control list for the WLL offers Maximum Power and Constant Power (its curve list greyed out). Chosen
+in the window, no command: `Confocal/LightSourceList/LightSource[2]/AOTF/CurrentExcitationControlMode` 0 to 1, and LCS set
+`CurrentConstantPowerCurve` 85 and `ExcitationControlBegin`/`End` 485 and 685 nm; back to 0, all reset. Written into the state tree,
+LCS answered the same. Built: `set_excitation_control(mode, source=None)`. Through the driver: constant power, maximum power.
+

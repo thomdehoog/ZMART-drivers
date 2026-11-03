@@ -1020,6 +1020,25 @@ def start_live(client, project=None, *, fast=False) -> dict:
     return run(client, change)
 
 
+def set_excitation_control(client, mode, *, source=None, max_retries=None) -> dict:
+    """Set a tunable laser's Excitation Control, "maximum power" or "constant power", as the Laser Overview; the white-light
+    laser unless *source* names another. The result's ``excitation_control`` is read back."""
+    if mode not in direct_reader.EXCITATION_CONTROL.values():
+        return dispatch.refused(f"Excitation Control is {sorted(direct_reader.EXCITATION_CONTROL.values())}, not {mode!r}")
+    now = readers.get_excitation_control(client) or {}
+    if source is None:
+        if len(now) != 1:
+            return dispatch.refused(f"name the light source; these have an Excitation Control: {sorted(now)}")
+        source = next(iter(now))
+    if source not in now:
+        return dispatch.refused(f"{source!r} has no Excitation Control; these have: {sorted(now)}")
+    names = [s.get("name") for s in readers.get_light_sources(client) or []]
+    result = run(client, writes.excitation_control(names.index(source), source, mode), max_retries=max_retries)
+    if result["success"]:
+        result["excitation_control"] = readers.get_excitation_control(client)
+    return result
+
+
 def set_laser_output_power(client, percent, *, source=None, max_retries=None) -> dict:
     """Set a light source's own output power in the current setting, in percent, as the Laser Overview's slider; the
     result's ``output_power`` is read back. *source* is LAS X's name for it; None, the only one with an output power

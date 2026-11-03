@@ -99,6 +99,7 @@ READS = (
     "lambda_scan",
     "excitation_scan",
     "laser_output_power",
+    "excitation_control",
     "coverslip_offset",
     "fluorifier",
     "mfp_auto_select",
@@ -1173,6 +1174,28 @@ def current_setting_place(nodes) -> int:
         if node_value(nodes, named(nodes, info, "SettingID")) is not None
     ]
     return ids.index(current) if current in ids else 0
+
+
+#: The Laser Overview's Excitation Control, by LCS's code (``AOTF/CurrentExcitationControlMode``).
+EXCITATION_CONTROL = {0: "maximum power", 1: "constant power"}
+
+
+def get_excitation_control() -> dict:
+    """Each tunable laser's Excitation Control, by LAS X's name for the source: "maximum power" or "constant power", as the
+    Laser Overview shows it (``Confocal/LightSourceList/LightSource[n]/AOTF/CurrentExcitationControlMode``)."""
+
+    def reading(nodes):
+        found = {}
+        for source, node in zip(layout(nodes, LIGHT_SOURCES, light_layout), of_name(nodes, children(nodes, node_at(nodes, LIGHT_SOURCES)), "LightSource")):
+            if not any(low != high for _name, low, high in source["lasers"]):
+                continue
+            aotf = child_named(nodes, node, "AOTF")
+            mode = child_named(nodes, aotf, "CurrentExcitationControlMode") if aotf is not None else None
+            if mode is not None:
+                found[source["name"]] = EXCITATION_CONTROL.get(node_value(nodes, mode), node_value(nodes, mode))
+        return found
+
+    return read("the excitation control", reading)
 
 
 def get_laser_output_power() -> dict:

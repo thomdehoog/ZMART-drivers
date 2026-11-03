@@ -421,6 +421,10 @@ STATE_TREE_WRITES = {
     },
     # A light source's own output power in a setting (the Laser Overview's slider), percent; LCS sets it on every
     # line of the source when one is written (simulator, 2026-11-02). Which setting and source is the element's At.
+    # A tunable laser's Excitation Control in the Laser Overview: 0 Maximum Power, 1 Constant Power (LCS then picks the
+    # power curve and the range itself; simulator, 2026-11-03). Which light source is the element's At.
+    "CurrentExcitationControlMode": TreeWrite(("Confocal", "LightSourceList", "LightSource", "AOTF", "CurrentExcitationControlMode"),
+                                              choices=frozenset({0, 1}), numbered=("LightSource",)),
     "LaserTargetOutputPower": TreeWrite(
         ("Acquire", "ATL", "CurrentBlock", "ConfocalSequentialInfo", "SequentialSettingParameter", "LightSourceList_SequentialInfo",
          "LightSource_SequentialInfo", "UnifiedLaser_SequentialInfo", "UnifiedLaserLine_SequentialInfo", "LaserTargetOutputPower"),

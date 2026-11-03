@@ -1070,6 +1070,23 @@ class TestFastLive:
         assert changes.set_fast_live(client, "galvo", format=256)["success"] is False
 
 
+class TestExcitationControl:
+    @pytest.fixture
+    def wll(self, lasx):
+        wll = next(s for s in lasx.nodes.light_sources if "SuperCont" in s["LightSourceName"])
+        wll["AOTF"]["CurrentExcitationControlMode"] = 0
+        return wll
+
+    def test_the_white_light_laser_s_excitation_control_is_set_and_read_back(self, lasx, client, wll):
+        result = changes.set_excitation_control(client, "constant power")
+
+        assert result["confirmed"] is True and result["excitation_control"] == {"SuperContVisible Light": "constant power"}
+        assert changes.set_excitation_control(client, "maximum power")["excitation_control"] == {"SuperContVisible Light": "maximum power"}
+
+    def test_a_mode_the_overview_does_not_have_is_refused(self, lasx, client, wll):
+        assert changes.set_excitation_control(client, "half power")["success"] is False
+
+
 class TestMfpPosition:
     def test_with_autoselect_off_the_mfp_is_set_as_its_list_does(self, lasx, client):
         changes.set_mfp_auto_select(client, False)
