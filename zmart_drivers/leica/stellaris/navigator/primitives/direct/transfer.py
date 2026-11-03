@@ -349,6 +349,13 @@ STATE_TREE_WRITES = {
     # Reflection on the simulator, 2026-11-02); LCS sets the mode itself and
     # applies it to the detector. Which setting, photometer and detector is At.
     # A detector's TauContrast in the setting, as the detector panel's switch writes it (simulator, 2026-11-03).
+    # A detector's dye in the setting (``Namespace/Name``), as the detector panel's Dye list writes it; LCS takes any
+    # text, so the driver checks the name against LAS X's dye library first (simulator, 2026-11-03).
+    "DyeName": TreeWrite(
+        ("Acquire", "ATL", "CurrentBlock", "ConfocalSequentialInfo", "SequentialSettingParameter", "SpectralDetection_SequentialInfo",
+         "Spectrophotometer_SequentialInfo", "DetectionUnitList_SequentialInfo", "DetectorHWInfo_SequentialInfo", "DyeName"),
+        str, numbered=("SequentialSettingParameter", "Spectrophotometer_SequentialInfo", "DetectorHWInfo_SequentialInfo"),
+    ),
     "IsLifetimeContrastActive": TreeWrite(
         ("Acquire", "ATL", "CurrentBlock", "ConfocalSequentialInfo", "SequentialSettingParameter", "SpectralDetection_SequentialInfo",
          "Spectrophotometer_SequentialInfo", "DetectionUnitList_SequentialInfo", "DetectorHWInfo_SequentialInfo", "IsLifetimeContrastActive"),
@@ -459,7 +466,7 @@ STATE_TREE_WRITES = {
 
 #: Text the driver writes into the state tree: 1 to 64 characters, letters, digits,
 #: spaces and ``_ - . , ( ) / + #``; nothing that could be read as markup.
-PLAIN_TEXT = re.compile(r"^[\w ._,()/+#-]{1,64}$")
+PLAIN_TEXT = re.compile(r"^[\w ._,()/+#:-]{1,64}$")
 
 @dataclass(frozen=True)
 class CheckedCommand:

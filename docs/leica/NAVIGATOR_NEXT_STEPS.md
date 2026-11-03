@@ -67,7 +67,6 @@ checked by the driver either way (`transfer.CHECKED_COMMANDS`, `transfer.STATE_T
 **Other**
 - The Dye Assistant, "Apply to hardware", Bulk Options.
 - A dye of one's own in LAS X's library; the dye bar's "+".
-- `set_detector(dye=...)` still goes through a saved setting (Setting 1 only); `set_dyes` sets dyes in any setting.
 - The Best Focus Setting changed during the dye trials (its scan zoom to 48, a 488 nm line at 1 %); the zoom was put back.
 
 ## To check on the STELLARIS

@@ -55,16 +55,6 @@ def test_a_detector_is_switched_on_with_one_command_and_read_back(lasx, client, 
     assert lasx.commands() == ["SetDetectorActive"]
 
 
-def test_only_setting_1_is_changed_in_the_file_loaded(lasx, client, tmp_path):
-    setting_files.set_detector(client, tmp_path, "HyD S 3", dye="Leica/ALEXA 555")
-
-    loaded = (tmp_path / lasx.loaded[-1].split("\\")[-1].split("/")[-1]).read_text(encoding="utf-8")
-    best_focus = loaded[loaded.index("Best Focus Setting"):]
-    hyd = re.search(r'<Detector [^>]*Name="HyD S 3"[^>]*>', best_focus)[0]
-    assert 'DyeName="Leica/ALEXA 555"' not in hyd
-    assert detectors()["HyD S 3"]["dye"] == "Leica/ALEXA 555"
-
-
 def test_a_detector_s_band_is_changed_and_read_back(lasx, client, tmp_path):
     result = setting_files.set_detector(client, tmp_path, "HyD S 3", band=(550.0, 650.0))
 
@@ -79,12 +69,13 @@ def test_a_detector_the_setting_does_not_have_is_refused_before_anything_is_load
     assert "ATL_Block_Load_From_XML" not in lasx.commands()
 
 
-def test_with_several_settings_a_dye_is_refused_but_on_off_still_works(lasx, client, tmp_path):
+def test_with_several_settings_a_dye_and_on_off_still_work(lasx, client, tmp_path, monkeypatch):
+    from zmart_drivers.leica.stellaris.navigator.procedures import dye_library
+
+    monkeypatch.setattr(dye_library, "dye_names", lambda namespace="Leica": ["ALEXA 488"])
     lasx.sequential = 2
 
-    result = setting_files.set_detector(client, tmp_path, "Trans PMT", dye="Leica/ALEXA 488")
-
-    assert result["success"] is False and "sequential" in result["message"]
+    assert setting_files.set_detector(client, tmp_path, "HyD S 3", dye="Leica/ALEXA 488")["confirmed"] is True
     assert "ATL_Block_Load_From_XML" not in lasx.commands()
     assert setting_files.set_detector(client, tmp_path, "Trans PMT", on=True)["confirmed"] is True
 
@@ -372,11 +363,29 @@ def test_each_tau_mode_is_written_as_las_x_writes_it_and_read_back(lasx, client,
     assert direct_reader.get_detector_modes()["HyD S 3"]["tau"] == {"None": 0, "Intensity": 2, "TauGating": 3, "TauScan": 5, "TauSeparation": 6, "TauInteraction": 10}[mode]
 
 
-def test_the_dye_is_set_through_the_setting_and_read_back(lasx, client, tmp_path):
-    result = setting_files.set_detector(client, tmp_path, "HyD S 3", dye="Leica/ALEXA 488")
+@pytest.fixture
+def dyes(monkeypatch):
+    from zmart_drivers.leica.stellaris.navigator.procedures import dye_library
+
+    monkeypatch.setattr(dye_library, "dye_names", lambda namespace="Leica": ["ALEXA 488", "ALEXA 514"] if namespace == "Leica" else [])
+
+
+def test_the_dye_is_written_as_the_detector_panel_s_dye_list_and_read_back(lasx, client, tmp_path, dyes):
+    loaded = len(lasx.loaded)
+
+    result = setting_files.set_detector(client, tmp_path, "HyD S 3", dye="Leica/ALEXA 514")
 
     assert result["confirmed"] is True
-    assert setting_1(tmp_path, lasx)["detectors"]["HyD S 3"]["dye"] == "Leica/ALEXA 488"
+    assert {d["name"]: d["dye"] for d in direct_reader.get_detectors()}["HyD S 3"] == "Leica/ALEXA 514"
+    assert len(lasx.loaded) == loaded  # no setting file: it works in any setting
+
+
+@pytest.mark.parametrize("dye", ["Leica/NOT A DYE", "ALEXA 488", "User:nobody/ALEXA 488"])
+def test_a_dye_las_x_does_not_have_is_refused_and_nothing_is_written(lasx, client, tmp_path, dyes, dye):
+    before = {d["name"]: d["dye"] for d in direct_reader.get_detectors()}
+
+    assert setting_files.set_detector(client, tmp_path, "HyD S 3", dye=dye)["success"] is False
+    assert {d["name"]: d["dye"] for d in direct_reader.get_detectors()} == before
 
 
 def test_tau_contrast_is_written_as_the_detector_panel_s_switch_and_read_back(lasx, client, tmp_path):

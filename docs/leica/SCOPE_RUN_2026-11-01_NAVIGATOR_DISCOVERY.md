@@ -1171,3 +1171,12 @@ names with "Lifetime".) Written into the state tree, LCS took it both ways and t
 tau_contrast=...)` now writes it, in any setting, refused where LCS does not allow it; `get_detector_modes()[name]["tau_contrast"]`.
 Through the driver: HyD 2 on and off (the switch followed), HyD 4 refused.
 
+## 72. A detector's dye, as the detector panel's Dye list (3 November 2026)
+
+The detector panel's Dye list (no id; beside Excitation Line) offers the dyes that fit the detector (for HyD 2, ALEXA 430 onwards).
+Choosing ALEXA 514 with the driver's mouse sent no command: the setting's `DetectorHWInfo_SequentialInfo[n]/DyeName` changed, and
+LCS followed on the detector itself. Written into the state tree, LCS took it, and took any text ("Not A Dye") as well. Built:
+`set_detector(dye=...)` now writes it, in any setting, the name checked first against LAS X's dye library (Namespace/Name, the
+namespace Leica or User:<name>); the saved-setting route is no longer used for the dye. Through the driver: HyD 2 to ALEXA 514, an
+unknown dye refused, back to ALEXA 488.
+

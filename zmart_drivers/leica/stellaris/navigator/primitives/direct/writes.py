@@ -1110,6 +1110,18 @@ def tau_channel_colour(route, name: str, setting_id: int, channel: int, colour: 
 OPERATING_CODES = {"Fast Mode": 4, "Counting": 1, "Analog": 10, "Reflection": 11}
 
 
+def detector_dye(at, name: str, dye: str) -> Write:
+    """The dye of the detector *name* (LAS X's ``Namespace/Name``), written into its setting's entry (*at*) as the detector
+    panel's Dye list does (simulator, 2026-11-03); read back from the detector."""
+
+    def fill(request: Request) -> None:
+        request.elements = [f'<StateTree Command="DyeName" Value="{dye}" At="{",".join(str(int(n)) for n in at)}"/>']
+
+    return Write(command="set_detector_dye", values={"value": dye}, request="DyeName", fill=fill,
+                 description=f"Detector {name} dye -> {dye}", ready=idle(),
+                 confirm=Expect("detectors", lambda found: any(d.get("name") == name and d.get("dye") == dye for d in found or [])))
+
+
 def detector_tau_contrast(at, name: str, on: bool) -> Write:
     """TauContrast of the detector *name* on or off, written into its setting's entry (*at*: the setting's, photometer's and
     detector's places) as the detector panel's switch does (simulator, 2026-11-03); read back."""

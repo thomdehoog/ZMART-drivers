@@ -153,6 +153,7 @@ discovery session in `SCOPE_RUN_2026-11-01_NAVIGATOR_DISCOVERY.md` and the build
 | Operating mode (Fast Mode, Counting, Analog, Reflection) | Works (through a saved setting) |
 | Tau mode (Intensity, TauGating, TauScan, TauSeparation, TauInteraction; with a pulsed WLL line) | Works (through a saved setting) |
 | TauContrast | Works: written into LAS X's state tree, as the detector panel's switch does, in any setting |
+| A detector's dye (the detector panel's Dye list) | Works: written into LAS X's state tree, as the window does, in any setting; checked against LAS X's dye library |
 | A setting's dyes on its detectors, with its lines and bands (the window's dye drop), in any setting | Works, with LAS X's command; every setting is sent, the others as they stand |
 | A TauSeparation channel's colour | Works, with LAS X's command; the other tau channels keep theirs (the window moves them on) |
 | A TauSeparation channel's lifetime (the slider) | Works, with LAS X's command; within the window's scale, 0.07 to 9.37 ns |
@@ -204,7 +205,7 @@ service and the person responsible for the instrument.
 
 | State | Settings |
 |---|---|
-| Works | 107 (the objective among them, not yet tried) |
+| Works | 108 (the objective among them, not yet tried) |
 | Tried | 0 |
 | Command known | 0 |
 | Not yet learned | 8 |

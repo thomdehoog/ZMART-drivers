@@ -87,7 +87,21 @@ def load(client, path) -> dict:
     return result
 
 
-def by_command(client, name, *, operating_mode=None, on=None, gain=None, band=None, tau_contrast=None, tau_mode=None) -> list:
+def known_dye(dye) -> str | None:
+    """Why *dye* is not one of LAS X's dyes (``Namespace/Name``, the namespace ``Leica`` or ``User:<name>``), or None."""
+    from . import dye_library
+
+    if not isinstance(dye, str) or "/" not in dye:
+        return f"a dye is named as LAS X names it, Namespace/Name such as 'Leica/ALEXA 488', not {dye!r}"
+    namespace, name = dye.split("/", 1)
+    try:
+        names = dye_library.dye_names(namespace)
+    except Exception as why:  # noqa: BLE001 -- LAS X's dye database could not be asked: refuse rather than guess
+        return f"LAS X's dye library could not be asked ({why}), so {dye!r} cannot be checked"
+    return None if name in names else f"LAS X's dye library has no {name!r} in {namespace!r}"
+
+
+def by_command(client, name, *, operating_mode=None, on=None, gain=None, band=None, tau_contrast=None, tau_mode=None, dye=None) -> list:
     """The changes of detector *name* LAS X's window makes itself, in the current setting; refused ones as text.
 
     The operating mode first, written as the window writes it, since a mode
@@ -116,6 +130,11 @@ def by_command(client, name, *, operating_mode=None, on=None, gain=None, band=No
     if band is not None:
         begin, end = band
         planned.append(writes.detector_band(route, name, float(begin), float(end)))
+    if dye is not None:
+        refusal = known_dye(dye)
+        if refusal:
+            return [refusal]
+        planned.append(writes.detector_dye(modes["at"], name, dye))
     if tau_contrast is not None:
         if not isinstance(tau_contrast, bool):
             return [f"tau_contrast takes True or False, not {tau_contrast!r}"]
@@ -144,10 +163,10 @@ def set_detector(
     the window writes it, first; *on*, *gain*, *band* ``(begin_nm, end_nm)`` and
     *tau_mode* go with LAS X's own commands, as its window sends them
     (simulator, 2026-11-02), and *tau_contrast* is written as the detector
-    panel's switch writes it (2026-11-03); all of these work in any setting,
-    the gain within the detector's own range. *dye* (LAS X's name, such as
-    ``"Leica/ALEXA 488"``) goes through a saved setting first, Setting 1 only;
-    ``set_dyes`` sets dyes in any setting.
+    panel's switch writes it, and *dye* (LAS X's name, such as
+    ``"Leica/ALEXA 488"``, checked against its dye library) as the panel's Dye
+    list writes it (2026-11-03); all of these work in any setting, the gain
+    within the detector's own range.
     *folder* is where the setting files are kept.
     """
     if operating_mode is not None and operating_mode not in OPERATING_MODES:
@@ -155,20 +174,7 @@ def set_detector(
     if tau_mode is not None and tau_mode not in TAU_MODES:
         return dispatch.refused(f"no tau mode {tau_mode!r}; LAS X offers {list(TAU_MODES)}")
     results = []
-    if dye is not None:
-        # The dye on its own: through the setting, first (set_dyes does it in any setting).
-        def change(part):
-            return with_detector(part, name, dye=dye)
-
-        def shows(client_, folder_):
-            asked = {"dye": dye}
-            found = saved_now(client_, folder_)["detectors"].get(name, {})
-            return all(found.get(key) == value for key, value in asked.items() if value is not None)
-
-        results.append(through_setting_1(client, folder, change, shows))
-        if not results[-1].get("success"):
-            return results[-1]
-    for done in by_command(client, name, operating_mode=operating_mode, on=on, gain=gain, band=band, tau_contrast=tau_contrast, tau_mode=tau_mode):
+    for done in by_command(client, name, operating_mode=operating_mode, on=on, gain=gain, band=band, tau_contrast=tau_contrast, tau_mode=tau_mode, dye=dye):
         if isinstance(done, str):
             return dispatch.refused(done)
         results.append(done)

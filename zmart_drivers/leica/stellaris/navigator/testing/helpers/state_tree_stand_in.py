@@ -598,6 +598,15 @@ class StandInNodes:
                 name, parent, _kids = nodes[node]
                 path.insert(0, name)
                 node = parent
+            if path[-1] == "DyeName" and "SequentialSettingParameter" in path:
+                # A detector's dye in the setting, by place; LCS follows it on the detector itself.
+                unit_node = nodes[change.NodeID][1]
+                spectro_node = nodes[nodes[unit_node][1]][1]
+                units = [n for n in nodes[nodes[unit_node][1]][2] if nodes[n][0] == "DetectorHWInfo_SequentialInfo"]
+                spectros = [n for n in nodes[nodes[spectro_node][1]][2] if nodes[n][0] == "Spectrophotometer_SequentialInfo"]
+                self.detection["Spectrophotometer"][spectros.index(spectro_node)]["DetectionUnitList"]["DetectorHWInfo"][units.index(unit_node)][
+                    "DyeName"] = change.Value
+                continue
             if path[-1] == "IsLifetimeContrastActive":
                 # A detector's TauContrast in the setting, by place (simulator, 2026-11-03).
                 unit_node = nodes[change.NodeID][1]

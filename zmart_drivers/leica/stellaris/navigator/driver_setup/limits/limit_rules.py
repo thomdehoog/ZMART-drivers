@@ -478,6 +478,7 @@ MUTATING_COMMANDS = {
     "set_tau_gate": "set_tau_gate",
     "set_tau_scan": "set_tau_scan",
     "set_detector_tau_contrast": "set_detector_tau_contrast",
+    "set_detector_dye": "set_detector_dye",
     "set_tau_donor_lifetime": "set_tau_donor_lifetime",
     "add_tau_channel": "add_tau_channel",
     "remove_tau_channel": "remove_tau_channel",
