@@ -263,6 +263,11 @@ def get_apply_to_hardware(client, **keywords):
     return _routed("apply_to_hardware", client, **keywords)
 
 
+def get_locked_laser_lines(client, **keywords):
+    """The laser lines locked from LAS X's Dye Assistant in the current setting: ``route`` and ``line_index`` of each."""
+    return _routed("locked_laser_lines", client, **keywords)
+
+
 def get_auto_sync(client, **keywords):
     """Auto Sync and its scan options: ``on``, and by scanner ``format``, ``scan_frequency``, ``overview_zoom``, ``bidirectional``, ``no_average``."""
     return _routed("auto_sync", client, **keywords)

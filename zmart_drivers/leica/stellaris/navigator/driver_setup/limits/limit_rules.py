@@ -498,6 +498,7 @@ MUTATING_COMMANDS = {
     "activate_setting": "activate_setting",
     # a detector and its line kept from LAS X's Dye Assistant
     "lock_detector": "lock_detector",
+    "lock_laser_line": "lock_laser_line",
     "lock_all_settings": "lock_all_settings",
     # the settings toolbar's apply-to-hardware switch; the limits check each change as before
     "apply_to_hardware": "apply_to_hardware",

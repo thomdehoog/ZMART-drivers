@@ -1585,6 +1585,28 @@ def lock_all_settings(client, locked=True, *, max_retries=None) -> dict:
     return run(client, writes.settings_locked(locked), max_retries=max_retries)
 
 
+def setting_lines(client) -> list[dict]:
+    """The current setting's laser lines that are on: ``route``, ``line_index``, ``wavelength``, ``percent`` of each."""
+    setting = readers.get_setting(client)
+    ids = [s["id"] for s in setting["all"]]
+    return readers.get_setting_definitions(client)[ids.index(setting["id"]) if setting["id"] in ids else 0]["lines"]
+
+
+def lock_laser_line(client, wavelength_nm, locked, *, max_retries=None) -> dict:
+    """Lock the laser line at *wavelength_nm* from LAS X's Dye Assistant, or free it, as the lock on its row in the laser
+    panel does; only a line that is on in the current setting. The result's ``locked_lines`` is read back."""
+    if not isinstance(locked, bool):
+        return dispatch.refused(f"lock_laser_line takes True or False, not {locked!r}")
+    lines = setting_lines(client)
+    line = next((each for each in lines if isinstance(wavelength_nm, (int, float)) and abs(each["wavelength"] - wavelength_nm) < 0.5), None)
+    if line is None:
+        on = ", ".join(f"{each['wavelength']:g}" for each in lines) or "none"
+        return dispatch.refused(f"no laser line at {wavelength_nm!r} nm is on in this setting; the lines on are {on} nm")
+    result = run(client, writes.laser_line_lock(line["route"], line["line_index"], locked), max_retries=max_retries)
+    result["locked_lines"] = readers.get_locked_laser_lines(client)
+    return result
+
+
 def lock_detector(client, detector, locked, *, max_retries=None) -> dict:
     """Lock *detector* and its excitation line from LAS X's Dye Assistant, or free them, as the window's detector lock
     does; read back. In any setting.
@@ -1597,9 +1619,7 @@ def lock_detector(client, detector, locked, *, max_retries=None) -> dict:
     in_use = {d["name"]: d for d in readers.get_detectors(client) or []}
     if detector not in in_use:
         return dispatch.refused(f"{detector!r} is not in use; the detectors in use are {sorted(in_use)}")
-    setting = readers.get_setting(client)
-    ids = [s["id"] for s in setting["all"]]
-    lines = readers.get_setting_definitions(client)[ids.index(setting["id"]) if setting["id"] in ids else 0]["lines"]
+    lines = setting_lines(client)
     place = ((readers.get_detector_modes(client) or {}).get(detector) or {}).get("reference_line") or 0
     if place == 0 and len(lines) != 1:
         return dispatch.refused(f"{detector}'s excitation line is on Auto with {len(lines)} lines on; choose it with set_excitation_line first")

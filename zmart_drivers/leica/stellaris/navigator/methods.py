@@ -500,6 +500,16 @@ class Microscope:
         result = changes.lock_detector(self.handle.client, name, locked)
         return checked(self.handle, result, f"lock_detector({name!r}, {locked!r})")
 
+    def lock_laser_line(self, wavelength_nm: float, locked: bool = True) -> dict:
+        """Keep the laser line at *wavelength_nm* from LAS X's Dye Assistant, or free it, as the lock on its row in the laser panel does.
+
+        Only a line that is on in the current setting. The result's
+        ``locked_lines`` lists the lines locked now, read back from LAS X.
+        """
+        self.handle.require_open()
+        result = changes.lock_laser_line(self.handle.client, wavelength_nm, locked)
+        return checked(self.handle, result, f"lock_laser_line({wavelength_nm!r}, {locked!r})")
+
     def lock_channel_colour(self, locked: bool = True) -> dict:
         """Lock or free the colour of the channel LAS X's detector panel shows, as the window's colour lock does.
 

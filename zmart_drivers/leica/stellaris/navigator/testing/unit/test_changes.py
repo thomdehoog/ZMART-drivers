@@ -672,6 +672,32 @@ class TestTheDetectorLock:
         assert result["success"] is False and "set_excitation_line" in result["message"]
         assert lasx.commands() == []
 
+    def test_a_laser_line_is_locked_and_freed_on_its_own_as_its_row_s_lock_does(self, lasx, client, monkeypatch):
+        one_line(monkeypatch, [LINE_405, LINE_497])
+
+        locked = changes.lock_laser_line(client, 497.0, True)
+
+        assert locked["confirmed"] is True
+        assert lasx.commands() == ["BlockLightSourceLineForDyeAssistant"]
+        assert 'LineIndex="1"' in lasx.sent[-1] and 'BlockedState="1"' in lasx.sent[-1] and 'BeamPosition="10"' in lasx.sent[-1]
+        assert locked["locked_lines"] == [{"route": "10;10", "line_index": 1}]
+        freed = changes.lock_laser_line(client, 497.0, False)
+        assert freed["confirmed"] is True and freed["locked_lines"] == []
+
+    def test_a_line_that_is_not_on_in_the_setting_is_refused_and_nothing_is_sent(self, lasx, client, monkeypatch):
+        one_line(monkeypatch, [LINE_405])
+
+        result = changes.lock_laser_line(client, 561.0, True)
+
+        assert result["success"] is False and "405" in result["message"]
+        assert lasx.commands() == []
+
+    @pytest.mark.parametrize("locked", ["yes", 1, None])
+    def test_a_line_lock_that_is_not_a_switch_is_refused(self, lasx, client, monkeypatch, locked):
+        one_line(monkeypatch, [LINE_405])
+        assert changes.lock_laser_line(client, 405.0, locked)["success"] is False
+        assert lasx.commands() == []
+
     def test_every_setting_is_locked_and_freed_as_bulk_options_does(self, lasx, client):
         assert changes.lock_all_settings(client, True)["confirmed"] is True
         assert lasx.commands() == ["LockSetting"] and 'LockState="1"' in lasx.sent[-1] and 'SetMode="1"' in lasx.sent[-1]

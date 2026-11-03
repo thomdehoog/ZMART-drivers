@@ -798,6 +798,32 @@ def dye_assistant_lock(detector_route, line_route, line_index: int, locked: bool
     )
 
 
+def laser_line_lock(line_route, line_index: int, locked: bool) -> Write:
+    """Lock one laser line from LAS X's Dye Assistant, or free it, as the lock on its row in the laser panel does
+    (``BlockLightSourceLineForDyeAssistant`` alone, ``BlockedState`` 1 locked, 0 free; simulator, 2026-11-03); read back."""
+    state = int(bool(locked))
+
+    def fill(request: Request) -> None:
+        request.elements = [
+            f'<Scanner Command="BlockLightSourceLineForDyeAssistant" LineIndex="{int(line_index)}" '
+            f'SequentialSettingIndex="{request.setting}" BlockedState="{state}">{beam_route(line_route)}</Scanner>'
+        ]
+
+    def shows(found) -> bool:
+        held = any(route_of(each["route"]) == tuple(line_route) and each["line_index"] == int(line_index) for each in found or [])
+        return held is bool(locked)
+
+    return Write(
+        command="lock_laser_line",
+        values={"value": bool(locked)},
+        request="BlockLightSourceLineForDyeAssistant",
+        fill=fill,
+        description=f"Laser line {tuple(line_route)}#{int(line_index)} -> {'locked' if locked else 'free'} for the Dye Assistant",
+        ready=idle(),
+        confirm=Expect("locked_laser_lines", shows),
+    )
+
+
 def autofocus_change(name: str, elements: list[str], description: str, shows) -> Write:
     """One of the autofocus's settings written into LCS's state tree, as its Best Focus Scan Options do; read back."""
 

@@ -1320,3 +1320,14 @@ values, so these inputs only change the window's own sum and are not built.
 delete that day sent `ATL_Setting_Delete` alone, as `delete_setting` does. `ResetAutoFocusToAutoSync` is the Best Focus
 Setting's X, built as `set_auto_sync(True)` (section 52). The mounting
 medium (`ATL_HyVolution_SetMountingMedium`) has no control in the Acquire tab's window, so it is not built.
+
+## 85. A laser line's own lock (3 November 2026)
+
+Each row of the laser panel has its own lock, "Remove laser wavelength from optimization" (`LockLaser`, one per setting;
+the first is the Best Focus Setting's). Setting 1's, on the white-light laser's 499 nm line, sent
+`BlockLightSourceLineForDyeAssistant` with `LineIndex="1" SequentialSettingIndex="0" BlockedState="1"` alone, without the
+detector's command, and set `IsBlocked` in the setting's `LineBlockedForAutomatic_SequentialInfo` and in the light source's
+`LightSourceLineUsage` (beside its `LineIndex`); pressed again, `BlockedState="0"` freed it. The Best Focus Setting's lock
+sent the same for its line index 0, which was not on, and LCS kept nothing. Built: `lock_laser_line(wavelength_nm,
+locked)`, for a line on in the current setting, read back from `LightSourceLineUsage`; tried through the driver, locked and
+freed, and 561 nm (not on) refused.

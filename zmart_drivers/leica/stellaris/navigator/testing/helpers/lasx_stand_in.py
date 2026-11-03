@@ -653,6 +653,14 @@ class PlainNavigator:
         return "<Result/>"
 
     def take_BlockLightSourceLineForDyeAssistant(self, e):
+        """A line locked from the Dye Assistant, or freed: its ``LightSourceLineUsage`` (simulator, 2026-11-03)."""
+        usages = self.light_source(e).setdefault("LightSourceLineUsage", [])
+        index = int(e.get("LineIndex"))
+        usage = next((u for u in usages if u["LineIndex"] == index), None)
+        if usage is None:
+            usage = {"LineIndex": index, "IsBlocked": False}
+            usages.append(usage)
+        usage["IsBlocked"] = e.get("BlockedState") == "1"
         return "<Result/>"
 
     def take_SetLut(self, e):
