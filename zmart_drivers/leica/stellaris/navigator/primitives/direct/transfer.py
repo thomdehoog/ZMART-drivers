@@ -667,6 +667,9 @@ CHECKED_WRITES = {
         # The time series, the xt line scan, and when the autofocus runs in a series and at stage positions.
         "CalculationMode", "DelayTime", "Duration", "IsMinimized", "Lines", "LinesPerPage", "IsMaxLinesActive",
         "WorkflowTimelapse", "WorkflowTimelapseIterator", "WorkflowXY", "WorkflowXYIterator", "IsFirstPositionOnly",
+        # The setting's name, the dye spectra shown, ROI scan and the bleach mode, the ROI scan's stack sections.
+        "Name", "ShowExcitationSpectrum", "ShowEmissionSpectrum", "EnableRoiScan", "EnableBleachScan",
+        "Is3DLimitedRoiScanEnabled", "First3DRoiSection", "Last3DRoiSection",
     }),
 }
 
