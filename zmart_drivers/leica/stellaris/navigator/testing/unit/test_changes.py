@@ -1096,13 +1096,17 @@ class TestFastLive:
         }
         assert result["fast_live"]["resonant"]["format"] == 256
 
+    def test_the_format_takes_the_slider_s_steps_of_8(self, lasx, client):
+        assert changes.set_fast_live(client, "fov", format=264)["fast_live"]["fov"]["format"] == 264
+
     def test_the_overview_zoom_is_switched_off(self, lasx, client):
         changes.set_fast_live(client, "fov", overview_zoom=2.0)
 
         assert changes.set_fast_live(client, "fov", overview_zoom=False)["fast_live"]["fov"]["overview_zoom"] is None
 
     @pytest.mark.parametrize(("option", "value"), [
-        ("format", 300), ("format", 1024), ("scan_frequency", 3000), ("overview_zoom", 100.0), ("bidirectional", "yes"), ("speed", 1),
+        ("format", 300), ("format", 260), ("format", 8), ("format", 1024), ("scan_frequency", 3000), ("overview_zoom", 100.0),
+        ("bidirectional", "yes"), ("speed", 1),
     ])
     def test_what_the_window_does_not_offer_is_refused_and_nothing_is_written(self, lasx, client, option, value):
         before = direct_reader.get_fast_live()

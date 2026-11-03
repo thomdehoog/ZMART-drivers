@@ -47,8 +47,6 @@ checked by the driver either way (`transfer.CHECKED_COMMANDS`, `transfer.STATE_T
 - Saving a time series: `acquire()` takes it (LAS X's Start), but the files are written for x, y and z
   only (`save_data/metadata.py` refuses LAS X dimension 4).
 - Spiral: not learned.
-- Fast Live's Maximal Format: the driver takes 16, 32, ... 512 (powers of two within LAS X's range); check
-  which values the window's slider offers.
 
 **Region and experiment types**
 - The regions of an ROI scan and the bleach points: drawn in LAS X's viewer and kept in its data container

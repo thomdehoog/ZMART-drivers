@@ -1216,3 +1216,10 @@ from 0 to 1; freeing it left the pin. The Best Focus panel's lock (its HyD S 3, 
 Auto it locks the one line that is on, and with several lines on Auto it is refused until the line is chosen, because LAS X's
 choice cannot be read. `saved_now` and `read_back`, no longer used, were removed. Through the driver: HyD 2 locked on Auto and
 on 499, freed each time, and its line put back to Auto.
+
+## 77. Fast Live's Maximal Format steps (3 November 2026)
+
+Fast Live's Scan Settings open with a right-click on the Fast Live button. The FOV scanner's Maximal Format slider and its box
+read, through UI Automation, 16 to 512 in steps of 8; two clicks on the box's up arrow (the driver's mouse) wrote
+`FastLiveParameters/ScanFormat` 256, 264, 272, and two on the down arrow put it back to 256. The driver took only powers of
+two; it now takes the slider's steps of 8 within LCS's range (264 accepted, 260 refused). The window was closed.

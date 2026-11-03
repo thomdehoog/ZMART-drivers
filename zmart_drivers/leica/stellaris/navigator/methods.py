@@ -895,7 +895,7 @@ class Microscope:
     def set_fast_live(self, scanner: str = "fov", **settings) -> dict:
         """Set Fast Live's Scan Settings for ``"fov"`` (the FOV scanner) or ``"resonant"``, as its window does.
 
-        *settings*: ``format`` (Maximal Format: 16, 32, ... 512), ``scan_frequency``
+        *settings*: ``format`` (Maximal Format: 16, 24, ... 512), ``scan_frequency``
         (Minimal Scan Frequency, Hz), ``overview_zoom`` (a zoom, or False),
         ``bidirectional``, ``no_average``, ``no_dynamic_signal_enhancement``,
         ``selected_setting_only``, ``no_tau_sted_xtend``. Each is checked against

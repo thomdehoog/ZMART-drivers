@@ -1865,8 +1865,8 @@ def time_until_stopped(on: bool) -> Write:
                               lambda t: t["until_stopped"] is bool(on))
 
 
-#: Fast Live's Maximal Format: the window's slider stops at these, within LCS's own range.
-FAST_LIVE_FORMATS = (16, 32, 64, 128, 256, 512, 1024, 2048)
+#: Fast Live's Maximal Format: the window's slider and arrows step by 8 (simulator, 2026-11-03), within LCS's own range.
+FAST_LIVE_FORMAT_STEP = 8
 #: Fast Live's Scan Settings by the driver's name: the end of the state-tree name, and its kind.
 FAST_LIVE_OPTIONS = {
     "format": ("Format", int),
@@ -1915,8 +1915,8 @@ def fast_live_setting(scanner: str, option: str, value) -> list[Write]:
         return [write(name, int(value), option, value, value)]
     if isinstance(value, bool) or not isinstance(value, int):
         raise ValueError(f"{option} takes a whole number, not {value!r}")
-    if option == "format" and value not in FAST_LIVE_FORMATS:
-        raise ValueError(f"Fast Live's Maximal Format is one of {FAST_LIVE_FORMATS}, not {value}")
+    if option == "format" and value % FAST_LIVE_FORMAT_STEP:
+        raise ValueError(f"Fast Live's Maximal Format goes in steps of {FAST_LIVE_FORMAT_STEP}, as its slider, not {value}")
     return [write(name, value, option, value, value)]
 
 
