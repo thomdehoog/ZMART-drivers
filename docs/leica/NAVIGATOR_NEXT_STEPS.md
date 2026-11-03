@@ -73,6 +73,18 @@ checked by the driver either way (`transfer.CHECKED_COMMANDS`, `transfer.STATE_T
 
 ## To check on the STELLARIS
 
+The first session, in this order (Thom, 3 November 2026):
+
+1. Connect (setup step 1) and read LAS X's build.
+2. Define limits (setup step 2) at the stage: its corners, the z ranges, a detector gain limit, a laser limit.
+3. Read only: every value the driver reads, against what the window shows. Nothing is changed.
+4. Commands at harmless values, each read back: zoom, scan speed, a small stage move, one pan step, a laser at low
+   power with the shutter checked.
+5. The state-tree writes, one by one against their window, only after the build is checked and added (below).
+6. Acquisition last: a capture, a z-stack, a time series, a tile scan.
+
+The checks, by subject:
+
 - LAS X's build (`Acquire/LASAFversion`). The state-tree writes go in only on a build they were checked on
   (`transfer.CHECKED_LASX_BUILDS`, 4.9.0.30051); on another, each write is refused and names the build. Check the
   writes there, each against its window, one by one, before the build is added.
