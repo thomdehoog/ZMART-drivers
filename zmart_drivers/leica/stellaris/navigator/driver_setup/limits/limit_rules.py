@@ -499,6 +499,8 @@ MUTATING_COMMANDS = {
     # a detector and its line kept from LAS X's Dye Assistant
     "lock_detector": "lock_detector",
     "lock_all_settings": "lock_all_settings",
+    # the settings toolbar's apply-to-hardware switch; the limits check each change as before
+    "apply_to_hardware": "apply_to_hardware",
     "move_y_line": "move_y_line",
     # a white-light line switched on, at LCS's starting power; its power is set and checked after
     "set_laser_lines": "set_laser_lines",

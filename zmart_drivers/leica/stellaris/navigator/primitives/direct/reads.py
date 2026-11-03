@@ -97,6 +97,7 @@ READS = (
     "z_compensation",
     "autofocus_in_time_series",
     "auto_sync",
+    "apply_to_hardware",
     "lambda_scan",
     "excitation_scan",
     "laser_output_power",
@@ -1347,6 +1348,12 @@ def get_lambda_scan() -> dict:
         ("begin_nm", "DetectionBegin"), ("end_nm", "DetectionEnd"), ("step_nm", "DetectionStepSize"),
         ("bandwidth_nm", "DetectionBandWidth"))})
     return {k: float(v) for k, v in found.items()}
+
+
+def get_apply_to_hardware() -> bool:
+    """Whether a change to a setting moves the hardware, as the settings toolbar's apply-to-hardware switch shows it
+    (``Acquire/IsHwConnectedMode``; simulator, 2026-11-03). Off, LAS X keeps the changes in its settings only."""
+    return bool(settings("the apply-to-hardware switch", {"on": ("Acquire", "IsHwConnectedMode")})["on"])
 
 
 #: Auto Sync's scan options, by scanner, where LCS keeps them.

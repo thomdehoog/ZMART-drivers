@@ -258,6 +258,11 @@ def get_lambda_scan(client, **keywords):
     return _routed("lambda_scan", client, **keywords)
 
 
+def get_apply_to_hardware(client, **keywords):
+    """Whether a change to a setting moves the hardware (the settings toolbar's apply-to-hardware switch)."""
+    return _routed("apply_to_hardware", client, **keywords)
+
+
 def get_auto_sync(client, **keywords):
     """Auto Sync and its scan options: ``on``, and by scanner ``format``, ``scan_frequency``, ``overview_zoom``, ``bidirectional``, ``no_average``."""
     return _routed("auto_sync", client, **keywords)

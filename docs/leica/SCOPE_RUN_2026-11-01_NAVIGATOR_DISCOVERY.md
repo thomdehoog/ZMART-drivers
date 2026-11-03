@@ -1301,3 +1301,22 @@ Image and Spiral; Mark, the drawing tools, Hide and Focus Map; Preview and Start
 Scanmode, Z-Stack, Stage and Carrier. UI Automation shows only Mark, Hide and Close Navigator, so its other controls must be
 learned by their place on the screen. Close Navigator sent `SetStageUseMode` 7, `StageClearAllPoints`, `SetStageUseMode` 1,
 `StageClearAllPoints` and `SetStageUseMode` 0. Nothing was acquired with it open (section 9: LCS wrote dumps then).
+
+## 84. Apply to hardware; the formula's typed inputs; the last unbuilt commands (3 November 2026)
+
+The settings toolbar's last button (`ApplyToHardwareButton`, "Toggle apply to hardware") sent
+`<ATL Activate="0" Command="ATL_ActivateHardwareConnectedMode" Attribute="0"/>` and set `Acquire/IsHwConnectedMode` from
+True to False; pressed again, `Activate="1"` put it back. Off, LAS X keeps changes to a setting in its settings and leaves
+the hardware as it is. Built: `apply_to_hardware(on)`, read back; tried through the driver, off and on, and the window's
+button followed.
+
+The Formula of Optical Section Thickness's "Use from System" box (`CheckBoxRefractiveIndexFromSystem`) sent LCS nothing,
+unticked or ticked, and a refractive index typed in changed nothing in the state tree. Apply to Step Size then sent the
+same `SetOptimalStackStepSize SamplingFactor="3"` as before, without the index: LCS computes the step from its own
+values, so these inputs only change the window's own sum and are not built.
+
+`ResetConfocalSetting` (`SetMode="0" SingleSettingIndex="0"`), seen on 1 November, came 2 s before an
+`ATL_Setting_Delete` from the same click: it is part of LAS X's delete of a setting while another is chosen. Another
+delete that day sent `ATL_Setting_Delete` alone, as `delete_setting` does. `ResetAutoFocusToAutoSync` is the Best Focus
+Setting's X, built as `set_auto_sync(True)` (section 52). The mounting
+medium (`ATL_HyVolution_SetMountingMedium`) has no control in the Acquire tab's window, so it is not built.

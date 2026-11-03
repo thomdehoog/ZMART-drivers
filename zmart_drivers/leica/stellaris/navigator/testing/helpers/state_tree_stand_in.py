@@ -109,6 +109,8 @@ SIMULATOR_SETTINGS = {
     ("Acquire", "AutoFocusInfo", "ReflectionOffset"): 0.0,
     # Auto Sync and its scan options (simulator, 2026-11-02); the options are taken only while Auto Sync is on.
     ("Acquire", "AutoFocusInfo", "IsAutoSyncActive"): False,
+    # The settings toolbar's apply-to-hardware switch: on, a change to a setting moves the hardware (simulator, 2026-11-03).
+    ("Acquire", "IsHwConnectedMode"): True,
     **{
         ("Acquire", parent, name): value
         for parent, speed, zoom in (("AutoFocusSettingConfocalScanOptions", (100, 2600, 600), (0.75, 1.0)),

@@ -47,6 +47,8 @@ discovery session in `SCOPE_RUN_2026-11-01_NAVIGATOR_DISCOVERY.md` and the build
 | The y-stack of the xz scan modes (xzy ...): the scan line, begin and end there, Move to | Works: the stack with LAS X's commands, the line written into LAS X's state tree |
 | The z-stack's Set Focus | Works: pressed in LAS X's window (it sends LAS X's hardware server nothing); read back from LAS X |
 | The optical section's formula: Apply to Step Size | Works, with LAS X's command |
+| The optical section's formula: refractive index, NA and Airy units typed in | Not needed: they feed only the window's own sum; Apply sends LAS X's command without them |
+| Apply to hardware (the settings toolbar's switch) | Works, with LAS X's command; off, changes stay in LAS X's settings and the hardware stays as it is |
 | Transmitted-light detector (Trans PMT) on or off | Works |
 
 ## Taking pictures
@@ -121,7 +123,7 @@ discovery session in `SCOPE_RUN_2026-11-01_NAVIGATOR_DISCOVERY.md` and the build
 | Re-Center | Works, with LAS X's command |
 | Move to Begin, End, Center, Focus | Works: the window's buttons send no logged command, so the focus moves as any z move does, within the z limits |
 | The bin (Clear) | Works, with the End and Begin buttons' commands at the focus |
-| Set Focus (the focus plane) | Not yet: no logged command, and LCS ignored the plane written into the state tree |
+| Set Focus (the focus plane) | Works: pressed in LAS X's window, since it sends no logged command and LCS ignored the plane written into the state tree |
 | System-optimized step | Works: written into LAS X's state tree; LAS X takes its optimal step and may stretch the end |
 | Direction | Works: begin above end runs the stack downwards |
 

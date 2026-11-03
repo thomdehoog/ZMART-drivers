@@ -705,6 +705,24 @@ def setting_enabled(setting_id: int, on: bool, *, all_settings: bool = False) ->
     )
 
 
+def hardware_connected(on: bool) -> Write:
+    """The settings toolbar's apply-to-hardware switch, as it sends it (``ATL_ActivateHardwareConnectedMode``; simulator,
+    2026-11-03): on, a change to a setting moves the hardware; off, LAS X keeps it in its settings only. Read back."""
+
+    def fill(request: Request) -> None:
+        request.elements = [f'<ATL Activate="{int(bool(on))}" Command="ATL_ActivateHardwareConnectedMode" Attribute="0"/>']
+
+    return Write(
+        command="apply_to_hardware",
+        values={"value": bool(on)},
+        request="ATL_ActivateHardwareConnectedMode",
+        fill=fill,
+        description=f"Changes to the settings -> {'applied to the hardware' if on else 'kept from the hardware'}",
+        ready=idle(),
+        confirm=Expect("apply_to_hardware", lambda found: found is bool(on)),
+    )
+
+
 def settings_locked(locked: bool) -> Write:
     """Lock every setting's detectors and lines from LAS X's Dye Assistant, as Bulk Options' Lock All Settings does
     (``LockState="1"``, ``SetMode="1"``), or free them all (``LockState="0"``) (simulator, 2026-11-03); read back from

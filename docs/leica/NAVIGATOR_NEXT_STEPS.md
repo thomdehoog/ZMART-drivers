@@ -58,8 +58,9 @@ checked by the driver either way (`transfer.CHECKED_COMMANDS`, `transfer.STATE_T
 
 **Commands seen in LCS's log but not built**
 - The Number of Steps mode as such (the count is set through the step).
-- `ResetConfocalSetting`, `ResetAutoFocusToAutoSync`.
-- The mounting medium (`ATL_HyVolution_SetMountingMedium`).
+- None left: `ResetAutoFocusToAutoSync` is `set_auto_sync(True)`; `ResetConfocalSetting` is part of LAS X's own
+  delete of a setting; the mounting medium (`ATL_HyVolution_SetMountingMedium`) has no control in the Acquire tab
+  (section 84).
 
 **Other**
 - Bulk Options' Reset System and Reset ImageCompass (hard to undo: Thom decides). The Dye Assistant's Apply is

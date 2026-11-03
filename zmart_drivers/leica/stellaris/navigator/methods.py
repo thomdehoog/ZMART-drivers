@@ -477,6 +477,17 @@ class Microscope:
         result = changes.enable_setting(self.handle.client, on, all_settings=all_settings)
         return checked(self.handle, result, f"enable_setting({on!r}, all_settings={all_settings!r})")
 
+    def apply_to_hardware(self, on: bool = True) -> dict:
+        """Let a change to a setting move the hardware, or keep it in LAS X's settings only, as the settings toolbar's apply-to-hardware switch does.
+
+        With *on* False, laser powers, gains and the other setting values are
+        changed in LAS X's settings, and the lasers, detectors and scanner stay
+        as they are until it is switched on again. The limits check each change
+        either way. Read back.
+        """
+        self.handle.require_open()
+        return checked(self.handle, changes.apply_to_hardware(self.handle.client, on), f"apply_to_hardware({on!r})")
+
     def lock_all_settings(self, locked: bool = True) -> dict:
         """Keep every setting's detectors and lines from LAS X's Dye Assistant, as Bulk Options' Lock All Settings
         does, or free them all with *locked* False; read back."""

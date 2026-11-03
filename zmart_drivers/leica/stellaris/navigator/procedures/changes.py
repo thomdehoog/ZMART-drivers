@@ -1567,6 +1567,16 @@ def enable_setting(client, on, *, all_settings=False, max_retries=None) -> dict:
     return run(client, change, max_retries=max_retries)
 
 
+def apply_to_hardware(client, on, *, max_retries=None) -> dict:
+    """Let a change to a setting move the hardware, or keep the changes in LAS X's settings only with *on* False, as
+    the settings toolbar's apply-to-hardware switch does; the result's ``apply_to_hardware`` is read back."""
+    if not isinstance(on, bool):
+        return dispatch.refused(f"apply_to_hardware takes True or False, not {on!r}")
+    result = run(client, writes.hardware_connected(on), max_retries=max_retries)
+    result["apply_to_hardware"] = readers.get_apply_to_hardware(client)
+    return result
+
+
 def lock_all_settings(client, locked=True, *, max_retries=None) -> dict:
     """Lock every setting's detectors and lines from LAS X's Dye Assistant, as Bulk Options' Lock All Settings does,
     or free them all with *locked* False; read back."""

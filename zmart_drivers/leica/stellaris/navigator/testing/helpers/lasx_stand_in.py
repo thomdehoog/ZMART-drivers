@@ -634,6 +634,11 @@ class PlainNavigator:
             self.live[("Acquire", "ATL", "CurrentSetting", "IsEnabledForScanning")] = on
         return "<Result/>"
 
+    def take_ATL_ActivateHardwareConnectedMode(self, e):
+        """The settings toolbar's apply-to-hardware switch (simulator, 2026-11-03)."""
+        self.live[("Acquire", "IsHwConnectedMode")] = e.get("Activate") == "1"
+        return "<Result/>"
+
     def take_LockSetting(self, e):
         """Every setting's detectors locked from the Dye Assistant, or freed (only the current setting's are modelled)."""
         for spectro in self.nodes.detection["Spectrophotometer"]:

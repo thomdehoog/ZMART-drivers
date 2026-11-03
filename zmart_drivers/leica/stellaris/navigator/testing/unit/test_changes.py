@@ -678,6 +678,19 @@ class TestTheDetectorLock:
         assert changes.lock_all_settings(client, False)["confirmed"] is True
         assert 'LockState="0"' in lasx.sent[-1]
 
+    def test_the_settings_are_kept_from_the_hardware_and_given_back_as_the_toolbar_switch_does(self, lasx, client):
+        off = changes.apply_to_hardware(client, False)
+
+        assert off["confirmed"] is True and off["apply_to_hardware"] is False
+        assert lasx.sent[-1] == '<ATL Activate="0" Command="ATL_ActivateHardwareConnectedMode" Attribute="0"/>'
+        assert changes.apply_to_hardware(client, True)["apply_to_hardware"] is True
+        assert lasx.live[("Acquire", "IsHwConnectedMode")] is True
+
+    @pytest.mark.parametrize("on", ["off", 0, None])
+    def test_an_apply_to_hardware_that_is_not_a_switch_is_refused(self, lasx, client, on):
+        assert changes.apply_to_hardware(client, on)["success"] is False
+        assert lasx.commands() == []
+
     @pytest.mark.parametrize("locked", ["yes", 1, None])
     def test_a_lock_that_is_not_a_switch_is_refused(self, lasx, client, locked):
         assert changes.lock_all_settings(client, locked)["success"] is False
