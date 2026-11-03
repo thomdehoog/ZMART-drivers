@@ -164,24 +164,6 @@ class Viewer:
         self.send(win32con.WM_RBUTTONUP, (x, y))
         time.sleep(SETTLE_S)
 
-    def choices(self, help_text: str) -> list[str]:
-        """The items of the window's dropdown with *help_text*, as it lists them: opened to read them, and closed again."""
-        c, uia = self.window.client, self.window.uia
-        box = self.window.first(c.UIA_HelpTextPropertyId, help_text)
-        opener = box.GetCurrentPattern(c.UIA_ExpandCollapsePatternId).QueryInterface(c.IUIAutomationExpandCollapsePattern)
-        opener.Expand()
-        time.sleep(0.3)
-        try:
-            items = box.FindAll(c.TreeScope_Descendants, uia.CreatePropertyCondition(c.UIA_ControlTypePropertyId, c.UIA_ListItemControlTypeId))
-            names = []
-            for i in range(items.Length):
-                item = items.GetElement(i)
-                texts = item.FindAll(c.TreeScope_Descendants, uia.CreatePropertyCondition(c.UIA_ControlTypePropertyId, c.UIA_TextControlTypeId))
-                names.append(" ".join(texts.GetElement(k).CurrentName for k in range(texts.Length)) if texts.Length else item.CurrentName)
-            return names
-        finally:
-            opener.Collapse()
-
     def box(self, automation_id: str) -> str:
         """The text in the window's box *automation_id*."""
         found = self.window.control(automation_id)
@@ -316,12 +298,6 @@ def draw_range(first_x: int, last_x: int, *, viewer=None) -> dict:
     viewer.tool_on(TOOLS["range"])
     viewer.span(locate(viewer, first_x, middle), locate(viewer, last_x, middle))
     return {"success": True, "regions": viewer.is_enabled(SELECT_ALL)}
-
-
-def bleach_points(*, viewer=None) -> list[str]:
-    """The bleach points the Bleach Point panel's dropdown lists, by name ("ROI 1", ...), in their places."""
-    viewer = viewer if viewer is not None else Viewer()
-    return viewer.choices("Bleach Points")
 
 
 def bleach_time(*, viewer=None) -> float:

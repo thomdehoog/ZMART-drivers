@@ -574,14 +574,13 @@ class Microscope:
     def set_z_stack_focus(self, on: bool = True) -> dict:
         """Set the z-stack's focus plane where the focus is now, or clear it with *on* False, as the z-stack panel's Set Focus.
 
-        Set Focus sends LAS X's hardware server nothing, so the driver presses
-        it in LAS X's window. The result's ``focus`` is the plane as LAS X holds
-        it (``z_um``, ``set``); :meth:`move_to_z_stack` moves back to it.
+        Written into LCS's state tree, as the button's effect: the plane goes
+        where the stack's drive stands. The result's ``focus`` is the plane as
+        LAS X holds it (``z_um``, ``set``); :meth:`move_to_z_stack` moves back
+        to it.
         """
         self.handle.require_open()
-        result = checked(self.handle, lasx_window.set_z_stack_focus(on), f"set_z_stack_focus({on!r})")
-        result["focus"] = readings.get_z_stack_focus(self.handle.client)
-        return result
+        return checked(self.handle, changes.set_z_stack_focus(self.handle.client, on), f"set_z_stack_focus({on!r})")
 
     def autofocus(self, project=None) -> dict:
         """Run LAS X's autofocus once, with the settings in its Best Focus Scan Options, as the window's Autofocus button does.

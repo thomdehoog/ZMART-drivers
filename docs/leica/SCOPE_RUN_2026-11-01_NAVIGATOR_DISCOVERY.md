@@ -1790,3 +1790,25 @@ Each looked for in LAS X 4.9's window on the simulator; none needs building.
   out); no Frequency (not equipped), no GDD (STELLARIS DIVE's femtosecond lasers).
 - The bleach point's preset line: the line the point takes from the setting; its power is `set_bleach_laser_power`, more
   lines `add_bleach_laser_line` (section 107).
+
+## 111. Less UI Automation: Set Focus and the bleach point through LCS (3 November 2026)
+
+Thom asked whether the driver's UI Automation can go. Both LCS command logs (22 October to now, 123 commands) hold no
+command for drawing a region, a bleaching time, the pan (other than the COM steps) or the colour lock; LCS's whole state
+tree (15,392 values) has no colour lock beside the channel's colour (`SetLut`, `LockSetting` are the colour and the
+setting's own lock). Two did go:
+
+- Set Focus: writing `AcquireZStackInfo/AFPlanePosition` alone had been ignored (sections 41, 81). Writing the switch,
+  `IsAFPlanePosition`, True put the plane where the stack's drive stood (z-galvo moved 3 µm: the plane at 3.0 µm), and
+  False cleared it. Built: `set_z_stack_focus` through the state tree (cleared, then set, so a plane moves to where the
+  drive stands now), refused while `CanDoAFPlane` is False, as the window greys the button out; the UI Automation route
+  removed. Through the driver: set, set again 2 µm higher (1.9996 µm), cleared.
+- The bleach point's choice: with two points drawn, `CurrentBleachPoint` 5 written was not taken (LCS kept 1); -1 was
+  taken (no point). So `select_bleach_point` writes the place and checks LCS's read-back, refusing when LCS kept its point;
+  the panel's dropdown is no longer read. Through the driver: point 0 chosen; point 2 of two refused ("LCS kept bleach
+  point 1").
+
+What stays in LAS X's window: drawing regions and bleach points, clearing them, and the bleaching time (LAS X's data
+container, which LCS does not reach; its Load of bleach points failed, section 106); the colour lock (only guards the
+channel's colour against LAS X's own Dye Assistant); the pan pad's arrows (the COM scanner route does the same through
+LCS); and OK on LAS X's harmless notices.

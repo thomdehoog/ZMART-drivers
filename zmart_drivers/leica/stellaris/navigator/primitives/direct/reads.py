@@ -432,12 +432,18 @@ def get_z_stack() -> dict | None:
     }
 
 
+def get_z_stack_focus_possible() -> bool:
+    """Whether Set Focus can be used now (``Acquire/AcquireZStackInfo/CanDoAFPlane``; greyed out before the stack's begin is set)."""
+    return bool(settings("Set Focus", {"can": (*Z_STACK, "CanDoAFPlane")})["can"])
+
+
 def get_z_stack_focus() -> dict:
-    """The z-stack's focus plane, set with the window's Set Focus: ``z_um`` and whether it is ``set``.
+    """The z-stack's focus plane, set with Set Focus: ``z_um`` and whether it is ``set``.
 
     ``Acquire/AcquireZStackInfo/AFPlanePosition`` and ``IsAFPlanePosition``
-    (simulator, 2026-11-02). Only the window sets it: written into the state
-    tree, LCS ignored it.
+    (simulator, 2026-11-02). LCS ignores the position written itself; the
+    switch, written, sets the plane where the stack's drive stands
+    (2026-11-03).
     """
     found = settings("the z-stack's focus plane", {"at": (*Z_STACK, "AFPlanePosition"), "set": (*Z_STACK, "IsAFPlanePosition")})
     return {"z_um": metres(found["at"], "AFPlanePosition") * 1e6, "set": bool(found["set"])}

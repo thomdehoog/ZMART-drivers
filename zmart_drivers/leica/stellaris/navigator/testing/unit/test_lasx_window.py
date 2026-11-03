@@ -84,33 +84,3 @@ def test_the_lock_takes_true_or_false_only():
         lasx_window.lock_channel_colour("yes", window=Window(Lock()))
 
 
-def test_set_focus_is_pressed_once_when_no_plane_is_set():
-    button = Lock(on=False)
-
-    result = lasx_window.set_z_stack_focus(True, window=Window(button, "ButtonSetFocus"))
-
-    assert result["confirmed"] is True and button.on is True and button.presses == 1
-
-
-def test_set_focus_already_set_is_pressed_twice_so_the_plane_moves_to_the_focus_now():
-    button = Lock(on=True)
-
-    result = lasx_window.set_z_stack_focus(True, window=Window(button, "ButtonSetFocus"))
-
-    assert result["confirmed"] is True and button.on is True and button.presses == 2
-
-
-def test_the_focus_plane_is_cleared_with_one_press_or_none():
-    button = Lock(on=True)
-    assert lasx_window.set_z_stack_focus(False, window=Window(button, "ButtonSetFocus"))["confirmed"] is True
-    assert button.on is False and button.presses == 1
-    assert lasx_window.set_z_stack_focus(False, window=Window(button, "ButtonSetFocus"))["confirmed"] is True
-    assert button.presses == 1
-
-
-def test_set_focus_greyed_out_without_a_stack_is_refused_and_not_pressed():
-    button = Lock(enabled=False)
-
-    result = lasx_window.set_z_stack_focus(True, window=Window(button, "ButtonSetFocus"))
-
-    assert result["success"] is False and "z-stack" in result["message"] and button.presses == 0

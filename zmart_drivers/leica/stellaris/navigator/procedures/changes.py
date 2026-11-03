@@ -1271,24 +1271,42 @@ def set_bleach_time(client, seconds, *, viewer=None) -> dict:
         return dispatch.refused(f"the bleaching time was not set: {why}")
 
 
-def select_bleach_point(client, point, *, viewer=None) -> dict:
-    """Show the bleach point at *point* (its place in the Bleach Point panel's dropdown, 0 for the first, as
-    ``draw_bleach_point`` answers it) in the panel, as its dropdown does; the bleaching time, the light and Save then act
-    on it. Written into LCS's state tree; read back. The bleach mode must be on, and the point listed."""
-    from . import answer_dialogs, lasx_viewer
+def set_z_stack_focus(client, on, *, max_retries=None) -> dict:
+    """Set the z-stack's focus plane where the stack's drive stands, or clear it, as the z-stack panel's Set Focus; the
+    result's ``focus`` is read back. Written into LCS's state tree; a plane set already is cleared first, so it moves to
+    where the drive stands now. Refused where LAS X greys Set Focus out (``CanDoAFPlane``: before the stack's begin is
+    set)."""
+    if not isinstance(on, bool):
+        return dispatch.refused(f"Set Focus takes True (set it here) or False (clear it), not {on!r}")
+    if on and not readers.get_z_stack_focus_possible(client):
+        return dispatch.refused("LAS X has Set Focus greyed out (is the z-stack's begin set?); nothing was written")
+    planned = [writes.z_stack_focus(False)]
+    if on:
+        planned.append(writes.z_stack_focus(True))
+    result = None
+    for change in planned:
+        result = run(client, change, max_retries=max_retries)
+        if not result["success"]:
+            return result
+    result["focus"] = readers.get_z_stack_focus(client)
+    return result
 
+
+def select_bleach_point(client, point, *, max_retries=None) -> dict:
+    """Show the bleach point at *point* (0 for the first, as ``draw_bleach_point`` answers it) in the Bleach Point panel,
+    as its dropdown does; the bleaching time, the light and Save then act on it. Written into LCS's state tree and read
+    back: LCS keeps the point it has when asked for one beyond those drawn (simulator, 2026-11-03), and that is refused.
+    The bleach mode must be on."""
     if not readers.get_roi_scan(client)["bleach_mode"]:
         return dispatch.refused("the bleach mode is off; switch it on with set_bleach_mode first; nothing was sent")
-    try:
-        listed = lasx_viewer.bleach_points(viewer=viewer)
-    except answer_dialogs.WindowsUnavailable as why:
-        return dispatch.refused(f"the bleach points the panel lists could not be read: {why}; nothing was sent")
-    if isinstance(point, bool) or not isinstance(point, int) or not 0 <= point < len(listed):
-        return dispatch.refused(f"the panel lists {len(listed)} bleach points ({', '.join(listed) or 'none'}); "
-                                f"choose one by its place, 0 to {len(listed) - 1}, not {point!r}; nothing was sent")
-    result = run(client, writes.bleach_point_choice(point))
-    if result["success"]:
-        result["bleach_point"] = readers.get_bleach_point(client)
+    if isinstance(point, bool) or not isinstance(point, int) or point < 0:
+        return dispatch.refused(f"a bleach point is chosen by its place, 0 for the first, not {point!r}; nothing was sent")
+    result = run(client, writes.bleach_point_choice(point), max_retries=max_retries)
+    shown = readers.get_bleach_point(client)
+    result["bleach_point"] = shown
+    if shown["point"] != point:
+        result.update(success=False, confirmed=False,
+                      message=f"LCS kept bleach point {shown['point']}: fewer than {point + 1} points are drawn")
     return result
 
 

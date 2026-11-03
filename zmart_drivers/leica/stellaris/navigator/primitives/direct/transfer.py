@@ -449,6 +449,9 @@ STATE_TREE_WRITES = {
     # IsFirstPositionOnly beside it (simulator, 2026-11-03).
     # The bleach point the Bleach Point panel shows: its dropdown writes it here, and LCS follows with the point's own
     # setting (simulator, 2026-11-03). The driver checks it against the points the panel lists.
+    # The z-stack's Set Focus: True puts the focus plane where the stack's drive stands, False clears it; the plane's
+    # position written itself is ignored (simulator, 2026-11-03).
+    "IsAFPlanePosition": TreeWrite(("Acquire", "AcquireZStackInfo", "IsAFPlanePosition"), bool),
     "CurrentBleachPoint": TreeWrite(("Confocal", "ROIScan", "CurrentBleachPoint"), within=(0, 10_000)),
     "WorkflowXY": TreeWrite(("Acquire", "AutoFocusInfo", "WorkflowXY"), choices=frozenset({1, 2, 3})),
     "WorkflowXYIterator": TreeWrite(("Acquire", "AutoFocusInfo", "WorkflowXYIterator"), within=(1, 1_000_000_000)),

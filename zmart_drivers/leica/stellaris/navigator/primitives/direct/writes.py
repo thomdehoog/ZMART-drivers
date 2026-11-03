@@ -478,6 +478,19 @@ def bleach_laser_lines(lines, new_wavelength_nm: float, new_route) -> Write:
     )
 
 
+def z_stack_focus(on: bool) -> Write:
+    """The z-stack's Set Focus: ``IsAFPlanePosition`` written into the state tree, True puts the focus plane where the
+    stack's drive stands, False clears it (simulator, 2026-11-03: LCS ignores the plane's position written itself, but
+    takes this switch). Read back."""
+
+    def fill(request: Request) -> None:
+        request.elements = [f'<StateTree Command="IsAFPlanePosition" Value="{int(bool(on))}"/>']
+
+    return Write(command="set_z_stack_focus", values={"value": int(bool(on))}, request="IsAFPlanePosition", fill=fill,
+                 description=f"Set Focus -> {'here' if on else 'cleared'}", ready=idle(),
+                 confirm=Expect("z_stack_focus", lambda shown: bool(shown) and shown["set"] is bool(on)))
+
+
 def bleach_point_choice(point: int) -> Write:
     """The bleach point the Bleach Point panel shows, chosen by its place, written into the state tree as the panel's
     dropdown does (simulator, 2026-11-03); read back."""

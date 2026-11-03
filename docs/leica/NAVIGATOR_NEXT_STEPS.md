@@ -122,10 +122,10 @@ The simulator cannot show these; each needs one careful run on the real microsco
 - The detector offset: LCS holds it, but LAS X's window offers no control for it, and the driver
   changes only what the window offers (Thom, 1 November 2026).
 - Anything learned by decompiling LAS X: never.
-- The pan through LCS's older COM automation interface (`Scanner.MoveInDirection` with the pad's nine directions,
-  `Scanner.PanPercentage`, seen only in LCS's registered type library): not used (Thom, 3 November 2026). It is another
-  door into LCS than the commands the window sends, the window keeps its own copy of the pan, and a hand-made call held
-  LCS for 33 hours once. The pan stays on the window's arrows; a pan command is a question for Leica.
+- LCS's older COM automation interface beyond the pan's steps: never. Only `Scanner.MoveInDirection` and
+  `Scanner.PanPercentage` (1 to 3) are used, through `primitives/direct/scanner.py`, first on the simulator and allowed on
+  the STELLARIS since (Thom, 3 November 2026; sections 98 to 101); never `Scanspeed`, `Zoom`, `SetPosition` or the scan
+  starts. A hand-made COM call once held LCS for 33 hours, so on the STELLARIS the scanner route is tried one step first.
 
 ## Housekeeping
 

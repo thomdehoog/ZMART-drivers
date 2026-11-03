@@ -38,6 +38,8 @@ SIMULATOR_SETTINGS = {
     # The z-stack's focus plane, the window's Set Focus (simulator, 2026-11-02).
     ("Acquire", "AcquireZStackInfo", "AFPlanePosition"): 0.0,
     ("Acquire", "AcquireZStackInfo", "IsAFPlanePosition"): False,
+    # Set Focus can be used once the stack's begin is set (the window greys it out before).
+    ("Acquire", "AcquireZStackInfo", "CanDoAFPlane"): True,
     ("Acquire", "ZStackUseMode"): 1,
     # The time series, as LCS keeps it (simulator, 2026-11-02): one frame, as fast as it goes.
     ("Acquire", "AcquireTStackInfo", "RepeatCount"): 1,
@@ -628,6 +630,14 @@ class StandInNodes:
                 name, parent, _kids = nodes[node]
                 path.insert(0, name)
                 node = parent
+            if path == ["Acquire", "AcquireZStackInfo", "IsAFPlanePosition"]:
+                # As LCS: True puts the focus plane where the z-stack's drive stands, False clears it (simulator, 2026-11-03).
+                drive = self.live[("Acquire", "ZPositionMode")]
+                self.live[("Acquire", "AcquireZStackInfo", "IsAFPlanePosition")] = bool(change.Value)
+                self.live[("Acquire", "AcquireZStackInfo", "AFPlanePosition")] = self.zdrives()[drive] if change.Value else 0.0
+                continue
+            if path == ["Confocal", "ROIScan", "CurrentBleachPoint"] and change.Value >= getattr(self, "bleach_count", 0):
+                continue  # LCS keeps the point it has when asked for one beyond those drawn (simulator, 2026-11-03)
             if path[-1] in ("ShowExcitationSpectrum", "ShowEmissionSpectrum") and "SequentialSettingParameter" in path:
                 self.spectra["excitation" if "Excitation" in path[-1] else "emission"] = bool(change.Value)
                 continue

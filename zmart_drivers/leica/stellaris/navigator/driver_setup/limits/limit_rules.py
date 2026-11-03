@@ -466,6 +466,8 @@ MUTATING_COMMANDS = {
     "save_bleach_points": "save_bleach_points",
     # which bleach point the panel shows: nothing moves, no light
     "select_bleach_point": "select_bleach_point",
+    # the z-stack's focus plane set where the drive already stands: nothing moves
+    "set_z_stack_focus": "set_z_stack_focus",
     # a line added to the bleach point: at the panel's 2 %, below every limit; another power goes to the limits after
     "add_bleach_laser_line": "add_bleach_laser_line",
     # the coverslip search: its two ends, as an autofocus's; the offset is a number the autofocus uses

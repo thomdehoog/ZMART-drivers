@@ -176,6 +176,11 @@ def get_y_line(client, **keywords):
     return _routed("y_line", client, **keywords)
 
 
+def get_z_stack_focus_possible(client, **keywords):
+    """Whether Set Focus can be used now (LAS X greys it out before the stack's begin is set)."""
+    return _routed("z_stack_focus_possible", client, **keywords)
+
+
 def get_z_stack_focus(client, **keywords):
     """The z-stack's focus plane, set with the window's Set Focus: ``z_um`` and whether it is ``set``."""
     return _routed("z_stack_focus", client, **keywords)

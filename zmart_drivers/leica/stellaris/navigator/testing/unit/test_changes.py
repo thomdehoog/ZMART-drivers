@@ -1193,34 +1193,74 @@ class TestBleachPointLaserPower:
         assert not any("BleachPointLaserPower" in each for each in lasx.sent)
 
 
+class TestSetFocus:
+    """The z-stack's Set Focus through LCS's state tree: ``IsAFPlanePosition`` True puts the plane where the stack's drive
+    stands, False clears it (simulator, 2026-11-03)."""
+
+    def test_the_plane_is_set_where_the_drive_stands_and_read_back(self, lasx, client):
+        lasx.live[("Acquire", "ZPositionMode")] = 1
+        lasx.z_um = {1: 3.0, 2: 100.0}
+
+        result = changes.set_z_stack_focus(client, True)
+
+        assert result["confirmed"] is True and result["focus"] == {"z_um": pytest.approx(3.0), "set": True}
+
+    def test_a_plane_set_already_moves_to_where_the_drive_stands_now(self, lasx, client):
+        lasx.live[("Acquire", "ZPositionMode")] = 1
+        lasx.z_um = {1: 3.0, 2: 100.0}
+        changes.set_z_stack_focus(client, True)
+        lasx.z_um = {1: 5.0, 2: 100.0}
+
+        assert changes.set_z_stack_focus(client, True)["focus"]["z_um"] == pytest.approx(5.0)
+
+    def test_the_plane_is_cleared(self, lasx, client):
+        changes.set_z_stack_focus(client, True)
+
+        assert changes.set_z_stack_focus(client, False)["focus"] == {"z_um": 0.0, "set": False}
+
+    def test_refused_where_las_x_greys_it_out(self, lasx, client):
+        lasx.live[("Acquire", "AcquireZStackInfo", "CanDoAFPlane")] = False
+
+        result = changes.set_z_stack_focus(client, True)
+
+        assert result["success"] is False and "z-stack" in result["message"]
+        assert lasx.live[("Acquire", "AcquireZStackInfo", "IsAFPlanePosition")] is False
+
+    def test_true_or_false_only(self, lasx, client):
+        assert changes.set_z_stack_focus(client, "yes")["success"] is False
+
+
 class TestTheBleachPanel:
     """The Bleach Point panel's dropdown and its Add Laser (simulator, 2026-11-03)."""
 
     @pytest.fixture
     def two_points(self, lasx, client):
-        from viewer_stand_in import Viewer
-
         lasx.live[("Confocal", "ROIScan", "EnableBleachScan")] = True
         lasx.live[("Confocal", "ROIScan", "CurrentBleachPoint")] = 1
+        lasx.nodes.bleach_count = 2
         lasx.nodes.bleach_lines = [{"beamRoute": "10;10", "lineIndex": 1, "wavelength": 499.0, "percent": 2.0}]
-        viewer = Viewer()
-        viewer.listed = {"Bleach Points": ["ROI 1", "ROI 2"]}
-        return viewer
+        return client
 
-    def test_a_point_is_chosen_by_its_place_in_the_dropdown_and_read_back(self, lasx, client, two_points):
-        result = changes.select_bleach_point(client, 0, viewer=two_points)
+    def test_a_point_is_chosen_by_its_place_and_read_back(self, lasx, client, two_points):
+        result = changes.select_bleach_point(client, 0)
 
         assert result["confirmed"] is True and result["bleach_point"]["point"] == 0
         assert lasx.live[("Confocal", "ROIScan", "CurrentBleachPoint")] == 0
 
-    @pytest.mark.parametrize("point", [2, -1, 1.0, True, "ROI 1"])
-    def test_a_point_the_panel_does_not_list_is_refused(self, lasx, client, two_points, point):
-        assert changes.select_bleach_point(client, point, viewer=two_points)["success"] is False
+    def test_a_point_beyond_those_drawn_is_refused_as_lcs_keeps_the_one_it_has(self, lasx, client, two_points):
+        result = changes.select_bleach_point(client, 2, max_retries=0)
+
+        assert result["success"] is False and "1" in result["message"]
+        assert lasx.live[("Confocal", "ROIScan", "CurrentBleachPoint")] == 1
+
+    @pytest.mark.parametrize("point", [-1, 1.0, True, "ROI 1"])
+    def test_what_is_not_a_place_is_refused_before_anything_is_written(self, lasx, client, two_points, point):
+        assert changes.select_bleach_point(client, point)["success"] is False
         assert lasx.live[("Confocal", "ROIScan", "CurrentBleachPoint")] == 1
 
     def test_choosing_needs_the_bleach_mode(self, lasx, client, two_points):
         lasx.live[("Confocal", "ROIScan", "EnableBleachScan")] = False
-        assert "set_bleach_mode" in changes.select_bleach_point(client, 0, viewer=two_points)["message"]
+        assert "set_bleach_mode" in changes.select_bleach_point(client, 0)["message"]
 
     def test_a_line_is_added_to_the_point_as_the_panel_s_drag_in(self, lasx, client, two_points):
         result = changes.add_bleach_laser_line(client, 559)
