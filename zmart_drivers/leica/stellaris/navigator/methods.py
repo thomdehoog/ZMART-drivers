@@ -689,6 +689,18 @@ class Microscope:
         checked(self.handle, result, f"set_z_drive({drive!r})")
         return result["z_drive"]
 
+    def set_excitation_scan(self, begin_nm: int | None = None, end_nm: int | None = None, step_nm: int | None = None,
+                            automatic_sp: bool | None = None, method: str | None = None, min_gap_nm: int | None = None,
+                            after_stage: bool | None = None) -> dict:
+        """Set the Λ (excitation) scan as LAS X's Λ panel: begin and end within the white-light laser's range, step,
+        Automatic SP Movement, the method ("right fixed" or "constant"), the minimal gap to the detection, Lambda
+        After Stage; whole nanometres. The scan mode is set apart (``xyΛ``, ...). Answers the Λ scan."""
+        self.handle.require_open()
+        result = changes.set_excitation_scan(self.handle.client, begin_nm=begin_nm, end_nm=end_nm, step_nm=step_nm, automatic_sp=automatic_sp,
+                                             method=method, min_gap_nm=min_gap_nm, after_stage=after_stage)
+        checked(self.handle, result, "set_excitation_scan()")
+        return result["excitation_scan"]
+
     def set_lambda_scan(self, begin_nm: int | None = None, end_nm: int | None = None, step_nm: int | None = None,
                         bandwidth_nm: int | None = None) -> dict:
         """Set the λ scan's detection as LAS X's λ panel: begin and end (380 to 800 nm), step and bandwidth, in whole

@@ -50,6 +50,14 @@ SIMULATOR_SETTINGS = {
     ("Confocal", "LambdaDefinition", "DetectionStepSize"): 30.0,
     ("Confocal", "LambdaDefinition", "DetectionStepCount"): 15,
     ("Confocal", "LambdaDefinition", "DetectionBandWidth"): 30.0,
+    # The Λ (excitation) scan (simulator, 2026-11-03).
+    ("Confocal", "LambdaDefinition", "ExcitationBegin"): 485.0,
+    ("Confocal", "LambdaDefinition", "ExcitationEnd"): 685.0,
+    ("Confocal", "LambdaDefinition", "ExcitationStepSize"): 20.0,
+    ("Confocal", "LambdaDefinition", "IsAutomaticSPUnitMovementActive"): True,
+    ("Confocal", "LambdaDefinition", "DetectionBandWidthMode"): 4,
+    ("Confocal", "LambdaDefinition", "LambdaMinGapExctToDetct"): 10.0,
+    ("Confocal", "LambdaDefinition", "IsExcitationLambdaAfterStageDim"): False,
     # Linear Z-compensation (simulator, 2026-11-02): no mode, the reference at the stack's begin.
     ("Confocal", "ZCompensation", "CurrentMode"): 0,
     ("Confocal", "ZCompensation", "ReferencePosition"): 0.000995,

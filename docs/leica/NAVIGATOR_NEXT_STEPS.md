@@ -87,7 +87,7 @@ The simulator cannot show these; each needs one careful run on the real microsco
 - That the hardware follows the state-tree values (for example, bidirectional halving the frame time).
 
 - The λ scan: why LCS sometimes moves begin and end by a few nm (380 to 385, 650 to 655, 800 to 775) and
-  sometimes keeps them; the Λ (excitation) and Λλ scans, and the λ scan's gaps and direction.
+  sometimes keeps them; the Λλ scan's own settings (geometry, maximal distance, direction).
 
 - The Laser Overview's power switch (a laser on or off) and its Options: Thom to decide, as switching a laser
   is hard to undo on the STELLARIS. Online Dye Separation: needs a separation matrix from the Process tab.

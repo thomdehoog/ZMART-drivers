@@ -436,6 +436,7 @@ MUTATING_COMMANDS = {
     "set_auto_sync": "set_auto_sync",
     # the λ scan's detection band: which light is collected, not the light
     "set_lambda_scan": "set_lambda_scan",
+    "set_excitation_scan": "set_excitation_scan",
     "set_auto_sync_options": "set_auto_sync_options",
     "add_z_compensation_point": "add_z_compensation_point",
     "remove_z_compensation_point": "remove_z_compensation_point",

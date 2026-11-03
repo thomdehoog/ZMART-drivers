@@ -1041,6 +1041,50 @@ def set_z_drive(client, drive, *, max_retries=None) -> dict:
     return result
 
 
+def set_excitation_scan(client, *, begin_nm=None, end_nm=None, step_nm=None, automatic_sp=None, method=None, min_gap_nm=None,
+                        after_stage=None, max_retries=None) -> dict:
+    """Set the Λ (excitation) scan as LAS X's Λ panel does: its begin and end (within the white-light laser's range), its
+    step, Automatic SP Movement, the method ("right fixed" or "constant"), the minimal gap to the detection, and Lambda
+    After Stage; whole nanometres. Checked before anything is sent; the result's ``excitation_scan`` is read back."""
+    asked = {"step_nm": step_nm, "begin_nm": begin_nm, "end_nm": end_nm, "automatic_sp": automatic_sp, "method": method,
+             "min_gap_nm": min_gap_nm, "after_stage": after_stage}
+    given = {k: v for k, v in asked.items() if v is not None}
+    if not given:
+        return dispatch.refused("set_excitation_scan needs at least one value")
+    for key in ("step_nm", "begin_nm", "end_nm", "min_gap_nm"):
+        if key in given and (isinstance(given[key], bool) or not isinstance(given[key], int)):
+            return dispatch.refused(f"{key} takes whole nanometres, not {given[key]!r}")
+    for key in ("automatic_sp", "after_stage"):
+        if key in given and not isinstance(given[key], bool):
+            return dispatch.refused(f"{key} takes True or False, not {given[key]!r}")
+    if "method" in given and given["method"] not in direct_reader.EXCITATION_METHODS.values():
+        return dispatch.refused(f"the method is one of {sorted(direct_reader.EXCITATION_METHODS.values())}, not {given['method']!r}")
+    now = readers.get_excitation_scan(client)
+    tunable = [(line["MinWavelength"], line["MaxWavelength"]) for source in readers.get_light_sources(client) or []
+               for line in source["LaserLines"] if line["MinWavelength"] != line["MaxWavelength"]]
+    low, high = (min(t[0] for t in tunable), max(t[1] for t in tunable)) if tunable else (0, 0)
+    begin, end = given.get("begin_nm", now["begin_nm"]), given.get("end_nm", now["end_nm"])
+    if ("begin_nm" in given or "end_nm" in given) and not low <= begin < end <= high:
+        return dispatch.refused(f"the Λ scan runs within the white-light laser's {low:g} to {high:g} nm, begin before end; not {begin} to {end}")
+    if "step_nm" in given and not 0 < given["step_nm"] <= max(end - begin, 1):
+        return dispatch.refused(f"the step is above 0 and at most the range, {end - begin:g} nm, not {given['step_nm']}")
+    if "min_gap_nm" in given and not 0 <= given["min_gap_nm"] <= 100:
+        return dispatch.refused(f"the minimal gap is 0 to 100 nm, not {given['min_gap_nm']}")
+    result = None
+    for name in asked:  # the step first: a later step moved the end of the λ scan (simulator, 2026-11-02)
+        if name in given:
+            result = run(client, writes.excitation_scan(name, given[name]), max_retries=max_retries)
+            if not result["success"]:
+                return result
+    result["excitation_scan"] = readers.get_excitation_scan(client)
+    moved = {k: result["excitation_scan"][k] for k, v in given.items() if result["excitation_scan"][k] != v and not (
+        isinstance(v, (int, float)) and not isinstance(v, bool) and abs(result["excitation_scan"][k] - v) < 0.5)}
+    if moved:
+        result["confirmed"] = False
+        result["message"] = f"LAS X holds {moved}, not what was asked"
+    return result
+
+
 def set_lambda_scan(client, *, begin_nm=None, end_nm=None, step_nm=None, bandwidth_nm=None, max_retries=None) -> dict:
     """Set the λ scan's detection as LAS X's λ panel does: its begin and end (380 to 800 nm), its step and its
     bandwidth, in whole nanometres; the result's ``lambda_scan`` is read back. Checked before anything is sent."""

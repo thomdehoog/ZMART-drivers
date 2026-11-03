@@ -221,6 +221,11 @@ def get_laser_output_power(client, **keywords):
     return _routed("laser_output_power", client, **keywords)
 
 
+def get_excitation_scan(client, **keywords):
+    """The Λ (excitation) scan: ``begin_nm``, ``end_nm``, ``step_nm``, ``automatic_sp``, ``method``, ``min_gap_nm``, ``after_stage``."""
+    return _routed("excitation_scan", client, **keywords)
+
+
 def get_lambda_scan(client, **keywords):
     """The λ scan's detection: ``begin_nm``, ``end_nm``, ``step_nm``, ``bandwidth_nm``, ``steps``."""
     return _routed("lambda_scan", client, **keywords)

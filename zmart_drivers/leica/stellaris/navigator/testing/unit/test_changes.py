@@ -1153,6 +1153,24 @@ class TestZDrive:
         assert changes.set_z_drive(client, "z-piezo")["success"] is False
 
 
+class TestExcitationScan:
+    def test_the_excitation_scan_is_set_with_the_window_s_commands(self, lasx, client):
+        result = changes.set_excitation_scan(client, begin_nm=500, end_nm=640, step_nm=10, automatic_sp=False, method="constant",
+                                             min_gap_nm=15, after_stage=True)
+
+        assert result["confirmed"] is True
+        assert result["excitation_scan"] == {"begin_nm": 500.0, "end_nm": 640.0, "step_nm": 10.0, "automatic_sp": False,
+                                             "method": "constant", "min_gap_nm": 15.0, "after_stage": True}
+
+    @pytest.mark.parametrize("keywords", [{"begin_nm": 400}, {"end_nm": 800}, {"begin_nm": 650, "end_nm": 600}, {"step_nm": 0},
+                                          {"method": "left"}, {"min_gap_nm": -1}, {"automatic_sp": "yes"}, {}])
+    def test_what_the_window_does_not_offer_is_refused_and_nothing_is_sent(self, lasx, client, keywords):
+        sent = len(lasx.sent)
+
+        assert changes.set_excitation_scan(client, **keywords)["success"] is False
+        assert len(lasx.sent) == sent
+
+
 class TestLambdaScan:
     def test_the_detection_range_step_and_bandwidth_are_set_with_the_window_s_commands(self, lasx, client):
         result = changes.set_lambda_scan(client, begin_nm=400, end_nm=700, step_nm=10, bandwidth_nm=20)

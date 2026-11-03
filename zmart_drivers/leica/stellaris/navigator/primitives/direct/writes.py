@@ -1411,6 +1411,35 @@ def laser_output_power(setting_place: int, source_place: int, name: str, percent
                  confirm=Expect("laser_output_power", lambda found: abs((found or {}).get(name, -1) - percent) <= 0.05))
 
 
+def excitation_scan(name: str, value) -> Write:
+    """One value of the Λ (excitation) scan, with the Λ panel's own command (Lambda After Stage written into the state
+    tree, as the panel does); read back."""
+    if name == "after_stage":
+        element = f'<StateTree Command="IsExcitationLambdaAfterStageDim" Value="{int(bool(value))}"/>'
+    else:
+        command, attribute, text = {
+            "begin_nm": ("SetLambdaExcitationBegin", "Begin", lambda v: str(int(v))),
+            "end_nm": ("SetLambdaExcitationEnd", "End", lambda v: str(int(v))),
+            "step_nm": ("SetLambdaExcitationStepsize", "Stepsize", lambda v: str(int(v))),
+            "automatic_sp": ("SetLambdaAutomaticSPUnitMovement", "Movement", lambda v: str(int(bool(v)))),
+            "method": ("SetLambdaDetectionBandwidthMode", "Mode", lambda v: str({b: a for a, b in direct_reader.EXCITATION_METHODS.items()}[v])),
+            "min_gap_nm": ("SetLambdaMinGap", "MinGap", lambda v: str(int(v))),
+        }[name]
+        element = f'<Scanner Command="{command}" {attribute}="{text(value)}"/>'
+
+    def fill(request: Request) -> None:
+        request.elements = [element]
+
+    def shows(found) -> bool:
+        if not found:
+            return False
+        shown = found[name]
+        return abs(shown - value) < 0.5 if isinstance(value, (int, float)) and not isinstance(value, bool) else shown == value
+
+    return Write(command="set_excitation_scan", values={"value": str(value)}, request=element.split('"')[1], fill=fill,
+                 description=f"Λ scan {name} -> {value}", ready=idle(), confirm=Expect("excitation_scan", shows))
+
+
 #: The λ scan's detection: the driver's name, LAS X's command and its attribute, and the reading's key.
 LAMBDA_SCAN = {
     "begin_nm": ("SetLambdaDetectionBegin", "Begin"),

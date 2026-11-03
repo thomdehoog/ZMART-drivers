@@ -1088,3 +1088,17 @@ default; LCS keeps it in the setting's entry (`TauInteractionDonorLifetime`). Bu
 only in TauInteraction, 0.1 to 11.5 ns; `get_detector_modes()[name]["donor_lifetime_ns"]`. Through the driver on HyD 2: 3.1 ns,
 20 refused, back to 2.4; HyD 2 back in TauSeparation.
 
+## 65. The Λ (excitation) scan (3 November 2026)
+
+In xyΛ, the Λ panel, by the driver's mouse: begin and end `<Scanner Command="SetLambdaExcitationBegin" Begin="495"/>`,
+`SetLambdaExcitationEnd End="655"`, step `SetLambdaExcitationStepsize Stepsize="20"`, Automatic SP Movement
+`SetLambdaAutomaticSPUnitMovement Movement="0|1"`, Method `SetLambdaDetectionBandwidthMode Mode="4"` (Right fixed) or
+`"5"` (Constant), Gap to SP Unit `SetLambdaMinGap MinGap="11"`; SP Unit Lambda Max is the λ detection's end
+(`SetLambdaDetectionEnd`); Lambda After Stage no command, `Confocal/LambdaDefinition/IsExcitationLambdaAfterStageDim`. The
+window's begin and end ran 485 to 685 nm, the white-light laser's range on the simulator.
+
+Built: `set_excitation_scan(begin_nm=, end_nm=, step_nm=, automatic_sp=, method=, min_gap_nm=, after_stage=)`, the step
+first, begin and end within the white-light laser's range, what LAS X moved reported. Through the driver: 500 to 640 nm, 10,
+constant, gap 15, after stage; 300 refused; back to 485 to 685, 20, right fixed, gap 10; the λ detection back to 385 to
+775 nm, 30, 30; the scan mode back to xyz.
+

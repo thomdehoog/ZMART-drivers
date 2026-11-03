@@ -269,6 +269,24 @@ class PlainNavigator:
         begin, end, step = (self.live[(*self.LAMBDA, k)] for k in ("DetectionBegin", "DetectionEnd", "DetectionStepSize"))
         self.live[(*self.LAMBDA, "DetectionStepCount")] = int((end - begin) // step) + 1 if step else 1
 
+    def take_SetLambdaExcitationBegin(self, e):
+        self.live[(*self.LAMBDA, "ExcitationBegin")] = float(e.get("Begin"))
+
+    def take_SetLambdaExcitationEnd(self, e):
+        self.live[(*self.LAMBDA, "ExcitationEnd")] = float(e.get("End"))
+
+    def take_SetLambdaExcitationStepsize(self, e):
+        self.live[(*self.LAMBDA, "ExcitationStepSize")] = float(e.get("Stepsize"))
+
+    def take_SetLambdaAutomaticSPUnitMovement(self, e):
+        self.live[(*self.LAMBDA, "IsAutomaticSPUnitMovementActive")] = e.get("Movement") == "1"
+
+    def take_SetLambdaDetectionBandwidthMode(self, e):
+        self.live[(*self.LAMBDA, "DetectionBandWidthMode")] = int(e.get("Mode"))
+
+    def take_SetLambdaMinGap(self, e):
+        self.live[(*self.LAMBDA, "LambdaMinGapExctToDetct")] = float(e.get("MinGap"))
+
     def take_SetLambdaDetectionBegin(self, e):
         self.live[(*self.LAMBDA, "DetectionBegin")] = float(e.get("Begin"))
         self.lambda_steps()

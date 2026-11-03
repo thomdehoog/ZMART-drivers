@@ -96,6 +96,7 @@ READS = (
     "autofocus_in_time_series",
     "auto_sync",
     "lambda_scan",
+    "excitation_scan",
     "laser_output_power",
     "coverslip_offset",
     "fluorifier",
@@ -1193,6 +1194,25 @@ def get_laser_output_power() -> dict:
         return found
 
     return read("the lasers' output power", reading)
+
+
+#: The Λ scan's methods for the detection band, by LCS's code (``DetectionBandWidthMode``).
+EXCITATION_METHODS = {4: "right fixed", 5: "constant"}
+
+
+def get_excitation_scan() -> dict:
+    """The Λ (excitation) scan, as LAS X's Λ panel shows it: ``begin_nm``, ``end_nm``, ``step_nm``, ``automatic_sp`` (the
+    detection follows the excitation), ``method`` ("right fixed" or "constant"), ``min_gap_nm`` (between excitation and
+    detection), ``after_stage`` (Lambda After Stage). ``Confocal/LambdaDefinition`` (simulator, 2026-11-03)."""
+    l = ("Confocal", "LambdaDefinition")
+    found = settings("the Λ scan", {k: (*l, n) for k, n in (
+        ("begin", "ExcitationBegin"), ("end", "ExcitationEnd"), ("step", "ExcitationStepSize"), ("auto", "IsAutomaticSPUnitMovementActive"),
+        ("method", "DetectionBandWidthMode"), ("gap", "LambdaMinGapExctToDetct"), ("after", "IsExcitationLambdaAfterStageDim"))})
+    return {
+        "begin_nm": float(found["begin"]), "end_nm": float(found["end"]), "step_nm": float(found["step"]),
+        "automatic_sp": bool(found["auto"]), "method": EXCITATION_METHODS.get(found["method"], found["method"]),
+        "min_gap_nm": float(found["gap"]), "after_stage": bool(found["after"]),
+    }
 
 
 def get_lambda_scan() -> dict:

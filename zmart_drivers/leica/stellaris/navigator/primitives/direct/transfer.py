@@ -201,6 +201,12 @@ ALLOWED_COMMANDS = frozenset(
         "ResetAutoFocusToAutoSync",
         "StartFindCoverSlipReflection",
         "SetLambdaDetectionBegin",
+        "SetLambdaExcitationBegin",
+        "SetLambdaExcitationEnd",
+        "SetLambdaExcitationStepsize",
+        "SetLambdaAutomaticSPUnitMovement",
+        "SetLambdaDetectionBandwidthMode",
+        "SetLambdaMinGap",
         "SetLambdaDetectionEnd",
         "SetLambdaDetectionStepsize",
         "SetLambdaDetectionBandwidth",
@@ -422,6 +428,8 @@ STATE_TREE_WRITES = {
     "IsSpectrumTurnMode": TreeWrite(("Confocal", "HWParameter", "FilterWheelList", "PolarizationFW", "IsSpectrumTurnMode"), bool),
     "FilterSpectrumPos": TreeWrite(("Confocal", "HWParameter", "FilterWheelList", "PolarizationFW", "FilterSpectrumPos"), float,
                                    between=("FilterSpectrumPosMin", "FilterSpectrumPosMax")),
+    # The Λ scan's "Lambda After Stage": the window writes it here (simulator, 2026-11-03).
+    "IsExcitationLambdaAfterStageDim": TreeWrite(("Confocal", "LambdaDefinition", "IsExcitationLambdaAfterStageDim"), bool),
     "MotCorrRefPos": TreeWrite(
         ("Microscope", "ObjectiveList", "ObjectiveInfo", "MotCorrRefPos"), float,
         choices=frozenset({-1.0}), within=(0, 100), of_objective=True,
