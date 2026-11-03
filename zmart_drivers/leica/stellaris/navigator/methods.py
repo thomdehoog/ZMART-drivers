@@ -380,6 +380,11 @@ class Microscope:
         checked(self.handle, result, f"find_tau_lifetimes({detector!r})")
         return {"found": result["found"], "lifetimes_ns": result["lifetimes_ns"]}
 
+    def set_tau_donor_lifetime(self, detector: str, ns: float) -> dict:
+        """Set TauInteraction's average donor lifetime, in nanoseconds (0.1 to 11.5), as its window; only in TauInteraction."""
+        self.handle.require_open()
+        return checked(self.handle, changes.set_tau_donor_lifetime(self.handle.client, detector, ns), f"set_tau_donor_lifetime({detector!r}, {ns!r})")
+
     def add_tau_channel(self, detector: str) -> dict:
         """Add a TauSeparation channel, as its window's + (at most seven); set its lifetime and colour after."""
         self.handle.require_open()

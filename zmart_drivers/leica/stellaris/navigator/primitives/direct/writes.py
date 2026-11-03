@@ -899,6 +899,21 @@ def detector_tau(route, name: str, place: int, mode: str) -> Write:
 TAU_LIFETIME_NS = (0.07, 9.37)
 
 
+#: TauInteraction's donor lifetime scale in the window, in nanoseconds (simulator, 2026-11-03).
+TAU_DONOR_NS = (0.1, 11.5)
+
+
+def tau_donor_lifetime(route, name: str, ns: float) -> Write:
+    """TauInteraction's average donor lifetime of the detector *name*, in nanoseconds, as its window sends it; read back."""
+
+    def fill(request: Request) -> None:
+        request.elements = [f'<Scanner Command="SetTauInteractionDonorLifetime" DonorLifetime="{ns / 1e9!r}">{beam_route(route)}</Scanner>']
+
+    return Write(command="set_tau_donor_lifetime", values={"value": float(ns)}, request="SetTauInteractionDonorLifetime", fill=fill,
+                 description=f"Detector {name} donor lifetime -> {ns:g} ns", ready=idle(),
+                 confirm=Expect("detector_modes", lambda modes: abs((((modes or {}).get(name) or {}).get("donor_lifetime_ns") or -1) - ns) <= 0.01))
+
+
 #: TauScan's lifetime range as LCS keeps it, in nanoseconds (simulator, 2026-11-03).
 TAU_SCAN_NS = (0.05, 11.5)
 

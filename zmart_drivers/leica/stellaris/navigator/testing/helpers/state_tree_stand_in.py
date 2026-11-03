@@ -541,6 +541,7 @@ class StandInNodes:
                  # TauScan's number of images and lifetime range (seconds), as LCS keeps them in the setting.
                  "TauScanImageCount": unit.get("TauScanImageCount", 3), "TauScanRangeBegin": unit.get("TauScanRangeBegin", 1e-10),
                  "TauScanRangeEnd": unit.get("TauScanRangeEnd", 1e-08),
+                 "TauInteractionDonorLifetime": unit.get("TauInteractionDonorLifetime", 2.4e-09),
                  # TauGating's channels and their gates (seconds), as LCS lists them in TauGating.
                  **({"DetectorChannelList_SeqInfo": {"FreeGatingChannelCount": 2 - len(unit["Gates"]), "DetectorChannel": [
                      {"IsChannelActive": True, "Gate": [{"GateBegin": b, "GateEnd": e} for b, e in gates]} for gates in unit["Gates"]]}}

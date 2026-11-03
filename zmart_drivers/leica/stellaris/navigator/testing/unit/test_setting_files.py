@@ -152,6 +152,29 @@ def test_a_tau_mode_las_x_greys_out_is_refused_and_nothing_is_sent(lasx, client,
     assert len(lasx.sent) == sent
 
 
+class TestTauInteraction:
+    def test_the_donor_lifetime_is_set_with_the_window_s_command_and_read_back(self, lasx, client, tmp_path):
+        from zmart_drivers.leica.stellaris.navigator.procedures import changes
+
+        setting_files.set_detector(client, tmp_path, "HyD S 3", tau_mode="TauInteraction")
+        assert direct_reader.get_detector_modes()["HyD S 3"]["donor_lifetime_ns"] == pytest.approx(2.4)
+
+        assert changes.set_tau_donor_lifetime(client, "HyD S 3", 3.1)["confirmed"] is True
+        assert direct_reader.get_detector_modes()["HyD S 3"]["donor_lifetime_ns"] == pytest.approx(3.1)
+
+    @pytest.mark.parametrize("ns", [0.05, 12.0, "3"])
+    def test_a_lifetime_off_the_window_s_scale_is_refused(self, lasx, client, tmp_path, ns):
+        from zmart_drivers.leica.stellaris.navigator.procedures import changes
+
+        setting_files.set_detector(client, tmp_path, "HyD S 3", tau_mode="TauInteraction")
+        assert changes.set_tau_donor_lifetime(client, "HyD S 3", ns)["success"] is False
+
+    def test_outside_tau_interaction_it_is_refused(self, lasx, client):
+        from zmart_drivers.leica.stellaris.navigator.procedures import changes
+
+        assert changes.set_tau_donor_lifetime(client, "HyD S 3", 3.0)["success"] is False
+
+
 class TestTauSeparationChannels:
     @pytest.fixture
     def separating(self, lasx, client, tmp_path):

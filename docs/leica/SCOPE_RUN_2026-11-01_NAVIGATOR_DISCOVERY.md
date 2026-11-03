@@ -1080,3 +1080,11 @@ Built: `add_tau_channel(detector)` (at most seven), `remove_tau_channel(detector
 `set_tau_channel_colour`. Through the driver on HyD 2: a third channel (LCS gave it yellow, 2 ns), coloured green, removed;
 removing a second refused; channel 1 unlocked and locked again.
 
+## 64. TauInteraction's donor lifetime (3 November 2026)
+
+"TauInteraction - HyD 2" shows "Average Donor Lifetime", 0.1 to 11.5 ns; its slider is not visible to UI Automation. Opening
+the window sent `<Scanner Command="SetTauInteractionDonorLifetime" DonorLifetime="2.4E-09">` (with the beam route), LAS X's
+default; LCS keeps it in the setting's entry (`TauInteractionDonorLifetime`). Built: `set_tau_donor_lifetime(detector, ns)`,
+only in TauInteraction, 0.1 to 11.5 ns; `get_detector_modes()[name]["donor_lifetime_ns"]`. Through the driver on HyD 2: 3.1 ns,
+20 refused, back to 2.4; HyD 2 back in TauSeparation.
+

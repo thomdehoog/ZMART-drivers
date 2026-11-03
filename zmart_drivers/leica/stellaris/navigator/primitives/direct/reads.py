@@ -1089,6 +1089,10 @@ def get_detector_modes() -> dict:
                 "tau_colours": listed_codes(unit, "TauSeparationDefinition_SeqInfo", "TauSeparationChannel", "LutName"),
                 "gates": tau_gates(unit),
                 "tau_scan": tau_scan(unit, most.get(name)),
+                "donor_lifetime_ns": (
+                    node_value(nodes, named(nodes, unit, "TauInteractionDonorLifetime")) * 1e9
+                    if node_value(nodes, named(nodes, unit, "DigitalGatingMode")) == 10 else None
+                ),
                 "tau_lifetimes_ns": [
                     node_value(nodes, named(nodes, child_named(nodes, channel, "TauSeparationLine"), "TauLinePosition")) * 1e9
                     for channel in tau_channels(unit)

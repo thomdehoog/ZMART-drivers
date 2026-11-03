@@ -408,6 +408,9 @@ class PlainNavigator:
         if success and found:
             self.detector_at(e)["TauLifetimes"] = list(found)
 
+    def take_SetTauInteractionDonorLifetime(self, e):
+        self.detector_at(e)["TauInteractionDonorLifetime"] = float(e.get("DonorLifetime"))
+
     def take_SetDetectorTauScanCount(self, e):
         unit = self.detector_at(e)
         if int(e.get("ImageCount")) <= unit.get("TauScanMaxImageCount", 7):  # more is ignored, as by LCS

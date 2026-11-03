@@ -460,6 +460,19 @@ def find_tau_lifetimes(client, detector) -> dict:
     return result
 
 
+def set_tau_donor_lifetime(client, detector, ns, *, max_retries=None) -> dict:
+    """Set TauInteraction's average donor lifetime of *detector*, in nanoseconds (0.1 to 11.5), as its window; only in TauInteraction."""
+    low, high = writes.TAU_DONOR_NS
+    if isinstance(ns, bool) or not isinstance(ns, (int, float)) or not low <= ns <= high:
+        return dispatch.refused(f"the donor lifetime is {low} to {high} ns, as the window's scale runs, not {ns!r}")
+    units = {unit.get("Name"): unit for unit in readers.get_detection_units(client) or []}
+    if detector not in units:
+        return dispatch.refused(f"no detector {detector!r}; LAS X's are {sorted(units)}")
+    if ((readers.get_detector_modes(client) or {}).get(detector) or {}).get("tau") != 10:
+        return dispatch.refused(f"{detector} is not in TauInteraction")
+    return run(client, writes.tau_donor_lifetime(writes.route_of(units[detector]["BeamRoute"]), detector, float(ns)), max_retries=max_retries)
+
+
 def set_tau_scan(client, detector, *, images=None, range_ns=None, max_retries=None) -> dict:
     """Set TauScan's number of images (1 to the detector's most) and lifetime range ``(begin_ns, end_ns)`` (0.05 to
     11.5 ns) of *detector*, as its TauScan window; only while the detector is in TauScan. Checked before anything is sent."""
