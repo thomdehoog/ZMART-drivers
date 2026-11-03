@@ -63,8 +63,8 @@ checked by the driver either way (`transfer.CHECKED_COMMANDS`, `transfer.STATE_T
 
 **Commands seen in LCS's log but not built**
 - The Number of Steps mode as such (the count is set through the step).
-- None left: `ResetAutoFocusToAutoSync` is `set_auto_sync(True)`; `ResetConfocalSetting` is part of LAS X's own
-  delete of a setting; the mounting medium (`ATL_HyVolution_SetMountingMedium`) has no control in the Acquire tab
+- None left: `ResetAutoFocusToAutoSync` is `set_auto_sync(True)`; `ResetConfocalSetting` is a setting's Reset,
+  built as `reset_setting()` (section 91); the mounting medium (`ATL_HyVolution_SetMountingMedium`) has no control in the Acquire tab
   (section 84).
 
 **Other**

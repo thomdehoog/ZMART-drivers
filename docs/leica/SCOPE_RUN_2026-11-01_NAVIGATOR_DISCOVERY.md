@@ -1316,8 +1316,8 @@ same `SetOptimalStackStepSize SamplingFactor="3"` as before, without the index: 
 values, so these inputs only change the window's own sum and are not built.
 
 `ResetConfocalSetting` (`SetMode="0" SingleSettingIndex="0"`), seen on 1 November, came 2 s before an
-`ATL_Setting_Delete` from the same click: it is part of LAS X's delete of a setting while another is chosen. Another
-delete that day sent `ATL_Setting_Delete` alone, as `delete_setting` does. `ResetAutoFocusToAutoSync` is the Best Focus
+`ATL_Setting_Delete`. It was taken here for part of the delete; section 91 shows it is the setting's own Reset (its
+context menu), pressed just before the delete. A delete alone sends `ATL_Setting_Delete`, as `delete_setting` does. `ResetAutoFocusToAutoSync` is the Best Focus
 Setting's X, built as `set_auto_sync(True)` (section 52). The mounting
 medium (`ATL_HyVolution_SetMountingMedium`) has no control in the Acquire tab's window, so it is not built.
 
