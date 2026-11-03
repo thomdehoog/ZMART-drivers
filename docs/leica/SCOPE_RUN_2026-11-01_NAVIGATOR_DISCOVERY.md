@@ -1389,3 +1389,12 @@ limits, and the power put back. The panel's bin removes the point's laser line (
 `IsBleachPointDefinition="1"` and no line); the viewer's Select All and bin removed the point. While the bleach panel is
 in front, the light source's current values are the bleach point's. Put back: the point removed, Setting 1's 499 nm at 2 %,
 Draw point and the bleach mode off.
+
+## 89. An ROI scan's regions, drawn; ROI Configuration lists none on the simulator (3 November 2026)
+
+With ROI scan on (`set_roi_scan(True)`), the viewer offered Draw rectangle, ellipse, polygon and range, and the ROI panel
+Background, 3D (greyed out without a stack) and Show Roi Configuration Panel. Draw rectangle and a drag in the image drew a
+region in both channels; LCS got nothing, as for a bleach point: the regions are kept in LAS X's data container. The ROI
+Configuration window (on the right screen) showed a column for each laser line (405, 488, 638, 730 and the white-light
+lines), but no row for the region, nor for a second one drawn with the window open; so the lines per region cannot be
+learned on the simulator. Put back: the window closed, the regions removed (Select All and the bin), ROI scan off.
