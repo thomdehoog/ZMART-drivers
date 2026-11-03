@@ -1084,15 +1084,81 @@ def set_bleach_laser_power(client, laser_nm, percent, *, max_retries=None) -> di
     return run(client, change, max_retries=max_retries)
 
 
-def draw_bleach_point(client, x_px, y_px, *, viewer=None) -> dict:
+def picture_is_current(client, folder, name) -> str | None:
+    """None when the picture *name* that LAS X's viewer shows was taken with the field as it is now; else why not.
+
+    A bleach point or an ROI region is kept in the scan field, not on the
+    sample, so it lands where the picture showed only while the field is
+    where it was for the picture: the same objective, zoom, stage position,
+    pan and rotation. Compared with the picture's own description in LAS X's
+    cache; the pan is read from a setting saved now into *folder*.
+    """
+    from . import pan
+    from .save_data import collect
+    from .save_data import metadata as described
+
+    xml = collect.newest_description(collect.data_container_root(), name)
+    if xml is None:
+        return f"the picture LAS X's viewer shows ({name}) is not in its cache, so where it was taken cannot be told"
+    setting = described.image_of(xml).find("./Attachment[@Name='HardwareSetting']/ATLConfocalSettingDefinition")
+    if setting is None:
+        return f"the description of {name} holds no setting, so where it was taken cannot be told"
+    then = lambda key: float(setting.get(key) or 0)  # noqa: E731 -- one reading of the description
+    xy, panned = readers.get_xy(client), pan.read(client, folder)
+    objective = readers.get_objective(client)["name"]
+    differs = []
+    if (setting.get("ObjectiveName") or "").strip() != objective.strip():
+        differs.append(f"the objective {(setting.get('ObjectiveName') or '').strip()} (now {objective.strip()})")
+    if abs(then("Zoom") - readers.get_zoom(client)["current"]) > 1e-3:
+        differs.append(f"the zoom {then('Zoom'):g} (now {readers.get_zoom(client)['current']:g})")
+    if max(abs(then("StagePosX") * 1e6 - xy["x_um"]), abs(then("StagePosY") * 1e6 - xy["y_um"])) > 1.0:
+        differs.append(f"the stage at {then('StagePosX') * 1e6:.1f}, {then('StagePosY') * 1e6:.1f} µm (now {xy['x_um']:.1f}, {xy['y_um']:.1f})")
+    if max(abs(then("PanFirstDim") - panned["x"]), abs(then("PanSecondDim") - panned["y"])) > 1e-7:
+        differs.append("another pan")
+    if abs(then("RotatorAngle") - readers.get_scan_field_rotation(client)["value"]) > 0.05:
+        differs.append(f"the rotation {then('RotatorAngle'):g}°")
+    if not differs:
+        return None
+    return (f"the picture LAS X's viewer shows ({name}) was taken with " + ", ".join(differs)
+            + "; take a new picture first (start_live and stop_live, or acquire) and draw on it")
+
+
+def drawings_in_the_way(client, *, viewer=None) -> str | None:
+    """Why the objective must not change now: a bleach point or an ROI region is drawn (None when nothing is).
+
+    They are kept in the scan field, so with another objective they would
+    land elsewhere on the sample: they are cleared first and drawn again on a
+    picture taken with the new objective.
+    """
+    from . import answer_dialogs, lasx_viewer
+
+    advice = "clear them with clear_drawings first, and draw them again on a picture taken with the new objective"
+    if readers.get_bleach_point(client)["point"] is not None:
+        return f"a bleach point is drawn; {advice}"
+    if readers.get_roi_scan(client)["on"]:
+        try:
+            drawn = (viewer if viewer is not None else lasx_viewer.Viewer()).is_enabled(lasx_viewer.SELECT_ALL)
+        except answer_dialogs.WindowsUnavailable as why:
+            return f"ROI scan is on and whether regions are drawn cannot be read ({why}); {advice}"
+        if drawn:
+            return f"ROI regions are drawn; {advice}"
+    return None
+
+
+def draw_bleach_point(client, x_px, y_px, *, folder, viewer=None) -> dict:
     """Draw a bleach point at the pixel (*x_px*, *y_px*) of the picture LAS X's viewer shows, as Draw point and a click
-    do; read back from LCS (the point it shows becomes the new one). The bleach mode must be on."""
+    do; read back from LCS (the point it shows becomes the new one). The bleach mode must be on, and the picture must
+    have been taken with the field as it is now (:func:`picture_is_current`)."""
     from . import answer_dialogs, lasx_viewer
 
     if not readers.get_roi_scan(client)["bleach_mode"]:
         return dispatch.refused("the bleach mode is off; switch it on with set_bleach_mode first; nothing was drawn")
     before = readers.get_bleach_point(client)["point"]
     try:
+        viewer = viewer if viewer is not None else lasx_viewer.Viewer()
+        stale = picture_is_current(client, folder, viewer.picture()["name"])
+        if stale:
+            return dispatch.refused(f"the bleach point was not drawn: {stale}")
         result = lasx_viewer.draw_point(x_px, y_px, viewer=viewer)
     except (ValueError, LookupError, answer_dialogs.WindowsUnavailable) as why:
         return dispatch.refused(f"the bleach point was not drawn: {why}")
@@ -1101,7 +1167,7 @@ def draw_bleach_point(client, x_px, y_px, *, viewer=None) -> dict:
     return result
 
 
-def draw_roi_region(client, shape, corner, opposite, *, viewer=None) -> dict:
+def draw_roi_region(client, shape, corner, opposite, *, folder, viewer=None) -> dict:
     """Draw an ROI region, a ``"rectangle"`` or ``"ellipse"`` in the box from pixel *corner* to pixel *opposite* of the
     picture LAS X's viewer shows, as its tool and a drag do. ROI scan must be on. ``confirmed`` when the viewer has
     regions afterwards; LAS X shows no count of them, and LCS gets nothing."""
@@ -1110,6 +1176,10 @@ def draw_roi_region(client, shape, corner, opposite, *, viewer=None) -> dict:
     if not readers.get_roi_scan(client)["on"]:
         return dispatch.refused("ROI scan is off; switch it on with set_roi_scan first; nothing was drawn")
     try:
+        viewer = viewer if viewer is not None else lasx_viewer.Viewer()
+        stale = picture_is_current(client, folder, viewer.picture()["name"])
+        if stale:
+            return dispatch.refused(f"the ROI region was not drawn: {stale}")
         result = lasx_viewer.draw_region(shape, corner, opposite, viewer=viewer)
     except (ValueError, LookupError, answer_dialogs.WindowsUnavailable) as why:
         return dispatch.refused(f"the ROI region was not drawn: {why}")

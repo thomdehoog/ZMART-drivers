@@ -107,4 +107,4 @@ def test_the_status_line_s_cursor_is_read_as_las_x_writes_it(text, found):
 def test_the_status_line_s_picture_is_read_as_las_x_writes_it():
     texts = ["Image001   x = 512 y = 512  (256 kB)", "Size: 1162.50 µm x 1162.50 µm"]
 
-    assert lasx_viewer.picture_in(texts) == {"pixels": (512, 512), "size_um": (1162.5, 1162.5)}
+    assert lasx_viewer.picture_in(texts) == {"name": "Image001", "pixels": (512, 512), "size_um": (1162.5, 1162.5)}

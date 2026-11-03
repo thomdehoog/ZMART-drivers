@@ -1503,3 +1503,24 @@ So the window it is, but without the computer's pointer: mouse moves and clicks 
 exactly. `lasx_viewer` now sends all its moves and clicks so. Through the driver: the rectangle (60, 60)-(200, 160), the
 ellipse (260, 300)-(450, 460) and the bleach point (400, 120) drawn in place and cleared, and the pointer stood at the same
 place before and after. The toolbar's tools are still pressed through UI Automation.
+
+## 96. Points and regions belong to the scan field: two guards (3 November 2026)
+
+Thom pointed to the region work done with the Navigator Expert (March to May 2026, `experimental/lrp_edits/roi.py` and
+`scanfields/` in the earlier smart-microscopy repository; read for its lessons only, not used): a region's vertices are
+metres around its centre and its `Translation` the offset from the field's middle (the stage centre, x negated), both in
+the display frame; the pan moves the field, so it moves them; the picture's orientation must be the display's for pixels
+to map onto regions; and with another objective the regions landed a little elsewhere on the sample. All of this says the
+same: a bleach point or region is kept in the scan field, not on the sample.
+
+Two guards follow. Before drawing, the driver compares the picture LAS X's viewer shows (by the name on its status line,
+"Preview" for the last scan) with the field now, from the picture's own description in LAS X's cache: objective, zoom,
+stage position, pan (`PanFirstDim`, `PanSecondDim`, the pan now read from a setting saved now) and rotation; a picture
+taken with any of them otherwise is refused, and a new one is taken first. And `change_objective` is refused while a
+bleach point or region is drawn: they are cleared, and drawn again on a picture taken with the new objective. (The
+objective change itself already moves the stage by the measured offset between the two objectives, which keeps the field
+on the same place of the sample; whether LAS X keeps a region's size in micrometres across the change is not yet
+measured: the simulator's pair is not calibrated.)
+
+On the simulator: the last scan's picture passed; with the zoom set to 2 a point was refused ("taken with the zoom 1
+(now 2)"); at zoom 1 it was drawn; with it drawn, the objective change was refused before anything turned.

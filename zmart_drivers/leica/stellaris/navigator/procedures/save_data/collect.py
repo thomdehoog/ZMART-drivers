@@ -218,6 +218,23 @@ def pictures(root: Path, started_at: float, own_name: re.Pattern) -> list[tuple[
     return found
 
 
+def newest_description(root: Path, name: str) -> str | None:
+    """The description of the newest picture in the cache named *name* (``Preview``, ``Image001`` ...); None when there
+    is none. LAS X's viewer shows a picture by this name."""
+    newest = None
+    for path in root.glob("V2LMSDC_OBJ*_*.tmp"):
+        try:
+            when = path.stat().st_mtime
+            if newest is not None and when <= newest[0]:
+                continue
+            records = read_records(path.read_bytes())
+        except OSError:
+            continue
+        if len(records) >= 3 and first_text(records[2]) == name and first_text(records[1]):
+            newest = (when, first_text(records[1]))
+    return newest[1] if newest else None
+
+
 #: The pictures collected so far, by :func:`_picture_key`.
 _collected: set[tuple[str, str, int]] = set()
 

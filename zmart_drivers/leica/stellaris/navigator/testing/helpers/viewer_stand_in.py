@@ -22,7 +22,7 @@ class Viewer:
         self.on_click = None
 
     def picture(self):
-        return {"pixels": (self.pixels, self.pixels), "size_um": (self.size_um, self.size_um)}
+        return {"name": "Preview", "pixels": (self.pixels, self.pixels), "size_um": (self.size_um, self.size_um)}
 
     def area(self):
         return (-734, 204, -70, 1136)

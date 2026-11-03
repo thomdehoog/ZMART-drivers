@@ -608,12 +608,15 @@ class Microscope:
         window (the computer's pointer is not moved): it first finds the pixel
         by the viewer's own read-out of where the mouse is, and clicks only when
         that shows the pixel, within half a pixel. Pixels count from the
-        picture's top-left corner, x to the right, y down. The bleach mode must
+        picture's top-left corner, x to the right, y down. A point is kept in
+        the scan field, not on the sample, so the picture must have been taken
+        with the field as it is now (objective, zoom, stage, pan, rotation);
+        else it is refused, and a new picture is taken first. The bleach mode must
         be on (:meth:`set_bleach_mode`); the point takes the setting's lines,
         whose power :meth:`set_bleach_laser_power` changes. Read back from LAS X.
         """
         self.handle.require_open()
-        result = changes.draw_bleach_point(self.handle.client, x_px, y_px)
+        result = changes.draw_bleach_point(self.handle.client, x_px, y_px, folder=setting_files.folder_for(self.handle))
         return checked(self.handle, result, f"draw_bleach_point({x_px!r}, {y_px!r})")
 
     def draw_roi_region(self, shape: str, corner: tuple[int, int], opposite: tuple[int, int]) -> dict:
@@ -625,7 +628,7 @@ class Microscope:
         result says only that there are some.
         """
         self.handle.require_open()
-        result = changes.draw_roi_region(self.handle.client, shape, corner, opposite)
+        result = changes.draw_roi_region(self.handle.client, shape, corner, opposite, folder=setting_files.folder_for(self.handle))
         return checked(self.handle, result, f"draw_roi_region({shape!r}, {corner!r}, {opposite!r})")
 
     def clear_drawings(self) -> dict:
@@ -1133,9 +1136,17 @@ class Microscope:
         """Change the objective, by its slot, name or magnification, and keep the same spot in view.
 
         The stage is moved by the measured offset between the two objectives,
-        so the frame still points at the same place on the sample.
+        so the frame still points at the same place on the sample. Refused
+        while bleach points or ROI regions are drawn: they are kept in the scan
+        field, so with another objective they would land a little elsewhere on
+        the sample; clear them first (:meth:`clear_drawings`) and draw them
+        again on a picture taken with the new objective.
         """
         self.handle.require_open()
+        in_the_way = changes.drawings_in_the_way(self.handle.client)
+        if in_the_way:
+            checked(self.handle, {"success": False, "confirmed": False, "message": f"the objective was not changed: {in_the_way}"},
+                    "change_objective")
         result = keep_in_view.set_objective(
             self.handle.client,
             readings.get_objectives(self.handle.client),

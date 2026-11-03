@@ -73,6 +73,10 @@ checked by the driver either way (`transfer.CHECKED_COMMANDS`, `transfer.STATE_T
 
 ## To check on the STELLARIS
 
+- Drawn regions across an objective change (after the pair's calibration): whether LAS X keeps a region's size in
+  micrometres, and how far it lands from its place on the sample; the driver refuses the change while regions are drawn
+  until this is measured (section 96).
+
 The simulator cannot show these; each needs one careful run on the real microscope.
 
 - The objective change: its two refusals tried on the simulator (an uncalibrated pair, another

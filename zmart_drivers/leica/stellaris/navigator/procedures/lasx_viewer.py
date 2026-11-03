@@ -44,7 +44,7 @@ SELECT_ALL, CLEAR_SELECTED = "Select all ROIs", "Clear selected ROIs"
 
 #: The status line, as LAS X writes it (simulator, 2026-11-03).
 CURSOR = re.compile(r"Cursor:\s+Pos:\s+(-?[\d.]+) µm, (-?[\d.]+) µm")
-PIXELS = re.compile(r"\bx = (\d+) y = (\d+)")
+PIXELS = re.compile(r"^(.*?)\s+x = (\d+) y = (\d+)")
 EXTENT = re.compile(r"Size: ([\d.]+) µm x ([\d.]+) µm")
 
 #: The screen pixels between the two places that learn the mapping, and how long the status line takes to follow.
@@ -62,12 +62,14 @@ def cursor_in(texts) -> tuple[float, float] | None:
 
 
 def picture_in(texts) -> dict:
-    """The picture the status line among *texts* describes: ``pixels`` (x, y) and ``size_um`` (x, y)."""
+    """The picture the status line among *texts* describes: its ``name`` (``Preview`` for the last scan,
+    ``Image001`` ...), ``pixels`` (x, y) and ``size_um`` (x, y)."""
     pixels = next((PIXELS.search(t) for t in texts if PIXELS.search(t)), None)
     extent = next((EXTENT.search(t) for t in texts if EXTENT.search(t)), None)
     if pixels is None or extent is None:
         raise answer_dialogs.WindowsUnavailable("LAS X's viewer shows no picture (its status line has no size)")
-    return {"pixels": (int(pixels.group(1)), int(pixels.group(2))), "size_um": (float(extent.group(1)), float(extent.group(2)))}
+    return {"name": pixels.group(1).strip(), "pixels": (int(pixels.group(2)), int(pixels.group(3))),
+            "size_um": (float(extent.group(1)), float(extent.group(2)))}
 
 
 class Viewer:
