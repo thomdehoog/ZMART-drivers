@@ -283,19 +283,12 @@ def write_store(
     annotations (*notes*) in ``OME/METADATA.ome.xml``.
     """
     import zarr
-    from ome_zarr_models.v05.axes import Axis
-    from ome_zarr_models.v05.image import Image
-    from pydantic_zarr.v3 import ArraySpec
 
     if store.exists():
         raise RuntimeError(
             f"{store} already exists; a capture is never written over another"
         )
     volume, metadata = capture.volume, capture.metadata
-    ny, nx = volume.shape[-2:]
-    names = [
-        channel.name or f"channel {channel.index}" for channel in metadata.channels
-    ]
 
     # Short, and hidden by its dot: the store's chunks lie several folders
     # deeper, and Windows refuses a path longer than 260 characters where long
@@ -303,6 +296,39 @@ def write_store(
     writing = store.with_name(f".{uuid.uuid4().hex[:8]}.writing")
     store.parent.mkdir(parents=True, exist_ok=True)
     levels = mean_pyramid(volume)
+    group = image_of(capture, store.name, levels).to_zarr(
+        zarr.storage.LocalStore(str(writing)), path=""
+    )
+    group["0"][...] = volume
+    if not np.array_equal(group["0"][...], volume):
+        _remove_when_free(writing)
+        raise RuntimeError(
+            f"{store.name}: the pixels read back from disk are not those written; not saved"
+        )
+    for index, level in enumerate(levels[1:], start=1):
+        group[str(index)][...] = level
+    group.attrs["ome"] = described(dict(group.attrs["ome"]), capture, len(levels))
+    group.attrs["zmart"] = convention.zarr_attributes()
+    (writing / "OME").mkdir()
+    (writing / "OME" / "METADATA.ome.xml").write_bytes(
+        canonical.image_xml(metadata, image_name=store.name, notes=notes)
+    )
+    _rename_when_free(writing, store)
+    return store
+
+
+def image_of(capture: Capture, name: str, levels: list[np.ndarray]):
+    """The OME-Zarr 0.5 image model of *capture* with these *levels*, checked as it is built.
+
+    Each level's scale, and where the centre of its first voxel lies: an
+    OME-Zarr store is written from it, and an OME-TIFF position carries the
+    same description in its note, so both are placed by the same rules.
+    """
+    from ome_zarr_models.v05.axes import Axis
+    from ome_zarr_models.v05.image import Image
+    from pydantic_zarr.v3 import ArraySpec
+
+    metadata = capture.metadata
     specs = [
         ArraySpec.from_array(
             level,
@@ -331,7 +357,7 @@ def write_store(
         translations.append([t, c, z, y, x])
         y, x = y + step_y / 2, x + step_x / 2
         step_y, step_x = step_y * 2, step_x * 2
-    image = Image.new(
+    return Image.new(
         array_specs=specs,
         paths=[str(index) for index in range(len(levels))],
         axes=[
@@ -343,26 +369,29 @@ def write_store(
         ],
         scales=scales,
         translations=translations,
-        name=store.name,
+        name=name,
     )
-    group = image.to_zarr(zarr.storage.LocalStore(str(writing)), path="")
-    group["0"][...] = volume
-    if not np.array_equal(group["0"][...], volume):
-        _remove_when_free(writing)
-        raise RuntimeError(
-            f"{store.name}: the pixels read back from disk are not those written; not saved"
-        )
+
+
+def described(ome: dict, capture: Capture, count: int) -> dict:
+    """The image's ``ome`` attributes as ZMART writes them, from the model's *ome*.
+
+    It says its levels are a mean pyramid (the viewer bakes only stores that
+    say so), and gives each channel its name, colour and a display window
+    from its pixels (the ``omero`` block).
+    """
+    volume, metadata = capture.volume, capture.metadata
+    names = [
+        channel.name or f"channel {channel.index}" for channel in metadata.channels
+    ]
     deepest = (1 << (metadata.significant_bits or volume.dtype.itemsize * 8)) - 1
     # The models write an absent value as null (a channel axis's unit, a
     # multiscale's metadata); a browser viewer refuses "unit": null, so what
     # is absent is left out, as the specification has it.
-    for index, level in enumerate(levels[1:], start=1):
-        group[str(index)][...] = level
-    ome = _without_empty(dict(group.attrs["ome"]))
-    # The viewer bakes only stores that say their pyramid is a mean one.
+    ome = _without_empty(ome)
     ome["multiscales"][0]["type"] = "mean"
     ome["multiscales"][0]["metadata"] = {
-        "description": _levels_described(metadata, len(levels))
+        "description": _levels_described(metadata, count)
     }
     ome["omero"] = {
         "channels": [
@@ -381,14 +410,7 @@ def write_store(
         ],
         "rdefs": {"defaultT": 0, "defaultZ": metadata.size_z // 2, "model": "color"},
     }
-    group.attrs["ome"] = ome
-    group.attrs["zmart"] = convention.zarr_attributes()
-    (writing / "OME").mkdir()
-    (writing / "OME" / "METADATA.ome.xml").write_bytes(
-        canonical.image_xml(metadata, image_name=store.name, notes=notes)
-    )
-    _rename_when_free(writing, store)
-    return store
+    return ome
 
 
 def _rename_when_free(

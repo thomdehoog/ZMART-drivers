@@ -55,12 +55,17 @@ def image_xml(
     *,
     image_name: str,
     notes: convention.Notes | None = None,
+    position_note: dict[str, str] | None = None,
 ) -> bytes:
-    """OME XML for a whole capture whose pixels live elsewhere (an OME-Zarr store).
+    """OME XML for a whole capture, with every channel and every plane.
 
-    Every channel and every plane, with the pixels declared absent from the
-    XML itself (``MetadataOnly``): the store beside it holds them. With
-    *notes*, the convention's annotations as well.
+    Without *position_note* the pixels live elsewhere (an OME-Zarr store), so
+    they are declared absent from the XML itself (``MetadataOnly``). With
+    *position_note* the XML heads an OME-TIFF that holds every plane in this
+    file, in the order ``DimensionOrder`` says, and ZMART's note
+    (``POSITION_NOTE``) carries the store's OME-Zarr description: where the
+    image lies is read from there, by the same rules as an OME-Zarr store.
+    With *notes*, the convention's annotations as well.
     """
     return _ome_xml(
         metadata,
@@ -69,7 +74,14 @@ def image_xml(
         tiff_entries=[],
         planes=sorted(metadata.planes.items()),
         notes=notes,
+        position_note=position_note,
     )
+
+
+#: The namespace of ZMART's note in an OME-TIFF position: the OME-Zarr
+#: description of the image (``multiscales``, ``omero``), which OME-XML has
+#: no place for. Other programs skip it; ZMART places the file by it.
+POSITION_NOTE = "zmart/position"
 
 
 def extract_embedded_ome_xml(tiff_src: Path) -> bytes:
@@ -109,6 +121,7 @@ def _ome_xml(
     tiff_entries: list[tuple[int, int, int, str]],
     planes: list[tuple[PlaneIndex, PlaneMetadata]] = (),
     notes: convention.Notes | None = None,
+    position_note: dict[str, str] | None = None,
 ) -> bytes:
     """OME 2016-06 XML for the planes named, in the order the schema requires.
 
@@ -164,7 +177,11 @@ def _ome_xml(
 
     for channel in channels:
         _append_channel(pixels, channel)
-    if not tiff_entries:
+    if position_note is not None:
+        # Every plane is in this one file, from its first page on.
+        planes_held = metadata.size_t * metadata.size_c * metadata.size_z
+        ET.SubElement(pixels, _tag("TiffData"), {"IFD": "0", "PlaneCount": str(planes_held)})
+    elif not tiff_entries:
         ET.SubElement(pixels, _tag("MetadataOnly"))
     for first_t, first_z, first_c, filename in tiff_entries:
         tiff_data = ET.SubElement(
@@ -196,6 +213,11 @@ def _ome_xml(
         )
     if notes is not None:
         convention.append_notes(annotations, image, notes)
+    if position_note is not None:
+        convention.reference(image, "Annotation:zmart-position")
+        convention.append_map(
+            annotations, "Annotation:zmart-position", POSITION_NOTE, position_note.items()
+        )
     if metadata.annotations:
         ref = f"Annotation:{VENDOR}-highlights"
         convention.reference(image, ref)
