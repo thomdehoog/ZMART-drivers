@@ -503,6 +503,7 @@ MUTATING_COMMANDS = {
     # Bulk Options' resets: LAS X's own start values, the lasers left on
     "reset_system": "reset_system",
     "reset_imagecompass": "reset_imagecompass",
+    "reset_setting": "reset_setting",
     # the settings toolbar's apply-to-hardware switch; the limits check each change as before
     "apply_to_hardware": "apply_to_hardware",
     "move_y_line": "move_y_line",

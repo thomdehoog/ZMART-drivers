@@ -706,6 +706,13 @@ class TestTheDetectorLock:
         assert result["confirmed"] is True and lasx.commands() == ["ResetSystem"]
         assert lasx.live[("Confocal", "ScanningParameter", "Zoom")] == 1.0
 
+    def test_a_setting_s_reset_works_on_the_current_setting(self, lasx, client):
+        result = changes.reset_setting(client)
+
+        assert result["confirmed"] is True
+        assert lasx.sent[-1] == '<Scanner Command="ResetConfocalSetting" SetMode="0" SingleSettingIndex="0"/>'
+        assert direct_reader.get_laser_lines() == []
+
     def test_reset_imagecompass_switches_the_setting_s_lines_off(self, lasx, client):
         result = changes.reset_imagecompass(client)
 

@@ -1607,6 +1607,11 @@ def reset_system(client, *, max_retries=None) -> dict:
     return run(client, writes.system_reset(), max_retries=max_retries)
 
 
+def reset_setting(client, *, max_retries=None) -> dict:
+    """Put the current setting back to LAS X's start (its lines off, its detectors), as the setting's Reset does."""
+    return run(client, writes.setting_reset(), max_retries=max_retries)
+
+
 def reset_imagecompass(client, *, max_retries=None) -> dict:
     """Put the ImageCompass back to LAS X's start (lines, detectors, dyes, name), as Bulk Options' Reset ImageCompass does."""
     return run(client, writes.imagecompass_reset(), max_retries=max_retries)

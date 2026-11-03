@@ -736,6 +736,18 @@ def system_reset() -> Write:
                  confirm=Expect("zoom", lambda found: bool(found) and abs(found["current"] - 1.0) < 1e-6))
 
 
+def setting_reset() -> Write:
+    """A setting's Reset, as its context menu sends it (``ResetConfocalSetting``, ``SetMode="0"``: the current setting;
+    simulator, 2026-11-03): its laser lines off and its detectors back to LAS X's start. Read back: no laser line on."""
+
+    def fill(request: Request) -> None:
+        request.elements = [f'<Scanner Command="ResetConfocalSetting" SetMode="0" SingleSettingIndex="{request.setting}"/>']
+
+    return Write(command="reset_setting", values={}, request="ResetConfocalSetting", fill=fill,
+                 description="The current setting reset", ready=idle(),
+                 confirm=Expect("laser_lines", lambda found: found == []))
+
+
 def imagecompass_reset() -> Write:
     """Bulk Options' Reset ImageCompass, as it sends it (``ResetImageCompass``; simulator, 2026-11-03): the setting's
     laser lines, detectors, dyes and name back to LAS X's start. Read back: no laser line on."""

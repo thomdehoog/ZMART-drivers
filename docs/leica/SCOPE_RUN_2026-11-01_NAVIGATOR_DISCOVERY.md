@@ -1416,3 +1416,14 @@ went from 100 to 10. Built: `reset_system()` (read back on the zoom) and `reset_
 driver sends them without the question. Through the driver: the setting saved, the zoom set to 2, Reset System (zoom 1, xyz,
 no line on), Reset ImageCompass, and the saved setting loaded back (499 nm at 2 %, "Setting 1"). HyD 2 stays at gain 10:
 in its tau mode LCS allows only 10.
+
+## 91. A setting's context menu: Duplicate and Reset (3 November 2026)
+
+LAS X's help (the same Beam Path Settings page) lists a right click on a setting: Duplicate and Reset; the menu also
+offers "Copy to LDD setting". The driver's own right click on Setting 1's name opened it inside LAS X's main window.
+Duplicate sent `<ATL CloneSetting="1" Command="ATL_Setting_Create" Attribute="2"/>`, as `add_setting(copy=True)` already
+does: "Setting 2" came with Setting 1's 499 nm line and became the current setting. Reset, on Setting 2, sent
+`<Scanner Command="ResetConfocalSetting" SetMode="0" SingleSettingIndex="0"/>`: the current setting's line went off and its
+detectors went back to their start. This is the command seen on 1 November (section 84), so it is the setting's Reset,
+not a part of deleting a setting. Built: `reset_setting()`, on the current setting, read back with no line on. Through the
+driver: Setting 1 duplicated, the copy reset (Setting 1 kept 499 nm at 2 %), the copy deleted.

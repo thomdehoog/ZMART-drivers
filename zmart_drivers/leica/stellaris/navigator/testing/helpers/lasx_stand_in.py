@@ -645,6 +645,13 @@ class PlainNavigator:
         self.live[("Acquire", "ScanDimensionList", "ScanModeName")] = "xyz"
         return "<Result/>"
 
+    def take_ResetConfocalSetting(self, e):
+        """A setting's Reset (its context menu): the current setting's lines off (simulator, 2026-11-03)."""
+        for source in self.nodes.light_sources:
+            for line in source["AOTF"]["AotfLine"]:
+                line["Intensity"] = 0.0
+        return "<Result/>"
+
     def take_ResetImageCompass(self, e):
         """Bulk Options' Reset ImageCompass: the setting's laser lines off (simulator, 2026-11-03)."""
         for source in self.nodes.light_sources:

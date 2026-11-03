@@ -447,6 +447,9 @@ class Microscope:
     def add_setting(self, copy: bool = False) -> dict:
         """Add a setting to the current job, new or a copy of the current one, as the window's "Add new Setting" does.
 
+        With *copy*, it is the setting's Duplicate (its context menu), which
+        sends the same command.
+
         LAS X makes it the current setting, and the changes after go into it. With
         more than one setting, the changes through a saved setting (``set_detector``
         and the like) are refused.
@@ -499,6 +502,16 @@ class Microscope:
         """
         self.handle.require_open()
         return checked(self.handle, changes.reset_system(self.handle.client), "reset_system()")
+
+    def reset_setting(self) -> dict:
+        """Put the current setting back to LAS X's start, as the setting's Reset (its context menu) does.
+
+        Its laser lines are switched off and its detectors go back to the
+        start; the other settings stay as they are. Choose the setting first
+        with :meth:`activate_setting`.
+        """
+        self.handle.require_open()
+        return checked(self.handle, changes.reset_setting(self.handle.client), "reset_setting()")
 
     def reset_imagecompass(self) -> dict:
         """Put only the ImageCompass back to LAS X's start, as Bulk Options' Reset ImageCompass does.
