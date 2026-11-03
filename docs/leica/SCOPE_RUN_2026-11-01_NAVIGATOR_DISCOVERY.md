@@ -1291,3 +1291,13 @@ setting came back (HyD S 3, 405 nm, 270 values changed). Not built: it would loa
 check against the limits before they reach the microscope, and the driver clears LAS X's image cache after collecting its
 pictures, so their IDs do not last. `save_setting` and `load_setting` (limits checked first) do the same. The setting saved
 before was loaded again after (HyD 2, 499 nm).
+
+## 83. The plain Navigator, opened and closed (3 November 2026)
+
+The Acquisition Mode panel's `ButtonStageOverview` opened LAS X's Navigator full-screen on the right screen. Opening it
+sent `SetStageUseMode` 7 and `SetStageIrregularTileScanPositions` with one tile where the stage stood (z-wide's 982.9 µm),
+each three times, `GetCurrentZPosition`, and saved the job to a temporary file. Its window offers Live, Fast Live, Capture
+Image and Spiral; Mark, the drawing tools, Hide and Focus Map; Preview and Start; and on its side Projects, Beam Path,
+Scanmode, Z-Stack, Stage and Carrier. UI Automation shows only Mark, Hide and Close Navigator, so its other controls must be
+learned by their place on the screen. Close Navigator sent `SetStageUseMode` 7, `StageClearAllPoints`, `SetStageUseMode` 1,
+`StageClearAllPoints` and `SetStageUseMode` 0. Nothing was acquired with it open (section 9: LCS wrote dumps then).
