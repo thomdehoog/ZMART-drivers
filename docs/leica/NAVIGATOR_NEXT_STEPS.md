@@ -50,7 +50,8 @@ checked by the driver either way (`transfer.CHECKED_COMMANDS`, `transfer.STATE_T
 
 **Region and experiment types**
 - The regions of an ROI scan, the bleach points and the Zoom In rectangle: drawn in LAS X's viewer and kept in its
-  data container (`Confocal/ROIScan/CurrentDCROISetID`), not in LCS; the laser lines per region (ROI Configuration).
+  data container (`Confocal/ROIScan/CurrentDCROISetID`), not in LCS. The laser lines per region (ROI Configuration):
+  its window lists no region on the simulator (section 89), so they are learned on the STELLARIS.
   A bleach point is drawn with Draw point and one click in the image; LCS gets nothing, and its place and bleaching
   time stay in LAS X's data container (section 88). Its laser power is built (`set_bleach_laser_power`). Placing
   points and regions would need the driver's mouse at positions in the image: Thom decides whether the driver should
