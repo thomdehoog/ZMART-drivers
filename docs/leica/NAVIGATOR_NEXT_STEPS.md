@@ -51,16 +51,14 @@ checked by the driver either way (`transfer.CHECKED_COMMANDS`, `transfer.STATE_T
   data container (`Confocal/ROIScan/CurrentDCROISetID`), not in LCS. The laser lines per region (ROI Configuration):
   its window lists no region on the simulator (section 89), so they are learned on the STELLARIS.
   A bleach point is drawn with Draw point and one click in the image; LCS gets nothing, and its place and bleaching
-  time stay in LAS X's data container (section 88). Its laser power is built (`set_bleach_laser_power`). Points and
-  rectangle and ellipse regions are drawn by the driver with the mouse (section 94); polygons, ranges and a point's
-  bleaching time are not yet. The Zoom In rectangle's result, a zoom and a pan, the driver sets with `change_setting("zoom", ...)` and
-  `move_pan`.
+  time stay in LAS X's data container (section 88). Its laser power is built (`set_bleach_laser_power`). Points, rectangles, ellipses, polygons and ranges are drawn by the driver (sections 94, 102), and a point's bleaching
+  time is set (`set_bleach_time`); the Zoom In rectangle is `zoom_in(corner, opposite)`, a zoom and a pan.
 - Bleaching and FRAP (LCS has `SequentialBleachPointParameter`); the FRAP and FRET applications are LAS X's other
   wizards (section 86), outside the plain Acquire tab.
 - The carrier: slide, dish, well plate (the Navigator Expert sent `StageSetCarrierAttachment`).
 
 **Commands seen in LCS's log but not built**
-- The Number of Steps mode as such (the count is set through the step).
+- None: the Number of Steps mode is `z_stack_mode` (section 102).
 - None left: `ResetAutoFocusToAutoSync` is `set_auto_sync(True)`; `ResetConfocalSetting` is a setting's Reset,
   built as `reset_setting()` (section 91); the mounting medium (`ATL_HyVolution_SetMountingMedium`) has no control in the Acquire tab
   (section 84).
@@ -73,6 +71,7 @@ checked by the driver either way (`transfer.CHECKED_COMMANDS`, `transfer.STATE_T
 
 ## To check on the STELLARIS
 
+- `zoom_in` on a sample: that the box's middle comes to the centre (the pan's direction, from March to May).
 - `measure_pan_window()` on the STELLARIS (by the window's pad): its largest pan and field fraction against the code's; the
   field fraction on a sample with pictures; the resonant scanner's window.
 - The pan's window on the STELLARIS: that LAS X clips there too, at the largest pan times `1 - smallest zoom / zoom`

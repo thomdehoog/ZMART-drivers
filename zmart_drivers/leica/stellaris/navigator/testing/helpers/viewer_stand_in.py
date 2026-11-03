@@ -17,7 +17,8 @@ class Viewer:
 
     def __init__(self, scale=1.756, origin=(-700.0, 220.0), pixels=512, size_um=1162.5, gap=None, regions=False):
         self.scale, self.origin, self.pixels, self.size_um, self.gap = scale, origin, pixels, size_um, gap
-        self.clicks, self.drags, self.pressed, self.tools = [], [], [], set()
+        self.clicks, self.drags, self.pressed, self.tools, self.right_clicks = [], [], [], set(), []
+        self.boxes = {name: "0" for name in ("TextDays", "TextHours", "TextMinutes", "TextSeconds", "TextMilliseconds")}
         self.regions = regions
         self.on_click = None
 
@@ -43,6 +44,16 @@ class Viewer:
         self.clicks.append((x, y))
         if self.on_click:
             self.on_click()
+
+    def right_click(self, x, y):
+        self.right_clicks.append((x, y))
+        self.regions = True
+
+    def box(self, automation_id):
+        return self.boxes[automation_id]
+
+    def set_box(self, automation_id, text):
+        self.boxes[automation_id] = text
 
     def span(self, start, end):
         self.drags.append((start, end))

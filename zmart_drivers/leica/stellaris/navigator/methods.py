@@ -287,7 +287,9 @@ class Microscope:
         (the objective's correction collar, 0 to 100 percent) and ``smartcorr_range``
         (``(begin, end, steps)``, the collar positions SmartCORR scans through) and
         ``setting_name`` (the current setting's name, plain text) and ``sequential_mode``
-        (``"line"``, ``"frame"`` or ``"stack"``: how several settings are taken in turn). The limits are asked
+        (``"line"``, ``"frame"`` or ``"stack"``: how several settings are taken in turn) and ``z_stack_mode``
+        (``"steps"``, ``"step_size"`` or ``"system_optimized"``: the z-stack panel's Number of Steps, Z-Step
+        Size or System Optimized). A lower zoom that pulls the pan in says so (``pan_pulled_in``). The limits are asked
         first. Answers the change's result, with ``confirmed`` True when the
         read-back showed the new value; a change that was never seen is
         recorded and does not raise.
@@ -295,7 +297,10 @@ class Microscope:
         self.handle.require_open()
         if name not in SETTINGS and name not in NAMED_SETTINGS:
             raise ValueError(f"no setting {name!r}; the settings are {sorted([*SETTINGS, *NAMED_SETTINGS])}")
-        result = changes.change(self.handle.client, name, value)
+        if name == "zoom":
+            result = pan_step.change_zoom(self.handle.client, setting_files.folder_for(self.handle), value)
+        else:
+            result = changes.change(self.handle.client, name, value)
         return checked(self.handle, result, f"change_setting({name!r}, {value!r})")
 
     def optimize_format(self) -> dict:
@@ -622,7 +627,7 @@ class Microscope:
     def draw_roi_region(self, shape: str, corner: tuple[int, int], opposite: tuple[int, int]) -> dict:
         """Draw an ROI region, a ``"rectangle"`` or an ``"ellipse"`` in the box from pixel *corner* to pixel *opposite*.
 
-        As LAS X's Draw rectangle and Draw ellipse with a drag, in its viewer,
+        As LAS X's Draw rectangle and Draw ellipse with a click at each corner, in its viewer,
         each corner found as for :meth:`draw_bleach_point`. ROI scan must be on
         (:meth:`set_roi_scan`). LAS X shows no count of the regions, so the
         result says only that there are some.
@@ -630,6 +635,37 @@ class Microscope:
         self.handle.require_open()
         result = changes.draw_roi_region(self.handle.client, shape, corner, opposite, folder=setting_files.folder_for(self.handle))
         return checked(self.handle, result, f"draw_roi_region({shape!r}, {corner!r}, {opposite!r})")
+
+    def draw_roi_polygon(self, vertices) -> dict:
+        """Draw an ROI polygon through the pixels *vertices* (at least three) of the picture LAS X's viewer shows.
+
+        As LAS X's Draw polygon: a click at each corner and a right click at
+        the last, which closes it; each corner found as for
+        :meth:`draw_bleach_point`. ROI scan must be on.
+        """
+        self.handle.require_open()
+        result = changes.draw_roi_polygon(self.handle.client, vertices, folder=setting_files.folder_for(self.handle))
+        return checked(self.handle, result, f"draw_roi_polygon({vertices!r})")
+
+    def draw_roi_range(self, first_x: int, last_x: int) -> dict:
+        """Draw an ROI range: the columns *first_x* to *last_x* of the picture LAS X's viewer shows, over its whole height.
+
+        As LAS X's Draw range: a click at one column and one at the other.
+        ROI scan must be on.
+        """
+        self.handle.require_open()
+        result = changes.draw_roi_range(self.handle.client, first_x, last_x, folder=setting_files.folder_for(self.handle))
+        return checked(self.handle, result, f"draw_roi_range({first_x!r}, {last_x!r})")
+
+    def set_bleach_time(self, seconds: float) -> dict:
+        """Set the bleaching time of the bleach point the Bleach Point panel shows, in seconds; read back.
+
+        Typed into the panel's boxes (days to milliseconds), as the operator
+        does; LAS X keeps the time with the point, not in its hardware
+        server. The bleach mode must be on and a point drawn.
+        """
+        self.handle.require_open()
+        return checked(self.handle, changes.set_bleach_time(self.handle.client, seconds), f"set_bleach_time({seconds!r})")
 
     def clear_drawings(self) -> dict:
         """Clear every bleach point and ROI region drawn in LAS X's viewer, as its Select all ROIs and Clear selected ROIs do."""
@@ -811,6 +847,23 @@ class Microscope:
             return checked(self.handle, {"success": False, "confirmed": False, "message": str(why)}, "measure_pan_window")
         result = pan_step.measure_window(self.handle.client, setting_files.folder_for(self.handle), pad, zooms=tuple(zooms))
         return checked(self.handle, result, f"measure_pan_window({tuple(zooms)!r})")
+
+    def zoom_in(self, corner: tuple[int, int], opposite: tuple[int, int], route: str = "window") -> dict:
+        """Zoom in on the box from pixel *corner* to pixel *opposite* of the field now, as LAS X's Zoom In rectangle does.
+
+        Pixels count from the field's top-left corner, x to the right, y down.
+        The zoom is raised until the box fills the field, then the pan brings
+        its middle to the centre (by *route*, as :meth:`set_pan`), clipped to
+        LAS X's window; read back. Refused while points or regions are drawn.
+        """
+        self.handle.require_open()
+        refuse_with_drawings(self.handle, "the pan", "zoom_in")
+        pad = pan_route(self.handle, route, "zoom_in")
+        try:
+            result = pan_step.zoom_in(self.handle.client, setting_files.folder_for(self.handle), corner, opposite, pad=pad)
+        except ValueError as why:
+            result = {"success": False, "confirmed": False, "message": str(why)}
+        return checked(self.handle, result, f"zoom_in({corner!r}, {opposite!r})")
 
     def pan_window(self) -> dict:
         """How far LAS X lets the pan go from the centre at the zoom now, on each axis, in micrometres.

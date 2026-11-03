@@ -356,3 +356,43 @@ def test_the_window_is_measured_from_where_las_x_clips_and_matches_the_formula(l
     assert result["largest_pan"] == pytest.approx(0.00775, rel=1e-3) and result["field_fraction"] == pytest.approx(0.6667, rel=1e-3)
     assert result["matches_the_code"] is True and [m["zoom"] for m in result["measured"]] == [1.0, 2.0]
     assert lasx.pan == [0.0, 0.0] and lasx.live[(*SCANNING, "Zoom")] == pytest.approx(1.0)
+
+
+def test_a_lower_zoom_that_pulls_the_pan_in_says_so(lasx, client, tmp_path):
+    lasx.live[(*SCANNING, "Zoom")] = 4.0
+    lasx.pan = [0.004, 0.0]  # 400 um across, within the window at zoom 4, beyond it at zoom 1
+
+    result = pan.change_zoom(client, tmp_path, 1.0)
+
+    assert result["confirmed"] is True and lasx.pan[0] == pytest.approx(0.0019375)
+    pulled = result["pan_pulled_in"]
+    assert pulled["before_um"][0] == pytest.approx(400.2, abs=0.1) and pulled["after_um"][0] == pytest.approx(193.85, abs=0.1)
+    assert "pulled" in result["message"]
+
+
+def test_a_zoom_that_leaves_the_pan_alone_says_nothing_of_it(lasx, client, tmp_path):
+    lasx.pan = [0.001, 0.0]
+
+    assert "pan_pulled_in" not in pan.change_zoom(client, tmp_path, 2.0)
+    assert "pan_pulled_in" not in pan.change_zoom(client, tmp_path, 1.5)
+
+
+def test_zoom_in_fills_the_field_with_the_box_and_brings_its_middle_to_the_centre(lasx, client, tmp_path):
+    # A 128 x 128 pixel box in the 512 x 512 field's top-left quarter, its middle 128 pixels left of and above the centre.
+    result = pan.zoom_in(client, tmp_path, (64, 64), (191, 191), pad=Pad(lasx))
+
+    assert lasx.live[(*SCANNING, "Zoom")] == pytest.approx(4.0)
+    pixel_um = 1162.5 / 512
+    # LAS X's pan moves the picture as its arrows point: the box's middle comes to the centre with the pan the other
+    # way across and the same way down (Navigator Expert route, STELLARIS, March to May 2026).
+    assert result["pan"]["x_um"] == pytest.approx(128 * pixel_um, abs=0.5)
+    assert result["pan"]["y_um"] == pytest.approx(-128 * pixel_um, abs=0.5)
+
+
+@pytest.mark.parametrize("corner, opposite", [((0, 0), (511, 511)), ((10, 10), (10, 40)), ((-1, 0), (40, 40)), ((0, 0), (40, 512))])
+def test_a_box_that_does_not_zoom_in_or_lies_outside_the_field_is_refused(lasx, client, tmp_path, corner, opposite):
+    pad = Pad(lasx)
+
+    with pytest.raises(ValueError):
+        pan.zoom_in(client, tmp_path, corner, opposite, pad=pad)
+    assert pad.pressed == [] and lasx.live[(*SCANNING, "Zoom")] == pytest.approx(1.0)

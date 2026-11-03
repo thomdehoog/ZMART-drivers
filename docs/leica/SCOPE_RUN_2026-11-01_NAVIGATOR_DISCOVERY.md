@@ -1627,3 +1627,23 @@ So the check (and its `get_system` reading) went; kept: refused while LAS X scan
 formula (centring on a wrong one), LCS's step put back, every pan to the closest place in the window, read back after every
 move. What the simulator cannot show is that the real galvo answers the same; the first try on the STELLARIS is one step
 right, read back and compared with one press of the window's arrow, then centred.
+
+## 102. A zoom that pulls the pan in, Zoom In to a box, the z-stack's step mode, polygons, ranges, the bleaching time (3 November 2026)
+
+- A lower zoom shrinks LAS X's pan window and pulls a pan beyond it in, without a word. `change_setting("zoom", ...)` now
+  reads the pan before and after a lower zoom and reports `pan_pulled_in`: through the driver, a pan of 300.08 µm at zoom 4
+  came to 193.85 µm at zoom 1, and the result said so.
+- `zoom_in(corner, opposite)`: LAS X's Zoom In rectangle as a zoom and a pan, without drawing: the zoom raised until the box
+  (pixels of the field now) fills the field, then the pan bringing its middle to the centre, clipped to the window. The pan's
+  direction is the one measured on the STELLARIS in March to May (a place right of the centre comes to it with the pan the
+  other way across; below it, the same way down); the simulator's picture cannot show it, so it is checked on the STELLARIS.
+  Through the driver: the top-left quarter's box gave zoom 4 and the pan at 290.6, -290.8 µm.
+- The z-stack panel's Number of Steps, Z-Step Size and System Optimized are `Acquire/AcquireZStackInfo/StackCalculationMode`
+  0, 1 and 2 (the driver's mouse; LCS got no command; `StepSizeConstant` and `UseSystemOptimizedCalculation` followed).
+  Built: `change_setting("z_stack_mode", "steps" | "step_size" | "system_optimized")`, written into the state tree, read back.
+- Draw polygon: a click at each corner, and a right click to close it; a double click or a click on the first corner did
+  not close it, and while it is open the status line does not follow the mouse, so every corner is found first. Built:
+  `draw_roi_polygon(vertices)`. Draw range: a band of columns over the picture's whole height, from one click to the other.
+  Built: `draw_roi_range(first_x, last_x)`. Through the driver: a four-corner polygon and the columns 330 to 430, in place.
+- The bleaching time: the Bleach Point panel's boxes (days to milliseconds), typed through UI Automation with the focus moved
+  on, no keys. Built: `set_bleach_time(seconds)`, read back from the boxes: 2.5 s on a drawn point.

@@ -232,6 +232,7 @@ SETTER_LIMIT_KEYS = (
     "set_autofocus_range_um",
     "set_laser_output_power",
     "set_autofocus_drive",
+    "set_z_stack_mode",
 )
 
 

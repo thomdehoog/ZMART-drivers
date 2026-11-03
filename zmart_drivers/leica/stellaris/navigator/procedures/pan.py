@@ -398,6 +398,65 @@ def measure_window(client, folder, pad, *, zooms=(1.0, 2.0)) -> dict:
             "in_the_code": {"largest_pan": PAN_LIMIT, "field_fraction": GALVO_FIELD_FRACTION}}
 
 
+def change_zoom(client, folder, zoom: float) -> dict:
+    """Change the zoom, and say when a lower zoom pulled the pan in.
+
+    A lower zoom shrinks LAS X's window, and LAS X pulls a pan beyond it in
+    without a word (simulator, 2026-11-03). So when the zoom goes down the
+    pan is read before and after, and a pan that moved is reported in the
+    result's ``pan_pulled_in`` (``before_um``, ``after_um``) and its message.
+    """
+    going_down = isinstance(zoom, (int, float)) and not isinstance(zoom, bool) and zoom < readers.get_zoom(client)["current"]
+    before = read(client, folder) if going_down else None
+    result = change(client, "zoom", zoom)
+    if before is not None and result.get("success"):
+        after = read(client, folder)
+        if max(abs(after["x_um"] - before["x_um"]), abs(after["y_um"] - before["y_um"])) > 0.05:
+            result["pan_pulled_in"] = {"before_um": (before["x_um"], before["y_um"]), "after_um": (after["x_um"], after["y_um"])}
+            result["message"] = (f"the lower zoom's window pulled the pan in, from {before['x_um']:.2f}, {before['y_um']:.2f} "
+                                 f"to {after['x_um']:.2f}, {after['y_um']:.2f} um")
+    return result
+
+
+def zoom_in(client, folder, corner, opposite, *, pad=None) -> dict:
+    """Zoom in on the box from pixel *corner* to pixel *opposite* of the field now, as the Zoom In rectangle does.
+
+    Pixels count from the field's top-left corner, x to the right, y down.
+    The zoom is raised until the box's larger side fills the field (at most
+    LAS X's largest zoom), and then the pan brings the box's middle to the
+    centre, zoom first, as its window is larger then. LAS X's pan moves the
+    picture as its arrows point: a place right of the centre comes to it
+    with the pan the other way across, and a place below it with the pan
+    the same way down (the Navigator Expert route, STELLARIS, March to May
+    2026). The pan is clipped to the window, as :func:`set_to` does; read back.
+    """
+    nx, ny = (int(v) for v in readers.get_format(client).split(" x "))
+    for name, (x, y) in (("corner", corner), ("opposite", opposite)):
+        for value, count in ((x, nx), (y, ny)):
+            if isinstance(value, bool) or not isinstance(value, int) or not 0 <= value < count:
+                raise ValueError(f"the box's {name} {corner if name == 'corner' else opposite!r} is not a pixel of the {nx} x {ny} field")
+    width_m, height_m = readers.get_fov(client)
+    pixel = (width_m * 1e6 / nx, height_m * 1e6 / ny)
+    (x0, y0), (x1, y1) = corner, opposite
+    across, down = abs(x1 - x0) + 1, abs(y1 - y0) + 1
+    zooms = readers.get_zoom(client)
+    factor = min(nx / across, ny / down)
+    if factor <= 1.0 or across < 2 or down < 2:
+        raise ValueError(f"a box of {across} x {down} pixels does not zoom in on the {nx} x {ny} field")
+    zoom = min(zooms["current"] * factor, zooms["max"])
+    middle = ((x0 + x1 + 1) / 2 - nx / 2) * pixel[0], ((y0 + y1 + 1) / 2 - ny / 2) * pixel[1]
+    now = read(client, folder)
+    target = (now["x_um"] - middle[0], now["y_um"] + middle[1])
+    zoomed = change(client, "zoom", zoom)
+    if not zoomed.get("success"):
+        if pad is not None and hasattr(pad, "close"):
+            pad.close()
+        return zoomed
+    result = set_to(client, folder, *target, pad=pad)
+    result["zoom"] = readers.get_zoom(client)["current"]
+    return result
+
+
 def clipped_note(clipped: dict) -> str:
     """What a clip did, in words."""
     (ax, ay), (tx, ty), window = clipped["asked_um"], clipped["to_um"], clipped["window_um"]

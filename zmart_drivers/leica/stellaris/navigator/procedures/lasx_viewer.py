@@ -39,7 +39,11 @@ from . import answer_dialogs
 from .lasx_window import MainWindow
 
 #: The viewer's tools, by the help text LAS X gives them.
-TOOLS = {"point": "Draw point", "rectangle": "Draw rectangle", "ellipse": "Draw ellipse"}
+TOOLS = {"point": "Draw point", "rectangle": "Draw rectangle", "ellipse": "Draw ellipse", "polygon": "Draw polygon",
+         "range": "Draw range"}
+
+#: The Bleach Point panel's time boxes, and how many seconds each counts.
+TIME_BOXES = (("TextDays", 86400), ("TextHours", 3600), ("TextMinutes", 60), ("TextSeconds", 1), ("TextMilliseconds", 0.001))
 SELECT_ALL, CLEAR_SELECTED = "Select all ROIs", "Clear selected ROIs"
 
 #: The status line, as LAS X writes it (simulator, 2026-11-03).
@@ -151,6 +155,37 @@ class Viewer:
         self.send(win32con.WM_LBUTTONUP, (x, y))
         time.sleep(SETTLE_S)
 
+    def right_click(self, x: int, y: int) -> None:
+        """A right click at the screen point (*x*, *y*), sent to LAS X's window: it finishes a polygon."""
+        import win32con
+
+        self.send(win32con.WM_RBUTTONDOWN, (x, y), win32con.MK_RBUTTON)
+        time.sleep(0.05)
+        self.send(win32con.WM_RBUTTONUP, (x, y))
+        time.sleep(SETTLE_S)
+
+    def box(self, automation_id: str) -> str:
+        """The text in the window's box *automation_id*."""
+        found = self.window.control(automation_id)
+        pattern = found.GetCurrentPattern(self.window.client.UIA_ValuePatternId)
+        return pattern.QueryInterface(self.window.client.IUIAutomationValuePattern).CurrentValue
+
+    def set_box(self, automation_id: str, text: str) -> None:
+        """Type *text* into the window's box *automation_id*, as the operator does: LAS X takes it when the box loses
+        focus, so the focus moves to another box after it; no keys are sent."""
+        c = self.window.client
+        found = self.window.control(automation_id)
+        found.SetFocus()
+        found.GetCurrentPattern(c.UIA_ValuePatternId).QueryInterface(c.IUIAutomationValuePattern).SetValue(text)
+        time.sleep(0.2)
+        others = self.window.element.FindAll(c.TreeScope_Descendants, self.window.uia.CreatePropertyCondition(c.UIA_ControlTypePropertyId, c.UIA_EditControlTypeId))
+        for i in range(others.Length):
+            other = others.GetElement(i)
+            if other.CurrentIsEnabled and not self.window.uia.CompareElements(other, found):
+                other.SetFocus()
+                break
+        time.sleep(0.2)
+
     def span(self, start: tuple[int, int], end: tuple[int, int]) -> None:
         """A shape from *start* to *end*, as LAS X's region tools take it: a click at one corner, the mouse moved
         across, a click at the other (simulator, 2026-11-03: a drag left the shape unfinished, and LAS X dropped it
@@ -233,6 +268,56 @@ def draw_region(shape: str, corner, opposite, *, viewer=None) -> dict:
     start, end = locate(viewer, x0, y0), locate(viewer, x1, y1)
     viewer.span(start, end)
     return {"success": True, "regions": viewer.is_enabled(SELECT_ALL)}
+
+
+def draw_polygon(vertices, *, viewer=None) -> dict:
+    """An ROI polygon through the picture's pixels *vertices* (at least three), as the viewer's Draw polygon draws it: a
+    click at each corner and a right click at the last, which closes it (simulator, 2026-11-03). Every corner is found
+    first: while a polygon is open the status line no longer follows the mouse. ``regions`` as for :func:`draw_region`."""
+    if isinstance(vertices, (str, bytes)) or len(vertices) < 3:
+        raise ValueError(f"a polygon has at least three corners, not {vertices!r}")
+    viewer = viewer if viewer is not None else Viewer()
+    for x, y in vertices:
+        target_um(viewer, x, y)
+    viewer.tool_on(TOOLS["polygon"])
+    corners = [locate(viewer, x, y) for x, y in vertices]
+    for corner in corners:
+        viewer.click(*corner)
+    viewer.right_click(*corners[-1])
+    return {"success": True, "regions": viewer.is_enabled(SELECT_ALL)}
+
+
+def draw_range(first_x: int, last_x: int, *, viewer=None) -> dict:
+    """An ROI range, the picture's columns from *first_x* to *last_x* over its whole height, as the viewer's Draw range
+    draws it: a click at one column and one at the other (simulator, 2026-11-03)."""
+    viewer = viewer if viewer is not None else Viewer()
+    middle = viewer.picture()["pixels"][1] // 2
+    target_um(viewer, first_x, middle), target_um(viewer, last_x, middle)
+    if first_x == last_x:
+        raise ValueError(f"a range from column {first_x} to column {last_x} has no width")
+    viewer.tool_on(TOOLS["range"])
+    viewer.span(locate(viewer, first_x, middle), locate(viewer, last_x, middle))
+    return {"success": True, "regions": viewer.is_enabled(SELECT_ALL)}
+
+
+def bleach_time(*, viewer=None) -> float:
+    """The bleaching time of the bleach point the Bleach Point panel shows, in seconds, from its boxes."""
+    viewer = viewer if viewer is not None else Viewer()
+    return sum(float(viewer.box(name) or 0) * seconds for name, seconds in TIME_BOXES)
+
+
+def set_bleach_time(seconds, *, viewer=None) -> dict:
+    """The bleaching time of the bleach point the Bleach Point panel shows, typed into its boxes (days to milliseconds),
+    as the operator does; read back from them. LCS holds no bleaching time: LAS X keeps it with the point."""
+    if isinstance(seconds, bool) or not isinstance(seconds, (int, float)) or not seconds > 0:
+        raise ValueError(f"the bleaching time is a number of seconds above 0, not {seconds!r}")
+    viewer = viewer if viewer is not None else Viewer()
+    left = round(seconds * 1000)  # in milliseconds, the panel's finest
+    for name, unit in TIME_BOXES:
+        count, left = divmod(left, round(unit * 1000))
+        viewer.set_box(name, str(int(count)))
+    shown = bleach_time(viewer=viewer)
+    return {"success": True, "confirmed": abs(shown - seconds) < 0.0005, "seconds": shown}
 
 
 def clear_regions(*, viewer=None) -> dict:

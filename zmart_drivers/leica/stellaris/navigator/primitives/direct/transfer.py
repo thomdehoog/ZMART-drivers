@@ -312,7 +312,7 @@ STATE_TREE_WRITES = {
     # (1) or stacks (2). The window writes it here, and LCS rearranges the
     # detectors' channels itself, as for the window (simulator, 2026-11-01).
     "SequentialMode": TreeWrite(("Confocal", "ScanningParameter", "SequentialMode"), choices=frozenset({0, 1, 2})),
-    "StackCalculationMode": TreeWrite(("Acquire", "AcquireZStackInfo", "StackCalculationMode"), choices=frozenset({1, 2})),
+    "StackCalculationMode": TreeWrite(("Acquire", "AcquireZStackInfo", "StackCalculationMode"), choices=frozenset({0, 1, 2})),
     # SmartCORR's range: the collar positions it scans through, in percent,
     # and how many. The window writes them here (simulator, 2026-11-01); LCS
     # gives them no range, the collar's is 0 to 100 percent.

@@ -181,7 +181,7 @@ class TestADialogInTheWay:
     ("xml", "why"),
     [
         ('<StateTree Command="PinholeMax" Value="0.002"/>', "PinholeMax"),
-        ('<StateTree Command="StackCalculationMode" Value="0"/>', "0"),
+        ('<StateTree Command="StackCalculationMode" Value="3"/>', "3"),
         ('<StateTree Command="MotCorrRefPos" Value="-0.5"/>', "-0.5"),
         ('<StateTree Command="AutofocusLaserPower" Value="5"/>', "place"),
         ('<StateTree Command="AutofocusLaserPower" Value="5" At="0"/>', "place"),

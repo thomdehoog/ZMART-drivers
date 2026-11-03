@@ -108,3 +108,53 @@ def test_the_status_line_s_picture_is_read_as_las_x_writes_it():
     texts = ["Image001   x = 512 y = 512  (256 kB)", "Size: 1162.50 µm x 1162.50 µm"]
 
     assert lasx_viewer.picture_in(texts) == {"name": "Image001", "pixels": (512, 512), "size_um": (1162.5, 1162.5)}
+
+
+def test_a_polygon_is_a_click_at_each_corner_and_a_right_click_at_the_last():
+    viewer = Viewer()
+
+    result = lasx_viewer.draw_polygon([(100, 100), (250, 120), (200, 260)], viewer=viewer)
+
+    assert result["regions"] is True and lasx_viewer.TOOLS["polygon"] in viewer.tools
+    assert [round(landed(viewer, c, p), 1) <= 0.5 for c, p in zip(viewer.clicks, [(100, 100), (250, 120), (200, 260)])] == [True] * 3
+    assert viewer.right_clicks == [viewer.clicks[-1]]
+
+
+@pytest.mark.parametrize("vertices", [[(1, 1), (5, 5)], [(1, 1), (5, 5), (600, 5)], "abc"])
+def test_a_polygon_of_fewer_than_three_pixels_or_outside_the_picture_is_refused(vertices):
+    viewer = Viewer()
+
+    with pytest.raises(ValueError):
+        lasx_viewer.draw_polygon(vertices, viewer=viewer)
+    assert viewer.clicks == [] and viewer.right_clicks == []
+
+
+def test_a_range_is_two_clicks_from_one_column_to_the_other():
+    viewer = Viewer()
+
+    result = lasx_viewer.draw_range(300, 420, viewer=viewer)
+
+    ((start, end),) = viewer.drags
+    assert result["regions"] is True and lasx_viewer.TOOLS["range"] in viewer.tools
+    assert landed(viewer, start, (300, 256)) <= 0.5 and landed(viewer, end, (420, 256)) <= 0.5
+
+
+@pytest.mark.parametrize("seconds, boxes", [
+    (3723.5, {"TextDays": "0", "TextHours": "1", "TextMinutes": "2", "TextSeconds": "3", "TextMilliseconds": "500"}),
+    (90061.007, {"TextDays": "1", "TextHours": "1", "TextMinutes": "1", "TextSeconds": "1", "TextMilliseconds": "7"}),
+])
+def test_the_bleaching_time_goes_into_the_panel_s_boxes_and_is_read_back(seconds, boxes):
+    viewer = Viewer()
+
+    result = lasx_viewer.set_bleach_time(seconds, viewer=viewer)
+
+    assert viewer.boxes == boxes and result["seconds"] == pytest.approx(seconds)
+
+
+@pytest.mark.parametrize("seconds", [0, -1, "2 s", True])
+def test_a_bleaching_time_that_is_not_a_positive_number_is_refused(seconds):
+    viewer = Viewer()
+
+    with pytest.raises(ValueError):
+        lasx_viewer.set_bleach_time(seconds, viewer=viewer)
+    assert set(viewer.boxes.values()) == {"0"}

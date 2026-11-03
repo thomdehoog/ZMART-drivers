@@ -18,6 +18,7 @@
   "set_autofocus": [],
   "set_laser_power": {"range": [0, 10]},
   "set_laser_output_power": {"range": [0, 85]},
+  "set_z_stack_mode": [],
   "set_laser_shutter": [],
   "set_frame_average": [],
   "set_line_accumulation": [],

@@ -348,6 +348,11 @@ def get_detection_units(client, **keywords):
     return _routed("detection_units", client, **keywords)
 
 
+def get_z_stack_mode(client, **keywords):
+    """The z-stack's step mode: ``"steps"``, ``"step_size"`` or ``"system_optimized"``."""
+    return _routed("z_stack_mode", client, **keywords)
+
+
 def get_system_optimized_step(client, **keywords):
     """Whether the z-stack's step is System Optimized."""
     return _routed("system_optimized_step", client, **keywords)

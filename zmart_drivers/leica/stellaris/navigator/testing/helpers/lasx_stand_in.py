@@ -131,8 +131,10 @@ class PlainNavigator:
         if not self.live[(*SCANNING, "ZoomMin")] <= zoom <= self.live[(*SCANNING, "ZoomMax")]:
             return f'<Result Error="1">Zoom {zoom:g} is out of range</Result>'
         self.live[(*SCANNING, "Zoom")] = zoom
-        if zoom <= self.live[(*SCANNING, "ZoomMin")] and not self.keeps_pan:
-            self.pan = [0.0, 0.0]  # the simulator pulled the pan to the centre at the smallest zoom
+        if not self.keeps_pan:
+            # LAS X keeps the pan inside a window that grows with the zoom, none at the smallest (simulator, 2026-11-03).
+            edge = max(0.0, 0.00775 * (1 - self.live[(*SCANNING, "ZoomMin")] / zoom))
+            self.pan = [max(-edge, min(edge, value)) for value in self.pan]
 
     def take_SetScanSpeed(self, e):
         self.live[(*SCANNING, "Speed")] = int(float(e.get("Speed")))

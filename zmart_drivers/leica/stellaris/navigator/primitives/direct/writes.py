@@ -2284,6 +2284,21 @@ def system_optimized_step(on: bool) -> Write:
     )
 
 
+#: The z-stack panel's three step modes, as LCS numbers them (``StackCalculationMode``; simulator, 2026-11-03).
+Z_STACK_MODES = {"steps": 0, "step_size": 1, "system_optimized": 2}
+
+
+def z_stack_mode(mode: str) -> Write:
+    """The z-stack's step mode, as the panel's Number of Steps (``"steps"``: the count kept when the ends move), Z-Step
+    Size (``"step_size"``: the step kept) or System Optimized (``"system_optimized"``) writes it; read back."""
+    if not isinstance(mode, str) or mode not in Z_STACK_MODES:
+        raise ValueError(f"z_stack_mode is one of {sorted(Z_STACK_MODES)}, not {mode!r}")
+    return tree_write(
+        "set_z_stack_mode", "StackCalculationMode", Z_STACK_MODES[mode], {"value": mode},
+        f"Z-stack step mode -> {mode}", Expect("z_stack_mode", lambda shown: shown == mode),
+    )
+
+
 #: The settings with a write of their own, by name, beside the table of numbers (:data:`SETTINGS`).
 NAMED_SETTINGS = {
     "scan_mode": scan_mode,
@@ -2297,6 +2312,7 @@ NAMED_SETTINGS = {
     "emission_wavelength": emission_wavelength,
     "bit_depth": bit_depth,
     "system_optimized_step": system_optimized_step,
+    "z_stack_mode": z_stack_mode,
     "collar": collar,
     "smartcorr_range": smartcorr_range,
     "setting_name": setting_name,

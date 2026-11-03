@@ -1171,7 +1171,7 @@ def draw_bleach_point(client, x_px, y_px, *, folder, viewer=None) -> dict:
 
 def draw_roi_region(client, shape, corner, opposite, *, folder, viewer=None) -> dict:
     """Draw an ROI region, a ``"rectangle"`` or ``"ellipse"`` in the box from pixel *corner* to pixel *opposite* of the
-    picture LAS X's viewer shows, as its tool and a drag do. ROI scan must be on. ``confirmed`` when the viewer has
+    picture LAS X's viewer shows, as its tool and a click at each corner do. ROI scan must be on. ``confirmed`` when the viewer has
     regions afterwards; LAS X shows no count of them, and LCS gets nothing."""
     from . import answer_dialogs, lasx_viewer
 
@@ -1187,6 +1187,53 @@ def draw_roi_region(client, shape, corner, opposite, *, folder, viewer=None) -> 
         return dispatch.refused(f"the ROI region was not drawn: {why}")
     result["confirmed"] = result["regions"]
     return result
+
+
+def drawn_region(client, folder, viewer, draw) -> dict:
+    """An ROI region drawn by *draw* (given the viewer) when ROI scan is on and the picture shown is current."""
+    from . import answer_dialogs, lasx_viewer
+
+    if not readers.get_roi_scan(client)["on"]:
+        return dispatch.refused("ROI scan is off; switch it on with set_roi_scan first; nothing was drawn")
+    try:
+        viewer = viewer if viewer is not None else lasx_viewer.Viewer()
+        stale = picture_is_current(client, folder, viewer.picture()["name"])
+        if stale:
+            return dispatch.refused(f"the ROI region was not drawn: {stale}")
+        result = draw(viewer)
+    except (ValueError, LookupError, answer_dialogs.WindowsUnavailable) as why:
+        return dispatch.refused(f"the ROI region was not drawn: {why}")
+    result["confirmed"] = result["regions"]
+    return result
+
+
+def draw_roi_polygon(client, vertices, *, folder, viewer=None) -> dict:
+    """Draw an ROI polygon through the pixels *vertices* of the picture LAS X's viewer shows, as Draw polygon does."""
+    from . import lasx_viewer
+
+    return drawn_region(client, folder, viewer, lambda shown: lasx_viewer.draw_polygon(vertices, viewer=shown))
+
+
+def draw_roi_range(client, first_x, last_x, *, folder, viewer=None) -> dict:
+    """Draw an ROI range, the columns *first_x* to *last_x* of the picture LAS X's viewer shows, as Draw range does."""
+    from . import lasx_viewer
+
+    return drawn_region(client, folder, viewer, lambda shown: lasx_viewer.draw_range(first_x, last_x, viewer=shown))
+
+
+def set_bleach_time(client, seconds, *, viewer=None) -> dict:
+    """The bleaching time of the bleach point the Bleach Point panel shows, typed into its boxes; read back from them.
+    The bleach mode must be on and a point drawn; LCS holds no bleaching time."""
+    from . import answer_dialogs, lasx_viewer
+
+    if not readers.get_roi_scan(client)["bleach_mode"]:
+        return dispatch.refused("the bleach mode is off; switch it on with set_bleach_mode first; nothing was typed")
+    if readers.get_bleach_point(client)["point"] is None:
+        return dispatch.refused("no bleach point is drawn; draw one with draw_bleach_point first; nothing was typed")
+    try:
+        return lasx_viewer.set_bleach_time(seconds, viewer=viewer)
+    except (ValueError, answer_dialogs.WindowsUnavailable) as why:
+        return dispatch.refused(f"the bleaching time was not set: {why}")
 
 
 def clear_drawings(client, *, viewer=None) -> dict:

@@ -77,6 +77,7 @@ READS = (
     "bidirectional",
     "phase_x",
     "system_optimized_step",
+    "z_stack_mode",
     "pane_percentage",
     "collar",
     "smartcorr",
@@ -642,6 +643,15 @@ def get_pixel_size() -> tuple[float, float]:
         metres(found["x"], "ImageSizeX") / found["columns"],
         metres(found["y"], "ImageSizeY") / found["rows"],
     )
+
+
+def get_z_stack_mode() -> str:
+    """The z-stack's step mode: ``"steps"``, ``"step_size"`` or ``"system_optimized"`` (LCS's ``StackCalculationMode``)."""
+    value = settings("the step mode", {"mode": (*Z_STACK, "StackCalculationMode")})["mode"]
+    named = {0: "steps", 1: "step_size", 2: "system_optimized"}
+    if value not in named:
+        raise HardwareServerUnavailable(f"the state tree answered StackCalculationMode = {value!r}")
+    return named[value]
 
 
 def get_system_optimized_step() -> bool:

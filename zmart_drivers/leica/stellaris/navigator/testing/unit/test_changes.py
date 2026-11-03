@@ -1281,6 +1281,28 @@ class TestDrawingInTheViewer:
 
         assert changes.drawings_in_the_way(client, viewer=self.viewer(lasx)) is None
 
+    def test_a_polygon_and_a_range_are_drawn_with_roi_scan_on(self, lasx, client):
+        lasx.live[("Confocal", "ROIScan", "EnableRoiScan")] = True
+        viewer = self.viewer(lasx)
+
+        assert changes.draw_roi_polygon(client, [(10, 10), (100, 20), (50, 90)], folder="unused", viewer=viewer)["confirmed"] is True
+        assert changes.draw_roi_range(client, 100, 200, folder="unused", viewer=viewer)["confirmed"] is True
+
+    def test_without_roi_scan_no_polygon_or_range_is_drawn(self, lasx, client):
+        viewer = self.viewer(lasx)
+
+        assert "set_roi_scan" in changes.draw_roi_polygon(client, [(10, 10), (100, 20), (50, 90)], folder="unused", viewer=viewer)["message"]
+        assert "set_roi_scan" in changes.draw_roi_range(client, 100, 200, folder="unused", viewer=viewer)["message"]
+        assert viewer.clicks == [] and viewer.drags == []
+
+    def test_the_bleaching_time_needs_a_drawn_point(self, lasx, client):
+        lasx.live[("Confocal", "ROIScan", "EnableBleachScan")] = True
+        viewer = self.viewer(lasx)
+
+        assert "draw" in changes.set_bleach_time(client, 2.0, viewer=viewer)["message"]
+        lasx.live[("Confocal", "ROIScan", "CurrentBleachPoint")] = 0
+        assert changes.set_bleach_time(client, 2.0, viewer=viewer)["confirmed"] is True and viewer.boxes["TextSeconds"] == "2"
+
     def test_clearing_takes_the_points_away_in_lcs_too(self, lasx, client):
         lasx.live[("Confocal", "ROIScan", "CurrentBleachPoint")] = 1
         viewer = self.viewer(lasx)
@@ -1902,6 +1924,23 @@ class TestTheYStack:
         assert changes.move_to_z_stack(xzy, "begin")["confirmed"] is True
         assert lasx.live[("Acquire", "ZPosition")] == pytest.approx(-5e-6)
         assert len(lasx.sent) == sent and lasx.z_um[1] == 0.0
+
+
+class TestTheZStackStepMode:
+    """The z-stack panel's Number of Steps, Z-Step Size and System Optimized: LCS's StackCalculationMode 0, 1, 2."""
+
+    @pytest.mark.parametrize("mode, value", [("steps", 0), ("step_size", 1), ("system_optimized", 2)])
+    def test_each_mode_is_written_as_the_window_writes_it(self, lasx, client, mode, value):
+        result = changes.change(client, "z_stack_mode", mode)
+
+        assert result["confirmed"] is True
+        assert lasx.live[("Acquire", "AcquireZStackInfo", "StackCalculationMode")] == value
+
+    @pytest.mark.parametrize("mode", ["count", 0, None])
+    def test_another_mode_is_refused_before_anything_is_sent(self, lasx, client, mode):
+        with pytest.raises(ValueError, match="z_stack_mode"):
+            changes.change(client, "z_stack_mode", mode)
+        assert lasx.live[("Acquire", "AcquireZStackInfo", "StackCalculationMode")] == 1
 
 
 class TestTheZStackPanel:
