@@ -264,7 +264,10 @@ def connect(connection: dict | None = None) -> ZmartHandle:
     the **camera-to-stage orientation**, and the **per-objective calibration**
     (both into the per-connection session registry). Image orientation follows
     ``IMAGE_SAVE`` in ``config/profiles.py``. The connection dict may override
-    limits/calibration loading and pick a named calibration set.
+    limits/calibration loading and pick a named calibration set, and may say
+    how captures are saved under ``format``: ``"ome-tiff"``, one OME-TIFF
+    file per capture, or ``"ome-zarr"``, one OME-Zarr image per capture
+    (the profile's ``IMAGE_SAVE.format`` when it does not say).
 
     The limits load is fail-soft: an invalid or opted-out ``limits.json``
     falls back to the bundled default envelope (loudly warned) rather than
@@ -291,6 +294,8 @@ def connect(connection: dict | None = None) -> ZmartHandle:
         unreachable; the controller passes that to the caller unchanged.
     """
     connection = {**CONNECTION, **(connection or {})}
+    # Checked before LAS X is contacted, so a misspelt format leaves nothing half-connected.
+    _the_image_format(connection)
     saved_origin = _load_saved_origin() if connection.get("load_origin", True) else None
     saved_location = _load_data_location()
     client = _session.connect_microscope(
@@ -307,6 +312,21 @@ def connect(connection: dict | None = None) -> ZmartHandle:
         handle.origin = saved_origin
     handle.data_location = saved_location
     return handle
+
+
+#: The formats a connection may ask captures to be saved in (``output.save.FORMATS``).
+CONNECTION_FORMATS = ("ome-tiff", "ome-zarr")
+
+
+def _the_image_format(connection: dict) -> str:
+    """How this session saves its captures: the connection's ``format``, else the profile's.
+
+    Raises ``ValueError`` naming the formats when the connection asks for another.
+    """
+    chosen = connection.get("format") or IMAGE_SAVE.format
+    if chosen not in CONNECTION_FORMATS:
+        raise ValueError(f"captures are saved as one of {list(CONNECTION_FORMATS)}, not {chosen!r}")
+    return chosen
 
 
 def _load_data_location() -> Path | None:
@@ -1059,7 +1079,7 @@ def acquire(
         # concern from pixel-scale calibration and limits.
         orientation=_loaded_orientation(handle),
         cleanup_cache=IMAGE_SAVE.cleanup_cache,
-        format=IMAGE_SAVE.format,
+        format=_the_image_format(handle.connection),
         projection=IMAGE_SAVE.projection,
         # Where on the sample each plane was taken, the same answer the
         # acquisition gives below, so a store lies where its planes say.
@@ -1076,9 +1096,8 @@ def acquire(
             "t": int(getattr(index, "t", 0)),
             "z": upward.index(depths[ordinal]),
             "c": int(getattr(index, "c", ordinal)),
-            # Where the pixels are, and where inside them. A flat OME-TIFF
-            # holds exactly the one plane t/c/z name; were this a store, the
-            # same three would index into it and only the path would change.
+            # Where the pixels are, and where inside them: every plane names
+            # the capture's one file (or store), and t/c/z index into it.
             "path": str(path),
             **taken_at(depths[ordinal]),
         }
@@ -1110,7 +1129,7 @@ def acquire(
         "position_label": label,
         "trigger": resolved["trigger"],
         "job": job,
-        "format": IMAGE_SAVE.format,
+        "format": _the_image_format(handle.connection),
         "settle": "backlash-corrected" if apply_backlash else "direct",
         "backlash_rounds": backlash_rounds if apply_backlash else 0,
         # Every file this acquisition saved, under the name the ZMART
@@ -1564,7 +1583,7 @@ def _setup(handle: ZmartHandle) -> dict:
         "data_location": {
             "done": handle.data_location is not None,
             "says": (
-                f"{handle.data_location}, as {IMAGE_SAVE.format}"
+                f"{handle.data_location}, as {_the_image_format(handle.connection)}"
                 if handle.data_location is not None else _info.SET_UP
             ),
         },

@@ -351,9 +351,10 @@ def _capture_for_calibration(
         session.paths.data_dir / name,
         naming,
         orientation=orientation,
-        # A calibration frame is read back as one picture (one OME-TIFF),
-        # whatever format the profile saves captures in.
-        format="ome-tiff",
+        # A calibration frame is read back plane by plane (one OME-TIFF a
+        # plane), whatever format the profile or the connection saves
+        # captures in.
+        format="ome-tiff-planes",
     )
 
 

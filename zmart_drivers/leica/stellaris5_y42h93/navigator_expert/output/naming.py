@@ -93,9 +93,9 @@ def free_stem(output_root: Path | str, stem: str) -> str:
 
     taken = data_dir(output_root)
     candidate, number = stem, 0
-    while (taken / build_image_name(Naming(stem=candidate))).exists() or (
-        taken / f"{Naming(stem=candidate).stem}.ome.zarr"
-    ).exists():
+    while (taken / build_image_name(Naming(stem=candidate))).exists() or any(
+        (taken / f"{Naming(stem=candidate).stem}{ending}").exists() for ending in (".ome.zarr", ".ome.tif")
+    ):
         number += 1
         candidate = f"{stem}_{number:03d}"
     return candidate

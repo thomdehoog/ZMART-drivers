@@ -25,7 +25,7 @@ from ..actions.acquire import AcquisitionResult
 from ..configuration.image_stage_registration import Orientation
 from . import files as _files
 from . import materialize as _materialize
-from . import ome_zarr
+from . import ome_tiff_position, ome_zarr
 from .files import (
     DEFAULT_EXPORT_COMPLETION_POLL_INTERVAL_S,
     DEFAULT_EXPORT_COMPLETION_TIMEOUT_S,
@@ -45,9 +45,17 @@ from .product import ExportedAcquisition, PlaneIndex, SavedAcquisition
 
 log = logging.getLogger(__name__)
 
-#: What ``save`` writes the capture as: one OME-TIFF a plane, or one OME-Zarr
-#: image (``ome_zarr``). Only the one chosen is written.
-FORMATS = ("ome-tiff", "ome-zarr")
+#: What ``save`` writes the capture as. Only the one chosen is written.
+#:
+#: - ``"ome-tiff"``: one OME-TIFF file for the whole capture
+#:   (``ome_tiff_position``), which opens in Fiji, napari or QuPath as one stack;
+#: - ``"ome-zarr"``: one OME-Zarr image for the whole capture (``ome_zarr``);
+#: - ``"ome-tiff-planes"``: one OME-TIFF a plane, as LAS X's own export. The
+#:   calibrations ask for this, because they read a capture back plane by plane.
+FORMATS = ("ome-tiff", "ome-zarr", "ome-tiff-planes")
+
+#: Each whole-capture format, and the ending of the one file or folder it writes.
+POSITION_ENDINGS = {"ome-tiff": ".ome.tif", "ome-zarr": ".ome.zarr"}
 
 #: What ``save`` projects from a capture with more than one plane, into
 #: ``<acquisition>/projections``: its max over z, or nothing.
@@ -89,9 +97,11 @@ def save(
     before anything is written, so the driver never deletes a file itself.
 
     *format* is one of ``FORMATS`` and defaults to the profile's
-    (``IMAGE_SAVE.format``). With ``"ome-zarr"`` the capture becomes one
-    image store; *placement*, handed the planes' z numbers, answers where on
-    the sample each was taken, and places the store there.
+    (``IMAGE_SAVE.format``). With ``"ome-tiff"`` or ``"ome-zarr"`` the
+    capture becomes one position, one file or one image store; *placement*,
+    handed the planes' z numbers, answers where on the sample each was
+    taken, and places the position there. With ``"ome-tiff-planes"`` every
+    plane is its own file.
 
     *projection* is one of ``PROJECTIONS`` and defaults to the profile's
     (``IMAGE_SAVE.projection``). A capture with more than one plane then
@@ -124,11 +134,12 @@ def save(
             "gives no way to; nothing was saved and nothing deleted"
         )
     exported = replace(exported, metadata=on_the_canvas(exported.metadata, exported, placement))
-    if format == "ome-zarr":
-        saved = _persist_store(
+    if format in POSITION_ENDINGS:
+        saved = _persist_position(
             exported,
             Path(output_root),
             naming,
+            format=format,
             lineage=lineage,
             state=state,
             orientation=orientation,
@@ -173,9 +184,14 @@ def _persist_projection(
     where = placement(sorted({index.z for index in indices})) if placement is not None else None
     projected = ome_zarr.max_projection(ome_zarr.gather(exported, orientation=orientation, where=where))
     folder = projections_dir(output_root)
+    # A whole-capture projection is named as the capture itself, so whoever
+    # finds the position finds its projection under the same name.
     if format == "ome-zarr":
         store = folder / f"{naming.stem}.ome.zarr"
         return (ome_zarr.write_store(projected, store, state=state),)
+    if format == "ome-tiff":
+        path = folder / f"{naming.stem}.ome.tif"
+        return (ome_tiff_position.write_tiff(projected, path, state=state),)
     folder.mkdir(parents=True, exist_ok=True)
     written = []
     for (ti, ci), plane in (
@@ -213,22 +229,25 @@ def on_the_canvas(metadata, exported: ExportedAcquisition, placement) -> object:
     return replace(metadata, planes=planes)
 
 
-def _persist_store(
+def _persist_position(
     exported: ExportedAcquisition,
     output_root: Path,
     naming: Naming,
     *,
+    format: str,
     lineage: dict | None,
     state: dict | None,
     orientation: Orientation,
     placement: Callable[[list[int]], Callable[[int], dict]] | None,
 ) -> SavedAcquisition:
-    """The capture as one OME-Zarr image in ``data``, beside the vendor's metadata and the state."""
+    """The capture as one position in ``data``: one OME-TIFF file or one OME-Zarr image,
+    beside the vendor's metadata and the state."""
     vendor_records = _persist_vendor_metadata(exported, output_root, naming)
     indices = [index for position in exported.positions for index in position.planes]
     where = placement(sorted({index.z for index in indices})) if placement is not None else None
-    store = data_dir(output_root) / f"{naming.stem}.ome.zarr"
-    ome_zarr.write_position_store(exported, store, orientation=orientation, where=where, state=state)
+    position = data_dir(output_root) / f"{naming.stem}{POSITION_ENDINGS[format]}"
+    write = ome_zarr.write_position_store if format == "ome-zarr" else ome_tiff_position.write_position_tiff
+    write(exported, position, orientation=orientation, where=where, state=state)
     printed = _print_state(state, output_root, naming)
 
     summary_path = output_root / "summary.json"
@@ -237,8 +256,8 @@ def _persist_store(
         summary,
         {
             "naming": _naming_to_dict(naming),
-            "image_path": _rel_posix(store, output_root),
-            "format": "ome-zarr",
+            "image_path": _rel_posix(position, output_root),
+            "format": format,
             "source": _rel_posix(exported.source_dir, exported.source_root),
             "source_exporter": exported.source_exporter,
             "canonical_metadata": True,
@@ -249,7 +268,7 @@ def _persist_store(
     )
     _write_json_atomic(summary_path, summary)
     return SavedAcquisition(
-        image_paths={index: store for index in sorted(indices)},
+        image_paths={index: position for index in sorted(indices)},
         naming=naming,
         vendor_metadata_paths=tuple(output_root / record["path"] for record in vendor_records),
         state_paths=(printed,) if printed is not None else (),

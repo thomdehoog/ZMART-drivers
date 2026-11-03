@@ -48,12 +48,12 @@ def _identity_rig_orientation(monkeypatch):
 
 @pytest.fixture(autouse=True)
 def saves_as_ome_tiff(monkeypatch):
-    """These tests are about captures saved as OME-TIFF, kept in LAS X's cache."""
+    """These tests are about captures saved one OME-TIFF a plane, kept in LAS X's cache."""
     from dataclasses import replace as replaced
 
     from zmart_drivers.leica.stellaris5_y42h93.navigator_expert.actions import profiles
 
-    monkeypatch.setattr(profiles, "IMAGE_SAVE", replaced(profiles.IMAGE_SAVE, format="ome-tiff", cleanup_cache=False))
+    monkeypatch.setattr(profiles, "IMAGE_SAVE", replaced(profiles.IMAGE_SAVE, format="ome-tiff-planes", cleanup_cache=False))
 
 
 @pytest.fixture

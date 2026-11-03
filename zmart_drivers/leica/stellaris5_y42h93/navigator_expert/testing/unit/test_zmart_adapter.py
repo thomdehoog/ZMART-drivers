@@ -882,6 +882,24 @@ class TestAcquire(unittest.TestCase):
         self.assertIs(calls["save"]["cleanup_cache"], adapter.IMAGE_SAVE.cleanup_cache)
         self.assertEqual(record["format"], adapter.IMAGE_SAVE.format)
 
+    def test_a_connection_that_names_a_format_is_saved_that_way(self):
+        """The connection may say how captures are saved; it then wins over the profile."""
+        for asked in ("ome-tiff", "ome-zarr"):
+            h = _handle()
+            h.connection = {**h.connection, "format": asked}
+            h.driven_to = {"x": 0.0, "y": 0.0, "z": 0.0, "z_wide_um": 0.0}
+            with self._capturing() as calls:
+                record = adapter.acquire(h, position_label="A1")
+            self.assertEqual(calls["save"]["format"], asked)
+            self.assertEqual(record["format"], asked)
+
+    def test_connect_refuses_a_format_it_cannot_save_before_lasx_is_contacted(self):
+        with patch.object(adapter._session, "connect_microscope") as connect_microscope:
+            for asked in ("tiff", "ome-tiff-planes"):
+                with self.assertRaisesRegex(ValueError, "captures are saved as one of"):
+                    adapter.connect({**adapter.CONNECTION, "format": asked})
+        connect_microscope.assert_not_called()
+
     def test_letting_go_of_the_cache_follows_the_profile(self):
         """A capture read from LAS X's cache is let go of when the profile says so, never per capture."""
         h = _handle()

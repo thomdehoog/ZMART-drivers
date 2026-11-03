@@ -169,9 +169,11 @@ class ImageSaveProfile:
     """
 
     apply_orientation: bool = True
-    #: What a capture is saved as (``output.save.FORMATS``): ``"ome-tiff"``,
-    #: one file a plane, or ``"ome-zarr"``, one image store. Only the one
-    #: chosen is written.
+    #: What a capture is saved as when the connection does not say
+    #: (``output.save.FORMATS``): ``"ome-tiff"``, one OME-TIFF file for the
+    #: whole capture, or ``"ome-zarr"``, one image store. A connection that
+    #: names a ``format`` is saved that way instead. Only the one chosen is
+    #: written.
     format: str = "ome-zarr"
     #: What a capture with more than one plane also gets, in
     #: ``<acquisition>/projections`` (``output.save.PROJECTIONS``): its

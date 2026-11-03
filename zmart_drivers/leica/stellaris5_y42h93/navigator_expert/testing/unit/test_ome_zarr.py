@@ -1,4 +1,4 @@
-"""Saving a capture as one OME-Zarr 0.5 image instead of OME-TIFF planes.
+"""Saving a capture as one position, an OME-Zarr 0.5 image or one OME-TIFF file, instead of OME-TIFF planes.
 
 The cache is written in LAS X's layout with LAS X's own descriptions of
 HiRes004 (two channels, 12 bit) and AF Job002 (17 planes, 16 bit), so the
@@ -292,7 +292,7 @@ class TestEveryFileSaysTheCanvasPosition:
         saved = saving.save(
             None, acquisition_of("HiRes"), tmp_path / "out",
             Naming(stem="high-res_000001_A1"),
-            cache_root=root, format="ome-tiff", orientation=Orientation(),
+            cache_root=root, format="ome-tiff-planes", orientation=Orientation(),
             placement=at(1000.0, 2000.0, {0: 50.0}),
         )
 
@@ -329,7 +329,7 @@ class TestEveryFileSaysTheCanvasPosition:
         saved = saving.save(
             None, acquisition_of("HiRes"), tmp_path / "out",
             Naming(stem="high-res_000001_A1"),
-            cache_root=root, format="ome-tiff", orientation=Orientation(),
+            cache_root=root, format="ome-tiff-planes", orientation=Orientation(),
         )
 
         with tifffile.TiffFile(saved.image_paths[PlaneIndex(0, 0, 0)]) as tif:
@@ -425,13 +425,79 @@ class TestTheProjection:
 
         root, pixels = stack
 
-        saved = save_with_projection(root, tmp_path, "AF Job", format="ome-tiff",
+        saved = save_with_projection(root, tmp_path, "AF Job", format="ome-tiff-planes",
                                      placement=at(0.0, 0.0, self.heights()))
 
         [path] = saved.projection_paths
         assert path.parent == tmp_path / "out" / "projections"
         assert path.name == "high-res_000001_A1_T000000_C00_max.ome.tiff"
         np.testing.assert_array_equal(tifffile.imread(path), pixels.max(axis=0))
+
+
+class TestTheOmeTiffPosition:
+    """The capture as one OME-TIFF file: the same pixels, place and description as its
+    OME-Zarr store, in a file Fiji, napari or QuPath open as one stack."""
+
+    def both_ways(self, root, tmp_path, job, placement, projection="none"):
+        saved = {}
+        for format in ("ome-zarr", "ome-tiff"):
+            saved[format] = saving.save(
+                None, acquisition_of(job), tmp_path / format, Naming(stem="high-res_000001_A1"),
+                cache_root=root, format=format, orientation=Orientation(),
+                placement=placement, projection=projection,
+            )
+        return saved["ome-zarr"], saved["ome-tiff"]
+
+    def test_it_holds_the_stores_pixels_at_the_stores_place(self, hires, tmp_path):
+        ome_types = pytest.importorskip("ome_types")
+        import tifffile
+
+        root, pixels = hires
+        as_zarr, as_tiff = self.both_ways(root, tmp_path, "HiRes", at(1000.0, 2000.0, {0: 50.0}))
+
+        [path] = set(as_tiff.image_paths.values())
+        assert path == tmp_path / "ome-tiff" / "data" / "high-res_000001_A1.ome.tif"
+        assert [p.name for p in path.parent.iterdir() if p.name != "metadata"] == [path.name]
+        store = next(iter(as_zarr.image_paths.values()))
+        with tifffile.TiffFile(path) as tif:
+            assert len(tif.series) == 1
+            np.testing.assert_array_equal(tif.series[0].asarray(), zarr.open_array(str(store / "0"))[0, :, 0])
+            ome = ome_types.from_xml(tif.pages[0].description, validate=True)
+        np.testing.assert_array_equal(tifffile.imread(path), pixels)
+
+        translation = {t["type"]: t for t in attributes(store)["ome"]["multiscales"][0]["datasets"][0]
+                       ["coordinateTransformations"]}["translation"]["translation"]
+        planes = ome.images[0].pixels.planes
+        assert {(p.position_z, p.position_y, p.position_x) for p in planes} == {tuple(translation[2:])}
+        labels = [c["label"] for c in attributes(store)["ome"]["omero"]["channels"]]
+        assert [c.name for c in ome.images[0].pixels.channels] == labels
+        [note] = [a for a in ome.structured_annotations.map_annotations if a.namespace == "zmart/position"]
+        assert {m.k: m.value for m in note.value.ms}["position_origin"] == "corner"
+        # The drives each plane was taken at still stand beside it, as in LAS X's planes.
+        drives = {m.k for a in ome.structured_annotations.map_annotations
+                  if a.id == planes[0].annotation_refs[0].id for m in a.value.ms}
+        assert "stage x (µm)" in drives
+
+    def test_a_stack_is_one_file_and_its_projection_another(self, stack, tmp_path):
+        import tifffile
+
+        root, pixels = stack
+        heights = {z: 10.0 + z for z in range(17)}
+        _, as_tiff = self.both_ways(root, tmp_path, "AF Job", at(0.0, 0.0, heights), projection="max")
+
+        [path] = set(as_tiff.image_paths.values())
+        np.testing.assert_array_equal(tifffile.imread(path), pixels)
+        [projection] = as_tiff.projection_paths
+        assert projection == tmp_path / "ome-tiff" / "projections" / path.name, "named as the capture"
+        np.testing.assert_array_equal(tifffile.imread(projection), pixels.max(axis=0))
+
+    def test_a_position_without_a_canvas_position_is_refused(self, hires, tmp_path):
+        root, _ = hires
+        with pytest.raises(ValueError, match="canvas"):
+            saving.save(
+                None, acquisition_of("HiRes"), tmp_path / "out", Naming(stem="high-res_000001_A1"),
+                cache_root=root, format="ome-tiff", orientation=Orientation(), placement=None,
+            )
 
 
 def test_the_log_is_written_beside_data(tmp_path):

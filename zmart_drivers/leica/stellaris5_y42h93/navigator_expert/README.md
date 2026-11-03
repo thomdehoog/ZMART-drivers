@@ -425,15 +425,20 @@ save(client, acq, output_root, naming, *, lineage=None, fix_ome=True,
      cleanup_cache=False) -> SavedAcquisition                                    # image_paths / xml_paths / naming
 ```
 `save()` collects the capture from LAS X's cache as LAS X writes it (LAS X's AutoSave is not used)
-and writes it as one OME-Zarr store, or as single-plane OME-TIFFs with OME-XML embedded in each
-image (`IMAGE_SAVE.format`). They land in `<output_root>/data/`, so what is made from
+and writes it as one position: one OME-TIFF file holding every channel and plane (`"ome-tiff"`,
+which opens as one stack in Fiji, napari, QuPath or Imaris), or one OME-Zarr store
+(`"ome-zarr"`). The connection's `format` chooses, and `IMAGE_SAVE.format` when it names none.
+Either way every plane's stage position is the corner of the frame, and an OME-TIFF says so in a
+ZMART note (namespace `zmart/position`) that other programs skip. The calibrations ask for a
+third way, single-plane OME-TIFFs with OME-XML embedded in each (`"ome-tiff-planes"`), because
+they read a capture back plane by plane. The files land in `<output_root>/data/`, so what is made from
 them later (a stitched view, an analysis) becomes a folder beside `data` and is
 never confused with it. Everything describing the capture is under
 `data/metadata`, one folder per party:
 
 ```
 data/
-  overview_<hash6>_K00_M000001_G000001_P000000_V00_T000000_C00_Z00000.ome.tiff
+  overview_<hash6>_K00_M000001_G000001_P000000_V00.ome.tif
   metadata/
     ZMART_state/  overview_<hash6>_..._T000000_ZMART_state.json
     vendor/       lasx_data_container/<picture>.lasx-description.xml
@@ -473,9 +478,9 @@ position and leave the LAS X template alone.
 
 **Acquisition settings say only how a capture is triggered.** This driver has one trigger,
 `full`: the whole of the LAS X job that is selected. Which job that is belongs to the state
-(`set_state({"job": ...})`). How a capture is saved -- the format, where the pixels are read from
-(`source`), the projection -- is this microscope's `IMAGE_SAVE` profile, and where it goes is its
-data location, both set up once.
+(`set_state({"job": ...})`). How a capture is saved -- where the pixels are read from
+(`source`), the projection, and the format unless the connection names one -- is this
+microscope's `IMAGE_SAVE` profile, and where it goes is its data location, both set up once.
 
 **Extra in-place backlash rounds are off by default.** They are the driver's own setting,
 `ACQUISITION_BACKLASH_DEFAULT_ROUNDS` in the adapter, `0` unless changed there. The normal XY
