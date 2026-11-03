@@ -356,6 +356,13 @@ STATE_TREE_WRITES = {
          "Spectrophotometer_SequentialInfo", "DetectionUnitList_SequentialInfo", "DetectorHWInfo_SequentialInfo", "DyeName"),
         str, numbered=("SequentialSettingParameter", "Spectrophotometer_SequentialInfo", "DetectorHWInfo_SequentialInfo"),
     ),
+    # A detector's excitation line in the setting, the detector panel's list: 0 Auto, then the setting's lines that are on, by place;
+    # LCS takes any number, so the driver keeps to the list (simulator, 2026-11-03).
+    "TimegateReferenceLineIndex": TreeWrite(
+        ("Acquire", "ATL", "CurrentBlock", "ConfocalSequentialInfo", "SequentialSettingParameter", "SpectralDetection_SequentialInfo",
+         "Spectrophotometer_SequentialInfo", "DetectionUnitList_SequentialInfo", "DetectorHWInfo_SequentialInfo", "TimegateReferenceLineIndex"),
+        within=(0, 64), numbered=("SequentialSettingParameter", "Spectrophotometer_SequentialInfo", "DetectorHWInfo_SequentialInfo"),
+    ),
     "IsLifetimeContrastActive": TreeWrite(
         ("Acquire", "ATL", "CurrentBlock", "ConfocalSequentialInfo", "SequentialSettingParameter", "SpectralDetection_SequentialInfo",
          "Spectrophotometer_SequentialInfo", "DetectionUnitList_SequentialInfo", "DetectorHWInfo_SequentialInfo", "IsLifetimeContrastActive"),

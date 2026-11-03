@@ -344,11 +344,11 @@ class Microscope:
         """
         return dye_library.dye(name)
 
-    def set_excitation_line(self, line) -> dict:
-        """Choose the excitation line: a wavelength in nm of a line that is on, or ``"auto"``; read back. With one detector on."""
+    def set_excitation_line(self, line, detector: str | None = None) -> dict:
+        """Choose a detector's excitation line, as the detector panel's list: a wavelength in nm of a line that is on in the
+        current setting, or ``"auto"``; read back. *detector* may be left out with one detector on. Works in any setting."""
         self.handle.require_open()
-        result = setting_files.set_excitation_line(self.handle.client, setting_files.folder_for(self.handle), line)
-        return checked(self.handle, result, f"set_excitation_line({line!r})")
+        return checked(self.handle, changes.set_excitation_line(self.handle.client, line, detector=detector), f"set_excitation_line({line!r})")
 
     def show_spectra(self, *, excitation: bool | None = None, emission: bool | None = None) -> dict:
         """Show or hide the dyes' excitation and emission spectra in LAS X's setting panel; read back."""

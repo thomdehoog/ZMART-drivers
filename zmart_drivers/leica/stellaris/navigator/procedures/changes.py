@@ -921,6 +921,32 @@ def find_coverslip_reflection(client, project=None, **watching) -> dict:
     return result
 
 
+def set_excitation_line(client, line, *, detector=None, max_retries=None) -> dict:
+    """Choose *detector*'s excitation line, as the detector panel's Excitation Line list: ``"auto"`` for LAS X's choice, or the
+    wavelength of a line that is on in the current setting; read back. *detector* may be left out with one detector on."""
+    active = [d.get("name") for d in readers.get_detectors(client) or []]
+    if detector is None:
+        if len(active) != 1:
+            return dispatch.refused(f"name the detector; these are on: {active}")
+        detector = active[0]
+    modes = (readers.get_detector_modes(client) or {}).get(detector)
+    if not modes:
+        return dispatch.refused(f"no detector {detector!r}")
+    if line == "auto":
+        place, shown = 0, "auto"
+    else:
+        if isinstance(line, bool) or not isinstance(line, (int, float)):
+            return dispatch.refused(f"the excitation line is 'auto' or a wavelength in nm, not {line!r}")
+        setting = readers.get_setting(client)
+        ids = [s["id"] for s in setting["all"]]
+        lines = readers.get_setting_definitions(client)[ids.index(setting["id"]) if setting["id"] in ids else 0]["lines"]
+        found = [i for i, entry in enumerate(lines) if abs(entry["wavelength"] - float(line)) < 0.5]
+        if not found:
+            return dispatch.refused(f"no laser line at {line} nm is on in the setting; these are: {[e['wavelength'] for e in lines]}")
+        place, shown = found[0] + 1, f"{float(line):g} nm"
+    return run(client, writes.detector_excitation_line(modes["at"], detector, place, shown), max_retries=max_retries)
+
+
 def set_dyes(client, *, lines, detectors, max_retries=None) -> dict:
     """Give the current setting its laser lines and its detectors' dyes, as the window does when a dye is dropped on a
     detector: one command describing every setting (the others sent again as they stand), from which LAS X rebuilds the

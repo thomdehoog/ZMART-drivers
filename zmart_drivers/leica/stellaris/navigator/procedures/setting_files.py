@@ -188,36 +188,6 @@ def set_detector(
     return result
 
 
-def set_excitation_line(client, folder, line) -> dict:
-    """Choose the excitation line of the setting's detector: a wavelength in nm, or ``"auto"`` for LAS X's choice; read back.
-
-    LAS X keeps one reference line per setting, not one per detector, so
-    this is refused while more than one detector is on.
-    """
-    if len(readers.get_detectors(client) or []) != 1:
-        return dispatch.refused("the excitation line is set with one detector on; which detector it belongs to with several is not known")
-    if line != "auto":
-        found = [entry for entry in readers.get_laser_lines(client) or [] if entry.get("wavelength") == float(line)]
-        if not found:
-            return dispatch.refused(f"no laser line at {line} nm is on in the setting")
-        laser = "WLL" if found[0].get("laserName") == "WLL" else found[0].get("laserName")
-
-    def change(part):
-        tag = re.search(r"<DetectionReferenceLine [^>]*>", part)
-        if tag is None:
-            raise ValueError("the setting has no excitation line")
-        new = re.sub(r' IsAutomaticAssigned="[^"]*"', f' IsAutomaticAssigned="{1 if line == "auto" else 0}"', tag[0])
-        if line != "auto":
-            new = re.sub(r' LaserName="[^"]*"', f' LaserName="{laser}"', new)
-            new = re.sub(r' LaserWavelength="[^"]*"', f' LaserWavelength="{float(line):g}"', new)
-        return part.replace(tag[0], new, 1)
-
-    def shows(client_, folder_):
-        return saved_now(client_, folder_)["excitation_line"] == (line if line == "auto" else float(line))
-
-    return through_setting_1(client, folder, change, shows)
-
-
 def show_spectra(client, folder, *, excitation=None, emission=None) -> dict:
     """Show or hide the dyes' excitation and emission spectra in LAS X's setting panel; read back."""
 

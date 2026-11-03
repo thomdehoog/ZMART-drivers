@@ -1097,6 +1097,8 @@ def get_detector_modes() -> dict:
                 "tau_colours": listed_codes(unit, "TauSeparationDefinition_SeqInfo", "TauSeparationChannel", "LutName"),
                 "gates": tau_gates(unit),
                 "tau_contrast": flag(unit, "IsLifetimeContrastActive"),
+                "reference_line": (node_value(nodes, child_named(nodes, unit, "TimegateReferenceLineIndex"))
+                                   if child_named(nodes, unit, "TimegateReferenceLineIndex") is not None else None),
                 "tau_contrast_allowed": flag(unit, "IsLifetimeContrastAllowed"),
                 "tau_scan": tau_scan(unit, most.get(name)),
                 "donor_lifetime_ns": (

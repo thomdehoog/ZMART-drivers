@@ -12,8 +12,6 @@ Author: Thom de Hoog, Center for Microscopy and Image Analysis (ZMB),
 University of Zurich (thom.dehoog@zmb.uzh.ch, thomdehoog@gmail.com).
 """
 
-import re
-
 import pytest
 from lasx_stand_in import PlainNavigator, attach
 from limits_fixtures import (
@@ -412,17 +410,35 @@ def test_an_operating_mode_las_x_does_not_have_is_refused(lasx, client, tmp_path
     assert "ATL_Block_Load_From_XML" not in lasx.commands()
 
 
-def test_the_excitation_line_is_chosen_or_left_to_las_x_and_read_back(lasx, client, tmp_path):
-    lasx.nodes.detection["Spectrophotometer"][0]["DetectionUnitList"]["DetectorHWInfo"][0]["IsActive"] = False
+@pytest.fixture
+def two_lines(monkeypatch):
+    from zmart_drivers.leica.stellaris.navigator.procedures import readings
 
-    assert setting_files.set_excitation_line(client, tmp_path, 405.0)["confirmed"] is True
-    assert setting_1(tmp_path, lasx)["excitation_line"] == 405.0
-    assert setting_files.set_excitation_line(client, tmp_path, "auto")["confirmed"] is True
-    assert setting_1(tmp_path, lasx)["excitation_line"] == "auto"
+    lines = [{"route": (30,), "line_index": 0, "wavelength": 405.0, "percent": 2.0},
+             {"route": (10, 10), "line_index": 0, "wavelength": 497.0, "percent": 2.0}]
+    monkeypatch.setattr(readings, "get_setting_definitions", lambda client, **k: [{"name": "Setting 1", "lines": lines, "detectors": []}])
 
 
-def test_the_excitation_line_is_refused_with_several_detectors_on(lasx, client, tmp_path):
-    result = setting_files.set_excitation_line(client, tmp_path, 405.0)
+def test_a_detector_s_excitation_line_is_chosen_or_left_to_las_x_and_read_back(lasx, client, two_lines):
+    from zmart_drivers.leica.stellaris.navigator.procedures import changes
+
+    assert changes.set_excitation_line(client, 497.0, detector="HyD S 3")["confirmed"] is True
+    assert direct_reader.get_detector_modes()["HyD S 3"]["reference_line"] == 2
+    assert changes.set_excitation_line(client, "auto", detector="HyD S 3")["confirmed"] is True
+    assert direct_reader.get_detector_modes()["HyD S 3"]["reference_line"] == 0
+
+
+@pytest.mark.parametrize("line", [561.0, "first", True])
+def test_a_line_that_is_not_on_is_refused(lasx, client, two_lines, line):
+    from zmart_drivers.leica.stellaris.navigator.procedures import changes
+
+    assert changes.set_excitation_line(client, line, detector="HyD S 3")["success"] is False
+
+
+def test_with_several_detectors_on_the_detector_must_be_named(lasx, client, two_lines):
+    from zmart_drivers.leica.stellaris.navigator.procedures import changes
+
+    result = changes.set_excitation_line(client, 405.0)
 
     assert result["success"] is False and "detector" in result["message"]
 

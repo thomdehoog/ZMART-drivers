@@ -1180,3 +1180,12 @@ LCS followed on the detector itself. Written into the state tree, LCS took it, a
 namespace Leica or User:<name>); the saved-setting route is no longer used for the dye. Through the driver: HyD 2 to ALEXA 514, an
 unknown dye refused, back to ALEXA 488.
 
+## 73. A detector's excitation line (3 November 2026)
+
+The detector panel's Excitation Line list offers "Auto (499)" and the setting's lines that are on ("499"). Choosing 499 with the
+driver's mouse sent no command: the setting's `DetectorHWInfo_SequentialInfo[n]/TimegateReferenceLineIndex` went 0 to 1 (and the
+detector's own), per detector, not one per setting as the driver had assumed. Written into the state tree, LCS took it, and any
+number (5) as well. Built: `set_excitation_line(line, detector=None)` rewritten on that write, in any setting: "auto" is 0, a line
+that is on is its place among the setting's lines plus one; a line that is not on is refused; with several detectors on, the
+detector is named. The saved-setting route is gone. Through the driver: HyD 2 to 499, 561 refused, back to Auto.
+

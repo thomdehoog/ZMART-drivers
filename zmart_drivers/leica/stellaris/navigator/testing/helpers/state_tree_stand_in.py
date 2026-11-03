@@ -556,6 +556,7 @@ class StandInNodes:
                 {"BeamRoute": tuple(unit["BeamRoute"]), "IsActive": unit["IsActive"], "WaveLengthBegin": unit["WaveLengthBegin"],
                  "WaveLengthEnd": unit["WaveLengthEnd"], "DyeName": unit["DyeName"], "DyeRelation": unit.get("DyeRelation", 0),
                  "ImageChannelLutList": {"ImageChannelLut": [{"LutName": unit.get("LutName", "Gray"), "IsUserDefinedLutName": False}]},
+                 "TimegateReferenceLineIndex": unit.get("ReferenceLine", 0),
                  "IsLifetimeContrastActive": unit.get("TauContrast", False), "IsLifetimeContrastAllowed": unit.get("TauContrastAllowed", True),
                  "DigitalGatingMode": unit.get("DigitalGatingMode", 2), "DigitalGatingModeList_SeqInfo": {"DigitalGatingMode": [
                     {"DigitalGatingMode": code, "IsEnabled": code not in unit.get("TauDisabled", ())} for code in (0, 2, 3, 5, 6, 10)]},
@@ -598,6 +599,14 @@ class StandInNodes:
                 name, parent, _kids = nodes[node]
                 path.insert(0, name)
                 node = parent
+            if path[-1] == "TimegateReferenceLineIndex":
+                unit_node = nodes[change.NodeID][1]
+                spectro_node = nodes[nodes[unit_node][1]][1]
+                units = [n for n in nodes[nodes[unit_node][1]][2] if nodes[n][0] == "DetectorHWInfo_SequentialInfo"]
+                spectros = [n for n in nodes[nodes[spectro_node][1]][2] if nodes[n][0] == "Spectrophotometer_SequentialInfo"]
+                self.detection["Spectrophotometer"][spectros.index(spectro_node)]["DetectionUnitList"]["DetectorHWInfo"][units.index(unit_node)][
+                    "ReferenceLine"] = int(change.Value)
+                continue
             if path[-1] == "DyeName" and "SequentialSettingParameter" in path:
                 # A detector's dye in the setting, by place; LCS follows it on the detector itself.
                 unit_node = nodes[change.NodeID][1]

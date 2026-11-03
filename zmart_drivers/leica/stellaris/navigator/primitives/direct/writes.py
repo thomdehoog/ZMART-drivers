@@ -1110,6 +1110,18 @@ def tau_channel_colour(route, name: str, setting_id: int, channel: int, colour: 
 OPERATING_CODES = {"Fast Mode": 4, "Counting": 1, "Analog": 10, "Reflection": 11}
 
 
+def detector_excitation_line(at, name: str, place: int, shown: str) -> Write:
+    """The detector *name*'s excitation line, by its *place* in the detector panel's list (0 Auto, then the setting's lines that
+    are on), written into its setting's entry (*at*) as the window does (simulator, 2026-11-03); read back."""
+
+    def fill(request: Request) -> None:
+        request.elements = [f'<StateTree Command="TimegateReferenceLineIndex" Value="{int(place)}" At="{",".join(str(int(n)) for n in at)}"/>']
+
+    return Write(command="set_excitation_line", values={"value": shown}, request="TimegateReferenceLineIndex", fill=fill,
+                 description=f"Detector {name} excitation line -> {shown}", ready=idle(),
+                 confirm=Expect("detector_modes", lambda modes: ((modes or {}).get(name) or {}).get("reference_line") == place))
+
+
 def detector_dye(at, name: str, dye: str) -> Write:
     """The dye of the detector *name* (LAS X's ``Namespace/Name``), written into its setting's entry (*at*) as the detector
     panel's Dye list does (simulator, 2026-11-03); read back from the detector."""
