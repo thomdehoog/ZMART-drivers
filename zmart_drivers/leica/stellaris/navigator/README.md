@@ -211,6 +211,17 @@ mic.connect("stellaris-navigator")                                              
 | `close()` | Close the session. Every later call is refused. |
 | `client` | The connection to LAS X's hardware server itself, for the setup notebooks. |
 
+### Values written into LAS X's state tree
+
+Some values have no command of their own in LAS X: its window writes them straight into the hardware server's
+state tree, and so does the driver. Such a write is made only when three things hold, and refused with the reason
+otherwise:
+
+- LAS X is a build the driver's writes were checked on (4.9.0.30051, the simulator's). On another build, nothing is
+  written until the writes are checked again on it.
+- LAS X takes input for its settings now: not while it is scanning or busy, when its window greys its controls out.
+- The value is one the window offers, within LAS X's own range and this microscope's limits file.
+
 ### The settings `change_setting` can change
 
 Each is sent to the current scan with the command LAS X's own software sends (learned in LCS's log),

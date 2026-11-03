@@ -2016,6 +2016,35 @@ class TestNoStateTreeWriteWhileLasXRefusesInput:
         assert changes.set_roi_scan(client, True)["confirmed"] is True
 
 
+class TestStateTreeWritesOnlyOnACheckedLasXBuild:
+    """Where a value sits in LCS's state tree can move from one LAS X build to the next; the driver writes into the
+    tree only on a build its writes were checked on, and says which build it found otherwise."""
+
+    @pytest.mark.parametrize("version", ["LAS X 5.1.0.12345", "", None])
+    def test_another_build_is_refused_and_nothing_changes(self, lasx, client, version):
+        lasx.live[("Acquire", "LASAFversion")] = version
+
+        result = changes.set_roi_scan(client, True)
+
+        assert result["success"] is False and "build" in result["message"]
+        assert lasx.live[("Confocal", "ROIScan", "EnableRoiScan")] is False
+        assert lasx.nodes.tree_writes == []
+
+    def test_the_build_found_is_named(self, lasx, client):
+        lasx.live[("Acquire", "LASAFversion")] = "LAS X 5.1.0.12345"
+
+        assert "5.1.0.12345" in changes.set_roi_scan(client, True)["message"]
+
+    def test_a_command_is_still_sent_on_another_build(self, lasx, client):
+        """Commands go to LCS's own command door, which checks them itself; only the tree writes are pinned."""
+        lasx.live[("Acquire", "LASAFversion")] = "LAS X 5.1.0.12345"
+
+        assert changes.set_auto_sync(client, True)["confirmed"] is True
+
+    def test_the_checked_build_writes(self, lasx, client):
+        assert changes.set_roi_scan(client, True)["confirmed"] is True
+
+
 class TestRoiScanAndBleachMode:
     def test_roi_scan_is_switched_on_and_off(self, lasx, client):
         assert changes.set_roi_scan(client, True)["roi"] == {"on": True, "sections": None, "bleach_mode": False}

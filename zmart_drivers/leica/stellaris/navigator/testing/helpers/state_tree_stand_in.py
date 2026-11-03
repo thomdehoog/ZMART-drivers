@@ -75,6 +75,8 @@ SIMULATOR_SETTINGS = {
     ("Confocal", "ROIScan", "CurrentBleachPoint"): -1,
     # Whether LAS X takes input now: both go on while it is idle; Live turns the first off (simulator, 2026-11-03).
     ("Acquire", "CanDoChangeOnIdleOrPrepare"): True,
+    # LAS X's build, as the simulator's LCS gives it (2026-11-03).
+    ("Acquire", "LASAFversion"): "LAS X [ BETA ] 4.9.0.30051",
     ("Acquire", "ATL", "UIInputForBlockAllowed"): True,
     ("Confocal", "ROIScan", "CanDo3DLimitedRoiScan"): False,
     ("Confocal", "ROIScan", "Is3DLimitedRoiScanEnabled"): False,

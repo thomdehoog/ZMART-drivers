@@ -1867,3 +1867,11 @@ The setting's name and the stage autofocus's first-position switch were checked 
 name (`ATL/CurrentSetting/Name`) or its entry's (`SequentialSettingParameter/Name`) changes the same three nodes, so
 the driver keeps the current setting's. Choosing First or Every in the Navigator's Autofocus Stage tab changed
 `IsFirstPositionOnly` with `WorkflowXY`, and LCS does not follow `WorkflowXY` by itself, so the driver keeps writing both.
+
+## 116. State-tree writes only on a checked LAS X build (3 November 2026)
+
+LCS gives LAS X's build at `Acquire/LASAFversion` ("LAS X [ BETA ] 4.9.0.30051" on the simulator). Where a value sits
+in the state tree can move from one build to the next, so a write into the tree is made only on a build the writes were
+checked on (`transfer.CHECKED_LASX_BUILDS`, now only 4.9.0.30051); on any other, it is refused and the build found is
+named. Commands are not pinned: LCS checks those itself. On the simulator, Acquire Until Stopped and 5 frames went in;
+with the checked build set to another number, the same write was refused and named 4.9.0.30051.

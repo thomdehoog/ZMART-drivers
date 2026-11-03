@@ -73,6 +73,9 @@ checked by the driver either way (`transfer.CHECKED_COMMANDS`, `transfer.STATE_T
 
 ## To check on the STELLARIS
 
+- LAS X's build (`Acquire/LASAFversion`). The state-tree writes go in only on a build they were checked on
+  (`transfer.CHECKED_LASX_BUILDS`, 4.9.0.30051); on another, each write is refused and names the build. Check the
+  writes there, each against its window, one by one, before the build is added.
 - `zoom_in` on a sample: that the box's middle comes to the centre (the pan's direction, from March to May).
 - `measure_pan_window()` on the STELLARIS (by the window's pad): its largest pan and field fraction against the code's; the
   field fraction on a sample with pictures; the resonant scanner's window.
