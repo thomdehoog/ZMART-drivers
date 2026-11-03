@@ -1416,6 +1416,8 @@ def excitation_scan(name: str, value) -> Write:
     tree, as the panel does); read back."""
     if name == "after_stage":
         element = f'<StateTree Command="IsExcitationLambdaAfterStageDim" Value="{int(bool(value))}"/>'
+    elif name == "max_gap_nm":
+        return max_gap(value)
     else:
         command, attribute, text = {
             "begin_nm": ("SetLambdaExcitationBegin", "Begin", lambda v: str(int(v))),
@@ -1424,6 +1426,7 @@ def excitation_scan(name: str, value) -> Write:
             "automatic_sp": ("SetLambdaAutomaticSPUnitMovement", "Movement", lambda v: str(int(bool(v)))),
             "method": ("SetLambdaDetectionBandwidthMode", "Mode", lambda v: str({b: a for a, b in direct_reader.EXCITATION_METHODS.items()}[v])),
             "min_gap_nm": ("SetLambdaMinGap", "MinGap", lambda v: str(int(v))),
+            "geometry": ("SetLambdaGeometry", "Geometry", lambda v: str({b: a for a, b in direct_reader.LAMBDA_GEOMETRIES.items()}[v])),
         }[name]
         element = f'<Scanner Command="{command}" {attribute}="{text(value)}"/>'
 
@@ -1438,6 +1441,20 @@ def excitation_scan(name: str, value) -> Write:
 
     return Write(command="set_excitation_scan", values={"value": str(value)}, request=element.split('"')[1], fill=fill,
                  description=f"Λ scan {name} -> {value}", ready=idle(), confirm=Expect("excitation_scan", shows))
+
+
+def max_gap(value) -> Write:
+    """The Λλ scan's maximal distance between excitation and detection: a number ticks its box and sets it, False unticks it."""
+    elements = ['<Scanner Command="SetLambdaUseMaxGap" UseMaxGap="0"/>'] if value is False else [
+        '<Scanner Command="SetLambdaUseMaxGap" UseMaxGap="1"/>', f'<Scanner Command="SetLambdaMaxGap" MaxGap="{int(value)}"/>']
+
+    def fill(request: Request) -> None:
+        request.elements = list(elements)
+
+    expected = None if value is False else float(value)
+    return Write(command="set_excitation_scan", values={"value": str(value)}, request=elements[-1].split('"')[1], fill=fill,
+                 description=f"Λλ maximal distance -> {value}", ready=idle(),
+                 confirm=Expect("excitation_scan", lambda found: bool(found) and found["max_gap_nm"] == expected))
 
 
 #: The λ scan's detection: the driver's name, LAS X's command and its attribute, and the reading's key.

@@ -1042,12 +1042,12 @@ def set_z_drive(client, drive, *, max_retries=None) -> dict:
 
 
 def set_excitation_scan(client, *, begin_nm=None, end_nm=None, step_nm=None, automatic_sp=None, method=None, min_gap_nm=None,
-                        after_stage=None, max_retries=None) -> dict:
+                        after_stage=None, geometry=None, max_gap_nm=None, max_retries=None) -> dict:
     """Set the Λ (excitation) scan as LAS X's Λ panel does: its begin and end (within the white-light laser's range), its
     step, Automatic SP Movement, the method ("right fixed" or "constant"), the minimal gap to the detection, and Lambda
     After Stage; whole nanometres. Checked before anything is sent; the result's ``excitation_scan`` is read back."""
     asked = {"step_nm": step_nm, "begin_nm": begin_nm, "end_nm": end_nm, "automatic_sp": automatic_sp, "method": method,
-             "min_gap_nm": min_gap_nm, "after_stage": after_stage}
+             "min_gap_nm": min_gap_nm, "after_stage": after_stage, "geometry": geometry, "max_gap_nm": max_gap_nm}
     given = {k: v for k, v in asked.items() if v is not None}
     if not given:
         return dispatch.refused("set_excitation_scan needs at least one value")
@@ -1057,9 +1057,16 @@ def set_excitation_scan(client, *, begin_nm=None, end_nm=None, step_nm=None, aut
     for key in ("automatic_sp", "after_stage"):
         if key in given and not isinstance(given[key], bool):
             return dispatch.refused(f"{key} takes True or False, not {given[key]!r}")
+    if "geometry" in given and given["geometry"] not in direct_reader.LAMBDA_GEOMETRIES.values():
+        return dispatch.refused(f"the geometry is one of {sorted(direct_reader.LAMBDA_GEOMETRIES.values())}, not {given['geometry']!r}")
+    if "max_gap_nm" in given and given["max_gap_nm"] is not False and (
+            isinstance(given["max_gap_nm"], bool) or not isinstance(given["max_gap_nm"], int) or not 1 <= given["max_gap_nm"] <= 420):
+        return dispatch.refused(f"the maximal distance is 1 to 420 nm, or False for none, not {given['max_gap_nm']!r}")
     if "method" in given and given["method"] not in direct_reader.EXCITATION_METHODS.values():
         return dispatch.refused(f"the method is one of {sorted(direct_reader.EXCITATION_METHODS.values())}, not {given['method']!r}")
     now = readers.get_excitation_scan(client)
+    if given.get("max_gap_nm") not in (None, False) and given.get("geometry", now["geometry"]) == "independent":
+        return dispatch.refused("a maximal distance applies to a detection behind or ahead of the excitation, not an independent one")
     tunable = [(line["MinWavelength"], line["MaxWavelength"]) for source in readers.get_light_sources(client) or []
                for line in source["LaserLines"] if line["MinWavelength"] != line["MaxWavelength"]]
     low, high = (min(t[0] for t in tunable), max(t[1] for t in tunable)) if tunable else (0, 0)
@@ -1077,7 +1084,7 @@ def set_excitation_scan(client, *, begin_nm=None, end_nm=None, step_nm=None, aut
             if not result["success"]:
                 return result
     result["excitation_scan"] = readers.get_excitation_scan(client)
-    moved = {k: result["excitation_scan"][k] for k, v in given.items() if result["excitation_scan"][k] != v and not (
+    moved = {k: result["excitation_scan"][k] for k, v in given.items() if k != "max_gap_nm" and result["excitation_scan"][k] != v and not (
         isinstance(v, (int, float)) and not isinstance(v, bool) and abs(result["excitation_scan"][k] - v) < 0.5)}
     if moved:
         result["confirmed"] = False

@@ -691,13 +691,15 @@ class Microscope:
 
     def set_excitation_scan(self, begin_nm: int | None = None, end_nm: int | None = None, step_nm: int | None = None,
                             automatic_sp: bool | None = None, method: str | None = None, min_gap_nm: int | None = None,
-                            after_stage: bool | None = None) -> dict:
+                            after_stage: bool | None = None, geometry: str | None = None, max_gap_nm=None) -> dict:
         """Set the Λ (excitation) scan as LAS X's Λ panel: begin and end within the white-light laser's range, step,
         Automatic SP Movement, the method ("right fixed" or "constant"), the minimal gap to the detection, Lambda
-        After Stage; whole nanometres. The scan mode is set apart (``xyΛ``, ...). Answers the Λ scan."""
+        After Stage; and for the Λλ scan the *geometry* ("behind", "ahead", "independent") and the maximal distance
+        *max_gap_nm* (False: none); whole nanometres. The scan mode is set apart (``xyΛ``, ``xyΛλ`` ...). Answers the Λ scan."""
         self.handle.require_open()
         result = changes.set_excitation_scan(self.handle.client, begin_nm=begin_nm, end_nm=end_nm, step_nm=step_nm, automatic_sp=automatic_sp,
-                                             method=method, min_gap_nm=min_gap_nm, after_stage=after_stage)
+                                             method=method, min_gap_nm=min_gap_nm, after_stage=after_stage, geometry=geometry,
+                                             max_gap_nm=max_gap_nm)
         checked(self.handle, result, "set_excitation_scan()")
         return result["excitation_scan"]
 

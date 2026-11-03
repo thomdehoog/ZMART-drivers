@@ -1196,6 +1196,8 @@ def get_laser_output_power() -> dict:
     return read("the lasers' output power", reading)
 
 
+#: The Λλ scan's side of the detection, by LCS's code (``LambdaLambdaDetectionRangeGeometry``; simulator, 2026-11-03).
+LAMBDA_GEOMETRIES = {0: "behind", 1: "ahead", 2: "independent"}
 #: The Λ scan's methods for the detection band, by LCS's code (``DetectionBandWidthMode``).
 EXCITATION_METHODS = {4: "right fixed", 5: "constant"}
 
@@ -1203,15 +1205,19 @@ EXCITATION_METHODS = {4: "right fixed", 5: "constant"}
 def get_excitation_scan() -> dict:
     """The Λ (excitation) scan, as LAS X's Λ panel shows it: ``begin_nm``, ``end_nm``, ``step_nm``, ``automatic_sp`` (the
     detection follows the excitation), ``method`` ("right fixed" or "constant"), ``min_gap_nm`` (between excitation and
-    detection), ``after_stage`` (Lambda After Stage). ``Confocal/LambdaDefinition`` (simulator, 2026-11-03)."""
+    detection), ``after_stage`` (Lambda After Stage), and for the Λλ scan ``geometry`` (the detection "behind", "ahead" or
+    "independent" of the excitation) and ``max_gap_nm`` (None when off). ``Confocal/LambdaDefinition`` (simulator, 2026-11-03)."""
     l = ("Confocal", "LambdaDefinition")
     found = settings("the Λ scan", {k: (*l, n) for k, n in (
         ("begin", "ExcitationBegin"), ("end", "ExcitationEnd"), ("step", "ExcitationStepSize"), ("auto", "IsAutomaticSPUnitMovementActive"),
-        ("method", "DetectionBandWidthMode"), ("gap", "LambdaMinGapExctToDetct"), ("after", "IsExcitationLambdaAfterStageDim"))})
+        ("method", "DetectionBandWidthMode"), ("gap", "LambdaMinGapExctToDetct"), ("after", "IsExcitationLambdaAfterStageDim"),
+        ("geometry", "LambdaLambdaDetectionRangeGeometry"), ("use_max", "UseLambdaMaxGapExctToDetct"), ("max", "LambdaMaxGapExctToDetct"))})
     return {
         "begin_nm": float(found["begin"]), "end_nm": float(found["end"]), "step_nm": float(found["step"]),
         "automatic_sp": bool(found["auto"]), "method": EXCITATION_METHODS.get(found["method"], found["method"]),
         "min_gap_nm": float(found["gap"]), "after_stage": bool(found["after"]),
+        "geometry": LAMBDA_GEOMETRIES.get(found["geometry"], found["geometry"]),
+        "max_gap_nm": float(found["max"]) if found["use_max"] else None,
     }
 
 

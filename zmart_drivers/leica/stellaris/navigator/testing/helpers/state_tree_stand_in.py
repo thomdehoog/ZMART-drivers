@@ -58,6 +58,9 @@ SIMULATOR_SETTINGS = {
     ("Confocal", "LambdaDefinition", "DetectionBandWidthMode"): 4,
     ("Confocal", "LambdaDefinition", "LambdaMinGapExctToDetct"): 10.0,
     ("Confocal", "LambdaDefinition", "IsExcitationLambdaAfterStageDim"): False,
+    ("Confocal", "LambdaDefinition", "LambdaLambdaDetectionRangeGeometry"): 0,
+    ("Confocal", "LambdaDefinition", "UseLambdaMaxGapExctToDetct"): False,
+    ("Confocal", "LambdaDefinition", "LambdaMaxGapExctToDetct"): 40.0,
     # Linear Z-compensation (simulator, 2026-11-02): no mode, the reference at the stack's begin.
     ("Confocal", "ZCompensation", "CurrentMode"): 0,
     ("Confocal", "ZCompensation", "ReferencePosition"): 0.000995,

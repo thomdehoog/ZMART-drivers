@@ -284,6 +284,15 @@ class PlainNavigator:
     def take_SetLambdaDetectionBandwidthMode(self, e):
         self.live[(*self.LAMBDA, "DetectionBandWidthMode")] = int(e.get("Mode"))
 
+    def take_SetLambdaGeometry(self, e):
+        self.live[(*self.LAMBDA, "LambdaLambdaDetectionRangeGeometry")] = int(e.get("Geometry"))
+
+    def take_SetLambdaUseMaxGap(self, e):
+        self.live[(*self.LAMBDA, "UseLambdaMaxGapExctToDetct")] = e.get("UseMaxGap") == "1"
+
+    def take_SetLambdaMaxGap(self, e):
+        self.live[(*self.LAMBDA, "LambdaMaxGapExctToDetct")] = float(e.get("MaxGap"))
+
     def take_SetLambdaMinGap(self, e):
         self.live[(*self.LAMBDA, "LambdaMinGapExctToDetct")] = float(e.get("MinGap"))
 

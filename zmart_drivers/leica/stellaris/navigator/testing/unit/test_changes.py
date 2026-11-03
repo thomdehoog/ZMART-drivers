@@ -1160,10 +1160,23 @@ class TestExcitationScan:
 
         assert result["confirmed"] is True
         assert result["excitation_scan"] == {"begin_nm": 500.0, "end_nm": 640.0, "step_nm": 10.0, "automatic_sp": False,
-                                             "method": "constant", "min_gap_nm": 15.0, "after_stage": True}
+                                             "method": "constant", "min_gap_nm": 15.0, "after_stage": True,
+                                             "geometry": "behind", "max_gap_nm": None}
+
+    def test_the_lambda_lambda_side_and_maximal_distance_are_set(self, lasx, client):
+        result = changes.set_excitation_scan(client, geometry="ahead", max_gap_nm=50)
+
+        assert result["confirmed"] is True
+        assert (result["excitation_scan"]["geometry"], result["excitation_scan"]["max_gap_nm"]) == ("ahead", 50.0)
+        assert changes.set_excitation_scan(client, max_gap_nm=False)["excitation_scan"]["max_gap_nm"] is None
+
+    def test_a_maximal_distance_with_an_independent_detection_is_refused(self, lasx, client):
+        # LCS kept it off with "independent" (simulator, 2026-11-03).
+        assert changes.set_excitation_scan(client, geometry="independent", max_gap_nm=50)["success"] is False
 
     @pytest.mark.parametrize("keywords", [{"begin_nm": 400}, {"end_nm": 800}, {"begin_nm": 650, "end_nm": 600}, {"step_nm": 0},
-                                          {"method": "left"}, {"min_gap_nm": -1}, {"automatic_sp": "yes"}, {}])
+                                          {"method": "left"}, {"min_gap_nm": -1}, {"automatic_sp": "yes"}, {"geometry": "above"},
+                                          {"max_gap_nm": 0}, {}])
     def test_what_the_window_does_not_offer_is_refused_and_nothing_is_sent(self, lasx, client, keywords):
         sent = len(lasx.sent)
 

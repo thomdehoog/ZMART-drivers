@@ -62,7 +62,7 @@ discovery session in `SCOPE_RUN_2026-11-01_NAVIGATOR_DISCOVERY.md` and the build
 | The Reflection autofocus's coverslip offset, and Find Coverslip Reflection | Works: the offset written into LAS X's state tree; Find with LAS X's command, reporting whether it found the coverslip |
 | Auto Sync on or off, and its scan options (format, frequency, overview zoom, bidirectional, no averaging) for both scanners | Works: on with LAS X's command, off and the options written into its state tree, as the Best Focus Scan Options window does |
 | The λ scan's detection: begin, end, step, bandwidth | Works, with LAS X's commands; LAS X sometimes moves begin or end by a few nm, which the driver reports |
-| The Λ (excitation) scan: begin, end, step, Automatic SP Movement, method, minimal gap, Lambda After Stage | Works, with LAS X's commands (Lambda After Stage written into the state tree); within the white-light laser's range |
+| The Λ (excitation) scan: begin, end, step, Automatic SP Movement, method, minimal gap, Lambda After Stage; the Λλ scan's side and maximal distance | Works, with LAS X's commands (Lambda After Stage written into the state tree); within the white-light laser's range |
 | The z drive on its own (z-galvo or z-wide), and with z-galvo the xz scan modes (xzy, xzt, xzλ ...) | Works, with LAS X's commands |
 | A value given to every setting (the "apply to all settings" boxes beside line and frame averaging and accumulation, and the pinhole) | Works, with LAS X's commands |
 | The Fluorifier disc: notch filters by hand or with the laser (Auto Select), and the polarizer's angle | Works: the filters with `set_filter_wheel` (wheels 130, 131); Auto Select and the polarizer written into LAS X's state tree, as its window does |

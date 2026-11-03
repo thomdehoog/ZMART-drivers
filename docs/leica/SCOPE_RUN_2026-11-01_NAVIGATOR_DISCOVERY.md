@@ -1102,3 +1102,12 @@ first, begin and end within the white-light laser's range, what LAS X moved repo
 constant, gap 15, after stage; 300 refused; back to 485 to 685, 20, right fixed, gap 10; the λ detection back to 385 to
 775 nm, 30, 30; the scan mode back to xyz.
 
+## 66. The Λλ scan's side and maximal distance (3 November 2026)
+
+In xyΛλ, by the driver's mouse: the three option buttons for the detection's side sent `<Scanner Command="SetLambdaGeometry"
+Geometry="0"/>` (detection behind, larger than the excitation), `"1"` (ahead) and `"2"` (independent); the maximal Λλ distance's
+box `SetLambdaUseMaxGap UseMaxGap="1|0"` and its arrows `SetLambdaMaxGap MaxGap="50"`. The minimal gap is `SetLambdaMinGap`, as in
+the Λ scan; the reverse direction was greyed out. Through the driver, 60 nm was taken with "behind" and "ahead", and LCS kept it
+off with "independent". Built: `geometry=` and `max_gap_nm=` (False: none) on `set_excitation_scan`, the maximal distance refused
+with an independent detection. Left behind, no maximal distance (40 nm stored); the scan mode back to xyz.
+
