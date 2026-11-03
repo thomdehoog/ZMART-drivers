@@ -1761,14 +1761,20 @@ def set_bleach_mode(client, on, *, max_retries=None) -> dict:
     return roi_result(client, [writes.bleach_mode(on)], max_retries)
 
 
-def set_line_scan(client, *, lines=None, max_lines_per_page=None, lines_per_page=None, page_interval_s=None, max_retries=None) -> dict:
+def set_line_scan(client, *, lines=None, max_lines_per_page=None, lines_per_page=None, page_interval_s=None, minimize=None,
+                  max_retries=None) -> dict:
     """Set the xt line scan as LAS X's t panel does in xt: the *lines*, MAX (*max_lines_per_page*: as many lines per page as
-    LAS X takes), the *lines_per_page* (only with MAX off) and the *page_interval_s*; the result's ``line_scan`` is read back.
-    Only with the scan mode xt."""
-    asked = {"max_lines_per_page": max_lines_per_page, "lines": lines, "lines_per_page": lines_per_page, "page_interval_s": page_interval_s}
+    LAS X takes), the *lines_per_page* (only with MAX off), the *page_interval_s*, and Minimize (*minimize*: the shortest
+    page interval, kept by LCS while it is on); the result's ``line_scan`` is read back. Only with the scan mode xt. A
+    page interval is refused while Minimize is on, as LCS would keep the shortest anyway; give ``minimize=False`` with it.
+    Minimize is written into LCS's state tree, as the window keeps it (simulator, 2026-11-03)."""
+    asked = {"minimize": minimize, "max_lines_per_page": max_lines_per_page, "lines": lines, "lines_per_page": lines_per_page,
+             "page_interval_s": page_interval_s}
     given = {k: v for k, v in asked.items() if v is not None}
     if not given:
-        return dispatch.refused("set_line_scan needs lines, max_lines_per_page, lines_per_page or page_interval_s")
+        return dispatch.refused("set_line_scan needs lines, max_lines_per_page, lines_per_page, page_interval_s or minimize")
+    if "minimize" in given and not isinstance(minimize, bool):
+        return dispatch.refused(f"minimize takes True or False, not {minimize!r}")
     for key in ("lines", "lines_per_page"):
         if key in given and (isinstance(given[key], bool) or not isinstance(given[key], int) or not 1 <= given[key] <= MOST_FRAMES):
             return dispatch.refused(f"{key} is a whole number from 1 to {MOST_FRAMES}, not {given[key]!r}")
@@ -1781,6 +1787,8 @@ def set_line_scan(client, *, lines=None, max_lines_per_page=None, lines_per_page
     now = readers.get_line_scan(client)
     if "lines_per_page" in given and given.get("max_lines_per_page", now["max_lines_per_page"]):
         return dispatch.refused("with MAX on, LAS X sets the lines per page; give max_lines_per_page=False first")
+    if "page_interval_s" in given and given.get("minimize", now["minimized"]):
+        return dispatch.refused("Minimize is on: LCS keeps the shortest page interval; give minimize=False with the interval")
     result = None
     for name in asked:
         if name in given:

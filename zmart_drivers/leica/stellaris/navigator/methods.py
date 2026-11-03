@@ -1214,12 +1214,13 @@ class Microscope:
         return result["roi"]
 
     def set_line_scan(self, lines: int | None = None, max_lines_per_page: bool | None = None, lines_per_page: int | None = None,
-                      page_interval_s: float | None = None) -> dict:
+                      page_interval_s: float | None = None, minimize: bool | None = None) -> dict:
         """Set the xt line scan as LAS X's t panel does in xt: the number of *lines*, MAX (*max_lines_per_page*), the
-        *lines_per_page* (with MAX off) and the *page_interval_s*. The scan mode must be xt. Answers the line scan."""
+        *lines_per_page* (with MAX off), the *page_interval_s*, and Minimize (*minimize*: the shortest page interval; a
+        page interval needs it off). The scan mode must be xt. Answers the line scan."""
         self.handle.require_open()
         result = changes.set_line_scan(self.handle.client, lines=lines, max_lines_per_page=max_lines_per_page, lines_per_page=lines_per_page,
-                                       page_interval_s=page_interval_s)
+                                       page_interval_s=page_interval_s, minimize=minimize)
         checked(self.handle, result, "set_line_scan()")
         return result["line_scan"]
 

@@ -2045,6 +2045,7 @@ def line_scan(name: str, value) -> Write:
         "lines_per_page": ("LinesPerPage", "lines_per_page", lambda v: str(int(v))),
         "max_lines_per_page": ("IsMaxLinesActive", "max_lines_per_page", lambda v: str(int(bool(v)))),
         "page_interval_s": ("DelayTime", "page_interval_s", lambda v: repr(float(v))),
+        "minimize": ("IsMinimized", "minimized", lambda v: str(int(bool(v)))),
     }[name]
 
     def fill(request: Request) -> None:

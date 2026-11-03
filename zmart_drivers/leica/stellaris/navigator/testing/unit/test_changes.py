@@ -1878,7 +1878,7 @@ class TestLineScan:
 
         assert result["confirmed"] is True
         assert result["line_scan"] == {"lines": 4000, "lines_per_page": 500, "pages": 8, "max_lines_per_page": False,
-                                       "page_interval_s": 5.0, "line_time_s": 0.0025}
+                                       "page_interval_s": 5.0, "line_time_s": 0.0025, "minimized": False}
 
     def test_lines_per_page_with_max_on_is_refused(self, lasx, xt):
         assert changes.set_line_scan(xt, lines_per_page=500)["success"] is False
@@ -1889,6 +1889,21 @@ class TestLineScan:
 
     def test_outside_xt_it_is_refused(self, lasx, client):
         assert changes.set_line_scan(client, lines=1000)["success"] is False
+
+    def test_minimize_takes_the_shortest_page_interval_and_off_lets_a_longer_one_in(self, lasx, xt):
+        shortest = 1 / lasx.live[("Acquire", "AcquireTStackInfo", "MaxFrameRate")]
+
+        assert changes.set_line_scan(xt, minimize=True)["line_scan"]["page_interval_s"] == pytest.approx(shortest)
+        result = changes.set_line_scan(xt, minimize=False, page_interval_s=shortest + 10)
+
+        assert result["confirmed"] is True and result["line_scan"]["page_interval_s"] == pytest.approx(shortest + 10)
+        assert result["line_scan"]["minimized"] is False
+
+    def test_a_page_interval_while_minimize_is_on_is_refused(self, lasx, xt):
+        changes.set_line_scan(xt, minimize=True)
+
+        assert "minimize=False" in changes.set_line_scan(xt, page_interval_s=30.0)["message"]
+        assert changes.set_line_scan(xt, minimize=True, page_interval_s=30.0)["success"] is False
 
 
 class TestRoiScanAndBleachMode:

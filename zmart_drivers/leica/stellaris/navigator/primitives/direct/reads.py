@@ -1503,13 +1503,14 @@ def get_roi_scan() -> dict:
 
 def get_line_scan() -> dict:
     """The xt line scan, as LAS X's t panel shows it in xt: ``lines``, ``lines_per_page``, ``pages``, ``max_lines_per_page``
-    (MAX), ``page_interval_s``, ``line_time_s`` (``Acquire/AcquireTStackInfo``; simulator, 2026-11-03)."""
+    (MAX), ``page_interval_s``, ``line_time_s``, ``minimized`` (Minimize: the shortest page interval)
+    (``Acquire/AcquireTStackInfo``; simulator, 2026-11-03)."""
     t = ("Acquire", "AcquireTStackInfo")
     found = settings("the line scan", {k: (*t, n) for k, n in (
         ("lines", "Lines"), ("per_page", "LinesPerPage"), ("pages", "Pages"), ("max", "IsMaxLinesActive"), ("interval", "DelayTime"),
-        ("line", "LineTime"))})
+        ("line", "LineTime"), ("minimized", "IsMinimized"))})
     return {"lines": found["lines"], "lines_per_page": found["per_page"], "pages": found["pages"], "max_lines_per_page": bool(found["max"]),
-            "page_interval_s": float(found["interval"]), "line_time_s": float(found["line"])}
+            "page_interval_s": float(found["interval"]), "line_time_s": float(found["line"]), "minimized": bool(found["minimized"])}
 
 
 def get_time_series() -> dict:

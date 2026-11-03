@@ -1744,3 +1744,12 @@ two of them.
   Add Laser (range, 8 nm from lines in use); another power set after, through the limits. Through the driver: point 0
   given 600 nm at 3 % (its lines 600 and 499, point 1's 559 and 499 unchanged); point 2 of two refused. The panel drew
   the new line once the point was shown again.
+
+## 108. The xt line scan's Minimize (3 November 2026)
+
+In xt the t panel's Minimize (`CheckBoxMinimize`) was ticked. Unticked and ticked again through UI Automation, it sent LCS
+nothing and changed nothing in the state tree. With it on, `set_line_scan(page_interval_s=30)` came back at 20.48 s
+(8192 lines a page x 2.5 ms): `Acquire/AcquireTStackInfo/IsMinimized` was True. Written into the state tree, False let
+30 s in, and True brought the shortest, 20.48 s, back: LCS keeps the shortest page interval while it is on. Built:
+`set_line_scan(minimize=)`, as `set_time_series` has it, written into the state tree; a page interval refused while
+Minimize is on, as LCS would keep the shortest. Through the driver: refused; off with 30 s; on, 20.48 s; then xyz.

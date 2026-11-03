@@ -758,7 +758,9 @@ class StandInNodes:
                     self.live[(*t, "RepeatCount")] = round(change.Value / self.live[(*t, "DelayTime")]) + 1
                     continue
                 if path[-1] == "DelayTime":
-                    self.live[(*t, "DelayTime")] = max(change.Value, 1 / self.live[(*t, "MaxFrameRate")])
+                    # With Minimize on, LCS keeps the shortest interval (simulator, 2026-11-03: 30 s written, 20.48 s kept).
+                    shortest = 1 / self.live[(*t, "MaxFrameRate")]
+                    self.live[(*t, "DelayTime")] = shortest if self.live[(*t, "IsMinimized")] else max(change.Value, shortest)
                     self.live[(*t, "Duration")] = (self.live[(*t, "RepeatCount")] - 1) * self.live[(*t, "DelayTime")]
                     continue
                 if path[-1] in ("Lines", "LinesPerPage", "IsMaxLinesActive"):
