@@ -1812,3 +1812,11 @@ What stays in LAS X's window: drawing regions and bleach points, clearing them, 
 container, which LCS does not reach; its Load of bleach points failed, section 106); the colour lock (only guards the
 channel's colour against LAS X's own Dye Assistant); the pan pad's arrows (the COM scanner route does the same through
 LCS); and OK on LAS X's harmless notices.
+
+## 112. The pan only through LCS's COM scanner (3 November 2026)
+
+Thom chose the scanner route for the pan. The window's pan pad (UI Automation), the `route` argument and the centring
+through the smallest zoom are gone: `move_pan`, `set_pan`, `step_pan` (1, 2 or 3 % a step; 3 by default), the nine pad
+functions with `pan_centre`, `measure_pan_window`, `zoom_in` and `pan_step` all step the pan through
+`primitives/direct/scanner.py`, which opens only `MoveInDirection` and `PanPercentage`. `center_pan` is removed;
+`pan_centre` is the one way to centre. On the STELLARIS, the first pan is one step, read back, before anything larger.

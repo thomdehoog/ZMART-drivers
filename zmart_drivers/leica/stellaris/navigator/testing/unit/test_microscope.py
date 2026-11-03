@@ -332,19 +332,25 @@ def test_the_bit_depth_is_read_with_the_settings(scope, lasx):
     assert scope.settings()["bit_depth"] == 12
 
 
-def test_the_pan_is_read_and_centred(scope, lasx):
-    lasx.pan = [0.0001743713507108436, 0.0]
-    assert scope.pan()["x_um"] == pytest.approx(17.44, abs=0.01)
-    assert scope.center_pan()["confirmed"] is True
-    assert scope.pan()["x_um"] == pytest.approx(0.0, abs=0.01)
-
-
-def test_the_pan_is_moved_by_micrometres(scope, lasx, monkeypatch):
-    from test_pan import Pad
+def test_the_pan_is_read_and_centred_through_the_scanner(scope, lasx, monkeypatch):
+    from test_pan import Steps
 
     from zmart_drivers.leica.stellaris.navigator.procedures import pan
 
-    monkeypatch.setattr(pan, "WindowPad", lambda: Pad(lasx))
+    monkeypatch.setattr(pan.scanner, "PanSteps", lambda: Steps(lasx))
+    lasx.pan = [0.0001743713507108436, 0.0]
+    assert scope.pan()["x_um"] == pytest.approx(17.44, abs=0.01)
+    assert scope.pan_centre()["confirmed"] is True
+    assert scope.pan()["x_um"] == pytest.approx(0.0, abs=0.01)
+    assert not hasattr(scope, "center_pan")
+
+
+def test_the_pan_is_moved_by_micrometres_through_the_scanner(scope, lasx, monkeypatch):
+    from test_pan import Steps
+
+    from zmart_drivers.leica.stellaris.navigator.procedures import pan
+
+    monkeypatch.setattr(pan.scanner, "PanSteps", lambda: Steps(lasx))
     assert scope.move_pan(15.0, 0.0)["confirmed"] is True
     assert scope.pan()["x_um"] == pytest.approx(15.0, abs=0.01)
 
@@ -463,7 +469,7 @@ def test_each_of_the_pan_pad_s_nine_buttons_has_its_function(name, direction, mo
     monkeypatch.setattr(Microscope, "step_pan", lambda self, *a, **k: asked.append((a, k)) or {"success": True})
     scope = Microscope.__new__(Microscope)
 
-    getattr(scope, name)(route="scanner") if name == "pan_centre" else getattr(scope, name)(2, route="scanner", percent=1)
+    getattr(scope, name)() if name == "pan_centre" else getattr(scope, name)(2, percent=1)
 
-    expected = ((direction,), {"route": "scanner"}) if name == "pan_centre" else ((direction, 2), {"route": "scanner", "percent": 1})
+    expected = ((direction,), {}) if name == "pan_centre" else ((direction, 2), {"percent": 1})
     assert asked == [expected]

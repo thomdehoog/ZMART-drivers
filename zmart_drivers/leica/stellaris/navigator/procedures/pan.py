@@ -1,37 +1,33 @@
-"""The pan: where the galvo has moved LAS X's scan field, read, and set back to the centre.
+"""The pan: where the galvo has moved LAS X's scan field, read, and stepped through LCS's COM scanner.
 
 LAS X's window moves the pan with its arrows, with no command LCS logs and
 no value in LCS's state tree. LAS X keeps it in its own setting, where a
 saved setting shows it, on the master: ``PanFirstDim`` (across) and
 ``PanSecondDim`` (down). A loaded setting does not set it, in any of its
 modes, nor with the pan on Setting 1 (simulator, 2026-11-01). So the pan is
-read from a setting saved now, and is not set to a chosen value.
+read from a setting saved now.
 
-It can be set back to the centre: at LAS X's smallest zoom the pan has no
-room, LAS X pulls it to the centre, and it stays there when the zoom goes
-back (simulator, 2026-11-01: from -0.000754 to -0.00000004 at zoom 0.75,
-unchanged back at 4.177). Both zoom changes go through the limits and are
-read back like any other.
-
-And it can be moved by a distance, the way the operator moves it: with the
-arrows of the window's pan pad, pressed through Windows UI Automation, as
-the driver presses OK on LAS X's message boxes (Thom chose this,
-2026-11-01). A press moves the pan by LCS's ``PanePercentage`` (3) percent
-of the field shown, so the driver first raises the zoom just enough that a
-whole number of presses lands on the distance, presses, and sets the zoom
-back. It never lowers the zoom below the one it had: a lower zoom pulls the
-pan towards the centre. The pad's nine buttons have no names; they are told
-apart by where they sit on it.
+It is moved through LCS's older COM scanner, only its pad's steps and its
+centre (:mod:`..primitives.direct.scanner`; Thom allowed it on the simulator,
+then on the STELLARIS, 2026-11-03): each step is 1, 2 or 3 percent of the
+field shown, nine directions as the window's pan pad. To move by a distance,
+the driver raises the zoom just enough that a whole number of steps lands on
+it, steps, and sets the zoom back; it never lowers the zoom below the one it
+had, as a lower zoom pulls the pan towards the centre. Each move's first step
+is checked against the formula below, and on a wrong one the pan is centred
+and stepped no further. LAS X keeps the pan inside a window that grows with
+the zoom and clips a pan beyond it; the driver works the window out first
+and goes to the closest place within it.
 
 A pan value is a fraction of the galvo's deflection, not a length. Thom de
 Hoog measured, on the Navigator Expert route (March to May 2026), that the
 largest pan, :data:`PAN_LIMIT`, shifts the sample by
 :data:`GALVO_FIELD_FRACTION` of the objective's field of view at zoom 1. So
 the shift in micrometres is the pan times that field times
-``GALVO_FIELD_FRACTION / PAN_LIMIT``, the same at every zoom. One click of
-the window's arrows is 3 % of the field shown (LCS's ``PanePercentage``):
-17.4 micrometres with the 10x at zoom 2. The fraction depends on the
-microscope's optics and should be measured on each one.
+``GALVO_FIELD_FRACTION / PAN_LIMIT``, the same at every zoom: one step of 3 %
+is 17.4 micrometres with the 10x at zoom 2. The fraction depends on the
+microscope's optics and should be measured on each one
+(``measure_pan_window``).
 
 Author: Thom de Hoog, Center for Microscopy and Image Analysis (ZMB),
 University of Zurich (thom.dehoog@zmb.uzh.ch, thomdehoog@gmail.com).
@@ -45,7 +41,7 @@ import time
 from pathlib import Path
 
 from ..primitives.direct import scanner
-from . import answer_dialogs, lasx_window, setting_files
+from . import setting_files
 from . import readings as readers
 from .changes import change
 
@@ -102,59 +98,10 @@ def base_fov_um(client) -> float:
 
 
 def click_um(client, zoom: float, percent: float | None = None) -> float:
-    """How far one press of an arrow moves the pan at *zoom*, in micrometres: *percent* of the field shown, LCS's
-    ``PanePercentage`` (the window's arrows) when not given."""
+    """How far one step moves the pan at *zoom*, in micrometres: *percent* of the field shown, LCS's ``PanePercentage``
+    when not given."""
     percent = percent if percent is not None else readers.get_pane_percentage(client)
     return percent / 100 * base_fov_um(client) / zoom
-
-
-class WindowPad:
-    """The pan pad in LAS X's XY panel, through Windows UI Automation: its arrows pressed by direction."""
-
-    def __init__(self):
-        self.window = lasx_window.MainWindow()
-        self.buttons = self.find()
-
-    def find(self) -> dict:
-        """The pad's buttons by where they sit: ``right``, ``left``, ``up``, ``down``, the diagonals and ``centre``."""
-        c, uia = self.window.client, self.window.uia
-        pad = self.window.first(c.UIA_ClassNamePropertyId, "ScanPanControl")
-        edge = pad.CurrentBoundingRectangle
-        middle = ((edge.left + edge.right) / 2, (edge.top + edge.bottom) / 2)
-        found = pad.FindAll(c.TreeScope_Descendants, uia.CreatePropertyCondition(c.UIA_ControlTypePropertyId, c.UIA_ButtonControlTypeId))
-        buttons = {}
-        for i in range(found.Length):
-            button = found.GetElement(i)
-            box = button.CurrentBoundingRectangle
-            across = (box.left + box.right) / 2 - middle[0]
-            down = (box.top + box.bottom) / 2 - middle[1]
-            vertical = "" if abs(down) < 8 else ("down" if down > 0 else "up")
-            horizontal = "" if abs(across) < 8 else ("right" if across > 0 else "left")
-            buttons["-".join(part for part in (vertical, horizontal) if part) or "centre"] = button
-        if not {"right", "left", "up", "down"} <= set(buttons):
-            raise answer_dialogs.WindowsUnavailable(f"the pan pad's arrows were not found, only {sorted(buttons)}")
-        return buttons
-
-    #: The window's arrows step by LCS's ``PanePercentage``.
-    percent = None
-
-    def press(self, arrow: str) -> None:
-        self.window.press(self.buttons[arrow])
-
-    def centre(self) -> None:
-        """The pad's middle button, which centres the pan."""
-        if "centre" not in self.buttons:
-            raise answer_dialogs.WindowsUnavailable("the pan pad's middle button was not found")
-        self.press("centre")
-
-    def close(self) -> None:
-        """Nothing to put back: the window's arrows keep LCS's step."""
-
-
-def window_step(client) -> dict:
-    """The step of the window's arrows: ``percent`` of the field shown (LCS's ``PanePercentage``), and ``um`` at the zoom now."""
-    percent = readers.get_pane_percentage(client)
-    return {"percent": percent, "um": click_um(client, readers.get_zoom(client)["current"], percent)}
 
 
 class ScannerRefused(RuntimeError):
@@ -162,13 +109,13 @@ class ScannerRefused(RuntimeError):
 
 
 class ScannerPad:
-    """The pan's steps through LCS's older COM scanner instead of the window's arrows.
+    """The pan's steps through LCS's older COM scanner: the pan pad's nine directions and its centre.
 
     Each step is *percent* (1 to 3, 1 by default) of the field shown
-    (:mod:`..primitives.direct.scanner`); the window's arrows take 3 %.
-    Refused while LAS X scans. The step LCS had is put back by
-    :meth:`close`, which :func:`move` and :func:`center_by_scanner` call
-    whatever happens. :func:`move` checks the first step against the formula.
+    (:mod:`..primitives.direct.scanner`). Refused while LAS X scans. The step
+    LCS had is put back by :meth:`close`, which :func:`move`, :func:`step` and
+    :func:`center_by_pad` call whatever happens. :func:`move` and :func:`step`
+    check the first step against the formula.
     """
 
     checks_first_step = True
@@ -263,29 +210,6 @@ def center_by_pad(client, folder, pad) -> dict:
     result = {"success": True, "confirmed": centred, "pan": now}
     if not centred:
         result["message"] = f"the pan did not come to the centre: {now['x']:g}, {now['y']:g}"
-    return result
-
-
-def center(client, folder) -> dict:
-    """Set the pan back to the centre: LAS X's smallest zoom, then the zoom it had, then the pan read back.
-
-    ``confirmed`` when the zoom is back and the pan reads 0. When the
-    smallest zoom is refused, nothing has changed. When the way back is
-    refused, the zoom stays at the smallest and the message says so.
-    """
-    zoom = readers.get_zoom(client)
-    smallest = change(client, "zoom", zoom["min"])
-    if not smallest.get("success"):
-        return smallest
-    back = change(client, "zoom", zoom["current"])
-    if not back.get("success"):
-        back["message"] = f"the zoom stays at {zoom['min']:g}, not back at {zoom['current']:g}: {back.get('message')}"
-        return back
-    now = read(client, folder)
-    centred = abs(now["x"]) <= CENTRED and abs(now["y"]) <= CENTRED
-    result = dict(back, pan=now, confirmed=bool(back.get("confirmed")) and centred)
-    if not centred:
-        result["message"] = f"the zoom is back, but the pan did not come to the centre: {now['x']:g}, {now['y']:g}"
     return result
 
 
@@ -480,15 +404,15 @@ def move(client, folder, x_um: float, y_um: float, *, pad=None) -> dict:
     A pan that would end beyond LAS X's window at the zoom now (the zoom it
     ends at) goes to the closest place within it instead (:func:`clip`), and
     the result's ``clipped`` says what was asked and how far over it was. For
-    each axis the zoom is raised just enough that a whole number of presses
-    lands on the distance, the arrow is pressed, and at the end the zoom is
-    set back. ``confirmed`` when the pan moved by the distance it went,
+    each axis the zoom is raised just enough that a whole number of steps
+    lands on the distance, the scanner steps (*pad*: a scanner pad, of 1 % by
+    default), and at the end the zoom is set back. ``confirmed`` when the pan moved by the distance it went,
     within :data:`MOVE_TOLERANCE_UM`.
     """
     before = read(client, folder)
     clipped = clip(client, before["x_um"] + x_um, before["y_um"] + y_um)
     x_um, y_um = clipped["to_um"][0] - before["x_um"], clipped["to_um"][1] - before["y_um"]
-    pad = pad if pad is not None else WindowPad()
+    pad = pad if pad is not None else ScannerPad(client)
     percent = getattr(pad, "percent", None)
     check_first = getattr(pad, "checks_first_step", False)
     zoom = readers.get_zoom(client)

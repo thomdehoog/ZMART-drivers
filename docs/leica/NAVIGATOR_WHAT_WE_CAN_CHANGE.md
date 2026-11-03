@@ -106,7 +106,7 @@ discovery session in `SCOPE_RUN_2026-11-01_NAVIGATOR_DISCOVERY.md` and the build
 | Sequential mode (between lines, frames or stacks) | Works: written into LAS X's state tree; LAS X rearranges the detectors' channels itself, as for its window |
 | Scan direction (uni- or bidirectional) | Works: written into LAS X's state tree |
 | Phase X | Works: written into LAS X's state tree, within LAS X's own range |
-| Pan | Works: read in micrometres, moved by a distance in micrometres (the window's pan arrows pressed by the ZMART Driver), and set back to the centre (through the smallest zoom) |
+| Pan | Works: read in micrometres, moved by a distance in micrometres, stepped as the pan pad's nine buttons, and set back to the centre, all through LCS's COM scanner (only its pad's steps and centre); LAS X clips it to its window, and the driver goes to the closest place within it |
 | Bit depth | Works: written into LAS X's state tree, one of LAS X's own list (8, 12, 16) |
 | Autofocus on or off | Works |
 | Autofocus run once now (the window's Autofocus button) | Works, with LAS X's command; reports whether LAS X found a focus and z before and after |

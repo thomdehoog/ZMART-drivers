@@ -1,11 +1,10 @@
-"""The pan, against the stand-in for LAS X's plain Navigator: read from a saved setting, and set back to the centre.
+"""The pan, against the stand-in for LAS X's plain Navigator: read from a saved setting, and stepped through LCS's COM scanner.
 
-LAS X's window moves the pan with no command LCS logs, and holds it only in
-its own setting, where a save shows it (``PanFirstDim``, ``PanSecondDim``).
-A loaded setting does not set it, but the smallest zoom pulls it to the
-centre and it stays there when the zoom goes back (simulator, 2026-11-01).
-These tests check the reading in micrometres and that the centring puts the
-zoom back where it was.
+LAS X holds the pan only in its own setting, where a save shows it
+(``PanFirstDim``, ``PanSecondDim``). The driver steps it with LCS's COM
+scanner, the pan pad's steps and its centre (Thom, 2026-11-03). These tests
+check the reading in micrometres, the steps, the clipping to LAS X's window
+and the zoom put back.
 
 Author: Thom de Hoog, Center for Microscopy and Image Analysis (ZMB),
 University of Zurich (thom.dehoog@zmb.uzh.ch, thomdehoog@gmail.com).
@@ -55,41 +54,8 @@ def test_the_reading_does_not_change_with_the_zoom(lasx, client, tmp_path):
     assert pan.read(client, tmp_path)["x_um"] == pytest.approx(first)
 
 
-def test_centring_goes_through_the_smallest_zoom_and_back(lasx, client, tmp_path):
-    lasx.pan = [-0.000754, -0.000096]
-    lasx.live[(*SCANNING, "Zoom")] = 4.177
-
-    result = pan.center(client, tmp_path)
-
-    assert result["success"] is True and result["confirmed"] is True
-    assert lasx.live[(*SCANNING, "Zoom")] == pytest.approx(4.177)
-    assert result["pan"]["x"] == pytest.approx(0.0, abs=pan.CENTRED)
-    zooms = [e for e in lasx.sent if 'Command="SetZoom"' in e]
-    assert len(zooms) == 2 and 'Zoom="0.75"' in zooms[0]
-
-
-def test_a_pan_the_smallest_zoom_does_not_centre_is_not_confirmed(lasx, client, tmp_path):
-    lasx.pan = [0.0005, 0.0]
-    lasx.keeps_pan = True
-
-    result = pan.center(client, tmp_path)
-
-    assert result["confirmed"] is False and "centre" in result["message"]
-    assert lasx.live[(*SCANNING, "Zoom")] == pytest.approx(1.0)
-
-
-def test_a_zoom_the_limits_refuse_leaves_everything_as_it_was(lasx, client, tmp_path):
-    lasx.pan = [0.0005, 0.0]
-    lasx.answers["SetZoom"] = '<Result Error="1">Zoom 0.75 is out of range</Result>'
-
-    result = pan.center(client, tmp_path)
-
-    assert result["success"] is False
-    assert lasx.pan == [0.0005, 0.0]
-
-
 class Pad:
-    """LAS X's pan pad as the stand-in has it: each press moves the pan 3 % of the field shown, within LAS X's window;
+    """A pad as the pan's functions use one: each press moves the pan 3 % of the field shown, within LAS X's window;
     the middle button centres it."""
 
     percent = None
@@ -315,24 +281,34 @@ def test_through_the_scanner_a_place_beyond_the_window_goes_to_its_edge(lasx, cl
 
 
 @pytest.mark.parametrize("direction", ["up-left", "down-right", "left"])
-def test_the_window_s_buttons_step_the_pan_in_their_direction(lasx, client, tmp_path, direction):
+def test_the_scanner_steps_the_pan_in_each_direction_of_the_pad(lasx, client, tmp_path, direction):
     lasx.live[(*SCANNING, "Zoom")] = 2.0
     lasx.live[("Acquire", "AcquireImageSizeInfo", "ImageSizeX")] = 0.0011625 / 2
-    pad = Pad(lasx)
+    steps = Steps(lasx)
 
-    result = pan.step(client, tmp_path, direction, 2, pad)
+    result = pan.step(client, tmp_path, direction, 2, pan.ScannerPad(client, percent=3, steps=steps))
 
     across, up = pan.VECTORS[direction]
-    assert result["confirmed"] is True and [arrow for arrow, _ in pad.pressed] == [direction, direction]
+    assert result["confirmed"] is True and [taken for taken, _, _ in steps.taken] == [direction, direction]
     assert (result["pan"]["x_um"], result["pan"]["y_um"]) == (pytest.approx(across * 34.875, abs=0.01), pytest.approx(up * 34.875, abs=0.01))
 
 
-def test_the_window_s_middle_button_centres_the_pan(lasx, client, tmp_path):
+def test_the_scanner_s_middle_centres_the_pan(lasx, client, tmp_path):
     lasx.pan = [0.0005, 0.0002]
 
-    result = pan.step(client, tmp_path, "centre", 1, Pad(lasx))
+    result = pan.step(client, tmp_path, "centre", 1, pan.ScannerPad(client, steps=Steps(lasx)))
 
     assert result["confirmed"] is True and lasx.pan == [0.0, 0.0]
+
+
+def test_without_a_pad_given_the_pan_is_moved_through_the_scanner(lasx, client, tmp_path, monkeypatch):
+    steps = Steps(lasx)
+    monkeypatch.setattr(pan.scanner, "PanSteps", lambda: steps)
+
+    result = pan.move(client, tmp_path, 5.0, 0.0)
+
+    assert result["confirmed"] is True and {percent for _, percent, _ in steps.taken} == {1}
+    assert not hasattr(pan, "WindowPad")
 
 
 def test_with_the_resonant_scanner_the_window_is_not_known_and_nothing_is_clipped_ahead(lasx, client, tmp_path):
@@ -342,14 +318,9 @@ def test_with_the_resonant_scanner_the_window_is_not_known_and_nothing_is_clippe
     assert pan.clip(client, 900.0, 0.0) == {"asked_um": (900.0, 0.0), "to_um": (900.0, 0.0), "over_um": (0.0, 0.0), "window_um": None}
 
 
-def test_the_window_s_step_is_read_from_lcs(lasx, client):
-    assert pan.window_step(client) == {"percent": 3.0, "um": pytest.approx(34.875)}
-
-
-@pytest.mark.parametrize("route", ["window", "scanner"])
-def test_the_window_is_measured_from_where_las_x_clips_and_matches_the_formula(lasx, client, tmp_path, route):
+def test_the_window_is_measured_from_where_las_x_clips_and_matches_the_formula(lasx, client, tmp_path):
     steps = Steps(lasx)
-    pad = Pad(lasx) if route == "window" else pan.ScannerPad(client, percent=3, steps=steps)
+    pad = pan.ScannerPad(client, percent=3, steps=steps)
 
     result = pan.measure_window(client, tmp_path, pad, zooms=(1.0, 2.0))
 

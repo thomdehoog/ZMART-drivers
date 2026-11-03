@@ -2,8 +2,8 @@
 
 Almost everything the driver changes goes to LCS, LAS X's hardware server,
 as a command or a state-tree value. A few of the window's controls send
-LCS nothing: the pan pad's arrows, the colour lock on the detector panel's
-colour button (``LockLut``; simulator, 2026-11-01). For these the
+LCS nothing: the colour lock on the detector panel's colour button
+(``LockLut``; simulator, 2026-11-01). For it the
 driver presses the control in LAS X's window, as the operator does, through
 Windows UI Automation, as it presses OK on LAS X's message boxes; and it
 reads the control's state back from the window.
