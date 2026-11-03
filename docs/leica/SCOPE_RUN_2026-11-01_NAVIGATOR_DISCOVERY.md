@@ -1539,3 +1539,12 @@ arrows. LCS's whole command log holds no pan command; the old route wrote `PanFi
 Navigator Expert's template and had the Navigator Expert load it; in plain LAS X a loaded setting does not set the pan
 (section 18). So the arrows, pressed through UI Automation (no mouse), stay the only way; `center_pan` alone needs no
 window, as LAS X's smallest zoom pulls the pan to the centre.
+
+Checked again (Thom asked whether no other surface sets the pan): a 50 µm pan through the driver changed no value in
+LCS's whole state tree (only two unrelated laser flags) and sent LCS no command; Live after it sent only
+`StartLiveAcquiring`, so LCS already held the pan, in its setting block (`ATL_Block_Save_To_XML` writes it), set by the
+window through a way LCS does not log. A setting saved, its master's and sequence's `PanFirstDim` set to 0.001, and loaded
+through LCS (`load_setting`) left the pan at 0. So no LCS command, state-tree value or setting load sets the pan in plain
+LAS X. What remains: the window's arrows (UI Automation, no mouse), the stage instead of the pan (LCS's
+`SetStagePositionInHwOnly`, within the stage limits; it moves the sample, not the beam), or a pan command from Leica
+(LCS holds the pan in its setting block, so one could exist).
