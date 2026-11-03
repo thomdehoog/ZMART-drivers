@@ -136,7 +136,6 @@ The simulator cannot show these; each needs one careful run on the real microsco
 
 - The detector offset: LCS holds it, but LAS X's window offers no control for it, and the driver
   changes only what the window offers (Thom, 1 November 2026).
-- Anything learned by decompiling LAS X: never.
 - LCS's older COM automation interface beyond the pan's steps: never. Only `Scanner.MoveInDirection` and
   `Scanner.PanPercentage` (1 to 3) are used, through `primitives/direct/scanner.py`, first on the simulator and allowed on
   the STELLARIS since (Thom, 3 November 2026; sections 98 to 101); never `Scanspeed`, `Zoom`, `SetPosition` or the scan
