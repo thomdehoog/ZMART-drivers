@@ -56,8 +56,6 @@ checked by the driver either way (`transfer.CHECKED_COMMANDS`, `transfer.STATE_T
   sets with `change_setting("zoom", ...)` and `move_pan`.
 - Bleaching and FRAP (LCS has `SequentialBleachPointParameter`); the FRAP and FRET applications are LAS X's other
   wizards (section 86), outside the plain Acquire tab.
-- Z-compensation's "Move to and Apply" (`WithAotfAndPMTSetting="1"`, not seen from the window) and Set to Begin
-  (sent nothing when the reference was the begin already).
 - The carrier: slide, dish, well plate (the Navigator Expert sent `StageSetCarrierAttachment`).
 
 **Commands seen in LCS's log but not built**

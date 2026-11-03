@@ -1350,3 +1350,12 @@ Draw point. Draw point was switched on through UI Automation and the image click
 on the stored image, then with Live running, and with the pointer moved in before the click. No point appeared, the list
 stayed empty, and LCS got nothing. The ROI regions and the Zoom In rectangle are drawn in the same viewer, so they wait
 too. Live was stopped, Draw point and the bleach mode switched off again.
+
+## 87. Z-compensation's Set to Begin; no Move to and Apply (3 November 2026)
+
+With a z-wide stack of 977.9 to 987.9 µm and the reference at 980 µm, the Linear Z-Compensation window's Set to Begin
+(the driver's mouse) sent LCS no command and wrote `Confocal/ZCompensation/ReferencePosition` 0.00098 to 0.0009779, the
+stack's begin; the points kept their offsets (7.9 and -2.1 µm), so they moved with it. `set_z_compensation(reference_um=)`
+writes the same node, so nothing new is built. The window in LAS X 4.9 has Add, Delete, Move To, Remove All, the reference
+and Set to Begin; the "Move to and Apply" that LAS X's help describes is not in it, so it is not built. The table only shows
+each point's values. Put back: the points removed, the modes off, the stack cleared, the reference at 980 µm.
