@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import json
 import math
+import xml.etree.ElementTree as ET
 
 from .client import HardwareServerUnavailable, connected_server, forget_connection
 from .state_tree import (
@@ -1786,14 +1787,10 @@ def get_active_settings() -> list[dict]:
     ]
 
 
-def server_answer(command: str, what: str) -> dict:
-    """The JSON LAS X answers to a read *command*.
-
-    LAS X answers ``<Result Error="">{...}</Result>``; any other answer raises
-    :class:`HardwareServerUnavailable` with LAS X's words.
-    """
+def server_reply(command: str, what: str) -> str:
+    """What LAS X answers to a read *command*, as it answers it; :class:`HardwareServerUnavailable` when it does not."""
     try:
-        answer = str(connected_server().SendCommand2(command, ""))
+        return str(connected_server().SendCommand2(command, ""))
     except HardwareServerUnavailable:
         raise
     except Exception as why:
@@ -1801,6 +1798,15 @@ def server_answer(command: str, what: str) -> dict:
         raise HardwareServerUnavailable(
             f"the hardware server did not answer {what}: {why}"
         ) from why
+
+
+def server_answer(command: str, what: str) -> dict:
+    """The JSON LAS X answers to a read *command*.
+
+    LAS X answers ``<Result Error="">{...}</Result>``; any other answer raises
+    :class:`HardwareServerUnavailable` with LAS X's words.
+    """
+    answer = server_reply(command, what)
     if not answer.startswith('<Result Error="">'):
         raise HardwareServerUnavailable(f"LAS X refused {what}: {answer[:200]}")
     try:
@@ -1809,6 +1815,31 @@ def server_answer(command: str, what: str) -> dict:
         raise HardwareServerUnavailable(
             f"LAS X's answer to {what} is not JSON: {answer[:200]}"
         ) from why
+
+
+def get_last_focus_point() -> dict | None:
+    """The focal point LAS X's Navigator autofocus measured last: ``x_um``, ``y_um`` (the stage), ``found``, and
+    ``focus_um`` on the autofocus's drive. None when it measured none.
+
+    LCS's ``GetValuesFromLastNavigatorAutoFocusMeasurement``, as the Focus
+    Map's "Find all by Autofocus" reads it after each point (simulator,
+    2026-11-03: ``<AfPoint StagePosX= StagePosY= FoundFocus= FocusPos= .../>``,
+    in metres).
+    """
+    answer = server_reply('<Scanner Command="GetValuesFromLastNavigatorAutoFocusMeasurement"/>', "the last focal point")
+    try:
+        points = ET.fromstring(answer).findall("AfPoint")
+    except ET.ParseError as why:
+        raise HardwareServerUnavailable(f"LAS X's answer about the last focal point cannot be read: {answer[:200]}") from why
+    if not points:
+        return None
+    point = points[-1]
+    return {
+        "x_um": float(point.get("StagePosX")) * 1e6,
+        "y_um": float(point.get("StagePosY")) * 1e6,
+        "found": point.get("FoundFocus") == "1",
+        "focus_um": float(point.get("FocusPos")) * 1e6,
+    }
 
 
 def get_hardware_info() -> dict:

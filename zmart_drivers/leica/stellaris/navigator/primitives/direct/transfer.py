@@ -172,6 +172,8 @@ ALLOWED_COMMANDS = frozenset(
         "ScanMode",
         "ActivateAutoFocus",
         "ActivateExtendedAutoFocusInMarkAndFind",
+        "StartNavigatorAutoFocus",
+        "DisableManualOperation",
         "StageMoveToCoordinates",
         "SetZUseMode",
         "SetZStackDefinition",

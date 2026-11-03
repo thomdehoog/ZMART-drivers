@@ -1440,15 +1440,17 @@ class Microscope:
         return acquire_step.spiral_of_fields(self.handle, rings)
 
     def find_focus_map(self, places: list[tuple[float, float]]) -> list[tuple[float, float, float]]:
-        """Find the focus at each of *places* (x, y in micrometres from the origin) with LAS X's autofocus, as the
-        Navigator's Focus Map does with "Find all by Autofocus"; answers the focal points ``(x, y, z)`` for
+        """Find the focus at each of *places* (x, y in micrometres from the origin) with LAS X's Navigator autofocus,
+        as the Navigator's Focus Map does with "Find all by Autofocus"; answers the focal points ``(x, y, z)`` for
         :meth:`tile_scan`.
 
-        The stage goes to each place in turn, at the focus found at the one
-        before (the focus now, for the first), and the autofocus searches
-        there with its own settings. A place where it finds no focus refuses
-        the map. The stage is put back where it stood afterwards, also when
-        the map was refused.
+        The stage goes to each place in turn (checked by the limits), at the
+        focus found at the one before (the focus now, for the first), and
+        LCS's Navigator autofocus searches there with the autofocus's
+        settings, the manual controls held meanwhile. A place where it finds
+        no focus refuses the map. Afterwards the manual controls are given
+        back and the stage put back where it stood, also when the map was
+        refused.
         """
         focus_map_step.checked_points([(x, y, 0.0) for x, y in places])
         here = self.position()
@@ -1457,13 +1459,29 @@ class Microscope:
         try:
             for x, y in places:
                 self.move_to(x, y, z)
-                if not self.autofocus().get("found"):
-                    raise RuntimeError(f"the autofocus found no focus at ({x:g}, {y:g}) um, so the focus map is not made")
+                result = checked(self.handle, changes.focus_point(self.handle.client), f"find_focus_map at ({x:g}, {y:g})")
+                if not result["found"]:
+                    raise RuntimeError(
+                        f"the Navigator's autofocus found no focus at ({x:g}, {y:g}) um, so the focus map is not made"
+                    )
                 z = self.position()["z"]["position"]
                 points.append((float(x), float(y), z))
         finally:
+            changes.give_back_manual_operation(self.handle.client)
             self.move_to(*start)
         return points
+
+    def shift_focus_map(self, points: list[tuple[float, float, float]]) -> list[tuple[float, float, float]]:
+        """The focus map moved by one offset to the focus here, as the Focus Map's "Shift focus map to current Z":
+        focus a spot (after a drift, say), then every point moves by the difference between the focus here and the
+        map's here; the map's shape is kept. Answers the moved points; nothing moves on the microscope."""
+        here = self.position()
+        return focus_map_step.shift(points, *(here[axis]["position"] for axis in ("x", "y", "z")))
+
+    def focus_points(self, positions: list[tuple[float, float]], number: int) -> list[tuple[float, float]]:
+        """*number* places spread over *positions* (the fields of a scan, x, y in micrometres), for
+        :meth:`find_focus_map`, as the Navigator's "Setup Focus Points"; the same fields give the same places."""
+        return focus_map_step.spread(positions, number)
 
     def save(self, label: str | None = None) -> list[dict]:
         """Write the pictures that are waiting (only *label* when given) as OME-Zarr; answer one record each."""

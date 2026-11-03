@@ -207,6 +207,19 @@ class TestCapturing:
         with pytest.raises(ValueError, match="button"):
             writes.tile_scan([(63500, 41500, 0)], 2518, button="go")
 
+    def test_a_focal_point_is_searched_as_the_focus_map_s_find_all_by_autofocus(self):
+        # Simulator, 2026-11-03: the window's elements, its own scan options left out.
+        write = writes.focus_point(2518, "z-galvo", 2.0, 80.0, 4, 33858.7102, 15231.8434, start={"from_z_galvo_um": 2.0})
+        assert elements(write) == [
+            '<AcquireControl Command="StopAcquiring" DCParentElementID="0"/>',
+            '<Microscope Command="DisableManualOperation" Disable="1"/>',
+            '<AcquireControl Command="StartNavigatorAutoFocus" DCParentElementID="2518" OverrideRangePrecision="0" '
+            'Range="0.0000800000" Precision="4" RunSingleScan="0" RunMode="1">'
+            '<Position XPos="0.0338587102" YPos="0.0152318434" ZPos="0.0000020000"/></AcquireControl>',
+        ]
+        assert write.never_resend
+        assert (write.values["begin_um"], write.values["end_um"]) == (-38.0, 42.0)
+
     def test_a_tile_scan_needs_a_position(self):
         with pytest.raises(ValueError, match="no position"):
             writes.tile_scan([], 2518)
@@ -243,6 +256,8 @@ def test_every_element_the_driver_builds_is_on_the_transfer_s_allowlist():
         writes.after_tile_scan(63500.0, 41500.0, 0.0),
         writes.tile_scan([(63500.0, 41500.0, 0.0)], 2518, button="start", autofocus=True),
         writes.after_tile_scan(63500.0, 41500.0, 0.0, button="start"),
+        writes.focus_point(2518, "z-galvo", 0.0, 80.0, 4, 63500.0, 41500.0),
+        writes.manual_operation(),
     ]
     for write in built:
         for element in elements(write):

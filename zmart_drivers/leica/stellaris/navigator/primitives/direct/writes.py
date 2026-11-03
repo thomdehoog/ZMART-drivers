@@ -1540,6 +1540,53 @@ def start_autofocus(project: int, drive: str, begin_um: float, end_um: float, *,
     )
 
 
+def focus_point(
+    project: int, drive: str, z_um: float, range_um: float, precision: int, x_um: float, y_um: float, *, start: dict | None = None
+) -> Write:
+    """The Navigator's autofocus at one focal point, as the Focus Map's "Find all by Autofocus" starts it, into *project*.
+
+    LCS's ``StartNavigatorAutoFocus`` at the stage's place (*x_um*, *y_um*,
+    in LCS's frame) and *z_um* on the autofocus's *drive*, over its capture
+    range *range_um*, with the manual controls held while it runs
+    (``DisableManualOperation``, simulator, 2026-11-03). The range's two
+    ends go to the limits, as the autofocus's do. Never sent again, like a
+    capture.
+    """
+    parent = checked_project(project)
+    axis = "z_galvo_um" if drive == "z-galvo" else "z_wide_um"
+    elements = [
+        '<AcquireControl Command="StopAcquiring" DCParentElementID="0"/>',
+        '<Microscope Command="DisableManualOperation" Disable="1"/>',
+        f'<AcquireControl Command="StartNavigatorAutoFocus" DCParentElementID="{parent}" OverrideRangePrecision="0" '
+        f'Range="{metres(range_um)}" Precision="{int(precision)}" RunSingleScan="0" RunMode="1">'
+        f'<Position XPos="{metres(x_um)}" YPos="{metres(y_um)}" ZPos="{metres(z_um)}"/></AcquireControl>',
+    ]
+
+    def fill(request: Request) -> None:
+        request.elements = list(elements)
+
+    return Write(
+        command="focus_point",
+        values={"project": project, "drive": drive, "axis": axis, "begin_um": z_um - range_um / 2,
+                "end_um": z_um + range_um / 2, **(start or {})},
+        request="StartNavigatorAutoFocus",
+        fill=fill,
+        description=f"Navigator autofocus at ({x_um:g}, {y_um:g}) um over {range_um:g} um ({drive}) into project {project}",
+        ready=idle(without_limit=True),
+        never_resend=True,
+    )
+
+
+def manual_operation() -> Write:
+    """The manual controls given back after the Navigator's autofocus (``DisableManualOperation`` 0)."""
+
+    def fill(request: Request) -> None:
+        request.elements = ['<Microscope Command="DisableManualOperation" Disable="0"/>']
+
+    return Write(command="manual_operation", values={}, request="DisableManualOperation", fill=fill,
+                 description="Manual operation given back", ready=idle())
+
+
 def smartcorr(project: int) -> Write:
     """SmartCORR, the window's Start SmartCORR: a scan through the collar positions of its range, into *project*.
 

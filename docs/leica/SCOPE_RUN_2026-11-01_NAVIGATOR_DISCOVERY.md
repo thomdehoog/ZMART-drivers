@@ -1682,4 +1682,34 @@ are). Through the driver: the tile scan in 11.4 s, LAS X's notice answered in 0.
   `tile_scan(..., button="start", focus_map=points)`, each field's z-galvo moved by the map's focus there. On the
   simulator the autofocus finds no focus (ValidateFocus failed), so `find_focus_map` refused and put the stage back; with
   a map given by hand (-3, +3 and 0 µm), a one-ring spiral was taken at -3 to +3 µm, each store at its field's focus.
-  Still to check on the STELLARIS: the autofocus at the focal points.
+  Still to check on the STELLARIS: the autofocus at the focal points. (Superseded the same day: section 105.)
+
+## 105. The Carrier, Setup Focus Points, and Find all by Autofocus through LCS (3 November 2026)
+
+- The Carrier panel: None, Slide (a list of glass slides by size), Dish; Chamber Slide, Multi Slide and Well Plate
+  greyed out on the simulator. Choosing a slide sent LCS nothing and changed nothing in the state tree; the Navigator
+  drew the slide's outline over its overview. A Preview pressed with the slide chosen sent exactly what it sends
+  without one. So the carrier is the Navigator's drawing aid; nothing to build. Put back to None.
+- Setup Focus Points (a region's context menu; a region drawn in the Navigator by click, move, click, as in the viewer:
+  a drag left it unfinished and a right click then dropped it): Current, Selected or All Regions, a number. Five over
+  a region of 486 fields came in two rows, unevenly, at the same places both times; LCS got nothing. The help does not
+  say how they are laid out. Built: `focus_points(positions, number)`, the middles of groups of fields (k-means from
+  middles farthest apart): spread, and the same fields give the same places.
+- Find all by Autofocus (the Focus Map dialog, the points listed in mm): for each point
+  `SetAfSettingScanOptions` (the Focus Map's own scan options, from its "..." box), `DisableManualOperation 1`,
+  `StartNavigatorAutoFocus` with the point's `Position` and the capture range (80 µm) and a precision; about 95 s a
+  point on the simulator; then the Best Focus options put back, `ActivateAutoFocus 1`,
+  `GetValuesFromLastNavigatorAutoFocusMeasurement` (answered `<AfPoint StagePosX= StagePosY= FoundFocus="1"
+  FocusPos= .../>`), a `CaptureSingleFrame` for the overview, and `StageMoveToCoordinates` to the next point. At the
+  end `DisableManualOperation 0`; the stage stayed at the last point. Every point "found", at 0.00 µm. Unlike the
+  window's Autofocus button, the Navigator's autofocus reports a focus found on the simulator.
+- Built: `find_focus_map` now goes LCS's way: the stage to each place (the driver's checked move), then
+  `StartNavigatorAutoFocus` there with the autofocus's own range and precision (both ends of the range checked by the
+  limits), the answer read with `GetValuesFromLastNavigatorAutoFocusMeasurement`, the manual controls given back at the
+  end, and the stage put back where it stood. Left out: the Focus Map's own scan options (the driver searches with the
+  autofocus's settings as they are, so nothing needs putting back) and the overview picture at each point. And
+  `shift_focus_map(points)`: the map moved by one offset to the focus here ("Shift focus map to current Z").
+  Through the driver: three focus points spread over a two-ring spiral, each found (about 4 min 15 s each at the
+  autofocus's precision 5, against 95 s at the Focus Map's 4), the stage back at 59880, 38160 µm, z -17.1 µm.
+- Cleaned up: the test region and focal points removed (Remove All asks "This will delete all Focus Points!
+  Continue?"), the Navigator closed, the stage moved back inside the limits (63500, 41500 µm) through the driver.

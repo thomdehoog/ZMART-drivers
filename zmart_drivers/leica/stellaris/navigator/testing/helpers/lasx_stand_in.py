@@ -390,6 +390,29 @@ class PlainNavigator:
             drive = self.live[("Acquire", "AutoFocusInfo", "ZUseMode")]
             self.z_um[drive] += getattr(self, "autofocus_finds_um", 0.0)
 
+    def take_StartNavigatorAutoFocus(self, e):
+        """The Navigator's autofocus at one focal point: the stage to the point, a search on the autofocus's drive, the
+        drive left at the focus (``focus_points_find``: a list of finds in micrometres, one per point, None for none)."""
+        self.captures += 1
+        self.scanning_until = time.monotonic() + self.scan_s
+        place = e.find("Position")
+        self.x_um, self.y_um = float(place.get("XPos")) * 1e6, float(place.get("YPos")) * 1e6
+        finds = getattr(self, "focus_points_find", [])
+        found = finds.pop(0) if finds else 0.0
+        drive = self.live[("Acquire", "AutoFocusInfo", "ZUseMode")]
+        if found is not None:
+            self.z_um[drive] += found
+        self.last_focus_point = (self.x_um, self.y_um, found is not None, self.z_um[drive])
+
+    def take_GetValuesFromLastNavigatorAutoFocusMeasurement(self, e):
+        point = getattr(self, "last_focus_point", None)
+        if point is None:
+            return '<Result MeasurementPoints="0"/>'
+        x, y, found, focus = point
+        return (f'<Result MeasurementPoints="1"><AfPoint StagePosX="{x * 1e-6!r}" StagePosY="{y * 1e-6!r}" '
+                f'FoundFocus="{int(found)}" FocusPos="{focus * 1e-6!r}" AfcOffset="-2" FoundReflection="0" '
+                'ReflectionOffset="0"/></Result>')
+
     def take_StartFindCoverSlipReflection(self, e):
         """A search for the coverslip's reflection: found, the offset is set; not, LAS X's log says so (simulator, 2026-11-02)."""
         self.captures += 1

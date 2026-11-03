@@ -4,7 +4,10 @@ A focal point is a place on the sample with its focus, ``(x, y, z)`` in
 micrometres from the origin, as ``position`` and ``move_to`` give them.
 The Navigator finds each point's focus with its autofocus ("Find all by
 Autofocus") or takes it as set ("Set Z"); the driver does the same with
-``find_focus_map``, or takes points given.
+``find_focus_map``, or takes points given. Its "Setup Focus Points"
+spreads a number of points over the fields of the regions
+(:func:`spread`), and "Shift focus map to current Z" moves the whole map
+by one offset (:func:`shift`).
 
 At Start, each field is taken at the focus the map gives its place, as
 LAS X's help describes it (Creating a Focus Map, the calculation): the
@@ -105,6 +108,47 @@ def outer_edges(points, mesh) -> list[tuple[int, int]]:
             key = frozenset(edge)
             count[key] = count.get(key, 0) + 1
     return [tuple(key) for key, seen in count.items() if seen == 1]
+
+
+def spread(fields, number: int) -> list[tuple[float, float]]:
+    """*number* places spread over *fields* (``(x, y)`` in micrometres), for the focal points, as "Setup Focus Points".
+
+    LAS X's help does not say how it lays them out; on the simulator it put
+    5 over a region of 18 by 27 fields in two rows, unevenly, the same both
+    times (2026-11-03), as the middles of groups of fields do. So the fields
+    are grouped round *number* middles (k-means, from middles chosen
+    farthest apart, the first the field nearest the fields' centre), and the
+    middles are the places: the same fields give the same places.
+    """
+    if isinstance(number, bool) or not isinstance(number, int) or number < 1:
+        raise ValueError(f"the number of focal points is 1 or more, not {number!r}")
+    fields = [(float(x), float(y)) for x, y in fields]
+    if number > len(fields):
+        raise ValueError(f"{number} focal points over {len(fields)} fields: at most one point per field")
+    centre = (sum(x for x, _ in fields) / len(fields), sum(y for _, y in fields) / len(fields))
+    middles = [min(fields, key=lambda f: math.dist(f, centre))]
+    while len(middles) < number:
+        middles.append(max(fields, key=lambda f: min(math.dist(f, m) for m in middles)))
+    for _ in range(100):
+        groups = [[] for _ in middles]
+        for field in fields:
+            groups[min(range(len(middles)), key=lambda i: math.dist(field, middles[i]))].append(field)
+        moved = [
+            (sum(x for x, _ in group) / len(group), sum(y for _, y in group) / len(group)) if group else middle
+            for group, middle in zip(groups, middles)
+        ]
+        if moved == middles:
+            break
+        middles = moved
+    return middles
+
+
+def shift(points, x: float, y: float, z: float) -> list[tuple[float, float, float]]:
+    """The map moved by one offset so that it gives *z* at (*x*, *y*), as "Shift focus map to current Z": the focus
+    found here after a drift, the map's shape kept."""
+    points = checked_points(points)
+    offset = z - focus_at(points, x, y)
+    return [(px, py, pz + offset) for px, py, pz in points]
 
 
 def focus_at(points, x: float, y: float) -> float:

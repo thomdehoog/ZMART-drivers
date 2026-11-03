@@ -40,11 +40,11 @@ checked by the driver either way (`transfer.CHECKED_COMMANDS`, `transfer.STATE_T
 - The simulator's Best Focus Setting kept a 499 nm line at 2 % after the Auto Sync trial (Auto Sync off copies
   Setting 1 into it); a line cannot be taken out of it without redefining the whole Best Focus Setting.
 - The hardware autofocus (AFC, `Microscope/AFC`) and its offset.
-- The autofocus's Stage tab (at which positions: `WorkflowXY`, `WorkflowXYIterator`, `WorkflowXYPositions`);
-  it is greyed out without stage positions, so it comes with the Navigator.
-
-**Acquisition**
-- Spiral: not learned.
+- Built on 3 November 2026 (sections 104, 105): the Stage tab (`set_autofocus_at_stage_positions`), Spiral
+  (`spiral_of_fields`), Start (`tile_scan(button="start")`) and the Focus Map (`find_focus_map` through LCS's
+  `StartNavigatorAutoFocus`, `focus_points`, `shift_focus_map`, `tile_scan(focus_map=)`). Not built: the Focus Map's own
+  autofocus scan options (its "..." box; the driver searches with the autofocus's settings as they are), and the
+  picture the Navigator takes at each focal point for its overview.
 
 **Region and experiment types**
 - The regions of an ROI scan, the bleach points and the Zoom In rectangle: drawn in LAS X's viewer and kept in its
@@ -55,7 +55,9 @@ checked by the driver either way (`transfer.CHECKED_COMMANDS`, `transfer.STATE_T
   time is set (`set_bleach_time`); the Zoom In rectangle is `zoom_in(corner, opposite)`, a zoom and a pan.
 - Bleaching and FRAP (LCS has `SequentialBleachPointParameter`); the FRAP and FRET applications are LAS X's other
   wizards (section 86), outside the plain Acquire tab.
-- The carrier: slide, dish, well plate (the Navigator Expert sent `StageSetCarrierAttachment`).
+- The carrier (slide, dish, well plate): the Navigator's drawing aid only; choosing one sends LCS nothing and a Preview
+  carries nothing of it (section 105). Nothing to build: the driver lays out wells and chambers as positions.
+- The bleach points saved to and loaded from a file (the Bleach Point panel's Save and Load): a file, so asked first.
 
 **Commands seen in LCS's log but not built**
 - None: the Number of Steps mode is `z_stack_mode` (section 102).
@@ -93,7 +95,8 @@ The simulator cannot show these; each needs one careful run on the real microsco
 - The white-light laser: tuning, adding and removing lines, and the 8 nm and 8-line limits.
 - That a change goes into the current setting with several settings, and that the white-light
   slots are shared between settings as on the simulator.
-- An autofocus that finds a focus (only the failing case has been seen), and the Best Focus Setting.
+- An autofocus that finds a focus (only the failing case has been seen), and the Best Focus Setting; the Navigator's
+  autofocus (`find_focus_map`) finding a focus that differs from point to point on a tilted sample.
 - That the hardware follows the state-tree values (for example, bidirectional halving the frame time).
 
 - The λ scan: why LCS sometimes moves begin and end by a few nm (380 to 385, 650 to 655, 800 to 775) and

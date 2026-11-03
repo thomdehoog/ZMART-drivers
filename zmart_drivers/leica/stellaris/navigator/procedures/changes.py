@@ -849,6 +849,41 @@ def autofocus(client, project=None, **watching) -> dict:
     return result
 
 
+def focus_point(client, project=None, **watching) -> dict:
+    """The Navigator's autofocus where the stage stands, as the Focus Map's "Find all by Autofocus" at one point.
+
+    With the autofocus's own settings (drive, capture range, precision); the
+    range's two ends are checked against the limits first. The result's
+    ``found`` is LCS's answer for the point, with ``z_before_um`` and
+    ``z_after_um`` on the autofocus's drive. The manual controls stay held
+    until :func:`give_back_manual_operation`.
+    """
+    try:
+        used = readers.get_autofocus_settings(client)
+        drive = used["drive"]
+        before, here = readers.read_z_um(client, drive), readers.get_xy(client)
+        if before is None or not here:
+            raise RuntimeError(f"where the stage and {drive} stand could not be read")
+        axis = "z_galvo_um" if drive == "z-galvo" else "z_wide_um"
+        into = project if project is not None else data_container.experiment_for_capture()
+        change = writes.focus_point(into, drive, before, used["range_um"], used["precision"], here["x_um"], here["y_um"],
+                                    start={f"from_{axis}": before})
+    except (RuntimeError, ValueError) as why:
+        return dispatch.refused(f"the Navigator's autofocus cannot be started: {why}", logged=True)
+    result = picture(client, change, **watching)
+    if not result["success"]:
+        return result
+    point = direct_reader.get_last_focus_point()
+    result.update(found=bool(point and point["found"]), drive=drive, z_before_um=before,
+                  z_after_um=readers.read_z_um(client, drive), settings=used)
+    return result
+
+
+def give_back_manual_operation(client, *, max_retries=None) -> dict:
+    """Give the manual controls back after the Navigator's autofocus, as the Focus Map does when it is done."""
+    return run(client, writes.manual_operation(), max_retries=max_retries)
+
+
 def fluorifier_result(client, change, max_retries=None) -> dict:
     result = run(client, change, max_retries=max_retries)
     if result["success"]:

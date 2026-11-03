@@ -458,6 +458,10 @@ MUTATING_COMMANDS = {
     "clear_z_stack": "z_stack",
     # the autofocus's search: its two ends, as a z-stack's
     "autofocus_run": "z_stack",
+    # the Navigator's autofocus at a focal point: its range like the autofocus's; the stage moved there first
+    "focus_point": "z_stack",
+    # the manual controls given back: nothing moves
+    "manual_operation": "manual_operation",
     # the coverslip search: its two ends, as an autofocus's; the offset is a number the autofocus uses
     "find_coverslip": "z_stack",
     "set_coverslip_offset": "set_coverslip_offset",
