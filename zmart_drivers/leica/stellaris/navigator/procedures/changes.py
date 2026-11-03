@@ -1654,13 +1654,31 @@ def set_z_stack(client, drive, begin_um, end_um, step_um, *, max_retries=None) -
     return result
 
 
+def in_xz_mode(client) -> bool:
+    """Whether the scan mode is an xz one (xzy ...), in which the z-stack panel is LAS X's y-stack along the scan line."""
+    return str(readers.get_scan_mode(client)).startswith("xz")
+
+
+def move_y_line(client, y_um, *, max_retries=None) -> dict:
+    """In an xz scan mode, move the y-stack's scan line to *y_um*, as the Y-Position box does; within LCS's range; read back."""
+    if not in_xz_mode(client):
+        return dispatch.refused(f"the scan line moves in an xz scan mode (xzy ...), not in {readers.get_scan_mode(client)}")
+    if isinstance(y_um, bool) or not isinstance(y_um, (int, float)):
+        return dispatch.refused(f"the scan line's position is a number of micrometres, not {y_um!r}")
+    return run(client, writes.y_line(float(y_um)), max_retries=max_retries)
+
+
 def the_stack(client):
-    """``(stack, drive, z_um, start)``: the z-stack, its drive, where that drive stands, and that as the limits take it."""
+    """``(stack, drive, z_um, start)``: the z-stack, its drive, where that drive stands, and that as the limits take it.
+
+    In an xz scan mode the stack runs along the scan line, so where it stands
+    is the line's place; the limits take it as the drive's, which is stricter.
+    """
     stack = readers.get_z_stack(client)
     if not stack:
         raise RuntimeError("LAS X has no z-stack set")
     drive = stack["mode"]
-    here = readers.read_z_um(client, drive)
+    here = readers.get_y_line(client)["y_um"] if in_xz_mode(client) else readers.read_z_um(client, drive)
     if here is None:
         raise RuntimeError(f"where {drive} stands could not be read")
     axis = "z_galvo_um" if drive == "z-galvo" else "z_wide_um"
@@ -1736,6 +1754,8 @@ def move_to_z_stack(client, place, *, max_retries=None) -> dict:
     except RuntimeError as why:
         return dispatch.refused(f"the focus cannot move to the z-stack's {place}: {why}")
     target = {"begin": stack["begin"], "end": stack["end"], "center": (stack["begin"] + stack["end"]) / 2}[place]
+    if in_xz_mode(client):
+        return move_y_line(client, target, max_retries=max_retries)
     return move_z(client, drive, target, max_retries=max_retries)
 
 

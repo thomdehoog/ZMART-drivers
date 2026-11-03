@@ -458,6 +458,10 @@ STATE_TREE_WRITES = {
     ),
     # The Reflection autofocus's coverslip offset, in metres; the window writes it here (simulator, 2026-11-02).
     # Kept within the autofocus's largest capture range, 5000 micrometres either way.
+    # In an xz scan mode (xzy ...), the y-stack's scan line in metres, as the Y-Position box and the Move to buttons write
+    # it, within LCS's range beside it; in the other modes the node is the focus, so the driver writes it only in xz modes
+    # (simulator, 2026-11-03).
+    "ZPosition": TreeWrite(("Acquire", "ZPosition"), float, between=("ZPositionMin", "ZPositionMax")),
     "ReflectionOffset": TreeWrite(("Acquire", "AutoFocusInfo", "ReflectionOffset"), float, within=(-0.005, 0.005)),
     # The Fluorifier disc: the notch filters chosen with the laser (Auto Select), and its left wheel turned as a
     # polarizer (in degrees, within LCS's range beside it) instead of holding a notch filter (simulator, 2026-11-03).

@@ -959,8 +959,10 @@ class Microscope:
         """Move the focus to the z-stack's ``"begin"``, ``"end"`` or ``"center"``, or to its ``"focus"`` plane, as the window's Move to buttons.
 
         The focus plane is the one set with Set Focus in LAS X's z-stack panel.
-        The move is checked against the z limits like any z move. Answers the
-        change's result, as the other changes do.
+        The move is checked against the z limits like any z move. In an xz scan
+        mode (xzy ...) the panel is LAS X's y-stack, and the scan line moves
+        instead (:meth:`move_y_line`). Answers the change's result, as the other
+        changes do.
         """
         self.handle.require_open()
         result = changes.move_to_z_stack(self.handle.client, place)
@@ -971,6 +973,17 @@ class Microscope:
         self.handle.require_open()
         result = changes.clear_z_stack(self.handle.client)
         checked(self.handle, result, "clear_z_stack()")
+
+    def move_y_line(self, y_um: float) -> dict:
+        """In an xz scan mode (xzy ...), move the y-stack's scan line to *y_um*, as the y-stack panel's Y-Position box does.
+
+        LAS X's range is checked first; read back. In an xz scan mode the
+        z-stack functions work on the y-stack: its begin and end are set where
+        the line is, and its Move to buttons move the line. Choosing an xz scan
+        mode sets the zoom to its maximum, and it stays there after.
+        """
+        self.handle.require_open()
+        return checked(self.handle, changes.move_y_line(self.handle.client, y_um), f"move_y_line({y_um!r})")
 
     def set_z_stack_sections(self, sections: int) -> dict:
         """Set the z-stack's number of sections over its size (by the step that gives it); answers the stack."""

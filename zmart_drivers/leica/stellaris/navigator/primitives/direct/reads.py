@@ -66,6 +66,7 @@ READS = (
     "z_stack",
     "z_drive_in_use",
     "z_stack_focus",
+    "y_line",
     "autofocus",
     "light_sources",
     "filter_wheels",
@@ -434,6 +435,14 @@ def get_z_stack_focus() -> dict:
     """
     found = settings("the z-stack's focus plane", {"at": (*Z_STACK, "AFPlanePosition"), "set": (*Z_STACK, "IsAFPlanePosition")})
     return {"z_um": metres(found["at"], "AFPlanePosition") * 1e6, "set": bool(found["set"])}
+
+
+def get_y_line() -> dict:
+    """In an xz scan mode (xzy ...), where the y-stack's scan line is: ``y_um``, and LCS's range, ``min_um`` and ``max_um``
+    (``Acquire/ZPosition`` with its minimum and maximum; simulator, 2026-11-03). In the other modes these are the focus's."""
+    found = settings("the scan line", {name: ("Acquire", f"ZPosition{name}") for name in ("", "Min", "Max")})
+    return {"y_um": metres(found[""], "ZPosition") * 1e6, "min_um": metres(found["Min"], "ZPositionMin") * 1e6,
+            "max_um": metres(found["Max"], "ZPositionMax") * 1e6}
 
 
 def get_z_drive_in_use() -> str:

@@ -97,6 +97,10 @@ SIMULATOR_SETTINGS = {
         }.items()
     },
     ("Acquire", "ZPositionMode"): 1,
+    # In an xz scan mode (xzy ...) the y-stack's scan line, in metres, within LCS's range beside it (simulator, 2026-11-03).
+    ("Acquire", "ZPosition"): 0.0,
+    ("Acquire", "ZPositionMin"): -0.0009687488451602829,
+    ("Acquire", "ZPositionMax"): 0.0009687488451602829,
     ("Confocal", "ScanningParameter", "ScanDirectionX"): 1,
     ("Acquire", "AutoFocusInfo", "IsSeriesScanAutofocusActive"): True,
     ("Acquire", "AutoFocusInfo", "ZUseMode"): 1,

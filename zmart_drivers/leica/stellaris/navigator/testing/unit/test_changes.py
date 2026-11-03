@@ -1586,6 +1586,49 @@ class TestLive:
         assert changes.stop_live(client)["confirmed"] is True
 
 
+class TestTheYStack:
+    """In an xz scan mode (xzy ...) the z-stack panel is LAS X's y-stack: it runs along the scan line, not the focus."""
+
+    @pytest.fixture
+    def xzy(self, lasx, client):
+        lasx.live[("Acquire", "ScanDimensionList", "ScanModeName")] = "xzy"
+        return client
+
+    def test_the_scan_line_moves_as_the_y_position_box_writes_it(self, lasx, xzy):
+        result = changes.move_y_line(xzy, 12.5)
+
+        assert result["confirmed"] is True
+        assert lasx.live[("Acquire", "ZPosition")] == pytest.approx(12.5e-6)
+        assert lasx.commands() == []
+
+    @pytest.mark.parametrize("y", [2000.0, "far", True])
+    def test_a_line_outside_las_x_s_range_or_not_a_number_is_refused(self, lasx, xzy, y):
+        assert changes.move_y_line(xzy, y)["success"] is False
+        assert lasx.live[("Acquire", "ZPosition")] == 0.0
+
+    def test_outside_an_xz_scan_mode_it_is_refused_and_nothing_is_written(self, lasx, client):
+        assert changes.move_y_line(client, 12.5)["success"] is False
+        assert lasx.live[("Acquire", "ZPosition")] == 0.0
+
+    def test_begin_and_end_are_set_where_the_scan_line_is(self, lasx, xzy):
+        lasx.z_um = {1: 0.0, 2: 1000.0}
+        assert changes.set_z_stack(xzy, "z-galvo", -5.0, 5.0, 1.0)["confirmed"] is True
+        changes.move_y_line(xzy, 3.0)
+
+        result = changes.set_z_stack_here(xzy, "end")
+
+        assert result["confirmed"] is True and result["z_stack"]["end"] == pytest.approx(3.0)
+
+    def test_move_to_writes_the_scan_line_not_the_focus(self, lasx, xzy):
+        lasx.z_um = {1: 0.0, 2: 1000.0}
+        assert changes.set_z_stack(xzy, "z-galvo", -5.0, 5.0, 1.0)["confirmed"] is True
+        sent = len(lasx.sent)
+
+        assert changes.move_to_z_stack(xzy, "begin")["confirmed"] is True
+        assert lasx.live[("Acquire", "ZPosition")] == pytest.approx(-5e-6)
+        assert len(lasx.sent) == sent and lasx.z_um[1] == 0.0
+
+
 class TestTheZStackPanel:
     @pytest.fixture
     def stacked(self, lasx, client):

@@ -171,6 +171,11 @@ def get_z_drive_in_use(client, **keywords):
     return _routed("z_drive_in_use", client, **keywords)
 
 
+def get_y_line(client, **keywords):
+    """In an xz scan mode, where the y-stack's scan line is: ``y_um``, ``min_um``, ``max_um``."""
+    return _routed("y_line", client, **keywords)
+
+
 def get_z_stack_focus(client, **keywords):
     """The z-stack's focus plane, set with the window's Set Focus: ``z_um`` and whether it is ``set``."""
     return _routed("z_stack_focus", client, **keywords)

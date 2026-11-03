@@ -2398,6 +2398,18 @@ def z_stack_range(drive: str, begin_um: float, end_um: float, *, start: dict | N
     )
 
 
+def y_line(y_um: float) -> Write:
+    """In an xz scan mode, the y-stack's scan line to *y_um*, as the Y-Position box and the Move to buttons write it into
+    the state tree (simulator, 2026-11-03); within LCS's range; read back."""
+
+    def fill(request: Request) -> None:
+        request.elements = [f'<StateTree Command="ZPosition" Value="{metres(y_um)}"/>']
+
+    return Write(command="move_y_line", values={"value": y_um}, request="ZPosition", fill=fill,
+                 description=f"Scan line -> y {y_um:g} um", ready=idle(),
+                 confirm=Expect("y_line", lambda found: bool(found) and abs(found["y_um"] - y_um) <= STACK_TOLERANCE_UM))
+
+
 def z_stack_change(command: str, drive: str, elements: list[str], begin_um: float, end_um: float,
                    description: str, start: dict | None = None) -> Write:
     """A change of the z-stack that leaves it from *begin_um* to *end_um* on *drive*; both ends go to the limits; read back.
