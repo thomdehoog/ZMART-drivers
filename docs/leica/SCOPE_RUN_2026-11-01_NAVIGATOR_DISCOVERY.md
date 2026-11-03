@@ -1989,6 +1989,22 @@ bidirectional halves the frame time LAS X works out (1.7197 to 0.8630 s, x 0.502
 tree; the lambda scan's range, step and bandwidth and the Lambda scan's range and step changed and put back; mCherry
 added to Setting 1 as Thom asked (a 587 nm line at 2 %, HyD S 3 narrowed to 502 to 575 nm, HyD X 4 on at 597 to 700 nm
 with the dye mCherry, colour red, gain 10), each read back.
+
+**The limits on the microscope.** x 114000 um (outside), a 6000 um step in x, z-wide 6600 um, the 405 line at 15 % and
+HyD X 4 at gain 60 were each refused, and the position, the power and the gain stayed. But `move_to(x, y, z)` with a z
+outside its limits sent the stage's x and y (`SetStagePositionInHwOnly`, here the place it already stood) before the z
+was refused: **a move with a bad z moves x and y first.** The whole move must be checked before any part is sent.
+
+**Further controls, each read back and put back:** Optimize XY Format (288 x 288 here); apply to hardware off and on;
+Setting 1 disabled and enabled; Lock All Settings and a laser line's lock; HyD S 3's tau modes (TauSeparation with a
+channel added and removed and a lifetime set, TauScan, TauGating, back to Intensity); Live and Fast Live started and
+stopped; the white-light laser switched off and on (its lines kept); one autofocus over 80 um on z-wide, which answered
+`found` and left z exactly where it was (no sample: to check with one). `lock_detector` was refused with the excitation
+line on Auto and three lines on, as it should be; HyD X 4's gain is fixed at 10 in Counting (LAS X: 10 to 10).
+
+**Left open:** the autofocus's drive (`ZUseMode`) was z-galvo before these runs and reads z-wide after them; writing
+z-galvo again was answered without an error and did not take. `set_z_drive` (the z-stack panel's drive) went z-galvo
+and back to z-wide in between, which is the likely cause; not proven. Thom sets it back in LAS X's window.
 - `settings()["collar"]["motorised"]` says True with the 10x dry: it comes from `Microscope/CanDoMotCorr` (the stand),
   not from the objective.
 - `pan()` saves a setting file although it only reads.
