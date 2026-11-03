@@ -142,3 +142,14 @@ def test_only_the_direct_source_exists(client):
         "log", direct_profile.spec("xy"), client, until=time.monotonic() + 1, answer_counts=lambda r: False, about=None, source_kwargs={}
     )
     assert isinstance(reading.error, direct_profile.UnsupportedSource)
+
+
+@pytest.mark.parametrize(("code", "shown"), [(2, "first channel only"), (0, "other (0)")])
+def test_the_autofocus_s_focus_mode_is_read_as_lcs_holds_it(lasx, code, shown):
+    """LAS X's help: an autofocus in a series or over stage positions needs "First channel only"; the window offers no
+    control for it, LCS holds it (CurrentAutoFocusMode, 2 on the simulator, named in saved settings), so it is read."""
+    from zmart_drivers.leica.stellaris.navigator.primitives.direct import reads as direct_reader
+
+    lasx.live[("Acquire", "AutoFocusInfo", "CurrentAutoFocusMode")] = code
+    assert direct_reader.get_autofocus_settings()["focus_mode"] == shown
+

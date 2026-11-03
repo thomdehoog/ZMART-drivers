@@ -134,6 +134,8 @@ SIMULATOR_SETTINGS = {
     ("Acquire", "AutoFocusInfo", "WorkflowTimelapseIterator"): 1,
     ("Acquire", "AutoFocusInfo", "FocusRange"): 80,
     ("Acquire", "AutoFocusInfo", "AFAnalyseType"): 1,
+    # The autofocus's focus mode: 2 "first channel only" (simulator, 2026-11-03), which a series or positions need.
+    ("Acquire", "AutoFocusInfo", "CurrentAutoFocusMode"): 2,
     ("Acquire", "AutoFocusInfo", "Precision"): 3,
     ("Acquire", "AutoFocusInfo", "UseFixSliceCount"): False,
     ("Acquire", "AutoFocusInfo", "FixSliceCount"): 25,

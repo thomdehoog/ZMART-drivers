@@ -1011,16 +1011,23 @@ def get_filter_wheels() -> list[dict]:
 #: The autofocus's methods, by LCS's ``AFAnalyseType`` (the window's "Optimized for", simulator, 2026-11-02).
 AUTOFOCUS_METHODS = {1: "contrast 1", 2: "intensity", 3: "noise", 4: "contrast 2", 5: "reflection"}
 
+#: The autofocus's focus modes LCS names (``CurrentAutoFocusMode``; "FirstChannelOnly" in saved settings). LAS X's help:
+#: an autofocus in a time series or over stage positions needs "first channel only". LCS lists 0 as well, unnamed.
+AUTOFOCUS_FOCUS_MODES = {2: "first channel only"}
+
 
 def get_autofocus_settings() -> dict:
     """The autofocus's settings (the window's Best Focus Scan Options): ``drive``, ``range_um``, ``method``,
-    ``precision`` (1 speed to 5 accuracy), and ``steps`` (a fixed number of steps, or None when the precision decides).
+    ``precision`` (1 speed to 5 accuracy), ``steps`` (a fixed number of steps, or None when the precision decides), and
+    ``focus_mode`` (``"first channel only"``, which an autofocus in a series or over positions needs; LAS X's window
+    offers no control for it, so it is only read).
     """
     found = settings(
         "the autofocus's settings",
         {name: ("Acquire", "AutoFocusInfo", node) for name, node in (
             ("drive", "ZUseMode"), ("range", "FocusRange"), ("method", "AFAnalyseType"),
             ("precision", "Precision"), ("fixed", "UseFixSliceCount"), ("steps", "FixSliceCount"),
+            ("mode", "CurrentAutoFocusMode"),
         )},
     )
     drives = {code: drive for drive, code in Z_USE_MODE.items()}
@@ -1032,6 +1039,7 @@ def get_autofocus_settings() -> dict:
         "method": AUTOFOCUS_METHODS.get(found["method"], f"unknown ({found['method']})"),
         "precision": found["precision"],
         "steps": found["steps"] if found["fixed"] else None,
+        "focus_mode": AUTOFOCUS_FOCUS_MODES.get(found["mode"], f"other ({found['mode']})"),
     }
 
 

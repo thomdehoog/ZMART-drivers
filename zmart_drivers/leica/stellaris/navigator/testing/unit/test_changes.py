@@ -1064,7 +1064,8 @@ class TestAutofocusSettings:
                             ("autofocus_drive", "z-wide"), ("autofocus_precision", 2)):
             assert changes.change(client, name, value)["confirmed"] is True, name
         shown = direct_reader.get_autofocus_settings()
-        assert shown == {"drive": "z-wide", "range_um": 60.0, "method": "noise", "precision": 2, "steps": None}
+        assert shown == {"drive": "z-wide", "range_um": 60.0, "method": "noise", "precision": 2, "steps": None,
+                         "focus_mode": "first channel only"}
         assert lasx.commands() == []
 
 

@@ -1820,3 +1820,18 @@ through the smallest zoom are gone: `move_pan`, `set_pan`, `step_pan` (1, 2 or 3
 functions with `pan_centre`, `measure_pan_window`, `zoom_in` and `pan_step` all step the pan through
 `primitives/direct/scanner.py`, which opens only `MoveInDirection` and `PanPercentage`. `center_pan` is removed;
 `pan_centre` is the one way to centre. On the STELLARIS, the first pan is one step, read back, before anything larger.
+
+## 113. A Navigator Expert job against the driver; the autofocus's focus mode read (3 November 2026)
+
+A job in a Navigator Expert template (`.lrp`, Leica's `{ScanningTemplate}Fiji_Workflows_Simulator.lrp` in LAS X's
+`AddIns/NavigatorExpert/API/Scripte/VSCode/WorkflowTemplates`, 4 jobs) is LAS X's setting block, as the plain
+Navigator's: the master setting, the sequential settings, the autofocus setting and an execution mask. Its 314 distinct
+attributes, checked against the driver: 104 read and set, 138 worked out by LAS X or capabilities, 54 out of scope or
+absent hardware, 17 with no control in the Acquire window or the help, and one gap, Z Flow (`IsFastZStack`), which the
+simulator does not offer. The template's name for the autofocus method 1, "EveryChannel", is stale: LCS's own list names
+it "Contrast Based Method 1", as the driver does.
+
+The autofocus's focus mode (`Autofocus-config/AutoFocusMode`, "FirstChannelOnly"): LAS X's help says an autofocus in a
+time series or over stage positions needs "First channel only"; the window offers no control for it, and LCS holds it
+(`AutoFocusInfo/CurrentAutoFocusMode` 2, the list 0 and 2). Built: `settings()["autofocus_settings"]["focus_mode"]`,
+read only. Through the driver: "first channel only".
