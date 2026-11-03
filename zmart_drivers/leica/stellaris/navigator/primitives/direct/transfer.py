@@ -664,6 +664,9 @@ CHECKED_WRITES = {
         "FixSliceCount", "FocusRange", "ZUseMode",
         # Fast Live's and Auto Sync's scan options, both scanners (not Auto Sync's own switch, IsAutoSyncActive).
         *(name for name in STATE_TREE_WRITES if name.startswith(("FastLive", "AutoSync"))),
+        # The time series, the xt line scan, and when the autofocus runs in a series and at stage positions.
+        "CalculationMode", "DelayTime", "Duration", "IsMinimized", "Lines", "LinesPerPage", "IsMaxLinesActive",
+        "WorkflowTimelapse", "WorkflowTimelapseIterator", "WorkflowXY", "WorkflowXYIterator", "IsFirstPositionOnly",
     }),
 }
 
