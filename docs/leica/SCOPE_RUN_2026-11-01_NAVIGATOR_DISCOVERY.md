@@ -1942,12 +1942,13 @@ x, landing to the nanometre (the Navigator's readout followed with a delay); For
 Accumulation, Rotation, Pinhole in AU; the z-stack's ends, Z Size, Number of Steps, Re-Center, the optical section's
 step, Begin and End here; Move to Begin, End and Center (10 um each way on z-wide, landing within 4 nm).
 
-**State-tree writes checked on 4.9.2.31016: 82 of 93**, listed in `transfer.CHECKED_WRITES`: the scan (bidirectional,
+**State-tree writes checked on 4.9.2.31016: 84 of 93**, listed in `transfer.CHECKED_WRITES`: the scan (bidirectional,
 Phase X, bit depth, pinhole unit, sequential mode, emission wavelength), the z-stack's step mode, the autofocus's
 settings, Fast Live and Auto Sync (both scanners), the time series, the xt line scan and the autofocus's when, the
 setting's name, the spectra shown, ROI scan and the bleach mode with their stack sections, a detector's dye, TauContrast
 and operating mode, the AOBS's Reflection, the laser's output power and Excitation Control, Lambda After Stage, the
-coverslip offset, the MFP's Autoselect, the notch filters' Auto Select, the polarizer, Z-compensation and Set Focus.
+coverslip offset, the MFP's Autoselect, the notch filters' Auto Select, the polarizer, Z-compensation and Set Focus, a
+detector's excitation line, and the Best Focus Setting's laser power (its 405 nm line, the only one it holds).
 
 Not checked, and why:
 
@@ -1957,9 +1958,7 @@ Not checked, and why:
 | `CurrentMultiFunctionPortPos` | this STELLARIS has no MFP wheel (the hardware lists none) |
 | `MotCorrRefPos`, `AutomationBegin`, `AutomationEnd`, `AutomationSteps` | the 10x has no collar; to check with the 40x water |
 | `IsAutoSyncActive` | Auto Sync is on; off copies the current setting into the Best Focus Setting, which cannot be put back |
-| `BleachPointLaserPower`, `CurrentBleachPoint` | need bleach points drawn |
-| `TimegateReferenceLineIndex` | needs TauGating with a pulsed line |
-| `AutofocusLaserPower` | not tried: with Auto Sync on, the Best Focus Setting's light is the current setting's |
+| `BleachPointLaserPower`, `CurrentBleachPoint` | need a bleach point; adding one through the data container was refused (below) |
 
 **Acquisition**, saved as OME-Zarr under the output root's `.staging` (a standalone `save()` stays there; the move
 into a run comes with the ZMART Controller's `output_folder`): one capture (6.6 s, 1 x 2 x 1 x 1024 x 1024, uint8,
@@ -1974,6 +1973,10 @@ of 2 fields 63.9 um apart (8.2 s, one store per field, the stage back on the fir
   `Attribute="11" Origin="LMSApplication"`, which writes the file. So the pan cannot be read: a lower zoom, `pan()`, the
   pan's steps, `move_pan`, `set_pan` and `zoom_in` fail, and `save_setting` too (`load_setting` probably as well).
   The pan read from the window's file was 0, 0.
+- **LAS X's data container wrapper is version 2.65.0.1 here** (2.65.0.0 on the simulator). The driver checks the
+  version first and refused, touching nothing: `add_roi_regions`, `add_bleach_points` and their clear and read are
+  refused on this STELLARIS until the new version is checked.
+- No objective was changed: everything ran on the 10x dry in slot 1.
 - `settings()["collar"]["motorised"]` says True with the 10x dry: it comes from `Microscope/CanDoMotCorr` (the stand),
   not from the objective.
 - `pan()` saves a setting file although it only reads.

@@ -679,6 +679,8 @@ CHECKED_WRITES = {
         # a detector's operating mode, linear Z-compensation's reference and support point, the z-stack's Set Focus.
         "IsMultiFunctionPortAutoSelectionEnabled", "IsNotchFilterAutoSelectionEnabled", "IsSpectrumTurnMode",
         "FilterSpectrumPos", "OperatingModeIndex", "ReferencePosition", "ZPosition", "IsAFPlanePosition",
+        # A detector's excitation line, and the Best Focus Setting's laser power.
+        "TimegateReferenceLineIndex", "AutofocusLaserPower",
     }),
 }
 
