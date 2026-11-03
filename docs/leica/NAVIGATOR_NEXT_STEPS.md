@@ -113,6 +113,9 @@ The simulator cannot show these; each needs one careful run on the real microsco
 
 ## Decided not to do
 
+- LAS X's wizards in the Acquire tab, SpectraPlex (the Acquisition Mode panel's "Plex") and FRAP: not part of parity for
+  now (Thom, 3 November 2026).
+
 - Removing a laser line in another setting than the first: the window allowed it only in Setting 1
   (Thom, 1 November 2026). A line is switched off in any setting by a power of 0.
 
