@@ -1070,6 +1070,66 @@ class TestFastLive:
         assert changes.set_fast_live(client, "galvo", format=256)["success"] is False
 
 
+class TestDyes:
+    TWO_SETTINGS = [
+        {"name": "Setting 1", "lines": [{"route": (30,), "line_index": 0, "wavelength": 405.0, "percent": 1.96}],
+         "detectors": [{"name": "HyD 2", "route": (40, 2), "begin": 410.0, "end": 487.0, "dye": "Leica/ALEXA 405", "relation": 2,
+                        "colour": "Blue", "colour_locked": False}]},
+        {"name": "Setting 2", "lines": [{"route": (30,), "line_index": 0, "wavelength": 405.0, "percent": 1.96}],
+         "detectors": [{"name": "HyD 2", "route": (40, 2), "begin": 410.0, "end": 487.0, "dye": "Leica/ALEXA 405", "relation": 2,
+                        "colour": "Blue", "colour_locked": False}]},
+    ]
+
+    def test_with_two_settings_every_setting_is_sent_and_only_the_target_changed(self, lasx, client, monkeypatch):
+        from zmart_drivers.leica.stellaris.navigator.procedures import readings
+
+        monkeypatch.setattr(readings, "get_setting_definitions", lambda client, **k: self.TWO_SETTINGS)
+        monkeypatch.setattr(readings, "get_setting", lambda client, **k: {"id": 120, "name": "Setting 2", "enabled": True,
+                                                                          "all": [{"id": 3, "name": "Setting 1"}, {"id": 120, "name": "Setting 2"}]})
+
+        changes.set_dyes(client, lines=[(405.0, 2.0)], detectors=[("HyD S 3", "Leica/ALEXA 405", (420.0, 470.0), "Cyan")])
+
+        sent = lasx.sent[-1]
+        first, second = sent.split('<Sequence Index="1">')
+        assert '<Sequence Index="0">' in first and "<Dye>Leica/ALEXA 405</Dye>" in first and "<Begin>410</Begin>" in first
+        assert "<Begin>420</Begin>" in second and "<LutName>Cyan</LutName>" in second and "<Begin>410</Begin>" not in second
+
+    def test_the_setting_s_dyes_are_sent_as_the_window_s_dye_drop(self, lasx, client):
+        result = changes.set_dyes(client, lines=[(405.0, 2.0)], detectors=[("HyD S 3", "Leica/ALEXA 405", (410.0, 480.0), "Blue")])
+
+        assert result["success"] is True
+        sent = lasx.sent[-1]
+        assert sent.startswith('<Scanner IsAutoFocusDefinition="0" ActiveSettingIndex="-1" Command="SetConfocalDefinitionFromDyeAssistant">')
+        assert "<Dye>Leica/ALEXA 405</Dye>" in sent and "<Intensity>0.02</Intensity>" in sent and "<LutName>Blue</LutName>" in sent
+
+    def test_a_power_above_the_limits_is_refused_and_nothing_is_sent(self, lasx):
+        from limits_fixtures import DEFAULT_STAGE_UM, merged_limits_payload
+
+        from zmart_drivers.leica.stellaris.navigator.driver_setup.limits import limit_rules
+
+        limited = hardware_server.Client("test")
+        gate.install(limited, gate.GateState(limits=limit_rules.LeicaLimits(merged_limits_payload(dict(DEFAULT_STAGE_UM)), source="test",
+                                                                             path=None, is_fallback=False), stage_cfg=None, error=None))
+        try:
+            sent = len(lasx.sent)
+            result = changes.set_dyes(limited, lines=[(405.0, 50.0)], detectors=[("HyD S 3", "Leica/ALEXA 405", (410.0, 480.0), "Blue")])
+        finally:
+            gate.uninstall(limited)
+
+        assert result["success"] is False and len(lasx.sent) == sent
+
+    @pytest.mark.parametrize(("lines", "detectors"), [
+        ([], [("HyD S 3", "Leica/ALEXA 405", (410.0, 480.0), "Blue")]),
+        ([(405.0, 2.0)], []),
+        ([(405.0, 2.0)], [("HyD 9", "Leica/ALEXA 405", (410.0, 480.0), "Blue")]),
+        ([(405.0, 2.0)], [("HyD S 3", "Leica/ALEXA 405", (480.0, 410.0), "Blue")]),
+        ([(405.0, 2.0)], [("HyD S 3", 'Bad"Dye', (410.0, 480.0), "Blue")]),
+        ([(405.0, 0.0)], [("HyD S 3", "Leica/ALEXA 405", (410.0, 480.0), "Blue")]),
+    ])
+    def test_what_the_window_does_not_offer_is_refused(self, lasx, client, lines, detectors):
+        assert changes.set_dyes(client, lines=lines, detectors=detectors)["success"] is False
+
+
 class TestExcitationControl:
     @pytest.fixture
     def wll(self, lasx):

@@ -1143,3 +1143,21 @@ in the window, no command: `Confocal/LightSourceList/LightSource[2]/AOTF/Current
 `CurrentConstantPowerCurve` 85 and `ExcitationControlBegin`/`End` 485 and 685 nm; back to 0, all reset. Written into the state tree,
 LCS answered the same. Built: `set_excitation_control(mode, source=None)`. Through the driver: constant power, maximum power.
 
+## 70. A setting's dyes, as the window's dye drop, in any setting (3 November 2026)
+
+The window's dye drop sends `SetConfocalDefinitionFromDyeAssistant` (`IsAutoFocusDefinition="0"`, `DoAdjustSequenceCount` 1,
+`MessageSource` DyeDragNDrop) with the setting's laser lines (route, line, wavelength, power) and its detectors (route, band, dye,
+relation, colour and its lock); LCS rebuilds the setting's light and detection from it. Sent by the driver with one sequence while
+the job had two settings, LCS cut the job down to one: Setting 2 was gone. A drop done with the driver's own mouse (ALEXA 514
+dragged from the dye bar onto Setting 2's detectors) showed why: with two settings the window sends both, `<Sequence Index="0">`
+for Setting 1 as it stands and `<Sequence Index="1">` for Setting 2 with the new dye.
+
+LCS keeps each setting's lines (`IsLineVisible`, `Intensity`, `WaveLength`, `LineIndex`) and detectors (`IsActive`, `BeamRoute`,
+`WaveLengthBegin`/`End`, `DyeName`, `DyeRelation`, `ImageChannelLut/LutName`, `IsUserDefinedLutName`) in its
+`SequentialSettingParameter[n]`. Built: `get_setting_definitions()`, and `set_dyes(lines, detectors)` sending every setting, the
+current one as asked and the others as they stand, then checking the job still has its settings and the others their dyes. Through
+the driver with two settings: Setting 2's HyD 2 band 505 to 540 nm (HyD S 3 left out, so off), both settings kept. In "between
+lines" sequential mode LCS gave Setting 1's HyD 2 the same band, as the window's own drop had (504 to 531): the settings share the
+detectors' bands there, only the light switches between lines. Put back: Setting 2 deleted, Setting 1's HyD 2 485 to 527 nm, the
+line 499 nm at 2 %.
+

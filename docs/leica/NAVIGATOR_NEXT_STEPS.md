@@ -99,9 +99,6 @@ The simulator cannot show these; each needs one careful run on the real microsco
 
 - Removing a laser line in another setting than the first: the window allowed it only in Setting 1
   (Thom, 1 November 2026). A line is switched off in any setting by a power of 0.
-- The dye dropped onto a detector (`SetConfocalDefinitionFromDyeAssistant`, `MessageSource` DyeDragNDrop):
-  the command carries the whole setting as LAS X works it out from the dye (each laser line, each
-  detector's band, dye and colour). To learn: whether LCS works it out when given only the dye.
 
 - The detector offset: LCS holds it, but LAS X's window offers no control for it, and the driver
   changes only what the window offers (Thom, 1 November 2026).

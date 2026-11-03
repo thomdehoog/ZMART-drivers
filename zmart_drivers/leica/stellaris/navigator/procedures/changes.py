@@ -921,6 +921,45 @@ def find_coverslip_reflection(client, project=None, **watching) -> dict:
     return result
 
 
+def set_dyes(client, *, lines, detectors, max_retries=None) -> dict:
+    """Give the current setting its laser lines and its detectors' dyes, as the window does when a dye is dropped on a
+    detector: one command describing every setting (the others sent again as they stand), from which LAS X rebuilds the
+    current setting's light and detection (lines and detectors left out are switched off). *lines*: ``[(laser_nm, percent),
+    ...]``, each line already offered (a white-light line tuned first); *detectors*: ``[(name, dye, (begin_nm, end_nm),
+    colour), ...]``. The powers go to the limits first. Afterwards the job must still have its settings, and the others
+    their dyes; else the result is unconfirmed.
+    """
+    units = {unit.get("Name"): unit for unit in readers.get_detection_units(client) or []}
+    try:
+        built_lines = []
+        for laser_nm, percent in lines or []:
+            route, index = laser_line(client, laser_nm)
+            built_lines.append((route, index, float(laser_nm), percent))
+        built_detectors = []
+        for name, dye, band, colour in detectors or []:
+            if name not in units:
+                raise ValueError(f"no detector {name!r}; LAS X's are {sorted(units)}")
+            begin, end = band
+            built_detectors.append((name, writes.route_of(units[name]["BeamRoute"]), float(begin), float(end), dye, colour))
+        before = readers.get_setting_definitions(client)
+        setting = readers.get_setting(client)
+        ids = [s["id"] for s in setting["all"]]
+        place = ids.index(setting["id"]) if setting["id"] in ids else 0
+        mode = {name: code for code, name in direct_reader.SEQUENTIAL_MODES.items()}.get(readers.get_sequential_mode(client), 0) if len(before) > 1 else 0
+        change = writes.setting_dyes(built_lines, built_detectors, before, place, mode)
+    except (RuntimeError, ValueError, TypeError) as why:
+        return dispatch.refused(f"the setting's dyes cannot be set: {why}")
+    result = run(client, change, max_retries=max_retries)
+    if result["success"] and len(before) > 1:
+        after = readers.get_setting_definitions(client)
+        kept = len(after) == len(before) and all(
+            [d["dye"] for d in a["detectors"]] == [d["dye"] for d in b["detectors"]] for i, (a, b) in enumerate(zip(after, before)) if i != place)
+        if not kept:
+            result["confirmed"] = False
+            result["message"] = f"LAS X changed more than the current setting: the job now has {[s['name'] for s in after]}"
+    return result
+
+
 def set_autofocus_optics(client, laser_nm, percent, detector, band, dye, *, max_retries=None) -> dict:
     """Give the Best Focus Setting the laser line at *laser_nm* with *percent* power, and *detector* with *band* and *dye*; read back.
 

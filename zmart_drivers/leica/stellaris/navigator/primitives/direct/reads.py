@@ -1165,6 +1165,62 @@ def get_coverslip_offset() -> float:
     return metres(settings("the coverslip offset", {"o": ("Acquire", "AutoFocusInfo", "ReflectionOffset")})["o"], "ReflectionOffset") * 1e6
 
 
+def get_setting_definitions() -> list[dict]:
+    """Every setting of the job, in order, as its laser lines and detectors stand: ``name``, ``lines`` (the visible ones with a
+    power: ``route``, ``line_index``, ``wavelength``, ``percent``) and ``detectors`` (the active ones: ``name``, ``route``,
+    ``begin``, ``end``, ``dye``, ``relation``, ``colour``, ``colour_locked``). What the window sends again for the settings a dye
+    drop leaves as they are (``SequentialSettingParameter[n]``; simulator, 2026-11-03)."""
+
+    def reading(nodes):
+        sources = [tuple(int(p) for p in str(s["route"]).split(";") if p) for s in layout(nodes, LIGHT_SOURCES, light_layout)]
+        detector_names = {tuple(int(p) for p in str(u["fixed"]["BeamRoute"]).split(";") if p) if not isinstance(u["fixed"]["BeamRoute"], tuple)
+                          else tuple(u["fixed"]["BeamRoute"]): u["fixed"]["Name"] for u in layout(nodes, DETECTION, detection_layout)}
+        block = node_at(nodes, ("Acquire", "ATL", "CurrentBlock"))
+        infos = of_name(nodes, children(nodes, block), "SettingInfo")
+        params = of_name(nodes, children(nodes, node_at(nodes, (*block_path(), "ConfocalSequentialInfo"))), "SequentialSettingParameter")
+        found = []
+        for info, param in zip(infos, params):
+            if node_value(nodes, named(nodes, info, "SettingID")) is None:
+                continue  # a deleted setting's entry, left with no values
+            lines = []
+            listed = child_named(nodes, param, "LightSourceList_SequentialInfo")
+            for place, source in enumerate(of_name(nodes, children(nodes, listed), "LightSource_SequentialInfo") if listed else []):
+                laser = child_named(nodes, source, "UnifiedLaser_SequentialInfo")
+                for line in of_name(nodes, children(nodes, laser), "UnifiedLaserLine_SequentialInfo") if laser else []:
+                    visible = child_named(nodes, line, "IsLineVisible")
+                    found_power = child_named(nodes, line, "Intensity")
+                    power = node_value(nodes, found_power) if found_power is not None else None
+                    if visible is not None and node_value(nodes, visible) and isinstance(power, (int, float)) and power > 0 and place < len(sources):
+                        lines.append({"route": sources[place], "line_index": node_value(nodes, named(nodes, line, "LineIndex")),
+                                      "wavelength": float(node_value(nodes, named(nodes, line, "WaveLength"))), "percent": float(power)})
+            detectors = []
+            detection = child_named(nodes, param, "SpectralDetection_SequentialInfo")
+            for spectro in of_name(nodes, children(nodes, detection), "Spectrophotometer_SequentialInfo") if detection else []:
+                units = child_named(nodes, spectro, "DetectionUnitList_SequentialInfo")
+                for unit in of_name(nodes, children(nodes, units), "DetectorHWInfo_SequentialInfo") if units else []:
+                    if not node_value(nodes, named(nodes, unit, "IsActive")):
+                        continue
+                    route = tuple(node_value(nodes, named(nodes, unit, "BeamRoute")))
+                    luts = child_named(nodes, unit, "ImageChannelLutList")
+                    lut = of_name(nodes, children(nodes, luts), "ImageChannelLut") if luts else []
+                    detectors.append({
+                        "name": detector_names.get(route), "route": route,
+                        "begin": round(float(node_value(nodes, named(nodes, unit, "WaveLengthBegin"))), 3),
+                        "end": round(float(node_value(nodes, named(nodes, unit, "WaveLengthEnd"))), 3),
+                        "dye": node_value(nodes, named(nodes, unit, "DyeName")), "relation": node_value(nodes, named(nodes, unit, "DyeRelation")),
+                        "colour": node_value(nodes, named(nodes, lut[0], "LutName")) if lut else "Gray",
+                        "colour_locked": bool(node_value(nodes, named(nodes, lut[0], "IsUserDefinedLutName"))) if lut else False,
+                    })
+            found.append({"name": node_value(nodes, named(nodes, info, "Name")), "lines": lines, "detectors": detectors})
+        return found
+
+    return read("the settings' definitions", reading)
+
+
+def block_path() -> tuple[str, ...]:
+    return ("Acquire", "ATL", "CurrentBlock")
+
+
 def current_setting_place(nodes) -> int:
     """The current setting's place among the job's settings, 0 the first, as LCS orders ``SequentialSettingParameter``."""
     current = node_value(nodes, node_at(nodes, ("Acquire", "ATL", "CurrentSetting", "SettingID")))

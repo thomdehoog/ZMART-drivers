@@ -553,7 +553,10 @@ class StandInNodes:
             for point in self.zcomp_points
         ]}, "SpectralDetection_SequentialInfo": {"Spectrophotometer_SequentialInfo": [
             {"DetectionUnitList_SequentialInfo": {"DetectorHWInfo_SequentialInfo": [
-                {"DigitalGatingMode": unit.get("DigitalGatingMode", 2), "DigitalGatingModeList_SeqInfo": {"DigitalGatingMode": [
+                {"BeamRoute": tuple(unit["BeamRoute"]), "IsActive": unit["IsActive"], "WaveLengthBegin": unit["WaveLengthBegin"],
+                 "WaveLengthEnd": unit["WaveLengthEnd"], "DyeName": unit["DyeName"], "DyeRelation": unit.get("DyeRelation", 0),
+                 "ImageChannelLutList": {"ImageChannelLut": [{"LutName": unit.get("LutName", "Gray"), "IsUserDefinedLutName": False}]},
+                 "DigitalGatingMode": unit.get("DigitalGatingMode", 2), "DigitalGatingModeList_SeqInfo": {"DigitalGatingMode": [
                     {"DigitalGatingMode": code, "IsEnabled": code not in unit.get("TauDisabled", ())} for code in (0, 2, 3, 5, 6, 10)]},
                  "OperatingModeIndex": unit.get("OperatingModeIndex", 1), "OperatingMode": unit.get("OperatingMode", 1),
                  # TauScan's number of images and lifetime range (seconds), as LCS keeps them in the setting.

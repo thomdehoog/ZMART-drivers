@@ -669,6 +669,18 @@ class Microscope:
         self.handle.require_open()
         return checked(self.handle, changes.apply_to_all_settings(self.handle.client, name), f"apply_to_all_settings({name!r})")
 
+    def set_dyes(self, lines: list, detectors: list) -> dict:
+        """Give the current setting its laser lines and its detectors' dyes, as LAS X does when a dye is dropped on a detector.
+
+        *lines*: ``[(laser_nm, percent), ...]`` (a white-light line tuned first with :meth:`tune_laser_line` or added);
+        *detectors*: ``[(name, dye, (begin_nm, end_nm), colour), ...]``, the dye as LAS X names it (``"Leica/ALEXA 488"``).
+        LAS X rebuilds the setting's light and detection from these: lines and detectors left out are switched off. The
+        powers are checked against the limits first. Works in whichever setting is current; the other settings are sent
+        again as they stand, as the window does.
+        """
+        self.handle.require_open()
+        return checked(self.handle, changes.set_dyes(self.handle.client, lines=lines, detectors=detectors), "set_dyes()")
+
     def set_excitation_control(self, mode: str, source: str | None = None) -> dict:
         """Set a tunable laser's Excitation Control, "maximum power" or "constant power", as LAS X's Laser Overview: the
         white-light laser's unless *source* names another. Answers each tunable laser's."""

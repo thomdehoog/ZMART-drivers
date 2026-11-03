@@ -1245,6 +1245,69 @@ def autofocus_optics(line_route, line_index: int, wavelength_nm: float, percent:
     )
 
 
+def setting_dyes(lines, detectors, others=None, place: int = 0, sequential_mode: int = 0) -> Write:
+    """A setting's laser lines with their powers and its detectors with their bands, dyes and colours, in one command, as the
+    window sends it when a dye is dropped on a detector (``SetConfocalDefinitionFromDyeAssistant``, ``IsAutoFocusDefinition`` 0;
+    simulator, 2026-11-02). The command describes the whole job, one sequence per setting (2026-11-03): sent with fewer, LCS
+    cut the job down to them. *lines*: ``(route, line_index, wavelength_nm, percent)``; *detectors*: ``(name, route, begin_nm,
+    end_nm, dye, colour)`` for the setting at *place*; *others*: every setting's definition as it stands
+    (``get_setting_definitions``), sent again unchanged. LCS rebuilds the setting's light and detection from it: lines and
+    detectors left out are switched off. The powers go to the limits; read back from the detectors in use.
+    """
+    if not lines or not detectors:
+        raise ValueError("a setting's dyes need at least one laser line and one detector")
+    for _route, _index, nm, percent in lines:
+        if isinstance(percent, bool) or not isinstance(percent, (int, float)) or not 0 < percent <= 100:
+            raise ValueError(f"a line's power is above 0 and at most 100 percent, not {percent!r} ({nm:g} nm)")
+    for name, _route, begin, end, dye, colour in detectors:
+        if not begin < end:
+            raise ValueError(f"{name}'s band runs from a lower to a higher wavelength, not {begin!r} to {end!r}")
+        for text, what in ((dye, "a dye"), (colour, "a colour")):
+            if not isinstance(text, str) or not text or any(c in text for c in '<>&"'):
+                raise ValueError(f"{what} is named as LAS X names it, not {text!r}")
+    def light(entries):
+        return "".join(
+            f"<LightSource>{beam_route(route)}<LineIndex>{int(index)}</LineIndex><WaveLength>{value(nm)}</WaveLength>"
+            f"<Locked>0</Locked><Intensity>{value(percent / 100)}</Intensity></LightSource>"
+            for route, index, nm, percent in entries
+        )
+
+    def detection(entries):
+        return "".join(
+            f"<Detector>{beam_route(route)}<Begin>{value(begin)}</Begin><End>{value(end)}</End><Dye>{dye or 'None'}</Dye>"
+            f"<DetectorDyeRelation>{int(relation)}</DetectorDyeRelation><DyeWasAdded>0</DyeWasAdded><DyeExcitationMode>0</DyeExcitationMode>"
+            f"<Locked>0</Locked><LutName>{colour}</LutName><IsLutUserDefined>{int(bool(locked))}</IsLutUserDefined></Detector>"
+            for route, begin, end, dye, relation, colour, locked in entries
+        )
+
+    others = others or [{"lines": [], "detectors": []}]
+    sequences = []
+    for index, setting in enumerate(others if others else [None]):
+        if index == place:
+            body = light(lines) + detection([(route, begin, end, dye, 2, colour, False) for _name, route, begin, end, dye, colour in detectors])
+        else:
+            body = light([(l["route"], l["line_index"], l["wavelength"], l["percent"]) for l in setting["lines"]]) + detection(
+                [(d["route"], d["begin"], d["end"], d["dye"], d["relation"] or 0, d["colour"], d["colour_locked"]) for d in setting["detectors"]])
+        sequences.append(f'<Sequence Index="{index}">{body}</Sequence>')
+    element = (
+        '<Scanner IsAutoFocusDefinition="0" ActiveSettingIndex="-1" Command="SetConfocalDefinitionFromDyeAssistant">'
+        "<Sequences><DoAdjustSequenceCount>1</DoAdjustSequenceCount><MessageSource>DyeDragNDrop</MessageSource>"
+        f'<SequentialMode>{int(sequential_mode)}</SequentialMode>{"".join(sequences)}</Sequences></Scanner>'
+    )
+    wanted = {name: dye for name, _route, _b, _e, dye, _c in detectors}
+
+    def fill(request: Request) -> None:
+        request.elements = [element]
+
+    def shows(found) -> bool:
+        dyes = {d.get("name"): d.get("dye") for d in found or []}
+        return all(dyes.get(name) == dye for name, dye in wanted.items())
+
+    return Write(command="set_dyes", values={"laser_power": [percent for *_rest, percent in lines]}, request="SetConfocalDefinitionFromDyeAssistant",
+                 fill=fill, description=f"Setting's dyes -> {', '.join(f'{n}: {d}' for n, d in wanted.items())}", ready=idle(),
+                 confirm=Expect("detectors", shows))
+
+
 def autofocus_laser_power(place: int, line_index: int, wavelength_nm: float, percent: float) -> Write:
     """The power of the Best Focus Setting's line *line_index* of light source *place*, written into the state tree as the window does; read back.
 

@@ -221,6 +221,13 @@ def get_coverslip_offset(client, **keywords):
     return _routed("coverslip_offset", client, **keywords)
 
 
+def get_setting_definitions(client, **keywords):
+    """Every setting's laser lines and active detectors (band, dye, colour), in order; read straight from the state tree."""
+    from ..primitives.direct import reads as direct_reader
+
+    return direct_reader.get_setting_definitions()
+
+
 def get_excitation_control(client, **keywords):
     """Each tunable laser's Excitation Control, "maximum power" or "constant power", by name."""
     return _routed("excitation_control", client, **keywords)
