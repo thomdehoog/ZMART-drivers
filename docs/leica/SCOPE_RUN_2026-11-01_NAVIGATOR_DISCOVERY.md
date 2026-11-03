@@ -2012,6 +2012,18 @@ from 6019.71 to 6012.28 um by itself); its collar moved 65 to 70 % and back, Set
 each read back, no z move. **91 of 93** writes are listed for 4.9.2.31016; `IsDoubleModeEnabled` and
 `CurrentMultiFunctionPortPos` cannot be checked on this STELLARIS.
 
+**With the 40x in, no sample.** `set_autofocus_optics` (with the Best Focus Setting's own line and detector), the tau
+functions (TauGating's gates and channels, counted from 1; TauScan's images and range; TauInteraction's donor lifetime;
+TauSeparation's channel colour and Find, which found nothing), `zero_z_galvo`, `clear_cache`, `save_bleach_points` (the
+`.bpr` file written) and `move_to_z_compensation_point` worked, each put back. A SmartCORR run (`StartMotCorrAutomation`)
+brought up LCS's "MotCorr initialization required"; the run was stopped and Thom closed the box. After it the collar read
+0 % (put back to 65 %), HyD S 3's band read 502 to 532 nm (put back to 575; switching its tau modes did not move it), and
+the stage stood at x 113779, y 73079 um, 33 um beyond the y limit, with no stage command from the driver in LCS's log
+(put back). The spiral's nine fields were laid out as the Navigator's; their tile scan was refused there, as the stage
+stood outside the limits. Not yet checked: SmartCORR's run (the collar needs initialising first), `set_dyes`,
+`set_filter_wheel`, the spiral's tile scan and Start, and anything that needs a sample (autofocus finding a focus, the
+focus map, the coverslip reflection).
+
 **Left open:** the autofocus's drive (`ZUseMode`) was z-galvo before these runs and reads z-wide after them; writing
 z-galvo again was answered without an error and did not take. `set_z_drive` (the z-stack panel's drive) went z-galvo
 and back to z-wide in between, which is the likely cause; not proven. Thom sets it back in LAS X's window.
