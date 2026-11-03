@@ -63,7 +63,7 @@ discovery session in `SCOPE_RUN_2026-11-01_NAVIGATOR_DISCOVERY.md` and the build
 | The whole z-stack in one picture | Works: `acquire()` takes it when a stack is set |
 | Letting go of saved pictures in LAS X | Works |
 | Live, started and stopped | Works, with LAS X's commands; stop it before taking pictures |
-| Time series: frames, interval, Acquire Until Stopped, Minimize | Works: written into LAS X's state tree, as its t panel does; saving a series is not yet possible |
+| Time series: frames, interval, Acquire Until Stopped, Minimize | Works: written into LAS X's state tree, as its t panel does; `acquire()` takes every frame with Start and `save()` writes one OME-Zarr store along t |
 | The xt line scan: lines, MAX, lines per page, page interval | Works: written into LAS X's state tree (lines as unsigned numbers), as its t panel does in xt |
 | ROI scan on or off, and the sections of a stack it is limited to (ROI 3D) | Works: written into LAS X's state tree, as its button does; the regions themselves are drawn in LAS X's viewer |
 | The bleach mode on or off | Works: written into LAS X's state tree, as its button does; the bleach points are set in LAS X's window |

@@ -1441,3 +1441,23 @@ its light source; LCS lists it as `LaserBeamRoute`), and `Laser/PowerState` went
 put it back. Built: `switch_laser(name, on)`, refused for a laser LCS does not let be switched, read back from
 `PowerState`. Through the driver: the white-light laser off and on, Laser 488 refused; the 499 nm line and the 85 % output
 stayed.
+
+## 93. A time series taken and saved (3 November 2026)
+
+The layout follows what the driver's OME-Zarr writer already had: its arrays are t, c, z, y, x, with a time axis in
+seconds, as the OME-Zarr (NGFF) specification orders them. So a time series is one store per field with every frame along
+t, its t scale the time between frames, and `TimeIncrement` in its OME metadata; a tile scan stays one store per field.
+
+`acquire()` with the scan mode xyt took one frame: it used Capture Image. The window's Start, in xyt with 3 frames, sent
+`StartAcquiring` and LAS X wrote one picture, Series002: LAS X's dimension 4, 3 elements, in seconds, its byte step one
+frame (both channels), and a time stamp for each channel of each frame. Built: with a time series set (a scan mode with t,
+more than one frame), `acquire()` takes it with Start, as for a z-stack, the picture `"time_series"`; a series until stopped
+is refused, as it would never finish. The reader takes dimension 4 (each frame from its own place, each plane its own
+time), and the store holds them along t.
+
+In HyD 2's tau mode LAS X also writes, for a moment, a second picture of the same name (three channels, its own pixels),
+and lets go of its pixels soon after; this happens for a capture too. The reader now waits while two pictures share the
+name and refuses only if two are still there at the end of its wait.
+
+Through the driver: 3 frames, saved as one store of shape (3, 2, 1, 512, 512), its t scale 1.46 s (the frames' own times;
+1.28 s was the interval set, LAS X's shortest), LAS X's cache let go of after.

@@ -201,6 +201,8 @@ class AcquisitionMetadata:
     physical_size_x_um: float | None = None
     physical_size_y_um: float | None = None
     physical_size_z_um: float | None = None
+    #: The time from one frame of a time series to the next, in seconds; None for a single frame.
+    time_increment_s: float | None = None
     channels: tuple[ChannelMetadata, ...] = ()
     #: The bits the detector filled (8, 12 or 16 on a STELLARIS); a 12-bit
     #: picture is kept in 16-bit pixels, and this says that only 12 are used.

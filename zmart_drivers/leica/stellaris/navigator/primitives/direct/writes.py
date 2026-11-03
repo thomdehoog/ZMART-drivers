@@ -2666,6 +2666,30 @@ def z_stack_picture(project: int, drive: str, begin_um: float, end_um: float, *,
     )
 
 
+def time_series_picture(project: int, frames: int) -> Write:
+    """Take the time series LAS X is set to, into *project*: the window's Start, as for a z-stack (simulator,
+    2026-11-03: three frames in one picture, Series002). Nothing moves, so it goes to the limits as a picture.
+    Never sent again, like a capture."""
+    parent = checked_project(project)
+    elements = [
+        '<AcquireControl Command="StopAcquiring" DCParentElementID="0"/>',
+        f'<AcquireControl Command="StartAcquiring" DCParentElementID="{parent}"/>',
+    ]
+
+    def fill(request: Request) -> None:
+        request.elements = list(elements)
+
+    return Write(
+        command="time_series_picture",
+        values={"project": project, "frames": frames},
+        request="StartAcquiring",
+        fill=fill,
+        description=f"Time series of {frames} frames into project {project}",
+        ready=idle(without_limit=True),
+        never_resend=True,
+    )
+
+
 # =============================================================================
 # A whole setting as a file: LAS X's Setting panel, save and load (simulator, 2026-11-01)
 # =============================================================================

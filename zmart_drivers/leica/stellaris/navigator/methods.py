@@ -961,9 +961,10 @@ class Microscope:
         Answers the time series as LAS X holds it.
 
         The scan mode must have time (``change_setting("scan_mode", "xyt")`` first).
-        The interval is at least one frame (``shortest_interval_s``). Saving a
-        series taken with :meth:`acquire` is not yet possible: the files are
-        written for x, y and z only.
+        The interval is at least one frame (``shortest_interval_s``). Then
+        :meth:`acquire` takes every frame with LAS X's Start, and :meth:`save`
+        writes one OME-Zarr store with the frames along its t axis, the time
+        between frames as its scale. A series "until stopped" is not taken.
         """
         self.handle.require_open()
         result = changes.set_time_series(self.handle.client, frames=frames, interval_s=interval_s, until_stopped=until_stopped, minimize=minimize)

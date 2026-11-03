@@ -417,6 +417,8 @@ MUTATING_COMMANDS = {
     "after_tile_scan": "set_xyz",
     # a picture
     "capture": "capture",
+    # a time series: every frame where the stage stands, as a picture
+    "time_series_picture": "capture",
     # a scan through the collar's positions, within the range just set
     "smartcorr": "capture",
     # Live: a scan like a picture's, on until it is stopped

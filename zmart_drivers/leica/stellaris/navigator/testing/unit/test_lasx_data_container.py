@@ -254,6 +254,100 @@ class TestTileScan:
             description.metadata_from_description(mosaic_xml(times=2), field=0)
 
 
+def series_xml(*, frames=3, interval_s=1.28) -> str:
+    """A time series taken with Start, as LAS X describes it (simulator, 2026-11-03, Series002): 2 channels, 4 x 3
+    pixels at 8 bit, its frames one after the other (DimID 4, in seconds), a time stamp for each channel of each frame."""
+    ticks = [0x1DD59653D1099D0 + round((f * interval_s + c * 0.01) * 1e7) for f in range(frames) for c in (0, 1)]
+    return (
+        '<Data><Image TextDescription=""><ImageDescription><Channels>'
+        '<ChannelDescription DataType="0" ChannelTag="0" Resolution="8" LUTName="Blue" BytesInc="0" BitInc="0"/>'
+        '<ChannelDescription DataType="0" ChannelTag="0" Resolution="8" LUTName="Green" BytesInc="12" BitInc="0"/>'
+        "</Channels><Dimensions>"
+        '<DimensionDescription DimID="1" NumberOfElements="4" Origin="0" Length="1e-05" Unit="m" BitInc="0" BytesInc="1"/>'
+        '<DimensionDescription DimID="2" NumberOfElements="3" Origin="0" Length="1e-05" Unit="m" BitInc="0" BytesInc="4"/>'
+        f'<DimensionDescription DimID="4" NumberOfElements="{frames}" Origin="0" Length="{frames * interval_s}" Unit="s" BitInc="0" BytesInc="24"/>'
+        f'</Dimensions></ImageDescription><TimeStampList NumberOfTimeStamps="{len(ticks)}">{" ".join(format(t, "x") for t in ticks)}'
+        '</TimeStampList><Attachment Name="HardwareSetting" SystemTypeName="SIMULATOR">'
+        '<ATLConfocalSettingDefinition StagePosX="0.0635" StagePosY="0.0415"/>'
+        "</Attachment></Image></Data>"
+    )
+
+
+class TestATimeSeries:
+    """A time series taken with Start: one picture, its frames one after the other, saved as one store along t."""
+
+    def series(self, cache):
+        pixels = np.arange(3 * 2 * 3 * 4, dtype=np.uint8).reshape(3, 2, 3, 4)  # frame, channel, y, x
+        write_pixels(cache, 449, pixels)
+        write_description(cache, 449, "Series002", series_xml())
+        return pixels
+
+    def test_every_frame_is_read_from_its_own_place(self, cache):
+        pixels = self.series(cache)
+
+        (exported,) = container.collect_picture(acquisition_of("time_series"), cache_root=cache)
+
+        assert [p.t for p in exported.positions] == [0, 1, 2]
+        for f, position in enumerate(exported.positions):
+            for c in (0, 1):
+                np.testing.assert_array_equal(plane(position.planes[PlaneIndex(t=f, z=0, c=c)]), pixels[f, c])
+
+    def test_each_frame_has_its_time_and_the_series_its_interval(self):
+        metadata = description.metadata_from_description(series_xml())
+
+        assert metadata.size_t == 3
+        assert metadata.planes[PlaneIndex(t=2, z=0, c=0)].delta_t_s == pytest.approx(2.56)
+        assert metadata.time_increment_s == pytest.approx(1.28)
+
+    def test_the_series_is_saved_as_one_store_with_every_frame_along_t(self, cache, tmp_path):
+        import zarr
+
+        pixels = self.series(cache)
+
+        (saved,) = saving.save(
+            acquisition_of("time_series"), tmp_path / "out", [Naming(stem="series_000001_one")],
+            place=one_place, cache_root=cache, orientation=Orientation(),
+        )
+
+        group = zarr.open_group(str(saved.image_paths[PlaneIndex(0, 0, 0)]), mode="r")
+        level = group["0"][:]
+        assert level.shape == (3, 2, 1, 3, 4)
+        for f in range(3):
+            for c in (0, 1):
+                np.testing.assert_array_equal(level[f, c, 0], pixels[f, c])
+        scale = group.attrs["ome"]["multiscales"][0]["datasets"][0]["coordinateTransformations"][0]["scale"]
+        assert scale[0] == pytest.approx(1.28)
+
+
+class TestTwoPicturesOfOneName:
+    """In a tau mode LAS X keeps a second picture of the same name for a moment, with three channels and its own
+    pixels, which it lets go of soon after (simulator, 2026-11-03: Series003 twice, then once)."""
+
+    def test_the_one_left_when_the_other_s_pixels_are_gone_is_collected(self, cache, monkeypatch):
+        TestATimeSeries().series(cache)
+        real = container.pictures
+        looks = []
+
+        def pictures(root, started_at, own_name):
+            found = real(root, started_at, own_name)
+            looks.append(len(found))
+            return found * 2 if len(looks) == 1 else found  # twice on the first look
+
+        monkeypatch.setattr(container, "pictures", pictures)
+
+        (exported,) = container.collect_picture(acquisition_of("time_series"), cache_root=cache, poll_interval_s=0.01)
+
+        assert looks[:2] == [1, 1] and exported.release_target == (449, "Series002")
+
+    def test_two_that_stay_are_refused_when_the_wait_is_over(self, cache, monkeypatch):
+        TestATimeSeries().series(cache)
+        real = container.pictures
+        monkeypatch.setattr(container, "pictures", lambda *a: real(*a) * 2)
+
+        with pytest.raises(RuntimeError, match="more than one new picture"):
+            container.collect_picture(acquisition_of("time_series"), cache_root=cache, timeout_s=0.2, poll_interval_s=0.01)
+
+
 class TestSavingATileScan:
     """The Navigator's Preview over several positions, saved as one OME-Zarr store per field, then let go of."""
 

@@ -52,16 +52,18 @@ from .product import (
 
 __all__ = ["axes", "fields", "image_of", "metadata_from_description", "tile_positions"]
 
-#: LAS X's dimension numbers for x, y and z. A time series (4) is taken one
-#: picture at a time by the workflow, so a picture with any other dimension
-#: is refused rather than guessed at.
+#: LAS X's dimension numbers for x, y and z. A time series (4) is read as
+#: well (:data:`TIME_AXIS`); a picture with any other dimension is refused
+#: rather than guessed at.
 X_AXIS, Y_AXIS, Z_AXIS = 1, 2, 3
 
 #: The Navigator's tile scan (its Preview, over a list of positions) keeps its
 #: fields one after the other along LAS X dimension 10, each field's position
 #: in the ``TileScanInfo`` attachment; it comes with dimension 4 holding one
-#: time point (simulator, 2026-10-15). A single time point is read as none; a
-#: time series is still refused.
+#: time point (simulator, 2026-10-15). A single time point is read as none. A
+#: time series taken with Start keeps its frames one after the other along
+#: dimension 4, in seconds (simulator, 2026-11-03, Series002); a time series
+#: of tile scans is still refused.
 TIME_AXIS, TILE_AXIS = 4, 10
 
 #: LAS X's look-up-table names as OME colours (RGBA, as a signed 32-bit int).
@@ -111,10 +113,11 @@ def image_of(xml: str) -> ET.Element:
 
 
 def axes(image: ET.Element) -> dict[int, dict]:
-    """The picture's x, y and z axes (count, length in metres, origin, byte step), and its tile fields.
+    """The picture's x, y and z axes (count, length in metres, origin, byte step), its tile fields and its frames.
 
-    The fields (:data:`TILE_AXIS`) give their count and byte step; a single
-    time point is passed over. Refuses any other dimension, a time series,
+    The fields (:data:`TILE_AXIS`) and the frames of a time series
+    (:data:`TIME_AXIS`) give their count and byte step; a single time point
+    is passed over. Refuses any other dimension, a time series of tile scans,
     and any x, y or z axis not in metres.
     """
     found = {}
@@ -123,6 +126,12 @@ def axes(image: ET.Element) -> dict[int, dict]:
     ):
         dim_id = int(dimension.get("DimID", "0"))
         if dim_id == TIME_AXIS and int(dimension.get("NumberOfElements")) == 1:
+            continue
+        if dim_id == TIME_AXIS:
+            found[TIME_AXIS] = {
+                "count": int(dimension.get("NumberOfElements")),
+                "step": int(dimension.get("BytesInc")),
+            }
             continue
         if dim_id == TILE_AXIS:
             found[TILE_AXIS] = {
@@ -147,6 +156,11 @@ def axes(image: ET.Element) -> dict[int, dict]:
         }
     if X_AXIS not in found or Y_AXIS not in found:
         raise RuntimeError("LAS X's description of the picture gives no x or no y axis")
+    if TIME_AXIS in found and TILE_AXIS in found:
+        raise RuntimeError(
+            f"the picture has LAS X dimension {TIME_AXIS} with {found[TIME_AXIS]['count']} time points and "
+            "tile fields: a time series of tile scans is not read"
+        )
     return found
 
 
@@ -207,15 +221,18 @@ def metadata_from_description(xml: str, field: int = 0) -> AcquisitionMetadata:
     x, y = dims[X_AXIS], dims[Y_AXIS]
     z = dims.get(Z_AXIS)
     size_z = z["count"] if z else 1
+    size_t = dims[TIME_AXIS]["count"] if TIME_AXIS in dims else 1
 
     reading = Reading(
         image, hardware, setting, position=position, first_stamp=field * size_z * len(channels)
     )
+    planes = reading.planes(len(channels), z, size_t)
+    last = planes.get(PlaneIndex(t=size_t - 1, z=0, c=0))
     described = [reading.channel(c, element) for c, element in enumerate(channels)]
     return AcquisitionMetadata(
         size_x=x["count"],
         size_y=y["count"],
-        size_t=1,
+        size_t=size_t,
         size_z=size_z,
         size_c=len(channels),
         pixel_type="uint8" if significant_bits <= 8 else "uint16",
@@ -229,11 +246,15 @@ def metadata_from_description(xml: str, field: int = 0) -> AcquisitionMetadata:
         physical_size_z_um=abs(z["length_m"]) / (size_z - 1) * 1e6
         if z and size_z > 1
         else None,
+        # The frames' own times: the first plane of the last frame, over the steps to it.
+        time_increment_s=last.delta_t_s / (size_t - 1)
+        if size_t > 1 and last is not None and last.delta_t_s is not None
+        else None,
         significant_bits=significant_bits,
         acquisition_date=reading.acquisition_date(),
         channels=tuple(channel for channel, _ in described),
         instrument=reading.instrument(),
-        planes=reading.planes(len(channels), z),
+        planes=planes,
         annotations=reading.annotations(described),
     )
 
@@ -455,7 +476,7 @@ class Reading:
         when = FILE_TIME_ZERO + datetime.timedelta(microseconds=stamps[0] // 10)
         return when.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
 
-    def planes(self, size_c: int, z: dict | None) -> dict[PlaneIndex, PlaneMetadata]:
+    def planes(self, size_c: int, z: dict | None, size_t: int = 1) -> dict[PlaneIndex, PlaneMetadata]:
         """When every plane was taken, and where each drive stood for it.
 
         The stage gives x and y. For z, the description names the drive that
@@ -471,7 +492,8 @@ class Reading:
 
         LAS X stamps every plane of every channel once, in the order the
         pixels are kept: channel inside plane (STELLARIS, 2026-10-15: two
-        channels in a six-plane stack).
+        channels in a six-plane stack), and plane inside frame for a time
+        series (simulator, 2026-11-03: two channels, three frames).
         """
         stamps = self.time_stamps()
         size_z = z["count"] if z else 1
@@ -503,9 +525,9 @@ class Reading:
                 (f"z/{name}", metres * 1e6 if metres is not None else None)
                 for name, metres in sorted(drives.items())
             ]
-            for c in range(size_c):
-                stamp = plane * size_c + c
-                planes[PlaneIndex(t=0, z=plane, c=c)] = PlaneMetadata(
+            for t, c in ((t, c) for t in range(size_t) for c in range(size_c)):
+                stamp = (t * size_z + plane) * size_c + c
+                planes[PlaneIndex(t=t, z=plane, c=c)] = PlaneMetadata(
                     delta_t_s=(stamps[stamp] - stamps[0]) / 1e7
                     if stamp < len(stamps)
                     else None,

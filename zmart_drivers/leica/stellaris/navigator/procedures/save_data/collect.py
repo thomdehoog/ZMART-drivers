@@ -67,6 +67,8 @@ PICTURE_NAMES = {
     "tile_scan": re.compile(r"Mosaic\d+"),
     # A z-stack taken with Start: Mosaic<n> with the Navigator open, Series<n> in Navigator Expert.
     "z_stack": re.compile(r"(?:Mosaic|Series)\d+"),
+    # A time series taken with Start: Series<n> (simulator, 2026-11-03).
+    "time_series": re.compile(r"(?:Mosaic|Series)\d+"),
 }
 
 #: How long to wait for a picture to appear and be finished after the scan
@@ -94,8 +96,9 @@ def collect_picture(
     fields follow one another, each placed where its tile was taken. It is
     finished when its description carries a time stamp for every plane of
     every field: LAS X rewrites the description once, after the last plane
-    is in. *timeout_s* bounds the wait, and passing it is reported in words
-    the operator can act on. Every field names the one picture it came from
+    is in, and when it is the only new picture of its name. *timeout_s*
+    bounds the wait, and passing it is reported in words the operator can
+    act on. Every field names the one picture it came from
     (``release_target``), so ``clear_cache`` lets go of it once, after every
     field is saved.
     """
@@ -107,11 +110,14 @@ def collect_picture(
     while True:
         found = pictures(root, acq.started_at, named)
         if len(found) > 1:
+            # In a tau mode LAS X keeps a second picture of the same name for a moment and lets go of its pixels soon
+            # after (simulator, 2026-11-03), so two are waited on; two still there at the end are refused.
             names = ", ".join(f"{name} ({path.name})" for path, name, _ in found)
-            raise RuntimeError(
-                f"LAS X's cache holds more than one new picture named {named.pattern}: "
-                f"{names}; refusing to guess which one this acquisition took"
-            )
+            waiting = f"LAS X's cache holds more than one new picture named {named.pattern}: {names}"
+            if time.perf_counter() >= deadline:
+                raise RuntimeError(f"{waiting}; refusing to guess which one this acquisition took")
+            time.sleep(poll_interval_s)
+            continue
         if found:
             path, name, xml = found[0]
             stamped, planes = time_stamps(xml), planes_expected(xml)
@@ -137,7 +143,10 @@ def collect_picture(
         ExportedAcquisition(
             source_root=root,
             source_dir=root,
-            positions=[ExportedPosition(t=0, planes=planes)],
+            positions=[
+                ExportedPosition(t=t, planes={index: source for index, source in planes.items() if index.t == t})
+                for t in sorted({index.t for index in planes})
+            ],
             metadata=metadata,
             method="lasx_data_container",
             relative_path=pixels.name,
@@ -268,7 +277,8 @@ def layout(
 
     Every size, step and start is the description's own; anything this
     reader does not know how to lay out is refused, never assumed. A tile
-    scan keeps its fields one after the other, each its own capture.
+    scan keeps its fields one after the other, each its own capture; a
+    time series its frames one after the other, all in one capture.
     """
     metadata = described.metadata_from_description(xml, field=field)
     image = described.image_of(xml)
@@ -282,14 +292,16 @@ def layout(
         )
     z_step = dims[described.Z_AXIS]["step"] if described.Z_AXIS in dims else 0
     field_start = field * dims[described.TILE_AXIS]["step"] if described.TILE_AXIS in dims else 0
+    t_step = dims[described.TIME_AXIS]["step"] if described.TIME_AXIS in dims else 0
     channels = image.findall("./ImageDescription/Channels/ChannelDescription")
     planes = {
-        PlaneIndex(t=0, z=plane, c=c): RawPlaneSource(
+        PlaneIndex(t=t, z=plane, c=c): RawPlaneSource(
             path=pixels,
-            offset=field_start + int(channel.get("BytesInc")) + plane * z_step,
+            offset=field_start + t * t_step + int(channel.get("BytesInc")) + plane * z_step,
             shape_yx=(metadata.size_y, nx),
             dtype=metadata.pixel_type,
         )
+        for t in range(metadata.size_t)
         for c, channel in enumerate(channels)
         for plane in range(metadata.size_z)
     }

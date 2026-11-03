@@ -328,7 +328,7 @@ def write_store(
     step_y, step_x = metadata.physical_size_y_um, metadata.physical_size_x_um
     t, c, z, y, x = capture.translation
     for _ in levels:
-        scales.append([1.0, 1.0, metadata.physical_size_z_um or 1.0, step_y, step_x])
+        scales.append([metadata.time_increment_s or 1.0, 1.0, metadata.physical_size_z_um or 1.0, step_y, step_x])
         translations.append([t, c, z, y, x])
         y, x = y + step_y / 2, x + step_x / 2
         step_y, step_x = step_y * 2, step_x * 2

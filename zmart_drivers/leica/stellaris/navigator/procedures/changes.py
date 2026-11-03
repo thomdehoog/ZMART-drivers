@@ -779,12 +779,20 @@ def capture(client, project=None, **watching) -> dict:
     as the Navigator Expert driver does (an open project, or a new
     ``ZMART_Experiment<N>``). With a z-stack set (more than one section) the
     picture is taken with the window's Start, which takes every plane, and
-    the result's ``picture`` is ``"z_stack"``; else with Capture Image, one
-    plane, ``"capture"``. A stack that cannot be read is taken for none.
+    the result's ``picture`` is ``"z_stack"``; with a time series set (a scan
+    mode with t, more than one frame), with Start too, every frame, as
+    ``"time_series"``; else with Capture Image, one plane, ``"capture"``. A
+    stack that cannot be read is taken for none. A series "until stopped" is
+    refused: it would never finish.
     """
     try:
         into = project if project is not None else data_container.experiment_for_capture()
         stack = readers.get_z_stack(client)
+        series = readers.get_time_series(client) if "t" in str(readers.get_scan_mode(client) or "") else None
+        if series and series["until_stopped"]:
+            raise ValueError("the time series is set to run until stopped, so it would never finish; set its frames")
+        if series and series["frames"] < 2:
+            series = None
         if stack:
             drive = stack["mode"]
             axis = "z_galvo_um" if drive == "z-galvo" else "z_wide_um"
@@ -792,12 +800,14 @@ def capture(client, project=None, **watching) -> dict:
             if now is None:
                 raise RuntimeError(f"where {drive} stands could not be read, so the z-stack cannot be checked")
             change = writes.z_stack_picture(into, drive, stack["begin"], stack["end"], start={f"from_{axis}": now})
+        elif series:
+            change = writes.time_series_picture(into, series["frames"])
         else:
             change = writes.capture(into)
     except (RuntimeError, ValueError) as why:
         return dispatch.refused(f"the picture cannot be taken: {why}", logged=True)
     result = picture(client, change, **watching)
-    result["picture"] = "z_stack" if stack else "capture"
+    result["picture"] = "z_stack" if stack else "time_series" if series else "capture"
     return result
 
 

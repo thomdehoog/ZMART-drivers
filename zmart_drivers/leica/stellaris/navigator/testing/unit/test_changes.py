@@ -353,6 +353,26 @@ class TestTheZStack:
         assert acq.picture == "z_stack"
         assert lasx.commands()[-2:] == ["StopAcquiring", "StartAcquiring"]
 
+    def test_with_a_time_series_set_a_picture_takes_every_frame(self, lasx, client, monkeypatch):
+        monkeypatch.setattr(data_container, "experiment_for_capture", lambda: 2518)
+        lasx.live[("Acquire", "ScanDimensionList", "ScanModeName")] = "xyt"
+        lasx.live[("Acquire", "AcquireTStackInfo", "RepeatCount")] = 3
+
+        acq = changes.take_picture(client, poll_interval=0.01)
+
+        assert acq.picture == "time_series"
+        assert lasx.commands()[-2:] == ["StopAcquiring", "StartAcquiring"]
+
+    def test_a_time_series_until_stopped_is_refused_and_nothing_is_sent(self, lasx, client, monkeypatch):
+        monkeypatch.setattr(data_container, "experiment_for_capture", lambda: 2518)
+        lasx.live[("Acquire", "ScanDimensionList", "ScanModeName")] = "xyt"
+        lasx.live[("Acquire", "AcquireTStackInfo", "IsEnableAutomaticTSectionsCalculation")] = True
+
+        result = changes.capture(client)
+
+        assert result["success"] is False and "until stopped" in result["message"]
+        assert "StartAcquiring" not in lasx.commands()
+
     def test_without_a_stack_a_picture_is_one_frame(self, lasx, client, monkeypatch):
         monkeypatch.setattr(data_container, "experiment_for_capture", lambda: 2518)
 

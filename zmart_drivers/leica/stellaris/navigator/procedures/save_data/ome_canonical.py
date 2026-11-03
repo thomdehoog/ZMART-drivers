@@ -169,6 +169,8 @@ def _ome_xml(
     _add_physical(pixels_attrs, "X", metadata.physical_size_x_um)
     _add_physical(pixels_attrs, "Y", metadata.physical_size_y_um)
     _add_physical(pixels_attrs, "Z", metadata.physical_size_z_um)
+    if metadata.time_increment_s:
+        pixels_attrs["TimeIncrement"] = _num(metadata.time_increment_s)  # seconds, OME's default unit
     pixels = ET.SubElement(image, _tag("Pixels"), pixels_attrs)
 
     for channel in channels:
