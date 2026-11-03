@@ -497,6 +497,7 @@ MUTATING_COMMANDS = {
     "activate_setting": "activate_setting",
     # a detector and its line kept from LAS X's Dye Assistant
     "lock_detector": "lock_detector",
+    "lock_all_settings": "lock_all_settings",
     # a white-light line switched on, at LCS's starting power; its power is set and checked after
     "set_laser_lines": "set_laser_lines",
     # a detector on or off, its band and its tau mode, in the current setting (the gain has its own key)

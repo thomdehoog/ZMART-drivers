@@ -619,6 +619,15 @@ class TestTheSetting:
         assert changes.enable_setting(client, True)["confirmed"] is True
         assert lasx.live[(*SETTING, "IsEnabledForScanning")] is True
 
+    def test_every_setting_is_switched_off_and_on_as_bulk_options_does(self, lasx, client):
+        lasx.nodes.settings.append({"SettingID": 4, "Name": "Setting 2", "IsEnabledForScanning": True})
+
+        assert changes.enable_setting(client, False, all_settings=True)["confirmed"] is True
+        assert 'SetMode="1"' in lasx.sent[-1] and 'EnableForScanning="0"' in lasx.sent[-1]
+        assert [s["IsEnabledForScanning"] for s in lasx.nodes.settings] == [False, False]
+        assert changes.enable_setting(client, True, all_settings=True)["confirmed"] is True
+        assert [s["IsEnabledForScanning"] for s in lasx.nodes.settings] == [True, True]
+
     def test_the_setting_is_renamed_in_the_state_tree(self, lasx, client):
         assert changes.change(client, "setting_name", "ZMART test")["confirmed"] is True
         assert lasx.live[(*SETTING, "Name")] == "ZMART test"
@@ -633,6 +642,17 @@ class TestTheDetectorLock:
         assert lasx.commands() == ["ATL_Block_Save_To_XML", "BlockLightSinkDetectorForDyeAssistant", "BlockLightSourceLineForDyeAssistant"]
         assert 'LineIndex="0"' in lasx.sent[-1] and 'BeamPosition="30"' in lasx.sent[-1]  # the 405 line, the setting's excitation line
         assert changes.lock_detector(client, tmp_path, "HyD S 3", False)["confirmed"] is True
+
+    def test_every_setting_is_locked_and_freed_as_bulk_options_does(self, lasx, client):
+        assert changes.lock_all_settings(client, True)["confirmed"] is True
+        assert lasx.commands() == ["LockSetting"] and 'LockState="1"' in lasx.sent[-1] and 'SetMode="1"' in lasx.sent[-1]
+        assert changes.lock_all_settings(client, False)["confirmed"] is True
+        assert 'LockState="0"' in lasx.sent[-1]
+
+    @pytest.mark.parametrize("locked", ["yes", 1, None])
+    def test_a_lock_that_is_not_a_switch_is_refused(self, lasx, client, locked):
+        assert changes.lock_all_settings(client, locked)["success"] is False
+        assert lasx.commands() == []
 
     def test_a_detector_not_in_use_is_refused_and_nothing_is_sent(self, lasx, client, tmp_path):
         result = changes.lock_detector(client, tmp_path, "Trans PMT", True)

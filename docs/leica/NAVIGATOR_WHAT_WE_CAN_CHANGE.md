@@ -43,6 +43,7 @@ discovery session in `SCOPE_RUN_2026-11-01_NAVIGATOR_DISCOVERY.md` and the build
 | Setting's name | Works: written into LAS X's state tree |
 | Detector lock (kept from the Dye Assistant) | Works, with LAS X's commands |
 | Channel colour lock | Works: pressed in LAS X's window (it sends LAS X's hardware server nothing) |
+| Bulk Options: Lock All Settings (and freeing them), Disable All Settings (and enabling them) | Works, with LAS X's commands |
 | Transmitted-light detector (Trans PMT) on or off | Works |
 
 ## Taking pictures

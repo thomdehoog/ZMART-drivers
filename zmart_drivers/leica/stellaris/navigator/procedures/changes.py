@@ -1557,13 +1557,22 @@ def delete_setting(client, name, *, max_retries=None) -> dict:
     return run(client, writes.delete_setting(chosen[0]["id"]), max_retries=max_retries)
 
 
-def enable_setting(client, on, *, max_retries=None) -> dict:
-    """Switch the current setting on or off for scanning, as the window's checkbox does; read back. Off, LAS X takes no picture."""
+def enable_setting(client, on, *, all_settings=False, max_retries=None) -> dict:
+    """Switch the current setting on or off for scanning, as the window's checkbox does, or every setting with
+    *all_settings*, as Bulk Options' Disable All Settings does; read back. Off, LAS X takes no picture."""
     try:
-        change = writes.setting_enabled(readers.get_setting(client)["id"], on)
+        change = writes.setting_enabled(readers.get_setting(client)["id"], on, all_settings=bool(all_settings))
     except ValueError as why:
         return dispatch.refused(str(why))
     return run(client, change, max_retries=max_retries)
+
+
+def lock_all_settings(client, locked=True, *, max_retries=None) -> dict:
+    """Lock every setting's detectors and lines from LAS X's Dye Assistant, as Bulk Options' Lock All Settings does,
+    or free them all with *locked* False; read back."""
+    if not isinstance(locked, bool):
+        return dispatch.refused(f"lock_all_settings takes True or False, not {locked!r}")
+    return run(client, writes.settings_locked(locked), max_retries=max_retries)
 
 
 def lock_detector(client, folder, detector, locked, *, max_retries=None) -> dict:

@@ -238,6 +238,7 @@ ALLOWED_COMMANDS = frozenset(
         "ATL_Setting_Delete",
         "ATL_Setting_Activate",
         "BlockLightSinkDetectorForDyeAssistant",
+        "LockSetting",
         "BlockLightSourceLineForDyeAssistant",
     }
 )

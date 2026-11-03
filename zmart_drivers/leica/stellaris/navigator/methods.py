@@ -467,13 +467,21 @@ class Microscope:
         self.handle.require_open()
         return checked(self.handle, changes.delete_setting(self.handle.client, name), f"delete_setting({name!r})")
 
-    def enable_setting(self, on: bool) -> dict:
+    def enable_setting(self, on: bool, all_settings: bool = False) -> dict:
         """Switch the current setting on or off for scanning, as the window's checkbox does; read back.
 
-        Off, LAS X takes no picture with it.
+        With *all_settings*, every setting is switched, as Bulk Options'
+        Disable All Settings does. Off, LAS X takes no picture with it.
         """
         self.handle.require_open()
-        return checked(self.handle, changes.enable_setting(self.handle.client, on), f"enable_setting({on!r})")
+        result = changes.enable_setting(self.handle.client, on, all_settings=all_settings)
+        return checked(self.handle, result, f"enable_setting({on!r}, all_settings={all_settings!r})")
+
+    def lock_all_settings(self, locked: bool = True) -> dict:
+        """Keep every setting's detectors and lines from LAS X's Dye Assistant, as Bulk Options' Lock All Settings
+        does, or free them all with *locked* False; read back."""
+        self.handle.require_open()
+        return checked(self.handle, changes.lock_all_settings(self.handle.client, locked), f"lock_all_settings({locked!r})")
 
     def lock_detector(self, name: str, locked: bool = True) -> dict:
         """Keep the detector *name* and its excitation line from LAS X's Dye Assistant, or free them, as the window's detector lock does."""

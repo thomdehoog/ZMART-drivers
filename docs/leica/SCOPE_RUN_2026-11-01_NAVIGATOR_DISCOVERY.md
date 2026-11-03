@@ -1197,3 +1197,12 @@ Written into the state tree, LCS took them and the buttons followed. `show_spect
 the saved-setting route's helpers no longer used were removed (`through_setting_1`, `with_detector`, `detector_shows`); `saved_now`
 stays, for the detector lock's excitation line. Through the driver: excitation shown and emission hidden, then back.
 
+## 75. Bulk Options: Lock All Settings, Disable All Settings (3 November 2026)
+
+The settings toolbar's Bulk Options button opens a menu: Reset System, Reset ImageCompass, Lock All Settings and Disable All
+Settings. Lock All Settings (the driver's mouse) sent `<Scanner Command="LockSetting" LockState="1" SetMode="1" .../>`: every
+setting's detectors and lines were locked from the Dye Assistant (`IsBlockedForDyeAssistant`, `IsBlocked`). Pressed again it sends
+the same, so the menu has no unlock; `LockState="0"` through LCS freed them all. Disable All Settings sent
+`ATL_Setting_EnableDisableForScanning` with `SetMode="1"` and `EnableForScanning="0"`; `EnableForScanning="1"` switched them all
+on again. Built: `lock_all_settings(locked=True)` and `enable_setting(on, all_settings=False)`. Through the driver: locked, freed,
+every setting off and on again. Reset System and Reset ImageCompass were not pressed: they are hard to undo, and Thom decides.

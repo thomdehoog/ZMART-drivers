@@ -65,7 +65,7 @@ checked by the driver either way (`transfer.CHECKED_COMMANDS`, `transfer.STATE_T
 - The mounting medium (`ATL_HyVolution_SetMountingMedium`).
 
 **Other**
-- The Dye Assistant, "Apply to hardware", Bulk Options.
+- The Dye Assistant, "Apply to hardware"; Bulk Options' Reset System and Reset ImageCompass (hard to undo: Thom decides).
 - A dye of one's own in LAS X's library; the dye bar's "+".
 - The Best Focus Setting changed during the dye trials (its scan zoom to 48, a 488 nm line at 1 %); the zoom was put back.
 

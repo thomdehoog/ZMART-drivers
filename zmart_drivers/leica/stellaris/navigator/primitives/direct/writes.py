@@ -675,29 +675,52 @@ def delete_setting(setting_id: int) -> Write:
     )
 
 
-def setting_enabled(setting_id: int, on: bool) -> Write:
-    """Switch the current setting on or off for scanning, as the window's checkbox does; read back.
+def setting_enabled(setting_id: int, on: bool, *, all_settings: bool = False) -> Write:
+    """Switch the current setting on or off for scanning, as the window's checkbox does, or every setting, as Bulk
+    Options' Disable All Settings does (``SetMode="1"``); read back.
 
     Off, LAS X takes no picture with it: LCS's ``CanDoScanSingle`` went False
-    (simulator, 2026-11-01).
+    (simulator, 2026-11-01 and 2026-11-03).
     """
     if not isinstance(on, bool):
         raise ValueError(f"a setting is switched on with True or off with False, not {on!r}")
 
     def fill(request: Request) -> None:
         request.elements = [
-            f'<ATL SettingID="{int(setting_id)}" SetMode="0" EnableForScanning="{int(on)}" '
+            f'<ATL SettingID="{int(setting_id)}" SetMode="{1 if all_settings else 0}" EnableForScanning="{int(on)}" '
             'Command="ATL_Setting_EnableDisableForScanning" Attribute="0"/>'
         ]
+
+    def shows(shown) -> bool:
+        return all(each["enabled"] is on for each in shown["all"]) if all_settings else shown["enabled"] is on
 
     return Write(
         command="set_setting_enabled",
         values={"value": on},
         request="ATL_Setting_EnableDisableForScanning",
         fill=fill,
-        description=f"Setting {setting_id} -> {'on' if on else 'off'}",
+        description=f"{'Every setting' if all_settings else 'Setting ' + str(setting_id)} -> {'on' if on else 'off'}",
         ready=idle(),
-        confirm=Expect("setting", lambda shown: shown["enabled"] is on),
+        confirm=Expect("setting", shows),
+    )
+
+
+def settings_locked(locked: bool) -> Write:
+    """Lock every setting's detectors and lines from LAS X's Dye Assistant, as Bulk Options' Lock All Settings does
+    (``LockState="1"``, ``SetMode="1"``), or free them all (``LockState="0"``) (simulator, 2026-11-03); read back from
+    the current setting's detectors in use."""
+
+    def fill(request: Request) -> None:
+        request.elements = [f'<Scanner Command="LockSetting" LockState="{int(bool(locked))}" SetMode="1" SingleSettingIndex="{request.setting}"/>']
+
+    return Write(
+        command="lock_all_settings",
+        values={"value": bool(locked)},
+        request="LockSetting",
+        fill=fill,
+        description=f"Every setting -> {'locked' if locked else 'free'} for the Dye Assistant",
+        ready=idle(),
+        confirm=Expect("detectors", lambda found: bool(found) and all(d.get("lockedForDyeAssistant") is bool(locked) for d in found)),
     )
 
 

@@ -618,8 +618,21 @@ class PlainNavigator:
         if int(e.get("SettingID")) == self.live[(*af, "SettingId")]:
             self.live[(*af, "IsEnabledForScanning")] = e.get("EnableForScanning") == "1"
             return "<Result/>"
+        on = e.get("EnableForScanning") == "1"
+        if e.get("SetMode") == "1":
+            for each in self.nodes.settings:
+                each["IsEnabledForScanning"] = on
+            self.live[("Acquire", "ATL", "CurrentSetting", "IsEnabledForScanning")] = on
+            return "<Result/>"
         if int(e.get("SettingID")) == self.live[("Acquire", "ATL", "CurrentSetting", "SettingID")]:
-            self.live[("Acquire", "ATL", "CurrentSetting", "IsEnabledForScanning")] = e.get("EnableForScanning") == "1"
+            self.live[("Acquire", "ATL", "CurrentSetting", "IsEnabledForScanning")] = on
+        return "<Result/>"
+
+    def take_LockSetting(self, e):
+        """Every setting's detectors locked from the Dye Assistant, or freed (only the current setting's are modelled)."""
+        for spectro in self.nodes.detection["Spectrophotometer"]:
+            for unit in spectro["DetectionUnitList"]["DetectorHWInfo"]:
+                unit["IsBlockedForDyeAssistant"] = e.get("LockState") == "1"
         return "<Result/>"
 
     def take_BlockLightSinkDetectorForDyeAssistant(self, e):
