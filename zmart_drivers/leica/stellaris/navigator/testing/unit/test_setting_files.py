@@ -12,6 +12,8 @@ Author: Thom de Hoog, Center for Microscopy and Image Analysis (ZMB),
 University of Zurich (thom.dehoog@zmb.uzh.ch, thomdehoog@gmail.com).
 """
 
+from pathlib import Path
+
 import pytest
 from lasx_stand_in import PlainNavigator, attach
 from limits_fixtures import (
@@ -90,6 +92,37 @@ def test_a_file_with_a_laser_above_the_limit_is_refused_before_it_is_loaded(lasx
         lasx.nodes.light_sources[0]["AOTF"]["AotfLine"][0]["Intensity"] = 2.0
 
         result = setting_files.load(limited, operators)
+    finally:
+        gate.uninstall(limited)
+
+    assert result["success"] is False and "set_laser_power" in result["message"]
+    assert "ATL_Block_Load_From_XML" not in lasx.commands()
+
+
+HIDDEN = Path(__file__).resolve().parents[1] / "data" / "setting_files" / "hidden_master_gain.xml"
+
+
+def test_the_limits_are_shown_every_part_of_the_file_also_the_hidden_master_copy():
+    """A file LAS X saved (simulator, 2026-11-03): Setting 1 shows HyD 2 at gain 10, but the block's master copy holds
+    100, and loading it set the hardware's HyD 2 to 100. Every part is shown to the limits."""
+    shown = setting_files.values_in(HIDDEN.read_text(encoding="utf-8"))
+
+    assert 100.0 in shown["detector_gain"] and 10.0 in shown["detector_gain"]
+    assert sorted({p for p in shown["laser_power"] if p > 0}) == [1.0, 2.0]  # 2 % in Setting 1 and the master, 1 % for Best Focus
+
+
+def test_a_laser_above_the_limit_in_the_hidden_master_copy_refuses_the_file(lasx, tmp_path):
+    text = HIDDEN.read_text(encoding="utf-8")
+    master_end = text.index("<LDM_Block_Sequential_List")
+    raised = text[:master_end].replace('IntensityDev="2"', 'IntensityDev="50"') + text[master_end:]
+    path = tmp_path / "raised_master.xml"
+    path.write_text(raised, encoding="utf-8")
+    limited = hardware_server.Client("test")
+    payload = merged_limits_payload(dict(DEFAULT_STAGE_UM))
+    gate.install(limited, gate.GateState(
+        limits=limit_rules.LeicaLimits(payload, source="test", path=None, is_fallback=False), stage_cfg=None, error=None))
+    try:
+        result = setting_files.load(limited, path)
     finally:
         gate.uninstall(limited)
 

@@ -213,14 +213,15 @@ def setting_1(text: str) -> tuple[int, int]:
 
 
 def values_in(text: str) -> dict:
-    """What the limits are shown of a setting file: every laser power (percent) and detector gain in Setting 1."""
-    try:
-        start, end = setting_1(text)
-    except ValueError:
-        start, end = 0, len(text)
-    part = text[start:end]
-    lasers = [float(v) for v in re.findall(r'<LaserLineSetting [^>]* IntensityDev="([^"]*)"', part) if float(v) >= 0]
-    gains = [float(v) for v in re.findall(r'<Detector [^>]*IsActive="1"[^>]* Gain="([^"]*)"', part)]
+    """What the limits are shown of a setting file: every laser power (percent) and every active detector's gain in
+    every part of it, the block's master copy, each setting and the Best Focus Setting.
+
+    Setting 1 alone is not enough: a file LAS X saved held HyD 2 at gain 10
+    in Setting 1 but 100 in the block's master copy, and loading it set the
+    hardware's HyD 2 to 100 (simulator, 2026-11-03).
+    """
+    lasers = [float(v) for v in re.findall(r'<LaserLineSetting [^>]* IntensityDev="([^"]*)"', text) if float(v) >= 0]
+    gains = [float(v) for v in re.findall(r'<Detector [^>]*IsActive="1"[^>]* Gain="([^"]*)"', text)]
     return {"laser_power": lasers, "detector_gain": gains}
 
 
