@@ -73,6 +73,9 @@ SIMULATOR_SETTINGS = {
     ("Confocal", "ROIScan", "EnableBleachScan"): False,
     # The bleach point the Bleach Point panel shows: -1 while none is drawn (simulator, 2026-11-03).
     ("Confocal", "ROIScan", "CurrentBleachPoint"): -1,
+    # Whether LAS X takes input now: both go on while it is idle; Live turns the first off (simulator, 2026-11-03).
+    ("Acquire", "CanDoChangeOnIdleOrPrepare"): True,
+    ("Acquire", "ATL", "UIInputForBlockAllowed"): True,
     ("Confocal", "ROIScan", "CanDo3DLimitedRoiScan"): False,
     ("Confocal", "ROIScan", "Is3DLimitedRoiScanEnabled"): False,
     ("Confocal", "ROIScan", "First3DRoiSection"): 1,

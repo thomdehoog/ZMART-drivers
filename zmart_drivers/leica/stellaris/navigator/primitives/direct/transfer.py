@@ -609,15 +609,27 @@ def tree_places(name: str, at: str | None) -> dict:
     return dict(zip(numbered, given))
 
 
+#: LCS's two switches for whether LAS X takes input for its settings now: both on while it is idle; Live turned the
+#: first off, and Start turns it off too (simulator, 2026-11-03). A state-tree write is made only with both on.
+TAKES_INPUT = (("Acquire", "CanDoChangeOnIdleOrPrepare"), ("Acquire", "ATL", "UIInputForBlockAllowed"))
+
+
 def write_into_state_tree(name: str, text: str, at: str | None = None) -> str:
     """Write one listed value into LCS's state tree; answer as LAS X answers a command.
 
-    A value with a range of LCS's own is first checked against that range,
-    read now; outside it, nothing is written and the answer is a refusal
-    (``Error="1"``) with the reason inside.
+    Nothing is written while LAS X itself takes no input for its settings
+    (:data:`TAKES_INPUT`, as its window then greys its controls out). A
+    value with a range of LCS's own is first checked against that range,
+    read now; outside it, nothing is written. Either way the answer is a
+    refusal (``Error="1"``) with the reason inside.
     """
     from . import state_tree
 
+    nodes = state_tree.server_nodes()
+    off = [path[-1] for path in TAKES_INPUT if not state_tree.node_value(nodes, state_tree.node_at(nodes, path))]
+    if off:
+        return (f'<Result Error="1">LAS X takes no input for its settings now ({", ".join(off)} off: '
+                f'it is scanning or busy); {name} not written</Result>')
     entry = STATE_TREE_WRITES[name]
     value = tree_value(name, text)
     places = tree_places(name, at)

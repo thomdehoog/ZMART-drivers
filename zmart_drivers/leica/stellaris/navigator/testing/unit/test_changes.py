@@ -1975,6 +1975,23 @@ class TestLineScan:
         assert changes.set_line_scan(xt, minimize=True, page_interval_s=30.0)["success"] is False
 
 
+class TestNoStateTreeWriteWhileLasXRefusesInput:
+    """LAS X's window takes no input for its settings while LCS says ``CanDoChangeOnIdleOrPrepare`` or
+    ``UIInputForBlockAllowed`` is off (Live turned the first off on the simulator, 2026-11-03); nor does the driver."""
+
+    @pytest.mark.parametrize("flag", [("Acquire", "CanDoChangeOnIdleOrPrepare"), ("Acquire", "ATL", "UIInputForBlockAllowed")])
+    def test_a_write_is_refused_and_nothing_changes(self, lasx, client, flag):
+        lasx.live[flag] = False
+
+        result = changes.set_roi_scan(client, True)
+
+        assert result["success"] is False and "input" in result["message"]
+        assert lasx.live[("Confocal", "ROIScan", "EnableRoiScan")] is False
+
+    def test_with_las_x_taking_input_the_write_goes_in(self, lasx, client):
+        assert changes.set_roi_scan(client, True)["confirmed"] is True
+
+
 class TestRoiScanAndBleachMode:
     def test_roi_scan_is_switched_on_and_off(self, lasx, client):
         assert changes.set_roi_scan(client, True)["roi"] == {"on": True, "sections": None, "bleach_mode": False}
