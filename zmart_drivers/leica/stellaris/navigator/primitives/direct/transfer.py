@@ -681,6 +681,9 @@ CHECKED_WRITES = {
         "FilterSpectrumPos", "OperatingModeIndex", "ReferencePosition", "ZPosition", "IsAFPlanePosition",
         # A detector's excitation line, and the Best Focus Setting's laser power.
         "TimegateReferenceLineIndex", "AutofocusLaserPower",
+        # Auto Sync's own switch (off and on; the Best Focus Setting's light stayed), SmartCORR's range (written and read
+        # back with the 10x; its run waits for an objective with a collar), and the bleach point's choice and power.
+        "IsAutoSyncActive", "AutomationBegin", "AutomationEnd", "AutomationSteps", "CurrentBleachPoint", "BleachPointLaserPower",
     }),
 }
 

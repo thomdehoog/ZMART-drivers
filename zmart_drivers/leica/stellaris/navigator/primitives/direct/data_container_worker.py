@@ -24,8 +24,9 @@ import json
 import os
 import sys
 
-#: The wrapper versions this program was learned on (LAS X 4.9.0.30051, simulator, 2026-11-03).
-KNOWN_VERSIONS = ("2.65.0.0",)
+#: The wrapper versions this program was learned on (LAS X 4.9.0.30051, simulator, 2026-11-03), and checked on: 2.65.0.1
+#: with LAS X 4.9.2.31016 on the STELLARIS (2026-11-04: ROI regions of each shape and a bleach point added, read back, cleared).
+KNOWN_VERSIONS = ("2.65.0.0", "2.65.0.1")
 
 
 def answer(**fields) -> None:
