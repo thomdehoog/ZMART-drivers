@@ -417,6 +417,7 @@ class StandInNodes:
         self.spectra = {"excitation": False, "emission": True}
         # The current setting's Z-compensation support points: z from the reference (metres) and the values held there.
         self.zcomp_points = []
+        self.tree_writes = []  # every (path, value) written into the state tree, in order
         # The AOBS's eight lines (Confocal/AOBSLineList), as on the simulator, 2026-11-02: 497 in use.
         self.aobs_lines = [{"IsUsed": True, "LaserLine": 497.0, "Intensity": 100.0, "IsDoubleModeEnabled": True, "IsReflection": False}] + [
             {"IsUsed": False, "LaserLine": 0.0, "Intensity": 0.0, "IsDoubleModeEnabled": False, "IsReflection": False} for _ in range(7)
@@ -635,6 +636,7 @@ class StandInNodes:
                 name, parent, _kids = nodes[node]
                 path.insert(0, name)
                 node = parent
+            self.tree_writes.append((tuple(path), change.Value))
             if path == ["Acquire", "AcquireZStackInfo", "IsAFPlanePosition"]:
                 # As LCS: True puts the focus plane where the z-stack's drive stands, False clears it (simulator, 2026-11-03).
                 drive = self.live[("Acquire", "ZPositionMode")]
@@ -767,7 +769,7 @@ class StandInNodes:
                 # The time series as LCS keeps it: the frames follow from the duration, the interval
                 # is at least a frame, and "until stopped" sets the mode (simulator, 2026-11-02).
                 t = ("Acquire", "AcquireTStackInfo")
-                if path[-1] == "RepeatCount" or path[-1] == "CalculationMode":
+                if path[-1] == "RepeatCount":
                     continue  # ignored by LCS
                 if path[-1] == "Duration":
                     # LCS rounds the intervals up: 249 intervals written gave 251 frames, 248.9 gave 250 (simulator,
@@ -795,6 +797,11 @@ class StandInNodes:
                 if path[-1] == "IsEnableAutomaticTSectionsCalculation":
                     self.live[(*t, path[-1])] = bool(change.Value)
                     self.live[(*t, "CalculationMode")] = 4 if change.Value else 3
+                    continue
+                if path[-1] == "CalculationMode":
+                    # As LCS: 4 (until stopped) turns the automatic flag on, 3 (frames) off (simulator, 2026-11-03).
+                    self.live[(*t, "CalculationMode")] = int(change.Value)
+                    self.live[(*t, "IsEnableAutomaticTSectionsCalculation")] = int(change.Value) == 4
                     continue
             self.live[tuple(path)] = change.Value
             if tuple(path) == ("Acquire", "AcquireZStackInfo", "StackCalculationMode"):

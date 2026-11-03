@@ -2105,8 +2105,9 @@ def time_minimize(on: bool) -> Write:
 
 
 def time_until_stopped(on: bool) -> Write:
-    """The t panel's "Acquire Until Stopped" on or off (off is its Frames); LCS sets the mode itself."""
-    return time_series_change("until stopped", "IsEnableAutomaticTSectionsCalculation", int(bool(on)), "on" if on else "off",
+    """The t panel's "Acquire Until Stopped" on or off (off is its Frames), written as the window does: the mode, 4
+    or 3; LCS then sets its automatic flag itself (simulator, 2026-11-03)."""
+    return time_series_change("until stopped", "CalculationMode", 4 if on else 3, "on" if on else "off",
                               lambda t: t["until_stopped"] is bool(on))
 
 

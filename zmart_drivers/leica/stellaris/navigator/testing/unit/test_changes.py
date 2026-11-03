@@ -2053,6 +2053,17 @@ class TestTimeSeries:
     def test_minimize_with_an_interval_is_refused(self, lasx, timed):
         assert changes.set_time_series(timed, interval_s=10.0, minimize=True)["success"] is False
 
+    def test_until_stopped_is_written_as_the_window_does_its_mode_4_and_frames_3(self, lasx, timed):
+        """The t panel's "Acquire Until Stopped" sets ``CalculationMode`` 4, its Frames 3; LCS then sets the automatic
+        flag itself. The driver writes the mode, never the flag (simulator, 2026-11-03)."""
+        t = ("Acquire", "AcquireTStackInfo")
+
+        changes.set_time_series(timed, until_stopped=True)
+        changes.set_time_series(timed, until_stopped=False)
+
+        written = [(path[-1], value) for path, value in lasx.nodes.tree_writes if path[:2] == t]
+        assert written == [("CalculationMode", 4), ("CalculationMode", 3)]
+
     def test_until_stopped_is_switched_on_and_off(self, lasx, timed):
         assert changes.set_time_series(timed, until_stopped=True)["time_series"]["until_stopped"] is True
         result = changes.set_time_series(timed, frames=3)

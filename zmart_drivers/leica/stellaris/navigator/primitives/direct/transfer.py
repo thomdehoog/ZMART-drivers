@@ -430,7 +430,9 @@ STATE_TREE_WRITES = {
     "Lines": TreeWrite(("Acquire", "AcquireTStackInfo", "Lines"), within=(1, 1_000_000_000), unsigned=True),
     "LinesPerPage": TreeWrite(("Acquire", "AcquireTStackInfo", "LinesPerPage"), within=(1, 1_000_000_000), unsigned=True),
     "IsMaxLinesActive": TreeWrite(("Acquire", "AcquireTStackInfo", "IsMaxLinesActive"), bool),
-    "IsEnableAutomaticTSectionsCalculation": TreeWrite(("Acquire", "AcquireTStackInfo", "IsEnableAutomaticTSectionsCalculation"), bool),
+    # The t panel's Acquire Until Stopped (4) and Frames (3): the mode the window writes; LCS sets the automatic flag
+    # itself; only as an unsigned number, a plain one is ignored (simulator, 2026-11-03).
+    "CalculationMode": TreeWrite(("Acquire", "AcquireTStackInfo", "CalculationMode"), choices=frozenset({3, 4}), unsigned=True),
     # ROI scan and the bleach mode (the Acquisition Mode panel's ROI and bleach buttons), and the ROI scan's
     # sections of a stack (ROI 3D). The window writes them here with no command (simulator, 2026-11-02);
     # LCS keeps the sections within the stack. The regions themselves are in LAS X's data container.

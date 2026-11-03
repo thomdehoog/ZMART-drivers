@@ -1835,3 +1835,21 @@ The autofocus's focus mode (`Autofocus-config/AutoFocusMode`, "FirstChannelOnly"
 time series or over stage positions needs "First channel only"; the window offers no control for it, and LCS holds it
 (`AutoFocusInfo/CurrentAutoFocusMode` 2, the list 0 and 2). Built: `settings()["autofocus_settings"]["focus_mode"]`,
 read only. Through the driver: "first channel only".
+
+## 114. Safer state-tree writes: LAS X's input switch, the whole setting file, until stopped (3 November 2026)
+
+A write into LCS's state tree has none of the window's own checks, so the driver keeps them itself.
+
+- **Only while LAS X takes input.** LCS holds two switches, `Acquire/CanDoChangeOnIdleOrPrepare` and
+  `Acquire/ATL/UIInputForBlockAllowed`; both are on while LAS X is idle, and Live turned the first off (its
+  `CanDoChangeOnLive` stayed on). With either off, the driver writes nothing and says why. On the simulator, the ROI
+  scan was refused during Live and written after it.
+- **The whole setting file is shown to the limits.** A file LAS X saved held HyD 2 at gain 10 in Setting 1 but 100 in
+  the block's master copy, and loading it set HyD 2 to 100. Every laser power and every active detector's gain in the
+  file (master copy, each setting, the Best Focus Setting) is now checked; a file with the master copy's laser at 50 %
+  was refused against a 10 % limit, and nothing was loaded.
+- **Acquire Until Stopped as the window writes it.** A click on the t panel's Acquire Until Stopped changed
+  `AcquireTStackInfo/CalculationMode` 3 to 4 and `IsEnableAutomaticTSectionsCalculation` False to True, with no
+  command; Frames turned both back. `CalculationMode` takes only an unsigned number (a plain one is ignored), and LCS
+  then sets the flag itself. The driver now writes the mode (4 on, 3 off), not the flag; the state tree after either is
+  the same. Through the driver: on, off, on, then 5 frames, each read back.
