@@ -130,3 +130,22 @@ def test_a_move_that_did_not_land_is_not_confirmed(lasx, client, tmp_path):
     result = pan.move(client, tmp_path, 20.0, 0.0, pad=pad)
 
     assert result["confirmed"] is False and "20" in result["message"]
+
+
+def test_the_pan_is_set_to_a_place_from_the_centre(lasx, client, tmp_path):
+    lasx.live[(*SCANNING, "Zoom")] = 4.177
+    pad = Pad(lasx)
+    assert pan.move(client, tmp_path, 20.0, -12.0, pad=pad)["confirmed"] is True
+
+    result = pan.set_to(client, tmp_path, -30.0, 10.0, pad=pad)
+
+    assert result["confirmed"] is True
+    assert (result["pan"]["x_um"], result["pan"]["y_um"]) == (pytest.approx(-30.0, abs=0.5), pytest.approx(10.0, abs=0.5))
+
+
+def test_a_place_beyond_the_largest_pan_is_refused_and_nothing_is_pressed(lasx, client, tmp_path):
+    pad = Pad(lasx)
+
+    result = pan.set_to(client, tmp_path, 0.0, -900.0, pad=pad)
+
+    assert result["success"] is False and pad.pressed == []

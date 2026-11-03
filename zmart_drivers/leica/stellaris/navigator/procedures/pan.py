@@ -160,6 +160,23 @@ def center(client, folder) -> dict:
     return result
 
 
+def set_to(client, folder, x_um: float, y_um: float, *, pad=None) -> dict:
+    """Set the pan to *x_um* right and *y_um* up of the centre (negative: left, down), and read it back.
+
+    The pan is read now and moved by the difference, with :func:`move`.
+    ``confirmed`` when it reads the place asked, within :data:`MOVE_TOLERANCE_UM`.
+    """
+    now = read(client, folder)
+    result = move(client, folder, x_um - now["x_um"], y_um - now["y_um"], pad=pad)
+    if result.get("success") and "pan" in result:
+        there = result["pan"]
+        landed = abs(there["x_um"] - x_um) <= MOVE_TOLERANCE_UM and abs(there["y_um"] - y_um) <= MOVE_TOLERANCE_UM
+        result["confirmed"] = bool(result.get("confirmed")) and landed
+        if not landed:
+            result["message"] = f"the pan is at {there['x_um']:.2f}, {there['y_um']:.2f} um, not {x_um:g}, {y_um:g} um"
+    return result
+
+
 def move(client, folder, x_um: float, y_um: float, *, pad=None) -> dict:
     """Move the pan by *x_um* across (right positive) and *y_um* up (down negative), and read it back.
 

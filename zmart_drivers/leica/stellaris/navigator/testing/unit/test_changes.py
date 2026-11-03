@@ -1269,6 +1269,13 @@ class TestDrawingInTheViewer:
 
         assert "clear_drawings" in changes.drawings_in_the_way(client, viewer=viewer)
 
+    def test_no_pan_with_a_bleach_point_drawn(self, lasx, client):
+        lasx.live[("Confocal", "ROIScan", "CurrentBleachPoint")] = 0
+
+        why = changes.drawings_in_the_way(client, "the pan", viewer=self.viewer(lasx))
+
+        assert "pan" in why and "clear_drawings" in why
+
     def test_with_nothing_drawn_the_objective_may_change(self, lasx, client):
         lasx.live[("Confocal", "ROIScan", "EnableRoiScan")] = True
 

@@ -696,15 +696,34 @@ class Microscope:
         Done as the operator does it, with the arrows of LAS X's pan pad,
         at a zoom raised just enough that whole presses land on the
         distance; the zoom is set back afterwards. Refused before anything
-        is pressed when the pan would go beyond LAS X's largest.
+        is pressed when the pan would go beyond LAS X's largest, and while
+        bleach points or ROI regions are drawn: they stay in the field, so a pan
+        would move them across the sample.
         """
         self.handle.require_open()
+        refuse_with_drawings(self.handle, "the pan", "move_pan")
         result = pan_step.move(self.handle.client, setting_files.folder_for(self.handle), x_um, y_um)
         return checked(self.handle, result, f"move_pan({x_um!r}, {y_um!r})")
 
-    def center_pan(self) -> dict:
-        """Set the pan back to the centre, through LAS X's smallest zoom and back to the zoom it had; read back."""
+    def set_pan(self, x_um: float, y_um: float) -> dict:
+        """Set the pan to *x_um* right and *y_um* up of the centre (negative: left, down), and read it back.
+
+        The pan is where the galvo has moved the scan field, in micrometres on
+        the sample from the centre. It is read now and moved by the difference,
+        as :meth:`move_pan` moves it; refused in the same cases.
+        """
         self.handle.require_open()
+        refuse_with_drawings(self.handle, "the pan", "set_pan")
+        result = pan_step.set_to(self.handle.client, setting_files.folder_for(self.handle), x_um, y_um)
+        return checked(self.handle, result, f"set_pan({x_um!r}, {y_um!r})")
+
+    def center_pan(self) -> dict:
+        """Set the pan back to the centre, through LAS X's smallest zoom and back to the zoom it had; read back.
+
+        Refused while bleach points or ROI regions are drawn, as :meth:`move_pan`.
+        """
+        self.handle.require_open()
+        refuse_with_drawings(self.handle, "the pan", "center_pan")
         result = pan_step.center(self.handle.client, setting_files.folder_for(self.handle))
         return checked(self.handle, result, "center_pan()")
 
@@ -1143,10 +1162,7 @@ class Microscope:
         again on a picture taken with the new objective.
         """
         self.handle.require_open()
-        in_the_way = changes.drawings_in_the_way(self.handle.client)
-        if in_the_way:
-            checked(self.handle, {"success": False, "confirmed": False, "message": f"the objective was not changed: {in_the_way}"},
-                    "change_objective")
+        refuse_with_drawings(self.handle, "the objective", "change_objective")
         result = keep_in_view.set_objective(
             self.handle.client,
             readings.get_objectives(self.handle.client),
@@ -1227,6 +1243,13 @@ class Microscope:
     def state(self) -> dict:
         """``{"changeable", "observed"}``: the settings and the objective, and what can only be read, with the unconfirmed changes."""
         return state_step.get_state(self.handle)
+
+
+def refuse_with_drawings(handle, change: str, what: str) -> None:
+    """Raise, as a refused change does, when bleach points or ROI regions are drawn and *change* would move them."""
+    in_the_way = changes.drawings_in_the_way(handle.client, change)
+    if in_the_way:
+        checked(handle, {"success": False, "confirmed": False, "message": f"{change} was not changed: {in_the_way}"}, what)
 
 
 def checked(handle: Session, result: dict, what: str) -> dict:

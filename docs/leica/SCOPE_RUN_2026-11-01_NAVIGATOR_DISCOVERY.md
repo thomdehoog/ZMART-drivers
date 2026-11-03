@@ -1524,3 +1524,18 @@ measured: the simulator's pair is not calibrated.)
 
 On the simulator: the last scan's picture passed; with the zoom set to 2 a point was refused ("taken with the zoom 1
 (now 2)"); at zoom 1 it was drawn; with it drawn, the objective change was refused before anything turned.
+
+## 97. The pan and drawn regions; the pan set from the centre (3 November 2026)
+
+A rectangle drawn at pan 0 kept its `Translation` (-12.69, -14.10 µm) in a setting saved after the pan moved 100 µm
+across (`PanFirstDim` 0 to 0.001): in plain LAS X a region stays where it is in the scan field, so a pan moves it across
+the sample. (The old Navigator Expert note, that the translation is measured from the stage's centre, does not hold here.)
+The simulator's picture is a pattern that does not follow the pan, so how far the sample moved could not be seen. So
+`move_pan`, `center_pan` and the new `set_pan` are refused while points or regions are drawn, as `change_objective` is.
+
+`set_pan(x_um, y_um)` sets the pan to a place in micrometres from the centre, right and up positive, as Thom set it on the
+Navigator Expert route: the pan is read now (from a setting saved now) and moved by the difference with the pan pad's
+arrows. LCS's whole command log holds no pan command; the old route wrote `PanFirstDim` and `PanSecondDim` into the
+Navigator Expert's template and had the Navigator Expert load it; in plain LAS X a loaded setting does not set the pan
+(section 18). So the arrows, pressed through UI Automation (no mouse), stay the only way; `center_pan` alone needs no
+window, as LAS X's smallest zoom pulls the pan to the centre.

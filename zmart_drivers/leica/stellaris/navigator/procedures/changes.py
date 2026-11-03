@@ -1123,16 +1123,18 @@ def picture_is_current(client, folder, name) -> str | None:
             + "; take a new picture first (start_live and stop_live, or acquire) and draw on it")
 
 
-def drawings_in_the_way(client, *, viewer=None) -> str | None:
-    """Why the objective must not change now: a bleach point or an ROI region is drawn (None when nothing is).
+def drawings_in_the_way(client, change="the objective", *, viewer=None) -> str | None:
+    """Why *change* (``"the objective"``, ``"the pan"``) must not happen now: a bleach point or an ROI region is drawn
+    (None when nothing is).
 
-    They are kept in the scan field, so with another objective they would
-    land elsewhere on the sample: they are cleared first and drawn again on a
-    picture taken with the new objective.
+    They are kept in the scan field, so with another objective, or the field
+    panned, they would land elsewhere on the sample: a region's place stayed
+    the same in the field when the pan moved 100 µm (simulator, 2026-11-03).
+    They are cleared first and drawn again on a picture taken after the change.
     """
     from . import answer_dialogs, lasx_viewer
 
-    advice = "clear them with clear_drawings first, and draw them again on a picture taken with the new objective"
+    advice = f"clear them with clear_drawings first, change {change}, and draw them again on a picture taken after it"
     if readers.get_bleach_point(client)["point"] is not None:
         return f"a bleach point is drawn; {advice}"
     if readers.get_roi_scan(client)["on"]:
