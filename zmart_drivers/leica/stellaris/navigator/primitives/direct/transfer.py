@@ -670,6 +670,11 @@ CHECKED_WRITES = {
         # The setting's name, the dye spectra shown, ROI scan and the bleach mode, the ROI scan's stack sections.
         "Name", "ShowExcitationSpectrum", "ShowEmissionSpectrum", "EnableRoiScan", "EnableBleachScan",
         "Is3DLimitedRoiScanEnabled", "First3DRoiSection", "Last3DRoiSection",
+        # A detector's dye and TauContrast, a white-light line's AOBS Reflection, the laser's output power and Excitation
+        # Control, the excitation scan's Lambda After Stage, the coverslip offset. Not IsDoubleModeEnabled: this AOBS has
+        # no Enhanced Dynamics.
+        "DyeName", "IsLifetimeContrastActive", "IsReflection", "LaserTargetOutputPower", "CurrentExcitationControlMode",
+        "IsExcitationLambdaAfterStageDim", "ReflectionOffset",
     }),
 }
 
