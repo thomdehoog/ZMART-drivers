@@ -659,7 +659,7 @@ CHECKED_WRITES = {
     # The STELLARIS, each checked against the window (2026-11-04).
     "4.9.2.31016": frozenset({
         "ScanDirectionX", "PhaseX", "Resolution", "PinholeUnit", "SequentialMode",
-        "EmissionWaveLengthForAiryAnddzCalculation",
+        "EmissionWaveLengthForAiryAnddzCalculation", "StackCalculationMode",
     }),
 }
 
