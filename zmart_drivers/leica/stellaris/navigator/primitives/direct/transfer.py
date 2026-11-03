@@ -660,6 +660,8 @@ CHECKED_WRITES = {
     "4.9.2.31016": frozenset({
         "ScanDirectionX", "PhaseX", "Resolution", "PinholeUnit", "SequentialMode",
         "EmissionWaveLengthForAiryAnddzCalculation", "StackCalculationMode",
+        "AutofocusSpeed", "AutofocusScanDirectionX", "AutofocusZoom", "AFAnalyseType", "Precision", "UseFixSliceCount",
+        "FixSliceCount", "FocusRange", "ZUseMode",
     }),
 }
 
