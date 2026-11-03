@@ -1575,28 +1575,28 @@ def lock_all_settings(client, locked=True, *, max_retries=None) -> dict:
     return run(client, writes.settings_locked(locked), max_retries=max_retries)
 
 
-def lock_detector(client, folder, detector, locked, *, max_retries=None) -> dict:
-    """Lock *detector* and its setting's excitation line from LAS X's Dye Assistant, or free them; read back.
+def lock_detector(client, detector, locked, *, max_retries=None) -> dict:
+    """Lock *detector* and its excitation line from LAS X's Dye Assistant, or free them, as the window's detector lock
+    does; read back. In any setting.
 
-    As the window's detector lock: only a detector in use; its excitation
-    line is the one the setting excites at, read from a setting saved now
-    into *folder*, among the laser lines that are on.
+    The line is the detector's own excitation line (:func:`set_excitation_line`).
+    On Auto, the window locks the one line that is on (simulator, 2026-11-03);
+    with several lines on, which one LAS X would choose cannot be read, so the
+    line is chosen first.
     """
-    from . import setting_files
-
     in_use = {d["name"]: d for d in readers.get_detectors(client) or []}
     if detector not in in_use:
         return dispatch.refused(f"{detector!r} is not in use; the detectors in use are {sorted(in_use)}")
-    wavelength = setting_files.saved_now(client, folder)["excitation_nm"]
-    line = next(
-        (each for each in readers.get_laser_lines(client) or [] if wavelength is not None and abs(each["wavelength"] - wavelength) < 0.5),
-        None,
-    )
-    if line is None:
-        return dispatch.refused(f"the setting's excitation line ({wavelength} nm) is not among the laser lines that are on")
-    change = writes.dye_assistant_lock(
-        writes.route_of(in_use[detector]["beamRoute"]), writes.route_of(line["beamRoute"]), line["lineIndex"], locked
-    )
+    setting = readers.get_setting(client)
+    ids = [s["id"] for s in setting["all"]]
+    lines = readers.get_setting_definitions(client)[ids.index(setting["id"]) if setting["id"] in ids else 0]["lines"]
+    place = ((readers.get_detector_modes(client) or {}).get(detector) or {}).get("reference_line") or 0
+    if place == 0 and len(lines) != 1:
+        return dispatch.refused(f"{detector}'s excitation line is on Auto with {len(lines)} lines on; choose it with set_excitation_line first")
+    if place > len(lines):
+        return dispatch.refused(f"{detector}'s excitation line ({place}) is not among the setting's lines that are on")
+    line = lines[max(place, 1) - 1]
+    change = writes.dye_assistant_lock(writes.route_of(in_use[detector]["beamRoute"]), line["route"], line["line_index"], locked)
     return run(client, change, max_retries=max_retries)
 
 

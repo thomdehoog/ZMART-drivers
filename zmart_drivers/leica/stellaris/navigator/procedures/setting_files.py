@@ -188,43 +188,6 @@ def set_detector(
     return result
 
 
-def saved_now(client, folder) -> dict:
-    """Setting 1 as LAS X saves it now (:func:`read_back`); empty when it cannot be saved."""
-    Path(folder).mkdir(parents=True, exist_ok=True)
-    path = Path(folder) / f"setting_{time.strftime('%Y%m%d-%H%M%S')}_read.seq"
-    if not save(client, path).get("success"):
-        return {"detectors": {}, "excitation_line": None, "excitation_nm": None, "show": {}}
-    return read_back(path.read_text(encoding="utf-8"))
-
-
-def read_back(text: str) -> dict:
-    """What Setting 1 of a saved setting says: each detector's mode, tau mode, contrast and dye; the excitation line; the spectra shown."""
-    start, end = setting_1(text)
-    part = text[start:end]
-    detectors = {}
-    for tag in re.findall(r"<Detector [^>]*>", part):
-        fields = dict(re.findall(r' (\w+)="([^"]*)"', tag))
-        if fields.get("OperatingType") == "1":
-            mode = "Reflection" if fields.get("IsReflectionModeActive") == "1" else "Analog"
-        else:
-            mode = next((n for n, f in OPERATING_MODES.items() if f.get("AcquisitionMode") == fields.get("AcquisitionMode")), None)
-        detectors[fields.get("Name")] = {
-            "operating_mode": mode,
-            "tau_mode": next((n for n, code in TAU_MODES.items() if code == fields.get("DigitalGatingMode")), None),
-            "tau_contrast": fields.get("IsLifetimeContrastActive") == "1",
-            "dye": fields.get("DyeName"),
-        }
-    line = re.search(r"<DetectionReferenceLine [^>]*>", part)
-    excitation = excitation_nm = None
-    if line:
-        fields = dict(re.findall(r' (\w+)="([^"]*)"', line[0]))
-        excitation_nm = float(fields.get("LaserWavelength", "nan"))
-        excitation = "auto" if fields.get("IsAutomaticAssigned") == "1" else excitation_nm
-    head = dict(re.findall(r' (\w+)="([^"]*)"', re.search(r"<ATLConfocalSettingDefinition [^>]*>", part)[0]))
-    show = {"excitation": head.get("IsShowDyeExcitationSpectrum") == "1", "emission": head.get("IsShowDyeEmissionSpectrum") == "1"}
-    return {"detectors": detectors, "excitation_line": excitation, "excitation_nm": excitation_nm, "show": show}
-
-
 # =============================================================================
 # The file: Setting 1, and the values in it
 # =============================================================================

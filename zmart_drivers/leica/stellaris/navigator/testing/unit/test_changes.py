@@ -634,14 +634,43 @@ class TestTheSetting:
         assert lasx.commands() == []
 
 
+LINE_405 = {"route": (30,), "line_index": 0, "wavelength": 405.0, "percent": 2.0}
+LINE_497 = {"route": (10, 10), "line_index": 1, "wavelength": 497.0, "percent": 2.0}
+
+
+def one_line(monkeypatch, lines):
+    """The current setting's lines that are on, as the setting reader gives them."""
+    from zmart_drivers.leica.stellaris.navigator.procedures import readings
+
+    monkeypatch.setattr(readings, "get_setting_definitions", lambda client, **k: [{"name": "Setting 1", "lines": lines, "detectors": []}])
+
+
 class TestTheDetectorLock:
-    def test_a_detector_and_its_excitation_line_are_locked_and_read_back(self, lasx, client, tmp_path):
-        result = changes.lock_detector(client, tmp_path, "HyD S 3", True)
+    def test_on_auto_with_one_line_on_that_line_is_locked_with_the_detector(self, lasx, client, monkeypatch):
+        one_line(monkeypatch, [LINE_405])
+
+        result = changes.lock_detector(client, "HyD S 3", True)
 
         assert result["confirmed"] is True
-        assert lasx.commands() == ["ATL_Block_Save_To_XML", "BlockLightSinkDetectorForDyeAssistant", "BlockLightSourceLineForDyeAssistant"]
-        assert 'LineIndex="0"' in lasx.sent[-1] and 'BeamPosition="30"' in lasx.sent[-1]  # the 405 line, the setting's excitation line
-        assert changes.lock_detector(client, tmp_path, "HyD S 3", False)["confirmed"] is True
+        assert lasx.commands() == ["BlockLightSinkDetectorForDyeAssistant", "BlockLightSourceLineForDyeAssistant"]  # no setting file
+        assert 'LineIndex="0"' in lasx.sent[-1] and 'BeamPosition="30"' in lasx.sent[-1]
+        assert changes.lock_detector(client, "HyD S 3", False)["confirmed"] is True
+
+    def test_the_detector_s_chosen_line_is_locked(self, lasx, client, monkeypatch):
+        one_line(monkeypatch, [LINE_405, LINE_497])
+        units = [u for spectro in lasx.nodes.detection["Spectrophotometer"] for u in spectro["DetectionUnitList"]["DetectorHWInfo"]]
+        next(u for u in units if tuple(u["BeamRoute"]) == (40, 3))["ReferenceLine"] = 2
+
+        assert changes.lock_detector(client, "HyD S 3", True)["confirmed"] is True
+        assert 'LineIndex="1"' in lasx.sent[-1] and 'BeamPosition="10"' in lasx.sent[-1]
+
+    def test_on_auto_with_several_lines_on_it_is_refused_and_nothing_is_sent(self, lasx, client, monkeypatch):
+        one_line(monkeypatch, [LINE_405, LINE_497])
+
+        result = changes.lock_detector(client, "HyD S 3", True)
+
+        assert result["success"] is False and "set_excitation_line" in result["message"]
+        assert lasx.commands() == []
 
     def test_every_setting_is_locked_and_freed_as_bulk_options_does(self, lasx, client):
         assert changes.lock_all_settings(client, True)["confirmed"] is True
@@ -654,8 +683,8 @@ class TestTheDetectorLock:
         assert changes.lock_all_settings(client, locked)["success"] is False
         assert lasx.commands() == []
 
-    def test_a_detector_not_in_use_is_refused_and_nothing_is_sent(self, lasx, client, tmp_path):
-        result = changes.lock_detector(client, tmp_path, "Trans PMT", True)
+    def test_a_detector_not_in_use_is_refused_and_nothing_is_sent(self, lasx, client):
+        result = changes.lock_detector(client, "Trans PMT", True)
 
         assert result["success"] is False and "in use" in result["message"]
         assert lasx.commands() == []

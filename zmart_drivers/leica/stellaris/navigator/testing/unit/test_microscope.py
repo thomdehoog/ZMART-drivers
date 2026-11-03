@@ -406,7 +406,11 @@ def test_a_setting_is_added_and_deleted(scope, lasx):
     assert scope.delete_setting("Setting 2")["confirmed"] is True
 
 
-def test_a_detector_is_locked_for_the_dye_assistant(scope, lasx):
+def test_a_detector_is_locked_for_the_dye_assistant(scope, lasx, monkeypatch):
+    from zmart_drivers.leica.stellaris.navigator.procedures import readings
+
+    line = {"route": (30,), "line_index": 0, "wavelength": 405.0, "percent": 2.0}
+    monkeypatch.setattr(readings, "get_setting_definitions", lambda client, **k: [{"name": "Setting 1", "lines": [line], "detectors": []}])
     assert scope.lock_detector("HyD S 3", True)["confirmed"] is True
 
 

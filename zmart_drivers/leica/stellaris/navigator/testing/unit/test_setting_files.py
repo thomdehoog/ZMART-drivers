@@ -111,11 +111,6 @@ def test_an_operator_s_setting_is_loaded_and_what_changed_is_reported(lasx, clie
 
 
 
-def setting_1(tmp_path, lasx):
-    """Setting 1 as LAS X would save it now, read the way the driver reads it back."""
-    return setting_files.read_back(lasx_saved(tmp_path, lasx))
-
-
 def lasx_saved(tmp_path, lasx):
     path = tmp_path / "now.seq"
     lasx.take_ATL_Block_Save_To_XML(type("E", (), {"get": lambda self, k: str(path)})())

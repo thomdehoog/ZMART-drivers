@@ -486,7 +486,7 @@ class Microscope:
     def lock_detector(self, name: str, locked: bool = True) -> dict:
         """Keep the detector *name* and its excitation line from LAS X's Dye Assistant, or free them, as the window's detector lock does."""
         self.handle.require_open()
-        result = changes.lock_detector(self.handle.client, setting_files.folder_for(self.handle), name, locked)
+        result = changes.lock_detector(self.handle.client, name, locked)
         return checked(self.handle, result, f"lock_detector({name!r}, {locked!r})")
 
     def lock_channel_colour(self, locked: bool = True) -> dict:

@@ -1206,3 +1206,13 @@ the same, so the menu has no unlock; `LockState="0"` through LCS freed them all.
 `ATL_Setting_EnableDisableForScanning` with `SetMode="1"` and `EnableForScanning="0"`; `EnableForScanning="1"` switched them all
 on again. Built: `lock_all_settings(locked=True)` and `enable_setting(on, all_settings=False)`. Through the driver: locked, freed,
 every setting off and on again. Reset System and Reset ImageCompass were not pressed: they are hard to undo, and Thom decides.
+
+## 76. The detector lock's excitation line, from the detector (3 November 2026)
+
+The setting's HyD 2 lock (the driver's mouse; its excitation line on "Auto (499)", one line on) sent the two commands the driver
+sends, the detector and the 499 line (`LineIndex="1"`, route 10;10), and LCS pinned the detector's `TimegateReferenceLineIndex`
+from 0 to 1; freeing it left the pin. The Best Focus panel's lock (its HyD S 3, not on) sent only the detector's command. Built:
+`lock_detector` takes the detector's own excitation line (section 73) instead of a saved setting, so it works in any setting; on
+Auto it locks the one line that is on, and with several lines on Auto it is refused until the line is chosen, because LAS X's
+choice cannot be read. `saved_now` and `read_back`, no longer used, were removed. Through the driver: HyD 2 locked on Auto and
+on 499, freed each time, and its line put back to Auto.
