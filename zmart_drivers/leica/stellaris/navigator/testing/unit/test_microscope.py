@@ -450,3 +450,20 @@ def test_the_autofocus_is_run(scope, lasx, tmp_path, monkeypatch):
 
     monkeypatch.setattr(changes, "LCS_LOG", tmp_path / "LCS.LOG")
     assert scope.autofocus(project=24)["found"] is True
+
+
+@pytest.mark.parametrize("name, direction", [
+    ("pan_up", "up"), ("pan_down", "down"), ("pan_left", "left"), ("pan_right", "right"), ("pan_up_left", "up-left"),
+    ("pan_up_right", "up-right"), ("pan_down_left", "down-left"), ("pan_down_right", "down-right"), ("pan_centre", "centre"),
+])
+def test_each_of_the_pan_pad_s_nine_buttons_has_its_function(name, direction, monkeypatch):
+    from zmart_drivers.leica.stellaris.navigator.methods import Microscope
+
+    asked = []
+    monkeypatch.setattr(Microscope, "step_pan", lambda self, *a, **k: asked.append((a, k)) or {"success": True})
+    scope = Microscope.__new__(Microscope)
+
+    getattr(scope, name)(route="scanner") if name == "pan_centre" else getattr(scope, name)(2, route="scanner", percent=1)
+
+    expected = ((direction,), {"route": "scanner"}) if name == "pan_centre" else ((direction, 2), {"route": "scanner", "percent": 1})
+    assert asked == [expected]

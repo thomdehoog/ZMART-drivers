@@ -73,6 +73,8 @@ checked by the driver either way (`transfer.CHECKED_COMMANDS`, `transfer.STATE_T
 
 ## To check on the STELLARIS
 
+- `measure_pan_window()` on the STELLARIS (by the window's pad): its largest pan and field fraction against the code's; the
+  field fraction on a sample with pictures; the resonant scanner's window.
 - The pan's window on the STELLARIS: that LAS X clips there too, at the largest pan times `1 - smallest zoom / zoom`
   (0.00775 on the simulator, a number in the code). The COM scanner route stays on the simulator until Thom allows it on the
   STELLARIS (section 99).

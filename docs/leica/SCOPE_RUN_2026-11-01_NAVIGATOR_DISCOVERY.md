@@ -1596,3 +1596,23 @@ is refused unless LCS names the system the simulator (`CurrentSerialNumber` "STE
 LCS's step back. Through the driver on the simulator: window 193.85 µm at zoom 1; `set_pan(300, -50, route="scanner")`
 went to 193.85, -50.0 and said so; three steps right from the edge stayed at the edge, clipped; the window route, 1 %
 diagonal steps, the centre, and the step back at 3 %, all read back.
+
+## 100. What the pan's two numbers depend on; the pad's nine buttons (3 November 2026)
+
+The largest pan (0.00775 in the driver) and the field fraction (0.667) were measured on the simulator under several
+conditions, at zoom 2: from where LAS X stops the pan, largest = edge / (1 - smallest zoom / zoom); from one 3 % step,
+fraction = 0.03 * largest / (zoom * step). Both came out 0.007750 and 0.6667 at 400, 600 and 100 Hz, formats 128, 512 and
+1024, rotation 30° and bidirectional scanning: they depend on none of these, and the zoom enters only through the window's
+formula. The fraction is exactly 2/3 in LAS X's own arrows, as Thom measured on the STELLARIS. With the resonant scanner
+(its zoom 24 to 48 here) the window follows another rule: its edge in pan units shrank with the zoom (0.003496 at 30,
+0.002620 at 40, about 0.105 / zoom); so with the resonant scanner the driver does not foresee the window (`pan_window`
+answers None), LAS X still clips, and the read-back says where the pan ended. The objective was not changed (Thom asks
+first); with another objective the window in micrometres scales with its field, by the formula.
+
+Built: the pan pad's nine buttons as functions (`pan_up`, `pan_down`, `pan_left`, `pan_right`, `pan_up_left`,
+`pan_up_right`, `pan_down_left`, `pan_down_right`, `pan_centre`; all through `step_pan`, by the window's pad by default or
+the COM scanner on the simulator), `pan_step(route)` (the window's step from LCS's `PanePercentage`), and
+`measure_pan_window(zooms, route)`, which steps to where LAS X stops the pan at each zoom and compares both numbers with the
+driver's. Through the driver on the simulator, by the window's pad: up twice to 69.78 µm, down-right, left nine times
+stopped at -193.85 µm and said so, the middle button centred the pan; measured by the window and by the scanner alike:
+0.007750 and 0.6667, matching the code, the pan centred and the zoom back at 1.

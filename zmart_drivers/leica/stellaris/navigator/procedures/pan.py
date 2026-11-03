@@ -135,8 +135,26 @@ class WindowPad:
             raise answer_dialogs.WindowsUnavailable(f"the pan pad's arrows were not found, only {sorted(buttons)}")
         return buttons
 
+    #: The window's arrows step by LCS's ``PanePercentage``.
+    percent = None
+
     def press(self, arrow: str) -> None:
         self.window.press(self.buttons[arrow])
+
+    def centre(self) -> None:
+        """The pad's middle button, which centres the pan."""
+        if "centre" not in self.buttons:
+            raise answer_dialogs.WindowsUnavailable("the pan pad's middle button was not found")
+        self.press("centre")
+
+    def close(self) -> None:
+        """Nothing to put back: the window's arrows keep LCS's step."""
+
+
+def window_step(client) -> dict:
+    """The step of the window's arrows: ``percent`` of the field shown (LCS's ``PanePercentage``), and ``um`` at the zoom now."""
+    percent = readers.get_pane_percentage(client)
+    return {"percent": percent, "um": click_um(client, readers.get_zoom(client)["current"], percent)}
 
 
 class ScannerRefused(RuntimeError):
@@ -195,7 +213,7 @@ def step(client, folder, direction: str, count: int, pad) -> dict:
     pan reads the end, within :data:`MOVE_TOLERANCE_UM`.
     """
     if direction == "centre":
-        return center_by_scanner(client, folder, pad)
+        return center_by_pad(client, folder, pad)
     try:
         if direction not in VECTORS:
             raise ValueError(f"the pan steps {sorted(VECTORS)} or to the 'centre', not {direction!r}")
@@ -240,8 +258,8 @@ def step_size(client, pad) -> dict:
     return {"percent": held, "um": click_um(client, readers.get_zoom(client)["current"], held)}
 
 
-def center_by_scanner(client, folder, pad) -> dict:
-    """Set the pan back to the centre with the COM scanner's centre, the zoom untouched; the step put back; read back."""
+def center_by_pad(client, folder, pad) -> dict:
+    """Set the pan back to the centre with the pad's middle button, the zoom untouched; the pad closed; read back."""
     try:
         pad.centre()
     finally:
@@ -308,8 +326,12 @@ def window_um(client, zoom: float | None = None) -> float:
     largest pan times ``1 - smallest zoom / zoom``, so none at the smallest
     zoom. Beyond it LAS X clips the pan to the edge without a word (simulator,
     2026-11-03: 0.001937 at zoom 1, 0.004844 at 2, 0.006297 at 4, as the
-    formula gives). That clip is the scanner's guard.
+    formula gives). That clip is the scanner's guard. None with the
+    resonant scanner, whose window shrank with the zoom on the simulator and
+    is not known yet.
     """
+    if readers.get_scan_speed(client).get("isResonant"):
+        return None  # the resonant scanner's window follows another rule (simulator, 2026-11-03): not known yet
     zooms = readers.get_zoom(client)
     zoom = zooms["current"] if zoom is None else zoom
     return max(0.0, PAN_LIMIT * (1 - zooms["min"] / zoom)) * micrometres_per_pan(base_fov_um(client))
@@ -323,8 +345,63 @@ def clip(client, x_um: float, y_um: float) -> dict:
     ``window_um``. The closest place is where LAS X itself would clip to.
     """
     window = window_um(client)
+    if window is None:  # not known: LAS X clips, and the read-back after the move says where the pan ended
+        return {"asked_um": (x_um, y_um), "to_um": (x_um, y_um), "over_um": (0.0, 0.0), "window_um": None}
     to = tuple(max(-window, min(window, value)) for value in (x_um, y_um))
     return {"asked_um": (x_um, y_um), "to_um": to, "over_um": (x_um - to[0], y_um - to[1]), "window_um": window}
+
+
+def measure_window(client, folder, pad, *, zooms=(1.0, 2.0)) -> dict:
+    """Measure LAS X's window and the arrows' step with *pad*, and compare them with the numbers in the driver.
+
+    At each zoom the pan is centred, stepped once to the right (the step's
+    size in pan units) and then on until LAS X stops it (the edge). The edge
+    gives the largest pan, ``edge / (1 - smallest zoom / zoom)``; the step
+    gives the field fraction, ``percent / 100 * largest / (zoom * step)``,
+    which is how LAS X itself defines its arrows (on a sample it is checked
+    with pictures). The pan is centred and the zoom set back afterwards.
+    ``matches_the_code`` when both are within 1 % of :data:`PAN_LIMIT` and
+    :data:`GALVO_FIELD_FRACTION`. Refused with the resonant scanner.
+    """
+    if readers.get_scan_speed(client).get("isResonant"):
+        pad.close()
+        return {"success": False, "confirmed": False, "message": "the window is measured with the galvo scanner, not the resonant one"}
+    percent = pad.percent if pad.percent is not None else readers.get_pane_percentage(client)
+    start = readers.get_zoom(client)
+    measured = []
+    try:
+        for zoom in zooms:
+            pad.centre()
+            raised = change(client, "zoom", zoom)
+            if not raised.get("success"):
+                return raised
+            before = read(client, folder)["x"]
+            pad.press("right")
+            time.sleep(0.2)
+            step_pan = read(client, folder)["x"] - before
+            expected = PAN_LIMIT * (1 - start["min"] / zoom)
+            for _ in range(math.ceil(expected / step_pan) + 3 if step_pan > 0 else 0):
+                pad.press("right")
+                time.sleep(0.05)
+            edge = read(client, folder)["x"]
+            for _ in range(3):
+                pad.press("right")
+            stopped = abs(read(client, folder)["x"] - edge) <= 1e-9
+            largest = edge / (1 - start["min"] / zoom)
+            measured.append({"zoom": zoom, "step_pan": step_pan, "edge_pan": edge, "stopped": stopped, "largest_pan": largest,
+                             "field_fraction": percent / 100 * largest / (zoom * step_pan) if step_pan > 0 else None})
+    finally:
+        pad.centre()
+        if abs(readers.get_zoom(client)["current"] - start["current"]) > 1e-9:
+            change(client, "zoom", start["current"])
+        pad.close()
+    largest = sum(m["largest_pan"] for m in measured) / len(measured)
+    fraction = sum(m["field_fraction"] for m in measured) / len(measured)
+    matches = (all(m["stopped"] for m in measured) and abs(largest / PAN_LIMIT - 1) <= 0.01
+               and abs(fraction / GALVO_FIELD_FRACTION - 1) <= 0.01)
+    return {"success": True, "confirmed": all(m["stopped"] for m in measured), "largest_pan": largest,
+            "field_fraction": fraction, "matches_the_code": matches, "measured": measured,
+            "in_the_code": {"largest_pan": PAN_LIMIT, "field_fraction": GALVO_FIELD_FRACTION}}
 
 
 def clipped_note(clipped: dict) -> str:

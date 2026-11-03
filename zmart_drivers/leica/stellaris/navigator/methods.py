@@ -724,26 +724,93 @@ class Microscope:
         result = pan_step.set_to(self.handle.client, setting_files.folder_for(self.handle), x_um, y_um, pad=pad)
         return checked(self.handle, result, f"set_pan({x_um!r}, {y_um!r})")
 
-    def step_pan(self, direction: str, count: int = 1, percent: int = 3) -> dict:
-        """Step the pan *count* times toward *direction*, or back to the ``"centre"``, as the pan pad's buttons do.
+    def step_pan(self, direction: str, count: int = 1, percent: int | None = None, route: str = "window") -> dict:
+        """Press one of the pan pad's buttons *count* times: one of its eight directions, or its middle, the ``"centre"``.
 
-        Through LCS's older COM scanner (its ``MoveInDirection``), for the
-        simulator only. *direction* is one of the pad's eight: ``"up"``,
-        ``"up-right"``, ``"right"``, ``"down-right"``, ``"down"``,
-        ``"down-left"``, ``"left"``, ``"up-left"``. A step is *percent* (1, 2
-        or 3) of the field shown; LCS's own step is put back afterwards. The
-        end is worked out first and refused beyond LAS X's largest pan; the
-        first step is checked, and on a wrong one the pan is centred. Refused
-        while LAS X scans and while points or regions are drawn. Read back.
+        *direction* is ``"up"``, ``"up-right"``, ``"right"``, ``"down-right"``,
+        ``"down"``, ``"down-left"``, ``"left"``, ``"up-left"`` or ``"centre"``.
+        With *route* ``"window"`` the buttons of LAS X's pan pad are pressed
+        (UI Automation, no mouse), each a step of LCS's 3 % of the field shown.
+        With ``"scanner"`` the step goes through LCS's older COM scanner (for
+        the simulator only), *percent* 1, 2 or 3 of the field shown, LCS's own
+        step put back afterwards. A pan that would end beyond LAS X's window
+        stops at its edge, and the result's ``clipped`` says how far over it
+        was; the first step is checked against the formula, and on a wrong
+        one the pan is centred. Refused while points or regions are drawn.
+        Read back.
         """
         self.handle.require_open()
         refuse_with_drawings(self.handle, "the pan", "step_pan")
         try:
-            pad = pan_step.ScannerPad(self.handle.client, percent=percent)
-        except (pan_step.ScannerRefused, ValueError) as why:
+            if route == "window":
+                held = readings.get_pane_percentage(self.handle.client)
+                if percent is not None and percent != held:
+                    raise ValueError(f"the window's buttons step by LCS's {held:g} percent; another step needs route='scanner'")
+                pad = pan_step.WindowPad()
+            elif route == "scanner":
+                pad = pan_step.ScannerPad(self.handle.client, percent=3 if percent is None else percent)
+            else:
+                raise ValueError(f"the pan's route is 'window' or 'scanner', not {route!r}")
+        except (pan_step.ScannerRefused, ValueError, answer_dialogs.WindowsUnavailable) as why:
             return checked(self.handle, {"success": False, "confirmed": False, "message": str(why)}, "step_pan")
         result = pan_step.step(self.handle.client, setting_files.folder_for(self.handle), direction, count, pad)
-        return checked(self.handle, result, f"step_pan({direction!r}, {count!r}, {percent!r})")
+        return checked(self.handle, result, f"step_pan({direction!r}, {count!r}, route={route!r})")
+
+    def pan_up(self, count: int = 1, route: str = "window", percent: int | None = None) -> dict:
+        """The pan pad's up button, *count* times (:meth:`step_pan`)."""
+        return self.step_pan("up", count, route=route, percent=percent)
+
+    def pan_down(self, count: int = 1, route: str = "window", percent: int | None = None) -> dict:
+        """The pan pad's down button, *count* times (:meth:`step_pan`)."""
+        return self.step_pan("down", count, route=route, percent=percent)
+
+    def pan_left(self, count: int = 1, route: str = "window", percent: int | None = None) -> dict:
+        """The pan pad's left button, *count* times (:meth:`step_pan`)."""
+        return self.step_pan("left", count, route=route, percent=percent)
+
+    def pan_right(self, count: int = 1, route: str = "window", percent: int | None = None) -> dict:
+        """The pan pad's right button, *count* times (:meth:`step_pan`)."""
+        return self.step_pan("right", count, route=route, percent=percent)
+
+    def pan_up_left(self, count: int = 1, route: str = "window", percent: int | None = None) -> dict:
+        """The pan pad's up-left button, *count* times (:meth:`step_pan`)."""
+        return self.step_pan("up-left", count, route=route, percent=percent)
+
+    def pan_up_right(self, count: int = 1, route: str = "window", percent: int | None = None) -> dict:
+        """The pan pad's up-right button, *count* times (:meth:`step_pan`)."""
+        return self.step_pan("up-right", count, route=route, percent=percent)
+
+    def pan_down_left(self, count: int = 1, route: str = "window", percent: int | None = None) -> dict:
+        """The pan pad's down-left button, *count* times (:meth:`step_pan`)."""
+        return self.step_pan("down-left", count, route=route, percent=percent)
+
+    def pan_down_right(self, count: int = 1, route: str = "window", percent: int | None = None) -> dict:
+        """The pan pad's down-right button, *count* times (:meth:`step_pan`)."""
+        return self.step_pan("down-right", count, route=route, percent=percent)
+
+    def pan_centre(self, route: str = "window") -> dict:
+        """The pan pad's middle button: the pan back to the centre, the zoom untouched (:meth:`step_pan`)."""
+        return self.step_pan("centre", route=route)
+
+    def measure_pan_window(self, zooms=(1.0, 2.0), route: str = "window") -> dict:
+        """Measure where LAS X stops the pan, and the pad's step, and compare them with the numbers in the driver.
+
+        At each zoom the pan is stepped right with the pad (*route* as for
+        :meth:`step_pan`) until LAS X stops it. The answer gives the largest
+        pan and the field fraction this machine's LAS X uses (0.00775 and
+        0.667 in the driver), each zoom's measurement, and ``matches_the_code``.
+        The pan is centred and the zoom set back afterwards. The field
+        fraction is how LAS X defines its arrows; on a sample it is checked
+        with pictures.
+        """
+        self.handle.require_open()
+        refuse_with_drawings(self.handle, "the pan", "measure_pan_window")
+        try:
+            pad = pan_step.WindowPad() if route == "window" else pan_step.ScannerPad(self.handle.client, percent=3)
+        except (pan_step.ScannerRefused, answer_dialogs.WindowsUnavailable) as why:
+            return checked(self.handle, {"success": False, "confirmed": False, "message": str(why)}, "measure_pan_window")
+        result = pan_step.measure_window(self.handle.client, setting_files.folder_for(self.handle), pad, zooms=tuple(zooms))
+        return checked(self.handle, result, f"measure_pan_window({tuple(zooms)!r})")
 
     def pan_window(self) -> dict:
         """How far LAS X lets the pan go from the centre at the zoom now, on each axis, in micrometres.
@@ -751,19 +818,24 @@ class Microscope:
         LAS X keeps the galvo inside a window that grows with the zoom (none at
         its smallest) and clips any pan beyond it. The pan functions go to the
         closest place within it and say so; this answers ``zoom``,
-        ``half_width_um``, and ``x_um`` and ``y_um`` as (low, high).
+        ``half_width_um``, and ``x_um`` and ``y_um`` as (low, high). With the
+        resonant scanner the window is not known: all three are None.
         """
         self.handle.require_open()
         half = pan_step.window_um(self.handle.client)
-        return {"zoom": readings.get_zoom(self.handle.client)["current"], "half_width_um": half,
-                "x_um": (-half, half), "y_um": (-half, half)}
+        span = (-half, half) if half is not None else None
+        return {"zoom": readings.get_zoom(self.handle.client)["current"], "half_width_um": half, "x_um": span, "y_um": span}
 
-    def pan_step(self) -> dict:
-        """The pan's step as LCS's COM scanner holds it: ``percent`` of the field shown, and ``um`` at the zoom now.
+    def pan_step(self, route: str = "window") -> dict:
+        """The pad's step: ``percent`` of the field shown, and ``um``, how far one press moves the pan at the zoom now.
 
-        For the simulator only, as :meth:`step_pan`.
+        *route* ``"window"`` reads the window's arrows' step from LCS's state
+        tree; ``"scanner"`` the step LCS's COM scanner holds (for the
+        simulator only, as :meth:`step_pan`).
         """
         self.handle.require_open()
+        if route == "window":
+            return pan_step.window_step(self.handle.client)
         try:
             pad = pan_step.ScannerPad(self.handle.client, percent=3)
         except pan_step.ScannerRefused as why:
@@ -781,7 +853,7 @@ class Microscope:
         refuse_with_drawings(self.handle, "the pan", "center_pan")
         folder = setting_files.folder_for(self.handle)
         pad = pan_route(self.handle, route, "center_pan")
-        result = pan_step.center_by_scanner(self.handle.client, folder, pad) if pad else pan_step.center(self.handle.client, folder)
+        result = pan_step.center_by_pad(self.handle.client, folder, pad) if pad else pan_step.center(self.handle.client, folder)
         return checked(self.handle, result, "center_pan()")
 
     def save_setting(self, path) -> dict:
