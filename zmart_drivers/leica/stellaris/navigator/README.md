@@ -219,8 +219,8 @@ Some values have no command of their own in LAS X: its window writes them straig
 state tree, and so does the driver. Such a write is made only when three things hold, and refused with the reason
 otherwise:
 
-- LAS X is a build the driver's writes were checked on (4.9.0.30051, the simulator's). On another build, nothing is
-  written until the writes are checked again on it.
+- The write was checked on this LAS X build, against its control in the window (all of them on 4.9.0.30051, the
+  simulator's). On a new build, each write is checked and switched on by itself, one at a time.
 - LAS X takes input for its settings now: not while it is scanning or busy, when its window greys its controls out.
 - The value is one the window offers, within LAS X's own range, and within its own entry in this microscope's limits
   file.

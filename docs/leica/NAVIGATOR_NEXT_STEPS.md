@@ -80,14 +80,15 @@ The first session, in this order (Thom, 3 November 2026):
 3. Read only: every value the driver reads, against what the window shows. Nothing is changed.
 4. Commands at harmless values, each read back: zoom, scan speed, a small stage move, one pan step, a laser at low
    power with the shutter checked.
-5. The state-tree writes, one by one against their window, only after the build is checked and added (below).
+5. The state-tree writes, one at a time: each checked against its control in the window, then added to the STELLARIS
+   build's list in `transfer.CHECKED_WRITES` on its own.
 6. Acquisition last: a capture, a z-stack, a time series, a tile scan.
 
 The checks, by subject:
 
-- LAS X's build (`Acquire/LASAFversion`). The state-tree writes go in only on a build they were checked on
-  (`transfer.CHECKED_LASX_BUILDS`, 4.9.0.30051); on another, each write is refused and names the build. Check the
-  writes there, each against its window, one by one, before the build is added.
+- LAS X's build (`Acquire/LASAFversion`). A state-tree write goes in only when it was checked on this build
+  (`transfer.CHECKED_WRITES`: on 4.9.0.30051, the simulator, all of them); otherwise it is refused and named. On the
+  STELLARIS's build, each write is checked against its control in the window and added to its list on its own.
 - `zoom_in` on a sample: that the box's middle comes to the centre (the pan's direction, from March to May).
 - `measure_pan_window()` on the STELLARIS (by the window's pad): its largest pan and field fraction against the code's; the
   field fraction on a sample with pictures; the resonant scanner's window.

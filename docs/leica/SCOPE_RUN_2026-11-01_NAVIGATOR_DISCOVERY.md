@@ -1911,3 +1911,9 @@ Each fact found by observation on the simulator:
 | A shape loaded, moved into the set, and deleted | on the simulator: ROI scan on, the set empty; a 20 by 10 µm rectangle added and read back with its corners, LAS X adding its own laser lines; cleared, the set empty again |
 
 The wrapper's version is checked before anything is touched; another version is refused.
+
+## 119. The build check, one write at a time (3 November 2026)
+
+The check of section 116 switched on every state-tree write of a build at once. Now `transfer.CHECKED_WRITES` lists,
+for each LAS X build, the writes checked on it, each against its control in the window: on 4.9.0.30051 (the simulator)
+all 93. On a new build none is made until it is checked and added by itself; one not listed is refused and named.

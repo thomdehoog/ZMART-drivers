@@ -2077,6 +2077,31 @@ class TestStateTreeWritesOnlyOnACheckedLasXBuild:
     def test_the_checked_build_writes(self, lasx, client):
         assert changes.set_roi_scan(client, True)["confirmed"] is True
 
+    def test_on_a_new_build_only_the_writes_checked_there_are_made(self, lasx, client, monkeypatch):
+        """On a new build the writes are switched on one at a time, each after it is checked against its window."""
+        from zmart_drivers.leica.stellaris.navigator.primitives.direct import transfer
+
+        lasx.live[("Acquire", "LASAFversion")] = "LAS X 5.1.0.12345"
+        monkeypatch.setitem(transfer.CHECKED_WRITES, "5.1.0.12345", frozenset({"EnableRoiScan"}))
+
+        assert changes.set_roi_scan(client, True)["confirmed"] is True
+        result = changes.set_fast_live(client, "fov", format=128)
+
+        assert result["success"] is False
+        assert "FastLiveFormat" in result["message"] and "5.1.0.12345" in result["message"]
+        assert not [path for path, _ in lasx.nodes.tree_writes if path[-1] == "ScanFormat"]
+
+    def test_every_write_was_checked_on_the_simulator_s_build(self):
+        from zmart_drivers.leica.stellaris.navigator.primitives.direct import transfer
+
+        assert transfer.CHECKED_WRITES["4.9.0.30051"] == frozenset(transfer.STATE_TREE_WRITES)
+
+    def test_a_checked_write_is_one_the_driver_knows(self):
+        from zmart_drivers.leica.stellaris.navigator.primitives.direct import transfer
+
+        for build, names in transfer.CHECKED_WRITES.items():
+            assert names <= set(transfer.STATE_TREE_WRITES), build
+
 
 class TestRoiScanAndBleachMode:
     def test_roi_scan_is_switched_on_and_off(self, lasx, client):

@@ -651,9 +651,12 @@ def outside_the_limits(client, elements) -> str | None:
 
 #: Where LCS gives LAS X's build (``"LAS X [ BETA ] 4.9.0.30051"`` on the simulator, 2026-11-03).
 LASX_VERSION = ("Acquire", "LASAFversion")
-#: The LAS X builds the state-tree writes were checked on, each value against its window. Another build is added
-#: here only after its writes are checked again.
-CHECKED_LASX_BUILDS = ("4.9.0.30051",)
+#: For each LAS X build, the state-tree writes checked on it, each against its control in the window. On another
+#: build, or for a write not listed for this one, nothing is written. A new build starts with none: each write is
+#: checked there and added on its own, one at a time.
+CHECKED_WRITES = {
+    "4.9.0.30051": frozenset(STATE_TREE_WRITES),  # the simulator, every write (2026-11-01 to 2026-11-03)
+}
 
 #: LCS's two switches for whether LAS X takes input for its settings now: both on while it is idle; Live turned the
 #: first off, and Start turns it off too (simulator, 2026-11-03). A state-tree write is made only with both on.
@@ -663,9 +666,9 @@ TAKES_INPUT = (("Acquire", "CanDoChangeOnIdleOrPrepare"), ("Acquire", "ATL", "UI
 def write_into_state_tree(name: str, text: str, at: str | None = None) -> str:
     """Write one listed value into LCS's state tree; answer as LAS X answers a command.
 
-    Nothing is written on a LAS X build the writes were not checked on
-    (:data:`CHECKED_LASX_BUILDS`), as where a value sits in the tree can move
-    from one build to the next. Nothing is written while LAS X itself takes no input for its settings
+    Nothing is written that was not checked on this LAS X build
+    (:data:`CHECKED_WRITES`), as where a value sits in the tree can move from
+    one build to the next. Nothing is written while LAS X itself takes no input for its settings
     (:data:`TAKES_INPUT`, as its window then greys its controls out). A
     value with a range of LCS's own is first checked against that range,
     read now; outside it, nothing is written. Either way the answer is a
@@ -676,9 +679,9 @@ def write_into_state_tree(name: str, text: str, at: str | None = None) -> str:
     nodes = state_tree.server_nodes()
     found = str(state_tree.node_value(nodes, state_tree.node_at(nodes, LASX_VERSION)) or "")
     build = re.search(r"\d+\.\d+\.\d+\.\d+", found)
-    if not build or build.group() not in CHECKED_LASX_BUILDS:
-        return (f'<Result Error="1">the state-tree writes were checked on LAS X {", ".join(CHECKED_LASX_BUILDS)}, '
-                f'not on this build ({found or "none given"}); {name} not written</Result>')
+    if not build or name not in CHECKED_WRITES.get(build.group(), ()):
+        return (f'<Result Error="1">{name} was not checked on this LAS X build ({found or "none given"}): check it '
+                f'against its control in the window, then add it to CHECKED_WRITES; not written</Result>')
     off = [path[-1] for path in TAKES_INPUT if not state_tree.node_value(nodes, state_tree.node_at(nodes, path))]
     if off:
         return (f'<Result Error="1">LAS X takes no input for its settings now ({", ".join(off)} off: '
