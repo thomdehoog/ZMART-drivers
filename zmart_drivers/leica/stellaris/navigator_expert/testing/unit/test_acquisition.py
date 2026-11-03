@@ -637,6 +637,33 @@ class TestSave:
         assert pixels.shape == (1, 2, 1, 16, 16)
         assert np.array_equal(pixels[0, :, 0, 0, 0], [10, 11])
 
+    def test_the_cache_is_read_once_for_the_store_and_its_projection(
+        self,
+        patched_export,
+        successful_acq,
+        tmp_path,
+        naming,
+        monkeypatch,
+    ):
+        """Each plane is read from LAS X's cache once: the projection is made
+        from the volume already in memory, not by reading the cache again."""
+        from zmart_drivers.leica.stellaris.navigator_expert.procedures.save_data import (
+            ome_canonical,
+        )
+
+        reads = []
+        real = ome_canonical._read_source_plane
+        monkeypatch.setattr(
+            ome_canonical, "_read_source_plane", lambda source: reads.append(source) or real(source)
+        )
+
+        saved = _save(successful_acq, tmp_path / "run_000001", naming)
+
+        assert saved.projection_paths, "a stack gets its projection"
+        planes = len(patched_export["plane_paths"])
+        # One extra read: gather opens the first plane once to learn its size.
+        assert len(reads) == planes + 1
+
     def test_the_state_is_printed_beside_the_images_as_metadata(
         self,
         patched_export,

@@ -133,15 +133,24 @@ def save(
     exported = replace(
         exported, metadata=on_the_canvas(exported.metadata, exported, placement)
     )
+    where = _placed(exported, placement)
+    if where is None:
+        raise ValueError(
+            "a position is placed by its canvas position, and none was given "
+            "(save's placement); without it the image would lie at an invented place"
+        )
     try:
+        # Every plane is read from LAS X's cache once, here: the position and
+        # its projection are both made from this one volume in memory.
+        capture = ome_zarr.gather(exported, orientation=orientation, where=where)
         saved = _persist_store(
             exported,
+            capture,
             Path(output_root),
             naming,
             lineage=lineage,
             notes=notes,
             orientation=orientation,
-            placement=placement,
             image_format=image_format,
         )
     except FileNotFoundError as why:
@@ -151,11 +160,10 @@ def save(
         saved = replace(
             saved,
             projection_paths=_persist_projection(
-                exported,
+                capture,
                 Path(output_root),
                 naming,
                 orientation=orientation,
-                placement=placement,
                 notes=notes,
                 projected_from=next(iter(saved.image_paths.values())),
                 vendor_files=saved.vendor_metadata_paths,
@@ -193,12 +201,11 @@ def say_when_the_path_is_too_long(
 
 
 def _persist_projection(
-    exported: ExportedAcquisition,
+    capture: ome_zarr.Capture,
     output_root: Path,
     naming: Naming,
     *,
     orientation: Orientation,
-    placement,
     notes: convention.Notes | None,
     projected_from: Path,
     vendor_files,
@@ -206,17 +213,11 @@ def _persist_projection(
 ) -> tuple[Path, ...]:
     """The capture's max projection in ``projections``, in the capture's own format.
 
-    Its capture record says which store it was made from, and how.
+    It is made from *capture*, the volume already read from LAS X's cache for
+    the position, so the cache is not read a second time. Its capture record
+    says which position it was made from, and how.
     """
-    indices = [index for position in exported.positions for index in position.planes]
-    where = (
-        placement(sorted({index.z for index in indices}))
-        if placement is not None
-        else None
-    )
-    projected = ome_zarr.max_projection(
-        ome_zarr.gather(exported, orientation=orientation, where=where)
-    )
+    projected = ome_zarr.max_projection(capture)
     store = projections_dir(output_root) / f"{naming.stem}{ENDINGS[image_format]}"
     record = dict((notes.capture_record if notes else None) or {})
     record["derived_from"] = {
@@ -230,6 +231,13 @@ def _persist_projection(
     )
     write = ome_tiff.write_tiff if image_format == "ome-tiff" else ome_zarr.write_store
     return (write(projected, store, notes=told),)
+
+
+def _placed(exported: ExportedAcquisition, placement):
+    """Where each plane of *exported* lies (plane z number -> canvas x, y, z), or None without a placement."""
+    if placement is None:
+        return None
+    return placement(sorted({index.z for position in exported.positions for index in position.planes}))
 
 
 def on_the_canvas(metadata, exported: ExportedAcquisition, placement) -> object:
@@ -262,34 +270,24 @@ def on_the_canvas(metadata, exported: ExportedAcquisition, placement) -> object:
 
 def _persist_store(
     exported: ExportedAcquisition,
+    capture: ome_zarr.Capture,
     output_root: Path,
     naming: Naming,
     *,
     lineage: dict | None,
     notes: convention.Notes | None,
     orientation: Orientation,
-    placement: Callable[[list[int]], Callable[[int], dict]] | None,
     image_format: str = FORMAT,
 ) -> SavedAcquisition:
     """The capture as one position in ``data``, beside the vendor's metadata and the state.
 
-    The position is one OME-Zarr image, or one OME-TIFF file when
+    *capture* is the capture's volume, already read from LAS X's cache and
+    placed. The position is one OME-Zarr image, or one OME-TIFF file when
     *image_format* is ``"ome-tiff"``.
     """
     vendor_records = _persist_vendor_metadata(exported, output_root, naming)
     indices = [index for position in exported.positions for index in position.planes]
-    where = (
-        placement(sorted({index.z for index in indices}))
-        if placement is not None
-        else None
-    )
     store = data_dir(output_root) / f"{naming.stem}{ENDINGS[image_format]}"
-    if where is None:
-        raise ValueError(
-            "an OME-Zarr store is placed by its canvas position, and none was given "
-            "(save's placement); without it the image would lie at an invented place"
-        )
-    capture = ome_zarr.gather(exported, orientation=orientation, where=where)
     vendor_files = [output_root / record["path"] for record in vendor_records]
     write = ome_tiff.write_tiff if image_format == "ome-tiff" else ome_zarr.write_store
     write(
