@@ -153,6 +153,22 @@ class TestAnswering:
         assert "No channel active" in caplog.text
         assert "Information" in answered.message
 
+    def test_las_x_s_mosaic_merge_failing_is_answered(self, lasx_log, monkeypatch, caplog):
+        """LAS X cannot merge a time series of tile scans for its own display and says so with OK alone; the fields are
+        taken and saved as they are (simulator, 2026-11-03)."""
+        show(
+            lasx_log,
+            "2026-11-03 15:42:08.699 0007  Info DbTracer 'MessageBox Mosaic Merge: Unable to merge!\n"
+            "Details: Unknown Data Container error (Code:1) '\n",
+        )
+        dialog = StandInDialog(lasx_log)
+        use(monkeypatch, StandInWindows([dialog]))
+
+        answered = answer_dialogs.answer_warnings()
+
+        assert dialog.pressed == ["ButtonMessageOk"] and answered.dialog.caption == "Mosaic Merge"
+        assert "Unable to merge!" in answered.dialog.text
+
     def test_a_dialog_with_another_button_is_left_open_and_refused(
         self, lasx_log, monkeypatch, caplog
     ):

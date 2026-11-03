@@ -70,18 +70,22 @@ WATCH_INTERVAL_S = waiting.POLL_S
 #: The one button the driver presses, and the caption of the dialogs it presses it on.
 OK_BUTTON = "ButtonMessageOk"
 WARNING = "Warning"
-#: The dialogs answered with OK, when OK is their only button: notices, never questions.
-ANSWERED_CAPTIONS = (WARNING, "Information")
+#: The dialogs answered with OK, when OK is their only button: notices, never questions. "Mosaic Merge" is LAS X's
+#: Mosaic Merge, which merges a tile scan's fields for its own display.
+ANSWERED_CAPTIONS = (WARNING, "Information", "Mosaic Merge")
 
 #: How the notices start that change nothing and are answered: each reports a
 #: start LAS X refused, or asks the operator to keep a distance it has kept
-#: already (all seen on the simulator, 2026-10-13 to 2026-11-01). Every other
-#: box, OK-only or not, is left for the person at the microscope.
+#: already (all seen on the simulator, 2026-10-13 to 2026-11-01), or says LAS X
+#: could not merge a time series of tile scans for its own display, whose
+#: fields are taken and saved as they are (2026-11-03). Every other box,
+#: OK-only or not, is left for the person at the microscope.
 HARMLESS = (
     "Can not start scan!",
     "Can not start while live scan is running!",
     "Please keep minimum distance of",
     "I Cannot Start The Scan",
+    "Unable to merge!",
 )
 
 #: COM's answer when a thread's COM is set up already, in another mode: usable as it is.
@@ -97,7 +101,7 @@ SHOWN = re.compile(r"^(\S+ \S+) .*?'MessageBox (?!Result: )(.*)$")
 ANSWER = re.compile(r"'MessageBox Result: ")
 #: Its caption: ``Warning : <text>`` (a text from the hardware server), ``Warning: <text>`` (a
 #: form LAS X writes too) or ``Warning! <text>`` (Navigator Expert's).
-CAPTION = re.compile(r"^(\w+)(?:!\s*|\s?:\s)(.*)$", re.DOTALL)
+CAPTION = re.compile(r"^(\w+(?: \w+)?)(?:!\s*|\s?:\s)(.*)$", re.DOTALL)
 
 
 def dialog_of(at: str, body: str) -> Dialog:

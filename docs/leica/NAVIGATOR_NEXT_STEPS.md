@@ -65,7 +65,6 @@ checked by the driver either way (`transfer.CHECKED_COMMANDS`, `transfer.STATE_T
 
 **Other**
 - The Dye Assistant's Apply is `set_dyes`'s command (section 80). Reset System and Reset ImageCompass are built (section 90).
-- A time series of tile scans (LAS X's dimensions 4 and 10 together) is still refused when saved.
 - A dye of one's own in LAS X's library; the dye bar's "+".
 - The Best Focus Setting changed during the dye trials (its scan zoom to 48, a 488 nm line at 1 %); the zoom was put back.
 

@@ -63,7 +63,7 @@ X_AXIS, Y_AXIS, Z_AXIS = 1, 2, 3
 #: time point (simulator, 2026-10-15). A single time point is read as none. A
 #: time series taken with Start keeps its frames one after the other along
 #: dimension 4, in seconds (simulator, 2026-11-03, Series002); a time series
-#: of tile scans is still refused.
+#: of tile scans has both, the frames outside the fields (Mosaic001).
 TIME_AXIS, TILE_AXIS = 4, 10
 
 #: LAS X's look-up-table names as OME colours (RGBA, as a signed 32-bit int).
@@ -117,8 +117,9 @@ def axes(image: ET.Element) -> dict[int, dict]:
 
     The fields (:data:`TILE_AXIS`) and the frames of a time series
     (:data:`TIME_AXIS`) give their count and byte step; a single time point
-    is passed over. Refuses any other dimension, a time series of tile scans,
-    and any x, y or z axis not in metres.
+    is passed over. A time series of tile scans keeps its frames one after
+    the other, each holding every field (simulator, 2026-11-03). Refuses any
+    other dimension, and any x, y or z axis not in metres.
     """
     found = {}
     for dimension in image.findall(
@@ -156,11 +157,6 @@ def axes(image: ET.Element) -> dict[int, dict]:
         }
     if X_AXIS not in found or Y_AXIS not in found:
         raise RuntimeError("LAS X's description of the picture gives no x or no y axis")
-    if TIME_AXIS in found and TILE_AXIS in found:
-        raise RuntimeError(
-            f"the picture has LAS X dimension {TIME_AXIS} with {found[TIME_AXIS]['count']} time points and "
-            "tile fields: a time series of tile scans is not read"
-        )
     return found
 
 
@@ -223,8 +219,10 @@ def metadata_from_description(xml: str, field: int = 0) -> AcquisitionMetadata:
     size_z = z["count"] if z else 1
     size_t = dims[TIME_AXIS]["count"] if TIME_AXIS in dims else 1
 
+    fields_count = dims[TILE_AXIS]["count"] if TILE_AXIS in dims else 1
     reading = Reading(
-        image, hardware, setting, position=position, first_stamp=field * size_z * len(channels)
+        image, hardware, setting, position=position, first_stamp=field * size_z * len(channels),
+        frame_stamps=fields_count * size_z * len(channels),
     )
     planes = reading.planes(len(channels), z, size_t)
     last = planes.get(PlaneIndex(t=size_t - 1, z=0, c=0))
@@ -270,6 +268,7 @@ class Reading:
         *,
         position: tuple[float, float, float] | None = None,
         first_stamp: int = 0,
+        frame_stamps: int | None = None,
     ) -> None:
         self.image = image
         self.hardware = hardware
@@ -277,6 +276,8 @@ class Reading:
         #: A tile scan's field: where it was taken (metres) and its first time stamp.
         self.position = position
         self.first_stamp = first_stamp
+        #: The stamps of one frame, every field's: a field's next frame is this many stamps on (None: one field).
+        self.frame_stamps = frame_stamps
         self.sequence = hardware.find("LDM_Block_Sequential")
         self.detectors: dict[str, Detector] = {}
         self.lasers: dict[str, Laser] = {}
@@ -526,7 +527,7 @@ class Reading:
                 for name, metres in sorted(drives.items())
             ]
             for t, c in ((t, c) for t in range(size_t) for c in range(size_c)):
-                stamp = (t * size_z + plane) * size_c + c
+                stamp = t * (self.frame_stamps or size_z * size_c) + plane * size_c + c
                 planes[PlaneIndex(t=t, z=plane, c=c)] = PlaneMetadata(
                     delta_t_s=(stamps[stamp] - stamps[0]) / 1e7
                     if stamp < len(stamps)

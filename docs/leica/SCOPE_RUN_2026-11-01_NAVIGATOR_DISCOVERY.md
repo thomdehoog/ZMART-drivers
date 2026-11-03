@@ -1647,3 +1647,15 @@ right, read back and compared with one press of the window's arrow, then centred
   Built: `draw_roi_range(first_x, last_x)`. Through the driver: a four-corner polygon and the columns 330 to 430, in place.
 - The bleaching time: the Bleach Point panel's boxes (days to milliseconds), typed through UI Automation with the focus moved
   on, no keys. Built: `set_bleach_time(seconds)`, read back from the boxes: 2.5 s on a drawn point.
+
+## 103. A time series of tile scans saved (3 November 2026)
+
+A 2-field tile scan in xyt with 2 frames (the stage first put inside the machine's limits, at 63500, 41500 µm) gave
+Mosaic001: x and y 512, the fields along LAS X's dimension 10 (2, a field's bytes apart), the frames along dimension 4 (2,
+both fields' bytes apart), and a time stamp for each channel of each field of each frame: the frames are outside the
+fields. LAS X then could not merge it for its own display ("Mosaic Merge: Unable to merge! Details: Unknown Data Container
+error (Code:1)", OK alone), and the box held the run until it was answered. Built: such a picture is saved as one store
+per field with its frames along t (the stamps counted frame by frame over every field), and the Mosaic Merge notice is
+among those the driver answers (its caption now read with up to two words: "Mosaic Merge"; the fields are saved as they
+are). Through the driver: the tile scan in 11.4 s, LAS X's notice answered in 0.35 s, `field0` and `field1` each
+(2, 2, 1, 512, 512), LAS X's cache let go of; the scan mode back to xyz, z-wide back at 982.9 µm.

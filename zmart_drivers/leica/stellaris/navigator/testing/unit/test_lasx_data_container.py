@@ -249,9 +249,22 @@ class TestTileScan:
         with pytest.raises(RuntimeError, match="2 positions for 3 fields"):
             description.metadata_from_description(mosaic_xml(listed=FIELDS_M[:2]), field=0)
 
-    def test_a_time_series_of_tile_scans_is_still_refused(self):
-        with pytest.raises(RuntimeError, match="dimension 4"):
-            description.metadata_from_description(mosaic_xml(times=2), field=0)
+    @pytest.mark.parametrize("field", [0, 1, 2])
+    def test_a_time_series_of_tile_scans_keeps_each_field_s_frames_along_t(self, cache, field):
+        # The frames follow one another, each holding every field (simulator, 2026-11-03: Mosaic001, 2 fields, 2 frames).
+        pixels = np.arange(2 * 3 * 2 * 3 * 4, dtype=np.uint8).reshape(2, 3, 2, 3, 4)  # frame, field, channel, y, x
+        path = write_pixels(cache, 10756, pixels)
+
+        metadata, planes = container.layout(mosaic_xml(times=2), path, field=field)
+
+        assert metadata.size_t == 2
+        for t in (0, 1):
+            for c in (0, 1):
+                np.testing.assert_array_equal(plane(planes[PlaneIndex(t=t, z=0, c=c)]), pixels[t, field, c])
+        # Each stamp is a second after the one before, frame by frame over every field: the field's next frame is
+        # 3 fields x 2 channels = 6 s later.
+        assert metadata.planes[PlaneIndex(t=1, z=0, c=0)].delta_t_s == pytest.approx(6.0)
+        assert metadata.time_increment_s == pytest.approx(6.0)
 
 
 def series_xml(*, frames=3, interval_s=1.28) -> str:
