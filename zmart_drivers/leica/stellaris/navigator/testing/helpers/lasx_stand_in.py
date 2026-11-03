@@ -438,6 +438,17 @@ class PlainNavigator:
     def take_RemoveDetectorImageChannel(self, e):
         del self.detector_at(e)["Gates"][int(e.get("ChannelIndex"))]
 
+    def take_AddDetectorTauSeparationChannel(self, e):
+        unit = self.detector_at(e)
+        if len(unit["TauColours"]) < 7:  # LCS ignores an eighth (simulator, 2026-11-03)
+            unit["TauColours"].append("Yellow")
+            unit.setdefault("TauLifetimes", [1e-09, 3e-09]).append(2e-09)
+
+    def take_RemoveDetectorTauSeparationChannel(self, e):
+        unit, place = self.detector_at(e), int(e.get("ChannelIndex"))
+        del unit["TauColours"][place]
+        del unit.setdefault("TauLifetimes", [1e-09, 3e-09])[place]
+
     def take_SetDetectorTauSeparationLut(self, e):
         self.detector_at(e)["TauColours"][int(e.get("TauChannelIndex"))] = e.get("LutName")
 

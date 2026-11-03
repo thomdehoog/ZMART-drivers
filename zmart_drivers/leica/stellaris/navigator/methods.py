@@ -359,14 +359,14 @@ class Microscope:
         result = setting_files.show_spectra(self.handle.client, setting_files.folder_for(self.handle), excitation=excitation, emission=emission)
         return checked(self.handle, result, "show_spectra")
 
-    def set_tau_channel_colour(self, detector: str, channel: int, colour: str) -> dict:
-        """Give TauSeparation's channel 1 or 2 of *detector* a colour (LAS X's name, such as ``"Red"``), as the window's colour pick.
+    def set_tau_channel_colour(self, detector: str, channel: int, colour: str, locked: bool = True) -> dict:
+        """Give a TauSeparation channel of *detector* a colour (LAS X's name, such as ``"Red"``), as the window's colour pick.
 
-        Only while the detector is in TauSeparation. Unlike the window, the
-        other tau channels keep their colours.
+        Only while the detector is in TauSeparation. *locked*: the window's lock
+        beside it. Unlike the window, the other tau channels keep their colours.
         """
         self.handle.require_open()
-        result = changes.set_tau_channel_colour(self.handle.client, detector, channel, colour)
+        result = changes.set_tau_channel_colour(self.handle.client, detector, channel, colour, locked=locked)
         return checked(self.handle, result, f"set_tau_channel_colour({detector!r}, {channel!r}, {colour!r})")
 
     def find_tau_lifetimes(self, detector: str) -> dict:
@@ -379,6 +379,16 @@ class Microscope:
         result = changes.find_tau_lifetimes(self.handle.client, detector)
         checked(self.handle, result, f"find_tau_lifetimes({detector!r})")
         return {"found": result["found"], "lifetimes_ns": result["lifetimes_ns"]}
+
+    def add_tau_channel(self, detector: str) -> dict:
+        """Add a TauSeparation channel, as its window's + (at most seven); set its lifetime and colour after."""
+        self.handle.require_open()
+        return checked(self.handle, changes.add_tau_channel(self.handle.client, detector), f"add_tau_channel({detector!r})")
+
+    def remove_tau_channel(self, detector: str, channel: int) -> dict:
+        """Remove TauSeparation's *channel* (1 the first), as its window's - (two always stay)."""
+        self.handle.require_open()
+        return checked(self.handle, changes.remove_tau_channel(self.handle.client, detector, channel), f"remove_tau_channel({detector!r}, {channel!r})")
 
     def set_tau_scan(self, detector: str, images: int | None = None, range_ns: tuple[float, float] | None = None) -> dict:
         """Set TauScan's number of images (1 to the detector's most, 7 on the simulator) and its lifetime range

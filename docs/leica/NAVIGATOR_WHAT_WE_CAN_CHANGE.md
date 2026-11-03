@@ -154,6 +154,7 @@ discovery session in `SCOPE_RUN_2026-11-01_NAVIGATOR_DISCOVERY.md` and the build
 | TauSeparation's Find | Works, with LAS X's command; reports whether LAS X found the lifetimes (only "none found" seen) |
 | TauGating's gates and channels: moved, added, removed | Works, with LAS X's commands; within the window's -1 to 11.5 ns |
 | TauScan's number of images and lifetime range | Works, with LAS X's commands; images up to the detector's most, range 0.05 to 11.5 ns |
+| TauSeparation's channels added and removed (two to seven), and a channel colour's lock | Works, with LAS X's commands |
 | Dye | Works (through a saved setting) |
 | Excitation line (a line, or Auto) | Works with one detector on (through a saved setting) |
 | Channel colour | Works |
@@ -197,7 +198,7 @@ service and the person responsible for the instrument.
 
 | State | Settings |
 |---|---|
-| Works | 100 (the objective among them, not yet tried) |
+| Works | 101 (the objective among them, not yet tried) |
 | Tried | 0 |
 | Command known | 0 |
 | Not yet learned | 8 |

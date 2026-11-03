@@ -152,6 +152,36 @@ def test_a_tau_mode_las_x_greys_out_is_refused_and_nothing_is_sent(lasx, client,
     assert len(lasx.sent) == sent
 
 
+class TestTauSeparationChannels:
+    @pytest.fixture
+    def separating(self, lasx, client, tmp_path):
+        setting_files.set_detector(client, tmp_path, "HyD S 3", tau_mode="TauSeparation")
+        return client
+
+    def test_a_channel_is_added_and_removed_as_the_window_s_plus_and_minus_do(self, lasx, separating):
+        from zmart_drivers.leica.stellaris.navigator.procedures import changes
+
+        assert changes.add_tau_channel(separating, "HyD S 3")["confirmed"] is True
+        assert len(direct_reader.get_detector_modes()["HyD S 3"]["tau_colours"]) == 3
+        assert changes.remove_tau_channel(separating, "HyD S 3", 3)["confirmed"] is True
+        assert direct_reader.get_detector_modes()["HyD S 3"]["tau_colours"] == ["Cyan", "Magenta"]
+
+    def test_two_channels_always_stay_and_at_most_seven(self, lasx, separating):
+        from zmart_drivers.leica.stellaris.navigator.procedures import changes
+
+        assert changes.remove_tau_channel(separating, "HyD S 3", 2)["success"] is False
+        for _ in range(5):
+            changes.add_tau_channel(separating, "HyD S 3")
+        assert changes.add_tau_channel(separating, "HyD S 3")["success"] is False
+
+    def test_the_colour_s_lock_is_sent_as_the_window_s_lock(self, lasx, separating):
+        from zmart_drivers.leica.stellaris.navigator.procedures import changes
+
+        changes.set_tau_channel_colour(separating, "HyD S 3", 1, "Cyan", locked=False)
+
+        assert 'IsUserDefined="0"' in lasx.sent[-1]
+
+
 class TestTauScan:
     @pytest.fixture
     def scanning(self, lasx, client, tmp_path):

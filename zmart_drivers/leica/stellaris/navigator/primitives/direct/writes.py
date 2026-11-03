@@ -1041,7 +1041,34 @@ def find_tau_lifetimes(route, name: str) -> Write:
                  description=f"Detector {name} tau lifetimes -> found by LAS X", ready=idle(), never_resend=True)
 
 
-def tau_channel_colour(route, name: str, setting_id: int, channel: int, colour: str) -> Write:
+#: The most TauSeparation channels LCS takes (an eighth was ignored; simulator, 2026-11-03), and the fewest.
+MOST_TAU_CHANNELS = 7
+FEWEST_TAU_CHANNELS = 2
+
+
+def tau_channel_added(route, name: str, count: int) -> Write:
+    """A TauSeparation channel added to the detector *name*, as its window's +; LCS gives it a lifetime, the colour can be set after."""
+
+    def fill(request: Request) -> None:
+        request.elements = [f'<Scanner Command="AddDetectorTauSeparationChannel">{beam_route(route)}</Scanner>']
+
+    return Write(command="add_tau_channel", values={"value": count + 1}, request="AddDetectorTauSeparationChannel", fill=fill,
+                 description=f"Detector {name} TauSeparation channel added", ready=idle(),
+                 confirm=Expect("detector_modes", lambda modes: len(((modes or {}).get(name) or {}).get("tau_colours") or []) == count + 1))
+
+
+def tau_channel_removed(route, name: str, channel: int, count: int) -> Write:
+    """TauSeparation's *channel* (1 the first) of the detector *name* removed, as its window's -."""
+
+    def fill(request: Request) -> None:
+        request.elements = [f'<Scanner Command="RemoveDetectorTauSeparationChannel" ChannelIndex="{channel - 1}">{beam_route(route)}</Scanner>']
+
+    return Write(command="remove_tau_channel", values={"value": channel}, request="RemoveDetectorTauSeparationChannel", fill=fill,
+                 description=f"Detector {name} TauSeparation channel {channel} removed", ready=idle(),
+                 confirm=Expect("detector_modes", lambda modes: len(((modes or {}).get(name) or {}).get("tau_colours") or []) == count - 1))
+
+
+def tau_channel_colour(route, name: str, setting_id: int, channel: int, colour: str, locked: bool = True) -> Write:
     """The colour of TauSeparation's *channel* (1 or 2) of the detector *name*, as the window's colour pick sends it; read back.
 
     ``SetDetectorTauSeparationLut`` names the setting by its ID, not its place
@@ -1054,7 +1081,7 @@ def tau_channel_colour(route, name: str, setting_id: int, channel: int, colour: 
 
     def fill(request: Request) -> None:
         request.elements = [f'<Scanner Command="SetDetectorTauSeparationLut" TauChannelIndex="{channel - 1}" SetMode="2" '
-                            f'SingleSettingID="{int(setting_id)}" IsUserDefined="1" LutName="{colour}">{beam_route(route)}</Scanner>']
+                            f'SingleSettingID="{int(setting_id)}" IsUserDefined="{int(bool(locked))}" LutName="{colour}">{beam_route(route)}</Scanner>']
 
     def shows(modes) -> bool:
         colours = (modes or {}).get(name, {}).get("tau_colours") or []

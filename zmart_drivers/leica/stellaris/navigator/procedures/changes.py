@@ -408,16 +408,16 @@ def tau_channel(client, detector, channel):
     return writes.route_of(units[detector]["BeamRoute"]), None
 
 
-def set_tau_channel_colour(client, detector, channel, colour, *, max_retries=None) -> dict:
-    """Give TauSeparation's *channel* (1 or 2) of *detector* the colour *colour*, in the current setting; read back.
+def set_tau_channel_colour(client, detector, channel, colour, *, locked=True, max_retries=None) -> dict:
+    """Give TauSeparation's *channel* (1 the first) of *detector* the colour *colour*, in the current setting; read back.
 
-    Only while the detector is in TauSeparation, which has two channels.
+    Only while the detector is in TauSeparation. *locked*: the window's lock beside the colour (LAS X then keeps it).
     """
     route, refusal = tau_channel(client, detector, channel)
     if refusal:
         return dispatch.refused(refusal)
     try:
-        change = writes.tau_channel_colour(route, detector, readers.get_setting(client)["id"], channel, colour)
+        change = writes.tau_channel_colour(route, detector, readers.get_setting(client)["id"], channel, colour, locked)
     except ValueError as why:
         return dispatch.refused(str(why))
     return run(client, change, max_retries=max_retries)
@@ -564,6 +564,28 @@ def remove_tau_gate_channel(client, detector, channel, *, max_retries=None) -> d
         return writes.tau_gate_channel_removed(route, detector, channel, len(gates))
 
     return tau_gate_run(client, detector, build, max_retries)
+
+
+def add_tau_channel(client, detector, *, max_retries=None) -> dict:
+    """Add a TauSeparation channel to *detector*, as its window's +; at most seven."""
+    route, refusal = tau_channel(client, detector, 1)
+    if refusal:
+        return dispatch.refused(refusal)
+    count = len((readers.get_detector_modes(client) or {}).get(detector, {}).get("tau_colours") or [])
+    if count >= writes.MOST_TAU_CHANNELS:
+        return dispatch.refused(f"{detector}'s TauSeparation has {count} channels, the most LAS X takes")
+    return run(client, writes.tau_channel_added(route, detector, count), max_retries=max_retries)
+
+
+def remove_tau_channel(client, detector, channel, *, max_retries=None) -> dict:
+    """Remove TauSeparation's *channel* (1 the first) of *detector*, as its window's -; two always stay."""
+    route, refusal = tau_channel(client, detector, channel)
+    if refusal:
+        return dispatch.refused(refusal)
+    count = len((readers.get_detector_modes(client) or {}).get(detector, {}).get("tau_colours") or [])
+    if count <= writes.FEWEST_TAU_CHANNELS:
+        return dispatch.refused(f"TauSeparation keeps at least {writes.FEWEST_TAU_CHANNELS} channels")
+    return run(client, writes.tau_channel_removed(route, detector, channel, count), max_retries=max_retries)
 
 
 def set_tau_channel_lifetime(client, detector, channel, ns, *, max_retries=None) -> dict:

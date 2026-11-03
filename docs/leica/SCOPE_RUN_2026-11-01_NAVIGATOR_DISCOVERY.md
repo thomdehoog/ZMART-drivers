@@ -1069,3 +1069,14 @@ Built: `set_tau_scan(detector, images=, range_ns=)`, refused outside TauScan, ab
 11.5 ns; `get_detector_modes()[name]["tau_scan"]`. Through the driver on HyD 2: 5 images, 0.5 to 8 ns; 9 refused; back to
 3 and 0.1 to 10 ns; HyD 2 back in TauSeparation.
 
+## 63. TauSeparation's + and -, and the colour lock (3 November 2026)
+
+In "TauSeparation - HyD 2", + sent `<Scanner Command="AddDetectorTauSeparationChannel">` (with the beam route); LCS gave the new
+channel 2 ns, and the window then sent its colour (`SetDetectorTauSeparationLut ... LutName="Yellow"`). - sent
+`RemoveDetectorTauSeparationChannel ChannelIndex="2"`. A channel's lock sent its colour again with `IsUserDefined="0"`
+(unlocked) or `"1"` (locked). Sent by hand, LCS took up to seven channels and ignored an eighth.
+
+Built: `add_tau_channel(detector)` (at most seven), `remove_tau_channel(detector, channel)` (two stay), and `locked=` on
+`set_tau_channel_colour`. Through the driver on HyD 2: a third channel (LCS gave it yellow, 2 ns), coloured green, removed;
+removing a second refused; channel 1 unlocked and locked again.
+
