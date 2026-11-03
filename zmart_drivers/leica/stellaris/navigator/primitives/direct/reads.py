@@ -1057,6 +1057,10 @@ def get_detector_modes() -> dict:
             return {"images": node_value(nodes, named(nodes, unit, "TauScanImageCount")), "range_ns": (begin * 1e9, end * 1e9),
                     "most_images": most_images}
 
+        def flag(unit, name):
+            found_flag = child_named(nodes, unit, name)
+            return bool(node_value(nodes, found_flag)) if found_flag is not None else False
+
         def tau_gates(unit):
             """TauGating's channels: each ``on`` and its ``gates`` as (begin, end) in nanoseconds; empty in another tau mode."""
             if node_value(nodes, named(nodes, unit, "DigitalGatingMode")) != 3:
@@ -1092,6 +1096,8 @@ def get_detector_modes() -> dict:
                 "operating_offered": listed_codes(unit, "DetectionUnitOperatingModeList_SeqInfo", "DetectionUnitOperatingMode", "OperatingMode"),
                 "tau_colours": listed_codes(unit, "TauSeparationDefinition_SeqInfo", "TauSeparationChannel", "LutName"),
                 "gates": tau_gates(unit),
+                "tau_contrast": flag(unit, "IsLifetimeContrastActive"),
+                "tau_contrast_allowed": flag(unit, "IsLifetimeContrastAllowed"),
                 "tau_scan": tau_scan(unit, most.get(name)),
                 "donor_lifetime_ns": (
                     node_value(nodes, named(nodes, unit, "TauInteractionDonorLifetime")) * 1e9

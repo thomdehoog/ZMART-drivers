@@ -320,13 +320,12 @@ class Microscope:
         TauScan, TauSeparation, TauInteraction; with a pulsed WLL line),
         *tau_contrast* and *dye* (LAS X's name, such as ``"Leica/ALEXA 488"``).
 
-        On/off, gain, band, operating mode and tau mode go into the current
-        setting with LAS X's own commands. TauContrast and the dye go through a
-        whole setting: the current setting is saved, only Setting 1 is changed
-        in a copy, its laser powers and gains are checked against the limits,
-        and the copy is loaded; the result's ``changed`` lists everything else
-        LAS X changed with it, and this is refused when LAS X has several
-        settings. In photon counting LAS X keeps the gain fixed.
+        On/off, gain, band, operating mode, TauContrast and tau mode go into the
+        current setting as LAS X's window sends them, in any setting. The dye
+        goes through a whole setting: the current setting is saved, only Setting
+        1 is changed in a copy, checked against the limits, and loaded; refused
+        with several settings (:meth:`set_dyes` sets dyes in any setting). In
+        photon counting LAS X keeps the gain fixed.
         """
         self.handle.require_open()
         result = setting_files.set_detector(

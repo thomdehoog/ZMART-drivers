@@ -1161,3 +1161,13 @@ lines" sequential mode LCS gave Setting 1's HyD 2 the same band, as the window's
 detectors' bands there, only the light switches between lines. Put back: Setting 2 deleted, Setting 1's HyD 2 485 to 527 nm, the
 line 499 nm at 2 %.
 
+## 71. TauContrast, as the detector panel's switch (3 November 2026)
+
+With Setting 1's HyD 2 selected (the driver's mouse on its band), the detector panel showed TauContrast; its switch took
+UI Automation's toggle (the mouse did not). No command for the switch itself: the setting's
+`DetectorHWInfo_SequentialInfo[n]/IsLifetimeContrastActive` went True (beside `IsLifetimeContrastAllowed`), LCS added channels and
+enabled the tau mode None, and the window sent the new channel's colour. (The record had hidden the flag: its noise filter skipped
+names with "Lifetime".) Written into the state tree, LCS took it both ways and the window's switch followed. Built: `set_detector(
+tau_contrast=...)` now writes it, in any setting, refused where LCS does not allow it; `get_detector_modes()[name]["tau_contrast"]`.
+Through the driver: HyD 2 on and off (the switch followed), HyD 4 refused.
+

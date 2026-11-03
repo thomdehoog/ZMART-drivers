@@ -348,6 +348,12 @@ STATE_TREE_WRITES = {
     # mode's place in the detector's list (Fast Mode, Counting, Analog,
     # Reflection on the simulator, 2026-11-02); LCS sets the mode itself and
     # applies it to the detector. Which setting, photometer and detector is At.
+    # A detector's TauContrast in the setting, as the detector panel's switch writes it (simulator, 2026-11-03).
+    "IsLifetimeContrastActive": TreeWrite(
+        ("Acquire", "ATL", "CurrentBlock", "ConfocalSequentialInfo", "SequentialSettingParameter", "SpectralDetection_SequentialInfo",
+         "Spectrophotometer_SequentialInfo", "DetectionUnitList_SequentialInfo", "DetectorHWInfo_SequentialInfo", "IsLifetimeContrastActive"),
+        bool, numbered=("SequentialSettingParameter", "Spectrophotometer_SequentialInfo", "DetectorHWInfo_SequentialInfo"),
+    ),
     "OperatingModeIndex": TreeWrite(
         ("Acquire", "ATL", "CurrentBlock", "ConfocalSequentialInfo", "SequentialSettingParameter", "SpectralDetection_SequentialInfo",
          "Spectrophotometer_SequentialInfo", "DetectionUnitList_SequentialInfo", "DetectorHWInfo_SequentialInfo", "OperatingModeIndex"),

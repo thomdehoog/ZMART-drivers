@@ -372,12 +372,28 @@ def test_each_tau_mode_is_written_as_las_x_writes_it_and_read_back(lasx, client,
     assert direct_reader.get_detector_modes()["HyD S 3"]["tau"] == {"None": 0, "Intensity": 2, "TauGating": 3, "TauScan": 5, "TauSeparation": 6, "TauInteraction": 10}[mode]
 
 
-def test_tau_contrast_and_the_dye_are_set_and_read_back(lasx, client, tmp_path):
-    result = setting_files.set_detector(client, tmp_path, "HyD S 3", tau_contrast=True, dye="Leica/ALEXA 488")
+def test_the_dye_is_set_through_the_setting_and_read_back(lasx, client, tmp_path):
+    result = setting_files.set_detector(client, tmp_path, "HyD S 3", dye="Leica/ALEXA 488")
 
     assert result["confirmed"] is True
-    detector = setting_1(tmp_path, lasx)["detectors"]["HyD S 3"]
-    assert (detector["tau_contrast"], detector["dye"]) == (True, "Leica/ALEXA 488")
+    assert setting_1(tmp_path, lasx)["detectors"]["HyD S 3"]["dye"] == "Leica/ALEXA 488"
+
+
+def test_tau_contrast_is_written_as_the_detector_panel_s_switch_and_read_back(lasx, client, tmp_path):
+    loaded = len(lasx.loaded)
+
+    result = setting_files.set_detector(client, tmp_path, "HyD S 3", tau_contrast=True)
+
+    assert result["confirmed"] is True and direct_reader.get_detector_modes()["HyD S 3"]["tau_contrast"] is True
+    assert len(lasx.loaded) == loaded  # no setting file: it works in any setting
+    assert setting_files.set_detector(client, tmp_path, "HyD S 3", tau_contrast=False)["confirmed"] is True
+
+
+def test_tau_contrast_where_the_detector_does_not_allow_it_is_refused(lasx, client, tmp_path):
+    units = [u for spectro in lasx.nodes.detection["Spectrophotometer"] for u in spectro["DetectionUnitList"]["DetectorHWInfo"]]
+    next(u for u in units if tuple(u["BeamRoute"]) == (40, 3))["TauContrastAllowed"] = False
+
+    assert setting_files.set_detector(client, tmp_path, "HyD S 3", tau_contrast=True)["success"] is False
 
 
 def test_an_operating_mode_las_x_does_not_have_is_refused(lasx, client, tmp_path):

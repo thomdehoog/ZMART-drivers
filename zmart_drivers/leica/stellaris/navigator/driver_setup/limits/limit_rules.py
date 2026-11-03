@@ -477,6 +477,7 @@ MUTATING_COMMANDS = {
     # TauGating's channels and gates: which photons a channel takes, not the light
     "set_tau_gate": "set_tau_gate",
     "set_tau_scan": "set_tau_scan",
+    "set_detector_tau_contrast": "set_detector_tau_contrast",
     "set_tau_donor_lifetime": "set_tau_donor_lifetime",
     "add_tau_channel": "add_tau_channel",
     "remove_tau_channel": "remove_tau_channel",

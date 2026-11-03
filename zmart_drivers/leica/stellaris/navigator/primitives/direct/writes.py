@@ -1110,6 +1110,18 @@ def tau_channel_colour(route, name: str, setting_id: int, channel: int, colour: 
 OPERATING_CODES = {"Fast Mode": 4, "Counting": 1, "Analog": 10, "Reflection": 11}
 
 
+def detector_tau_contrast(at, name: str, on: bool) -> Write:
+    """TauContrast of the detector *name* on or off, written into its setting's entry (*at*: the setting's, photometer's and
+    detector's places) as the detector panel's switch does (simulator, 2026-11-03); read back."""
+
+    def fill(request: Request) -> None:
+        request.elements = [f'<StateTree Command="IsLifetimeContrastActive" Value="{int(bool(on))}" At="{",".join(str(int(n)) for n in at)}"/>']
+
+    return Write(command="set_detector_tau_contrast", values={"value": bool(on)}, request="IsLifetimeContrastActive", fill=fill,
+                 description=f"Detector {name} TauContrast -> {'on' if on else 'off'}", ready=idle(),
+                 confirm=Expect("detector_modes", lambda modes: ((modes or {}).get(name) or {}).get("tau_contrast") is bool(on)))
+
+
 def detector_operating_mode(at, place: int, name: str, mode: str) -> Write:
     """The operating mode of the detector *name*, written as its *place* in the detector's list into its setting's entry
     (*at*: the setting's, photometer's and detector's places), as the window does; read back.
