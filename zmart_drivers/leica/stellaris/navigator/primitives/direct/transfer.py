@@ -173,6 +173,7 @@ ALLOWED_COMMANDS = frozenset(
         "ActivateAutoFocus",
         "ActivateExtendedAutoFocusInMarkAndFind",
         "StartNavigatorAutoFocus",
+        "SaveBleachPoints",
         "DisableManualOperation",
         "StageMoveToCoordinates",
         "SetZUseMode",

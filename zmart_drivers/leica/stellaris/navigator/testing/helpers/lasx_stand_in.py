@@ -390,6 +390,10 @@ class PlainNavigator:
             drive = self.live[("Acquire", "AutoFocusInfo", "ZUseMode")]
             self.z_um[drive] += getattr(self, "autofocus_finds_um", 0.0)
 
+    def take_SaveBleachPoints(self, e):
+        """The bleach points written to the file, as LCS writes them (simulator, 2026-11-03: <BleachPoints>...)."""
+        Path(e.get("FileName")).write_text('<?xml version="1.0"?><BleachPoints/>', encoding="utf-8")
+
     def take_StartNavigatorAutoFocus(self, e):
         """The Navigator's autofocus at one focal point: the stage to the point, a search on the autofocus's drive, the
         drive left at the focus (``focus_points_find``: a list of finds in micrometres, one per point, None for none)."""

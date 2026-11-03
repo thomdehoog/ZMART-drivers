@@ -909,6 +909,13 @@ class Microscope:
         result = pan_step.center_by_pad(self.handle.client, folder, pad) if pad else pan_step.center(self.handle.client, folder)
         return checked(self.handle, result, "center_pan()")
 
+    def save_bleach_points(self, path) -> dict:
+        """Save the bleach points, with their places, bleaching times and light, to the new ``.bpr`` file *path*, as
+        the Bleach Point panel's Save does; an existing file is never written over. The panel's Load is not offered:
+        LAS X's own Load failed inside its hardware server on the simulator."""
+        self.handle.require_open()
+        return checked(self.handle, changes.save_bleach_points(self.handle.client, path), f"save_bleach_points({str(path)!r})")
+
     def save_setting(self, path) -> dict:
         """Save LAS X's current setting to the file *path*, as its Setting panel does."""
         self.handle.require_open()

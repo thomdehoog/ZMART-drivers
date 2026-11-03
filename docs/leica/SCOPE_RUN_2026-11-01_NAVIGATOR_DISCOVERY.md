@@ -1713,3 +1713,17 @@ are). Through the driver: the tile scan in 11.4 s, LAS X's notice answered in 0.
   autofocus's precision 5, against 95 s at the Focus Map's 4), the stage back at 59880, 38160 µm, z -17.1 µm.
 - Cleaned up: the test region and focal points removed (Remove All asks "This will delete all Focus Points!
   Continue?"), the Navigator closed, the stage moved back inside the limits (63500, 41500 µm) through the driver.
+
+## 106. The Bleach Point panel's Save and Load (3 November 2026, Thom allowed the files)
+
+- Save (the panel's second button): a Save As box in LAS X's `Instrument Parameter Settings` folder, "Bleach Points
+  files (*.bpr)". Filled through UI Automation (the File name box's value, then its Save button; no keys), LCS got
+  `<SettingsManagement Command="SaveBleachPoints" FileName="..." Origin="LMSApplication"/>` and the file held both points:
+  their regions (`ROISingle`, places in the scan field), `Duration` 2500 and 4000 ms, and their light. Built:
+  `save_bleach_points(path)`, LCS's command, a new `.bpr` in a folder that is there, never over an existing file, only
+  with the bleach mode on and a point drawn (the panel shows only then). Through the driver: one point, 3 s, saved
+  (Duration 3000); saving to the same name again refused.
+- Load (the first button): the Open box, then `<SettingsManagement Command="LoadBleachPoints" FileName="..."/>`, and LAS X
+  showed "Hardware Server Update Error: Unhandled exception (c0000005) occurred." LCS.LOG: "Unknown error occurred in
+  CBleachSettings::LoadSettingsFromXML". The same with a point drawn first. LCS went on answering; the box was closed
+  with OK. Not built; to try on the STELLARIS.

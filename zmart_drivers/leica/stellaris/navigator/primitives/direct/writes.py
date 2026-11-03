@@ -2782,6 +2782,24 @@ def time_series_picture(project: int, frames: int) -> Write:
 # =============================================================================
 
 
+def save_bleach_points(path) -> Write:
+    """Save the bleach points, with their places, bleaching times and light, to the file *path* (``.bpr``), as the
+    Bleach Point panel's Save does (LCS's ``SaveBleachPoints``, simulator, 2026-11-03); changes nothing on the
+    instrument."""
+
+    def fill(request: Request) -> None:
+        request.elements = [f'<SettingsManagement Command="SaveBleachPoints" FileName="{path}" Origin="LMSApplication"/>']
+
+    return Write(
+        command="save_bleach_points",
+        values={"path": str(path)},
+        request="SaveBleachPoints",
+        fill=fill,
+        description=f"Save the bleach points to {path}",
+        ready=idle(),
+    )
+
+
 def save_setting(path) -> Write:
     """Save the current setting to the file *path*, as LAS X's Setting panel does; changes nothing on the instrument."""
 

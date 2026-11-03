@@ -1271,6 +1271,40 @@ def set_bleach_time(client, seconds, *, viewer=None) -> dict:
         return dispatch.refused(f"the bleaching time was not set: {why}")
 
 
+def save_bleach_points(client, path) -> dict:
+    """Save the bleach points (their places, bleaching times and light) to *path*, as the Bleach Point panel's Save;
+    ``confirmed`` when the file is there.
+
+    *path* is a new ``.bpr`` file in a folder that is there: an existing
+    file is never written over. The bleach mode must be on and a point
+    drawn, as the panel is only shown then. The panel's Load is not built:
+    LAS X's own Load failed inside its hardware server on the simulator,
+    with or without points drawn (2026-11-03).
+    """
+    from pathlib import Path
+
+    path = Path(path)
+    if path.suffix.lower() != ".bpr":
+        return dispatch.refused(f"bleach points are saved to a .bpr file, not {path.name!r}; nothing was saved")
+    if path.exists():
+        return dispatch.refused(f"{path} is there already and is not written over; choose a new name; nothing was saved")
+    if not path.parent.is_dir():
+        return dispatch.refused(f"the folder {path.parent} is not there; nothing was saved")
+    if not readers.get_roi_scan(client)["bleach_mode"]:
+        return dispatch.refused("the bleach mode is off; switch it on with set_bleach_mode first; nothing was saved")
+    if readers.get_bleach_point(client)["point"] is None:
+        return dispatch.refused("no bleach point is drawn; draw one with draw_bleach_point first; nothing was saved")
+    result = run(client, writes.save_bleach_points(path))
+    if result.get("success"):
+        deadline = time.monotonic() + 5.0
+        while not path.is_file() and time.monotonic() < deadline:
+            time.sleep(0.1)
+        result["confirmed"] = path.is_file()
+        if not result["confirmed"]:
+            result["message"] = f"LAS X did not write {path}"
+    return result
+
+
 def clear_drawings(client, *, viewer=None) -> dict:
     """Clear every bleach point and ROI region drawn in LAS X's viewer, as its Select all ROIs and Clear selected ROIs
     do; the bleach point is read back from LCS."""

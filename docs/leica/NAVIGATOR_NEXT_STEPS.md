@@ -57,7 +57,8 @@ checked by the driver either way (`transfer.CHECKED_COMMANDS`, `transfer.STATE_T
   wizards (section 86), outside the plain Acquire tab.
 - The carrier (slide, dish, well plate): the Navigator's drawing aid only; choosing one sends LCS nothing and a Preview
   carries nothing of it (section 105). Nothing to build: the driver lays out wells and chambers as positions.
-- The bleach points saved to and loaded from a file (the Bleach Point panel's Save and Load): a file, so asked first.
+- The bleach points' Save is built (`save_bleach_points`, section 106). Their Load is not: LAS X's own Load failed
+  inside its hardware server on the simulator (c0000005 in `CBleachSettings::LoadSettingsFromXML`); try it on the STELLARIS.
 
 **Commands seen in LCS's log but not built**
 - None: the Number of Steps mode is `z_stack_mode` (section 102).

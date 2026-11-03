@@ -1303,6 +1303,33 @@ class TestDrawingInTheViewer:
         lasx.live[("Confocal", "ROIScan", "CurrentBleachPoint")] = 0
         assert changes.set_bleach_time(client, 2.0, viewer=viewer)["confirmed"] is True and viewer.boxes["TextSeconds"] == "2"
 
+    def test_the_bleach_points_are_saved_to_a_file_as_the_panel_s_save(self, lasx, client, tmp_path):
+        lasx.live[("Confocal", "ROIScan", "EnableBleachScan")] = True
+        lasx.live[("Confocal", "ROIScan", "CurrentBleachPoint")] = 0
+        path = tmp_path / "points.bpr"
+
+        result = changes.save_bleach_points(client, path)
+
+        assert result["confirmed"] is True and path.is_file()
+        assert f'<SettingsManagement Command="SaveBleachPoints" FileName="{path}" Origin="LMSApplication"/>' in lasx.sent
+
+    def test_saving_needs_the_bleach_mode_and_a_drawn_point(self, lasx, client, tmp_path):
+        path = tmp_path / "points.bpr"
+        assert "bleach mode" in changes.save_bleach_points(client, path)["message"]
+        lasx.live[("Confocal", "ROIScan", "EnableBleachScan")] = True
+        assert "draw" in changes.save_bleach_points(client, path)["message"]
+        assert not path.exists() and not any("SaveBleachPoints" in e for e in lasx.sent)
+
+    @pytest.mark.parametrize("name", ["points.txt", "points", "existing.bpr", "missing/points.bpr"])
+    def test_a_file_that_is_not_a_new_bpr_in_a_folder_there_is_refused(self, lasx, client, tmp_path, name):
+        lasx.live[("Confocal", "ROIScan", "EnableBleachScan")] = True
+        lasx.live[("Confocal", "ROIScan", "CurrentBleachPoint")] = 0
+        (tmp_path / "existing.bpr").write_text("kept", encoding="utf-8")
+
+        assert changes.save_bleach_points(client, tmp_path / name)["success"] is False
+        assert (tmp_path / "existing.bpr").read_text(encoding="utf-8") == "kept"
+        assert not any("SaveBleachPoints" in e for e in lasx.sent)
+
     def test_clearing_takes_the_points_away_in_lcs_too(self, lasx, client):
         lasx.live[("Confocal", "ROIScan", "CurrentBleachPoint")] = 1
         viewer = self.viewer(lasx)
