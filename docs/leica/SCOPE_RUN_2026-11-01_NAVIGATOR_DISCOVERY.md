@@ -1972,11 +1972,23 @@ of 2 fields 63.9 um apart (8.2 s, one store per field, the stage back on the fir
   answers without an error and writes nothing (E: and C:, with and without a dot folder). LAS X's own window sends
   `Attribute="11" Origin="LMSApplication"`, which writes the file. So the pan cannot be read: a lower zoom, `pan()`, the
   pan's steps, `move_pan`, `set_pan` and `zoom_in` fail, and `save_setting` too (`load_setting` probably as well).
-  The pan read from the window's file was 0, 0.
+  The pan read from the window's file was 0, 0. **The same holds for every `ATL` command the driver sends with
+  `Attribute="2"`**: `ATL_Setting_Create` (copy) answered `Error="1"` "setting creation failed", where the window's
+  `ATL_Setting_Create CloneSetting="0" Attribute="11" Origin="LMSApplication"` made a setting. Affected: `add_setting`,
+  `activate_setting`, `delete_setting` (`ATL_Setting_Create`, `_Activate`, `_Delete`), `save_setting` and `load_setting`
+  (`ATL_Block_Save_To_XML`, `_Load_From_XML`). So a change landing in the current setting with several settings is not
+  checked yet.
 - **LAS X's data container wrapper is version 2.65.0.1 here** (2.65.0.0 on the simulator). The driver checks the
   version first and refused, touching nothing: `add_roi_regions`, `add_bleach_points` and their clear and read are
   refused on this STELLARIS until the new version is checked.
-- No objective was changed: everything ran on the 10x dry in slot 1.
+- No objective was changed: everything ran on the 10x dry in slot 1. `change_objective(slot=2)` was refused before the
+  turret turned: no calibration covers slots 1 to 2.
+
+**Also checked, without a sample:** a white-light line tuned (587 to 590 nm and back), added and removed (640 nm);
+bidirectional halves the frame time LAS X works out (1.7197 to 0.8630 s, x 0.502), so the hardware follows the state
+tree; the lambda scan's range, step and bandwidth and the Lambda scan's range and step changed and put back; mCherry
+added to Setting 1 as Thom asked (a 587 nm line at 2 %, HyD S 3 narrowed to 502 to 575 nm, HyD X 4 on at 597 to 700 nm
+with the dye mCherry, colour red, gain 10), each read back.
 - `settings()["collar"]["motorised"]` says True with the 10x dry: it comes from `Microscope/CanDoMotCorr` (the stand),
   not from the objective.
 - `pan()` saves a setting file although it only reads.
