@@ -44,6 +44,7 @@ import re
 import time
 from pathlib import Path
 
+from ..primitives.direct import scanner
 from . import answer_dialogs, lasx_window, setting_files
 from . import readings as readers
 from .changes import change
@@ -100,9 +101,10 @@ def base_fov_um(client) -> float:
     return readers.get_fov(client)[0] * 1e6 * readers.get_zoom(client)["current"]
 
 
-def click_um(client, zoom: float) -> float:
-    """How far one press of an arrow moves the pan at *zoom*, in micrometres: LCS's ``PanePercentage`` of the field shown."""
-    percent = readers.get_pane_percentage(client)
+def click_um(client, zoom: float, percent: float | None = None) -> float:
+    """How far one press of an arrow moves the pan at *zoom*, in micrometres: *percent* of the field shown, LCS's
+    ``PanePercentage`` (the window's arrows) when not given."""
+    percent = percent if percent is not None else readers.get_pane_percentage(client)
     return percent / 100 * base_fov_um(client) / zoom
 
 
@@ -137,6 +139,121 @@ class WindowPad:
         self.window.press(self.buttons[arrow])
 
 
+class ScannerRefused(RuntimeError):
+    """The pan's steps through LCS's COM scanner are refused here; nothing was sent."""
+
+
+class ScannerPad:
+    """The pan's steps through LCS's older COM scanner instead of the window's arrows: for the simulator only.
+
+    Each step is *percent* (1 to 3, 1 by default) of the field shown
+    (:mod:`..primitives.direct.scanner`); the window's arrows take 3 %. Refused unless LCS names the system the
+    simulator, and while LAS X scans. The step LCS had is put back by
+    :meth:`close`, which :func:`move` and :func:`center_by_scanner` call
+    whatever happens. :func:`move` checks the first step against the formula.
+    """
+
+    checks_first_step = True
+
+    def __init__(self, client, *, percent: int = 1, steps=None):
+        system = readers.get_system(client)
+        if not system["simulator"]:
+            raise ScannerRefused(
+                f"the pan through LCS's COM scanner is for the simulator only; LCS runs {system['serial']!r} "
+                f"({system['hardware_tree']}); nothing was sent"
+            )
+        status = readers.get_scan_status(client)
+        if status != "eScanIdle":
+            raise ScannerRefused(f"LAS X is scanning ({status}); the pan is not stepped now; nothing was sent")
+        self.steps = steps if steps is not None else scanner.PanSteps()
+        self.before = self.steps.percent()
+        self.percent = percent
+        self.steps.set_percent(percent)
+
+    def press(self, arrow: str) -> None:
+        self.steps.step(arrow)
+
+    def centre(self) -> None:
+        self.steps.step("centre")
+
+    def close(self) -> None:
+        self.steps.set_percent(self.before, putting_back=True)
+
+
+#: Where each of the pad's directions moves the field: across (right positive) and up (positive).
+VECTORS = {"up-left": (-1, 1), "up": (0, 1), "up-right": (1, 1), "right": (1, 0), "down-right": (1, -1),
+           "down": (0, -1), "down-left": (-1, -1), "left": (-1, 0)}
+
+
+def step(client, folder, direction: str, count: int, pad) -> dict:
+    """Step the pan *count* times toward *direction* (one of the pad's eight) with *pad*, or back to the ``"centre"``.
+
+    The end is worked out first with the formula (the pad's percent of the
+    field shown a step, at the zoom now) and refused beyond LAS X's largest
+    pan; the first step is checked against the formula, and on a wrong one
+    the pan is centred; the step LCS had is put back. ``confirmed`` when the
+    pan reads the end, within :data:`MOVE_TOLERANCE_UM`.
+    """
+    if direction == "centre":
+        return center_by_scanner(client, folder, pad)
+    try:
+        if direction not in VECTORS:
+            raise ValueError(f"the pan steps {sorted(VECTORS)} or to the 'centre', not {direction!r}")
+        if isinstance(count, bool) or not isinstance(count, int) or not 1 <= count <= 100:
+            raise ValueError(f"the steps are a whole number from 1 to 100, not {count!r}")
+        before = read(client, folder)
+        size = click_um(client, readers.get_zoom(client)["current"], pad.percent)
+        across, up = VECTORS[direction]
+        clipped = clip(client, before["x_um"] + across * count * size, before["y_um"] + up * count * size)
+        end = clipped["to_um"]
+        first = clip(client, before["x_um"] + across * size, before["y_um"] + up * size)["to_um"]
+        expected = (first[0] - before["x_um"], first[1] - before["y_um"])
+        for n in range(count):
+            pad.press(direction)
+            time.sleep(0.2)
+            if n == 0:
+                now = read(client, folder)
+                moved = (now["x_um"] - before["x_um"], now["y_um"] - before["y_um"])
+                if max(abs(moved[0] - expected[0]), abs(moved[1] - expected[1])) > max(0.2 * size, 0.05):
+                    pad.centre()
+                    return {"success": False, "confirmed": False, "pan": read(client, folder),
+                            "message": f"the first step moved the pan {moved[0]:.3f}, {moved[1]:.3f} um, not the "
+                            f"{expected[0]:.3f}, {expected[1]:.3f} um the formula gives; the pan was put back to the centre"}
+    finally:
+        pad.close()
+    now = read(client, folder)
+    landed = abs(now["x_um"] - end[0]) <= MOVE_TOLERANCE_UM and abs(now["y_um"] - end[1]) <= MOVE_TOLERANCE_UM
+    result = {"success": True, "confirmed": landed, "pan": now, "step_um": size}
+    if any(clipped["over_um"]):
+        result["clipped"], result["message"] = clipped, clipped_note(clipped)
+    if not landed:
+        result["message"] = f"the pan is at {now['x_um']:.2f}, {now['y_um']:.2f} um, not {end[0]:.2f}, {end[1]:.2f} um"
+    return result
+
+
+def step_size(client, pad) -> dict:
+    """The step the COM scanner held: ``percent``, and ``um``, how far a step moves the pan at the zoom now."""
+    try:
+        held = pad.before
+    finally:
+        pad.close()
+    return {"percent": held, "um": click_um(client, readers.get_zoom(client)["current"], held)}
+
+
+def center_by_scanner(client, folder, pad) -> dict:
+    """Set the pan back to the centre with the COM scanner's centre, the zoom untouched; the step put back; read back."""
+    try:
+        pad.centre()
+    finally:
+        pad.close()
+    now = read(client, folder)
+    centred = abs(now["x"]) <= CENTRED and abs(now["y"]) <= CENTRED
+    result = {"success": True, "confirmed": centred, "pan": now}
+    if not centred:
+        result["message"] = f"the pan did not come to the centre: {now['x']:g}, {now['y']:g}"
+    return result
+
+
 def center(client, folder) -> dict:
     """Set the pan back to the centre: LAS X's smallest zoom, then the zoom it had, then the pan read back.
 
@@ -163,67 +280,126 @@ def center(client, folder) -> dict:
 def set_to(client, folder, x_um: float, y_um: float, *, pad=None) -> dict:
     """Set the pan to *x_um* right and *y_um* up of the centre (negative: left, down), and read it back.
 
-    The pan is read now and moved by the difference, with :func:`move`.
-    ``confirmed`` when it reads the place asked, within :data:`MOVE_TOLERANCE_UM`.
+    The pan is read now and moved by the difference, with :func:`move`. A
+    place beyond LAS X's window at the zoom now is brought to the closest
+    place within it (:func:`clip`); the result's ``clipped`` says how far
+    over it was. ``confirmed`` when the pan reads the place it went to,
+    within :data:`MOVE_TOLERANCE_UM`.
     """
     now = read(client, folder)
-    result = move(client, folder, x_um - now["x_um"], y_um - now["y_um"], pad=pad)
+    clipped = clip(client, x_um, y_um)
+    to = clipped["to_um"]
+    result = move(client, folder, to[0] - now["x_um"], to[1] - now["y_um"], pad=pad)
     if result.get("success") and "pan" in result:
         there = result["pan"]
-        landed = abs(there["x_um"] - x_um) <= MOVE_TOLERANCE_UM and abs(there["y_um"] - y_um) <= MOVE_TOLERANCE_UM
+        landed = abs(there["x_um"] - to[0]) <= MOVE_TOLERANCE_UM and abs(there["y_um"] - to[1]) <= MOVE_TOLERANCE_UM
         result["confirmed"] = bool(result.get("confirmed")) and landed
+        if any(clipped["over_um"]):
+            result["clipped"], result["message"] = clipped, clipped_note(clipped)
         if not landed:
-            result["message"] = f"the pan is at {there['x_um']:.2f}, {there['y_um']:.2f} um, not {x_um:g}, {y_um:g} um"
+            result["message"] = f"the pan is at {there['x_um']:.2f}, {there['y_um']:.2f} um, not {to[0]:.2f}, {to[1]:.2f} um"
     return result
+
+
+def window_um(client, zoom: float | None = None) -> float:
+    """How far from the centre LAS X lets the pan go on each axis at *zoom* (the zoom now when not given), in micrometres.
+
+    LAS X keeps the galvo inside a window that grows with the zoom: the
+    largest pan times ``1 - smallest zoom / zoom``, so none at the smallest
+    zoom. Beyond it LAS X clips the pan to the edge without a word (simulator,
+    2026-11-03: 0.001937 at zoom 1, 0.004844 at 2, 0.006297 at 4, as the
+    formula gives). That clip is the scanner's guard.
+    """
+    zooms = readers.get_zoom(client)
+    zoom = zooms["current"] if zoom is None else zoom
+    return max(0.0, PAN_LIMIT * (1 - zooms["min"] / zoom)) * micrometres_per_pan(base_fov_um(client))
+
+
+def clip(client, x_um: float, y_um: float) -> dict:
+    """The closest place to *x_um*, *y_um* (micrometres from the centre) within LAS X's window at the zoom now.
+
+    ``asked_um``, ``to_um`` (each axis brought to the window's edge when it
+    is beyond), ``over_um`` (how far each axis was beyond; 0 within) and
+    ``window_um``. The closest place is where LAS X itself would clip to.
+    """
+    window = window_um(client)
+    to = tuple(max(-window, min(window, value)) for value in (x_um, y_um))
+    return {"asked_um": (x_um, y_um), "to_um": to, "over_um": (x_um - to[0], y_um - to[1]), "window_um": window}
+
+
+def clipped_note(clipped: dict) -> str:
+    """What a clip did, in words."""
+    (ax, ay), (tx, ty), window = clipped["asked_um"], clipped["to_um"], clipped["window_um"]
+    return (f"{ax:g}, {ay:g} um is beyond the {window:.1f} um LAS X allows from the centre at this zoom; "
+            f"the pan went to the closest place, {tx:.2f}, {ty:.2f} um")
+
+
+def first_step_off(client, folder, before, axis, expected_um) -> str | None:
+    """Why the first step was not the formula's (*expected_um* along *axis*, nothing across); None when it was."""
+    now = read(client, folder)
+    other = "y" if axis == "x" else "x"
+    moved, across = now[f"{axis}_um"] - before[f"{axis}_um"], now[f"{other}_um"] - before[f"{other}_um"]
+    if abs(moved - expected_um) > max(0.2 * abs(expected_um), 0.05) or abs(across) > 0.05:
+        return f"the first step moved the pan {moved:.3f} um along {axis} and {across:.3f} um across, not the {expected_um:.3f} um the formula gives"
+    return None
 
 
 def move(client, folder, x_um: float, y_um: float, *, pad=None) -> dict:
     """Move the pan by *x_um* across (right positive) and *y_um* up (down negative), and read it back.
 
-    Refused before anything is pressed when the pan would go beyond LAS X's
-    largest. For each axis the zoom is raised just enough that a whole
-    number of presses lands on the distance, the arrow is pressed, and at
-    the end the zoom is set back. ``confirmed`` when the pan moved by the
-    distance asked, within :data:`MOVE_TOLERANCE_UM`.
+    A pan that would end beyond LAS X's window at the zoom now (the zoom it
+    ends at) goes to the closest place within it instead (:func:`clip`), and
+    the result's ``clipped`` says what was asked and how far over it was. For
+    each axis the zoom is raised just enough that a whole number of presses
+    lands on the distance, the arrow is pressed, and at the end the zoom is
+    set back. ``confirmed`` when the pan moved by the distance it went,
+    within :data:`MOVE_TOLERANCE_UM`.
     """
     before = read(client, folder)
-    scale = micrometres_per_pan(base_fov_um(client))
-    for axis, distance in (("x", x_um), ("y", y_um)):
-        if abs(before[axis] + distance / scale) > PAN_LIMIT:
-            return {
-                "success": False,
-                "confirmed": False,
-                "message": f"a pan {distance:g} um further along {axis} goes beyond LAS X's largest pan "
-                f"({PAN_LIMIT * scale:.0f} um from the centre with this objective); nothing was pressed",
-            }
+    clipped = clip(client, before["x_um"] + x_um, before["y_um"] + y_um)
+    x_um, y_um = clipped["to_um"][0] - before["x_um"], clipped["to_um"][1] - before["y_um"]
     pad = pad if pad is not None else WindowPad()
+    percent = getattr(pad, "percent", None)
+    check_first = getattr(pad, "checks_first_step", False)
     zoom = readers.get_zoom(client)
     start = zoom["current"]
     try:
         for axis, distance in (("x", x_um), ("y", y_um)):
             if abs(distance) < SMALLEST_MOVE_UM:
                 continue
-            presses = math.ceil(abs(distance) / click_um(client, start) - 1e-9)
-            wanted = start * presses * click_um(client, start) / abs(distance)
+            presses = math.ceil(abs(distance) / click_um(client, start, percent) - 1e-9)
+            wanted = start * presses * click_um(client, start, percent) / abs(distance)
             if wanted > zoom["max"]:
                 wanted = zoom["max"]
-                presses = round(abs(distance) / click_um(client, wanted))
+                presses = round(abs(distance) / click_um(client, wanted, percent))
             if abs(wanted - readers.get_zoom(client)["current"]) > 1e-9:
                 raised = change(client, "zoom", wanted)
                 if not raised.get("success"):
                     return raised
-                presses = round(abs(distance) / click_um(client, readers.get_zoom(client)["current"]))
+                presses = round(abs(distance) / click_um(client, readers.get_zoom(client)["current"], percent))
+            sign = 1 if distance > 0 else -1
             for _ in range(presses):
-                pad.press(ARROWS[(axis, 1 if distance > 0 else -1)])
+                pad.press(ARROWS[(axis, sign)])
                 time.sleep(0.2)
+                if check_first:
+                    check_first = False
+                    wrong = first_step_off(client, folder, before, axis, sign * click_um(client, readers.get_zoom(client)["current"], percent))
+                    if wrong:
+                        pad.centre()
+                        return {"success": False, "confirmed": False, "pan": read(client, folder),
+                                "message": f"{wrong}; the pan was put back to the centre and stepped no further"}
     finally:
         if abs(readers.get_zoom(client)["current"] - start) > 1e-9:
             back = change(client, "zoom", start)
+        if hasattr(pad, "close"):
+            pad.close()
     now = read(client, folder)
     moved = (now["x_um"] - before["x_um"], now["y_um"] - before["y_um"])
     landed = abs(moved[0] - x_um) <= MOVE_TOLERANCE_UM and abs(moved[1] - y_um) <= MOVE_TOLERANCE_UM
     zoom_back = abs(readers.get_zoom(client)["current"] - start) <= 1e-6
     result = {"success": zoom_back, "confirmed": landed and zoom_back, "pan": now, "moved_um": moved}
+    if any(clipped["over_um"]):
+        result["clipped"], result["message"] = clipped, clipped_note(clipped)
     if not zoom_back:
         result["message"] = f"the zoom did not go back to {start:g}: {back.get('message')}"
     elif not landed:

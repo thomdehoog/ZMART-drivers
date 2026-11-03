@@ -1571,3 +1571,28 @@ value can harm the scanner). The probe first checked that LAS X's newest picture
 So the call does what the pan pad does, from outside the window. It is not built into the driver (Thom, 3 November
 2026); the pan stays on the window's arrows. Whether the beam follows, and whether it is safe on the STELLARIS, are
 questions for Leica.
+
+## 99. The galvo's three ways, and LAS X's window as their guard (3 November 2026)
+
+LAS X keeps the pan inside a window that grows with the zoom: the largest pan times `1 - smallest zoom / zoom`. On the
+simulator, stepping past it with the COM scanner (simulator only), the pan stopped exactly at 0.001937 at zoom 1, 0.004844
+at 2 and 0.006297 at 4, on both axes, as the formula gives; more steps changed nothing, with no error, no log line and no
+dialog; at the smallest zoom (0.75) the window is none, which is why that zoom centres the pan, and lowering the zoom pulls a
+pan beyond the new window in. The COM scanner's `Position` is not the pan: it read 0.0009829, where z-wide stands, whatever
+the pan; `SetPosition` is not used.
+
+So LAS X's clip guards the galvo, and the driver needs no limit of its own for it (Thom). What the driver adds: every pan
+goes to the closest place within the window at the zoom it ends at, and its result's `clipped` says what was asked, where
+the pan went and how far over it was; the pan is read back after every move. The three ways to move the galvo:
+
+- in micrometres: `set_pan(x_um, y_um)` from the centre, `move_pan(x_um, y_um)` by a distance (window's arrows, or
+  `route="scanner"`);
+- by the pad's buttons: `step_pan(direction, count, percent)`, the pad's eight directions and the centre;
+- by the step: `percent` (1, 2 or 3) of the field shown, read with `pan_step()`; and `pan_window()` gives the window now.
+
+The COM scanner route (`primitives/direct/scanner.py`) reaches only the steps, the centre and a step of 1 to 3 percent,
+is refused unless LCS names the system the simulator (`CurrentSerialNumber` "STELLARIS SIMULATOR" and the hardware tree
+`simulator.xlhw`) and while LAS X scans, checks its first step against the formula (centring on a wrong one) and puts
+LCS's step back. Through the driver on the simulator: window 193.85 µm at zoom 1; `set_pan(300, -50, route="scanner")`
+went to 193.85, -50.0 and said so; three steps right from the edge stayed at the edge, clipped; the window route, 1 %
+diagonal steps, the centre, and the step back at 3 %, all read back.

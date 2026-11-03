@@ -690,7 +690,7 @@ class Microscope:
         self.handle.require_open()
         return pan_step.read(self.handle.client, setting_files.folder_for(self.handle))
 
-    def move_pan(self, x_um: float, y_um: float) -> dict:
+    def move_pan(self, x_um: float, y_um: float, route: str = "window") -> dict:
         """Move the pan by *x_um* to the right and *y_um* up (negative: left, down), and read it back.
 
         Done as the operator does it, with the arrows of LAS X's pan pad,
@@ -699,32 +699,89 @@ class Microscope:
         is pressed when the pan would go beyond LAS X's largest, and while
         bleach points or ROI regions are drawn: they stay in the field, so a pan
         would move them across the sample.
+
+        *route* ``"scanner"`` steps the pan through LCS's older COM scanner
+        instead, 1 % of the field a step, with no window (for the simulator
+        only; refused elsewhere and while LAS X scans; the first step is
+        checked against the formula, and on a wrong one the pan is centred).
         """
         self.handle.require_open()
         refuse_with_drawings(self.handle, "the pan", "move_pan")
-        result = pan_step.move(self.handle.client, setting_files.folder_for(self.handle), x_um, y_um)
+        pad = pan_route(self.handle, route, "move_pan")
+        result = pan_step.move(self.handle.client, setting_files.folder_for(self.handle), x_um, y_um, pad=pad)
         return checked(self.handle, result, f"move_pan({x_um!r}, {y_um!r})")
 
-    def set_pan(self, x_um: float, y_um: float) -> dict:
+    def set_pan(self, x_um: float, y_um: float, route: str = "window") -> dict:
         """Set the pan to *x_um* right and *y_um* up of the centre (negative: left, down), and read it back.
 
         The pan is where the galvo has moved the scan field, in micrometres on
         the sample from the centre. It is read now and moved by the difference,
-        as :meth:`move_pan` moves it; refused in the same cases.
+        as :meth:`move_pan` moves it, by the same *route*; refused in the same cases.
         """
         self.handle.require_open()
         refuse_with_drawings(self.handle, "the pan", "set_pan")
-        result = pan_step.set_to(self.handle.client, setting_files.folder_for(self.handle), x_um, y_um)
+        pad = pan_route(self.handle, route, "set_pan")
+        result = pan_step.set_to(self.handle.client, setting_files.folder_for(self.handle), x_um, y_um, pad=pad)
         return checked(self.handle, result, f"set_pan({x_um!r}, {y_um!r})")
 
-    def center_pan(self) -> dict:
+    def step_pan(self, direction: str, count: int = 1, percent: int = 3) -> dict:
+        """Step the pan *count* times toward *direction*, or back to the ``"centre"``, as the pan pad's buttons do.
+
+        Through LCS's older COM scanner (its ``MoveInDirection``), for the
+        simulator only. *direction* is one of the pad's eight: ``"up"``,
+        ``"up-right"``, ``"right"``, ``"down-right"``, ``"down"``,
+        ``"down-left"``, ``"left"``, ``"up-left"``. A step is *percent* (1, 2
+        or 3) of the field shown; LCS's own step is put back afterwards. The
+        end is worked out first and refused beyond LAS X's largest pan; the
+        first step is checked, and on a wrong one the pan is centred. Refused
+        while LAS X scans and while points or regions are drawn. Read back.
+        """
+        self.handle.require_open()
+        refuse_with_drawings(self.handle, "the pan", "step_pan")
+        try:
+            pad = pan_step.ScannerPad(self.handle.client, percent=percent)
+        except (pan_step.ScannerRefused, ValueError) as why:
+            return checked(self.handle, {"success": False, "confirmed": False, "message": str(why)}, "step_pan")
+        result = pan_step.step(self.handle.client, setting_files.folder_for(self.handle), direction, count, pad)
+        return checked(self.handle, result, f"step_pan({direction!r}, {count!r}, {percent!r})")
+
+    def pan_window(self) -> dict:
+        """How far LAS X lets the pan go from the centre at the zoom now, on each axis, in micrometres.
+
+        LAS X keeps the galvo inside a window that grows with the zoom (none at
+        its smallest) and clips any pan beyond it. The pan functions go to the
+        closest place within it and say so; this answers ``zoom``,
+        ``half_width_um``, and ``x_um`` and ``y_um`` as (low, high).
+        """
+        self.handle.require_open()
+        half = pan_step.window_um(self.handle.client)
+        return {"zoom": readings.get_zoom(self.handle.client)["current"], "half_width_um": half,
+                "x_um": (-half, half), "y_um": (-half, half)}
+
+    def pan_step(self) -> dict:
+        """The pan's step as LCS's COM scanner holds it: ``percent`` of the field shown, and ``um`` at the zoom now.
+
+        For the simulator only, as :meth:`step_pan`.
+        """
+        self.handle.require_open()
+        try:
+            pad = pan_step.ScannerPad(self.handle.client, percent=3)
+        except pan_step.ScannerRefused as why:
+            return checked(self.handle, {"success": False, "confirmed": False, "message": str(why)}, "pan_step")
+        return pan_step.step_size(self.handle.client, pad)
+
+    def center_pan(self, route: str = "window") -> dict:
         """Set the pan back to the centre, through LAS X's smallest zoom and back to the zoom it had; read back.
 
         Refused while bleach points or ROI regions are drawn, as :meth:`move_pan`.
+        *route* ``"scanner"`` centres it with LCS's COM scanner instead, the
+        zoom untouched (for the simulator only, as for :meth:`move_pan`).
         """
         self.handle.require_open()
         refuse_with_drawings(self.handle, "the pan", "center_pan")
-        result = pan_step.center(self.handle.client, setting_files.folder_for(self.handle))
+        folder = setting_files.folder_for(self.handle)
+        pad = pan_route(self.handle, route, "center_pan")
+        result = pan_step.center_by_scanner(self.handle.client, folder, pad) if pad else pan_step.center(self.handle.client, folder)
         return checked(self.handle, result, "center_pan()")
 
     def save_setting(self, path) -> dict:
@@ -1243,6 +1300,18 @@ class Microscope:
     def state(self) -> dict:
         """``{"changeable", "observed"}``: the settings and the objective, and what can only be read, with the unconfirmed changes."""
         return state_step.get_state(self.handle)
+
+
+def pan_route(handle, route: str, what: str):
+    """The pad that moves the pan: None for the window's arrows, a scanner pad for ``"scanner"`` (simulator only)."""
+    if route == "window":
+        return None
+    if route != "scanner":
+        raise ValueError(f"the pan's route is 'window' or 'scanner', not {route!r}")
+    try:
+        return pan_step.ScannerPad(handle.client)
+    except pan_step.ScannerRefused as why:
+        checked(handle, {"success": False, "confirmed": False, "message": str(why)}, what)
 
 
 def refuse_with_drawings(handle, change: str, what: str) -> None:
