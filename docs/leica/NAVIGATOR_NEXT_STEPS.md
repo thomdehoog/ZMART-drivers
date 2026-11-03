@@ -49,9 +49,13 @@ checked by the driver either way (`transfer.CHECKED_COMMANDS`, `transfer.STATE_T
 - Spiral: not learned.
 
 **Region and experiment types**
-- The regions of an ROI scan and the bleach points: drawn in LAS X's viewer and kept in its data container
-  (`Confocal/ROIScan/CurrentDCROISetID`), not in LCS; the laser lines per region (ROI Configuration).
-- Bleaching and FRAP (LCS has `SequentialBleachPointParameter`).
+- The regions of an ROI scan, the bleach points and the Zoom In rectangle: drawn in LAS X's viewer and kept in its
+  data container (`Confocal/ROIScan/CurrentDCROISetID`), not in LCS; the laser lines per region (ROI Configuration).
+  The viewer took no point from the driver's mouse, with the Draw point tool on and Live running (section 86), so
+  these wait for a way to place them that LAS X offers. The Zoom In rectangle's result, a zoom and a pan, the driver
+  sets with `change_setting("zoom", ...)` and `move_pan`.
+- Bleaching and FRAP (LCS has `SequentialBleachPointParameter`); the FRAP and FRET applications are LAS X's other
+  wizards (section 86), outside the plain Acquire tab.
 - Z-compensation's "Move to and Apply" (`WithAotfAndPMTSetting="1"`, not seen from the window) and Set to Begin
   (sent nothing when the reference was the begin already).
 - The carrier: slide, dish, well plate (the Navigator Expert sent `StageSetCarrierAttachment`).

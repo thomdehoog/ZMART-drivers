@@ -1331,3 +1331,22 @@ detector's command, and set `IsBlocked` in the setting's `LineBlockedForAutomati
 sent the same for its line index 0, which was not on, and LCS kept nothing. Built: `lock_laser_line(wavelength_nm,
 locked)`, for a line on in the current setting, read back from `LightSourceLineUsage`; tried through the driver, locked and
 freed, and 561 nm (not on) refused.
+
+## 86. The window's last controls; the viewer takes no drawn point (3 November 2026)
+
+Every control LAS X's Acquire window shows to UI Automation was compared with what is learned. Those left were these:
+
+- The z panel's Sensitivity (`ButtonSensitivity`) shows a slider (`lMSSlider`) under the focus wheel. Moved from 0.8 to
+  1.1 it sent LCS nothing: it sets how far the window's own wheel turns the focus, so it is not built. Put back to 0.8.
+- `ComboWizards`, at the top left, switches LAS X to another application: Simulator (the plain one, in use), FRAP,
+  FRAP XT, FRET AB, FRET SE, Lightning and Navigator Expert. Not built: the plain driver works in the plain application,
+  and the Navigator Expert has its own driver.
+- `lMSToolBarButtonToggle` is the Configuration, Acquire, Process, Quantify and Analysis bar, and `RaActivationButton`
+  sits in the menu bar: outside the Acquire tab.
+
+With the bleach mode on (`set_bleach_mode(True)`), the Bleach Point panel showed Load, Save, Calibrate, the list of
+points (empty), the bleaching time (days to milliseconds), Add Laser and its own spectrum, and the viewer's toolbar gained
+Draw point. Draw point was switched on through UI Automation and the image clicked with the driver's mouse, three times:
+on the stored image, then with Live running, and with the pointer moved in before the click. No point appeared, the list
+stayed empty, and LCS got nothing. The ROI regions and the Zoom In rectangle are drawn in the same viewer, so they wait
+too. Live was stopped, Draw point and the bleach mode switched off again.
