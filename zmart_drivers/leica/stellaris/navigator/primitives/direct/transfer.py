@@ -662,6 +662,8 @@ CHECKED_WRITES = {
         "EmissionWaveLengthForAiryAnddzCalculation", "StackCalculationMode",
         "AutofocusSpeed", "AutofocusScanDirectionX", "AutofocusZoom", "AFAnalyseType", "Precision", "UseFixSliceCount",
         "FixSliceCount", "FocusRange", "ZUseMode",
+        # Fast Live's and Auto Sync's scan options, both scanners (not Auto Sync's own switch, IsAutoSyncActive).
+        *(name for name in STATE_TREE_WRITES if name.startswith(("FastLive", "AutoSync"))),
     }),
 }
 
