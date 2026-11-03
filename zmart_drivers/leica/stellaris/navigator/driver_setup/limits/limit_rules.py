@@ -436,6 +436,7 @@ MUTATING_COMMANDS = {
     "set_z_compensation": "set_z_compensation",
     # when the autofocus runs in a time series: its own search is checked when it runs
     "set_autofocus_in_time_series": "set_autofocus_in_time_series",
+    "set_autofocus_at_stage_positions": "set_autofocus_at_stage_positions",
     # Auto Sync and its scan options: how the autofocus scans, its light set as any power
     "set_auto_sync": "set_auto_sync",
     # the λ scan's detection band: which light is collected, not the light

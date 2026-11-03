@@ -288,6 +288,11 @@ def get_autofocus_in_time_series(client, **keywords):
     return _routed("autofocus_in_time_series", client, **keywords)
 
 
+def get_autofocus_at_stage_positions(client, **keywords):
+    """When the autofocus runs at stage positions: ``"first"``, ``"every"``, or n (every n-th position)."""
+    return _routed("autofocus_at_stage_positions", client, **keywords)
+
+
 def get_z_compensation(client, **keywords):
     """Linear Z-compensation: ``modes``, ``reference_um``, ``points`` (``z_um``, ``values``)."""
     return _routed("z_compensation", client, **keywords)

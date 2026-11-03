@@ -1659,3 +1659,27 @@ per field with its frames along t (the stamps counted frame by frame over every 
 among those the driver answers (its caption now read with up to two words: "Mosaic Merge"; the fields are saved as they
 are). Through the driver: the tile scan in 11.4 s, LAS X's notice answered in 0.35 s, `field0` and `field1` each
 (2, 2, 1, 512, 512), LAS X's cache let go of; the scan mode back to xyz, z-wide back at 982.9 µm.
+
+## 104. The Navigator's acquire tools: the autofocus Stage tab, Spiral, Start and the Focus Map (3 November 2026)
+
+- The Autofocus side's Stage tab, "Execution of focus for stage positions": First position only, Every position, Every n-th
+  position. The driver's mouse; LCS got no command, the state tree changed: `Acquire/AutoFocusInfo/WorkflowXY` 1, 2 and 3,
+  n in `WorkflowXYIterator`, and `IsFirstPositionOnly` beside it. Built: `set_autofocus_at_stage_positions(when)`,
+  `"first"`, `"every"` or n >= 2, written as the tab writes them, read back. Through the driver: every, 3, first.
+- Spiral: the Navigator's preparation and start, exactly as its Preview, over 361 positions (19 by 19) in an outward
+  square spiral from the stage, ring by ring, each ring starting below the last, 1046.25 µm apart (the field of
+  1162.5 µm less a tenth); pressed again, it stopped and put the stage back. Built: `spiral_of_fields(rings)`, the
+  positions for `tile_scan`, as many rings as asked. Through the driver: one ring, 9 fields in 19.8 s, 9 stores.
+- Start: unlike Preview, the setting as it is (no xyt, no attachment suppressed), with
+  `ActivateExtendedAutoFocusInMarkAndFind 1` and `ActivateAutoFocus 1` before `StartAcquiring`; afterwards the stage back,
+  `SetStageUseMode 0`, `ActivateAutoFocus 1`, `ActivateExtendedAutoFocusInMarkAndFind 0`. Built: `tile_scan(...,
+  button="start", autofocus=...)`. Through the driver: 2 fields with the autofocus (7.9 s), and 2 fields with a
+  3-section z-stack, each saved as (1, 2, 3, 512, 512); the z-stack cleared after.
+- Focus Map: greyed out without regions drawn in the Navigator. LAS X's help (Creating a Focus Map) gives it whole:
+  focal points found by the autofocus ("Find all by Autofocus") or set by hand ("Set Z"), a Delaunay triangulation, the
+  focus linear inside a triangle, the foot point on the nearest outer edge outside, else the nearest point's, never
+  extrapolated; used by Start only, not by the Preview. Built: `procedures/focus_map.py`, `find_focus_map(places)`, and
+  `tile_scan(..., button="start", focus_map=points)`, each field's z-galvo moved by the map's focus there. On the
+  simulator the autofocus finds no focus (ValidateFocus failed), so `find_focus_map` refused and put the stage back; with
+  a map given by hand (-3, +3 and 0 µm), a one-ring spiral was taken at -3 to +3 µm, each store at its field's focus.
+  Still to check on the STELLARIS: the autofocus at the focal points.

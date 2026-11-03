@@ -176,7 +176,7 @@ def test_capture_tile_scan_save_and_clear_call_their_procedures(scope, monkeypat
 
     assert calls == [
         ("acquire", {"position_label": "A1", "acquisition_settings": None, "acquisition_type": "overview", "output_folder": None}),
-        ("tile_scan", [(0.0, 0.0), (600.0, 0.0)], {"position_label": "row", "acquisition_type": "tile_scan", "output_folder": None}),
+        ("tile_scan", [(0.0, 0.0), (600.0, 0.0)], {"position_label": "row", "acquisition_type": "tile_scan", "output_folder": None, "button": "preview", "autofocus": False, "focus_map": None}),
         ("save", "A1"),
         ("clear", None),
     ]

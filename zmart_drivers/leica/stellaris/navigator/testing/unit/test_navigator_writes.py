@@ -171,6 +171,42 @@ class TestCapturing:
         assert not write.never_resend
         assert write.confirm.reading == "xy" and write.values == {"x_um": 63500, "y_um": 41500, "z_galvo_um": 0}
 
+    @pytest.mark.parametrize("autofocus", [True, False])
+    def test_start_takes_the_setting_as_it_is_over_the_positions(self, autofocus):
+        # The Navigator's Start (simulator, 2026-11-03): no xyt, no attachment suppressed; the autofocus as asked.
+        write = writes.tile_scan([(63500, 41500, 0)], 2518, button="start", autofocus=autofocus)
+        positions = (
+            '<Scanner Command="SetStageIrregularTileScanPositions" FocusOffset="0.0000000000">'
+            '<Tile XPos="0.0635000000" YPos="0.0415000000" ZPos="0.0000000000" FocusStabilizerOffset="0.0000000000"/>'
+            "</Scanner>"
+        )
+        assert elements(write) == [
+            '<AcquireControl Command="StopAcquiring" DCParentElementID="0"/>',
+            '<Scanner Command="SetStageUseMode" StageUseMode="7"/>',
+            positions,
+            f'<Scanner Command="ActivateExtendedAutoFocusInMarkAndFind" Activate="{int(autofocus)}"/>',
+            f'<Scanner Command="ActivateAutoFocus" Activate="{int(autofocus)}" InitNew="0"/>',
+            '<AcquireControl Command="StartAcquiring" DCParentElementID="2518"/>',
+        ]
+        assert write.never_resend
+
+    def test_after_start_the_stage_and_the_autofocus_are_put_back_as_the_window_does(self):
+        write = writes.after_tile_scan(63500, 41500, 0, button="start")
+        assert elements(write) == [
+            '<Scanner Command="StageMoveToCoordinates" PosX="0.0635000000" PosY="0.0415000000" PosZ="0.0000000000"/>',
+            '<Scanner Command="SetStageUseMode" StageUseMode="0"/>',
+            '<Scanner Command="ActivateAutoFocus" Activate="1" InitNew="0"/>',
+            '<Scanner Command="ActivateExtendedAutoFocusInMarkAndFind" Activate="0"/>',
+        ]
+
+    def test_the_preview_never_runs_the_autofocus(self):
+        with pytest.raises(ValueError, match="Preview"):
+            writes.tile_scan([(63500, 41500, 0)], 2518, autofocus=True)
+
+    def test_a_button_the_navigator_does_not_have_is_refused(self):
+        with pytest.raises(ValueError, match="button"):
+            writes.tile_scan([(63500, 41500, 0)], 2518, button="go")
+
     def test_a_tile_scan_needs_a_position(self):
         with pytest.raises(ValueError, match="no position"):
             writes.tile_scan([], 2518)
@@ -205,6 +241,8 @@ def test_every_element_the_driver_builds_is_on_the_transfer_s_allowlist():
         writes.capture(2518),
         writes.tile_scan([(63500.0, 41500.0, 0.0)], 2518),
         writes.after_tile_scan(63500.0, 41500.0, 0.0),
+        writes.tile_scan([(63500.0, 41500.0, 0.0)], 2518, button="start", autofocus=True),
+        writes.after_tile_scan(63500.0, 41500.0, 0.0, button="start"),
     ]
     for write in built:
         for element in elements(write):

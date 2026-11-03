@@ -1424,6 +1424,17 @@ def get_autofocus_in_time_series():
     return {1: "first", 2: "every"}.get(found["when"], found["n"])
 
 
+def get_autofocus_at_stage_positions():
+    """When the autofocus runs at stage positions, as the Navigator's Autofocus Stage tab shows it: ``"first"`` (the
+    first position only), ``"every"`` (every position), or n (every n-th position). ``Acquire/AutoFocusInfo/WorkflowXY``
+    and its iterator.
+    """
+    found = settings("the autofocus at stage positions", {
+        "when": ("Acquire", "AutoFocusInfo", "WorkflowXY"), "n": ("Acquire", "AutoFocusInfo", "WorkflowXYIterator"),
+    })
+    return {1: "first", 2: "every"}.get(found["when"], found["n"])
+
+
 #: Linear Z-compensation's modes by name and LCS's bit for them.
 Z_COMPENSATION_MODES = {"excitation": 1, "detector": 2, "motcorr": 4}
 

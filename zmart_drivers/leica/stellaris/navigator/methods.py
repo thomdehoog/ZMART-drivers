@@ -70,6 +70,7 @@ from .procedures import (
     setting_files,
 )
 from .procedures import acquire as acquire_step
+from .procedures import focus_map as focus_map_step
 from .procedures import lasx_window
 from .procedures import pan as pan_step
 from .procedures import state as state_step
@@ -1129,6 +1130,15 @@ class Microscope:
         checked(self.handle, result, f"set_autofocus_in_time_series({when!r})")
         return result["in_time_series"]
 
+    def set_autofocus_at_stage_positions(self, when) -> str | int:
+        """When LAS X's autofocus runs at the stage positions of a tile scan or a position list, as the Navigator's
+        Autofocus Stage tab: ``"first"`` (the first position only), ``"every"`` (every position), or n (every n-th
+        position). Answers it as LAS X holds it."""
+        self.handle.require_open()
+        result = changes.set_autofocus_at_stage_positions(self.handle.client, when)
+        checked(self.handle, result, f"set_autofocus_at_stage_positions({when!r})")
+        return result["at_stage_positions"]
+
     def set_z_compensation(self, excitation: bool | None = None, detector: bool | None = None, motcorr: bool | None = None,
                            reference_um: float | None = None) -> dict:
         """Switch linear Z-compensation's modes (laser power, detector gain, collar along z) on or off, and set its
@@ -1390,14 +1400,24 @@ class Microscope:
         *,
         acquisition_type: str = "tile_scan",
         output_folder: str | None = None,
+        button: str = "preview",
+        autofocus: bool = False,
+        focus_map: list[tuple[float, float, float]] | None = None,
     ) -> dict:
         """Take one picture of several fields at *positions* (x, y pairs in micrometres from the origin), at the current focus.
 
-        LAS X scans them in one acquisition. :meth:`save` writes one store
-        per field, named ``<acquisition_type>_<label>_field<n>``, each placed
-        where its field was taken. Every position is shown to the limits
-        first; one outside them refuses the whole scan. The stage is put back
-        at the first field afterwards.
+        LAS X scans them in one acquisition, as the Navigator's Preview (one
+        plane per field, *button* ``"preview"``) or its Start (``"start"``:
+        the setting as it is, its z-stack, time series and channels). With
+        Start, *autofocus* True runs LAS X's autofocus at the positions its
+        Stage tab says (:meth:`set_autofocus_at_stage_positions`), and
+        *focus_map* (focal points ``(x, y, z)``, as :meth:`find_focus_map`
+        answers them) takes each field at the focus the map gives its place,
+        on z-galvo. :meth:`save` writes one store per field, named
+        ``<acquisition_type>_<label>_field<n>``, each placed where its field
+        was taken. Every position is shown to the limits first; one outside
+        them refuses the whole scan. The stage is put back at the first
+        field afterwards.
         """
         return acquire_step.tile_scan(
             self.handle,
@@ -1405,11 +1425,45 @@ class Microscope:
             position_label=position_label,
             acquisition_type=acquisition_type,
             output_folder=output_folder,
+            button=button,
+            autofocus=autofocus,
+            focus_map=focus_map,
         )
 
     def row_of_fields(self, count: int) -> list[tuple[float, float]]:
         """*count* positions in a row along x from here, a field and a tenth apart, for :meth:`tile_scan`."""
         return acquire_step.row_of_fields(self.handle, count)
+
+    def spiral_of_fields(self, rings: int) -> list[tuple[float, float]]:
+        """Positions in an outward square spiral from here, *rings* rings round it, as LAS X's Spiral lays them out:
+        the fields a field less a tenth apart, ``(2 * rings + 1) ** 2`` of them, for :meth:`tile_scan`."""
+        return acquire_step.spiral_of_fields(self.handle, rings)
+
+    def find_focus_map(self, places: list[tuple[float, float]]) -> list[tuple[float, float, float]]:
+        """Find the focus at each of *places* (x, y in micrometres from the origin) with LAS X's autofocus, as the
+        Navigator's Focus Map does with "Find all by Autofocus"; answers the focal points ``(x, y, z)`` for
+        :meth:`tile_scan`.
+
+        The stage goes to each place in turn, at the focus found at the one
+        before (the focus now, for the first), and the autofocus searches
+        there with its own settings. A place where it finds no focus refuses
+        the map. The stage is put back where it stood afterwards, also when
+        the map was refused.
+        """
+        focus_map_step.checked_points([(x, y, 0.0) for x, y in places])
+        here = self.position()
+        start = tuple(here[axis]["position"] for axis in ("x", "y", "z"))
+        points, z = [], start[2]
+        try:
+            for x, y in places:
+                self.move_to(x, y, z)
+                if not self.autofocus().get("found"):
+                    raise RuntimeError(f"the autofocus found no focus at ({x:g}, {y:g}) um, so the focus map is not made")
+                z = self.position()["z"]["position"]
+                points.append((float(x), float(y), z))
+        finally:
+            self.move_to(*start)
+        return points
 
     def save(self, label: str | None = None) -> list[dict]:
         """Write the pictures that are waiting (only *label* when given) as OME-Zarr; answer one record each."""

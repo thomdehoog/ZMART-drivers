@@ -134,6 +134,36 @@ class TestATileScan:
         # The stage is back at the first field afterwards.
         assert (lasx.x_um, lasx.y_um) == (pytest.approx(63500.0), pytest.approx(41500.0))
 
+    def test_start_scans_with_the_setting_as_it_is_and_puts_the_autofocus_back(self, scope, lasx):
+        scope.tile_scan(scope.row_of_fields(2), "row", button="start", autofocus=True)
+
+        assert lasx.captures == 1
+        assert not any("ScanMode" in x or "ATL_SuppressAtlasAttachment" in x for x in lasx.sent)
+        assert any('ActivateExtendedAutoFocusInMarkAndFind" Activate="1"' in x for x in lasx.sent)
+        put_back = lasx.sent[next(i for i, x in enumerate(lasx.sent) if "StageMoveToCoordinates" in x):]
+        assert '<Scanner Command="ActivateExtendedAutoFocusInMarkAndFind" Activate="0"/>' in put_back
+        assert (lasx.x_um, lasx.y_um) == (pytest.approx(63500.0), pytest.approx(41500.0))
+
+    def test_start_takes_each_field_at_the_focus_of_the_map(self, scope, lasx):
+        here = scope.position()
+        x, y, z = (here[a]["position"] for a in ("x", "y", "z"))
+        points = [(x, y, z), (x + 1000.0, y, z + 4.0)]
+
+        scope.tile_scan([(x, y), (x + 500.0, y)], "map", button="start", focus_map=points)
+
+        tiles = next(e for e in lasx.sent if "SetStageIrregularTileScanPositions" in e)
+        zs = [float(part.split('"')[0]) * 1e6 for part in tiles.split('ZPos="')[1:]]
+        assert zs[1] - zs[0] == pytest.approx(2.0)
+        (pending,) = scope.handle.unsaved
+        assert pending.fields[1]["z"] - pending.fields[0]["z"] == pytest.approx(2.0)
+        assert pending.fields[0]["z"] == pytest.approx(z)
+
+    def test_the_preview_takes_no_focus_map(self, scope):
+        here = scope.position()
+        x, y, z = (here[a]["position"] for a in ("x", "y", "z"))
+        with pytest.raises(ValueError, match="Start"):
+            scope.tile_scan([(x, y)], "map", focus_map=[(x, y, z), (x + 1.0, y, z)])
+
     def test_no_positions_is_refused(self, scope):
         with pytest.raises(ValueError, match="at least one"):
             scope.tile_scan([], "row")
@@ -161,6 +191,27 @@ class TestATileScan:
             np.testing.assert_array_equal(level[0, 0, 0], pixels[field, 0])
         assert scope.handle.in_cache == [(10755, "Mosaic001")]
         assert len({p["path"] for p in planes}) == 3
+
+
+def test_the_spiral_runs_outward_as_las_x_s_spiral_does(scope, lasx):
+    """Ring by ring from where the stage stands, the fields a field less a tenth apart (simulator, 2026-11-03)."""
+    here = scope.position()
+    x, y = here["x"]["position"], here["y"]["position"]
+    step = 1162.5 * 0.9
+
+    spiral = scope.spiral_of_fields(2)
+
+    assert len(spiral) == 25
+    rings = [(round((px - x) / step), round((py - y) / step)) for px, py in spiral]
+    assert rings[:10] == [(0, 0), (0, -1), (1, -1), (1, 0), (1, 1), (0, 1), (-1, 1), (-1, 0), (-1, -1), (-1, -2)]
+    assert rings[-1] == (-2, -2) and len(set(rings)) == 25
+    assert spiral[1] == (pytest.approx(x), pytest.approx(y - step))
+
+
+@pytest.mark.parametrize("rings", [0, -1, 1.5, True])
+def test_a_spiral_has_one_ring_or_more(scope, rings):
+    with pytest.raises(ValueError, match="ring"):
+        scope.spiral_of_fields(rings)
 
 
 def test_the_row_turns_round_at_the_edge_of_the_canvas(scope, lasx):

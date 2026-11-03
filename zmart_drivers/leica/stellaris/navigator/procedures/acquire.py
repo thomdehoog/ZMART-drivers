@@ -35,7 +35,9 @@ try:  # the driver's version, for the capture record; never fail a capture over 
 except Exception:  # noqa: BLE001 -- best-effort provenance
     _DRIVER_VERSION = None
 
+from ..primitives.direct import writes
 from . import changes
+from . import focus_map as focus_map_step
 from . import readings as _readers
 from .absolute_coordinate_system import get_xyz, objective_delta_um, stage_target
 from .save_data.naming import Naming, free_stem
@@ -48,6 +50,10 @@ log = logging.getLogger(__name__)
 
 #: Between two fields of a row of tiles: a field and a tenth, so the fields do not overlap.
 TILE_SPACING = 1.1
+
+#: Between two fields of LAS X's Spiral: a field less a tenth, so neighbours overlap by a tenth (simulator,
+#: 2026-11-03: 1046.25 um apart with a field of 1162.5 um).
+SPIRAL_SPACING = 0.9
 
 
 def try_(fn):
@@ -260,14 +266,21 @@ def tile_scan(
     position_label: str | None = None,
     acquisition_type: str = "tile_scan",
     output_folder: str | None = None,
+    button: str = "preview",
+    autofocus: bool = False,
+    focus_map=None,
 ) -> dict:
     """Take one picture of several fields, at *positions*, and keep a note of it, for ``save_data``.
 
     *positions* are ``(x, y)`` pairs in micrometres from the origin, in the
     sample's frame, as ``move_to`` takes them; the fields are taken at the
-    current focus. LAS X scans them in one acquisition (its Preview), and
+    current focus. LAS X scans them in one acquisition, with the
+    Navigator's Preview (one plane per field) or Start (*button*: the
+    setting as it is, with the autofocus when *autofocus* is True), and
     ``save_data`` writes one store per field, each placed where its field
-    was taken and named ``<acquisition_type>_<label>_field<n>``. Afterwards
+    was taken and named ``<acquisition_type>_<label>_field<n>``. With Start,
+    *focus_map* (focal points ``(x, y, z)``) takes each field at the focus
+    the map gives its place (:mod:`.focus_map`), on z-galvo. Afterwards
     the stage is put back at the first field. Every position is shown to
     the limits first; one outside them refuses the whole scan, and nothing
     moves.
@@ -277,6 +290,15 @@ def tile_scan(
     handle.require_open()
     if not positions:
         raise ValueError("a tile scan needs at least one position")
+    if button not in writes.TILE_BUTTONS or (button == "preview" and autofocus):
+        raise ValueError(
+            f"a tile scan is taken with the Navigator's Preview (no autofocus) or Start, not {button!r} "
+            f"with autofocus={autofocus!r}"
+        )
+    if focus_map is not None:
+        if button != "start":
+            raise ValueError("the Navigator's Preview takes no focus map; Start does (button='start')")
+        focus_map = focus_map_step.checked_points(focus_map)
     output_root = _where_it_goes(handle, output_folder)
     noted_before = len(handle.unconfirmed)
     at = _stage_now(handle)
@@ -288,11 +310,13 @@ def tile_scan(
             x, y = (float(v) for v in position)
         except (TypeError, ValueError) as why:
             raise ValueError(f"a tile scan position is (x, y) in micrometres, not {position!r}: {why}") from why
-        abs_x, abs_y, _focus = stage_target(x, y, at["z"], handle.origin, delta)
-        stage_positions.append((abs_x, abs_y, at["z_galvo_um"]))
-        frame_positions.append({"x": x, "y": y, "z": at["z"], "z_wide_um": at["z_wide_um"], "z_galvo_um": at["z_galvo_um"]})
+        z = at["z"] if focus_map is None else focus_map_step.focus_at(focus_map, x, y)
+        galvo = at["z_galvo_um"] + (z - at["z"])
+        abs_x, abs_y, _focus = stage_target(x, y, z, handle.origin, delta)
+        stage_positions.append((abs_x, abs_y, galvo))
+        frame_positions.append({"x": x, "y": y, "z": z, "z_wide_um": at["z_wide_um"], "z_galvo_um": galvo})
     settings = current_settings(handle)
-    acq = changes.take_tile_scan(handle.client, stage_positions)
+    acq = changes.take_tile_scan(handle.client, stage_positions, button=button, autofocus=autofocus)
     put_back = acq.command_result.get("put_back") or {}
     if not put_back.get("confirmed"):
         handle.note_unconfirmed("tile_scan: the stage back at the first field", put_back or "not sent")
@@ -311,7 +335,7 @@ def tile_scan(
             output_root=output_root,
             session_hash6=handle.hash6,
             asked={"positions": [list(p) for p in positions]},
-            settings={"trigger": "tile_scan"},
+            settings={"trigger": "tile_scan", "button": button, "autofocus": autofocus, "focus_map": focus_map},
             unconfirmed=list(handle.unconfirmed[noted_before:]),
         )
     )
@@ -342,6 +366,35 @@ def row_of_fields(handle, count: int, *, spacing: float = TILE_SPACING) -> list[
     if all(low <= p[0] <= high for p in forward):
         return forward
     return [(x - i * step, y) for i in range(count)]
+
+
+def spiral_of_fields(handle, rings: int, *, spacing: float = SPIRAL_SPACING) -> list[tuple[float, float]]:
+    """Positions in an outward square spiral from where the stage stands, *rings* rings round it, as LAS X's Spiral.
+
+    Ring by ring, each starting below the last and going round with the
+    clock as the Navigator's Spiral lists them; the fields a field less a
+    tenth apart, so neighbours overlap by a tenth. ``(2 * rings + 1) ** 2``
+    positions in the sample's frame, as :func:`tile_scan` takes them;
+    LAS X's own Spiral goes on until it is stopped (19 by 19 fields), the
+    driver's has as many rings as asked. A field beyond the stage's limits
+    refuses the whole scan when it is taken.
+    """
+    if isinstance(rings, bool) or not isinstance(rings, int) or rings < 1:
+        raise ValueError(f"a spiral has one ring or more, not {rings!r}")
+    handle.require_open()
+    here = get_xyz(handle)
+    fov = _readers.get_fov(handle.client)
+    if not fov:
+        raise RuntimeError("could not read the field of view, so the spiral cannot be laid out")
+    step = fov[0] * 1e6 * spacing
+    steps = [(0, 0)]
+    for ring in range(1, rings + 1):
+        steps += [(i, -ring) for i in range(-ring + 1, ring + 1)]
+        steps += [(ring, j) for j in range(-ring + 1, ring + 1)]
+        steps += [(i, ring) for i in range(ring - 1, -ring - 1, -1)]
+        steps += [(-ring, j) for j in range(ring - 1, -ring - 1, -1)]
+    x, y = here["x"]["position"], here["y"]["position"]
+    return [(x + i * step, y + j * step) for i, j in steps]
 
 
 #: How far the stage may differ from the last reported position before the

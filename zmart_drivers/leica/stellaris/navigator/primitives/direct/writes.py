@@ -1808,17 +1808,23 @@ def auto_sync_option(scanner: str, option: str, value) -> list[Write]:
     return [replace(write(name, repr(shown), shown, shown), confirm=None), write(box, 1, shown, shown)]
 
 
+def autofocus_when(workflow: str, when, what: str) -> list[str]:
+    """The state-tree elements for when the autofocus runs, as its Timelapse and Stage tabs set it: *workflow* 1 for
+    ``"first"``, 2 for ``"every"``, 3 with n in its iterator for every n-th (n of 2 or more). *what* names the cycle
+    or position in the refusal."""
+    if when in ("first", "every") and isinstance(when, str):
+        return [f'<StateTree Command="{workflow}" Value="{1 if when == "first" else 2}"/>']
+    if isinstance(when, int) and not isinstance(when, bool) and when >= 2:
+        return [f'<StateTree Command="{workflow}" Value="3"/>', f'<StateTree Command="{workflow}Iterator" Value="{when}"/>']
+    raise ValueError(f"the autofocus runs at the 'first' {what}, at 'every' {what}, or every n-th (n of 2 or more), not {when!r}")
+
+
 def autofocus_in_time_series(when) -> Write:
     """When the autofocus runs in a time series, as its Timelapse tab: ``"first"``, ``"every"``, or n >= 2 (every n-th cycle).
 
     Written into LCS's state tree, as the tab does (simulator, 2026-11-02); read back.
     """
-    if when in ("first", "every") and isinstance(when, str):
-        elements = [f'<StateTree Command="WorkflowTimelapse" Value="{1 if when == "first" else 2}"/>']
-    elif isinstance(when, int) and not isinstance(when, bool) and when >= 2:
-        elements = ['<StateTree Command="WorkflowTimelapse" Value="3"/>', f'<StateTree Command="WorkflowTimelapseIterator" Value="{when}"/>']
-    else:
-        raise ValueError(f"the autofocus runs on the 'first' cycle, on 'every' cycle, or every n-th (n of 2 or more), not {when!r}")
+    elements = autofocus_when("WorkflowTimelapse", when, "cycle")
 
     def fill(request: Request) -> None:
         request.elements = list(elements)
@@ -1826,6 +1832,24 @@ def autofocus_in_time_series(when) -> Write:
     return Write(command="set_autofocus_in_time_series", values={"value": str(when)}, request="WorkflowTimelapse", fill=fill,
                  description=f"Autofocus in a time series -> {when}", ready=idle(),
                  confirm=Expect("autofocus_in_time_series", lambda shown: shown == when))
+
+
+def autofocus_at_stage_positions(when) -> Write:
+    """When the autofocus runs at the stage positions of a tile scan or a position list, as the Navigator's Autofocus
+    Stage tab: ``"first"`` (the first position only), ``"every"``, or n >= 2 (every n-th position).
+
+    Written into LCS's state tree, as the tab does, with its first-position switch beside it (simulator, 2026-11-03);
+    read back.
+    """
+    elements = autofocus_when("WorkflowXY", when, "position")
+    elements.append(f'<StateTree Command="IsFirstPositionOnly" Value="{int(when == "first")}"/>')
+
+    def fill(request: Request) -> None:
+        request.elements = list(elements)
+
+    return Write(command="set_autofocus_at_stage_positions", values={"value": str(when)}, request="WorkflowXY", fill=fill,
+                 description=f"Autofocus at stage positions -> {when}", ready=idle(),
+                 confirm=Expect("autofocus_at_stage_positions", lambda shown: shown == when))
 
 
 def z_compensation_change(command: str, element: str, description: str, shows, values=None) -> Write:
@@ -2861,18 +2885,46 @@ def tile_elements(positions_um: Iterable[tuple[float, float, float]], tile_z_um:
     )
 
 
+#: The Navigator's two buttons that scan over positions: Preview (one plane per field, xyt, no autofocus) and Start
+#: (the setting as it is: its z-stack, time series and channels; the autofocus as its Stage tab says).
+TILE_BUTTONS = ("preview", "start")
+
+
 def tile_scan_elements(
-    positions_um: Iterable[tuple[float, float, float]], project: int, tile_z_um: float | None = None
+    positions_um: Iterable[tuple[float, float, float]],
+    project: int,
+    tile_z_um: float | None = None,
+    *,
+    button: str = "preview",
+    autofocus: bool = False,
 ) -> list[str]:
-    """The window's Preview over *positions_um* (x, y, z) into *project*: the preparation, then the start.
+    """The Navigator's Preview or Start over *positions_um* (x, y, z) into *project*: the preparation, then the start.
 
     LAS X scans the positions in one acquisition into one picture of all the
     fields (``Mosaic<n>``), which it puts in a "TileScans" collection of the
-    project (STELLARIS, 2026-10-15). :func:`after_tile_scan` puts back what
-    the preparation changed.
+    project (STELLARIS, 2026-10-15). The Preview scans one plane per field
+    (scan mode xyt) with the autofocus off. Start takes the setting as it
+    is, with the autofocus on or off (*autofocus*): it then runs at the
+    positions the Navigator's Autofocus Stage tab says (simulator,
+    2026-11-03). :func:`after_tile_scan` puts back what the preparation
+    changed. Raises ValueError for another button, or the autofocus asked
+    of the Preview.
     """
+    if button not in TILE_BUTTONS:
+        raise ValueError(f"the Navigator's button is one of {TILE_BUTTONS}, not {button!r}")
+    if button == "preview" and autofocus:
+        raise ValueError("the Navigator's Preview never runs the autofocus; Start does (button='start')")
     parent = checked_project(project)
     positions = tile_elements(positions_um, tile_z_um)
+    if button == "start":
+        return [
+            '<AcquireControl Command="StopAcquiring" DCParentElementID="0"/>',
+            '<Scanner Command="SetStageUseMode" StageUseMode="7"/>',
+            positions,
+            f'<Scanner Command="ActivateExtendedAutoFocusInMarkAndFind" Activate="{int(autofocus)}"/>',
+            f'<Scanner Command="ActivateAutoFocus" Activate="{int(autofocus)}" InitNew="0"/>',
+            f'<AcquireControl Command="StartAcquiring" DCParentElementID="{parent}"/>',
+        ]
     return [
         '<AcquireControl Command="StopAcquiring" DCParentElementID="0"/>',
         '<Scanner Command="SetStageUseMode" StageUseMode="7"/>',
@@ -2887,17 +2939,24 @@ def tile_scan_elements(
 
 
 def tile_scan(
-    positions_um: list[tuple[float, float, float]], project: int, *, tile_z_um: float | None = None, start: dict | None = None
+    positions_um: list[tuple[float, float, float]],
+    project: int,
+    *,
+    tile_z_um: float | None = None,
+    start: dict | None = None,
+    button: str = "preview",
+    autofocus: bool = False,
 ) -> Write:
     """Take a tile scan over *positions_um* (x, y, z-galvo in micrometres) into the LAS X project *project*.
 
-    Every position is shown to the limits first, with its z-galvo. With
-    *tile_z_um* the tiles carry that z instead (:func:`tile_elements`).
-    Never sent again, like a capture; sent once the scanner is idle,
-    however long that takes.
+    With the Navigator's Preview or Start (*button*), the autofocus only with
+    Start (:func:`tile_scan_elements`). Every position is shown to the
+    limits first, with its z-galvo. With *tile_z_um* the tiles carry that z
+    instead (:func:`tile_elements`). Never sent again, like a capture; sent
+    once the scanner is idle, however long that takes.
     """
     positions = [tuple(float(v) for v in p) for p in positions_um]
-    elements = tile_scan_elements(positions, project, tile_z_um)
+    elements = tile_scan_elements(positions, project, tile_z_um, button=button, autofocus=autofocus)
 
     def fill(request: Request) -> None:
         request.elements = list(elements)
@@ -2913,12 +2972,20 @@ def tile_scan(
     )
 
 
-def after_tile_scan_elements(x_um: float, y_um: float, z_um: float) -> list[str]:
-    """What the window sends after its Preview: the stage back to (*x_um*, *y_um*), *z_um* as LCS reads a tile's z, the rest as it was."""
-    return [
+def after_tile_scan_elements(x_um: float, y_um: float, z_um: float, button: str = "preview") -> list[str]:
+    """What the window sends after its Preview or Start: the stage back to (*x_um*, *y_um*), *z_um* as LCS reads a
+    tile's z, the rest as it was (simulator, 2026-11-03, for Start)."""
+    move = [
         f'<Scanner Command="StageMoveToCoordinates" PosX="{metres(x_um)}" PosY="{metres(y_um)}" '
         f'PosZ="{metres(z_um)}"/>',
         '<Scanner Command="SetStageUseMode" StageUseMode="0"/>',
+    ]
+    if button == "start":
+        return move + [
+            '<Scanner Command="ActivateAutoFocus" Activate="1" InitNew="0"/>',
+            '<Scanner Command="ActivateExtendedAutoFocusInMarkAndFind" Activate="0"/>',
+        ]
+    return move + [
         '<ATL Command="ATL_SuppressAtlasAttachment" EnableSuppression="0"/>',
         f'<Scanner Command="ScanMode" ScanMode="xyz" {CURRENT}/>',
         '<Scanner Command="ActivateAutoFocus" Activate="1" InitNew="0"/>',
@@ -2926,7 +2993,14 @@ def after_tile_scan_elements(x_um: float, y_um: float, z_um: float) -> list[str]
 
 
 def after_tile_scan(
-    x_um: float, y_um: float, z_um: float, *, tolerance=None, tile_z_um: float | None = None, start: dict | None = None
+    x_um: float,
+    y_um: float,
+    z_um: float,
+    *,
+    tolerance=None,
+    tile_z_um: float | None = None,
+    start: dict | None = None,
+    button: str = "preview",
 ) -> Write:
     """Put back what a tile scan changed, and the stage to (*x_um*, *y_um*, *z_um*).
 
@@ -2936,7 +3010,7 @@ def after_tile_scan(
     it is not, it is the same put-back.
     """
     tolerance = XY_TOLERANCE_UM if tolerance is None else tolerance
-    elements = after_tile_scan_elements(x_um, y_um, z_um if tile_z_um is None else tile_z_um)
+    elements = after_tile_scan_elements(x_um, y_um, z_um if tile_z_um is None else tile_z_um, button)
 
     def fill(request: Request) -> None:
         request.elements = list(elements)

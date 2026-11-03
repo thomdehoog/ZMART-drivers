@@ -1490,6 +1490,19 @@ def set_autofocus_in_time_series(client, when, *, max_retries=None) -> dict:
     return result
 
 
+def set_autofocus_at_stage_positions(client, when, *, max_retries=None) -> dict:
+    """When the autofocus runs at stage positions, as the Navigator's Autofocus Stage tab: ``"first"``, ``"every"``,
+    or n (every n-th position); the result's ``at_stage_positions`` is read back."""
+    try:
+        change = writes.autofocus_at_stage_positions(when)
+    except ValueError as why:
+        return dispatch.refused(str(why))
+    result = run(client, change, max_retries=max_retries)
+    if result["success"]:
+        result["at_stage_positions"] = readers.get_autofocus_at_stage_positions(client)
+    return result
+
+
 def z_compensation_result(client, planned, max_retries=None) -> dict:
     result = None
     for change in planned:
@@ -2085,11 +2098,12 @@ def tile_z_um(client, positions_um) -> float | None:
     return wide
 
 
-def tile_scan(client, positions_um, project=None, **watching) -> dict:
+def tile_scan(client, positions_um, project=None, *, button="preview", autofocus=False, **watching) -> dict:
     """Take a tile scan over *positions_um* (x, y, z-galvo per field, micrometres); see :func:`picture`.
 
-    The tiles carry the z LCS reads them on (:func:`tile_z_um`), noted in
-    the result as ``tile_z_um``.
+    With the Navigator's Preview or Start (*button*), the autofocus only with
+    Start. The tiles carry the z LCS reads them on (:func:`tile_z_um`),
+    noted in the result as ``tile_z_um``.
     """
     try:
         tile_z = tile_z_um(client, positions_um)
@@ -2098,7 +2112,7 @@ def tile_scan(client, positions_um, project=None, **watching) -> dict:
             raise RuntimeError("where the stage and z-galvo stand could not be read, so the steps cannot be checked")
         into = project if project is not None else data_container.experiment_for_capture()
         change = writes.tile_scan(
-            positions_um, into, tile_z_um=tile_z,
+            positions_um, into, tile_z_um=tile_z, button=button, autofocus=autofocus,
             start={"from_x_um": here["x_um"], "from_y_um": here["y_um"], "from_z_galvo_um": galvo},
         )
     except (RuntimeError, ValueError, TypeError) as why:
@@ -2108,8 +2122,9 @@ def tile_scan(client, positions_um, project=None, **watching) -> dict:
     return result
 
 
-def after_tile_scan(client, x_um, y_um, z_um, *, max_retries=None, tile_z_um=None, last=None) -> dict:
-    """Put back what a tile scan changed: the stage to (*x_um*, *y_um*, *z_um*), scan mode xyz, autofocus on.
+def after_tile_scan(client, x_um, y_um, z_um, *, max_retries=None, tile_z_um=None, last=None, button="preview") -> dict:
+    """Put back what a tile scan changed: the stage to (*x_um*, *y_um*, *z_um*), and after a Preview scan mode xyz;
+    the autofocus on.
 
     *tile_z_um* is the z the tile scan sent its tiles with, sent again here;
     *last* is the last field ``(x, y, z-galvo)``, where the stage stands, for the step.
@@ -2117,7 +2132,7 @@ def after_tile_scan(client, x_um, y_um, z_um, *, max_retries=None, tile_z_um=Non
     start = None if last is None else {"from_x_um": last[0], "from_y_um": last[1], "from_z_galvo_um": last[2]}
     return run(
         client,
-        writes.after_tile_scan(float(x_um), float(y_um), float(z_um), tile_z_um=tile_z_um, start=start),
+        writes.after_tile_scan(float(x_um), float(y_um), float(z_um), tile_z_um=tile_z_um, start=start, button=button),
         max_retries=max_retries,
     )
 
@@ -2134,7 +2149,7 @@ def take_picture(client: Any, project=None, **watching) -> AcquisitionResult:
     )
 
 
-def take_tile_scan(client: Any, positions_um, project=None, **watching) -> AcquisitionResult:
+def take_tile_scan(client: Any, positions_um, project=None, *, button="preview", autofocus=False, **watching) -> AcquisitionResult:
     """Take a tile scan and answer when it ran, then put back what it changed; RuntimeError when it failed.
 
     The put-back (``after_tile_scan``) returns the stage to the first
@@ -2146,10 +2161,12 @@ def take_tile_scan(client: Any, positions_um, project=None, **watching) -> Acqui
     """
     positions = [tuple(float(v) for v in p) for p in positions_um]
     started_at = time.time()
-    result = tile_scan(client, positions, project, **watching)
+    result = tile_scan(client, positions, project, button=button, autofocus=autofocus, **watching)
     finished_at = time.time()
     if result.get("timing", {}).get("attempts", 0) > 0:
-        result["put_back"] = after_tile_scan(client, *positions[0], tile_z_um=result.get("tile_z_um"), last=positions[-1])
+        result["put_back"] = after_tile_scan(
+            client, *positions[0], tile_z_um=result.get("tile_z_um"), last=positions[-1], button=button
+        )
     if not result.get("success"):
         put_back = result.get("put_back")
         undone = "" if put_back is None else f"; put back: {put_back.get('message')}"

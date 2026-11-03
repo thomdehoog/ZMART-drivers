@@ -171,6 +171,7 @@ ALLOWED_COMMANDS = frozenset(
         "ATL_SuppressAtlasAttachment",
         "ScanMode",
         "ActivateAutoFocus",
+        "ActivateExtendedAutoFocusInMarkAndFind",
         "StageMoveToCoordinates",
         "SetZUseMode",
         "SetZStackDefinition",
@@ -441,6 +442,11 @@ STATE_TREE_WRITES = {
     # 3 every n-th, n in the iterator. The window writes them here (simulator, 2026-11-02).
     "WorkflowTimelapse": TreeWrite(("Acquire", "AutoFocusInfo", "WorkflowTimelapse"), choices=frozenset({1, 2, 3})),
     "WorkflowTimelapseIterator": TreeWrite(("Acquire", "AutoFocusInfo", "WorkflowTimelapseIterator"), within=(1, 1_000_000_000)),
+    # When the autofocus runs at stage positions (the Navigator's Autofocus Stage tab), the same way; the tab sets
+    # IsFirstPositionOnly beside it (simulator, 2026-11-03).
+    "WorkflowXY": TreeWrite(("Acquire", "AutoFocusInfo", "WorkflowXY"), choices=frozenset({1, 2, 3})),
+    "WorkflowXYIterator": TreeWrite(("Acquire", "AutoFocusInfo", "WorkflowXYIterator"), within=(1, 1_000_000_000)),
+    "IsFirstPositionOnly": TreeWrite(("Acquire", "AutoFocusInfo", "IsFirstPositionOnly"), bool),
     # Auto Sync off (on is the window's command), and its scan options for the FOV scanner and the resonant one
     # ("Resonant" at the end): each with its own on/off. The window writes them here, taken only while Auto Sync
     # is on; the format and the speed only as unsigned numbers (simulator, 2026-11-02).

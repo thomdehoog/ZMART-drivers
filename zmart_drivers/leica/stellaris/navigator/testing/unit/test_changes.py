@@ -1713,6 +1713,30 @@ class TestAutofocusInATimeSeries:
         assert direct_reader.get_autofocus_in_time_series() == "first"
 
 
+class TestAutofocusAtStagePositions:
+    @pytest.mark.parametrize(("when", "shown"), [("every", "every"), (3, 3), ("first", "first")])
+    def test_when_the_autofocus_runs_is_written_and_read_back(self, lasx, client, when, shown):
+        result = changes.set_autofocus_at_stage_positions(client, when)
+
+        assert result["confirmed"] is True and result["at_stage_positions"] == shown
+
+    @pytest.mark.parametrize(("when", "first_only"), [("every", False), (3, False), ("first", True)])
+    def test_the_first_position_switch_follows_as_the_tab_sets_it(self, lasx, client, when, first_only):
+        changes.set_autofocus_at_stage_positions(client, when)
+
+        assert lasx.live[("Acquire", "AutoFocusInfo", "IsFirstPositionOnly")] is first_only
+
+    @pytest.mark.parametrize("when", ["sometimes", 0, 1, 2.5, True])
+    def test_what_the_tab_does_not_offer_is_refused(self, lasx, client, when):
+        assert changes.set_autofocus_at_stage_positions(client, when)["success"] is False
+        assert direct_reader.get_autofocus_at_stage_positions() == "first"
+
+    def test_the_time_series_tab_is_left_as_it_was(self, lasx, client):
+        changes.set_autofocus_at_stage_positions(client, "every")
+
+        assert direct_reader.get_autofocus_in_time_series() == "first"
+
+
 class TestZCompensation:
     @pytest.fixture
     def stacked(self, lasx, client):
