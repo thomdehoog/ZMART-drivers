@@ -390,6 +390,8 @@ class StandInNodes:
         # Each light source's own output power in the current setting (percent; -1 for a laser without one),
         # as LCS keeps it on every line of the source (simulator, 2026-11-02): the white-light laser at 85.
         self.output_power = {i: (85.0 if "SuperCont" in source["LightSourceName"] else -1.0) for i, source in enumerate(SIMULATOR_LIGHT_SOURCES)}
+        # Whether the setting panel draws the dyes' spectra (the settings toolbar's two buttons).
+        self.spectra = {"excitation": False, "emission": True}
         # The current setting's Z-compensation support points: z from the reference (metres) and the values held there.
         self.zcomp_points = []
         # The AOBS's eight lines (Confocal/AOBSLineList), as on the simulator, 2026-11-02: 497 in use.
@@ -545,7 +547,9 @@ class StandInNodes:
         ]})
         # Each detector's tau modes in the current setting, as LCS lists them there.
         sequence = child(child(child(child(1, "Acquire"), "ATL"), "CurrentBlock"), "ConfocalSequentialInfo")
-        graft(sequence, "SequentialSettingParameter", {"LightSourceList_SequentialInfo": {"LightSource_SequentialInfo": [
+        graft(sequence, "SequentialSettingParameter", {"ShowExcitationSpectrum": self.spectra["excitation"],
+                                                       "ShowEmissionSpectrum": self.spectra["emission"],
+                                                       "LightSourceList_SequentialInfo": {"LightSource_SequentialInfo": [
             {"UnifiedLaser_SequentialInfo": {"UnifiedLaserLine_SequentialInfo": [{"LaserTargetOutputPower": self.output_power[i]}] * 2}}
             for i in range(len(self.light_sources))
         ]}, "ZCompensation_SeqInfo": {"ZCompensationPosition": [
@@ -599,6 +603,9 @@ class StandInNodes:
                 name, parent, _kids = nodes[node]
                 path.insert(0, name)
                 node = parent
+            if path[-1] in ("ShowExcitationSpectrum", "ShowEmissionSpectrum") and "SequentialSettingParameter" in path:
+                self.spectra["excitation" if "Excitation" in path[-1] else "emission"] = bool(change.Value)
+                continue
             if path[-1] == "TimegateReferenceLineIndex":
                 unit_node = nodes[change.NodeID][1]
                 spectro_node = nodes[nodes[unit_node][1]][1]

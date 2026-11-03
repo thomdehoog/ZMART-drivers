@@ -1110,6 +1110,19 @@ def tau_channel_colour(route, name: str, setting_id: int, channel: int, colour: 
 OPERATING_CODES = {"Fast Mode": 4, "Counting": 1, "Analog": 10, "Reflection": 11}
 
 
+def spectrum_shown(place: int, which: str, on: bool) -> Write:
+    """The current setting's panel drawing the dyes' *which* spectrum ("excitation" or "emission"), written as the settings
+    toolbar's button does (simulator, 2026-11-03); read back."""
+    node = "ShowExcitationSpectrum" if which == "excitation" else "ShowEmissionSpectrum"
+
+    def fill(request: Request) -> None:
+        request.elements = [f'<StateTree Command="{node}" Value="{int(bool(on))}" At="{int(place)}"/>']
+
+    return Write(command="show_spectra", values={"value": bool(on)}, request=node, fill=fill,
+                 description=f"{which.capitalize()} spectra -> {'shown' if on else 'hidden'}", ready=idle(),
+                 confirm=Expect("spectra", lambda found: bool(found) and found[which] is bool(on)))
+
+
 def detector_excitation_line(at, name: str, place: int, shown: str) -> Write:
     """The detector *name*'s excitation line, by its *place* in the detector panel's list (0 Auto, then the setting's lines that
     are on), written into its setting's entry (*at*) as the window does (simulator, 2026-11-03); read back."""

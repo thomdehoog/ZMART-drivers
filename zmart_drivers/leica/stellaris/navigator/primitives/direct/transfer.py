@@ -363,6 +363,11 @@ STATE_TREE_WRITES = {
          "Spectrophotometer_SequentialInfo", "DetectionUnitList_SequentialInfo", "DetectorHWInfo_SequentialInfo", "TimegateReferenceLineIndex"),
         within=(0, 64), numbered=("SequentialSettingParameter", "Spectrophotometer_SequentialInfo", "DetectorHWInfo_SequentialInfo"),
     ),
+    # Whether the setting panel draws the dyes' spectra, as the settings toolbar's buttons write it (simulator, 2026-11-03).
+    "ShowExcitationSpectrum": TreeWrite(("Acquire", "ATL", "CurrentBlock", "ConfocalSequentialInfo", "SequentialSettingParameter",
+                                         "ShowExcitationSpectrum"), bool, numbered=("SequentialSettingParameter",)),
+    "ShowEmissionSpectrum": TreeWrite(("Acquire", "ATL", "CurrentBlock", "ConfocalSequentialInfo", "SequentialSettingParameter",
+                                       "ShowEmissionSpectrum"), bool, numbered=("SequentialSettingParameter",)),
     "IsLifetimeContrastActive": TreeWrite(
         ("Acquire", "ATL", "CurrentBlock", "ConfocalSequentialInfo", "SequentialSettingParameter", "SpectralDetection_SequentialInfo",
          "Spectrophotometer_SequentialInfo", "DetectionUnitList_SequentialInfo", "DetectorHWInfo_SequentialInfo", "IsLifetimeContrastActive"),

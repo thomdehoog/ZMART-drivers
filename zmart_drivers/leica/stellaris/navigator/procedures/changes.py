@@ -921,6 +921,27 @@ def find_coverslip_reflection(client, project=None, **watching) -> dict:
     return result
 
 
+def show_spectra(client, *, excitation=None, emission=None, max_retries=None) -> dict:
+    """Show or hide the dyes' excitation and emission spectra in the current setting's panel, as the settings toolbar's buttons;
+    the result's ``spectra`` is read back."""
+    asked = {"excitation": excitation, "emission": emission}
+    if all(v is None for v in asked.values()):
+        return dispatch.refused("show_spectra needs excitation or emission")
+    if any(v is not None and not isinstance(v, bool) for v in asked.values()):
+        return dispatch.refused(f"show_spectra takes True or False, not {asked}")
+    setting = readers.get_setting(client)
+    ids = [s["id"] for s in setting["all"]]
+    place = ids.index(setting["id"]) if setting["id"] in ids else 0
+    result = None
+    for which, on in asked.items():
+        if on is not None:
+            result = run(client, writes.spectrum_shown(place, which, on), max_retries=max_retries)
+            if not result["success"]:
+                return result
+    result["spectra"] = readers.get_spectra(client)
+    return result
+
+
 def set_excitation_line(client, line, *, detector=None, max_retries=None) -> dict:
     """Choose *detector*'s excitation line, as the detector panel's Excitation Line list: ``"auto"`` for LAS X's choice, or the
     wavelength of a line that is on in the current setting; read back. *detector* may be left out with one detector on."""

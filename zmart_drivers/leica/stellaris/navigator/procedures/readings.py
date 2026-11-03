@@ -228,6 +228,11 @@ def get_setting_definitions(client, **keywords):
     return direct_reader.get_setting_definitions()
 
 
+def get_spectra(client, **keywords):
+    """Whether the current setting's panel draws the dyes' ``excitation`` and ``emission`` spectra."""
+    return _routed("spectra", client, **keywords)
+
+
 def get_excitation_control(client, **keywords):
     """Each tunable laser's Excitation Control, "maximum power" or "constant power", by name."""
     return _routed("excitation_control", client, **keywords)

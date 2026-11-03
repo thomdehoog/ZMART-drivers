@@ -1189,3 +1189,11 @@ number (5) as well. Built: `set_excitation_line(line, detector=None)` rewritten 
 that is on is its place among the setting's lines plus one; a line that is not on is refused; with several detectors on, the
 detector is named. The saved-setting route is gone. Through the driver: HyD 2 to 499, 561 refused, back to Auto.
 
+## 74. The dye spectra shown (3 November 2026)
+
+The settings toolbar's two spectrum buttons (`ShowExcitationButton`, `ShowEmissionButton`; the driver's mouse) sent no command:
+the setting's `SequentialSettingParameter[n]/ShowExcitationSpectrum` and `ShowEmissionSpectrum` changed (and `SettingInfo`'s).
+Written into the state tree, LCS took them and the buttons followed. `show_spectra` is rebuilt on that write, in any setting; with it
+the saved-setting route's helpers no longer used were removed (`through_setting_1`, `with_detector`, `detector_shows`); `saved_now`
+stays, for the detector lock's excitation line. Through the driver: excitation shown and emission hidden, then back.
+

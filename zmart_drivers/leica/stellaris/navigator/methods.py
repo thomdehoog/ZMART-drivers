@@ -353,7 +353,7 @@ class Microscope:
     def show_spectra(self, *, excitation: bool | None = None, emission: bool | None = None) -> dict:
         """Show or hide the dyes' excitation and emission spectra in LAS X's setting panel; read back."""
         self.handle.require_open()
-        result = setting_files.show_spectra(self.handle.client, setting_files.folder_for(self.handle), excitation=excitation, emission=emission)
+        result = changes.show_spectra(self.handle.client, excitation=excitation, emission=emission)
         return checked(self.handle, result, "show_spectra")
 
     def set_tau_channel_colour(self, detector: str, channel: int, colour: str, locked: bool = True) -> dict:

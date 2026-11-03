@@ -100,6 +100,7 @@ READS = (
     "excitation_scan",
     "laser_output_power",
     "excitation_control",
+    "spectra",
     "coverslip_offset",
     "fluorifier",
     "mfp_auto_select",
@@ -1171,6 +1172,19 @@ def get_fluorifier() -> dict:
 def get_coverslip_offset() -> float:
     """The Reflection autofocus's coverslip offset, in micrometres (``Acquire/AutoFocusInfo/ReflectionOffset``, metres)."""
     return metres(settings("the coverslip offset", {"o": ("Acquire", "AutoFocusInfo", "ReflectionOffset")})["o"], "ReflectionOffset") * 1e6
+
+
+def get_spectra() -> dict:
+    """Whether the current setting's panel draws the dyes' ``excitation`` and ``emission`` spectra (``SequentialSettingParameter[n]/
+    ShowExcitationSpectrum``, ``ShowEmissionSpectrum``)."""
+
+    def reading(nodes):
+        params = of_name(nodes, children(nodes, node_at(nodes, ("Acquire", "ATL", "CurrentBlock", "ConfocalSequentialInfo"))), "SequentialSettingParameter")
+        param = params[current_setting_place(nodes)]
+        return {"excitation": bool(node_value(nodes, named(nodes, param, "ShowExcitationSpectrum"))),
+                "emission": bool(node_value(nodes, named(nodes, param, "ShowEmissionSpectrum")))}
+
+    return read("the spectra shown", reading)
 
 
 def get_setting_definitions() -> list[dict]:

@@ -111,7 +111,7 @@ mic.connect("stellaris-navigator")                                              
 | `dyes(namespace="Leica")` | The names of the dyes in LAS X's dye library, read from LAS X's dye-database service on this computer, as LAS X reads it. |
 | `dye(name)` | One dye of the library: its full name, its excitation, emission and multiphoton peaks, and its spectra as `(nm, intensity)` pairs. Its `setting_name` is what `set_detector(..., dye=...)` takes. |
 | `set_excitation_line(line, detector=None)` | Choose a detector's excitation line, as the detector panel's list: the wavelength of a line that is on, or `"auto"`; read back. The detector may be left out with one on. Works in any setting. |
-| `show_spectra(excitation=None, emission=None)` | Show or hide the dyes' excitation and emission spectra in LAS X's setting panel; read back. |
+| `show_spectra(excitation=None, emission=None)` | Show or hide the dyes' excitation and emission spectra in the current setting's panel, as the settings toolbar's buttons; read back. |
 | `add_setting(copy=False)` | Add a setting to the current job, new or a copy of the current one, as the window's "Add new Setting" does; LAS X makes it the current setting. With more than one setting, the changes through a saved setting (`set_detector` and the like) are refused, because which setting is meant cannot be told. |
 | `activate_setting(name)` | Make a setting the current one, as clicking it in the window does, and read it back. Every change after goes into the current setting: the driver names it by its place in the job, as the window does. |
 | `delete_setting(name)` | Delete a setting by its name; the job's last setting is never deleted. |

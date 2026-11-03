@@ -188,47 +188,6 @@ def set_detector(
     return result
 
 
-def show_spectra(client, folder, *, excitation=None, emission=None) -> dict:
-    """Show or hide the dyes' excitation and emission spectra in LAS X's setting panel; read back."""
-
-    def change(part):
-        head = re.search(r"<ATLConfocalSettingDefinition [^>]*>", part)[0]
-        new = head
-        if excitation is not None:
-            new = re.sub(r' IsShowDyeExcitationSpectrum="[^"]*"', f' IsShowDyeExcitationSpectrum="{int(bool(excitation))}"', new)
-        if emission is not None:
-            new = re.sub(r' IsShowDyeEmissionSpectrum="[^"]*"', f' IsShowDyeEmissionSpectrum="{int(bool(emission))}"', new)
-        return part.replace(head, new, 1)
-
-    def shows(client_, folder_):
-        found = saved_now(client_, folder_)["show"]
-        return (excitation is None or found["excitation"] == excitation) and (emission is None or found["emission"] == emission)
-
-    return through_setting_1(client, folder, change, shows)
-
-
-def through_setting_1(client, folder, change, shows) -> dict:
-    """Save the setting, apply *change* to Setting 1's text in a copy, load it, and set ``confirmed`` by *shows*."""
-    folder = Path(folder)
-    folder.mkdir(parents=True, exist_ok=True)
-    stamp = time.strftime("%Y%m%d-%H%M%S")
-    saved, changed = folder / f"setting_{stamp}.seq", folder / f"setting_{stamp}_changed.seq"
-    result = save(client, saved)
-    if not result.get("success"):
-        return result
-    try:
-        text = saved.read_text(encoding="utf-8")
-        start, end = setting_1(text)
-        part = change(text[start:end])
-    except (OSError, ValueError) as why:
-        return dispatch.refused(f"the setting cannot be changed: {why}")
-    changed.write_text(text[:start] + part + text[end:], encoding="utf-8")
-    result = load(client, changed)
-    if result.get("success"):
-        result["confirmed"] = bool(shows(client, folder))
-    return result
-
-
 def saved_now(client, folder) -> dict:
     """Setting 1 as LAS X saves it now (:func:`read_back`); empty when it cannot be saved."""
     Path(folder).mkdir(parents=True, exist_ok=True)
@@ -290,48 +249,6 @@ def setting_1(text: str) -> tuple[int, int]:
     return start, min(ends) if ends else len(text)
 
 
-def with_detector(
-    part: str, name: str, *, on=None, gain=None, band=None,
-    operating_mode=None, tau_mode=None, tau_contrast=None, dye=None,
-) -> str:
-    """Setting 1's text with the detector *name* changed; ValueError when it has no such detector."""
-    found = re.search(rf'<Detector [^>]*Name="{re.escape(name)}"[^>]*>', part)
-    if found is None:
-        raise ValueError(f"the setting has no detector {name!r}")
-    tag = found[0]
-    fields = {}
-    if on is not None:
-        fields["IsActive"] = str(int(bool(on)))
-    if gain is not None:
-        fields["Gain"] = f"{float(gain):g}"
-    if operating_mode is not None:
-        fields.update(OPERATING_MODES[operating_mode])
-    if tau_mode is not None:
-        fields["DigitalGatingMode"] = TAU_MODES[tau_mode]
-    if tau_contrast is not None:
-        fields["IsLifetimeContrastActive"] = str(int(bool(tau_contrast)))
-    if dye is not None:
-        fields["DyeName"] = str(dye)
-    new = tag
-    for key, value in fields.items():
-        if f' {key}="' not in new:
-            raise ValueError(f"the setting's detector {name!r} has no {key}")
-        new = re.sub(rf' {key}="[^"]*"', f' {key}="{value}"', new)
-    part = part.replace(tag, new, 1)
-    if band is not None:
-        begin, end = (float(v) for v in band)
-        channel = re.search(r' Channel="([^"]*)"', tag)[1]
-
-        def moved(m):
-            text = re.sub(r' (LeftWorld|TargetWaveLengthBegin)="[^"]*"', rf' \g<1>="{begin:g}"', m[0])
-            return re.sub(r' (RightWorld|TargetWaveLengthEnd)="[^"]*"', rf' \g<1>="{end:g}"', text)
-
-        part, n = re.subn(rf'<MultiBand [^>]*Channel="{channel}"[^>]*>', moved, part, count=1)
-        if n == 0:
-            raise ValueError(f"the setting has no band for {name!r}")
-    return part
-
-
 def values_in(text: str) -> dict:
     """What the limits are shown of a setting file: every laser power (percent) and detector gain in Setting 1."""
     try:
@@ -347,19 +264,6 @@ def values_in(text: str) -> dict:
 # =============================================================================
 # Reading back, and what else changed
 # =============================================================================
-
-
-def detector_shows(detectors, name, *, on=None, gain=None, band=None) -> bool:
-    """Whether the detectors in use show *name* as asked."""
-    found = {d["name"]: d for d in detectors or []}
-    if on is not None and (name in found) != bool(on):
-        return False
-    if name not in found:
-        return on is False
-    detector = found[name]
-    if gain is not None and abs(detector["gain"]["value"] - float(gain)) > GAIN_TOLERANCE:
-        return False
-    return band is None or (detector["detectionBegin"], detector["detectionEnd"]) == tuple(float(v) for v in band)
 
 
 def snapshot(client) -> dict:

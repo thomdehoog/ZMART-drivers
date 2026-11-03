@@ -443,17 +443,21 @@ def test_with_several_detectors_on_the_detector_must_be_named(lasx, client, two_
     assert result["success"] is False and "detector" in result["message"]
 
 
-def test_the_dye_spectra_are_shown_or_hidden_and_read_back(lasx, client, tmp_path):
-    result = setting_files.show_spectra(client, tmp_path, excitation=True, emission=False)
+def test_the_dye_spectra_are_shown_or_hidden_as_the_toolbar_s_buttons_and_read_back(lasx, client):
+    from zmart_drivers.leica.stellaris.navigator.procedures import changes
 
-    assert result["confirmed"] is True
-    assert setting_1(tmp_path, lasx)["show"] == {"excitation": True, "emission": False}
+    loaded = len(lasx.loaded)
+    result = changes.show_spectra(client, excitation=True, emission=False)
+
+    assert result["confirmed"] is True and result["spectra"] == {"excitation": True, "emission": False}
+    assert len(lasx.loaded) == loaded  # no setting file: it works in any setting
 
 
-def test_the_setting_is_read_back_also_into_a_folder_that_does_not_exist_yet(lasx, client, tmp_path):
-    found = setting_files.saved_now(client, tmp_path / "new" / "folder")
+def test_nothing_asked_or_not_a_switch_is_refused(lasx, client):
+    from zmart_drivers.leica.stellaris.navigator.procedures import changes
 
-    assert "HyD S 3" in found["detectors"]
+    assert changes.show_spectra(client)["success"] is False
+    assert changes.show_spectra(client, excitation="yes")["success"] is False
 
 
 
