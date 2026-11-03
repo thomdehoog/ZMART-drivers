@@ -675,6 +675,10 @@ CHECKED_WRITES = {
         # no Enhanced Dynamics.
         "DyeName", "IsLifetimeContrastActive", "IsReflection", "LaserTargetOutputPower", "CurrentExcitationControlMode",
         "IsExcitationLambdaAfterStageDim", "ReflectionOffset",
+        # The MFP's Autoselect (no MFP wheel here, so not its position), the notch filters' Auto Select, the polarizer,
+        # a detector's operating mode, linear Z-compensation's reference and support point, the z-stack's Set Focus.
+        "IsMultiFunctionPortAutoSelectionEnabled", "IsNotchFilterAutoSelectionEnabled", "IsSpectrumTurnMode",
+        "FilterSpectrumPos", "OperatingModeIndex", "ReferencePosition", "ZPosition", "IsAFPlanePosition",
     }),
 }
 
