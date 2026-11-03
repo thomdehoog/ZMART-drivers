@@ -464,6 +464,10 @@ MUTATING_COMMANDS = {
     "manual_operation": "manual_operation",
     # the bleach points written to a file: nothing changes on the instrument
     "save_bleach_points": "save_bleach_points",
+    # which bleach point the panel shows: nothing moves, no light
+    "select_bleach_point": "select_bleach_point",
+    # a line added to the bleach point: at the panel's 2 %, below every limit; another power goes to the limits after
+    "add_bleach_laser_line": "add_bleach_laser_line",
     # the coverslip search: its two ends, as an autofocus's; the offset is a number the autofocus uses
     "find_coverslip": "z_stack",
     "set_coverslip_offset": "set_coverslip_offset",

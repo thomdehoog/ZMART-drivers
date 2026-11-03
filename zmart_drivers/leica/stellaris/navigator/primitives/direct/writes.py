@@ -447,6 +447,49 @@ def laser_lines_definition(lines, new_wavelength_nm: float) -> Write:
     )
 
 
+def bleach_laser_lines(lines, new_wavelength_nm: float, new_route) -> Write:
+    """The bleach point's lines, ``[(route, line_index, wavelength_nm), ...]``, with a new one at *new_wavelength_nm*, as the
+    Bleach Point panel's Add Laser drag-in sends them (``IsBleachPointDefinition`` 1, the new line's ``LineIndex`` -1: LCS
+    puts it on a free line, at 2 %; simulator, 2026-11-03). Read back from the point's lines."""
+    listed = "".join(
+        f"<LightSource>{beam_route(route)}<LineIndex>{int(index)}</LineIndex>"
+        f"<WaveLength>{value(wavelength)}</WaveLength><Locked>0</Locked></LightSource>"
+        for route, index, wavelength in [*lines, (new_route, -1, new_wavelength_nm)]
+    )
+    element = (
+        '<Scanner IsBleachPointDefinition="1" IsAutoFocusDefinition="0" Command="SetConfocalLaserLinesDefinition" '
+        f'Origin="LMSApplication"><Sequences><Sequence Index="0">{listed}</Sequence></Sequences></Scanner>'
+    )
+
+    def fill(request: Request) -> None:
+        request.elements = [element]
+
+    def shows(bleach) -> bool:
+        return any(abs(line["wavelength"] - new_wavelength_nm) < 0.5 for line in (bleach or {}).get("lines", []))
+
+    return Write(
+        command="add_bleach_laser_line",
+        values={"value": float(new_wavelength_nm)},
+        request="SetConfocalLaserLinesDefinition",
+        fill=fill,
+        description=f"Bleach point's line added at {new_wavelength_nm:g} nm",
+        ready=idle(),
+        confirm=Expect("bleach_point", shows),
+    )
+
+
+def bleach_point_choice(point: int) -> Write:
+    """The bleach point the Bleach Point panel shows, chosen by its place, written into the state tree as the panel's
+    dropdown does (simulator, 2026-11-03); read back."""
+
+    def fill(request: Request) -> None:
+        request.elements = [f'<StateTree Command="CurrentBleachPoint" Value="{int(point)}"/>']
+
+    return Write(command="select_bleach_point", values={"value": int(point)}, request="CurrentBleachPoint", fill=fill,
+                 description=f"Bleach point -> {int(point)}", ready=idle(),
+                 confirm=Expect("bleach_point", lambda shown: (shown or {}).get("point") == int(point)))
+
+
 def laser_shutter(route, open_: bool) -> Write:
     """Open or close the shutter of the light source on *route*; read back from its lines that are on."""
     if not isinstance(open_, bool):

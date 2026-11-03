@@ -1727,3 +1727,20 @@ are). Through the driver: the tile scan in 11.4 s, LAS X's notice answered in 0.
   showed "Hardware Server Update Error: Unhandled exception (c0000005) occurred." LCS.LOG: "Unknown error occurred in
   CBleachSettings::LoadSettingsFromXML". The same with a point drawn first. LCS went on answering; the box was closed
   with OK. Not built; to try on the STELLARIS.
+
+## 107. The Bleach Point panel's dropdown and Add Laser (3 November 2026)
+
+A recount of the Acquire checklist against the driver (2026-11-03) left six rows to learn on the simulator; these are
+two of them.
+
+- The dropdown (help text "Bleach Points") lists the drawn points, "ROI 1", "ROI 2". Choosing one sent LCS nothing; the
+  state tree changed `Confocal/ROIScan/CurrentBleachPoint` (1 to 0) and the bleach setting's `SettingId` (126 to 125):
+  each point has its own setting. Written into the state tree, `CurrentBleachPoint` 1 was taken: the `SettingId` followed
+  and the panel showed ROI 2. LCS keeps no count of the points, so the driver reads the dropdown's items (opened and
+  closed through UI Automation). Built: `select_bleach_point(point)`, 0 for the first as `draw_bleach_point` answers.
+- Add Laser, dragged onto the panel's spectrum (a real drag, about 561 nm): `SetConfocalLaserLinesDefinition` with
+  `IsBleachPointDefinition="1"`, the point's line listed again and the new one with `LineIndex` -1 at 559 nm; LCS put it
+  on line 0 at 2 %. Built: `add_bleach_laser_line(nm, percent=None)`, the same command, with the checks of a setting's
+  Add Laser (range, 8 nm from lines in use); another power set after, through the limits. Through the driver: point 0
+  given 600 nm at 3 % (its lines 600 and 499, point 1's 559 and 499 unchanged); point 2 of two refused. The panel drew
+  the new line once the point was shown again.

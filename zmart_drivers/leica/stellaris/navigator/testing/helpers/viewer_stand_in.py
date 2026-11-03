@@ -49,6 +49,10 @@ class Viewer:
         self.right_clicks.append((x, y))
         self.regions = True
 
+    def choices(self, help_text):
+        """The items of the window's dropdown *help_text*: the bleach points the panel lists."""
+        return list(getattr(self, "listed", {}).get(help_text, []))
+
     def box(self, automation_id):
         return self.boxes[automation_id]
 

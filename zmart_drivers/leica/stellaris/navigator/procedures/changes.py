@@ -1271,6 +1271,68 @@ def set_bleach_time(client, seconds, *, viewer=None) -> dict:
         return dispatch.refused(f"the bleaching time was not set: {why}")
 
 
+def select_bleach_point(client, point, *, viewer=None) -> dict:
+    """Show the bleach point at *point* (its place in the Bleach Point panel's dropdown, 0 for the first, as
+    ``draw_bleach_point`` answers it) in the panel, as its dropdown does; the bleaching time, the light and Save then act
+    on it. Written into LCS's state tree; read back. The bleach mode must be on, and the point listed."""
+    from . import answer_dialogs, lasx_viewer
+
+    if not readers.get_roi_scan(client)["bleach_mode"]:
+        return dispatch.refused("the bleach mode is off; switch it on with set_bleach_mode first; nothing was sent")
+    try:
+        listed = lasx_viewer.bleach_points(viewer=viewer)
+    except answer_dialogs.WindowsUnavailable as why:
+        return dispatch.refused(f"the bleach points the panel lists could not be read: {why}; nothing was sent")
+    if isinstance(point, bool) or not isinstance(point, int) or not 0 <= point < len(listed):
+        return dispatch.refused(f"the panel lists {len(listed)} bleach points ({', '.join(listed) or 'none'}); "
+                                f"choose one by its place, 0 to {len(listed) - 1}, not {point!r}; nothing was sent")
+    result = run(client, writes.bleach_point_choice(point))
+    if result["success"]:
+        result["bleach_point"] = readers.get_bleach_point(client)
+    return result
+
+
+def add_bleach_laser_line(client, wavelength_nm, percent=None, *, max_retries=None) -> dict:
+    """Add a line of the white-light laser at *wavelength_nm* to the bleach point the panel shows, as its Add Laser
+    drag-in does; read back. LCS puts it on a free line at the panel's 2 %; *percent*, when given, is then set as any
+    of the point's powers (through the limits). Refused, with nothing sent, without the bleach mode or a drawn point,
+    outside the laser's range, or within :data:`WLL_MIN_DISTANCE_NM` of a line in use."""
+    if isinstance(wavelength_nm, bool) or not isinstance(wavelength_nm, (int, float)):
+        return dispatch.refused(f"a laser line is a wavelength in nanometres, not {wavelength_nm!r}; nothing was sent")
+    if not readers.get_roi_scan(client)["bleach_mode"]:
+        return dispatch.refused("the bleach mode is off; switch it on with set_bleach_mode first; nothing was sent")
+    bleach = readers.get_bleach_point(client)
+    if bleach["point"] is None:
+        return dispatch.refused("no bleach point is drawn; draw one with draw_bleach_point first; nothing was sent")
+    tunable = [
+        s for s in readers.get_light_sources(client) or []
+        if any(line["MinWavelength"] != line["MaxWavelength"] for line in s.get("LaserLines", []))
+    ]
+    if not tunable:
+        return dispatch.refused("this microscope has no tunable laser; nothing was sent")
+    source = tunable[0]
+    route = writes.route_of(source["BeamRoute"])
+    low = min(line["MinWavelength"] for line in source["LaserLines"])
+    high = max(line["MaxWavelength"] for line in source["LaserLines"])
+    if not low <= float(wavelength_nm) <= high:
+        return dispatch.refused(f"{wavelength_nm:g} nm is outside the laser's range, {low:g} to {high:g} nm; nothing was sent")
+    in_use = [line["wavelength"] for line in lines_in_any_setting(client, route)]
+    in_use += [line["wavelength"] for line in bleach["lines"] if writes.route_of(line["beamRoute"]) == route]
+    near = [nm for nm in in_use if abs(nm - float(wavelength_nm)) < WLL_MIN_DISTANCE_NM]
+    if near:
+        return dispatch.refused(f"{wavelength_nm:g} nm is within {WLL_MIN_DISTANCE_NM:g} nm of the line at {near[0]:g} nm; nothing was sent")
+    lines = [(writes.route_of(line["beamRoute"]), line["lineIndex"], line["wavelength"]) for line in bleach["lines"]]
+    result = run(client, writes.bleach_laser_lines(lines, float(wavelength_nm), route), max_retries=max_retries)
+    if result["success"] and percent is not None:
+        powered = set_bleach_laser_power(client, float(wavelength_nm), percent, max_retries=max_retries)
+        if not powered["success"]:
+            return powered
+        result["confirmed"] = bool(result.get("confirmed")) and bool(powered.get("confirmed"))
+    if result["success"]:
+        result["bleach_point"] = readers.get_bleach_point(client)
+    return result
+
+
 def save_bleach_points(client, path) -> dict:
     """Save the bleach points (their places, bleaching times and light) to *path*, as the Bleach Point panel's Save;
     ``confirmed`` when the file is there.

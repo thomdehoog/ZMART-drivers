@@ -909,6 +909,22 @@ class Microscope:
         result = pan_step.center_by_pad(self.handle.client, folder, pad) if pad else pan_step.center(self.handle.client, folder)
         return checked(self.handle, result, "center_pan()")
 
+    def select_bleach_point(self, point: int) -> dict:
+        """Show the bleach point at *point* (0 for the first, as :meth:`draw_bleach_point` answers it) in the Bleach
+        Point panel, as its dropdown does; :meth:`set_bleach_time`, :meth:`set_bleach_laser_power` and
+        :meth:`add_bleach_laser_line` then act on it. Answers the point as LCS shows it."""
+        self.handle.require_open()
+        result = checked(self.handle, changes.select_bleach_point(self.handle.client, point), f"select_bleach_point({point!r})")
+        return result["bleach_point"]
+
+    def add_bleach_laser_line(self, wavelength_nm: float, percent: float | None = None) -> dict:
+        """Add a line of the white-light laser at *wavelength_nm* to the bleach point the panel shows, as its Add Laser
+        drag-in does: at the panel's 2 %, or at *percent* (through the limits). Answers the point's lines."""
+        self.handle.require_open()
+        result = changes.add_bleach_laser_line(self.handle.client, wavelength_nm, percent)
+        checked(self.handle, result, f"add_bleach_laser_line({wavelength_nm!r}, {percent!r})")
+        return result["bleach_point"]
+
     def save_bleach_points(self, path) -> dict:
         """Save the bleach points, with their places, bleaching times and light, to the new ``.bpr`` file *path*, as
         the Bleach Point panel's Save does; an existing file is never written over. The panel's Load is not offered:

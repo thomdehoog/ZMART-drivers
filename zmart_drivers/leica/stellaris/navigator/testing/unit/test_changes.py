@@ -1193,6 +1193,60 @@ class TestBleachPointLaserPower:
         assert not any("BleachPointLaserPower" in each for each in lasx.sent)
 
 
+class TestTheBleachPanel:
+    """The Bleach Point panel's dropdown and its Add Laser (simulator, 2026-11-03)."""
+
+    @pytest.fixture
+    def two_points(self, lasx, client):
+        from viewer_stand_in import Viewer
+
+        lasx.live[("Confocal", "ROIScan", "EnableBleachScan")] = True
+        lasx.live[("Confocal", "ROIScan", "CurrentBleachPoint")] = 1
+        lasx.nodes.bleach_lines = [{"beamRoute": "10;10", "lineIndex": 1, "wavelength": 499.0, "percent": 2.0}]
+        viewer = Viewer()
+        viewer.listed = {"Bleach Points": ["ROI 1", "ROI 2"]}
+        return viewer
+
+    def test_a_point_is_chosen_by_its_place_in_the_dropdown_and_read_back(self, lasx, client, two_points):
+        result = changes.select_bleach_point(client, 0, viewer=two_points)
+
+        assert result["confirmed"] is True and result["bleach_point"]["point"] == 0
+        assert lasx.live[("Confocal", "ROIScan", "CurrentBleachPoint")] == 0
+
+    @pytest.mark.parametrize("point", [2, -1, 1.0, True, "ROI 1"])
+    def test_a_point_the_panel_does_not_list_is_refused(self, lasx, client, two_points, point):
+        assert changes.select_bleach_point(client, point, viewer=two_points)["success"] is False
+        assert lasx.live[("Confocal", "ROIScan", "CurrentBleachPoint")] == 1
+
+    def test_choosing_needs_the_bleach_mode(self, lasx, client, two_points):
+        lasx.live[("Confocal", "ROIScan", "EnableBleachScan")] = False
+        assert "set_bleach_mode" in changes.select_bleach_point(client, 0, viewer=two_points)["message"]
+
+    def test_a_line_is_added_to_the_point_as_the_panel_s_drag_in(self, lasx, client, two_points):
+        result = changes.add_bleach_laser_line(client, 559)
+
+        assert result["confirmed"] is True
+        sent = next(e for e in lasx.sent if 'IsBleachPointDefinition="1"' in e)
+        assert "<LineIndex>1</LineIndex><WaveLength>499</WaveLength>" in sent
+        assert "<LineIndex>-1</LineIndex><WaveLength>559</WaveLength>" in sent
+        assert sorted(line["wavelength"] for line in direct_reader.get_bleach_point()["lines"]) == [499.0, 559.0]
+
+    def test_a_power_other_than_the_panel_s_two_percent_is_set_after(self, lasx, client, two_points):
+        result = changes.add_bleach_laser_line(client, 559, percent=5)
+
+        assert result["confirmed"] is True
+        assert next(l for l in direct_reader.get_bleach_point()["lines"] if l["wavelength"] == 559.0)["percent"] == 5.0
+
+    @pytest.mark.parametrize("nm", [300, 900, 501, "559"])
+    def test_a_line_outside_the_laser_or_beside_another_is_refused(self, lasx, client, two_points, nm):
+        assert changes.add_bleach_laser_line(client, nm)["success"] is False
+        assert not any('IsBleachPointDefinition="1"' in e for e in lasx.sent)
+
+    def test_adding_needs_a_drawn_point(self, lasx, client, two_points):
+        lasx.live[("Confocal", "ROIScan", "CurrentBleachPoint")] = -1
+        assert "draw" in changes.add_bleach_laser_line(client, 559)["message"]
+
+
 class TestDrawingInTheViewer:
     """Bleach points and ROI regions drawn in LAS X's viewer: LCS is asked first whether the mode is on, and a point is
     read back from LCS (CurrentBleachPoint goes to the new point; simulator, 2026-11-03)."""

@@ -337,7 +337,22 @@ class PlainNavigator:
         line["Intensity"] = round(float(e.get("LineIntensity")) * 255) / 255 * 100
 
     def take_SetConfocalLaserLinesDefinition(self, e):
-        """The lines listed are kept at their wavelength; a new one gets no power, one left out is off, as on the simulator."""
+        """The lines listed are kept at their wavelength; a new one gets no power, one left out is off, as on the simulator.
+        For the bleach point (``IsBleachPointDefinition`` 1) its own lines: a new one (``LineIndex`` -1) on the lowest
+        line the point does not use, at 2 % (simulator, 2026-11-03)."""
+        if e.get("IsBleachPointDefinition") == "1":
+            lines = []
+            for listed in e.iter("LightSource"):
+                route = ";".join(p.get("BeamPosition") for p in listed.iter("BeamPosition"))
+                index, nm = int(listed.findtext("LineIndex")), float(listed.findtext("WaveLength"))
+                old = next((line for line in self.nodes.bleach_lines if line["beamRoute"] == route and line["lineIndex"] == index), None)
+                if index < 0:
+                    used = {line["lineIndex"] for line in self.nodes.bleach_lines}
+                    index = min(i for i in range(8) if i not in used)
+                lines.append({"beamRoute": route, "lineIndex": index, "wavelength": nm, "percent": old["percent"] if old else 2.0})
+            # Listed by line, as LCS keeps them: a line's place is its index.
+            self.nodes.bleach_lines = sorted(lines, key=lambda line: line["lineIndex"])
+            return "<Result/>"
         kept = set()
         for listed in e.iter("LightSource"):
             kept.add((tuple(int(p.get("BeamPosition")) for p in listed.iter("BeamPosition")), int(listed.findtext("LineIndex"))))

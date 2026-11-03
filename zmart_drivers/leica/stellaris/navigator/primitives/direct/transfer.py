@@ -447,6 +447,9 @@ STATE_TREE_WRITES = {
     "WorkflowTimelapseIterator": TreeWrite(("Acquire", "AutoFocusInfo", "WorkflowTimelapseIterator"), within=(1, 1_000_000_000)),
     # When the autofocus runs at stage positions (the Navigator's Autofocus Stage tab), the same way; the tab sets
     # IsFirstPositionOnly beside it (simulator, 2026-11-03).
+    # The bleach point the Bleach Point panel shows: its dropdown writes it here, and LCS follows with the point's own
+    # setting (simulator, 2026-11-03). The driver checks it against the points the panel lists.
+    "CurrentBleachPoint": TreeWrite(("Confocal", "ROIScan", "CurrentBleachPoint"), within=(0, 10_000)),
     "WorkflowXY": TreeWrite(("Acquire", "AutoFocusInfo", "WorkflowXY"), choices=frozenset({1, 2, 3})),
     "WorkflowXYIterator": TreeWrite(("Acquire", "AutoFocusInfo", "WorkflowXYIterator"), within=(1, 1_000_000_000)),
     "IsFirstPositionOnly": TreeWrite(("Acquire", "AutoFocusInfo", "IsFirstPositionOnly"), bool),
