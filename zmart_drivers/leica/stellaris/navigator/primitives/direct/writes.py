@@ -1886,6 +1886,8 @@ def auto_sync_option(scanner: str, option: str, value) -> list[Write]:
         raise ValueError(f"Auto Sync has the scanners 'fov' and 'resonant', not {scanner!r}")
     if option not in AUTO_SYNC_OPTIONS:
         raise ValueError(f"Auto Sync's options are {sorted(AUTO_SYNC_OPTIONS)}, not {option!r}")
+    if scanner == "resonant" and option == "scan_frequency":
+        raise ValueError("the resonant scanner's speed is fixed (LCS holds it at one value) and Auto Sync's window shows no control for it")
     name, box, kind = AUTO_SYNC_OPTIONS[option]
     suffix = "Resonant" if scanner == "resonant" else ""
 
@@ -2154,6 +2156,8 @@ def fast_live_setting(scanner: str, option: str, value) -> list[Write]:
         ]
     if option not in FAST_LIVE_OPTIONS:
         raise ValueError(f"Fast Live's settings are {sorted([*FAST_LIVE_OPTIONS, 'overview_zoom'])}, not {option!r}")
+    if scanner == "resonant" and option == "scan_frequency":
+        raise ValueError("the resonant scanner's speed is fixed (LCS holds it at one value) and its window offers no control for it")
     name, kind = FAST_LIVE_OPTIONS[option]
     if kind is bool:
         if not isinstance(value, bool):

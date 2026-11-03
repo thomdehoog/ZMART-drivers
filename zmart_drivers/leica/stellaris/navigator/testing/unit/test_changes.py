@@ -1535,8 +1535,21 @@ class TestFastLive:
         assert result["success"] is False
         assert direct_reader.get_fast_live() == before
 
-    def test_the_resonant_scanner_s_fixed_frequency_cannot_be_changed(self, lasx, client):
-        assert changes.set_fast_live(client, "resonant", scan_frequency=8000)["success"] is False
+    @pytest.mark.parametrize("frequency", [8000, 12000])
+    def test_the_resonant_scanner_s_fixed_frequency_is_not_written_even_at_its_own_value(self, lasx, client, frequency):
+        """LCS holds the resonant scanner's speed at one value (min = max = 12000 Hz; simulator, 2026-11-03), and the
+        window offers no control for it: the driver writes nothing, even the value it already has."""
+        result = changes.set_fast_live(client, "resonant", scan_frequency=frequency)
+
+        assert result["success"] is False and "resonant" in result["message"]
+        assert not [path for path, _ in lasx.nodes.tree_writes if path[-1] == "ScanSpeed"]
+
+    def test_the_resonant_speed_is_no_state_tree_write_the_driver_knows(self):
+        from zmart_drivers.leica.stellaris.navigator.primitives.direct import transfer
+
+        for name in ("FastLiveFrequencyResonant", "AutoSyncSpeedResonant", "AutoSyncChangeSpeedResonant"):
+            assert name not in transfer.STATE_TREE_WRITES
+        assert {"FastLiveFrequency", "AutoSyncSpeed", "AutoSyncChangeSpeed"} <= set(transfer.STATE_TREE_WRITES)
 
     def test_a_scanner_the_window_does_not_have_is_refused(self, lasx, client):
         assert changes.set_fast_live(client, "galvo", format=256)["success"] is False
@@ -1816,6 +1829,17 @@ class TestAutoSync:
         before = direct_reader.get_auto_sync()
 
         assert changes.set_auto_sync_options(client, "fov", **{option: value})["success"] is False
+        assert direct_reader.get_auto_sync() == before
+
+    @pytest.mark.parametrize("value", [12000, False])
+    def test_the_resonant_scanner_s_speed_is_not_written(self, lasx, client, value):
+        """Its speed is fixed (min = max = 12000 Hz) and the window shows neither it nor its box (simulator, 2026-11-03)."""
+        changes.set_auto_sync(client, True)
+        before = direct_reader.get_auto_sync()
+
+        result = changes.set_auto_sync_options(client, "resonant", scan_frequency=value)
+
+        assert result["success"] is False and "resonant" in result["message"]
         assert direct_reader.get_auto_sync() == before
 
     def test_the_options_are_refused_while_auto_sync_is_off(self, lasx, client):

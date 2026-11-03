@@ -404,7 +404,9 @@ STATE_TREE_WRITES = {
     "IsDoubleModeEnabled": TreeWrite(("Confocal", "AOBSLineList", "AOBSLine", "IsDoubleModeEnabled"), bool, numbered=("AOBSLine",)),
     # Fast Live's Scan Settings, for the FOV scanner and the resonant one ("Resonant" at the end of
     # the name). The window writes them here with no command (simulator, 2026-11-02); LCS keeps the
-    # format and the zoom to no range of its own, so the range beside each is checked here.
+    # format and the zoom to no range of its own, so the range beside each is checked here. The resonant
+    # scanner's speed is not among them: LCS holds it at one value (min = max = 12000 Hz) and the window
+    # offers no control for it (simulator, 2026-11-03).
     **{
         f"FastLive{name}{suffix}": TreeWrite(("Confocal", parent, node), kind, between=between)
         for suffix, parent in (("", "FastLiveParameters"), ("Resonant", "FastLiveParametersResonant"))
@@ -419,6 +421,7 @@ STATE_TREE_WRITES = {
             ("SelectedSettingOnly", "SelectedSettingOnly", bool, None),
             ("NoTauStedXtend", "NoTauSTEDDeconvolution", bool, None),
         )
+        if f"{name}{suffix}" != "FrequencyResonant"
     },
     # The time series: its interval, its duration (LCS works the frames out from it: writing the
     # frames is ignored), and "Acquire Until Stopped". The window writes them here with no command
@@ -460,7 +463,9 @@ STATE_TREE_WRITES = {
     "IsFirstPositionOnly": TreeWrite(("Acquire", "AutoFocusInfo", "IsFirstPositionOnly"), bool),
     # Auto Sync off (on is the window's command), and its scan options for the FOV scanner and the resonant one
     # ("Resonant" at the end): each with its own on/off. The window writes them here, taken only while Auto Sync
-    # is on; the format and the speed only as unsigned numbers (simulator, 2026-11-02).
+    # is on; the format and the speed only as unsigned numbers (simulator, 2026-11-02). The resonant scanner's
+    # speed and its box are not among them: LCS holds the speed at one value (min = max = 12000 Hz) and the window
+    # shows neither (simulator, 2026-11-03).
     "IsAutoSyncActive": TreeWrite(("Acquire", "AutoFocusInfo", "IsAutoSyncActive"), bool),
     **{
         f"AutoSync{name}{suffix}": TreeWrite(("Acquire", parent, node), kind, within=within, between=between, unsigned=unsigned)
@@ -475,6 +480,7 @@ STATE_TREE_WRITES = {
             ("Bidirectional", "UseBiDir", bool, None, None, False),
             ("NoAverage", "NoAccuAndOrAverage", bool, None, None, False),
         )
+        if not (suffix == "Resonant" and name in ("ChangeSpeed", "Speed"))
     },
     # A light source's own output power in a setting (the Laser Overview's slider), percent; LCS sets it on every
     # line of the source when one is written (simulator, 2026-11-02). Which setting and source is the element's At.

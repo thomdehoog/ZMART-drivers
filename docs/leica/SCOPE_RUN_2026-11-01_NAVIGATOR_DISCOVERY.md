@@ -1853,3 +1853,17 @@ A write into LCS's state tree has none of the window's own checks, so the driver
   command; Frames turned both back. `CalculationMode` takes only an unsigned number (a plain one is ignored), and LCS
   then sets the flag itself. The driver now writes the mode (4 on, 3 off), not the flag; the state tree after either is
   the same. Through the driver: on, off, on, then 5 frames, each read back.
+
+## 115. The resonant scanner's speed is not written (3 November 2026)
+
+LCS holds the resonant scanner's speed at one value: `FastLiveParametersResonant/ScanSpeedMin` and `ScanSpeedMax` are
+both 12000, as are Auto Sync's `AutoFocusSettingConfocalScanOptionsResonant/SpeedMin` and `SpeedMax`, and the windows
+offer no control for it. The driver no longer writes `FastLiveFrequencyResonant`, `AutoSyncSpeedResonant` or
+`AutoSyncChangeSpeedResonant` (93 state-tree writes, from 96); `set_fast_live("resonant", scan_frequency=)` and
+`set_auto_sync_options("resonant", scan_frequency=)` are refused, even at 12000. On the simulator, the resonant speed
+was refused and the resonant scanner's bidirectional and the FOV scanner's speed still went in.
+
+The setting's name and the stage autofocus's first-position switch were checked again. Writing the current setting's
+name (`ATL/CurrentSetting/Name`) or its entry's (`SequentialSettingParameter/Name`) changes the same three nodes, so
+the driver keeps the current setting's. Choosing First or Every in the Navigator's Autofocus Stage tab changed
+`IsFirstPositionOnly` with `WorkflowXY`, and LCS does not follow `WorkflowXY` by itself, so the driver keeps writing both.

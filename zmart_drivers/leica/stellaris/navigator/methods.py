@@ -1094,7 +1094,8 @@ class Microscope:
     def set_auto_sync_options(self, scanner: str = "fov", **options) -> dict:
         """Auto Sync's scan options for ``"fov"`` or ``"resonant"``, as the Best Focus Scan Options window, while Auto
         Sync is on: ``format`` (16 to 512), ``scan_frequency``, ``overview_zoom`` (a number ticks the box, False
-        unticks it), ``bidirectional``, ``no_average``. Each is checked against LAS X's range first."""
+        unticks it), ``bidirectional``, ``no_average``. Each is checked against LAS X's range first. The resonant scanner's
+        ``scan_frequency`` is fixed and the window shows no control for it: refused."""
         self.handle.require_open()
         result = changes.set_auto_sync_options(self.handle.client, scanner, **options)
         checked(self.handle, result, f"set_auto_sync_options({scanner!r}, {options!r})")
@@ -1217,7 +1218,8 @@ class Microscope:
         (Minimal Scan Frequency, Hz), ``overview_zoom`` (a zoom, or False),
         ``bidirectional``, ``no_average``, ``no_dynamic_signal_enhancement``,
         ``selected_setting_only``, ``no_tau_sted_xtend``. Each is checked against
-        LAS X's range first. Answers all of Fast Live's settings as LAS X holds them.
+        LAS X's range first. The resonant scanner's ``scan_frequency`` is fixed and
+        the window offers no control for it: refused. Answers all of Fast Live's settings as LAS X holds them.
         """
         self.handle.require_open()
         result = changes.set_fast_live(self.handle.client, scanner, **settings)
