@@ -81,6 +81,7 @@ discovery session in `SCOPE_RUN_2026-11-01_NAVIGATOR_DISCOVERY.md` and the build
 | The Fluorifier disc: notch filters by hand or with the laser (Auto Select), and the polarizer's angle | Works: the filters with `set_filter_wheel` (wheels 130, 131); Auto Select and the polarizer written into LAS X's state tree, as its window does |
 | The white-light laser's Excitation Control (Maximum or Constant Power) | Works: written into LAS X's state tree, as the Laser Overview does |
 | The white-light laser's own output power (the Laser Overview's slider) | Works: written into LAS X's state tree, as the window does; within the limits (`set_laser_output_power`, by default up to 85 %) |
+| A laser on or off (the Laser Overview's ON/OFF) | Works, with LAS X's command; only a laser LAS X lets be switched (the white-light laser) |
 | Fast Live, started and stopped | Works, with LAS X's commands |
 | Fast Live's Scan Settings, both scanners | Works: written into LAS X's state tree, as its window does; each range checked first, since LAS X does not hold the format to it |
 

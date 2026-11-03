@@ -268,6 +268,11 @@ def get_apply_to_hardware(client, **keywords):
     return _routed("apply_to_hardware", client, **keywords)
 
 
+def get_lasers(client, **keywords):
+    """Every laser, as the Laser Overview lists it: ``name``, ``route``, ``on``, ``switchable``."""
+    return _routed("lasers", client, **keywords)
+
+
 def get_locked_laser_lines(client, **keywords):
     """The laser lines locked from LAS X's Dye Assistant in the current setting: ``route`` and ``line_index`` of each."""
     return _routed("locked_laser_lines", client, **keywords)

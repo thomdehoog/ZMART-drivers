@@ -504,6 +504,8 @@ MUTATING_COMMANDS = {
     "reset_system": "reset_system",
     "reset_imagecompass": "reset_imagecompass",
     "reset_setting": "reset_setting",
+    # the Laser Overview's ON/OFF: a laser on or off; its lines' powers are checked as before
+    "switch_laser": "switch_laser",
     # the settings toolbar's apply-to-hardware switch; the limits check each change as before
     "apply_to_hardware": "apply_to_hardware",
     "move_y_line": "move_y_line",

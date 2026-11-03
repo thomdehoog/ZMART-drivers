@@ -174,6 +174,7 @@ mic.connect("stellaris-navigator")                                              
 | `set_z_stack_sections(sections)` | Set the z-stack's number of sections over its size, by the step that gives it. |
 | `move_to_z_stack(place)` | Move the focus to the z-stack's `"begin"`, `"end"` or `"center"`, or to its `"focus"` plane (set with Set Focus in LAS X's window), as the window's Move to buttons. Checked against the z limits like any z move. In an xz scan mode the scan line moves instead. |
 | `set_z_stack_focus(on=True)` | Set the z-stack's focus plane where the focus is now, or clear it, as the z-stack panel's Set Focus. It sends LAS X's hardware server nothing, so the driver presses it in LAS X's window; the plane is read back from LAS X. |
+| `switch_laser(name, on=True)` | Switch a laser on or off, as the Laser Overview's ON/OFF; only one LAS X lets be switched (the white-light laser); read back. |
 | `reset_system()` | Put the ImageCompass and the scan back to LAS X's start (xyz, 512 x 512, 400 Hz, zoom 1, Airy 1, no z-stack ends), as Bulk Options' Reset System; the lasers stay on. Save the setting first to come back. |
 | `reset_setting()` | Put the current setting back to LAS X's start (its lines off, its detectors), as the setting's Reset in its context menu. The other settings stay. |
 | `reset_imagecompass()` | Put only the ImageCompass back to LAS X's start (its laser lines off, detectors, dyes and name), as Bulk Options' Reset ImageCompass. Save the setting first to come back. |

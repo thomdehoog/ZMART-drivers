@@ -723,6 +723,18 @@ def hardware_connected(on: bool) -> Write:
     )
 
 
+def laser_power_state(name: str, route, on: bool) -> Write:
+    """A laser on or off, as the Laser Overview's ON/OFF sends it (``SetLaserPowerState`` with the laser's full route;
+    simulator, 2026-11-03); read back."""
+
+    def fill(request: Request) -> None:
+        request.elements = [f'<Scanner Command="SetLaserPowerState" PowerState="{int(bool(on))}">{beam_route(route)}</Scanner>']
+
+    return Write(command="switch_laser", values={"value": bool(on)}, request="SetLaserPowerState", fill=fill,
+                 description=f"{name} -> {'on' if on else 'off'}", ready=idle(),
+                 confirm=Expect("lasers", lambda found: any(l["name"] == name and l["on"] is bool(on) for l in found or [])))
+
+
 def system_reset() -> Write:
     """Bulk Options' Reset System, as it sends it (``ResetSystem``; simulator, 2026-11-03): the ImageCompass and the scan
     back to LAS X's start (xyz, 512 x 512, 400 Hz, zoom 1, Airy 1, no z-stack ends, the filters at their start); the

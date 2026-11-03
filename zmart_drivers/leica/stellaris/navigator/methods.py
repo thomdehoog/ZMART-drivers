@@ -491,6 +491,17 @@ class Microscope:
         self.handle.require_open()
         return checked(self.handle, changes.apply_to_hardware(self.handle.client, on), f"apply_to_hardware({on!r})")
 
+    def switch_laser(self, name: str, on: bool = True) -> dict:
+        """Switch the laser *name* on or off, as the Laser Overview's ON/OFF does; read back.
+
+        LAS X's help: switch on the lasers you need before you start, and off
+        again when you are done. Only a laser LAS X lets be switched (on the
+        STELLARIS the white-light laser; the others' switches are greyed out);
+        a laser just switched on may need time before it is ready.
+        """
+        self.handle.require_open()
+        return checked(self.handle, changes.switch_laser(self.handle.client, name, on), f"switch_laser({name!r}, {on!r})")
+
     def reset_system(self) -> dict:
         """Put the ImageCompass and the scan back to LAS X's start, as Bulk Options' Reset System does.
 

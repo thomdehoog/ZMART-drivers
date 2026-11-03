@@ -93,8 +93,8 @@ The simulator cannot show these; each needs one careful run on the real microsco
 - The λ scan: why LCS sometimes moves begin and end by a few nm (380 to 385, 650 to 655, 800 to 775) and
   sometimes keeps them; the Λλ scan's reverse direction (greyed out on the simulator) and its light source list.
 
-- The Laser Overview's power switch (a laser on or off) and its Options: Thom to decide, as switching a laser
-  is hard to undo on the STELLARIS. Online Dye Separation: needs a separation matrix from the Process tab.
+- The Laser Overview's ON/OFF (`switch_laser`, section 92): how long the white-light laser needs before it is ready
+  again after being switched on. Online Dye Separation: needs a separation matrix from the Process tab.
 
 - Not on the simulator, so not learned: Z Flow, Dynamic Signal Enhancement, the Fluo Turret, Environmental Control
   (no incubator), and Triggering (needs the Sequencer Advanced board, set in the Project Settings).

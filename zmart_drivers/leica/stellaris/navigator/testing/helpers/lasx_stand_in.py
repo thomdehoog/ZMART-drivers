@@ -639,6 +639,15 @@ class PlainNavigator:
         self.live[("Acquire", "IsHwConnectedMode")] = e.get("Activate") == "1"
         return "<Result/>"
 
+    def take_SetLaserPowerState(self, e):
+        """The Laser Overview's ON/OFF: the laser at that full route on or off (simulator, 2026-11-03)."""
+        route = tuple(int(p.get("BeamPosition")) for p in e.iter("BeamPosition"))
+        for source in self.nodes.light_sources:
+            for each in source["LaserList"]["Laser"]:
+                if tuple(each["LaserBeamRoute"]) == route:
+                    each["PowerState"] = int(e.get("PowerState"))
+        return "<Result/>"
+
     def take_ResetSystem(self, e):
         """Bulk Options' Reset System: the scan back to LAS X's start (zoom 1, xyz); the lasers stay on (simulator, 2026-11-03)."""
         self.live[("Confocal", "ScanningParameter", "Zoom")] = 1.0

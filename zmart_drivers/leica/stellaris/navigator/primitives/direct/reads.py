@@ -98,6 +98,7 @@ READS = (
     "autofocus_in_time_series",
     "auto_sync",
     "locked_laser_lines",
+    "lasers",
     "apply_to_hardware",
     "lambda_scan",
     "excitation_scan",
@@ -1613,6 +1614,26 @@ def get_laser_slots() -> list[dict]:
         return used
 
     return read("the laser lines of every setting", reading)
+
+
+def get_lasers() -> list[dict]:
+    """Every laser, as the Laser Overview lists it: ``name``, ``route`` (its full route, ``"10;10;0"``), ``on`` (its
+    ``PowerState``) and ``switchable`` (whether LAS X lets its ON/OFF be used, ``SwitchablePowerState``; simulator,
+    2026-11-03: only the white-light laser)."""
+
+    def reading(nodes):
+        found = []
+        for source in of_name(nodes, children(nodes, node_at(nodes, LIGHT_SOURCES)), "LightSource"):
+            for laser in of_name(nodes, children(nodes, named(nodes, source, "LaserList")), "Laser"):
+                found.append({
+                    "name": node_value(nodes, named(nodes, laser, "LaserName")),
+                    "route": beam_route(node_value(nodes, named(nodes, laser, "LaserBeamRoute"))),
+                    "on": node_value(nodes, named(nodes, laser, "PowerState")) == 1,
+                    "switchable": node_value(nodes, named(nodes, laser, "SwitchablePowerState")) == 1,
+                })
+        return found
+
+    return read("the lasers", reading)
 
 
 def get_locked_laser_lines() -> list[dict]:

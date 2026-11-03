@@ -1602,6 +1602,18 @@ def apply_to_hardware(client, on, *, max_retries=None) -> dict:
     return result
 
 
+def switch_laser(client, name, on, *, max_retries=None) -> dict:
+    """Switch the laser *name* on or off, as the Laser Overview's ON/OFF does; only one LAS X lets be switched; read back."""
+    if not isinstance(on, bool):
+        return dispatch.refused(f"switch_laser takes True (on) or False (off), not {on!r}")
+    lasers = {l["name"]: l for l in readers.get_lasers(client) or []}
+    if name not in lasers:
+        return dispatch.refused(f"no laser {name!r}; the lasers are {sorted(lasers)}")
+    if not lasers[name]["switchable"]:
+        return dispatch.refused(f"LAS X does not let {name} be switched (its ON/OFF is greyed out); nothing was sent")
+    return run(client, writes.laser_power_state(name, writes.route_of(lasers[name]["route"]), on), max_retries=max_retries)
+
+
 def reset_system(client, *, max_retries=None) -> dict:
     """Put the ImageCompass and the scan back to LAS X's start, as Bulk Options' Reset System does; the lasers stay on."""
     return run(client, writes.system_reset(), max_retries=max_retries)

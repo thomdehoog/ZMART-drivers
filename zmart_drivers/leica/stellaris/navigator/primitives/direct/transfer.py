@@ -241,6 +241,7 @@ ALLOWED_COMMANDS = frozenset(
         "BlockLightSinkDetectorForDyeAssistant",
         "LockSetting",
         "ResetSystem",
+        "SetLaserPowerState",
         "ResetImageCompass",
         "ResetConfocalSetting",
         "ATL_ActivateHardwareConnectedMode",

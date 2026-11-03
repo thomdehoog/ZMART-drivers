@@ -698,6 +698,19 @@ class TestTheDetectorLock:
         assert changes.lock_laser_line(client, 405.0, locked)["success"] is False
         assert lasx.commands() == []
 
+    def test_the_white_light_laser_is_switched_off_and_on_as_the_laser_overview_does(self, lasx, client):
+        off = changes.switch_laser(client, "WLL", False)
+
+        assert off["confirmed"] is True and lasx.commands() == ["SetLaserPowerState"]
+        assert 'PowerState="0"' in lasx.sent[-1] and 'BeamPositionLevel="2" BeamPosition="0"' in lasx.sent[-1]
+        assert {l["name"]: l["on"] for l in direct_reader.get_lasers()}["WLL"] is False
+        assert changes.switch_laser(client, "WLL", True)["confirmed"] is True
+
+    @pytest.mark.parametrize("name, on", [("Laser 488", False), ("Laser 999", True), ("WLL", "off")])
+    def test_a_laser_las_x_greys_out_unknown_or_no_switch_is_refused(self, lasx, client, name, on):
+        assert changes.switch_laser(client, name, on)["success"] is False
+        assert lasx.commands() == []
+
     def test_reset_system_puts_the_scan_back_to_las_x_s_start(self, lasx, client):
         lasx.live[("Confocal", "ScanningParameter", "Zoom")] = 2.0
 

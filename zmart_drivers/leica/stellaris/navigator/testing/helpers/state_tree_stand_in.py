@@ -219,15 +219,18 @@ def aotf_line(wavelength, index, intensity):
 
 #: The simulator's light sources (Confocal/LightSourceList), 2026-10-13: the UV
 #: laser's 405 at 1.96 % and the white-light laser's 497 at 2.0 % are on.
-def laser(name, low, high):
-    return {"LaserName": name, "WavelengthMin": low, "WavelengthMax": high}
+def laser(name, low, high, route, switchable=False):
+    """A laser as LCS lists it: on (``PowerState`` 1), its full route, and whether the Laser Overview may switch it
+    (``SwitchablePowerState``; only the white-light laser on the simulator, 2026-11-03)."""
+    return {"LaserName": name, "WavelengthMin": low, "WavelengthMax": high, "PowerState": 1,
+            "SwitchablePowerState": int(switchable), "LaserBeamRoute": route}
 
 
 SIMULATOR_LIGHT_SOURCES = [
     {
         "LightSourceName": "UV",
         "BeamRoute": (30,),
-        "LaserList": {"Laser": [laser("Laser 405", 405.0, 405.0)]},
+        "LaserList": {"Laser": [laser("Laser 405", 405.0, 405.0, (30, 0))]},
         "Shutter": {"IsShutterActive": True},
         "AOTF": {"AotfLine": [aotf_line(405.0, 0, 1.9607843137254901)]},
     },
@@ -236,9 +239,9 @@ SIMULATOR_LIGHT_SOURCES = [
         "BeamRoute": (10, 30),
         "LaserList": {
             "Laser": [
-                laser("Laser 488", 488.0, 488.0),
-                laser("Laser 638", 638.0, 638.0),
-                laser("Laser 730", 730.0, 730.0),
+                laser("Laser 488", 488.0, 488.0, (10, 30, 0)),
+                laser("Laser 638", 638.0, 638.0, (10, 30, 1)),
+                laser("Laser 730", 730.0, 730.0, (10, 30, 2)),
             ]
         },
         "Shutter": {"IsShutterActive": True},
@@ -253,7 +256,7 @@ SIMULATOR_LIGHT_SOURCES = [
     {
         "LightSourceName": "SuperContVisible Light",
         "BeamRoute": (10, 10),
-        "LaserList": {"Laser": [laser("WLL", 485.0, 685.0)]},
+        "LaserList": {"Laser": [laser("WLL", 485.0, 685.0, (10, 10, 0), switchable=True)]},
         "Shutter": {"IsShutterActive": True},
         "AOTF": {
             "AotfLine": [

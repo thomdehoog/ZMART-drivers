@@ -1427,3 +1427,17 @@ does: "Setting 2" came with Setting 1's 499 nm line and became the current setti
 detectors went back to their start. This is the command seen on 1 November (section 84), so it is the setting's Reset,
 not a part of deleting a setting. Built: `reset_setting()`, on the current setting, read back with no line on. Through the
 driver: Setting 1 duplicated, the copy reset (Setting 1 kept 499 nm at 2 %), the copy deleted.
+
+## 92. The Laser Overview's ON/OFF (3 November 2026)
+
+LAS X's help (Activating Laser Lines) says to switch on the lasers needed before the first picture with the Laser
+Overview's ON/OFF, and off again after the work; the solid-state lasers have a standby, ready again within a second, while
+a laser switched on from off takes 1 to 2 minutes. So it is an ordinary operator control, and it is built.
+
+In the Laser Overview (on the right screen) only the white-light laser's switch is enabled: LCS marks it
+`SwitchablePowerState` 1, the 405, 488, 638 and 730 nm lasers 0. Clicked off, it sent
+`<Scanner Command="SetLaserPowerState" PowerState="0">` with the laser's full route (10;10 and a third level 0, the laser in
+its light source; LCS lists it as `LaserBeamRoute`), and `Laser/PowerState` went from 1 to 0; clicked on, `PowerState="1"`
+put it back. Built: `switch_laser(name, on)`, refused for a laser LCS does not let be switched, read back from
+`PowerState`. Through the driver: the white-light laser off and on, Laser 488 refused; the 499 nm line and the 85 % output
+stayed.
