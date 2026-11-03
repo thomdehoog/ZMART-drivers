@@ -2,8 +2,9 @@
 
 Taking a picture leaves it in LAS X's cache with a note of how it was taken (a
 :class:`~..acquire.PendingCapture`). This procedure reads
-each waiting picture from the cache and writes it to disk as an OME-Zarr image
-store, with its max projection when it has several planes, and a log of what
+each waiting picture from the cache and writes it to disk as one position, an
+OME-Zarr image store or an OME-TIFF file as the connection's ``format`` says,
+with its max projection when it has several planes, and a log of what
 was asked and done. It never clears LAS X's cache: that is the ``clear_cache``
 procedure, run when the operator chooses. What it does record is which cache
 picture each saved capture came from, so that ``clear_cache`` knows what it may
@@ -51,6 +52,7 @@ def save_waiting(handle, label: str | None = None) -> list[dict]:
         record, saved = save_pending(
             handle.client,
             pending,
+            image_format=handle.connection.get("format") or _save.FORMAT,
             orientation=_loaded_orientation(handle),
             where_the_planes_are=lambda plane_z, p=pending: place_planes(
                 handle.client, p.at, p.job, plane_z
@@ -67,9 +69,18 @@ def save_waiting(handle, label: str | None = None) -> list[dict]:
 
 
 def save_pending(
-    client: Any, pending, *, orientation: Any, where_the_planes_are
+    client: Any,
+    pending,
+    *,
+    orientation: Any,
+    where_the_planes_are,
+    image_format: str = _save.FORMAT,
 ) -> tuple[dict, Any]:
     """Save one waiting capture and answer ``(record, saved)``.
+
+    *image_format* is how the capture is saved, ``"ome-zarr"`` or
+    ``"ome-tiff"``: the connection's ``format``, so a run is saved the way
+    the workflow chose when it connected.
 
     *where_the_planes_are* answers, for the depths of a capture, where on the
     sample each plane was taken. Raises when the picture cannot be read from
@@ -94,6 +105,7 @@ def save_pending(
         orientation=orientation,
         projection=IMAGE_SAVE.projection,
         placement=where_the_planes_are,
+        image_format=image_format,
     )
 
     written = sorted(saved.image_paths.items())
@@ -160,7 +172,7 @@ def save_pending(
         "acquisition_type": p.acquisition_type,
         "trigger": p.settings["trigger"],
         "job": p.job,
-        "format": "ome-zarr",
+        "format": image_format,
         # Every file this capture saved, under the name the ZMART Controller's
         # contract fixes: the images, then the vendor's metadata, then the state.
         "files": [*files, str(log_path)],

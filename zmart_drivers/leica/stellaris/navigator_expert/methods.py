@@ -105,7 +105,10 @@ DRIVER_PACKAGE = __package__
 #: ``load_origin`` loads the saved zero point of the coordinate frame; set it
 #: to False only to start in plain stage coordinates, for example to capture a
 #: new origin when the saved one is damaged. ``calibration_name`` (not set by
-#: default) picks a named calibration set.
+#: default) picks a named calibration set. ``format`` is how each capture is
+#: saved: ``"ome-zarr"`` (one OME-Zarr image) or ``"ome-tiff"`` (one OME-TIFF
+#: file, which opens with a drag and drop in Fiji, napari, QuPath or Imaris);
+#: the ZMART interface sets it from its Connect step.
 DEFAULT_CONNECTION = {
     "microscope": "stellaris-y42h93",
     "api_type": "LAS X CAM API - Navigator Expert",
@@ -118,6 +121,7 @@ DEFAULT_CONNECTION = {
     "load_limits": True,
     "load_calibration": True,
     "load_origin": True,
+    "format": "ome-zarr",
 }
 
 #: The hosts that name this computer, besides its own name.
@@ -152,6 +156,11 @@ def checked_connection(connection: dict[str, Any] | None) -> dict[str, Any]:
         raise ValueError(
             f"host {host!r}: LAS X's CAM API answers on this computer only; "
             f"leave host empty or use localhost"
+        )
+    if connection["format"] not in ("ome-zarr", "ome-tiff"):
+        raise ValueError(
+            f"format {connection['format']!r}: a capture is saved as "
+            "'ome-zarr' or 'ome-tiff'"
         )
     kept = named_configurations()
     if connection["config"] is None:
@@ -358,7 +367,7 @@ class Microscope:
         )
 
     def save(self, label: str | None = None) -> list[dict]:
-        """Write the captures that are waiting (only *label* when given) as OME-Zarr; answer one record each."""
+        """Write the captures that are waiting (only *label* when given), in the connection's format; answer one record each."""
         return save_step.save_waiting(self.handle, label)
 
     def clear_cache(self) -> dict:

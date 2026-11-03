@@ -637,6 +637,33 @@ class TestSave:
         assert pixels.shape == (1, 2, 1, 16, 16)
         assert np.array_equal(pixels[0, :, 0, 0, 0], [10, 11])
 
+    def test_the_cache_is_read_once_for_the_store_and_its_projection(
+        self,
+        patched_export,
+        successful_acq,
+        tmp_path,
+        naming,
+        monkeypatch,
+    ):
+        """Each plane is read from LAS X's cache once: the projection is made
+        from the volume already in memory, not by reading the cache again."""
+        from zmart_drivers.leica.stellaris.navigator_expert.procedures.save_data import (
+            ome_canonical,
+        )
+
+        reads = []
+        real = ome_canonical._read_source_plane
+        monkeypatch.setattr(
+            ome_canonical, "_read_source_plane", lambda source: reads.append(source) or real(source)
+        )
+
+        saved = _save(successful_acq, tmp_path / "run_000001", naming)
+
+        assert saved.projection_paths, "a stack gets its projection"
+        planes = len(patched_export["plane_paths"])
+        # One extra read: gather opens the first plane once to learn its size.
+        assert len(reads) == planes + 1
+
     def test_the_state_is_printed_beside_the_images_as_metadata(
         self,
         patched_export,
@@ -763,3 +790,98 @@ class TestPathTooLong:
         assert (
             acquisition.say_when_the_path_is_too_long(error, on_windows=False) is None
         )
+
+
+class TestSaveAsOmeTiff:
+    """A capture saved as OME-TIFF holds what the same capture saved as OME-Zarr holds.
+
+    The ZMART interface asks for OME-TIFF on its Connect step, so the run
+    opens with a drag and drop in Fiji, napari, QuPath or Imaris. The file is
+    placed by the same OME-Zarr rules: its note (``zmart/position``) carries
+    the very description the store's ``zarr.json`` would.
+    """
+
+    def _both(self, successful_acq, tmp_path, naming, **kwargs):
+        as_zarr = _save(successful_acq, tmp_path / "zarr", naming, **kwargs)
+        as_tiff = _save(
+            successful_acq, tmp_path / "tiff", naming, image_format="ome-tiff", **kwargs
+        )
+        return as_zarr, as_tiff
+
+    def test_the_same_pixels_and_placement_either_way(
+        self, patched_export, successful_acq, tmp_path, naming
+    ):
+        from zmart_drivers.leica.stellaris.navigator_expert.procedures.save_data import (
+            ome_canonical,
+        )
+
+        as_zarr, as_tiff = self._both(successful_acq, tmp_path, naming)
+        store = next(iter(as_zarr.image_paths.values()))
+        path = next(iter(as_tiff.image_paths.values()))
+        assert path == tmp_path / "tiff" / "data" / f"{naming.stem}.ome.tif"
+        for index in as_zarr.image_paths:
+            assert np.array_equal(as_tiff.read_plane(index), as_zarr.read_plane(index))
+
+        group = zarr.open_group(str(store), mode="r")
+        with tifffile.TiffFile(path) as tif:
+            levels = tif.series[0].levels
+            assert len(levels) == len(list(group.array_keys()))
+            for number, level in enumerate(levels):
+                assert level.asarray().size == group[str(number)].size
+            xml = tif.ome_metadata
+        note = _the_note(xml, ome_canonical.POSITION_NOTE)
+        ome = group.attrs["ome"]
+        # Everything but the image's own name, which ends .ome.tif here.
+        described = json.loads(note["multiscales"])
+        assert described[0].pop("name") == path.name
+        assert described == [{k: v for k, v in one.items() if k != "name"} for one in ome["multiscales"]]
+        assert json.loads(note["omero"]) == ome["omero"]
+        assert json.loads(note["zmart"]) == group.attrs["zmart"]
+
+    def test_the_files_ome_xml_is_valid_and_keeps_zmarts_annotations(
+        self, patched_export, successful_acq, tmp_path, naming
+    ):
+        from ome_types import from_xml
+
+        notes = Notes(
+            controller_state={"changeable": {}, "observed": {}},
+            capture_record={"position_label": "000003"},
+        )
+        saved = _save(
+            successful_acq, tmp_path / "run", naming, notes=notes, image_format="ome-tiff"
+        )
+        with tifffile.TiffFile(next(iter(saved.image_paths.values()))) as tif:
+            described = from_xml(tif.ome_metadata, validate=True)
+        namespaces = {one.namespace for one in described.structured_annotations.map_annotations}
+        namespaces |= {one.namespace for one in described.structured_annotations.comment_annotations}
+        assert "zmart/position" in namespaces
+        assert any("capture-record" in one for one in namespaces)
+        pixels = described.images[0].pixels
+        assert len(pixels.tiff_data_blocks) == 1
+        assert pixels.tiff_data_blocks[0].plane_count == pixels.size_z * pixels.size_c * pixels.size_t
+
+    def test_a_stack_gets_its_max_projection_as_an_ome_tiff(
+        self, patched_export, successful_acq, tmp_path, naming
+    ):
+        output_root = tmp_path / "run"
+        saved = _save(successful_acq, output_root, naming, image_format="ome-tiff")
+
+        projection = output_root / "projections" / f"{naming.stem}.ome.tif"
+        assert saved.projection_paths == (projection,)
+        pixels = tifffile.imread(projection)
+        assert np.array_equal(pixels.reshape(2, 16, 16)[:, 0, 0], [10, 11])
+        assert not list((output_root / "data").glob(".*.writing"))
+
+    def test_an_unknown_format_is_refused(self, patched_export, successful_acq, tmp_path, naming):
+        with pytest.raises(ValueError, match="ome-tiff"):
+            _save(successful_acq, tmp_path / "run", naming, image_format="tiff")
+
+
+def _the_note(xml: str, namespace: str) -> dict:
+    """The entries of the MapAnnotation in *namespace*."""
+    import xml.etree.ElementTree as ET
+
+    for element in ET.fromstring(xml).iter():
+        if element.tag.endswith("}MapAnnotation") and element.get("Namespace") == namespace:
+            return {entry.get("K"): entry.text for entry in element.iter() if entry.tag.endswith("}M")}
+    raise AssertionError(f"no note in {namespace}")

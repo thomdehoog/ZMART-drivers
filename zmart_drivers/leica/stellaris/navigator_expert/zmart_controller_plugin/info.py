@@ -135,7 +135,8 @@ def _setup(handle) -> dict:
         "data_location": {
             "done": handle.data_location is not None,
             "says": (
-                f"{handle.data_location}, as OME-Zarr"
+                f"{handle.data_location}, as "
+                + ("OME-TIFF" if handle.connection.get("format") == "ome-tiff" else "OME-Zarr")
                 if handle.data_location is not None
                 else SET_UP
             ),

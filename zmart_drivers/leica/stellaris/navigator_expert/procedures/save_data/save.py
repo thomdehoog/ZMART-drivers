@@ -24,7 +24,7 @@ from typing import Any
 from ...driver_setup.orientation import Orientation
 from . import collect as _files
 from . import ome_canonical as _materialize
-from . import ome_zarr
+from . import ome_tiff, ome_zarr
 from zmart_drivers import metadata_convention as convention
 from .ome_canonical import VENDOR
 from .collect import DEFAULT_EXPORT_COMPLETION_POLL_INTERVAL_S, DEFAULT_EXPORT_COMPLETION_TIMEOUT_S
@@ -42,8 +42,15 @@ from .product import SavedAcquisition
 
 log = logging.getLogger(__name__)
 
-#: What ``save`` writes a capture as: one OME-Zarr image (``ome_zarr``).
+#: What ``save`` can write a capture as: one OME-Zarr image (``ome_zarr``),
+#: or one OME-TIFF file (``ome_tiff``) placed by the same OME-Zarr rules.
+FORMATS = ("ome-zarr", "ome-tiff")
+
+#: What ``save`` writes a capture as when it is not told.
 FORMAT = "ome-zarr"
+
+#: The ending of a saved capture's name, for each format.
+ENDINGS = {"ome-zarr": ".ome.zarr", "ome-tiff": ".ome.tif"}
 
 #: What ``save`` projects from a capture with more than one plane, into
 #: ``<acquisition>/projections``: its max over z, or nothing.
@@ -66,6 +73,7 @@ def save(
     cache_root: str | Path | None = None,
     placement: Callable[[list[int]], Callable[[int], dict]] | None = None,
     projection: str | None = None,
+    image_format: str = FORMAT,
 ) -> SavedAcquisition:
     """Persist the files produced for *acq* into *output_root*.
 
@@ -85,7 +93,9 @@ def save(
     was read from (``release_target``), so that the ``clear_cache`` procedure can
     have LAS X let go of it later.
 
-    The capture becomes one OME-Zarr image store. *placement*, handed the
+    The capture becomes one OME-Zarr image store, or with *image_format*
+    ``"ome-tiff"`` one OME-TIFF file placed by the same rules (see
+    :mod:`.ome_tiff`). *placement*, handed the
     planes' z numbers, answers where on the sample each was taken, and places
     the store there. ``SavedAcquisition.read_plane`` reads a saved plane back
     by the plane number the capture gave it.
@@ -103,6 +113,10 @@ def save(
         raise ValueError(
             f"unknown projection {projection!r}; the projections are {PROJECTIONS}"
         )
+    if image_format not in FORMATS:
+        raise ValueError(
+            f"unknown format {image_format!r}; a capture is saved as one of {FORMATS}"
+        )
     if orientation is None:
         from ...driver_setup.orientation import rig_orientation
 
@@ -119,15 +133,25 @@ def save(
     exported = replace(
         exported, metadata=on_the_canvas(exported.metadata, exported, placement)
     )
+    where = _placed(exported, placement)
+    if where is None:
+        raise ValueError(
+            "a position is placed by its canvas position, and none was given "
+            "(save's placement); without it the image would lie at an invented place"
+        )
     try:
+        # Every plane is read from LAS X's cache once, here: the position and
+        # its projection are both made from this one volume in memory.
+        capture = ome_zarr.gather(exported, orientation=orientation, where=where)
         saved = _persist_store(
             exported,
+            capture,
             Path(output_root),
             naming,
             lineage=lineage,
             notes=notes,
             orientation=orientation,
-            placement=placement,
+            image_format=image_format,
         )
     except FileNotFoundError as why:
         say_when_the_path_is_too_long(why)
@@ -136,14 +160,14 @@ def save(
         saved = replace(
             saved,
             projection_paths=_persist_projection(
-                exported,
+                capture,
                 Path(output_root),
                 naming,
                 orientation=orientation,
-                placement=placement,
                 notes=notes,
                 projected_from=next(iter(saved.image_paths.values())),
                 vendor_files=saved.vendor_metadata_paths,
+                image_format=image_format,
             ),
         )
     return replace(saved, release_target=exported.release_target)
@@ -177,30 +201,24 @@ def say_when_the_path_is_too_long(
 
 
 def _persist_projection(
-    exported: ExportedAcquisition,
+    capture: ome_zarr.Capture,
     output_root: Path,
     naming: Naming,
     *,
     orientation: Orientation,
-    placement,
     notes: convention.Notes | None,
     projected_from: Path,
     vendor_files,
+    image_format: str = FORMAT,
 ) -> tuple[Path, ...]:
-    """The capture's max projection in ``projections``, as an OME-Zarr image.
+    """The capture's max projection in ``projections``, in the capture's own format.
 
-    Its capture record says which store it was made from, and how.
+    It is made from *capture*, the volume already read from LAS X's cache for
+    the position, so the cache is not read a second time. Its capture record
+    says which position it was made from, and how.
     """
-    indices = [index for position in exported.positions for index in position.planes]
-    where = (
-        placement(sorted({index.z for index in indices}))
-        if placement is not None
-        else None
-    )
-    projected = ome_zarr.max_projection(
-        ome_zarr.gather(exported, orientation=orientation, where=where)
-    )
-    store = projections_dir(output_root) / f"{naming.stem}.ome.zarr"
+    projected = ome_zarr.max_projection(capture)
+    store = projections_dir(output_root) / f"{naming.stem}{ENDINGS[image_format]}"
     record = dict((notes.capture_record if notes else None) or {})
     record["derived_from"] = {
         "store": Path(os.path.relpath(projected_from, store)).as_posix(),
@@ -211,7 +229,15 @@ def _persist_projection(
         vendor_files,
         orientation,
     )
-    return (ome_zarr.write_store(projected, store, notes=told),)
+    write = ome_tiff.write_tiff if image_format == "ome-tiff" else ome_zarr.write_store
+    return (write(projected, store, notes=told),)
+
+
+def _placed(exported: ExportedAcquisition, placement):
+    """Where each plane of *exported* lies (plane z number -> canvas x, y, z), or None without a placement."""
+    if placement is None:
+        return None
+    return placement(sorted({index.z for position in exported.positions for index in position.planes}))
 
 
 def on_the_canvas(metadata, exported: ExportedAcquisition, placement) -> object:
@@ -244,31 +270,27 @@ def on_the_canvas(metadata, exported: ExportedAcquisition, placement) -> object:
 
 def _persist_store(
     exported: ExportedAcquisition,
+    capture: ome_zarr.Capture,
     output_root: Path,
     naming: Naming,
     *,
     lineage: dict | None,
     notes: convention.Notes | None,
     orientation: Orientation,
-    placement: Callable[[list[int]], Callable[[int], dict]] | None,
+    image_format: str = FORMAT,
 ) -> SavedAcquisition:
-    """The capture as one OME-Zarr image in ``data``, beside the vendor's metadata and the state."""
+    """The capture as one position in ``data``, beside the vendor's metadata and the state.
+
+    *capture* is the capture's volume, already read from LAS X's cache and
+    placed. The position is one OME-Zarr image, or one OME-TIFF file when
+    *image_format* is ``"ome-tiff"``.
+    """
     vendor_records = _persist_vendor_metadata(exported, output_root, naming)
     indices = [index for position in exported.positions for index in position.planes]
-    where = (
-        placement(sorted({index.z for index in indices}))
-        if placement is not None
-        else None
-    )
-    store = data_dir(output_root) / f"{naming.stem}.ome.zarr"
-    if where is None:
-        raise ValueError(
-            "an OME-Zarr store is placed by its canvas position, and none was given "
-            "(save's placement); without it the image would lie at an invented place"
-        )
-    capture = ome_zarr.gather(exported, orientation=orientation, where=where)
+    store = data_dir(output_root) / f"{naming.stem}{ENDINGS[image_format]}"
     vendor_files = [output_root / record["path"] for record in vendor_records]
-    ome_zarr.write_store(
+    write = ome_tiff.write_tiff if image_format == "ome-tiff" else ome_zarr.write_store
+    write(
         capture,
         store,
         notes=_the_stores_notes(notes or convention.Notes(), vendor_files, orientation),
@@ -282,7 +304,7 @@ def _persist_store(
         {
             "naming": _naming_to_dict(naming),
             "image_path": _rel_posix(store, output_root),
-            "format": "ome-zarr",
+            "format": image_format,
             "source": _rel_posix(exported.source_dir, exported.source_root),
             "source_exporter": exported.source_exporter,
             "canonical_metadata": True,
@@ -299,8 +321,12 @@ def _persist_store(
             output_root / record["path"] for record in vendor_records
         ),
         state_paths=(printed,) if printed is not None else (),
-        read_plane=lambda index: ome_zarr.read_plane(
-            store, capture.store_position[index]
+        read_plane=(
+            (lambda index: ome_tiff.read_plane(
+                store, capture.store_position[index], capture.volume.shape
+            ))
+            if image_format == "ome-tiff"
+            else (lambda index: ome_zarr.read_plane(store, capture.store_position[index]))
         ),
     )
 

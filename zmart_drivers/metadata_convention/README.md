@@ -1,7 +1,8 @@
 # The ZMART metadata convention
 
-Every capture a ZMART driver saves is one OME-Zarr store: its pixels, and everything that
-says how they were made. This page is the convention every driver writes to and every
+Every capture a ZMART driver saves is one OME-Zarr store (or, when the workflow asks for
+it, one OME-TIFF file holding the same; see 2): its pixels, and everything that says how
+they were made. This page is the convention every driver writes to and every
 reader reads from. It is the same for every microscope. It is not a file format of its
 own: the format is OME-Zarr 0.5 and the OME data model, and this convention says which of
 their fields a ZMART store fills and what it adds where they have no field.
@@ -76,6 +77,29 @@ while Fiji and OMERO cannot read OME-Zarr 0.5 either way. When a reader of the X
 it, stores move to that layout with one script.
 
 One store holds one position. A projection is a store of its own, in the same layout.
+
+**The same position as one OME-TIFF file.** A run can also be saved as OME-TIFF, when the
+workflow asks for it with the connection's `format` (`"ome-tiff"`; the ZMART interface
+offers it on its Connect step). It is meant for people who open their data with a drag and
+drop in Fiji, napari, QuPath or Imaris. The four layers are the same; only where they are
+kept changes:
+
+```
+<name>.ome.tif         every plane, z changing fastest, then the channel, then time
+                       (DimensionOrder XYZCT), with the coarser levels as sub-images
+  OME-XML              layers 2 to 4, as the file's own description, with one
+                       TiffData that holds every plane
+  MapAnnotation        layer 1, in the namespace "zmart/position": the entries
+    "zmart/position"   "multiscales" and "omero" (the very JSON zarr.json would hold
+                       under "ome") and "zmart" ({"metadata_convention": "1"})
+```
+
+So a file is placed by the same OME-Zarr rules as a store: by its levels' scales and the
+centre of its first voxel, read from that note. The OME-XML's own `PositionX` and
+`PositionY` say where the microscope reports the field, but programs disagree on which
+point of a picture they name, so ZMART never places a picture by them. An OME-TIFF without
+the note is not a ZMART position. The convention's version is the same for both forms,
+because what each layer says is the same.
 
 ## 3) Layer 1: OME-Zarr 0.5
 
