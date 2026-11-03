@@ -1296,6 +1296,36 @@ def set_bleach_mode(client, on, *, max_retries=None) -> dict:
     return roi_result(client, [writes.bleach_mode(on)], max_retries)
 
 
+def set_line_scan(client, *, lines=None, max_lines_per_page=None, lines_per_page=None, page_interval_s=None, max_retries=None) -> dict:
+    """Set the xt line scan as LAS X's t panel does in xt: the *lines*, MAX (*max_lines_per_page*: as many lines per page as
+    LAS X takes), the *lines_per_page* (only with MAX off) and the *page_interval_s*; the result's ``line_scan`` is read back.
+    Only with the scan mode xt."""
+    asked = {"max_lines_per_page": max_lines_per_page, "lines": lines, "lines_per_page": lines_per_page, "page_interval_s": page_interval_s}
+    given = {k: v for k, v in asked.items() if v is not None}
+    if not given:
+        return dispatch.refused("set_line_scan needs lines, max_lines_per_page, lines_per_page or page_interval_s")
+    for key in ("lines", "lines_per_page"):
+        if key in given and (isinstance(given[key], bool) or not isinstance(given[key], int) or not 1 <= given[key] <= MOST_FRAMES):
+            return dispatch.refused(f"{key} is a whole number from 1 to {MOST_FRAMES}, not {given[key]!r}")
+    if "max_lines_per_page" in given and not isinstance(given["max_lines_per_page"], bool):
+        return dispatch.refused(f"max_lines_per_page takes True or False, not {given['max_lines_per_page']!r}")
+    if "page_interval_s" in given and (isinstance(page_interval_s, bool) or not isinstance(page_interval_s, (int, float)) or page_interval_s <= 0):
+        return dispatch.refused(f"the page interval is a positive number of seconds, not {page_interval_s!r}")
+    if str(readers.get_scan_mode(client) or "").replace("N", "") != "xt":
+        return dispatch.refused("the line scan's settings are for the scan mode xt; choose it first")
+    now = readers.get_line_scan(client)
+    if "lines_per_page" in given and given.get("max_lines_per_page", now["max_lines_per_page"]):
+        return dispatch.refused("with MAX on, LAS X sets the lines per page; give max_lines_per_page=False first")
+    result = None
+    for name in asked:
+        if name in given:
+            result = run(client, writes.line_scan(name, given[name]), max_retries=max_retries)
+            if not result["success"]:
+                return result
+    result["line_scan"] = readers.get_line_scan(client)
+    return result
+
+
 #: The most frames LAS X's t panel takes.
 MOST_FRAMES = 1_000_000_000
 

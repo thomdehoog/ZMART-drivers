@@ -1304,6 +1304,30 @@ class TestZCompensation:
         assert changes.set_z_compensation(stacked, excitation="yes")["success"] is False
 
 
+class TestLineScan:
+    @pytest.fixture
+    def xt(self, lasx, client):
+        lasx.live[("Acquire", "ScanDimensionList", "ScanModeName")] = "xt"
+        return client
+
+    def test_lines_pages_and_the_page_interval_are_set_and_read_back(self, lasx, xt):
+        result = changes.set_line_scan(xt, lines=4000, max_lines_per_page=False, lines_per_page=500, page_interval_s=5.0)
+
+        assert result["confirmed"] is True
+        assert result["line_scan"] == {"lines": 4000, "lines_per_page": 500, "pages": 8, "max_lines_per_page": False,
+                                       "page_interval_s": 5.0, "line_time_s": 0.0025}
+
+    def test_lines_per_page_with_max_on_is_refused(self, lasx, xt):
+        assert changes.set_line_scan(xt, lines_per_page=500)["success"] is False
+
+    @pytest.mark.parametrize("keywords", [{"lines": 0}, {"lines": 2.5}, {"page_interval_s": -1.0}, {"max_lines_per_page": "yes"}, {}])
+    def test_what_the_window_does_not_offer_is_refused(self, lasx, xt, keywords):
+        assert changes.set_line_scan(xt, **keywords)["success"] is False
+
+    def test_outside_xt_it_is_refused(self, lasx, client):
+        assert changes.set_line_scan(client, lines=1000)["success"] is False
+
+
 class TestRoiScanAndBleachMode:
     def test_roi_scan_is_switched_on_and_off(self, lasx, client):
         assert changes.set_roi_scan(client, True)["roi"] == {"on": True, "sections": None, "bleach_mode": False}

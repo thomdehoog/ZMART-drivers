@@ -1650,6 +1650,27 @@ def bleach_mode(on: bool) -> Write:
                       lambda r: r["bleach_mode"] is bool(on))
 
 
+def line_scan(name: str, value) -> Write:
+    """One value of the xt line scan written into LCS's state tree, as the t panel does in xt; read back."""
+    node, key, text = {
+        "lines": ("Lines", "lines", lambda v: str(int(v))),
+        "lines_per_page": ("LinesPerPage", "lines_per_page", lambda v: str(int(v))),
+        "max_lines_per_page": ("IsMaxLinesActive", "max_lines_per_page", lambda v: str(int(bool(v)))),
+        "page_interval_s": ("DelayTime", "page_interval_s", lambda v: repr(float(v))),
+    }[name]
+
+    def fill(request: Request) -> None:
+        request.elements = [f'<StateTree Command="{node}" Value="{text(value)}"/>']
+
+    def shows(found) -> bool:
+        if not found:
+            return False
+        return abs(found[key] - value) <= 0.001 if name == "page_interval_s" else found[key] == value
+
+    return Write(command="set_line_scan", values={"value": str(value)}, request=node, fill=fill,
+                 description=f"Line scan {name} -> {value}", ready=idle(), confirm=Expect("line_scan", shows))
+
+
 def time_series_change(name: str, node: str, written, description: str, shows) -> Write:
     """One value of the time series written into LCS's state tree, as the t panel does; read back."""
 

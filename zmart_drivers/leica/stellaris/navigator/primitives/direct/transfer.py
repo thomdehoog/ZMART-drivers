@@ -382,6 +382,10 @@ STATE_TREE_WRITES = {
     "DelayTime": TreeWrite(("Acquire", "AcquireTStackInfo", "DelayTime"), float, within=(0, 1e9)),
     "Duration": TreeWrite(("Acquire", "AcquireTStackInfo", "Duration"), float, within=(0, 1e15)),
     "IsMinimized": TreeWrite(("Acquire", "AcquireTStackInfo", "IsMinimized"), bool),
+    # The xt line scan: its lines and lines per page (unsigned; plain ones are ignored), and MAX (simulator, 2026-11-03).
+    "Lines": TreeWrite(("Acquire", "AcquireTStackInfo", "Lines"), within=(1, 1_000_000_000), unsigned=True),
+    "LinesPerPage": TreeWrite(("Acquire", "AcquireTStackInfo", "LinesPerPage"), within=(1, 1_000_000_000), unsigned=True),
+    "IsMaxLinesActive": TreeWrite(("Acquire", "AcquireTStackInfo", "IsMaxLinesActive"), bool),
     "IsEnableAutomaticTSectionsCalculation": TreeWrite(("Acquire", "AcquireTStackInfo", "IsEnableAutomaticTSectionsCalculation"), bool),
     # ROI scan and the bleach mode (the Acquisition Mode panel's ROI and bleach buttons), and the ROI scan's
     # sections of a stack (ROI 3D). The window writes them here with no command (simulator, 2026-11-02);

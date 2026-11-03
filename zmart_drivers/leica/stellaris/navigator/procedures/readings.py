@@ -251,6 +251,11 @@ def get_roi_scan(client, **keywords):
     return _routed("roi_scan", client, **keywords)
 
 
+def get_line_scan(client, **keywords):
+    """The xt line scan: ``lines``, ``lines_per_page``, ``pages``, ``max_lines_per_page``, ``page_interval_s``, ``line_time_s``."""
+    return _routed("line_scan", client, **keywords)
+
+
 def get_time_series(client, **keywords):
     """The time series: ``frames``, ``interval_s``, ``duration_s``, ``until_stopped``, ``shortest_interval_s``."""
     return _routed("time_series", client, **keywords)

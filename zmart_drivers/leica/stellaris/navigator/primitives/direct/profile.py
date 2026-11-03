@@ -172,6 +172,7 @@ DATUMS = {
         DatumSpec("aobs_lines", direct_reader.get_aobs_lines, lambda v: isinstance(v, list)),
         DatumSpec("fast_live", direct_reader.get_fast_live, lambda v: isinstance(v, dict) and "fov" in v),
         DatumSpec("time_series", direct_reader.get_time_series, lambda v: isinstance(v, dict) and "frames" in v),
+        DatumSpec("line_scan", direct_reader.get_line_scan, lambda v: isinstance(v, dict) and "lines" in v),
         DatumSpec("roi_scan", direct_reader.get_roi_scan, lambda v: isinstance(v, dict) and "on" in v),
         DatumSpec("z_compensation", direct_reader.get_z_compensation, lambda v: isinstance(v, dict) and "modes" in v),
         DatumSpec("auto_sync", direct_reader.get_auto_sync, lambda v: isinstance(v, dict) and "fov" in v),

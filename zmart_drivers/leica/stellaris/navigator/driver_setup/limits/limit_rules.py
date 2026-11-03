@@ -426,6 +426,7 @@ MUTATING_COMMANDS = {
     "set_fast_live": "set_fast_live",
     # the time series: how many frames and how often, not the light
     "set_time_series": "set_time_series",
+    "set_line_scan": "set_line_scan",
     # ROI scan and the bleach mode: switches; the light in a region is set as any laser power
     "set_roi_scan": "set_roi_scan",
     # linear Z-compensation: its modes and points hold powers and gains already set; Move To is a z move

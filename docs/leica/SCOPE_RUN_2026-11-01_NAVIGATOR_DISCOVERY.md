@@ -1111,3 +1111,14 @@ the Λ scan; the reverse direction was greyed out. Through the driver, 60 nm was
 off with "independent". Built: `geometry=` and `max_gap_nm=` (False: none) on `set_excitation_scan`, the maximal distance refused
 with an independent detection. Left behind, no maximal distance (40 nm stored); the scan mode back to xyz.
 
+## 67. The xt line scan (3 November 2026)
+
+In xt the t panel shows Line Interval (greyed), Page Interval, Minimize, Duration, Lines, Lines / Page and MAX. The Lines field (set
+through UI Automation, as Frames) changed `Acquire/AcquireTStackInfo/Lines` and, with MAX on, `LinesPerPage`; no command. Written
+into the state tree: `Lines` and `LinesPerPage` were ignored as plain numbers and taken as unsigned ones, `IsMaxLinesActive` and the
+page interval (`DelayTime`) as plain ones; LCS works out `Pages` (4000 lines, 500 a page: 8) and the duration. With MAX, LCS puts
+8192 lines on a page.
+
+Built: `set_line_scan(lines=, max_lines_per_page=, lines_per_page=, page_interval_s=)`, only in xt, lines per page refused with MAX
+on. Through the driver: 3000 lines, 600 a page (5 pages), 4 s; back to 2048000 lines, MAX, 20.48 s; the scan mode back to xyz.
+
