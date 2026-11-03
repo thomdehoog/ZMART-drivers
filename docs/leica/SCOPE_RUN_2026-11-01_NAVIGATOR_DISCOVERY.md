@@ -1768,3 +1768,25 @@ Minimize is on, as LCS would keep the shortest. Through the driver: refused; off
   whichever way the last digit falls. Built: `set_time_series(duration_s=)`, the frames that fill it at the interval,
   in place of frames. And an interval is now refused while Minimize is on (LCS kept the shortest, 1.28 s, for 10 s asked).
   Through the driver: refused; Minimize off, 10 s, 60 s: 7 frames; 7 frames; back to 250 frames at the shortest.
+
+## 110. The last rows the recount was unsure of (3 November 2026)
+
+Each looked for in LAS X 4.9's window on the simulator; none needs building.
+
+- xt's "Duration ≈": with its radio button chosen and 2 minutes typed into its own time boxes (UI Automation, the
+  focus moved out), LCS got nothing and LAS X showed the old 1:25:20 again; written into the state tree, `Duration` was
+  ignored in xt. It follows the lines (hence ≈): `set_line_scan(lines=)`. The Lines radio button was chosen again.
+- Predictive Focus Mode (5 or 9 points, circle or rectangle) and Mark & Find's position list (Load, Save): in the
+  classic Tilescan and Mark & Find acquisition modes. The Acquisition Mode panel offers neither (autofocus, ROI,
+  Bleach, LAS X Navigator, SpectraPlex): the Navigator replaces them, with its Focus Map and positions (sections 104, 105).
+- Best Focus "Focus modes / First channel only": not in the Best Focus panel, nor in the Navigator's autofocus Settings
+  (drive, optimised for, capture range, precision; all built).
+- Project Settings' "Enable Manual/SmartMove control during acquisition" and "Lambda then Z / Z then Lambda": the
+  Projects tab's "Project settings" holds only New Project Defaults (name, Auto-Save, location, image type) and a user
+  defined image name; the help says which functions show "depends on the configuration of your system".
+- The optical-section formula's Multiphoton: the formula shows emission, refractive index, NA, Airy units, "Use from
+  System" and Apply to Step Size; no multiphoton laser, no Multiphoton choice.
+- The Laser Overview's options: the white-light laser shows Excitation Control (built) and Excitation Curves (greyed
+  out); no Frequency (not equipped), no GDD (STELLARIS DIVE's femtosecond lasers).
+- The bleach point's preset line: the line the point takes from the setting; its power is `set_bleach_laser_power`, more
+  lines `add_bleach_laser_line` (section 107).
