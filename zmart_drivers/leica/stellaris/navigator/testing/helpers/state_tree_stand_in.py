@@ -78,6 +78,9 @@ SIMULATOR_SETTINGS = {
     # LAS X's build, as the simulator's LCS gives it (2026-11-03).
     ("Acquire", "LASAFversion"): "LAS X [ BETA ] 4.9.0.30051",
     ("Acquire", "ATL", "UIInputForBlockAllowed"): True,
+    # The data container's sets of the ROI scan's regions and of the bleach points (simulator, 2026-11-03).
+    ("Confocal", "ROIScan", "CurrentDCROISetID"): 177,
+    ("Confocal", "ROIScan", "CurrentDCBleachPointROISetID"): 178,
     ("Confocal", "ROIScan", "CanDo3DLimitedRoiScan"): False,
     ("Confocal", "ROIScan", "Is3DLimitedRoiScanEnabled"): False,
     ("Confocal", "ROIScan", "First3DRoiSection"): 1,

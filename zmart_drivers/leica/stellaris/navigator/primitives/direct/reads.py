@@ -1197,6 +1197,14 @@ def get_autofocus_optics() -> dict:
 BLEACH_POINT = ("Acquire", "ATL", "CurrentBlock", "ConfocalSequentialInfo", "SequentialBleachPointParameter")
 
 
+def get_roi_sets() -> dict:
+    """Where LAS X's data container keeps the ROI scan's regions and the bleach points now: the sets' element IDs,
+    ``regions`` and ``bleach_points`` (``Confocal/ROIScan/CurrentDCROISetID``, ``CurrentDCBleachPointROISetID``)."""
+    found = settings("the ROI sets", {"regions": ("Confocal", "ROIScan", "CurrentDCROISetID"),
+                                      "bleach_points": ("Confocal", "ROIScan", "CurrentDCBleachPointROISetID")})
+    return {"regions": int(found["regions"]), "bleach_points": int(found["bleach_points"])}
+
+
 def get_bleach_point() -> dict:
     """The bleach point the Bleach Point panel shows: its ``name``, ``point`` (its place; None while no point is drawn,
     ``Confocal/ROIScan/CurrentBleachPoint`` -1) and ``lines`` with power, as for the Best Focus Setting (simulator,

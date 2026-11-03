@@ -1351,6 +1351,132 @@ def add_bleach_laser_line(client, wavelength_nm, percent=None, *, max_retries=No
     return result
 
 
+def outside_the_field(client, items, extent, what: str) -> str | None:
+    """Why *items* cannot go into the field now (one reaching beyond the scan field, by *extent*), or None."""
+    width_m, height_m = readers.get_fov(client)
+    half_x, half_y = width_m * 1e6 / 2, height_m * 1e6 / 2
+    for k, item in enumerate(items):
+        left, right, top, bottom = extent(item)
+        if left < -half_x or right > half_x or bottom < -half_y or top > half_y:
+            return (f"{what} {k + 1} reaches {left:.1f} to {right:.1f} um across and {bottom:.1f} to {top:.1f} um up, beyond the "
+                    f"field (+-{half_x:.1f} by +-{half_y:.1f} um); nothing was added")
+    return None
+
+
+def into_data_container(set_id, xml, written, read, container, key) -> dict:
+    """Add *xml*'s children to the data container's set *set_id* and read it back: ``confirmed`` when the set ends with
+    *written*, shape by shape and point by point within a nanometre, bleaching times alike."""
+    answer = container("add", set_id, xml)
+    if not answer.get("success"):
+        return dispatch.refused(f"LAS X's data container did not take them: {answer.get('message')}")
+    now = read(answer["xml"])
+    tail = now[len(now) - len(written):] if len(now) >= len(written) else []
+
+    def same(a, b):
+        return (a["shape"] == b["shape"] and len(a["points_um"]) == len(b["points_um"]) and a.get("seconds") == b.get("seconds")
+                and all(abs(p - q) <= 1e-3 for pa, pb in zip(a["points_um"], b["points_um"]) for p, q in zip(pa, pb)))
+
+    confirmed = len(tail) == len(written) and all(same(a, b) for a, b in zip(tail, written))
+    result = {"success": True, "confirmed": confirmed, key: now, "message": f"{len(written)} added to the data container's set {set_id}"}
+    if not confirmed:
+        kept = sum(1 for b in written if any(same(a, b) for a in now))
+        result["message"] = f"the data container's set {set_id} holds {kept} of {len(written)} as written"
+    return result
+
+
+def add_roi_regions(client, regions_given, *, container=None) -> dict:
+    """Put *regions_given* (rectangle, ellipse, polygon or range, in micrometres from the field's centre, x right and y
+    up) into the ROI scan's regions, through LAS X's data container, with no window; the result's ``regions`` are all
+    the set holds afterwards, read back. ROI scan must be on; every region must lie within the field. LAS X gives each
+    region the setting's laser lines itself."""
+    from ..primitives.direct import data_container as region_xml
+    
+    container = container or region_xml.request
+    if not readers.get_roi_scan(client)["on"]:
+        return dispatch.refused("ROI scan is off; switch it on with set_roi_scan first; nothing was added")
+    try:
+        outside = outside_the_field(client, regions_given, region_xml.extent, "region")
+    except ValueError as why:
+        return dispatch.refused(f"{why}; nothing was added")
+    if outside:
+        return dispatch.refused(outside)
+    set_id = readers.get_roi_sets(client)["regions"]
+    there = container("read", set_id)
+    if not there.get("success"):
+        return dispatch.refused(f"LAS X's data container could not be read: {there.get('message')}")
+    xml = region_xml.regions_xml(regions_given, first=len(region_xml.read_set(there["xml"])) + 1)
+    return into_data_container(set_id, xml, region_xml.read_set(xml), region_xml.read_set, container, "regions")
+
+
+def read_roi_set(client, which: str, *, container=None) -> dict:
+    """What LAS X's data container holds now for the ROI scan's ``"regions"`` or the ``"bleach_points"``, as the driver
+    gives them; the result's ``regions`` or ``points``."""
+    from ..primitives.direct import data_container as region_xml
+    
+    if which not in ("regions", "bleach_points"):
+        return dispatch.refused(f"the data container's sets are 'regions' and 'bleach_points', not {which!r}")
+    answer = (container or region_xml.request)("read", readers.get_roi_sets(client)[which])
+    if not answer.get("success"):
+        return dispatch.refused(f"LAS X's data container could not be read: {answer.get('message')}")
+    key = "regions" if which == "regions" else "points"
+    return {"success": True, "confirmed": True, key: region_xml.read_set(answer["xml"])}
+
+
+def clear_roi_regions(client, *, container=None) -> dict:
+    """Take every region of the ROI scan away, through LAS X's data container; the result's ``regions`` are read back."""
+    from ..primitives.direct import data_container as region_xml
+    
+    answer = (container or region_xml.request)("clear", readers.get_roi_sets(client)["regions"])
+    if not answer.get("success"):
+        return dispatch.refused(f"LAS X's data container did not clear the regions: {answer.get('message')}")
+    now = region_xml.read_set(answer["xml"])
+    return {"success": True, "confirmed": now == [], "regions": now, "message": "the ROI scan's regions cleared"}
+
+
+def add_bleach_points(client, points, *, container=None) -> dict:
+    """Put bleach *points* (each ``at_um``, x and y from the field's centre, x right and y up, and ``seconds``, its
+    bleaching time) into LAS X's data container, with no window; the result's ``points`` are all the set holds, read
+    back. The bleach mode must be on; LCS gives each point its own setting, with the setting's lines."""
+    from ..primitives.direct import data_container as region_xml
+    
+    container = container or region_xml.request
+    if not readers.get_roi_scan(client)["bleach_mode"]:
+        return dispatch.refused("the bleach mode is off; switch it on with set_bleach_mode first; nothing was added")
+
+    def extent(point):
+        x, y = region_xml.pair(point.get("at_um"), "a bleach point's at_um")
+        return x, x, y, y
+
+    try:
+        outside = outside_the_field(client, points, extent, "bleach point")
+    except ValueError as why:
+        return dispatch.refused(f"{why}; nothing was added")
+    if outside:
+        return dispatch.refused(outside)
+    drive = readers.get_z_drive_in_use(client) or "z-galvo"
+    z_um = readers.read_z_um(client, drive) or 0.0
+    set_id = readers.get_roi_sets(client)["bleach_points"]
+    there = container("read", set_id)
+    if not there.get("success"):
+        return dispatch.refused(f"LAS X's data container could not be read: {there.get('message')}")
+    try:
+        xml = region_xml.bleach_points_xml(points, z_um * 1e-6, first=len(region_xml.read_set(there["xml"])) + 1)
+    except ValueError as why:
+        return dispatch.refused(f"{why}; nothing was added")
+    return into_data_container(set_id, xml, region_xml.read_set(xml), region_xml.read_set, container, "points")
+
+
+def clear_bleach_points(client, *, container=None) -> dict:
+    """Take every bleach point away, through LAS X's data container; the result's ``points`` are read back."""
+    from ..primitives.direct import data_container as region_xml
+    
+    answer = (container or region_xml.request)("clear", readers.get_roi_sets(client)["bleach_points"])
+    if not answer.get("success"):
+        return dispatch.refused(f"LAS X's data container did not clear the bleach points: {answer.get('message')}")
+    now = region_xml.read_set(answer["xml"])
+    return {"success": True, "confirmed": now == [], "points": now, "message": "the bleach points cleared"}
+
+
 def save_bleach_points(client, path) -> dict:
     """Save the bleach points (their places, bleaching times and light) to *path*, as the Bleach Point panel's Save;
     ``confirmed`` when the file is there.

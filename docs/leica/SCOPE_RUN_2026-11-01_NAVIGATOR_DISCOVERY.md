@@ -1893,3 +1893,21 @@ values in words and takes `true` and `false` as on and off in an entry's allowed
 
 Corrected: the autofocus's and the bleach point's laser powers were already checked against the laser limit
 (`set_laser_power`), and a light source's output power against `set_laser_output_power`.
+
+## 118. ROI regions and bleach points through LAS X's data container, with no window (3 November 2026)
+
+`add_roi_regions`, `clear_roi_regions`, `roi_regions`, `add_bleach_points` (with each point's bleaching time),
+`clear_bleach_points` and `bleach_points` put the ROI scan's regions and the bleach points into LAS X's data container
+and read them back, through LAS X's own .NET wrapper (`BIN\LMSDataContainerWrapper.dll`) in a separate process. No
+window, no UI Automation, no focus; the viewer redraws them at once.
+
+Each fact found by observation on the simulator:
+
+| What | How it was found |
+|---|---|
+| The wrapper's methods and their parameters (`DataContainerClient.CreateAndInitInstance(string, string)`, `Instance()`, `LoadElementFromXML(string, bool, out int)`, `MoveElement(int, int)`, `SaveElementToXML(int, bool)`, `Exit()`; `DMObject.GetChildrenInfo(EElementVisibility)`, `Delete()`), version 2.65.0.0 | the assembly's public listing, read by reflection (names and parameters only) |
+| Where the sets are | LCS's state tree: `Confocal/ROIScan/CurrentDCROISetID` (177) for the regions, `CurrentDCBleachPointROISetID` (178) for the bleach points |
+| The shapes (point 1, polygon 8, rectangle 16, ellipse 32, range 64), their coordinates (metres, from the field's middle, y down), their turn (0 or 270) and a bleach point's time (`BLEACH_POINT` `Duration`, milliseconds) | the sets as LAS X wrote them after the shapes were drawn in its window at known pixels, saved with `SaveElementToXML` (`testing/data/datacontainer/`) |
+| A shape loaded, moved into the set, and deleted | on the simulator: ROI scan on, the set empty; a 20 by 10 µm rectangle added and read back with its corners, LAS X adding its own laser lines; cleared, the set empty again |
+
+The wrapper's version is checked before anything is touched; another version is refused.

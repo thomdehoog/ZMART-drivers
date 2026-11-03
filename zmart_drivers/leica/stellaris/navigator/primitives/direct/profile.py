@@ -152,6 +152,7 @@ DATUMS = {
         DatumSpec("bit_depth", direct_reader.get_bit_depth, number_present),
         DatumSpec("z_stack", z_stack_read, z_stack_present),
         DatumSpec("z_drive_in_use", direct_reader.get_z_drive_in_use, text_present),
+        DatumSpec("roi_sets", direct_reader.get_roi_sets, lambda v: isinstance(v, dict) and "regions" in v),
         DatumSpec("z_stack_focus", direct_reader.get_z_stack_focus, lambda v: isinstance(v, dict) and "set" in v),
         DatumSpec("z_stack_focus_possible", direct_reader.get_z_stack_focus_possible, lambda v: isinstance(v, bool)),
         DatumSpec("y_line", direct_reader.get_y_line, lambda v: isinstance(v, dict) and "y_um" in v),

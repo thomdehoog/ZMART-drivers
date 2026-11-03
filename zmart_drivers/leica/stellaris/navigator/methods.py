@@ -880,6 +880,47 @@ class Microscope:
         checked(self.handle, result, f"add_bleach_laser_line({wavelength_nm!r}, {percent!r})")
         return result["bleach_point"]
 
+    def add_roi_regions(self, regions: list[dict]) -> list[dict]:
+        """Add regions to the ROI scan, with no window: each a ``rectangle`` or ``ellipse`` (``centre_um``, ``size_um``),
+        a ``polygon`` (``vertices_um``) or a ``range`` (``from_um``, ``to_um``, a band of columns), in micrometres from
+        the field's centre, x to the right and y up. A circle is an ellipse, a square a rectangle, of equal sides.
+
+        Written into LAS X's data container, where its window keeps them, and read back; LAS X shows them at once and
+        gives each the setting's laser lines. ROI scan must be on, and every region within the field. Answers every
+        region the ROI scan holds now (``name``, ``shape``, ``points_um``, ``centre_um``, ``laser_lines``).
+        """
+        self.handle.require_open()
+        return checked(self.handle, changes.add_roi_regions(self.handle.client, regions), "add_roi_regions()")["regions"]
+
+    def clear_roi_regions(self) -> list[dict]:
+        """Take every region of the ROI scan away, with no window; answers the regions left (none)."""
+        self.handle.require_open()
+        return checked(self.handle, changes.clear_roi_regions(self.handle.client), "clear_roi_regions()")["regions"]
+
+    def roi_regions(self) -> list[dict]:
+        """The ROI scan's regions now, read from LAS X's data container, as :meth:`add_roi_regions` answers them."""
+        self.handle.require_open()
+        return checked(self.handle, changes.read_roi_set(self.handle.client, "regions"), "roi_regions()")["regions"]
+
+    def add_bleach_points(self, points: list[dict]) -> list[dict]:
+        """Add bleach points, with no window: each ``at_um`` (x, y in micrometres from the field's centre, x to the right
+        and y up) and ``seconds``, its bleaching time. Written into LAS X's data container and read back; LCS gives each
+        its own setting with the setting's lines (:meth:`select_bleach_point`, :meth:`set_bleach_laser_power`). The
+        bleach mode must be on, and every point within the field. Answers every bleach point now (``centre_um``,
+        ``seconds``)."""
+        self.handle.require_open()
+        return checked(self.handle, changes.add_bleach_points(self.handle.client, points), "add_bleach_points()")["points"]
+
+    def clear_bleach_points(self) -> list[dict]:
+        """Take every bleach point away, with no window; answers the points left (none)."""
+        self.handle.require_open()
+        return checked(self.handle, changes.clear_bleach_points(self.handle.client), "clear_bleach_points()")["points"]
+
+    def bleach_points(self) -> list[dict]:
+        """The bleach points now, read from LAS X's data container, with their places and bleaching times."""
+        self.handle.require_open()
+        return checked(self.handle, changes.read_roi_set(self.handle.client, "bleach_points"), "bleach_points()")["points"]
+
     def save_bleach_points(self, path) -> dict:
         """Save the bleach points, with their places, bleaching times and light, to the new ``.bpr`` file *path*, as
         the Bleach Point panel's Save does; an existing file is never written over. The panel's Load is not offered:

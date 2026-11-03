@@ -176,6 +176,11 @@ def get_y_line(client, **keywords):
     return _routed("y_line", client, **keywords)
 
 
+def get_roi_sets(client, **keywords):
+    """The data container's sets of the ROI scan's regions and of the bleach points: ``regions``, ``bleach_points``."""
+    return _routed("roi_sets", client, **keywords)
+
+
 def get_z_stack_focus_possible(client, **keywords):
     """Whether Set Focus can be used now (LAS X greys it out before the stack's begin is set)."""
     return _routed("z_stack_focus_possible", client, **keywords)
