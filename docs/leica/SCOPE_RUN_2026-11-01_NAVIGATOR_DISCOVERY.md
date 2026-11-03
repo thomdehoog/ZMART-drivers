@@ -1554,3 +1554,20 @@ are no Leica named pipes; its services (information, user data, file handling, r
 scan. LCS's registered type library lists an older COM automation interface beside `SendCommand2`, whose `Scanner` object
 has `MoveInDirection(EDirection)` with the pan pad's nine directions and `PanPercentage`. It was read only, not called:
 Thom decided not to use it (see NAVIGATOR_NEXT_STEPS.md, "Decided not to do").
+
+## 98. The COM scanner's MoveInDirection, on the simulator only (3 November 2026)
+
+Thom allowed LCS's older COM automation interface on the simulator only, to learn (never on the STELLARIS: the same
+`Scanner` object sets the scan speed, the zoom and the scan size and starts scans, outside the driver's limits, and a wrong
+value can harm the scanner). The probe first checked that LAS X's newest picture names the system "SIMULATOR" (LCS's
+`Hardware.SystemType` is 100). Results:
+
+- `Scanner.PanPercentage` reads 3, the arrow's step.
+- `Scanner.MoveInDirection(3)` (eRight) moved the pan 34.89 µm across, 3 % of the 1162.5 µm field at zoom 1, one arrow's
+  step; it answered at once, with no dialog, nothing in LCS's command log and no state-tree value.
+- The window kept in step: its own right arrow after it took the pan to 69.78 µm, two steps.
+- `MoveInDirection(8)` (eCenter) put the pan at 0, at the zoom it had.
+
+So the call does what the pan pad does, from outside the window. It is not built into the driver (Thom, 3 November
+2026); the pan stays on the window's arrows. Whether the beam follows, and whether it is safe on the STELLARIS, are
+questions for Leica.
