@@ -1917,3 +1917,74 @@ The wrapper's version is checked before anything is touched; another version is 
 The check of section 116 switched on every state-tree write of a build at once. Now `transfer.CHECKED_WRITES` lists,
 for each LAS X build, the writes checked on it, each against its control in the window: on 4.9.0.30051 (the simulator)
 all 93. On a new build none is made until it is checked and added by itself; one not listed is refused and named.
+
+## 120. STELLARIS, first run (3 and 4 November 2026)
+
+The plain Navigator driver on the real STELLARIS 8 (DMI8, serial 8400000246), LAS X **4.9.2.31016**, with the HC PL
+APO CS2 10x/0.40 DRY in slot 1 and no sample of interest under it. Thom at the microscope; one change at a time, each
+read back, left standing until seen in LAS X's window, then put back to the value read before. LAS X's dialogs were
+left to the operator for the whole session: the driver pressed nothing in LAS X (none appeared).
+
+**Limits** (setup step 2, `limits\2026-11-03T22-43-36-140983Z`): stage x 13575 to 113934 um and y 9096 to 73047 um
+(the four corners); z-wide 5520 to 6520 um (the focus at 6019.7 um, 500 um each way); z-galvo -250 to 250 um; at most
+5000 um per stage move in x and y, 100 um on z-wide, 50 um on z-galvo; laser lines at most 10 %; detector gain at most
+50; laser output power at most 85 %.
+
+**Read only, against the window.** Zoom 20, format 1024 x 1024, 600 Hz, unidirectional, Phase X 21.81, rotation 0.35,
+no averaging, pinhole 1.00 AU (53.05 um) at 580 nm, 8 bit, xyz, no z-stack, one setting, line sequential; image 58.13
+um, pixel 56.82 nm; the stage and both z drives. All as the window showed. Laser 405 and the white-light laser (497 nm)
+at 2 %, both shutters open, output 85 %; HyD S 2 (430 to 489 nm, ALEXA 405) and HyD S 3 (502 to 800 nm, ALEXA 488),
+both in Counting at gain 2.5. Read with the procedures' readers; `Microscope` has no method for them.
+
+**Commands, each seen in the window.** Zoom 20 to 25; scan speed 600 to 400 and back (the window followed within a
+second); the 405 line 2 to 1 % and back (the window followed after about 5 s); the stage 500 um, 500 um and 1000 um in
+x, landing to the nanometre (the Navigator's readout followed with a delay); Format, Line and Frame Average and
+Accumulation, Rotation, Pinhole in AU; the z-stack's ends, Z Size, Number of Steps, Re-Center, the optical section's
+step, Begin and End here; Move to Begin, End and Center (10 um each way on z-wide, landing within 4 nm).
+
+**State-tree writes checked on 4.9.2.31016: 82 of 93**, listed in `transfer.CHECKED_WRITES`: the scan (bidirectional,
+Phase X, bit depth, pinhole unit, sequential mode, emission wavelength), the z-stack's step mode, the autofocus's
+settings, Fast Live and Auto Sync (both scanners), the time series, the xt line scan and the autofocus's when, the
+setting's name, the spectra shown, ROI scan and the bleach mode with their stack sections, a detector's dye, TauContrast
+and operating mode, the AOBS's Reflection, the laser's output power and Excitation Control, Lambda After Stage, the
+coverslip offset, the MFP's Autoselect, the notch filters' Auto Select, the polarizer, Z-compensation and Set Focus.
+
+Not checked, and why:
+
+| Write | Why |
+|---|---|
+| `IsDoubleModeEnabled` | refused before sending: this AOBS has no Enhanced Dynamics |
+| `CurrentMultiFunctionPortPos` | this STELLARIS has no MFP wheel (the hardware lists none) |
+| `MotCorrRefPos`, `AutomationBegin`, `AutomationEnd`, `AutomationSteps` | the 10x has no collar; to check with the 40x water |
+| `IsAutoSyncActive` | Auto Sync is on; off copies the current setting into the Best Focus Setting, which cannot be put back |
+| `BleachPointLaserPower`, `CurrentBleachPoint` | need bleach points drawn |
+| `TimegateReferenceLineIndex` | needs TauGating with a pulsed line |
+| `AutofocusLaserPower` | not tried: with Auto Sync on, the Best Focus Setting's light is the current setting's |
+
+**Acquisition**, saved as OME-Zarr under the output root's `.staging` (a standalone `save()` stays there; the move
+into a run comes with the ZMART Controller's `output_folder`): one capture (6.6 s, 1 x 2 x 1 x 1024 x 1024, uint8,
+the image's centre at the stage position); a z-stack of 5 planes on z-wide (13.7 s, z step 2.0012 um, the stack's
+begin as the z origin, with its projection); a time series of 3 frames at the shortest interval (7.8 s); a tile scan
+of 2 fields 63.9 um apart (8.2 s, one store per field, the stage back on the first field). No signal (no sample).
+
+**What differed or failed:**
+
+- **A setting saved writes no file on 4.9.2.** The driver sends `ATL_Block_Save_To_XML` with `Attribute="2"`; LCS
+  answers without an error and writes nothing (E: and C:, with and without a dot folder). LAS X's own window sends
+  `Attribute="11" Origin="LMSApplication"`, which writes the file. So the pan cannot be read: a lower zoom, `pan()`, the
+  pan's steps, `move_pan`, `set_pan` and `zoom_in` fail, and `save_setting` too (`load_setting` probably as well).
+  The pan read from the window's file was 0, 0.
+- `settings()["collar"]["motorised"]` says True with the 10x dry: it comes from `Microscope/CanDoMotCorr` (the stand),
+  not from the objective.
+- `pan()` saves a setting file although it only reads.
+- `get_detector_modes` gives the operating and tau modes as numbers only (1 is Counting).
+- Line Average and Line Accumulation, Frame Average and Frame Accumulation, and the autofocus's precision and fixed
+  number of steps exclude each other: setting one puts the other back, and the driver reports each change as
+  confirmed without saying so.
+- `set_z_stack` with a step switches the step mode to Z-Step Size, whatever was chosen.
+- "Acquire Until Stopped" sets the frames to 2000 and switching it off keeps them.
+- Switching a Z-compensation mode on adds a support point by itself; a support point lists the collar as
+  -214748364.8 when the objective has none.
+- `clear_z_stack()` raises when no stack is set, where the window's bin does nothing.
+- The stage moves with `SetStagePositionInHwOnly` and no speed: noticeably faster than the window's moves. To check
+  before working with immersion.
