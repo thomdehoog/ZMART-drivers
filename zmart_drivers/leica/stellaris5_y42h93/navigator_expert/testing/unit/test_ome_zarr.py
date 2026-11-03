@@ -472,7 +472,10 @@ class TestTheOmeTiffPosition:
         labels = [c["label"] for c in attributes(store)["ome"]["omero"]["channels"]]
         assert [c.name for c in ome.images[0].pixels.channels] == labels
         [note] = [a for a in ome.structured_annotations.map_annotations if a.namespace == "zmart/position"]
-        assert {m.k: m.value for m in note.value.ms}["position_origin"] == "corner"
+        said = {m.k: m.value for m in note.value.ms}
+        assert said["position_origin"] == "corner"
+        # Each channel opens with the colour and brightness window the store says.
+        assert json.loads(said["omero"]) == attributes(store)["ome"]["omero"]
         # The drives each plane was taken at still stand beside it, as in LAS X's planes.
         drives = {m.k for a in ome.structured_annotations.map_annotations
                   if a.id == planes[0].annotation_refs[0].id for m in a.value.ms}

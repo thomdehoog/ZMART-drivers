@@ -48,7 +48,7 @@ from . import materialize
 from . import ome_canonical as canonical
 from .product import AcquisitionMetadata, ExportedAcquisition, PlaneIndex
 
-__all__ = ["Capture", "gather", "max_projection", "write_position_store", "write_store"]
+__all__ = ["Capture", "gather", "max_projection", "omero_of", "write_position_store", "write_store"]
 
 log = logging.getLogger(__name__)
 
@@ -212,7 +212,6 @@ def write_store(capture: Capture, store: Path, *, state: dict | None = None) -> 
         raise RuntimeError(f"{store} already exists; a capture is never written over another")
     volume, metadata = capture.volume, capture.metadata
     ny, nx = volume.shape[-2:]
-    names = [channel.name or f"channel {channel.index}" for channel in metadata.channels]
 
     writing = store.with_name(f".{store.name}.{uuid.uuid4().hex[:8]}.writing")
     store.parent.mkdir(parents=True, exist_ok=True)
@@ -244,27 +243,35 @@ def write_store(capture: Capture, store: Path, *, state: dict | None = None) -> 
     if not np.array_equal(group["0"][...], volume):
         shutil.rmtree(writing, ignore_errors=True)
         raise RuntimeError(f"{store.name}: the pixels read back from disk are not those written; not saved")
-    deepest = (1 << (metadata.significant_bits or volume.dtype.itemsize * 8)) - 1
     # The models write an absent value as null (a channel axis's unit, a
     # multiscale's metadata); a browser viewer refuses "unit": null, so what
     # is absent is left out, as the specification has it.
     ome = _without_empty(dict(group.attrs["ome"]))
-    ome["omero"] = {
-        "channels": [
-            {
-                "label": name,
-                "color": _hex(channel.color) if channel.color is not None else "FFFFFF",
-                "window": _window(volume[:, index], deepest),
-                "active": True,
-            }
-            for index, (name, channel) in enumerate(zip(names, metadata.channels, strict=True))
-        ]
-    }
+    ome["omero"] = omero_of(capture)
     group.attrs["ome"] = ome
     (writing / "OME").mkdir()
     (writing / "OME" / "METADATA.ome.xml").write_bytes(canonical.image_xml(metadata, image_name=store.name, state=state))
     _rename_when_free(writing, store)
     return store
+
+
+def omero_of(capture: Capture) -> dict:
+    """Each channel's name and colour, as LAS X described them, and a display window
+    measured from its pixels: OME-Zarr's ``omero`` block, also kept in an OME-TIFF's
+    ZMART note, so either opens looking the same."""
+    volume, metadata = capture.volume, capture.metadata
+    deepest = (1 << (metadata.significant_bits or volume.dtype.itemsize * 8)) - 1
+    return {
+        "channels": [
+            {
+                "label": channel.name or f"channel {channel.index}",
+                "color": _hex(channel.color) if channel.color is not None else "FFFFFF",
+                "window": _window(volume[:, index], deepest),
+                "active": True,
+            }
+            for index, channel in enumerate(metadata.channels)
+        ]
+    }
 
 
 def _rename_when_free(writing: Path, store: Path, *, wait_s: float = RENAME_WAIT_S) -> None:

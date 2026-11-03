@@ -16,9 +16,11 @@ differences from the description LAS X's planes carry:
   pixel), not its middle, the convention every ZMART position uses, so the
   file lies where an OME-Zarr store of the same capture would;
 - ZMART's note, a map annotation with the namespace ``zmart/position``, says
-  so (``position_origin`` = ``corner``). The ZMART interface and viewer read
-  that note to know they can use the file as a position as it is. Other
-  programs skip it.
+  so (``position_origin`` = ``corner``), and keeps each channel's colour and
+  the brightness window it first opens with (``omero``, as the OME-Zarr store
+  says it), for which OME-XML has no place. The ZMART interface and viewer
+  read that note to use the file as a position as it is. Other programs skip
+  it.
 
 Only the full-resolution level is written, as for the OME-Zarr store: the
 viewer builds the zoomed-out copies itself. The pixels are packed with
@@ -31,6 +33,7 @@ nothing or the finished file.
 
 from __future__ import annotations
 
+import json
 import uuid
 import xml.etree.ElementTree as ET
 from dataclasses import replace
@@ -40,7 +43,7 @@ import numpy as np
 
 from ..configuration.image_stage_registration import Orientation
 from . import ome_canonical as canonical
-from .ome_zarr import PIECE, Capture, Placement, _rename_when_free, gather
+from .ome_zarr import PIECE, Capture, Placement, _rename_when_free, gather, omero_of
 from .product import ExportedAcquisition
 
 __all__ = ["ZMART_NOTE", "write_position_tiff", "write_tiff"]
@@ -136,7 +139,12 @@ def _described(capture: Capture, *, image_name: str, state: dict | None) -> byte
         annotations = ET.SubElement(root, canonical._tag("StructuredAnnotations"))
     note = ET.SubElement(annotations, canonical._tag("MapAnnotation"), {"ID": note_id, "Namespace": ZMART_NOTE})
     value = ET.SubElement(note, canonical._tag("Value"))
-    for key, text in (("position_origin", "corner"), ("pyramid", "mean")):
+    entries = (
+        ("position_origin", "corner"),
+        ("pyramid", "mean"),
+        ("omero", json.dumps(omero_of(capture), sort_keys=True)),
+    )
+    for key, text in entries:
         ET.SubElement(value, canonical._tag("M"), {"K": key}).text = text
     text = ET.tostring(root, encoding="unicode")
     return b"<?xml version='1.0' encoding='utf-8'?>\n" + text.encode("ascii", "xmlcharrefreplace")
