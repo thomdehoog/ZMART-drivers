@@ -1122,3 +1122,17 @@ page interval (`DelayTime`) as plain ones; LCS works out `Pages` (4000 lines, 50
 Built: `set_line_scan(lines=, max_lines_per_page=, lines_per_page=, page_interval_s=)`, only in xt, lines per page refused with MAX
 on. Through the driver: 3000 lines, 600 a page (5 pages), 4 s; back to 2048000 lines, MAX, 20.48 s; the scan mode back to xyz.
 
+## 68. Stacks, the X1 port and the MFP; what the simulator does not have (3 November 2026)
+
+In xyzt the t panel's "Stacks" is the time series' frames: `set_time_series(frames=3)` showed 3 there. The X1 port is filter wheel
+140 (---, Substrate, Mirror); `set_filter_wheel(140, "Substrate")` and back confirmed. The MFP (180: ---, Substrate, SD 470, DD
+470/640) had been refused by the driver as one of LAS X's own wheels, but the window offers it: its Autoselect box writes
+`HWParameter/IsMultiFunctionPortAutoSelectionEnabled`, and with it off its list writes `HWParameter/CurrentMultiFunctionPortPos`
+(no command). Built: `set_mfp_auto_select(on)`, and `set_filter_wheel(180, name)` with Autoselect off (refused with it on), written
+as the window does. Through the driver: DD 470/640, Substrate, Autoselect on again, a choice then refused.
+
+Not found on the simulator, so not learned: Z Flow and Dynamic Signal Enhancement (not among the window's controls with z-galvo
+in xyzt), the Fluo Turret (its list greyed out), Environmental Control (no such node in LCS), and Triggering (LCS lists 3 inputs
+and 5 outputs and `Confocal/TriggerConfiguration`, but the plain Navigator shows no triggering window; the help says it needs the
+Sequencer Advanced board, set in the Project Settings).
+

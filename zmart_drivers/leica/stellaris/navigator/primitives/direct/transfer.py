@@ -431,6 +431,10 @@ STATE_TREE_WRITES = {
     "ReflectionOffset": TreeWrite(("Acquire", "AutoFocusInfo", "ReflectionOffset"), float, within=(-0.005, 0.005)),
     # The Fluorifier disc: the notch filters chosen with the laser (Auto Select), and its left wheel turned as a
     # polarizer (in degrees, within LCS's range beside it) instead of holding a notch filter (simulator, 2026-11-03).
+    # The multi-function port (MFP) chosen with the setting (Autoselect), as the beam path's box writes it (simulator, 2026-11-03).
+    # The MFP's position, by its place in LCS's list, as the window's MFP list writes it with Autoselect off.
+    "CurrentMultiFunctionPortPos": TreeWrite(("Confocal", "HWParameter", "CurrentMultiFunctionPortPos"), within=(0, 32)),
+    "IsMultiFunctionPortAutoSelectionEnabled": TreeWrite(("Confocal", "HWParameter", "IsMultiFunctionPortAutoSelectionEnabled"), bool),
     "IsNotchFilterAutoSelectionEnabled": TreeWrite(("Confocal", "HWParameter", "IsNotchFilterAutoSelectionEnabled"), bool),
     "IsSpectrumTurnMode": TreeWrite(("Confocal", "HWParameter", "FilterWheelList", "PolarizationFW", "IsSpectrumTurnMode"), bool),
     "FilterSpectrumPos": TreeWrite(("Confocal", "HWParameter", "FilterWheelList", "PolarizationFW", "FilterSpectrumPos"), float,

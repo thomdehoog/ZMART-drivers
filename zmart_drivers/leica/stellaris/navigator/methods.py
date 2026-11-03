@@ -712,6 +712,14 @@ class Microscope:
         checked(self.handle, result, "set_lambda_scan()")
         return result["lambda_scan"]
 
+    def set_mfp_auto_select(self, on: bool) -> bool:
+        """The multi-function port (MFP) following the setting (Autoselect) on or off, as LAS X's beam path; off, choose
+        its position with :meth:`set_filter_wheel` (wheel 180). Answers it as LAS X holds it."""
+        self.handle.require_open()
+        result = changes.set_mfp_auto_select(self.handle.client, on)
+        checked(self.handle, result, f"set_mfp_auto_select({on!r})")
+        return result["mfp_auto_select"]
+
     def set_notch_auto_select(self, on: bool) -> dict:
         """The notch filters chosen with the laser lines (Auto Select) on or off, as LAS X's Fluorifier Disc Settings;
         off, choose them with :meth:`set_filter_wheel` (wheels 130 and 131). Answers ``auto_select`` and ``polarizer_deg``."""

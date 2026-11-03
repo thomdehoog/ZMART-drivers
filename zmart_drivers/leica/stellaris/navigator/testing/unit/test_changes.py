@@ -1070,6 +1070,32 @@ class TestFastLive:
         assert changes.set_fast_live(client, "galvo", format=256)["success"] is False
 
 
+class TestMfpPosition:
+    def test_with_autoselect_off_the_mfp_is_set_as_its_list_does(self, lasx, client):
+        changes.set_mfp_auto_select(client, False)
+        names = next(w for w in direct_reader.get_filter_wheels() if w["type"] == 180)["filterNames"]
+        target = next(n for n in names if n.strip() and n.strip() != "---" and names.index(n) != 1)
+
+        result = changes.set_filter_wheel(client, 180, target)
+
+        assert result["confirmed"] is True
+        assert next(w for w in direct_reader.get_filter_wheels() if w["type"] == 180)["filterName"] == target
+
+    def test_with_autoselect_on_the_mfp_is_refused(self, lasx, client):
+        names = next(w for w in direct_reader.get_filter_wheels() if w["type"] == 180)["filterNames"]
+
+        assert changes.set_filter_wheel(client, 180, names[0])["success"] is False
+
+
+class TestMfpAutoSelect:
+    def test_the_mfp_s_autoselect_is_switched(self, lasx, client):
+        assert changes.set_mfp_auto_select(client, False)["mfp_auto_select"] is False
+        assert changes.set_mfp_auto_select(client, True)["mfp_auto_select"] is True
+
+    def test_not_a_switch_is_refused(self, lasx, client):
+        assert changes.set_mfp_auto_select(client, "on")["success"] is False
+
+
 class TestFluorifierDisc:
     def test_the_notch_auto_select_is_switched(self, lasx, client):
         assert changes.set_notch_auto_select(client, False)["fluorifier"]["auto_select"] is False

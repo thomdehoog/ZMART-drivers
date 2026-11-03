@@ -92,6 +92,9 @@ The simulator cannot show these; each needs one careful run on the real microsco
 - The Laser Overview's power switch (a laser on or off) and its Options: Thom to decide, as switching a laser
   is hard to undo on the STELLARIS. Online Dye Separation: needs a separation matrix from the Process tab.
 
+- Not on the simulator, so not learned: Z Flow, Dynamic Signal Enhancement, the Fluo Turret, Environmental Control
+  (no incubator), and Triggering (needs the Sequencer Advanced board, set in the Project Settings).
+
 ## Decided not to do
 
 - Removing a laser line in another setting than the first: the window allowed it only in Setting 1

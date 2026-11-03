@@ -206,6 +206,11 @@ def get_autofocus_settings(client, **keywords):
     return _routed("autofocus_settings", client, **keywords)
 
 
+def get_mfp_auto_select(client, **keywords):
+    """Whether the multi-function port (MFP) follows the setting (Autoselect)."""
+    return _routed("mfp_auto_select", client, **keywords)
+
+
 def get_fluorifier(client, **keywords):
     """The Fluorifier disc: ``auto_select`` and ``polarizer_deg`` (None when the left wheel holds a notch filter)."""
     return _routed("fluorifier", client, **keywords)

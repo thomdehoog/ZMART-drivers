@@ -458,6 +458,7 @@ MUTATING_COMMANDS = {
     "set_coverslip_offset": "set_coverslip_offset",
     # the Fluorifier disc: which light reaches the detectors, not the light
     "set_notch_auto_select": "set_notch_auto_select",
+    "set_mfp_auto_select": "set_mfp_auto_select",
     "set_polarizer": "set_polarizer",
     # a whole setting as a file: saving changes nothing; a file's values are checked before it is loaded
     "save_setting": "save_setting",

@@ -66,6 +66,7 @@ discovery session in `SCOPE_RUN_2026-11-01_NAVIGATOR_DISCOVERY.md` and the build
 | The Λ (excitation) scan: begin, end, step, Automatic SP Movement, method, minimal gap, Lambda After Stage; the Λλ scan's side and maximal distance | Works, with LAS X's commands (Lambda After Stage written into the state tree); within the white-light laser's range |
 | The z drive on its own (z-galvo or z-wide), and with z-galvo the xz scan modes (xzy, xzt, xzλ ...) | Works, with LAS X's commands |
 | A value given to every setting (the "apply to all settings" boxes beside line and frame averaging and accumulation, and the pinhole) | Works, with LAS X's commands |
+| The X1 port and the MFP: the X1 port with `set_filter_wheel(140, ...)`; the MFP's Autoselect, and with it off the MFP with `set_filter_wheel(180, ...)` | Works: the X1 port with LAS X's command; the MFP written into LAS X's state tree, as its list does |
 | The Fluorifier disc: notch filters by hand or with the laser (Auto Select), and the polarizer's angle | Works: the filters with `set_filter_wheel` (wheels 130, 131); Auto Select and the polarizer written into LAS X's state tree, as its window does |
 | The white-light laser's own output power (the Laser Overview's slider) | Works: written into LAS X's state tree, as the window does; within the limits (`set_laser_output_power`, by default up to 85 %) |
 | Fast Live, started and stopped | Works, with LAS X's commands |
@@ -201,7 +202,7 @@ service and the person responsible for the instrument.
 
 | State | Settings |
 |---|---|
-| Works | 104 (the objective among them, not yet tried) |
+| Works | 105 (the objective among them, not yet tried) |
 | Tried | 0 |
 | Command known | 0 |
 | Not yet learned | 8 |

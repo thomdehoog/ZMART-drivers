@@ -44,6 +44,7 @@ SIMULATOR_SETTINGS = {
     ("Confocal", "ROIScan", "CanDoROIScan"): True,
     # The Fluorifier disc's notch filters chosen with the laser (simulator, 2026-11-03); its polarizer is on the wheel below.
     ("Confocal", "HWParameter", "IsNotchFilterAutoSelectionEnabled"): True,
+    ("Confocal", "HWParameter", "IsMultiFunctionPortAutoSelectionEnabled"): True,
     # The λ scan's detection (simulator, 2026-11-02).
     ("Confocal", "LambdaDefinition", "DetectionBegin"): 380.0,
     ("Confocal", "LambdaDefinition", "DetectionEnd"): 800.0,

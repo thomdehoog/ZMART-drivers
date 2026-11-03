@@ -1352,6 +1352,17 @@ def fluorifier_change(command: str, elements: list[str], description: str, shows
                  description=description, ready=idle(), confirm=Expect("fluorifier", lambda found: bool(found) and shows(found)))
 
 
+def mfp_auto_select(on: bool) -> Write:
+    """The multi-function port (MFP) following the setting (Autoselect) on or off, as the beam path's box; read back."""
+
+    def fill(request: Request) -> None:
+        request.elements = [f'<StateTree Command="IsMultiFunctionPortAutoSelectionEnabled" Value="{int(bool(on))}"/>']
+
+    return Write(command="set_mfp_auto_select", values={"value": bool(on)}, request="IsMultiFunctionPortAutoSelectionEnabled", fill=fill,
+                 description=f"MFP Autoselect -> {'on' if on else 'off'}", ready=idle(),
+                 confirm=Expect("mfp_auto_select", lambda shown: shown is bool(on)))
+
+
 def notch_auto_select(on: bool) -> Write:
     """The notch filters chosen with the laser lines (Auto Select) on or off, as the Fluorifier Disc Settings' box."""
     return fluorifier_change("set_notch_auto_select", [f'<StateTree Command="IsNotchFilterAutoSelectionEnabled" Value="{int(bool(on))}"/>'],
@@ -1797,6 +1808,18 @@ def resonant_scanner(on: bool) -> Write:
         ready=idle(),
         confirm=Expect("scan_speed", shows),
     )
+
+
+def multi_function_port(slot: int, filter_name: str) -> Write:
+    """The multi-function port (MFP) at *slot*, which holds *filter_name*, written into LCS's state tree as the window's MFP list
+    does (simulator, 2026-11-03); read back as that position."""
+
+    def fill(request: Request) -> None:
+        request.elements = [f'<StateTree Command="CurrentMultiFunctionPortPos" Value="{int(slot)}"/>']
+
+    return Write(command="set_filter_wheel", values={"value": filter_name}, request="CurrentMultiFunctionPortPos", fill=fill,
+                 description=f"MFP -> {filter_name}", ready=idle(),
+                 confirm=Expect("filter_wheels", lambda wheels: any(w.get("type") == 180 and w.get("filterIndex") == slot for w in wheels or [])))
 
 
 def filter_wheel(wheel_type: int, slot: int, filter_name: str) -> Write:

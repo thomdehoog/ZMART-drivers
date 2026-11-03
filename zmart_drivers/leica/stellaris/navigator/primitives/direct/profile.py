@@ -181,6 +181,7 @@ DATUMS = {
         DatumSpec("laser_output_power", direct_reader.get_laser_output_power, lambda v: isinstance(v, dict)),
         DatumSpec("coverslip_offset", direct_reader.get_coverslip_offset, lambda v: isinstance(v, float)),
         DatumSpec("fluorifier", direct_reader.get_fluorifier, lambda v: isinstance(v, dict) and "auto_select" in v),
+        DatumSpec("mfp_auto_select", direct_reader.get_mfp_auto_select, lambda v: isinstance(v, bool)),
         DatumSpec("autofocus_in_time_series", direct_reader.get_autofocus_in_time_series, lambda v: v in ("first", "every") or isinstance(v, int)),
         DatumSpec("autofocus_settings", direct_reader.get_autofocus_settings, lambda v: isinstance(v, dict) and "drive" in v),
         DatumSpec("autofocus_scan", direct_reader.get_autofocus_scan, lambda v: isinstance(v, dict) and "format" in v),

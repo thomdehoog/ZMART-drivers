@@ -614,7 +614,7 @@ def set_tau_channel_lifetime(client, detector, channel, ns, *, max_retries=None)
 
 
 #: LAS X's own wheels: the galvo and scanner switches (types 200, 160, 170 on the
-#: simulator) and the multi-function port. They are never turned by this driver.
+#: simulator). They are never turned by this driver.
 INTERNAL_WHEELS = (200, 160, 170)
 
 
@@ -622,20 +622,24 @@ def set_filter_wheel(client, wheel_type, filter_name, *, max_retries=None) -> di
     """Turn the filter wheel of type *wheel_type* to the filter named *filter_name*; read back.
 
     The filter is found by its name among the wheel's filters (LAS X's names,
-    trailing spaces ignored). LAS X's own galvo and scanner wheels and the
-    multi-function port are refused.
+    trailing spaces ignored). LAS X's own galvo and scanner wheels are refused.
+    The multi-function port (180) is set as the window's MFP list does, and
+    only with its Autoselect off (``set_mfp_auto_select(False)``).
     """
     from ..primitives.direct.reads import MULTI_FUNCTION_PORT
 
-    if wheel_type in INTERNAL_WHEELS or wheel_type == MULTI_FUNCTION_PORT:
+    if wheel_type in INTERNAL_WHEELS:
         return dispatch.refused(f"wheel {wheel_type} is one of LAS X's own scanner wheels, never turned by this driver")
+    if wheel_type == MULTI_FUNCTION_PORT and readers.get_mfp_auto_select(client):
+        return dispatch.refused("the MFP follows the setting (Autoselect); set_mfp_auto_select(False) first, as in the window")
     wheel = next((w for w in readers.get_filter_wheels(client) or [] if w.get("type") == wheel_type), None)
     if wheel is None:
         return dispatch.refused(f"there is no filter wheel of type {wheel_type}")
     names = [str(name).strip() for name in wheel.get("filterNames", [])]
     if str(filter_name).strip() not in names:
         return dispatch.refused(f"wheel {wheel_type} holds no filter named {filter_name!r}; it holds {names}")
-    change = writes.filter_wheel(wheel_type, names.index(str(filter_name).strip()), str(filter_name).strip())
+    slot, name = names.index(str(filter_name).strip()), str(filter_name).strip()
+    change = writes.multi_function_port(slot, name) if wheel_type == MULTI_FUNCTION_PORT else writes.filter_wheel(wheel_type, slot, name)
     return run(client, change, max_retries=max_retries)
 
 
@@ -839,6 +843,17 @@ def fluorifier_result(client, change, max_retries=None) -> dict:
     result = run(client, change, max_retries=max_retries)
     if result["success"]:
         result["fluorifier"] = readers.get_fluorifier(client)
+    return result
+
+
+def set_mfp_auto_select(client, on, *, max_retries=None) -> dict:
+    """The multi-function port (MFP) following the setting (Autoselect) on or off, as the beam path's box; off, choose it with
+    ``set_filter_wheel`` (wheel 180). The result's ``mfp_auto_select`` is read back."""
+    if not isinstance(on, bool):
+        return dispatch.refused(f"set_mfp_auto_select takes True or False, not {on!r}")
+    result = run(client, writes.mfp_auto_select(on), max_retries=max_retries)
+    if result["success"]:
+        result["mfp_auto_select"] = readers.get_mfp_auto_select(client)
     return result
 
 

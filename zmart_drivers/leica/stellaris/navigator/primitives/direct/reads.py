@@ -101,6 +101,7 @@ READS = (
     "laser_output_power",
     "coverslip_offset",
     "fluorifier",
+    "mfp_auto_select",
     "autofocus_optics",
     "pixel_size",
     "bit_depth",
@@ -1140,6 +1141,11 @@ def get_autofocus_optics() -> dict:
         return {"lines": lines}
 
     return read("the Best Focus Setting's optics", reading)
+
+
+def get_mfp_auto_select() -> bool:
+    """Whether the multi-function port (MFP) follows the setting (Autoselect; ``HWParameter/IsMultiFunctionPortAutoSelectionEnabled``)."""
+    return bool(settings("the MFP's Autoselect", {"on": ("Confocal", "HWParameter", "IsMultiFunctionPortAutoSelectionEnabled")})["on"])
 
 
 def get_fluorifier() -> dict:
