@@ -1616,3 +1616,14 @@ the COM scanner on the simulator), `pan_step(route)` (the window's step from LCS
 driver's. Through the driver on the simulator, by the window's pad: up twice to 69.78 µm, down-right, left nine times
 stopped at -193.85 µm and said so, the middle button centred the pan; measured by the window and by the scanner alike:
 0.007750 and 0.6667, matching the code, the pan centred and the zoom back at 1.
+
+## 101. The COM scanner route allowed on the microscope (3 November 2026)
+
+Thom asked for the simulator-only check on the COM scanner route to go, to try it on the STELLARIS, if it is safe. It is
+the operation the window's pan pad does (on the simulator the window stayed in step with it, with nothing logged, no
+dialog and no state-tree value), LAS X keeps the pan inside its window whatever is asked, and the driver reaches only the
+steps, the centre and a step of 1 to 3 percent; the worst a broken run leaves is the arrows' step at 1 % instead of 3 %.
+So the check (and its `get_system` reading) went; kept: refused while LAS X scans, the first step checked against the
+formula (centring on a wrong one), LCS's step put back, every pan to the closest place in the window, read back after every
+move. What the simulator cannot show is that the real galvo answers the same; the first try on the STELLARIS is one step
+right, read back and compared with one press of the window's arrow, then centred.

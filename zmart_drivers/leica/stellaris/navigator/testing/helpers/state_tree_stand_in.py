@@ -113,9 +113,6 @@ SIMULATOR_SETTINGS = {
     ("Acquire", "AutoFocusInfo", "IsAutoSyncActive"): False,
     # The settings toolbar's apply-to-hardware switch: on, a change to a setting moves the hardware (simulator, 2026-11-03).
     ("Acquire", "IsHwConnectedMode"): True,
-    # Which system LCS runs: the simulator names itself so in two places (2026-11-03).
-    ("Acquire", "ActiveDataSource", "CurrentSerialNumber"): "STELLARIS SIMULATOR",
-    ("Confocal", "ServiceOnlyParameter", "HardwaretreeFileName"): "simulator.xlhw",
     **{
         ("Acquire", parent, name): value
         for parent, speed, zoom in (("AutoFocusSettingConfocalScanOptions", (100, 2600, 600), (0.75, 1.0)),

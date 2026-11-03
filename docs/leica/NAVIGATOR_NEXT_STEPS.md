@@ -76,8 +76,9 @@ checked by the driver either way (`transfer.CHECKED_COMMANDS`, `transfer.STATE_T
 - `measure_pan_window()` on the STELLARIS (by the window's pad): its largest pan and field fraction against the code's; the
   field fraction on a sample with pictures; the resonant scanner's window.
 - The pan's window on the STELLARIS: that LAS X clips there too, at the largest pan times `1 - smallest zoom / zoom`
-  (0.00775 on the simulator, a number in the code). The COM scanner route stays on the simulator until Thom allows it on the
-  STELLARIS (section 99).
+  (0.00775 on the simulator, a number in the code). The COM scanner route, allowed on the microscope (Thom, 3 November
+  2026): first one step right, read back, compared with one press of the window's arrow, centred; then
+  `measure_pan_window(route="scanner")` (section 101).
 - Drawn regions across an objective change (after the pair's calibration): whether LAS X keeps a region's size in
   micrometres, and how far it lands from its place on the sample; the driver refuses the change while regions are drawn
   until this is measured (section 96).

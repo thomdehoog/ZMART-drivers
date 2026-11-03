@@ -263,11 +263,6 @@ def get_lambda_scan(client, **keywords):
     return _routed("lambda_scan", client, **keywords)
 
 
-def get_system(client, **keywords):
-    """Which system LCS runs: ``serial``, ``hardware_tree`` and ``simulator``."""
-    return _routed("system", client, **keywords)
-
-
 def get_apply_to_hardware(client, **keywords):
     """Whether a change to a setting moves the hardware (the settings toolbar's apply-to-hardware switch)."""
     return _routed("apply_to_hardware", client, **keywords)

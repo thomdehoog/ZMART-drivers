@@ -162,11 +162,11 @@ class ScannerRefused(RuntimeError):
 
 
 class ScannerPad:
-    """The pan's steps through LCS's older COM scanner instead of the window's arrows: for the simulator only.
+    """The pan's steps through LCS's older COM scanner instead of the window's arrows.
 
     Each step is *percent* (1 to 3, 1 by default) of the field shown
-    (:mod:`..primitives.direct.scanner`); the window's arrows take 3 %. Refused unless LCS names the system the
-    simulator, and while LAS X scans. The step LCS had is put back by
+    (:mod:`..primitives.direct.scanner`); the window's arrows take 3 %.
+    Refused while LAS X scans. The step LCS had is put back by
     :meth:`close`, which :func:`move` and :func:`center_by_scanner` call
     whatever happens. :func:`move` checks the first step against the formula.
     """
@@ -174,12 +174,6 @@ class ScannerPad:
     checks_first_step = True
 
     def __init__(self, client, *, percent: int = 1, steps=None):
-        system = readers.get_system(client)
-        if not system["simulator"]:
-            raise ScannerRefused(
-                f"the pan through LCS's COM scanner is for the simulator only; LCS runs {system['serial']!r} "
-                f"({system['hardware_tree']}); nothing was sent"
-            )
         status = readers.get_scan_status(client)
         if status != "eScanIdle":
             raise ScannerRefused(f"LAS X is scanning ({status}); the pan is not stepped now; nothing was sent")

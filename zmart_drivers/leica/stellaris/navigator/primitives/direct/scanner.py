@@ -1,4 +1,4 @@
-"""LCS's older COM scanner, opened only as far as the pan's steps: for the simulator only.
+"""LCS's older COM scanner, opened only as far as the pan's steps.
 
 LCS, LAS X's hardware server, has beside its commands (``SendCommand2``) an
 older COM automation interface, listed in its registered type library. Its
@@ -14,9 +14,9 @@ The same object also sets the scan speed, the zoom and the scan size and
 starts scans, outside the driver's limits, and a wrong value there can harm
 the scanner. So this module keeps the object inside closures and offers only
 the pad's eight directions, the centre, and a step of 1 to 3 percent (and
-putting back the step it had). Thom de Hoog allowed it on the simulator only
-(3 November 2026); the procedure that uses it checks that first
-(``procedures/pan.py``).
+putting back the step it had). LAS X keeps the pan inside its window
+whatever is asked (``procedures/pan.py``). Thom de Hoog allowed it on the
+simulator first and then on the microscope (3 November 2026).
 
 Author: Thom de Hoog, Center for Microscopy and Image Analysis (ZMB),
 University of Zurich (thom.dehoog@zmb.uzh.ch, thomdehoog@gmail.com).

@@ -701,8 +701,8 @@ class Microscope:
         would move them across the sample.
 
         *route* ``"scanner"`` steps the pan through LCS's older COM scanner
-        instead, 1 % of the field a step, with no window (for the simulator
-        only; refused elsewhere and while LAS X scans; the first step is
+        instead, 1 % of the field a step, with no window (refused while LAS X
+        scans; the first step is
         checked against the formula, and on a wrong one the pan is centred).
         """
         self.handle.require_open()
@@ -731,8 +731,8 @@ class Microscope:
         ``"down"``, ``"down-left"``, ``"left"``, ``"up-left"`` or ``"centre"``.
         With *route* ``"window"`` the buttons of LAS X's pan pad are pressed
         (UI Automation, no mouse), each a step of LCS's 3 % of the field shown.
-        With ``"scanner"`` the step goes through LCS's older COM scanner (for
-        the simulator only), *percent* 1, 2 or 3 of the field shown, LCS's own
+        With ``"scanner"`` the step goes through LCS's older COM scanner,
+        *percent* 1, 2 or 3 of the field shown, LCS's own
         step put back afterwards. A pan that would end beyond LAS X's window
         stops at its edge, and the result's ``clipped`` says how far over it
         was; the first step is checked against the formula, and on a wrong
@@ -830,8 +830,7 @@ class Microscope:
         """The pad's step: ``percent`` of the field shown, and ``um``, how far one press moves the pan at the zoom now.
 
         *route* ``"window"`` reads the window's arrows' step from LCS's state
-        tree; ``"scanner"`` the step LCS's COM scanner holds (for the
-        simulator only, as :meth:`step_pan`).
+        tree; ``"scanner"`` the step LCS's COM scanner holds.
         """
         self.handle.require_open()
         if route == "window":
@@ -847,7 +846,7 @@ class Microscope:
 
         Refused while bleach points or ROI regions are drawn, as :meth:`move_pan`.
         *route* ``"scanner"`` centres it with LCS's COM scanner instead, the
-        zoom untouched (for the simulator only, as for :meth:`move_pan`).
+        zoom untouched.
         """
         self.handle.require_open()
         refuse_with_drawings(self.handle, "the pan", "center_pan")
@@ -1375,7 +1374,7 @@ class Microscope:
 
 
 def pan_route(handle, route: str, what: str):
-    """The pad that moves the pan: None for the window's arrows, a scanner pad for ``"scanner"`` (simulator only)."""
+    """The pad that moves the pan: None for the window's arrows, a scanner pad for ``"scanner"``."""
     if route == "window":
         return None
     if route != "scanner":

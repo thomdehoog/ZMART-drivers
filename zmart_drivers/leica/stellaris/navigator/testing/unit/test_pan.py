@@ -230,13 +230,13 @@ def test_through_the_scanner_the_pan_is_centred_without_a_zoom_change(lasx, clie
     assert not [e for e in lasx.sent if 'Command="SetZoom"' in e] and steps.value == 3
 
 
-def test_the_scanner_is_refused_on_anything_but_the_simulator(lasx, client):
+def test_the_scanner_steps_on_a_microscope_too(lasx, client, tmp_path):
     lasx.live[("Acquire", "ActiveDataSource", "CurrentSerialNumber")] = "STELLARIS 8 y42h93"
     steps = Steps(lasx)
 
-    with pytest.raises(pan.ScannerRefused, match="simulator only"):
-        pan.ScannerPad(client, steps=steps)
-    assert steps.taken == [] and steps.value == 3
+    result = pan.step(client, tmp_path, "right", 1, pan.ScannerPad(client, percent=3, steps=steps))
+
+    assert result["confirmed"] is True and steps.value == 3
 
 
 def test_the_scanner_is_refused_while_las_x_scans(lasx, client):

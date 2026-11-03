@@ -100,7 +100,6 @@ READS = (
     "locked_laser_lines",
     "lasers",
     "apply_to_hardware",
-    "system",
     "lambda_scan",
     "excitation_scan",
     "laser_output_power",
@@ -1372,19 +1371,6 @@ def get_lambda_scan() -> dict:
         ("begin_nm", "DetectionBegin"), ("end_nm", "DetectionEnd"), ("step_nm", "DetectionStepSize"),
         ("bandwidth_nm", "DetectionBandWidth"))})
     return {k: float(v) for k, v in found.items()}
-
-
-def get_system() -> dict:
-    """Which system LCS runs: its ``serial`` and ``hardware_tree`` file, and ``simulator``, True when both name the
-    simulator (``Acquire/ActiveDataSource/CurrentSerialNumber`` "STELLARIS SIMULATOR",
-    ``Confocal/ServiceOnlyParameter/HardwaretreeFileName`` "simulator.xlhw"; 2026-11-03)."""
-    found = settings("the system", {
-        "serial": ("Acquire", "ActiveDataSource", "CurrentSerialNumber"),
-        "tree": ("Confocal", "ServiceOnlyParameter", "HardwaretreeFileName"),
-    })
-    serial, tree = str(found["serial"] or ""), str(found["tree"] or "")
-    return {"serial": serial, "hardware_tree": tree,
-            "simulator": "SIMULATOR" in serial.upper() and tree.lower() == "simulator.xlhw"}
 
 
 def get_apply_to_hardware() -> bool:
