@@ -600,6 +600,39 @@ class Microscope:
         result = changes.set_autofocus_optics(self.handle.client, laser_nm, percent, detector, band, dye)
         return checked(self.handle, result, f"set_autofocus_optics({laser_nm!r}, {percent!r}, {detector!r})")
 
+    def draw_bleach_point(self, x_px: int, y_px: int) -> dict:
+        """Draw a bleach point at the pixel (*x_px*, *y_px*) of the picture LAS X's viewer shows, as Draw point does.
+
+        LAS X keeps a bleach point outside its hardware server, so the driver
+        draws it with the mouse, in LAS X's viewer: it first finds the pixel by
+        the viewer's own read-out of where the pointer is, and clicks only when
+        that shows the pixel, within half a pixel. Pixels count from the
+        picture's top-left corner, x to the right, y down. The bleach mode must
+        be on (:meth:`set_bleach_mode`); the point takes the setting's lines,
+        whose power :meth:`set_bleach_laser_power` changes. Nobody else should
+        use the mouse meanwhile. Read back from LAS X.
+        """
+        self.handle.require_open()
+        result = changes.draw_bleach_point(self.handle.client, x_px, y_px)
+        return checked(self.handle, result, f"draw_bleach_point({x_px!r}, {y_px!r})")
+
+    def draw_roi_region(self, shape: str, corner: tuple[int, int], opposite: tuple[int, int]) -> dict:
+        """Draw an ROI region, a ``"rectangle"`` or an ``"ellipse"`` in the box from pixel *corner* to pixel *opposite*.
+
+        As LAS X's Draw rectangle and Draw ellipse with a drag, in its viewer,
+        each corner found as for :meth:`draw_bleach_point`. ROI scan must be on
+        (:meth:`set_roi_scan`). LAS X shows no count of the regions, so the
+        result says only that there are some.
+        """
+        self.handle.require_open()
+        result = changes.draw_roi_region(self.handle.client, shape, corner, opposite)
+        return checked(self.handle, result, f"draw_roi_region({shape!r}, {corner!r}, {opposite!r})")
+
+    def clear_drawings(self) -> dict:
+        """Clear every bleach point and ROI region drawn in LAS X's viewer, as its Select all ROIs and Clear selected ROIs do."""
+        self.handle.require_open()
+        return checked(self.handle, changes.clear_drawings(self.handle.client), "clear_drawings()")
+
     def set_bleach_laser_power(self, laser_nm: float, percent: float) -> dict:
         """Change the power of the bleach point's line at *laser_nm*, as the Bleach Point panel's Intensity does; read back.
 

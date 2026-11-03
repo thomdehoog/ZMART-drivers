@@ -51,9 +51,9 @@ checked by the driver either way (`transfer.CHECKED_COMMANDS`, `transfer.STATE_T
   data container (`Confocal/ROIScan/CurrentDCROISetID`), not in LCS. The laser lines per region (ROI Configuration):
   its window lists no region on the simulator (section 89), so they are learned on the STELLARIS.
   A bleach point is drawn with Draw point and one click in the image; LCS gets nothing, and its place and bleaching
-  time stay in LAS X's data container (section 88). Its laser power is built (`set_bleach_laser_power`). Placing
-  points and regions would need the driver's mouse at positions in the image: Thom decides whether the driver should
-  draw. The Zoom In rectangle's result, a zoom and a pan, the driver sets with `change_setting("zoom", ...)` and
+  time stay in LAS X's data container (section 88). Its laser power is built (`set_bleach_laser_power`). Points and
+  rectangle and ellipse regions are drawn by the driver with the mouse (section 94); polygons, ranges and a point's
+  bleaching time are not yet. The Zoom In rectangle's result, a zoom and a pan, the driver sets with `change_setting("zoom", ...)` and
   `move_pan`.
 - Bleaching and FRAP (LCS has `SequentialBleachPointParameter`); the FRAP and FRET applications are LAS X's other
   wizards (section 86), outside the plain Acquire tab.

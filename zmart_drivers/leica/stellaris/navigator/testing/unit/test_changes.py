@@ -1161,6 +1161,73 @@ class TestBleachPointLaserPower:
         assert not any("BleachPointLaserPower" in each for each in lasx.sent)
 
 
+class TestDrawingInTheViewer:
+    """Bleach points and ROI regions drawn in LAS X's viewer: LCS is asked first whether the mode is on, and a point is
+    read back from LCS (CurrentBleachPoint goes to the new point; simulator, 2026-11-03)."""
+
+    def viewer(self, lasx):
+        from viewer_stand_in import Viewer
+
+        viewer = Viewer()
+
+        def drawn():
+            point = lasx.live[("Confocal", "ROIScan", "CurrentBleachPoint")]
+            lasx.live[("Confocal", "ROIScan", "CurrentBleachPoint")] = point + 1
+
+        viewer.on_click = drawn
+        return viewer
+
+    def test_a_bleach_point_is_drawn_and_read_back_from_lcs(self, lasx, client):
+        lasx.live[("Confocal", "ROIScan", "EnableBleachScan")] = True
+        viewer = self.viewer(lasx)
+
+        result = changes.draw_bleach_point(client, 256, 256, viewer=viewer)
+
+        assert result["confirmed"] is True and result["bleach_point"]["point"] == 0 and len(viewer.clicks) == 1
+
+    def test_without_the_bleach_mode_no_point_is_drawn(self, lasx, client):
+        viewer = self.viewer(lasx)
+
+        result = changes.draw_bleach_point(client, 256, 256, viewer=viewer)
+
+        assert result["success"] is False and "set_bleach_mode" in result["message"] and viewer.clicks == []
+
+    def test_a_pixel_outside_the_picture_is_refused(self, lasx, client):
+        lasx.live[("Confocal", "ROIScan", "EnableBleachScan")] = True
+
+        assert changes.draw_bleach_point(client, 600, 10, viewer=self.viewer(lasx))["success"] is False
+
+    def test_an_roi_region_is_drawn_with_roi_scan_on(self, lasx, client):
+        lasx.live[("Confocal", "ROIScan", "EnableRoiScan")] = True
+        viewer = self.viewer(lasx)
+
+        result = changes.draw_roi_region(client, "ellipse", (10, 10), (100, 80), viewer=viewer)
+
+        assert result["confirmed"] is True and len(viewer.drags) == 1
+
+    def test_without_roi_scan_no_region_is_drawn(self, lasx, client):
+        viewer = self.viewer(lasx)
+
+        result = changes.draw_roi_region(client, "rectangle", (10, 10), (100, 80), viewer=viewer)
+
+        assert result["success"] is False and "set_roi_scan" in result["message"] and viewer.drags == []
+
+    def test_clearing_takes_the_points_away_in_lcs_too(self, lasx, client):
+        lasx.live[("Confocal", "ROIScan", "CurrentBleachPoint")] = 1
+        viewer = self.viewer(lasx)
+        viewer.regions = True
+
+        def cleared(help_text, press=viewer.press):
+            press(help_text)
+            lasx.live[("Confocal", "ROIScan", "CurrentBleachPoint")] = -1
+
+        viewer.press = cleared
+
+        result = changes.clear_drawings(client, viewer=viewer)
+
+        assert result["confirmed"] is True and result["bleach_point"]["point"] is None
+
+
 def client_element(client):
     return client.reply["element"]
 

@@ -68,7 +68,10 @@ discovery session in `SCOPE_RUN_2026-11-01_NAVIGATOR_DISCOVERY.md` and the build
 | ROI scan on or off, and the sections of a stack it is limited to (ROI 3D) | Works: written into LAS X's state tree, as its button does; the regions themselves are drawn in LAS X's viewer |
 | The bleach mode on or off | Works: written into LAS X's state tree, as its button does; the bleach points are set in LAS X's window |
 | A drawn bleach point's laser power | Works: written into LAS X's state tree, as the Bleach Point panel's Intensity does; within the laser limits |
-| A bleach point's place and bleaching time | Not through LCS: LAS X keeps them in its data container; drawn and typed in its window |
+| A bleach point's place | Works: drawn with the mouse in LAS X's viewer (Draw point), the pixel found by the viewer's own read-out first; read back from LAS X |
+| ROI regions: rectangle, ellipse | Works: drawn with the mouse in LAS X's viewer, a click at each corner; LAS X shows only that there are regions |
+| Bleach points and ROI regions cleared | Works: the viewer's Select all ROIs and Clear selected ROIs |
+| A bleach point's bleaching time; polygon and range regions | Not yet: typed in and drawn in LAS X's window |
 | Linear Z-compensation: excitation, detector gain, motCORR on or off; support points added, removed, moved to; reference position (Set to Begin is the stack's begin written there) | Works, with LAS X's commands (the reference written into the state tree) |
 | When the autofocus runs in a time series (first cycle, every cycle, every n-th) | Works: written into LAS X's state tree, as its Timelapse tab does |
 | The Reflection autofocus's coverslip offset, and Find Coverslip Reflection | Works: the offset written into LAS X's state tree; Find with LAS X's command, reporting whether it found the coverslip |

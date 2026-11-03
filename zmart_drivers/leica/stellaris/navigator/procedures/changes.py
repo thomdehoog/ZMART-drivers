@@ -1084,6 +1084,53 @@ def set_bleach_laser_power(client, laser_nm, percent, *, max_retries=None) -> di
     return run(client, change, max_retries=max_retries)
 
 
+def draw_bleach_point(client, x_px, y_px, *, viewer=None) -> dict:
+    """Draw a bleach point at the pixel (*x_px*, *y_px*) of the picture LAS X's viewer shows, as Draw point and a click
+    do; read back from LCS (the point it shows becomes the new one). The bleach mode must be on."""
+    from . import answer_dialogs, lasx_viewer
+
+    if not readers.get_roi_scan(client)["bleach_mode"]:
+        return dispatch.refused("the bleach mode is off; switch it on with set_bleach_mode first; nothing was drawn")
+    before = readers.get_bleach_point(client)["point"]
+    try:
+        result = lasx_viewer.draw_point(x_px, y_px, viewer=viewer)
+    except (ValueError, LookupError, answer_dialogs.WindowsUnavailable) as why:
+        return dispatch.refused(f"the bleach point was not drawn: {why}")
+    result["bleach_point"] = readers.get_bleach_point(client)
+    result["confirmed"] = result["bleach_point"]["point"] is not None and result["bleach_point"]["point"] != before
+    return result
+
+
+def draw_roi_region(client, shape, corner, opposite, *, viewer=None) -> dict:
+    """Draw an ROI region, a ``"rectangle"`` or ``"ellipse"`` in the box from pixel *corner* to pixel *opposite* of the
+    picture LAS X's viewer shows, as its tool and a drag do. ROI scan must be on. ``confirmed`` when the viewer has
+    regions afterwards; LAS X shows no count of them, and LCS gets nothing."""
+    from . import answer_dialogs, lasx_viewer
+
+    if not readers.get_roi_scan(client)["on"]:
+        return dispatch.refused("ROI scan is off; switch it on with set_roi_scan first; nothing was drawn")
+    try:
+        result = lasx_viewer.draw_region(shape, corner, opposite, viewer=viewer)
+    except (ValueError, LookupError, answer_dialogs.WindowsUnavailable) as why:
+        return dispatch.refused(f"the ROI region was not drawn: {why}")
+    result["confirmed"] = result["regions"]
+    return result
+
+
+def clear_drawings(client, *, viewer=None) -> dict:
+    """Clear every bleach point and ROI region drawn in LAS X's viewer, as its Select all ROIs and Clear selected ROIs
+    do; the bleach point is read back from LCS."""
+    from . import answer_dialogs, lasx_viewer
+
+    try:
+        result = lasx_viewer.clear_regions(viewer=viewer)
+    except answer_dialogs.WindowsUnavailable as why:
+        return dispatch.refused(f"the drawings were not cleared: {why}")
+    result["bleach_point"] = readers.get_bleach_point(client)
+    result["confirmed"] = result["confirmed"] and result["bleach_point"]["point"] is None
+    return result
+
+
 def smartcorr(client, project=None, **watching) -> dict:
     """Run SmartCORR, the window's Start SmartCORR, into *project*; the result's ``collar`` is where LAS X left it.
 

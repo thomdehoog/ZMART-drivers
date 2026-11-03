@@ -44,7 +44,7 @@ class MainWindow:
     def first(self, property_id, value):
         """The first control in the window whose property *property_id* is *value*; WindowsUnavailable when there is none."""
         found = self.element.FindFirst(self.client.TreeScope_Descendants, self.uia.CreatePropertyCondition(property_id, value))
-        if found is None:
+        if not found:  # UI Automation answers an empty pointer, not None, when nothing is there
             raise answer_dialogs.WindowsUnavailable(f"LAS X's window shows no {value!r} (its panel is closed?)")
         return found
 

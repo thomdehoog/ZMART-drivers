@@ -1461,3 +1461,27 @@ name and refuses only if two are still there at the end of its wait.
 
 Through the driver: 3 frames, saved as one store of shape (3, 2, 1, 512, 512), its t scale 1.46 s (the frames' own times;
 1.28 s was the interval set, LAS X's shortest), LAS X's cache let go of after.
+
+## 94. Bleach points and ROI regions drawn by the driver (3 November 2026)
+
+LCS gets nothing when a point or a region is drawn, so the driver draws them with the mouse in LAS X's viewer
+(`procedures/lasx_viewer.py`). UI Automation does not say where the picture lies in the viewer (every layer covers the
+whole viewer), but the viewer's status line does: "Cursor: Pos: 584.49 µm, 584.12 µm" from the picture's top-left corner,
+with the picture's size ("x = 512 y = 512", "Size: 1162.50 µm x 1162.50 µm"). The driver puts the pointer on two places
+40 screen pixels apart to learn the mapping (1.756 µm a screen pixel at 162 %), then on the target, and clicks only when
+the status line shows the target pixel's centre within half a pixel. Learned on the way:
+
+- The pointer is moved as a real mouse moves it (an absolute input event): put there only, the viewer did not always
+  follow, and a stale reading once placed a rectangle's second corner wrongly. A reading that does not change after a
+  move is now taken for none.
+- A region drawn with a drag stayed unfinished: the status line froze, and LAS X dropped the region when the tool changed.
+  A click at one corner and a click at the other finish it, and it stays.
+- With two tau channels shown one above the other the picture is 2.52 µm a screen pixel, coarser than a picture pixel
+  (2.27 µm); the driver refuses then, and says to zoom in or show one picture. With one panel (162 %) every target was hit.
+- Select all ROIs is enabled while any region or point is drawn; LAS X shows no count. A bleach point reads back through
+  LCS: `CurrentBleachPoint` went -1, 0, 1 with each point.
+
+Built: `draw_bleach_point(x_px, y_px)` (bleach mode on, read back from LCS), `draw_roi_region(shape, corner, opposite)`
+(ROI scan on, "rectangle" or "ellipse"), `clear_drawings()`. Through the driver on the live picture: a rectangle from
+pixel (60, 60) to (200, 160) and an ellipse in (260, 300) to (450, 460), both kept and in place; a bleach point at (400,
+120) in place; pixel 512 refused; everything cleared, the modes off, the viewer's display put back.
