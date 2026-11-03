@@ -20,8 +20,11 @@ with a click at one corner and one at the other: a drag left it unfinished,
 and LAS X dropped it when the tool changed (simulator, 2026-11-03). Positions are pixels of the picture LAS X's viewer shows (x to the
 right, y down, from 0).
 
-The mouse is the computer's own: while the driver draws, nobody else should
-use it.
+The mouse's moves and clicks are sent to LAS X's window as messages
+(simulator, 2026-11-03: the status line followed them, and a point was drawn
+with them); the computer's pointer is not moved, so whoever uses the
+computer meanwhile is not disturbed, as long as they leave LAS X's viewer
+tools alone.
 
 Author: Thom de Hoog, Center for Microscopy and Image Analysis (ZMB),
 University of Zurich (thom.dehoog@zmb.uzh.ch, thomdehoog@gmail.com).
@@ -89,18 +92,27 @@ class Viewer:
         r = core.CurrentBoundingRectangle
         return r.left, r.top, r.right, r.bottom
 
-    def hover(self, x: int, y: int) -> tuple[float, float] | None:
-        """The status line's position with the pointer at (*x*, *y*); None when it shows none, or does not follow.
+    def send(self, message: int, at: tuple[int, int], held: int = 0) -> None:
+        """A mouse message to LAS X's window, as if the mouse were at the screen point *at*; the pointer is not moved."""
+        import win32api
+        import win32gui
 
-        The pointer is moved as a real mouse moves it (an input event), since
-        the viewer does not always follow a pointer only put somewhere. A
-        reading that stays what it was after the pointer moved is stale, and
+        hwnd = self.window.element.CurrentNativeWindowHandle
+        x, y = win32gui.ScreenToClient(hwnd, (int(at[0]), int(at[1])))
+        win32gui.PostMessage(hwnd, message, held, win32api.MAKELONG(x & 0xFFFF, y & 0xFFFF))
+
+    def hover(self, x: int, y: int) -> tuple[float, float] | None:
+        """The status line's position with the mouse at (*x*, *y*) for LAS X; None when it shows none, or does not follow.
+
+        A reading that stays what it was after the mouse moved is stale, and
         is waited on for a while, then taken for none.
         """
+        import win32con
+
         here, before = (int(x), int(y)), cursor_in(self.texts())
         stayed = here == getattr(self, "last", None)
         self.last = here
-        move(*here)
+        self.send(win32con.WM_MOUSEMOVE, here)
         reading = None
         for _ in range(int(1.5 / SETTLE_S)):
             time.sleep(SETTLE_S)
@@ -108,22 +120,6 @@ class Viewer:
             if reading is not None and (reading != before or stayed):
                 return reading
         return None
-
-    def bring_forward(self) -> None:
-        """LAS X in front, so the first click draws: an empty spot of its top bar is clicked when it is not."""
-        import win32api
-        import win32con
-        import win32gui
-        import win32process
-
-        if win32process.GetWindowThreadProcessId(win32gui.GetForegroundWindow())[1] == self.window.element.CurrentProcessId:
-            return
-        r = self.window.element.CurrentBoundingRectangle
-        win32api.SetCursorPos((r.left + 1150, r.top + 18))
-        time.sleep(0.15)
-        win32api.mouse_event(win32con.MOUSEEVENTF_LEFTDOWN, 0, 0)
-        win32api.mouse_event(win32con.MOUSEEVENTF_LEFTUP, 0, 0)
-        time.sleep(0.5)
 
     def button(self, help_text: str):
         return self.window.first(self.window.client.UIA_HelpTextPropertyId, help_text)
@@ -143,40 +139,27 @@ class Viewer:
         time.sleep(SETTLE_S)
 
     def click(self, x: int, y: int) -> None:
-        import win32api
+        """A left click at the screen point (*x*, *y*), sent to LAS X's window."""
         import win32con
 
-        move(int(x), int(y))
-        time.sleep(0.15)
-        win32api.mouse_event(win32con.MOUSEEVENTF_LEFTDOWN, 0, 0)
+        self.send(win32con.WM_MOUSEMOVE, (x, y))
+        time.sleep(0.1)
+        self.send(win32con.WM_LBUTTONDOWN, (x, y), win32con.MK_LBUTTON)
         time.sleep(0.08)
-        win32api.mouse_event(win32con.MOUSEEVENTF_LEFTUP, 0, 0)
+        self.send(win32con.WM_LBUTTONUP, (x, y))
         time.sleep(SETTLE_S)
 
     def span(self, start: tuple[int, int], end: tuple[int, int]) -> None:
-        """A shape from *start* to *end*, as LAS X's region tools take it: a click at one corner, the pointer moved
+        """A shape from *start* to *end*, as LAS X's region tools take it: a click at one corner, the mouse moved
         across, a click at the other (simulator, 2026-11-03: a drag left the shape unfinished, and LAS X dropped it
         when the tool changed)."""
+        import win32con
+
         self.click(*start)
         for i in range(1, 11):
-            move(start[0] + (end[0] - start[0]) * i // 10, start[1] + (end[1] - start[1]) * i // 10)
+            self.send(win32con.WM_MOUSEMOVE, (start[0] + (end[0] - start[0]) * i // 10, start[1] + (end[1] - start[1]) * i // 10))
             time.sleep(0.03)
         self.click(*end)
-
-
-def move(x: int, y: int) -> None:
-    """The pointer to (*x*, *y*) as a real mouse moves it: an absolute input event over every screen."""
-    import ctypes
-
-    import win32api
-    import win32con
-
-    metrics = ctypes.windll.user32.GetSystemMetrics
-    left, top, width, height = metrics(76), metrics(77), metrics(78), metrics(79)
-    flags = win32con.MOUSEEVENTF_MOVE | win32con.MOUSEEVENTF_ABSOLUTE | 0x4000  # 0x4000: the whole virtual desktop
-    win32api.mouse_event(flags, round((x - left) * 65535 / (width - 1)), round((y - top) * 65535 / (height - 1)), 0, 0)
-    if win32api.GetCursorPos() != (x, y):
-        win32api.SetCursorPos((x, y))
 
 
 def target_um(viewer, x_px, y_px) -> tuple[float, float, float]:
@@ -227,7 +210,6 @@ def draw_point(x_px: int, y_px: int, *, viewer=None) -> dict:
     """A bleach point at the picture's pixel (*x_px*, *y_px*), as the viewer's Draw point and one click draw it."""
     viewer = viewer if viewer is not None else Viewer()
     target_um(viewer, x_px, y_px)
-    viewer.bring_forward()
     viewer.tool_on(TOOLS["point"])
     at = locate(viewer, x_px, y_px)
     viewer.click(*at)
@@ -245,7 +227,6 @@ def draw_region(shape: str, corner, opposite, *, viewer=None) -> dict:
     target_um(viewer, x0, y0), target_um(viewer, x1, y1)
     if x0 == x1 or y0 == y1:
         raise ValueError(f"the box from {corner} to {opposite} has no area")
-    viewer.bring_forward()
     viewer.tool_on(TOOLS[shape])
     start, end = locate(viewer, x0, y0), locate(viewer, x1, y1)
     viewer.span(start, end)

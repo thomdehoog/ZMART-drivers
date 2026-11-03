@@ -604,13 +604,13 @@ class Microscope:
         """Draw a bleach point at the pixel (*x_px*, *y_px*) of the picture LAS X's viewer shows, as Draw point does.
 
         LAS X keeps a bleach point outside its hardware server, so the driver
-        draws it with the mouse, in LAS X's viewer: it first finds the pixel by
-        the viewer's own read-out of where the pointer is, and clicks only when
+        draws it in LAS X's viewer, with mouse moves and clicks sent to LAS X's
+        window (the computer's pointer is not moved): it first finds the pixel
+        by the viewer's own read-out of where the mouse is, and clicks only when
         that shows the pixel, within half a pixel. Pixels count from the
         picture's top-left corner, x to the right, y down. The bleach mode must
         be on (:meth:`set_bleach_mode`); the point takes the setting's lines,
-        whose power :meth:`set_bleach_laser_power` changes. Nobody else should
-        use the mouse meanwhile. Read back from LAS X.
+        whose power :meth:`set_bleach_laser_power` changes. Read back from LAS X.
         """
         self.handle.require_open()
         result = changes.draw_bleach_point(self.handle.client, x_px, y_px)

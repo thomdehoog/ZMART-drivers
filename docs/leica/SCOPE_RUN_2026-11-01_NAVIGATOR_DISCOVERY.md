@@ -1485,3 +1485,21 @@ Built: `draw_bleach_point(x_px, y_px)` (bleach mode on, read back from LCS), `dr
 (ROI scan on, "rectangle" or "ellipse"), `clear_drawings()`. Through the driver on the live picture: a rectangle from
 pixel (60, 60) to (200, 160) and an ellipse in (260, 300) to (450, 460), both kept and in place; a bleach point at (400,
 120) in place; pixel 512 refused; everything cleared, the modes off, the viewer's display put back.
+
+## 95. No LCS route for regions; the drawing sent as window messages (3 November 2026)
+
+Thom asked whether regions can be added through LCS or another server instead of the mouse. LCS's whole command log
+holds no command for ROIs or bleach points. The regions are LAS X's data container's objects (its log lists ROI sets,
+`DefaultScanROISet`, `BleachPointROISet`, and no requests a client could send); it has no documented interface, and it is
+not taken apart. A saved setting carries them in full (`<ROI>` with a `DCROISet` of `ROISingle` elements: `RoiType` 16 a
+rectangle, 32 an ellipse of 64 vertices, the vertices in metres around the region's centre, a `Transformation` with the
+scan field's rotation (270°) and the centre's `Translation` from the field's middle, and per region an `AOTF_SETTING`
+with every laser line's intensity, which is ROI Configuration; the bleach points in `BleachPoints/BleachPointROISet`). But
+a setting with a region in it, loaded through LCS (`load_setting`, `ATL_Block_Load_From_XML`), did not bring the region
+back: the current ROI set (`CurrentDCROISetID` 177) stayed empty, also after Live.
+
+So the window it is, but without the computer's pointer: mouse moves and clicks posted to LAS X's window
+(`WM_MOUSEMOVE`, `WM_LBUTTONDOWN`, `WM_LBUTTONUP`) drew a bleach point, and the status line followed the posted moves
+exactly. `lasx_viewer` now sends all its moves and clicks so. Through the driver: the rectangle (60, 60)-(200, 160), the
+ellipse (260, 300)-(450, 460) and the bleach point (400, 120) drawn in place and cleared, and the pointer stood at the same
+place before and after. The toolbar's tools are still pressed through UI Automation.

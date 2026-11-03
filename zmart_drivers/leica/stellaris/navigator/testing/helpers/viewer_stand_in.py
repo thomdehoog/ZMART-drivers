@@ -36,9 +36,6 @@ class Viewer:
     def hover(self, x, y):
         return self.at(x, y)
 
-    def bring_forward(self):
-        pass
-
     def tool_on(self, help_text):
         self.tools.add(help_text)
 
