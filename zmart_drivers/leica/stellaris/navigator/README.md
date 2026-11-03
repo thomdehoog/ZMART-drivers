@@ -220,7 +220,15 @@ otherwise:
 - LAS X is a build the driver's writes were checked on (4.9.0.30051, the simulator's). On another build, nothing is
   written until the writes are checked again on it.
 - LAS X takes input for its settings now: not while it is scanning or busy, when its window greys its controls out.
-- The value is one the window offers, within LAS X's own range and this microscope's limits file.
+- The value is one the window offers, within LAS X's own range, and within its own entry in this microscope's limits
+  file.
+
+Each of these values has its own entry in the limits file, shown in setup step 2 by its name in LAS X's state tree
+("Fast Live Format", "Enable Roi Scan"). By default an entry adds nothing to the driver's own check: it shows the
+window's choices or the driver's fixed range, or it is left open where LAS X's own range applies. The facility can
+narrow any of them, or keep a switch off (`false` as its only allowed value). A file can narrow a value, never widen
+it: the driver's own check stays beneath. The value is checked exactly as it would be written, before anything is
+sent.
 
 ### The settings `change_setting` can change
 

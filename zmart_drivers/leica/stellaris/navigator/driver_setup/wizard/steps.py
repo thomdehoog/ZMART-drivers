@@ -23,6 +23,7 @@ place, so a later reader can still see how the numbers came about.
 from __future__ import annotations
 
 import json
+import re
 import shutil
 import tempfile
 import time
@@ -293,7 +294,7 @@ class LeicaSteps:
     def limits_document(self, values):
         """The limits as they stand, every entry of the file, and how to name each row."""
         from ..limits.config import defaults_path, validate_payload
-        from ..limits.limit_rules import SETTER_LIMIT_KEYS
+        from ..limits.limit_rules import SETTER_LIMIT_KEYS, STATE_TREE_LIMIT_KEYS
 
         latest = _machine().latest_snapshot("limits")
         source = "published" if latest is not None else "defaults"
@@ -316,6 +317,7 @@ class LeicaSteps:
                 "note": "Turret slots count from 0. List the slots automation may turn to, or leave it unticked for all.",
             },
             "settings": list(SETTER_LIMIT_KEYS),
+            "labels": {name: state_tree_label(name) for name in STATE_TREE_LIMIT_KEYS},
             "actuators": {"x": motors["x"]["options"], "y": motors["y"]["options"]},
         }
 
@@ -700,6 +702,16 @@ class LeicaSteps:
         except (RuntimeError, ValueError) as why:
             raise StepError(str(why)) from None
         return {"saved_to": published["snapshot"]}
+
+
+def state_tree_label(name: str) -> str:
+    """A state-tree value's name in words for the limits table (``FastLiveFormat`` as "Fast Live Format"); one the
+    driver also checks against LAS X's own range, read at the moment of writing, says so."""
+    from ...primitives.direct.transfer import STATE_TREE_WRITES
+
+    words = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", " ", name)
+    entry = STATE_TREE_WRITES[name]
+    return f"{words} (also within LAS X's own range)" if entry.between or entry.listed else words
 
 
 def leica_wizard() -> Wizard:

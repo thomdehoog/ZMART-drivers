@@ -1875,3 +1875,21 @@ in the state tree can move from one build to the next, so a write into the tree 
 checked on (`transfer.CHECKED_LASX_BUILDS`, now only 4.9.0.30051); on any other, it is refused and the build found is
 named. Commands are not pinned: LCS checks those itself. On the simulator, Acquire Until Stopped and 5 frames went in;
 with the checked build set to another number, the same write was refused and named 4.9.0.30051.
+
+## 117. Every state-tree value in the limits file (3 November 2026)
+
+Setup step 2 showed 36 settings, the ones the driver changes by command; the 93 values written into the state tree
+were checked in the driver's code only. Each now has its own entry in `limits.json`, named as in LCS's tree
+(`FastLiveFormat`, `EnableRoiScan`), shown in step 2 in words ("Fast Live Format", with "also within LAS X's own
+range" where that applies). The defaults add nothing to the driver's own check: the window's choices
+(`CalculationMode` 3 or 4), the driver's fixed range, or `[]` for switches, text and the values LAS X's own range
+governs. A facility narrows an entry or keeps a switch off; the driver's check stays beneath, so a file cannot widen
+it. A limits file saved before these entries counts, with them taken from the defaults.
+
+The value is shown to its entry in the direct transport, exactly as it would be written, before any element of the
+change is sent; outside it, nothing is sent and the change is refused, naming the entry. On the simulator, with Fast
+Live's format narrowed to 16 to 128, 256 was refused with nothing sent and 128 went in. Step 2's page now names these
+values in words and takes `true` and `false` as on and off in an entry's allowed values.
+
+Corrected: the autofocus's and the bleach point's laser powers were already checked against the laser limit
+(`set_laser_power`), and a light source's output power against `set_laser_output_power`.

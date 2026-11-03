@@ -1,11 +1,12 @@
 """The limits rulebook: every "is this allowed?" answer in the driver.
 
 Stage positions (the envelope and the physical backstop), objective slots,
-and the five settings the plain Navigator route can change are checked here.
-Enforcement, the moment of refusing, is the dispatcher's limits gate
-(``dispatcher/limits.py``), which asks this rulebook through
-:class:`LeicaLimits` once for every change, before anything is sent. Nothing
-else checks limits itself.
+the settings the driver changes by command, and every value it writes into
+LAS X's state tree are checked here. Enforcement, the moment of refusing, is
+the dispatcher's limits gate (``dispatcher/limits.py``), which asks this
+rulebook through :class:`LeicaLimits` once for every change, before anything is
+sent; a state-tree value is shown to its own entry once more by the transfer,
+with the exact value, just before it is sent. Nothing else checks limits itself.
 
 Stage moves are guarded by two independent layers, both asked by the gate
 before anything is sent:
@@ -36,6 +37,7 @@ from types import MappingProxyType
 from typing import Any
 
 from ...dispatcher.limits import LimitsError, LimitsStatus, LimitViolation
+from ...primitives.direct.transfer import STATE_TREE_WRITES
 
 # =============================================================================
 # The physical backstop
@@ -236,6 +238,15 @@ SETTER_LIMIT_KEYS = (
 )
 
 
+# Every value the driver writes straight into LAS X's state tree, as its window
+# does (primitives/direct/transfer.py STATE_TREE_WRITES). Each has its own entry
+# in limits.json: ``[]`` leaves only the driver's own check (the window's
+# choices, LAS X's own range), or one typed constraint narrows it further. The
+# transfer shows the entry the exact value just before anything is sent; the
+# driver's own check stays beneath it, so a file can narrow a value, never widen it.
+STATE_TREE_LIMIT_KEYS = tuple(STATE_TREE_WRITES)
+
+
 @dataclass(frozen=True, slots=True, init=False)
 class LeicaLimits:
     """The limits document compiled into a checker the gate asks; it never changes once made."""
@@ -288,6 +299,9 @@ class LeicaLimits:
         self.check(MUTATING_COMMANDS[command], values)
 
     def check(self, function: str, values: Mapping[str, Any]) -> None:
+        if function == "state_tree":
+            self._check_one(values["name"], self._policy[values["name"]], values["value"])
+            return
         if function == "set_xyz":
             self._check_positions(values)
             return

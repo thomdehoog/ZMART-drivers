@@ -26,7 +26,7 @@ to open the page in your web browser instead.
 | Step | What happens | What it replaces |
 |---|---|---|
 | 1. Connect | Connects to LAS X and confirms the folder this microscope saves its pictures in. | `set_data_location.ipynb` |
-| 2. Define limits | Every entry of the limits file, ticked or not, and the four corners of the safe area imported from the stage; then Save and adopt. | `set_limits.ipynb` |
+| 2. Define limits | Every entry of the limits file, ticked or not (the settings changed by command, and each value written into LAS X's state tree), and the four corners of the safe area imported from the stage; then Save and adopt. | `set_limits.ipynb` |
 | 3. Define coordinate system origin | Read every drive where the stage stands; Save and adopt makes it (0, 0, 0). | `Microscope.set_origin` |
 | 4. Image-to-stage calibration | Start: three pictures and eight candidates. A check picture, then Save and adopt. | `set_orientation.ipynb` |
 | 5. Objective calibration | Choose the reference objective; each other objective is a preset. Measure a preset's focus and X/Y, see its offset as three tiles, then Save and adopt. | `calibrate_objective_pair.ipynb` |

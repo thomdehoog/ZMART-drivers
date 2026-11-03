@@ -28,8 +28,10 @@ const asRange = (e: Entry) => {
   return Array.isArray(r) && r.length === 2 ? `${r[0] ?? "open"} … ${r[1] ?? "open"}` : "not set";
 };
 const kindOf = (e: Entry) => (Array.isArray(e) ? "none" : e.range ? "range" : e.allowed ? "allowed" : "none");
+/** Allowed values as typed: numbers as numbers, true and false as on and off, anything else as text. */
 const allowedFrom = (text: string) =>
-  text.split(",").map((t) => t.trim()).filter(Boolean).map((t) => (Number.isFinite(Number(t)) ? Number(t) : t));
+  text.split(",").map((t) => t.trim()).filter(Boolean)
+    .map((t) => (t === "true" ? true : t === "false" ? false : Number.isFinite(Number(t)) ? Number(t) : t));
 
 export const limits: View = (host, ctx) => {
   const s = ctx.state;
@@ -72,7 +74,7 @@ export const limits: View = (host, ctx) => {
   const labelFor = (key: string) =>
     axes.has(key) ? `${axes.get(key)!.label} (${axes.get(key)!.unit})`
       : key === doc.slots.key ? doc.slots.label
-        : key.replace(/^set_/, "").replaceAll("_", " ");
+        : doc.labels?.[key] ?? key.replace(/^set_/, "").replaceAll("_", " ");
 
   for (const key of Object.keys(held)) {
     const label = labelFor(key);

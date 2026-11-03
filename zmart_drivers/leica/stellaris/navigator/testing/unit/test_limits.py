@@ -146,7 +146,72 @@ class TestTheFiveSettings:
 
     def test_the_limits_file_keys_are_exactly_what_the_rulebook_knows(self):
         loaded = limits_config.load()
-        assert set(loaded["policy"]) == {"x_um", "y_um", "z_galvo_um", "z_wide_um", *limit_rules.STEP_LIMIT_KEYS, "objective_slot", *limit_rules.SETTER_LIMIT_KEYS}
+        assert set(loaded["policy"]) == {"x_um", "y_um", "z_galvo_um", "z_wide_um", *limit_rules.STEP_LIMIT_KEYS, "objective_slot",
+                                         *limit_rules.SETTER_LIMIT_KEYS, *limit_rules.STATE_TREE_LIMIT_KEYS}
+
+
+def what_the_driver_allows(entry):
+    """A state-tree value's default in the limits file: what the driver's own check allows, where it is fixed."""
+    if entry.kind is bool or entry.between or entry.listed or entry.kind is str or (entry.choices and entry.within):
+        return []
+    if entry.choices:
+        return {"allowed": sorted(entry.choices)}
+    if entry.within:
+        return {"range": [float(entry.within[0]), float(entry.within[1])]}
+    return []
+
+
+class TestTheStateTreeValues:
+    """Every value written straight into LAS X's state tree has its own entry in the limits file, so the facility sees
+    it in setup step 2 and can narrow it; the driver's own check stays beneath, so a file can never widen it."""
+
+    def test_every_state_tree_value_has_its_own_entry_in_the_bundled_limits(self):
+        from zmart_drivers.leica.stellaris.navigator.primitives.direct import transfer
+
+        bundled = json.loads((DRIVER_ROOT / "driver_setup" / "limits" / "defaults" / "limits.json").read_text())
+        assert limit_rules.STATE_TREE_LIMIT_KEYS == tuple(transfer.STATE_TREE_WRITES)
+        assert set(limit_rules.STATE_TREE_LIMIT_KEYS) <= set(bundled)
+
+    def test_each_default_is_what_the_driver_allows_already(self):
+        from zmart_drivers.leica.stellaris.navigator.primitives.direct import transfer
+
+        defaults = limits_config.load()["policy"]
+        for name, entry in transfer.STATE_TREE_WRITES.items():
+            assert defaults[name] == what_the_driver_allows(entry), name
+
+    def test_a_limits_file_saved_before_these_entries_still_counts_with_the_defaults(self, tmp_path):
+        older = merged_limits_payload(dict(DEFAULT_STAGE_UM))
+        for key in limit_rules.STATE_TREE_LIMIT_KEYS:
+            older.pop(key)
+        path = tmp_path / "limits.json"
+        path.write_text(json.dumps(older), encoding="utf-8")
+
+        loaded = limits_config.load(path)
+
+        assert loaded["policy"]["CalculationMode"] == {"allowed": [3, 4]}
+        assert loaded["policy"]["EnableRoiScan"] == []
+
+    def test_a_value_outside_its_entry_is_refused_and_inside_passes(self):
+        payload = merged_limits_payload(dict(DEFAULT_STAGE_UM), functions={"FastLiveFormat": {"range": [16, 128]}})
+        limits = limit_rules.LeicaLimits(payload, source="test", path=None, is_fallback=False)
+
+        limits.check("state_tree", {"name": "FastLiveFormat", "value": 128})
+        with pytest.raises(limit_rule_violation()):
+            limits.check("state_tree", {"name": "FastLiveFormat", "value": 256})
+
+    def test_a_switch_can_be_kept_off(self):
+        payload = merged_limits_payload(dict(DEFAULT_STAGE_UM), functions={"EnableRoiScan": {"allowed": [False]}})
+        limits = limit_rules.LeicaLimits(payload, source="test", path=None, is_fallback=False)
+
+        limits.check("state_tree", {"name": "EnableRoiScan", "value": False})
+        with pytest.raises(limit_rule_violation()):
+            limits.check("state_tree", {"name": "EnableRoiScan", "value": True})
+
+    def test_an_empty_entry_leaves_only_the_driver_s_own_check(self):
+        payload = merged_limits_payload(dict(DEFAULT_STAGE_UM))
+        limits = limit_rules.LeicaLimits(payload, source="test", path=None, is_fallback=False)
+
+        limits.check("state_tree", {"name": "EnableRoiScan", "value": True})
 
 
 class TestEveryChangeIsKnown:

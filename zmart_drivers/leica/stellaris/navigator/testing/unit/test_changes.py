@@ -2016,6 +2016,39 @@ class TestNoStateTreeWriteWhileLasXRefusesInput:
         assert changes.set_roi_scan(client, True)["confirmed"] is True
 
 
+class TestStateTreeValuesMeetTheLimitsFile:
+    """Each value written into the state tree is shown to its own entry in this microscope's limits file, with the
+    exact value, before anything is sent; outside it, nothing is written."""
+
+    @pytest.fixture
+    def narrowed(self, lasx, client):
+        from limits_fixtures import DEFAULT_STAGE_UM, merged_limits_payload
+
+        from zmart_drivers.leica.stellaris.navigator.driver_setup.limits import limit_rules
+
+        payload = merged_limits_payload(dict(DEFAULT_STAGE_UM), functions={
+            "FastLiveFormat": {"range": [16, 128]}, "EnableRoiScan": {"allowed": [False]},
+        })
+        gate.install(client, gate.GateState(
+            limits=limit_rules.LeicaLimits(payload, source="test", path=None, is_fallback=False), stage_cfg=None, error=None))
+        return client
+
+    def test_a_value_beyond_its_entry_is_refused_and_nothing_is_written(self, lasx, narrowed):
+        result = changes.set_fast_live(narrowed, "fov", format=256)
+
+        assert result["success"] is False and "limits file" in result["message"]
+        assert not [path for path, _ in lasx.nodes.tree_writes if path[-1] == "ScanFormat"]
+
+    def test_a_value_within_its_entry_is_written(self, lasx, narrowed):
+        assert changes.set_fast_live(narrowed, "fov", format=128)["fast_live"]["fov"]["format"] == 128
+
+    def test_a_switch_the_file_keeps_off_is_not_switched_on(self, lasx, narrowed):
+        result = changes.set_roi_scan(narrowed, True)
+
+        assert result["success"] is False and "limits file" in result["message"]
+        assert lasx.live[("Confocal", "ROIScan", "EnableRoiScan")] is False
+
+
 class TestStateTreeWritesOnlyOnACheckedLasXBuild:
     """Where a value sits in LCS's state tree can move from one LAS X build to the next; the driver writes into the
     tree only on a build its writes were checked on, and says which build it found otherwise."""

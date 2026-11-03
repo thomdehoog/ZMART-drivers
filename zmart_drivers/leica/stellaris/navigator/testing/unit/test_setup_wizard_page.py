@@ -370,6 +370,7 @@ DOCUMENT = {
     "objective_slot": [],
     "set_zoom": [],
     "set_detector_gain": {"range": [0.0, 80.0]},
+    "EnableRoiScan": [],
 }
 
 
@@ -436,6 +437,7 @@ def _pretend(tmp_path, *, done=(), saved=None, overrides=None, sent=None):
                 ],
                 "required": ["x_um", "y_um", "z_galvo_um", "z_wide_um"],
                 "measured": ["x_um", "y_um"],
+                "labels": {"EnableRoiScan": "Enable Roi Scan"},
                 "slots": {
                     "key": "objective_slot",
                     "label": "Objective slots",
@@ -745,6 +747,23 @@ def test_the_limits_table_sends_what_the_operator_ticked_and_typed(window, tmp_p
     assert document["set_detector_gain"] == []
     assert document["objective_slot"] == {"allowed": [0, 2]}
     assert document["x_um"] == {"range": [1000.0, 130000.0]}
+
+
+def test_a_state_tree_switch_is_named_in_words_and_kept_off_with_false(window, tmp_path):
+    sent = {}
+    win = window(_pretend(tmp_path, sent=sent))
+    connect(win)
+    win.open_step("Define limits")
+    win.cell("Configure").wait_for()
+
+    win.page.get_by_label("apply a limit to Enable Roi Scan").check()
+    win.page.get_by_label("how Enable Roi Scan is limited").select_option("allowed")
+    win.page.get_by_label("Enable Roi Scan, allowed values").fill("false")
+    win.page.get_by_label("Enable Roi Scan, allowed values").blur()
+    win.press("Save and adopt", win.cell("Configure"))
+    win.says("Adopted.", within=win.cell("Configure"))
+
+    assert sent["limits.publish"][0]["document"]["EnableRoiScan"] == {"allowed": [False]}
 
 
 def test_four_imported_corners_set_x_and_y_above(window, tmp_path):

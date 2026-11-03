@@ -1,7 +1,8 @@
 """Load, validate, and publish the Leica driver's flat ``limits.json``.
 
 The file is deliberately operator-readable: four top-level stage ranges,
-``objective_slot``, and one top-level entry for each configurable setter.
+``objective_slot``, one top-level entry for each configurable setter, and one
+for each value the driver writes into LAS X's state tree (by its name there).
 Every constraint explicitly says ``range`` or ``allowed``; an empty list means
 "reviewed; no limit is enforced". ``objective_slot`` defaults to ``[]``
 (unrestricted): which slots exist is hardware knowledge the wrapper checks
@@ -46,9 +47,9 @@ _AXIS_FILE_KEYS = {
 # These are visible in the file even while unrestricted. Each entry is either
 # ``[]`` or one typed constraint, and the command wrapper with the same name
 # enforces a typed constraint immediately before its native CAM call.
-from .limit_rules import SETTER_LIMIT_KEYS, STEP_LIMIT_KEYS
+from .limit_rules import SETTER_LIMIT_KEYS, STATE_TREE_LIMIT_KEYS, STEP_LIMIT_KEYS
 
-_REQUIRED_FILE_KEYS = (*_AXIS_FILE_KEYS.values(), *STEP_LIMIT_KEYS, "objective_slot", *SETTER_LIMIT_KEYS)
+_REQUIRED_FILE_KEYS = (*_AXIS_FILE_KEYS.values(), *STEP_LIMIT_KEYS, "objective_slot", *SETTER_LIMIT_KEYS, *STATE_TREE_LIMIT_KEYS)
 
 # Entries added after limits files were first saved. A file saved before an
 # entry existed still counts: the entry is taken from the bundled defaults,
@@ -60,7 +61,7 @@ _ADDED_LATER = (*STEP_LIMIT_KEYS, "set_z_stack_step", "set_scan_mode", "set_auto
     "set_bit_depth", "set_system_optimized_step", "set_collar", "set_smartcorr_range",
     "set_collar_reference", "set_sequential_mode", "set_laser_wavelength",
     "set_autofocus_method", "set_autofocus_precision", "set_autofocus_steps", "set_autofocus_range_um", "set_autofocus_drive",
-    "set_laser_output_power", "set_z_stack_mode",
+    "set_laser_output_power", "set_z_stack_mode", *STATE_TREE_LIMIT_KEYS,
 )
 
 
@@ -209,11 +210,16 @@ def validate_payload(
             [] if entry == [] else _normalize_typed_limit(name, entry, path=path)
         )
 
+    tree = {
+        name: [] if payload[name] == [] else _normalize_typed_limit(name, payload[name], path=path)
+        for name in STATE_TREE_LIMIT_KEYS
+    }
     normalized = {
         **axes,
         **steps,
         "objective_slot": objective,
         **setters,
+        **tree,
     }
     return normalized
 
@@ -236,7 +242,7 @@ def build_limits_payload(stage_um: dict[str, Any]) -> dict[str, Any]:
         # power of at most 10 %, say), so a newly measured file keeps them.
         **{key: _read_json(defaults_path())[key] for key in STEP_LIMIT_KEYS},
         "objective_slot": [],
-        **{name: _read_json(defaults_path())[name] for name in SETTER_LIMIT_KEYS},
+        **{name: _read_json(defaults_path())[name] for name in (*SETTER_LIMIT_KEYS, *STATE_TREE_LIMIT_KEYS)},
     }
     return validate_payload(payload)
 

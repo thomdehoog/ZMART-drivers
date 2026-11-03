@@ -71,6 +71,11 @@ class DirectTransport:
             hardware_server.connected_server()
         except HardwareServerUnavailable as why:
             raise TransportUnavailable(str(why)) from why
+        refusal = outside_the_limits(client, request.elements)
+        if refusal is not None:
+            client.reply.update(accepted=False, text=refusal, answer=f'<Result Error="1">{refusal}</Result>',
+                                element=request.elements[0])
+            return True, [f"{label} | {refusal}"]
         notes = []
         for number, xml in enumerate(request.elements, start=1):
             answer = send(xml)
@@ -615,6 +620,33 @@ def tree_places(name: str, at: str | None) -> dict:
     if len(given) != len(numbered):
         raise NotAllowed(f"not written: {name} takes a place for each of {list(numbered)} in At, not {at!r}")
     return dict(zip(numbered, given))
+
+
+def outside_the_limits(client, elements) -> str | None:
+    """Why this microscope's limits file does not allow a state-tree value among *elements*; None when it allows them all.
+
+    Each value is shown to its own entry with the exact value it would be
+    written as, before any element is sent, so a refusal leaves everything as
+    it was. A value the driver's own list refuses is left to that refusal.
+    """
+    from ...dispatcher import limits as gate
+
+    state = gate.state_of(client)
+    for xml in elements:
+        tree = STATE_TREE.match(xml or "")
+        if tree is None:
+            continue
+        try:
+            value = tree_value(tree[1], tree[2])
+        except NotAllowed:
+            continue
+        if state is None or state.limits is None:
+            return f"{tree[1]} not written: no limits are installed for this session"
+        try:
+            state.limits.check("state_tree", {"name": tree[1], "value": value})
+        except gate.LimitViolation as why:
+            return f"{tree[1]} {tree[2]} is out of range of this microscope's limits file ({why}); nothing was sent"
+    return None
 
 
 #: Where LCS gives LAS X's build (``"LAS X [ BETA ] 4.9.0.30051"`` on the simulator, 2026-11-03).

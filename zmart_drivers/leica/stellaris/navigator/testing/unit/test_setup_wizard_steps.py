@@ -336,6 +336,7 @@ def test_disconnect_closes_the_connection_and_connect_is_to_do_again(connected):
 def test_the_limits_document_is_every_entry_of_the_file(connected):
     from zmart_drivers.leica.stellaris.navigator.driver_setup.limits.limit_rules import (
         SETTER_LIMIT_KEYS,
+        STATE_TREE_LIMIT_KEYS,
         STEP_LIMIT_KEYS,
     )
 
@@ -350,7 +351,12 @@ def test_the_limits_document_is_every_entry_of_the_file(connected):
         *STEP_LIMIT_KEYS,
         "objective_slot",
         *SETTER_LIMIT_KEYS,
+        *STATE_TREE_LIMIT_KEYS,
     }
+    # Each state-tree value is named in words, and one checked against LAS X's own range says so.
+    assert set(doc["labels"]) == set(STATE_TREE_LIMIT_KEYS)
+    assert doc["labels"]["FastLiveFormat"] == "Fast Live Format (also within LAS X's own range)"
+    assert doc["labels"]["EnableRoiScan"] == "Enable Roi Scan"
     assert doc["required"] == ["x_um", "y_um", "z_galvo_um", "z_wide_um"]
     assert doc["measured"] == ["x_um", "y_um"]
     assert doc["actuators"] == {"x": ["motoric"], "y": ["motoric"]}
