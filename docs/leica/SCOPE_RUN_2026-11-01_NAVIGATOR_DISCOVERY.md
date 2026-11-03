@@ -1548,3 +1548,9 @@ through LCS (`load_setting`) left the pan at 0. So no LCS command, state-tree va
 LAS X. What remains: the window's arrows (UI Automation, no mouse), the stage instead of the pan (LCS's
 `SetStagePositionInHwOnly`, within the stage limits; it moves the sample, not the beam), or a pan command from Leica
 (LCS holds the pan in its setting block, so one could exist).
+
+Other surfaces looked at: of LAS X's programs only the data container server listens on a port (127.0.0.1:8892); there
+are no Leica named pipes; its services (information, user data, file handling, remote analytics, GPU) do not touch the
+scan. LCS's registered type library lists an older COM automation interface beside `SendCommand2`, whose `Scanner` object
+has `MoveInDirection(EDirection)` with the pan pad's nine directions and `PanPercentage`. It was read only, not called:
+Thom decided not to use it (see NAVIGATOR_NEXT_STEPS.md, "Decided not to do").
