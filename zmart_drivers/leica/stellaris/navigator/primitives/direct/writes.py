@@ -723,6 +723,31 @@ def hardware_connected(on: bool) -> Write:
     )
 
 
+def system_reset() -> Write:
+    """Bulk Options' Reset System, as it sends it (``ResetSystem``; simulator, 2026-11-03): the ImageCompass and the scan
+    back to LAS X's start (xyz, 512 x 512, 400 Hz, zoom 1, Airy 1, no z-stack ends, the filters at their start); the
+    lasers stay on. Read back on the zoom."""
+
+    def fill(request: Request) -> None:
+        request.elements = ['<Scanner Command="ResetSystem"/>']
+
+    return Write(command="reset_system", values={}, request="ResetSystem", fill=fill,
+                 description="Reset System", ready=idle(),
+                 confirm=Expect("zoom", lambda found: bool(found) and abs(found["current"] - 1.0) < 1e-6))
+
+
+def imagecompass_reset() -> Write:
+    """Bulk Options' Reset ImageCompass, as it sends it (``ResetImageCompass``; simulator, 2026-11-03): the setting's
+    laser lines, detectors, dyes and name back to LAS X's start. Read back: no laser line on."""
+
+    def fill(request: Request) -> None:
+        request.elements = ['<Scanner Command="ResetImageCompass"/>']
+
+    return Write(command="reset_imagecompass", values={}, request="ResetImageCompass", fill=fill,
+                 description="Reset ImageCompass", ready=idle(),
+                 confirm=Expect("laser_lines", lambda found: found == []))
+
+
 def settings_locked(locked: bool) -> Write:
     """Lock every setting's detectors and lines from LAS X's Dye Assistant, as Bulk Options' Lock All Settings does
     (``LockState="1"``, ``SetMode="1"``), or free them all (``LockState="0"``) (simulator, 2026-11-03); read back from

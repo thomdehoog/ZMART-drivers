@@ -488,6 +488,28 @@ class Microscope:
         self.handle.require_open()
         return checked(self.handle, changes.apply_to_hardware(self.handle.client, on), f"apply_to_hardware({on!r})")
 
+    def reset_system(self) -> dict:
+        """Put the ImageCompass and the scan back to LAS X's start, as Bulk Options' Reset System does.
+
+        Following LAS X's help: the scan mode xyz, format 512 x 512, 400 Hz,
+        zoom 1, rotation 0, pinhole 1 Airy, no autofocus, ROI or bleach point,
+        the z-stack's begin and end cleared and the filters and beam splitters
+        at their start. The lasers stay on. LAS X asks first in its window; the
+        driver does not. Save the setting first (:meth:`save_setting`) to come back.
+        """
+        self.handle.require_open()
+        return checked(self.handle, changes.reset_system(self.handle.client), "reset_system()")
+
+    def reset_imagecompass(self) -> dict:
+        """Put only the ImageCompass back to LAS X's start, as Bulk Options' Reset ImageCompass does.
+
+        The setting's laser lines are switched off and its detectors, dyes and
+        name go back to the start; the scan stays as it is. Save the setting
+        first (:meth:`save_setting`) to come back.
+        """
+        self.handle.require_open()
+        return checked(self.handle, changes.reset_imagecompass(self.handle.client), "reset_imagecompass()")
+
     def lock_all_settings(self, locked: bool = True) -> dict:
         """Keep every setting's detectors and lines from LAS X's Dye Assistant, as Bulk Options' Lock All Settings
         does, or free them all with *locked* False; read back."""

@@ -1602,6 +1602,16 @@ def apply_to_hardware(client, on, *, max_retries=None) -> dict:
     return result
 
 
+def reset_system(client, *, max_retries=None) -> dict:
+    """Put the ImageCompass and the scan back to LAS X's start, as Bulk Options' Reset System does; the lasers stay on."""
+    return run(client, writes.system_reset(), max_retries=max_retries)
+
+
+def reset_imagecompass(client, *, max_retries=None) -> dict:
+    """Put the ImageCompass back to LAS X's start (lines, detectors, dyes, name), as Bulk Options' Reset ImageCompass does."""
+    return run(client, writes.imagecompass_reset(), max_retries=max_retries)
+
+
 def lock_all_settings(client, locked=True, *, max_retries=None) -> dict:
     """Lock every setting's detectors and lines from LAS X's Dye Assistant, as Bulk Options' Lock All Settings does,
     or free them all with *locked* False; read back."""

@@ -68,8 +68,7 @@ checked by the driver either way (`transfer.CHECKED_COMMANDS`, `transfer.STATE_T
   (section 84).
 
 **Other**
-- Bulk Options' Reset System and Reset ImageCompass (hard to undo: Thom decides). The Dye Assistant's Apply is
-  `set_dyes`'s command (section 80).
+- The Dye Assistant's Apply is `set_dyes`'s command (section 80). Reset System and Reset ImageCompass are built (section 90).
 - Saving a time series: how its pictures are laid out in OME-Zarr is Thom's decision.
 - A dye of one's own in LAS X's library; the dye bar's "+".
 - The Best Focus Setting changed during the dye trials (its scan zoom to 48, a 488 nm line at 1 %); the zoom was put back.

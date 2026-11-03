@@ -639,6 +639,19 @@ class PlainNavigator:
         self.live[("Acquire", "IsHwConnectedMode")] = e.get("Activate") == "1"
         return "<Result/>"
 
+    def take_ResetSystem(self, e):
+        """Bulk Options' Reset System: the scan back to LAS X's start (zoom 1, xyz); the lasers stay on (simulator, 2026-11-03)."""
+        self.live[("Confocal", "ScanningParameter", "Zoom")] = 1.0
+        self.live[("Acquire", "ScanDimensionList", "ScanModeName")] = "xyz"
+        return "<Result/>"
+
+    def take_ResetImageCompass(self, e):
+        """Bulk Options' Reset ImageCompass: the setting's laser lines off (simulator, 2026-11-03)."""
+        for source in self.nodes.light_sources:
+            for line in source["AOTF"]["AotfLine"]:
+                line["Intensity"] = 0.0
+        return "<Result/>"
+
     def take_LockSetting(self, e):
         """Every setting's detectors locked from the Dye Assistant, or freed (only the current setting's are modelled)."""
         for spectro in self.nodes.detection["Spectrophotometer"]:

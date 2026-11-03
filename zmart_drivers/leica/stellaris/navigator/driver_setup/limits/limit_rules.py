@@ -500,6 +500,9 @@ MUTATING_COMMANDS = {
     "lock_detector": "lock_detector",
     "lock_laser_line": "lock_laser_line",
     "lock_all_settings": "lock_all_settings",
+    # Bulk Options' resets: LAS X's own start values, the lasers left on
+    "reset_system": "reset_system",
+    "reset_imagecompass": "reset_imagecompass",
     # the settings toolbar's apply-to-hardware switch; the limits check each change as before
     "apply_to_hardware": "apply_to_hardware",
     "move_y_line": "move_y_line",

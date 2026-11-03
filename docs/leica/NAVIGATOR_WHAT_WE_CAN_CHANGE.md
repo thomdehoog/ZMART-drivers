@@ -45,6 +45,7 @@ discovery session in `SCOPE_RUN_2026-11-01_NAVIGATOR_DISCOVERY.md` and the build
 | A laser line's own lock (kept from the Dye Assistant) | Works, with LAS X's command |
 | Channel colour lock | Works: pressed in LAS X's window (it sends LAS X's hardware server nothing) |
 | Bulk Options: Lock All Settings (and freeing them), Disable All Settings (and enabling them) | Works, with LAS X's commands |
+| Bulk Options: Reset System, Reset ImageCompass | Works, with LAS X's commands; the setting can be saved first and loaded after |
 | The y-stack of the xz scan modes (xzy ...): the scan line, begin and end there, Move to | Works: the stack with LAS X's commands, the line written into LAS X's state tree |
 | The z-stack's Set Focus | Works: pressed in LAS X's window (it sends LAS X's hardware server nothing); read back from LAS X |
 | The optical section's formula: Apply to Step Size | Works, with LAS X's command |

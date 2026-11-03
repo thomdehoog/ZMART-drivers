@@ -1398,3 +1398,21 @@ region in both channels; LCS got nothing, as for a bleach point: the regions are
 Configuration window (on the right screen) showed a column for each laser line (405, 488, 638, 730 and the white-light
 lines), but no row for the region, nor for a second one drawn with the window open; so the lines per region cannot be
 learned on the simulator. Put back: the window closed, the regions removed (Select All and the bin), ROI scan off.
+
+## 90. Bulk Options' Reset System and Reset ImageCompass (3 November 2026)
+
+LAS X's help (Beam Path Settings: Adding, Loading, Renaming, Sorting, Resetting and Deactivating Settings) says Reset System
+sets the ImageCompass and the global settings to their state when LAS X starts (xyz, 512 x 512, 400 Hz, resonant and
+bidirectional off, zoom 1, z-galvo, rotation 0, Airy 1, no autofocus, ROI or bleach point, the z-stack's begin and end
+reset, the filters and beam splitters at their start), the lasers staying on; Reset ImageCompass resets only the
+ImageCompass (the setting's name, the spectral slider, the detectors' operating mode). Both are ordinary operator
+controls, so they are built.
+
+Each asks "Are you sure ...?" first (Yes, No). Answered Yes: Reset ImageCompass sent `<Scanner Command="ResetImageCompass"/>`;
+the setting's line went off, the detectors and the Best Focus Setting went back to their start and the setting's name became
+"Setting  1"; the zoom (2) stayed. Reset System sent `<Scanner Command="ResetSystem"/>`: the zoom went to 1, the z-stack's
+ends were cleared, the step became System Optimized, the λ scan and the autofocus took their start values, and HyD 2's gain
+went from 100 to 10. Built: `reset_system()` (read back on the zoom) and `reset_imagecompass()` (read back: no line on); the
+driver sends them without the question. Through the driver: the setting saved, the zoom set to 2, Reset System (zoom 1, xyz,
+no line on), Reset ImageCompass, and the saved setting loaded back (499 nm at 2 %, "Setting 1"). HyD 2 stays at gain 10:
+in its tau mode LCS allows only 10.

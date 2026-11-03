@@ -698,6 +698,20 @@ class TestTheDetectorLock:
         assert changes.lock_laser_line(client, 405.0, locked)["success"] is False
         assert lasx.commands() == []
 
+    def test_reset_system_puts_the_scan_back_to_las_x_s_start(self, lasx, client):
+        lasx.live[("Confocal", "ScanningParameter", "Zoom")] = 2.0
+
+        result = changes.reset_system(client)
+
+        assert result["confirmed"] is True and lasx.commands() == ["ResetSystem"]
+        assert lasx.live[("Confocal", "ScanningParameter", "Zoom")] == 1.0
+
+    def test_reset_imagecompass_switches_the_setting_s_lines_off(self, lasx, client):
+        result = changes.reset_imagecompass(client)
+
+        assert result["confirmed"] is True and lasx.commands() == ["ResetImageCompass"]
+        assert direct_reader.get_laser_lines() == []
+
     def test_every_setting_is_locked_and_freed_as_bulk_options_does(self, lasx, client):
         assert changes.lock_all_settings(client, True)["confirmed"] is True
         assert lasx.commands() == ["LockSetting"] and 'LockState="1"' in lasx.sent[-1] and 'SetMode="1"' in lasx.sent[-1]
