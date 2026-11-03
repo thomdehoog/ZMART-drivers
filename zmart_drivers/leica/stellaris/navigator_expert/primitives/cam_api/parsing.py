@@ -123,12 +123,6 @@ def parse_tile_geometry(settings):
     if tile_w is None:
         raise ValueError(f"Cannot parse imageSize: '{raw_size}'")
 
-    # ── pixel size (µm, converted to nm for output) ──
-    raw_px = settings.get("pixelSize", "")
-    pixel_w_um, pixel_h_um = _parse_dim_um(raw_px)
-    pixel_w_nm = pixel_w_um * 1000 if pixel_w_um is not None else None
-    pixel_h_nm = pixel_h_um * 1000 if pixel_h_um is not None else None
-
     # ── format (pixel count) ──
     raw_fmt = settings.get("format", "")
     fmt_parts = raw_fmt.split("x")
@@ -138,6 +132,17 @@ def parse_tile_geometry(settings):
     else:
         pixels_x = None
         pixels_y = None
+
+    # ── pixel size (µm, converted to nm for output) ──
+    # The field of view over the pixel count, as LAS X writes it into the image:
+    # ``pixelSize`` is rounded to two decimals (1.52 for 1550 um / 1024 px =
+    # 1.5137), and tiles laid at the rounded size leave strips unimaged.
+    if pixels_x and pixels_y:
+        pixel_w_um, pixel_h_um = tile_w / pixels_x, tile_h / pixels_y
+    else:
+        pixel_w_um, pixel_h_um = _parse_dim_um(settings.get("pixelSize", ""))
+    pixel_w_nm = pixel_w_um * 1000 if pixel_w_um is not None else None
+    pixel_h_nm = pixel_h_um * 1000 if pixel_h_um is not None else None
 
     # ── bounding box (µm) ──
     stage = settings.get("xyStage", {})

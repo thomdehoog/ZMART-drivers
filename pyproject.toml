@@ -23,7 +23,8 @@ classifiers = [
 # What the driver needs beyond the controller: pip install -e ".[leica]".
 [project.optional-dependencies]
 # The Leica driver: images and their metadata (numpy, tifffile; zarr and
-# OME's ome-zarr-models for saving a capture as OME-Zarr 0.5), the setup
+# OME's ome-zarr-models for saving a capture as OME-Zarr 0.5; ome-types and
+# lxml, its schema backend, for checking a store's OME-XML), the setup
 # notebooks for orientation and objective calibration (scipy, scikit-image,
 # opencv, matplotlib, pillow, ipython), pythonnet, which loads Leica's
 # LAS X interface, pywin32, which reads where the z drives are from LAS X's
@@ -35,6 +36,8 @@ leica = [
     "tifffile>=2024.1",
     "zarr>=3",
     "ome-zarr-models>=1.7",
+    "ome-types>=0.5",
+    "lxml>=4.9",
     "scipy>=1.10",
     "scikit-image>=0.21",
     "opencv-python-headless>=4.8",

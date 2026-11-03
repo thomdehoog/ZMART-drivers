@@ -1971,6 +1971,29 @@ class TestStateAndProcedures(unittest.TestCase):
         self.assertEqual(observed["image_size_px"], [1000, 400])
         self.assertEqual(observed["pixel_size_um"], [0.1, 0.2])
 
+    def test_the_pixel_size_is_the_field_over_the_pixels_not_the_rounded_text(self):
+        """LAS X rounds pixelSize to two decimals; the field of view and the format are exact.
+
+        On the STELLARIS (2026-11-03) an overview job read 1550 um over 1024 px
+        but pixelSize "1.52 um", and tiles laid at 1.52 left 6 um strips unimaged.
+        """
+        h = _handle()
+        p = self._state_patches()
+        settings = {
+            "imageSize": "1550 um x 1550 um",
+            "pixelSize": "1.52 um x 1.52 um",
+            "format": "1024 x 1024",
+        }
+        with (
+            p[0],
+            p[1],
+            p[2],
+            patch.object(_readers, "get_job_settings", return_value=settings),
+        ):
+            observed = _state_record.get_state(h)["observed"]
+        self.assertEqual(observed["pixel_size_um"], [1550 / 1024, 1550 / 1024])
+        self.assertEqual(observed["pixel_size"]["x"] * 1024, observed["frame_size"]["x"])
+
     def test_the_image_size_is_the_picture_as_saved_turned_with_it(self):
         """A quarter turn of the pixels swaps width and height, as in the saved picture."""
         h = _handle()

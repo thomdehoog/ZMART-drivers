@@ -7,7 +7,8 @@ what the microscope really did.
 
 - **Author:** Thom de Hoog (ZMB, University of Zurich) · thom.dehoog@zmb.uzh.ch · thomdehoog@gmail.com
 - **License:** see the repository root [`LICENSE`](../../../../LICENSE).
-- **Status:** **Beta (`0.7.0b10`).** 0.7.0b10 can save a run as OME-TIFF as well as OME-Zarr:
+- **Status:** **Beta (`0.7.0b11`).** 0.7.0b11 lays tiles at the exact pixel size (the
+  field of view over the pixel count, not LAS X's two-decimal `pixelSize`). 0.7.0b10 can save a run as OME-TIFF as well as OME-Zarr:
   the connection's `format` (`"ome-zarr"` by default, `"ome-tiff"` when the ZMART interface's
   Connect step asks for it) decides, and an OME-TIFF position is one file placed by the same
   OME-Zarr rules (see the [metadata convention](../../../metadata_convention/README.md)). It is
