@@ -197,6 +197,7 @@ SIMULATOR_SETTINGS = {
     ("Confocal", "ScanningParameter", "Resolution"): 8,
     ("Confocal", "ScanningParameter", "ResolutionList"): (8, 12, 16),
     ("Acquire", "AcquireZStackInfo", "StackCalculationMode"): 1,
+    ("Confocal", "ScanningParameter", "IsScanHeadControlledZStackActive"): False,
     ("Acquire", "AcquireZStackInfo", "UseSystemOptimizedCalculation"): False,
     ("Acquire", "AcquireZStackInfo", "OptimalStepSize"): 2.4e-06,
     ("Confocal", "ScanningParameter", "SpeedMin"): 1,

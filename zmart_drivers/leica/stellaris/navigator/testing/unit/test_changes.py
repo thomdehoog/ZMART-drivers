@@ -2141,6 +2141,27 @@ class TestTheYStack:
         assert len(lasx.sent) == sent and lasx.z_um[1] == 0.0
 
 
+class TestZFlow:
+    """The z-stack panel's Z Flow: LCS's IsScanHeadControlledZStackActive, written by the window with no command (STELLARIS,
+    2026-11-04)."""
+
+    @pytest.mark.parametrize("on", [True, False])
+    def test_it_is_written_as_the_window_writes_it_and_read_back(self, lasx, client, on):
+        lasx.live[("Confocal", "ScanningParameter", "IsScanHeadControlledZStackActive")] = not on
+
+        result = changes.change(client, "z_flow", on)
+
+        assert result["confirmed"] is True
+        assert client_element(client) == f'<StateTree Command="IsScanHeadControlledZStackActive" Value="{int(on)}"/>'
+        assert lasx.live[("Confocal", "ScanningParameter", "IsScanHeadControlledZStackActive")] is on
+
+    @pytest.mark.parametrize("value", ["on", 1, None])
+    def test_another_value_is_refused_before_anything_is_sent(self, lasx, client, value):
+        with pytest.raises(ValueError, match="z_flow"):
+            changes.change(client, "z_flow", value)
+        assert lasx.live[("Confocal", "ScanningParameter", "IsScanHeadControlledZStackActive")] is False
+
+
 class TestTheZStackStepMode:
     """The z-stack panel's Number of Steps, Z-Step Size and System Optimized: LCS's StackCalculationMode 0, 1, 2."""
 
@@ -2249,6 +2270,33 @@ class TestTheZStackPanel:
 
     def test_a_place_the_panel_does_not_have_is_refused(self, lasx, stacked):
         assert changes.move_to_z_stack(stacked, "middle")["success"] is False
+
+    def test_the_direction_swaps_begin_and_end(self, lasx, stacked):
+        """As the window's direction button: begin and end swapped (simulator, discovery section 6)."""
+        result = changes.set_z_stack_direction(stacked, "down")
+
+        assert result["confirmed"] is True
+        assert (result["z_stack"]["begin"], result["z_stack"]["end"]) == (pytest.approx(1005.0), pytest.approx(995.0))
+        assert lasx.commands()[-1] == "SetZStackDefinition"
+
+    def test_the_direction_it_already_runs_sends_nothing(self, lasx, stacked):
+        sent = len(lasx.sent)
+
+        result = changes.set_z_stack_direction(stacked, "up")
+
+        assert result["success"] is True and result["confirmed"] is True and "already" in result["message"]
+        assert len(lasx.sent) == sent
+
+    @pytest.mark.parametrize("direction", ["sideways", None, 1])
+    def test_another_direction_is_refused(self, lasx, stacked, direction):
+        sent = len(lasx.sent)
+
+        assert changes.set_z_stack_direction(stacked, direction)["success"] is False
+        assert len(lasx.sent) == sent
+
+    def test_without_a_stack_the_direction_is_refused(self, lasx, client):
+        assert changes.set_z_stack_direction(client, "down")["success"] is False
+        assert lasx.commands() == []
 
     def test_clear_leaves_no_stack(self, lasx, stacked):
         lasx.z_um[2] = 1001.0

@@ -79,6 +79,7 @@ READS = (
     "phase_x",
     "system_optimized_step",
     "z_stack_mode",
+    "z_flow",
     "pane_percentage",
     "collar",
     "smartcorr",
@@ -666,6 +667,14 @@ def get_system_optimized_step() -> bool:
     value = settings("the step mode", {"on": (*Z_STACK, "UseSystemOptimizedCalculation")})["on"]
     if not isinstance(value, bool):
         raise HardwareServerUnavailable(f"the state tree answered UseSystemOptimizedCalculation = {value!r}")
+    return value
+
+
+def get_z_flow() -> bool:
+    """Whether the z-stack panel's Z Flow is on: LCS's ``ScanningParameter/IsScanHeadControlledZStackActive``."""
+    value = settings("Z Flow", {"on": ("Confocal", "ScanningParameter", "IsScanHeadControlledZStackActive")})["on"]
+    if not isinstance(value, bool):
+        raise HardwareServerUnavailable(f"the state tree answered IsScanHeadControlledZStackActive = {value!r}")
     return value
 
 

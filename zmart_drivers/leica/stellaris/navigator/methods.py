@@ -268,7 +268,7 @@ class Microscope:
 
     def settings(self) -> dict:
         """What LAS X is set to now: ``zoom``, ``scan_speed``, ``scan_field_rotation``, ``averaging``, ``pinhole``, ``format``, ``scan_mode``, ``objective``, ``z_stack``, ``autofocus``,
-        ``bidirectional``, ``phase_x``, ``system_optimized_step``, ``collar``, ``smartcorr``, ``setting``, ``sequential_mode``, ``autofocus_settings``, ``autofocus_scan`` and ``bit_depth``."""
+        ``bidirectional``, ``phase_x``, ``system_optimized_step``, ``z_flow``, ``collar``, ``smartcorr``, ``setting``, ``sequential_mode``, ``autofocus_settings``, ``autofocus_scan`` and ``bit_depth``."""
         self.handle.require_open()
         found = acquire_step.current_settings(self.handle)
         return {name: found[name] for name in found if name != "fov_m"}
@@ -312,7 +312,8 @@ class Microscope:
         False), ``bidirectional`` (True or False), ``format`` (``(x, y)`` pixels),
         ``phase_x``, ``pinhole_um`` (micrometres), ``pinhole_unit`` (``"um"`` or ``"airy"``)
         ``emission_wavelength`` (whole nanometres, for the Airy unit), ``bit_depth``
-        (8, 12 or 16), ``system_optimized_step`` (True or False) and ``collar``
+        (8, 12 or 16), ``system_optimized_step`` (True or False), ``z_flow`` (the
+        z-stack panel's Z Flow, True or False) and ``collar``
         (the objective's correction collar, 0 to 100 percent) and ``smartcorr_range``
         (``(begin, end, steps)``, the collar positions SmartCORR scans through) and
         ``setting_name`` (the current setting's name, plain text) and ``sequential_mode``
@@ -1307,6 +1308,17 @@ class Microscope:
         self.handle.require_open()
         result = changes.recenter_z_stack(self.handle.client)
         checked(self.handle, result, "recenter_z_stack()")
+        return result["z_stack"]
+
+    def set_z_stack_direction(self, direction: str) -> dict:
+        """Run the z-stack ``"up"`` (begin below end) or ``"down"`` (begin above end), as the window's direction button.
+
+        Begin and end are swapped, as the button does; a stack that already runs
+        that way is left as it is. Answers the stack.
+        """
+        self.handle.require_open()
+        result = changes.set_z_stack_direction(self.handle.client, direction)
+        checked(self.handle, result, f"set_z_stack_direction({direction!r})")
         return result["z_stack"]
 
     def move_to_z_stack(self, place: str) -> dict:

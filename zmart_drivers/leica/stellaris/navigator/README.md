@@ -185,6 +185,7 @@ mic.connect("stellaris-navigator")                                              
 | `set_z_stack_size(size_um)` | Set the z-stack's size around its middle, as the window's Z Size; its new ends are checked against the z limits first. Answers the stack. |
 | `set_z_stack_begin_here()`, `set_z_stack_end_here()` | Set the z-stack's begin or end where its drive stands, as the window's Begin and End buttons. |
 | `recenter_z_stack()` | Move the z-stack, its size kept, around where its drive stands, as the window's Re-Center; its new ends are checked first. |
+| `set_z_stack_direction(direction)` | Run the z-stack `"up"` (begin below end) or `"down"` (begin above end), as the window's direction button: begin and end are swapped; a stack that already runs that way is left as it is. Answers the stack. |
 | `set_z_stack_sections(sections)` | Set the z-stack's number of sections over its size, by the step that gives it. |
 | `move_to_z_stack(place)` | Move the focus to the z-stack's `"begin"`, `"end"` or `"center"`, or to its `"focus"` plane (set with `set_z_stack_focus`), as the window's Move to buttons. Checked against the z limits like any z move. In an xz scan mode the scan line moves instead. |
 | `set_z_stack_focus(on=True)` | Set the z-stack's focus plane where the focus is now, or clear it, as the z-stack panel's Set Focus; written into LCS's state tree and read back. |
@@ -271,6 +272,7 @@ confirmed, with what LAS X set instead.
 | `bit_depth` | the bits per pixel, one LAS X offers (8, 12 or 16) | exact |
 | `z_stack_mode` | `"steps"`, `"step_size"` or `"system_optimized"`: the z-stack panel's Number of Steps (the count kept when the ends move), Z-Step Size or System Optimized | exact |
 | `system_optimized_step` | `True` or `False`: the z-stack's step System Optimized, as the window's button; LAS X may stretch the end to fit whole steps | exact |
+| `z_flow` | `True` or `False`: the z-stack panel's Z Flow; on, LAS X has frame accumulation, frame averaging and z-compensation unavailable | exact |
 
 These and the autofocus's settings have no command LAS X's window sends; the window writes them straight into
 LAS X's state tree, and so does the driver, for these seven values only. LAS X does not keep to its

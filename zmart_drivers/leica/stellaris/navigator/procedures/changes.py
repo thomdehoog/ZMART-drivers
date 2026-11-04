@@ -2200,6 +2200,25 @@ def recenter_z_stack(client, *, max_retries=None) -> dict:
     return stack_result(client, change, max_retries)
 
 
+def set_z_stack_direction(client, direction, *, max_retries=None) -> dict:
+    """Run the z-stack ``"up"`` (begin below end) or ``"down"`` (begin above end), as the window's direction button.
+
+    The button sends no command of its own: it swaps begin and end
+    (simulator, discovery section 6), and so does this. A stack that already
+    runs that way is left as it is, and nothing is sent.
+    """
+    if direction not in ("up", "down"):
+        return dispatch.refused(f"a z-stack runs 'up' or 'down', not {direction!r}")
+    try:
+        stack, drive, _, start = the_stack(client)
+    except RuntimeError as why:
+        return dispatch.refused(f"the z-stack's direction cannot be set: {why}")
+    if (stack["begin"] > stack["end"]) == (direction == "down"):
+        message = f"the z-stack already runs {direction}; nothing was sent"
+        return {**dispatch.refused(message), "success": True, "confirmed": True, "z_stack": stack}
+    return stack_result(client, writes.z_stack_range(drive, stack["end"], stack["begin"], start=start), max_retries)
+
+
 #: The places of the z-stack panel's Move to buttons.
 STACK_PLACES = ("begin", "end", "center", "focus")
 

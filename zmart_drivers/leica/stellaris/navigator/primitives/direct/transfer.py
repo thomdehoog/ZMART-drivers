@@ -462,6 +462,9 @@ STATE_TREE_WRITES = {
     # The z-stack's Set Focus: True puts the focus plane where the stack's drive stands, False clears it; the plane's
     # position written itself is ignored (simulator, 2026-11-03).
     "IsAFPlanePosition": TreeWrite(("Acquire", "AcquireZStackInfo", "IsAFPlanePosition"), bool),
+    # The z-stack panel's Z Flow: the window writes it here with no command; LCS turns frame accumulation, frame
+    # averaging and z-compensation unavailable with it on, and back with it off (STELLARIS, 2026-11-04).
+    "IsScanHeadControlledZStackActive": TreeWrite(("Confocal", "ScanningParameter", "IsScanHeadControlledZStackActive"), bool),
     "CurrentBleachPoint": TreeWrite(("Confocal", "ROIScan", "CurrentBleachPoint"), within=(0, 10_000)),
     "WorkflowXY": TreeWrite(("Acquire", "AutoFocusInfo", "WorkflowXY"), choices=frozenset({1, 2, 3})),
     "WorkflowXYIterator": TreeWrite(("Acquire", "AutoFocusInfo", "WorkflowXYIterator"), within=(1, 1_000_000_000)),
@@ -686,6 +689,8 @@ CHECKED_WRITES = {
         "IsAutoSyncActive", "AutomationBegin", "AutomationEnd", "AutomationSteps", "CurrentBleachPoint", "BleachPointLaserPower",
         # The collar's reference, with the 40x/1.10 WATER: Set, GoTo and Reset, the collar moved and put back.
         "MotCorrRefPos",
+        # Z Flow, on and off, against the window's switch; LCS's own neighbours followed and came back.
+        "IsScanHeadControlledZStackActive",
     }),
 }
 

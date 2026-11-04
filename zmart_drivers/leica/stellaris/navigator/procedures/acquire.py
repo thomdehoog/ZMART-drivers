@@ -121,6 +121,7 @@ def current_settings(handle) -> dict:
             ("bidirectional", _readers.get_bidirectional),
             ("phase_x", _readers.get_phase_x),
             ("system_optimized_step", _readers.get_system_optimized_step),
+            ("z_flow", _readers.get_z_flow),
             ("collar", _readers.get_collar),
             ("smartcorr", _readers.get_smartcorr),
             ("setting", _readers.get_setting),

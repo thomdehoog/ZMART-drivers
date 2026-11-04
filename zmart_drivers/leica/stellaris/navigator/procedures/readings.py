@@ -368,6 +368,11 @@ def get_z_stack_mode(client, **keywords):
     return _routed("z_stack_mode", client, **keywords)
 
 
+def get_z_flow(client, **keywords):
+    """Whether the z-stack panel's Z Flow is on."""
+    return _routed("z_flow", client, **keywords)
+
+
 def get_system_optimized_step(client, **keywords):
     """Whether the z-stack's step is System Optimized."""
     return _routed("system_optimized_step", client, **keywords)

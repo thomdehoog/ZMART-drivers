@@ -2418,6 +2418,20 @@ def system_optimized_step(on: bool) -> Write:
     )
 
 
+def z_flow(on: bool) -> Write:
+    """The z-stack panel's Z Flow, on or off, as the window writes it into the state tree with no command; read back.
+
+    On, LAS X has frame accumulation, frame averaging and z-compensation
+    unavailable (their ``CanDo`` off; STELLARIS, 2026-11-04).
+    """
+    if not isinstance(on, bool):
+        raise ValueError(f"z_flow takes True or False, not {on!r}")
+    return tree_write(
+        "set_z_flow", "IsScanHeadControlledZStackActive", int(on), {"value": on},
+        f"Z Flow -> {'on' if on else 'off'}", Expect("z_flow", lambda shown: shown is on),
+    )
+
+
 #: The z-stack panel's three step modes, as LCS numbers them (``StackCalculationMode``; simulator, 2026-11-03).
 Z_STACK_MODES = {"steps": 0, "step_size": 1, "system_optimized": 2}
 
@@ -2447,6 +2461,7 @@ NAMED_SETTINGS = {
     "bit_depth": bit_depth,
     "system_optimized_step": system_optimized_step,
     "z_stack_mode": z_stack_mode,
+    "z_flow": z_flow,
     "collar": collar,
     "smartcorr_range": smartcorr_range,
     "setting_name": setting_name,

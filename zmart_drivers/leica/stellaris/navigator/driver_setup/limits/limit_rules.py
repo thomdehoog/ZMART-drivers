@@ -235,6 +235,7 @@ SETTER_LIMIT_KEYS = (
     "set_laser_output_power",
     "set_autofocus_drive",
     "set_z_stack_mode",
+    "set_z_flow",
 )
 
 
