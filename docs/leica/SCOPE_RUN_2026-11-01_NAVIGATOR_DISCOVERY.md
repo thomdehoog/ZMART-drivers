@@ -1905,7 +1905,7 @@ Each fact found by observation on the simulator:
 
 | What | How it was found |
 |---|---|
-| The wrapper's methods and their parameters (`DataContainerClient.CreateAndInitInstance(string, string)`, `Instance()`, `LoadElementFromXML(string, bool, out int)`, `MoveElement(int, int)`, `SaveElementToXML(int, bool)`, `Exit()`; `DMObject.GetChildrenInfo(EElementVisibility)`, `Delete()`), version 2.65.0.0 | the assembly's public listing, read by reflection (names and parameters only) |
+| The wrapper's methods and their parameters (`DataContainerClient.CreateAndInitInstance(string, string)`, `Instance()`, `LoadElementFromXML(string, bool, out int)`, `MoveElement(int, int)`, `SaveElementToXML(int, bool)`, `Exit()`; `DMObject.GetChildrenInfo(EElementVisibility)`, `Delete()`), version 2.65.0.0 | the assembly's public listing (names and parameters only) |
 | Where the sets are | LCS's state tree: `Confocal/ROIScan/CurrentDCROISetID` (177) for the regions, `CurrentDCBleachPointROISetID` (178) for the bleach points |
 | The shapes (point 1, polygon 8, rectangle 16, ellipse 32, range 64), their coordinates (metres, from the field's middle, y down), their turn (0 or 270) and a bleach point's time (`BLEACH_POINT` `Duration`, milliseconds) | the sets as LAS X wrote them after the shapes were drawn in its window at known pixels, saved with `SaveElementToXML` (`testing/data/datacontainer/`) |
 | A shape loaded, moved into the set, and deleted | on the simulator: ROI scan on, the set empty; a 20 by 10 µm rectangle added and read back with its corners, LAS X adding its own laser lines; cleared, the set empty again |
