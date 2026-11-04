@@ -135,6 +135,36 @@ def move_xy(client, x_um, y_um, *, max_retries=None, tolerance=None):
     return result
 
 
+def refusal_of_move(client, x_um, y_um, z_targets) -> str | None:
+    """Why the limits refuse a leg of the move to (*x_um*, *y_um*) and the *z_targets*; None when they allow every leg.
+
+    Sends nothing. Each leg is shown to the limits exactly as :func:`move_xy` and :func:`move_z` show it when they
+    send, from where the stage and the drives stand now, so a move whose z is refused moves no x or y either (on the
+    STELLARIS a move with its z out of range had sent x and y first, 2026-11-04). *z_targets* is a list of
+    ``(drive, z_um)``.
+    """
+    from ..dispatcher import limits as gate
+
+    here = readers.get_xy(client)
+    if not here:
+        return "where the stage stands could not be read, so the move cannot be checked"
+    try:
+        legs = [writes.move_xy(float(x_um), float(y_um), start={"from_x_um": here["x_um"], "from_y_um": here["y_um"]})]
+        for drive, z_um in z_targets:
+            axis = {"z-galvo": "z_galvo_um", "z-wide": "z_wide_um"}[drive]
+            now = readers.read_z_um(client, drive)
+            if now is None:
+                return f"where {drive} stands could not be read, so the move cannot be checked"
+            legs.append(writes.move_z(drive, float(z_um), start={f"from_{axis}": now}))
+    except (TypeError, ValueError, KeyError) as why:
+        return f"the move cannot be checked: {why}"
+    for leg in legs:
+        message = gate.check_refusal(client, leg.command, leg.values, direct_profile.limits_setup_hint)
+        if message is not None:
+            return message
+    return None
+
+
 def move_z(client, drive, z_um, *, max_retries=None, tolerance=None):
     """Move the z drive *drive* (``"z-galvo"`` or ``"z-wide"``) to *z_um*, in micrometres.
 

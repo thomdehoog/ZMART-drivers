@@ -214,6 +214,31 @@ def test_a_spiral_has_one_ring_or_more(scope, rings):
         scope.spiral_of_fields(rings)
 
 
+def test_a_move_whose_z_is_refused_moves_no_x_or_y_either(scope, lasx):
+    """On the STELLARIS a move with its z out of range had sent x and y first (2026-11-04): the whole move is checked
+    before any leg is sent."""
+    here = scope.position()
+    x, y = here["x"]["position"], here["y"]["position"]
+    z_max = here["z"]["canvas"][1]
+
+    with pytest.raises(RuntimeError, match="before anything was sent"):
+        scope.move_to(x + 1000.0, y, z_max + 1000.0)
+
+    assert lasx.commands() == []
+    after = scope.position()
+    assert after["x"]["position"] == pytest.approx(x) and after["y"]["position"] == pytest.approx(y)
+
+
+def test_a_move_within_the_limits_still_moves_every_leg(scope, lasx):
+    here = scope.position()
+    x, y, z = (here[a]["position"] for a in ("x", "y", "z"))
+
+    after = scope.move_to(x + 100.0, y - 50.0, z + 5.0)
+
+    assert after["x"]["position"] == pytest.approx(x + 100.0) and after["y"]["position"] == pytest.approx(y - 50.0)
+    assert after["z"]["position"] == pytest.approx(z + 5.0, abs=0.01)
+
+
 def test_the_row_turns_round_at_the_edge_of_the_canvas(scope, lasx):
     """A row that would leave the stage's limits runs the other way instead."""
     here = scope.position()

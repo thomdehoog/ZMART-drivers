@@ -306,9 +306,13 @@ def set_xyz(
     z_target = target_focus - snap["z_galvo_um"]
     z_targets = [("z-wide", z_target)]
 
-    # Every leg below is limit-checked inside the command it fires — the
-    # frame code carries no checks of its own. A refused leg raises here with
-    # an actionable message; legs that already ran stay where they arrived.
+    # The whole move is shown to the limits before any leg is sent, so a z
+    # that is refused moves no x or y either. Each leg is checked again
+    # inside the command it fires; a leg refused then raises, and legs that
+    # already ran stay where they arrived.
+    refusal = changes.refusal_of_move(handle.client, abs_x, abs_y, z_targets)
+    if refusal is not None:
+        raise RuntimeError(f"move refused before anything was sent: {refusal}")
     arrived = changes.move_xy(handle.client, abs_x, abs_y)
     if not arrived.get("success"):
         raise RuntimeError(f"move_xy failed: {arrived.get('message')}")
