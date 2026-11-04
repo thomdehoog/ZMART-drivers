@@ -224,7 +224,7 @@ def main() -> int:
                 run.note(step, f"{name} to {target}", False, f"{type(why).__name__}: {why}")
             finally:
                 outcome(step, f"{name} back to {current}", changes.change(client, name, current))
-        wheels = [w for w in d.get_filter_wheels() if w["type"] not in changes.INTERNAL_WHEELS and len(w["filterNames"]) > 1]
+        wheels = [w for w in d.get_filter_wheels() if w["type"] not in (*changes.INTERNAL_WHEELS, *changes.MODE_WHEELS) and len(w["filterNames"]) > 1]
         if wheels:
             wheel = wheels[0]
             names = [str(n).strip() for n in wheel["filterNames"]]

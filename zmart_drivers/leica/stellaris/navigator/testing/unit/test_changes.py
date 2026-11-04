@@ -479,6 +479,13 @@ class TestTheAcquisitionSettings:
         assert result["success"] is False and "200" in result["message"]
         assert lasx.commands() == []
 
+    def test_the_frap_booster_is_left_to_las_x_s_frap_mode(self, lasx, client):
+        """STELLARIS, 2026-11-04: LCS refused turning wheel 121 ("not supported"), in FRAP mode too; FRAP mode put it in itself."""
+        result = changes.set_filter_wheel(client, 121, "FRAP Booster")
+
+        assert result["success"] is False and "FRAP" in result["message"]
+        assert lasx.commands() == []
+
     def test_a_filter_the_wheel_does_not_hold_is_refused(self, lasx, client):
         result = changes.set_filter_wheel(client, 140, "Polarizer")
 

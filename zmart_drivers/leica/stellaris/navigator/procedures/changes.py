@@ -646,6 +646,9 @@ def set_tau_channel_lifetime(client, detector, channel, ns, *, max_retries=None)
 #: LAS X's own wheels: the galvo and scanner switches (types 200, 160, 170 on the
 #: simulator). They are never turned by this driver.
 INTERNAL_WHEELS = (200, 160, 170)
+#: Wheels LAS X turns with a mode of its own, by type, and that mode. The FRAP Booster (121): FRAP mode put it in by
+#: itself, and LCS refused turning it, in FRAP mode too ("not supported"; STELLARIS, 2026-11-04).
+MODE_WHEELS = {121: "FRAP mode"}
 
 
 def set_filter_wheel(client, wheel_type, filter_name, *, max_retries=None) -> dict:
@@ -660,6 +663,8 @@ def set_filter_wheel(client, wheel_type, filter_name, *, max_retries=None) -> di
 
     if wheel_type in INTERNAL_WHEELS:
         return dispatch.refused(f"wheel {wheel_type} is one of LAS X's own scanner wheels, never turned by this driver")
+    if wheel_type in MODE_WHEELS:
+        return dispatch.refused(f"wheel {wheel_type} goes with LAS X's {MODE_WHEELS[wheel_type]}, which turns it itself; nothing was sent")
     if wheel_type == MULTI_FUNCTION_PORT and readers.get_mfp_auto_select(client):
         return dispatch.refused("the MFP follows the setting (Autoselect); set_mfp_auto_select(False) first, as in the window")
     wheel = next((w for w in readers.get_filter_wheels(client) or [] if w.get("type") == wheel_type), None)
