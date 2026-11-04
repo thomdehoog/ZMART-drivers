@@ -1968,21 +1968,27 @@ of 2 fields 63.9 um apart (8.2 s, one store per field, the stage back on the fir
 
 **What differed or failed:**
 
-- **A setting saved writes no file on 4.9.2.** The driver sends `ATL_Block_Save_To_XML` with `Attribute="2"`; LCS
-  answers without an error and writes nothing (E: and C:, with and without a dot folder). LAS X's own window sends
-  `Attribute="11" Origin="LMSApplication"`, which writes the file. So the pan cannot be read: a lower zoom, `pan()`, the
-  pan's steps, `move_pan`, `set_pan` and `zoom_in` fail, and `save_setting` too (`load_setting` probably as well).
-  The pan read from the window's file was 0, 0. **The same holds for every `ATL` command the driver sends with
-  `Attribute="2"`**: `ATL_Setting_Create` (copy) answered `Error="1"` "setting creation failed", where the window's
-  `ATL_Setting_Create CloneSetting="0" Attribute="11" Origin="LMSApplication"` made a setting. Affected: `add_setting`,
-  `activate_setting`, `delete_setting` (`ATL_Setting_Create`, `_Activate`, `_Delete`), `save_setting` and `load_setting`
-  (`ATL_Block_Save_To_XML`, `_Load_From_XML`). So a change landing in the current setting with several settings is not
-  checked yet.
+- **Setting files are written only after a setting has been worked in LAS X's session.** At first a save
+  (`ATL_Block_Save_To_XML`) was answered without an error and wrote nothing, on E: and on C:, and a copied setting
+  (`ATL_Setting_Create CloneSetting="1"`) was refused, "setting creation failed"; so the pan could not be read, and a
+  lower zoom, `pan()`, the pan's steps, `move_pan`, `set_pan` and `zoom_in` failed with `save_setting`. The window's
+  save after its own Add new Setting wrote the file. **Not the attribute** (corrected 2026-11-04): the driver's commands
+  sent with the window's `Attribute="11" Origin="LMSApplication"` failed the same way right after LAS X had started
+  again, and with the driver's own `Attribute="2"` a new setting (`CloneSetting="0"`) was made, activated and deleted.
+  From then on every save wrote its file, in every folder tried (E:, its subfolders, `D:\Temp2`, C:), and the pan
+  read, a lower zoom, one pan step and back to the centre, a copied setting, and a load all worked, the driver
+  unchanged. So after LAS X starts, a setting operation is needed before LAS X writes setting files: to prove with a
+  fresh start (a save failing, then working after one `activate_setting`), and then to do in `connect()`.
 - **LAS X's data container wrapper is version 2.65.0.1 here** (2.65.0.0 on the simulator). The driver checks the
-  version first and refused, touching nothing: `add_roi_regions`, `add_bleach_points` and their clear and read are
-  refused on this STELLARIS until the new version is checked.
-- No objective was changed: everything ran on the 10x dry in slot 1. `change_objective(slot=2)` was refused before the
-  turret turned: no calibration covers slots 1 to 2.
+  version first and refused, touching nothing; with 2.65.0.1 added to its known versions, regions and points were
+  added, read and cleared (below).
+- `change_objective(slot=2)` was at first refused before the turret turned (no calibration covers slots 1 to 2). On
+  2026-11-04 Thom decided the driver turns anyway: without a calibration the stage and focus stay and the answer says
+  it was not compensated, and to another immersion the answer says to check the medium. Through the driver: 10x to
+  40x water and back, then 20x dry, 20x IMM, 63x oil and back to 10x, each confirmed. **LAS X moves the stage and
+  z-wide by itself on an objective change** (10x to 20x dry: x -7.0, y +21.1, z-wide -6.1 um; back to 10x exactly
+  undone; 10x to 40x: -21, +32.5, -7.4 um, not undone on the way back). The driver does not check that move against
+  the limits; it is what put the stage 33 um beyond the y limit earlier in the session.
 
 **Also checked, without a sample:** a white-light line tuned (587 to 590 nm and back), added and removed (640 nm);
 bidirectional halves the frame time LAS X works out (1.7197 to 0.8630 s, x 0.502), so the hardware follows the state
@@ -2019,6 +2025,7 @@ TauSeparation's channel colour and Find, which found nothing), `zero_z_galvo`, `
 brought up LCS's "MotCorr initialization required"; the run was stopped and Thom closed the box. After it the collar read
 0 % (put back to 65 %), HyD S 3's band read 502 to 532 nm (put back to 575; switching its tau modes did not move it), and
 the stage stood at x 113779, y 73079 um, 33 um beyond the y limit, with no stage command from the driver in LCS's log
+(LAS X's own shift when Thom turned to the 40x, as found later)
 (put back). The spiral's nine fields were laid out as the Navigator's; their tile scan was refused there, as the stage
 stood outside the limits. Not yet checked: SmartCORR's run (the collar needs initialising first), `set_dyes`,
 `set_filter_wheel`, the spiral's tile scan and Start, and anything that needs a sample (autofocus finding a focus, the
@@ -2041,3 +2048,13 @@ and back to z-wide in between, which is the likely cause; not proven. Thom sets 
 - `clear_z_stack()` raises when no stack is set, where the window's bin does nothing.
 - The stage moves with `SetStagePositionInHwOnly` and no speed: noticeably faster than the window's moves. To check
   before working with immersion.
+
+**Fixed after the run (2026-11-04), each with its tests:** a move is checked whole before any leg is sent; `clear_z_stack`
+with no stack does nothing and says so; the collar is `motorised` only when the objective has one
+(`IsMotCorrApplicable`); a detector's modes are read by name as well (`tau_name`, `operating_name`); `lasers()` and
+`detectors()` read the light and the detection; a change names what LAS X put back by itself (`also_changed`: an
+average with its accumulation, the autofocus's precision with its steps, the z-stack's step mode); a setting saved is
+confirmed by its file; the objective turns without a calibration or to another immersion and says so; bleach points
+and ROI regions only through the data container (the window-drawing functions removed). Still open: the setting
+operation after LAS X starts (to prove, then in `connect()`), the stage's speed, LAS X's own shift on an objective
+change against the limits, the autofocus's drive, and "Acquire Until Stopped" keeping 2000 frames.
