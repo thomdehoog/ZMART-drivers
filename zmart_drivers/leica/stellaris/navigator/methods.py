@@ -605,58 +605,6 @@ class Microscope:
         result = changes.set_autofocus_optics(self.handle.client, laser_nm, percent, detector, band, dye)
         return checked(self.handle, result, f"set_autofocus_optics({laser_nm!r}, {percent!r}, {detector!r})")
 
-    def draw_bleach_point(self, x_px: int, y_px: int) -> dict:
-        """Draw a bleach point at the pixel (*x_px*, *y_px*) of the picture LAS X's viewer shows, as Draw point does.
-
-        LAS X keeps a bleach point outside its hardware server, so the driver
-        draws it in LAS X's viewer, with mouse moves and clicks sent to LAS X's
-        window (the computer's pointer is not moved): it first finds the pixel
-        by the viewer's own read-out of where the mouse is, and clicks only when
-        that shows the pixel, within half a pixel. Pixels count from the
-        picture's top-left corner, x to the right, y down. A point is kept in
-        the scan field, not on the sample, so the picture must have been taken
-        with the field as it is now (objective, zoom, stage, pan, rotation);
-        else it is refused, and a new picture is taken first. The bleach mode must
-        be on (:meth:`set_bleach_mode`); the point takes the setting's lines,
-        whose power :meth:`set_bleach_laser_power` changes. Read back from LAS X.
-        """
-        self.handle.require_open()
-        result = changes.draw_bleach_point(self.handle.client, x_px, y_px, folder=setting_files.folder_for(self.handle))
-        return checked(self.handle, result, f"draw_bleach_point({x_px!r}, {y_px!r})")
-
-    def draw_roi_region(self, shape: str, corner: tuple[int, int], opposite: tuple[int, int]) -> dict:
-        """Draw an ROI region, a ``"rectangle"`` or an ``"ellipse"`` in the box from pixel *corner* to pixel *opposite*.
-
-        As LAS X's Draw rectangle and Draw ellipse with a click at each corner, in its viewer,
-        each corner found as for :meth:`draw_bleach_point`. ROI scan must be on
-        (:meth:`set_roi_scan`). LAS X shows no count of the regions, so the
-        result says only that there are some.
-        """
-        self.handle.require_open()
-        result = changes.draw_roi_region(self.handle.client, shape, corner, opposite, folder=setting_files.folder_for(self.handle))
-        return checked(self.handle, result, f"draw_roi_region({shape!r}, {corner!r}, {opposite!r})")
-
-    def draw_roi_polygon(self, vertices) -> dict:
-        """Draw an ROI polygon through the pixels *vertices* (at least three) of the picture LAS X's viewer shows.
-
-        As LAS X's Draw polygon: a click at each corner and a right click at
-        the last, which closes it; each corner found as for
-        :meth:`draw_bleach_point`. ROI scan must be on.
-        """
-        self.handle.require_open()
-        result = changes.draw_roi_polygon(self.handle.client, vertices, folder=setting_files.folder_for(self.handle))
-        return checked(self.handle, result, f"draw_roi_polygon({vertices!r})")
-
-    def draw_roi_range(self, first_x: int, last_x: int) -> dict:
-        """Draw an ROI range: the columns *first_x* to *last_x* of the picture LAS X's viewer shows, over its whole height.
-
-        As LAS X's Draw range: a click at one column and one at the other.
-        ROI scan must be on.
-        """
-        self.handle.require_open()
-        result = changes.draw_roi_range(self.handle.client, first_x, last_x, folder=setting_files.folder_for(self.handle))
-        return checked(self.handle, result, f"draw_roi_range({first_x!r}, {last_x!r})")
-
     def set_bleach_time(self, seconds: float) -> dict:
         """Set the bleaching time of the bleach point the Bleach Point panel shows, in seconds; read back.
 
@@ -666,11 +614,6 @@ class Microscope:
         """
         self.handle.require_open()
         return checked(self.handle, changes.set_bleach_time(self.handle.client, seconds), f"set_bleach_time({seconds!r})")
-
-    def clear_drawings(self) -> dict:
-        """Clear every bleach point and ROI region drawn in LAS X's viewer, as its Select all ROIs and Clear selected ROIs do."""
-        self.handle.require_open()
-        return checked(self.handle, changes.clear_drawings(self.handle.client), "clear_drawings()")
 
     def set_bleach_laser_power(self, laser_nm: float, percent: float) -> dict:
         """Change the power of the bleach point's line at *laser_nm*, as the Bleach Point panel's Intensity does; read back.
@@ -865,7 +808,7 @@ class Microscope:
         return pan_step.step_size(self.handle.client, scanner_pad(self.handle, "pan_step", 3))
 
     def select_bleach_point(self, point: int) -> dict:
-        """Show the bleach point at *point* (0 for the first, as :meth:`draw_bleach_point` answers it) in the Bleach
+        """Show the bleach point at *point* (0 for the first, as :meth:`add_bleach_points` lists them) in the Bleach
         Point panel, as its dropdown does; :meth:`set_bleach_time`, :meth:`set_bleach_laser_power` and
         :meth:`add_bleach_laser_line` then act on it. Answers the point as LCS shows it."""
         self.handle.require_open()
@@ -1376,8 +1319,8 @@ class Microscope:
         see the medium, so check it. Refused
         while bleach points or ROI regions are drawn: they are kept in the scan
         field, so with another objective they would land a little elsewhere on
-        the sample; clear them first (:meth:`clear_drawings`) and draw them
-        again on a picture taken with the new objective.
+        the sample; clear them first (:meth:`clear_bleach_points`, :meth:`clear_roi_regions`) and add them
+        again after the change.
         """
         self.handle.require_open()
         refuse_with_drawings(self.handle, "the objective", "change_objective")

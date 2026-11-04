@@ -1122,35 +1122,6 @@ class TestBestFocusLaserPower:
 
 
 
-class TestThePictureShown:
-    """Whether the picture LAS X's viewer shows was taken with the field as it is now, from its own description."""
-
-    @pytest.fixture
-    def described(self, monkeypatch):
-        from zmart_drivers.leica.stellaris.navigator.procedures import pan
-        from zmart_drivers.leica.stellaris.navigator.procedures.save_data import collect
-
-        found = {}
-        monkeypatch.setattr(collect, "data_container_root", lambda: Path("cache"))
-        monkeypatch.setattr(collect, "newest_description", lambda root, name: found.get(name))
-        monkeypatch.setattr(pan, "read", lambda client, folder: {"x": 0.0, "y": 0.0})
-        return found
-
-    def test_a_picture_taken_with_the_field_as_now_is_current(self, lasx, client, described):
-        described["Preview"] = '<Data><Image><ImageDescription/><Attachment Name="HardwareSetting"><ATLConfocalSettingDefinition ObjectiveName="HC PL APO  CS    10x/0.40 DRY " Zoom="1" StagePosX="0.0635" StagePosY="0.0415" RotatorAngle="0" PanFirstDim="0" PanSecondDim="0"/></Attachment></Image></Data>'
-
-        assert changes.picture_is_current(client, "folder", "Preview") is None
-
-    def test_a_picture_at_another_zoom_or_place_is_not(self, lasx, client, described):
-        described["Preview"] = '<Data><Image><ImageDescription/><Attachment Name="HardwareSetting"><ATLConfocalSettingDefinition ObjectiveName="HC PL APO  CS    10x/0.40 DRY " Zoom="2" StagePosX="0.001" StagePosY="0" RotatorAngle="0" PanFirstDim="0" PanSecondDim="0"/></Attachment></Image></Data>'
-
-        why = changes.picture_is_current(client, "folder", "Preview")
-
-        assert "zoom 2" in why and "stage" in why
-
-    def test_a_picture_not_in_the_cache_is_not(self, lasx, client, described):
-        assert "not in" in changes.picture_is_current(client, "folder", "Image007")
-
 
 class TestBleachPointLaserPower:
     """The bleach point's laser power, as the Bleach Point panel's Intensity writes it; the point is drawn in LAS X's viewer."""
@@ -1288,107 +1259,38 @@ class TestTheBleachPanel:
         assert "draw" in changes.add_bleach_laser_line(client, 559)["message"]
 
 
-class TestDrawingInTheViewer:
-    """Bleach points and ROI regions drawn in LAS X's viewer: LCS is asked first whether the mode is on, and a point is
-    read back from LCS (CurrentBleachPoint goes to the new point; simulator, 2026-11-03)."""
-
-    @pytest.fixture(autouse=True)
-    def current_picture(self, monkeypatch):
-        monkeypatch.setattr(changes, "picture_is_current", lambda client, folder, name: None)
+class TestDrawnPointsAndRegions:
+    """What drawn bleach points and ROI regions keep from happening, the bleaching time and the points' file. The points
+    and regions themselves are added through LAS X's data container (``test_datacontainer_changes.py``)."""
 
     def viewer(self, lasx):
         from viewer_stand_in import Viewer
 
-        viewer = Viewer()
-
-        def drawn():
-            point = lasx.live[("Confocal", "ROIScan", "CurrentBleachPoint")]
-            lasx.live[("Confocal", "ROIScan", "CurrentBleachPoint")] = point + 1
-
-        viewer.on_click = drawn
-        return viewer
-
-    def test_a_bleach_point_is_drawn_and_read_back_from_lcs(self, lasx, client):
-        lasx.live[("Confocal", "ROIScan", "EnableBleachScan")] = True
-        viewer = self.viewer(lasx)
-
-        result = changes.draw_bleach_point(client, 256, 256, folder="unused", viewer=viewer)
-
-        assert result["confirmed"] is True and result["bleach_point"]["point"] == 0 and len(viewer.clicks) == 1
-
-    def test_without_the_bleach_mode_no_point_is_drawn(self, lasx, client):
-        viewer = self.viewer(lasx)
-
-        result = changes.draw_bleach_point(client, 256, 256, folder="unused", viewer=viewer)
-
-        assert result["success"] is False and "set_bleach_mode" in result["message"] and viewer.clicks == []
-
-    def test_a_pixel_outside_the_picture_is_refused(self, lasx, client):
-        lasx.live[("Confocal", "ROIScan", "EnableBleachScan")] = True
-
-        assert changes.draw_bleach_point(client, 600, 10, folder="unused", viewer=self.viewer(lasx))["success"] is False
-
-    def test_an_roi_region_is_drawn_with_roi_scan_on(self, lasx, client):
-        lasx.live[("Confocal", "ROIScan", "EnableRoiScan")] = True
-        viewer = self.viewer(lasx)
-
-        result = changes.draw_roi_region(client, "ellipse", (10, 10), (100, 80), folder="unused", viewer=viewer)
-
-        assert result["confirmed"] is True and len(viewer.drags) == 1
-
-    def test_without_roi_scan_no_region_is_drawn(self, lasx, client):
-        viewer = self.viewer(lasx)
-
-        result = changes.draw_roi_region(client, "rectangle", (10, 10), (100, 80), folder="unused", viewer=viewer)
-
-        assert result["success"] is False and "set_roi_scan" in result["message"] and viewer.drags == []
-
-    def test_on_a_picture_taken_elsewhere_nothing_is_drawn(self, lasx, client, monkeypatch):
-        lasx.live[("Confocal", "ROIScan", "EnableBleachScan")] = True
-        monkeypatch.setattr(changes, "picture_is_current", lambda client, folder, name: "the zoom 1 (now 2)")
-        viewer = self.viewer(lasx)
-
-        result = changes.draw_bleach_point(client, 256, 256, folder="unused", viewer=viewer)
-
-        assert result["success"] is False and "zoom 1 (now 2)" in result["message"] and viewer.clicks == []
+        return Viewer()
 
     def test_no_objective_change_with_a_bleach_point_drawn(self, lasx, client):
         lasx.live[("Confocal", "ROIScan", "CurrentBleachPoint")] = 0
 
-        assert "clear_drawings" in changes.drawings_in_the_way(client, viewer=self.viewer(lasx))
+        assert "clear_bleach_points" in changes.drawings_in_the_way(client, viewer=self.viewer(lasx))
 
     def test_no_objective_change_with_regions_drawn(self, lasx, client):
         lasx.live[("Confocal", "ROIScan", "EnableRoiScan")] = True
         viewer = self.viewer(lasx)
         viewer.regions = True
 
-        assert "clear_drawings" in changes.drawings_in_the_way(client, viewer=viewer)
+        assert "clear_bleach_points" in changes.drawings_in_the_way(client, viewer=viewer)
 
     def test_no_pan_with_a_bleach_point_drawn(self, lasx, client):
         lasx.live[("Confocal", "ROIScan", "CurrentBleachPoint")] = 0
 
         why = changes.drawings_in_the_way(client, "the pan", viewer=self.viewer(lasx))
 
-        assert "pan" in why and "clear_drawings" in why
+        assert "pan" in why and "clear_bleach_points" in why
 
     def test_with_nothing_drawn_the_objective_may_change(self, lasx, client):
         lasx.live[("Confocal", "ROIScan", "EnableRoiScan")] = True
 
         assert changes.drawings_in_the_way(client, viewer=self.viewer(lasx)) is None
-
-    def test_a_polygon_and_a_range_are_drawn_with_roi_scan_on(self, lasx, client):
-        lasx.live[("Confocal", "ROIScan", "EnableRoiScan")] = True
-        viewer = self.viewer(lasx)
-
-        assert changes.draw_roi_polygon(client, [(10, 10), (100, 20), (50, 90)], folder="unused", viewer=viewer)["confirmed"] is True
-        assert changes.draw_roi_range(client, 100, 200, folder="unused", viewer=viewer)["confirmed"] is True
-
-    def test_without_roi_scan_no_polygon_or_range_is_drawn(self, lasx, client):
-        viewer = self.viewer(lasx)
-
-        assert "set_roi_scan" in changes.draw_roi_polygon(client, [(10, 10), (100, 20), (50, 90)], folder="unused", viewer=viewer)["message"]
-        assert "set_roi_scan" in changes.draw_roi_range(client, 100, 200, folder="unused", viewer=viewer)["message"]
-        assert viewer.clicks == [] and viewer.drags == []
 
     def test_the_bleaching_time_needs_a_drawn_point(self, lasx, client):
         lasx.live[("Confocal", "ROIScan", "EnableBleachScan")] = True
@@ -1424,21 +1326,6 @@ class TestDrawingInTheViewer:
         assert changes.save_bleach_points(client, tmp_path / name)["success"] is False
         assert (tmp_path / "existing.bpr").read_text(encoding="utf-8") == "kept"
         assert not any("SaveBleachPoints" in e for e in lasx.sent)
-
-    def test_clearing_takes_the_points_away_in_lcs_too(self, lasx, client):
-        lasx.live[("Confocal", "ROIScan", "CurrentBleachPoint")] = 1
-        viewer = self.viewer(lasx)
-        viewer.regions = True
-
-        def cleared(help_text, press=viewer.press):
-            press(help_text)
-            lasx.live[("Confocal", "ROIScan", "CurrentBleachPoint")] = -1
-
-        viewer.press = cleared
-
-        result = changes.clear_drawings(client, viewer=viewer)
-
-        assert result["confirmed"] is True and result["bleach_point"]["point"] is None
 
 
 def client_element(client):
