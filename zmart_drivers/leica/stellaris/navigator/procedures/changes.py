@@ -2358,7 +2358,13 @@ def move_to_z_stack(client, place, *, max_retries=None) -> dict:
 
 
 def clear_z_stack(client, *, max_retries=None) -> dict:
-    """Leave no z-stack, as the window's bin: its begin and end both set where its drive stands."""
+    """Leave no z-stack, as the window's bin: its begin and end both set where its drive stands.
+
+    With no z-stack set there is nothing to clear: nothing is sent, and the answer says so, as the bin then does nothing.
+    """
+    if not readers.get_z_stack(client):
+        message = "no z-stack is set, so there is nothing to clear; nothing was sent"
+        return {**dispatch.refused(message), "success": True, "confirmed": True, "z_stack": None}
     try:
         _, drive, here, start = the_stack(client)
     except RuntimeError as why:

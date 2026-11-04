@@ -356,6 +356,18 @@ def test_the_pan_is_moved_by_micrometres_through_the_scanner(scope, lasx, monkey
 
 
 
+def test_an_objective_without_a_collar_is_not_motorised_on_a_stand_that_could_turn_one(monkeypatch):
+    """The stand's CanDoMotCorr alone said True for the STELLARIS's 10x dry, which has no collar (2026-11-04)."""
+    import state_tree_stand_in
+
+    from zmart_drivers.leica.stellaris.navigator.primitives.direct import reads
+
+    monkeypatch.setitem(state_tree_stand_in.SIMULATOR_OBJECTIVES[0], "IsMotCorrApplicable", False)
+    attach(monkeypatch, PlainNavigator(z_wide_um=100.0))
+
+    assert reads.get_collar()["motorised"] is False
+
+
 def test_the_collar_is_read_with_the_settings(scope, lasx):
     assert scope.settings()["collar"] == {"percent": 0.0, "motorised": True, "reference": None}
     assert scope.change_setting("collar", 25)["confirmed"] is True

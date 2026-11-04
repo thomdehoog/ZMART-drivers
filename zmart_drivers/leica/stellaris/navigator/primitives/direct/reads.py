@@ -672,6 +672,9 @@ def get_system_optimized_step() -> bool:
 def get_collar() -> dict:
     """The objective's correction collar (motCORR): ``percent`` where it stands, ``motorised`` whether LAS X can turn it,
     and ``reference``, the position the window's Set stored for the objective in the light path (None when none is).
+
+    ``motorised`` needs both the stand (``Microscope/CanDoMotCorr``) and the objective in the light path
+    (``IsMotCorrApplicable``): the stand alone said True for the STELLARIS's 10x dry, which has no collar (2026-11-04).
     """
 
     def reading(nodes):
@@ -682,7 +685,8 @@ def get_collar() -> dict:
         reference = node_value(nodes, named(nodes, infos[slot], "MotCorrRefPos"))
         return {
             "percent": metres(node_value(nodes, node_at(nodes, ("Microscope", "CurrentMotCorrPos"))), "CurrentMotCorrPos"),
-            "motorised": bool(node_value(nodes, node_at(nodes, ("Microscope", "CanDoMotCorr")))),
+            "motorised": bool(node_value(nodes, node_at(nodes, ("Microscope", "CanDoMotCorr"))))
+            and bool(node_value(nodes, named(nodes, infos[slot], "IsMotCorrApplicable"))),
             "reference": None if reference is None or reference < 0 else float(reference),
         }
 

@@ -2327,7 +2327,13 @@ class TestTheZStackPanel:
         assert changes.set_z_stack_size(client, 20.0)["success"] is False
         assert changes.recenter_z_stack(client)["success"] is False
         assert changes.move_to_z_stack(client, "begin")["success"] is False
-        assert changes.clear_z_stack(client)["success"] is False
+
+    def test_without_a_stack_the_bin_does_nothing_and_says_so(self, lasx, client):
+        """As the window's bin with no stack set (STELLARIS, 2026-11-04: the driver had raised)."""
+        result = changes.clear_z_stack(client)
+
+        assert result["success"] is True and result["z_stack"] is None and "nothing to clear" in result["message"]
+        assert lasx.commands() == []
 
     @pytest.mark.parametrize(("place", "z"), [("begin", 995.0), ("end", 1005.0), ("center", 1000.0)])
     def test_the_focus_moves_to_the_stack_s_begin_end_and_center(self, lasx, stacked, place, z):
