@@ -539,6 +539,8 @@ MUTATING_COMMANDS = {
     "switch_laser": "switch_laser",
     # the settings toolbar's apply-to-hardware switch; the limits check each change as before
     "apply_to_hardware": "apply_to_hardware",
+    # LAS X's application mode (standard, FRAP); the limits check each change in it as before
+    "set_mode": "set_mode",
     "move_y_line": "move_y_line",
     # a white-light line switched on, at LCS's starting power; its power is set and checked after
     "set_laser_lines": "set_laser_lines",

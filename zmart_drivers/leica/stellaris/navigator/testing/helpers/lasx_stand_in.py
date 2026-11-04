@@ -683,6 +683,11 @@ class PlainNavigator:
         self.live[("Acquire", "IsHwConnectedMode")] = e.get("Activate") == "1"
         return "<Result/>"
 
+    def take_ATL_Activate_ATL_Mode(self, e):
+        """LAS X's application mode: FRAP (23) and back to the standard mode (0), as LCS shows it (STELLARIS, 2026-11-04)."""
+        self.live[("Ra", "ApplicationSessionGUID")] = {"0": "eWizardModeNone", "23": "eWizardModeWizardFRAP"}[e.get("Attribute")]
+        return "<Result/>"
+
     def take_SetLaserPowerState(self, e):
         """The Laser Overview's ON/OFF: the laser at that full route on or off (simulator, 2026-11-03)."""
         route = tuple(int(p.get("BeamPosition")) for p in e.iter("BeamPosition"))

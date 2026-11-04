@@ -1997,6 +1997,29 @@ def enable_setting(client, on, *, all_settings=False, max_retries=None) -> dict:
     return run(client, change, max_retries=max_retries)
 
 
+#: What a change of LAS X's mode is reported with: opening FRAP mode made a new job, set the scan mode to xyt and
+#: cleared the z-stack's ends (STELLARIS, 2026-11-04).
+MODE_NEIGHBOURS = ("scan_mode", "z_stack")
+
+
+def set_mode(client, mode, *, max_retries=None) -> dict:
+    """Switch LAS X's application mode, ``"standard"`` or ``"frap"``, as its window does; the result's ``mode`` is read back,
+    and ``also_changed`` holds the scan mode and the z-stack where they changed with it. In the mode already, nothing is sent."""
+    if mode not in writes.MODE_CODES:
+        return dispatch.refused(f"LAS X's mode is one of {sorted(writes.MODE_CODES)}, not {mode!r}")
+    if readers.get_mode(client) == mode:
+        return {**dispatch.refused(f"LAS X is in the {mode} mode already; nothing was sent"), "success": True, "confirmed": True, "mode": mode}
+    readings = {"scan_mode": readers.get_scan_mode, "z_stack": readers.get_z_stack}
+    before = {name: readings[name](client) for name in MODE_NEIGHBOURS}
+    result = run(client, writes.lasx_mode(mode), max_retries=max_retries)
+    result["mode"] = readers.get_mode(client)
+    after = {name: readings[name](client) for name in MODE_NEIGHBOURS}
+    changed = {name: {"before": before[name], "after": after[name]} for name in MODE_NEIGHBOURS if before[name] != after[name]}
+    if changed:
+        result["also_changed"] = changed
+    return result
+
+
 def apply_to_hardware(client, on, *, max_retries=None) -> dict:
     """Let a change to a setting move the hardware, or keep the changes in LAS X's settings only with *on* False, as
     the settings toolbar's apply-to-hardware switch does; the result's ``apply_to_hardware`` is read back."""

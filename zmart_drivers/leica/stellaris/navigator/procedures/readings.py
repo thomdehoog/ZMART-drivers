@@ -273,6 +273,11 @@ def get_lambda_scan(client, **keywords):
     return _routed("lambda_scan", client, **keywords)
 
 
+def get_mode(client, **keywords):
+    """LAS X's application mode: ``"standard"`` or ``"frap"``."""
+    return _routed("mode", client, **keywords)
+
+
 def get_apply_to_hardware(client, **keywords):
     """Whether a change to a setting moves the hardware (the settings toolbar's apply-to-hardware switch)."""
     return _routed("apply_to_hardware", client, **keywords)

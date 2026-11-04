@@ -254,6 +254,7 @@ ALLOWED_COMMANDS = frozenset(
         "ResetImageCompass",
         "ResetConfocalSetting",
         "ATL_ActivateHardwareConnectedMode",
+        "ATL_Activate_ATL_Mode",
         "BlockLightSourceLineForDyeAssistant",
     }
 )

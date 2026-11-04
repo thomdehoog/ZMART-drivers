@@ -532,6 +532,16 @@ class Microscope:
         self.handle.require_open()
         return checked(self.handle, changes.apply_to_hardware(self.handle.client, on), f"apply_to_hardware({on!r})")
 
+    def set_mode(self, mode: str) -> dict:
+        """Switch LAS X's application mode, ``"standard"`` or ``"frap"``, as its window does; read back.
+
+        A mode brings its own job and settings: opening FRAP mode made a new job,
+        set the scan mode to xyt and cleared the z-stack's ends. The answer's
+        ``also_changed`` holds the scan mode and the z-stack where they changed.
+        """
+        self.handle.require_open()
+        return checked(self.handle, changes.set_mode(self.handle.client, mode), f"set_mode({mode!r})")
+
     def switch_laser(self, name: str, on: bool = True) -> dict:
         """Switch the laser *name* on or off, as the Laser Overview's ON/OFF does; read back.
 

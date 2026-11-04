@@ -779,6 +779,23 @@ def hardware_connected(on: bool) -> Write:
     )
 
 
+#: LAS X's application modes, as its window numbers them in ``ATL_Activate_ATL_Mode`` (STELLARIS, 2026-11-04: FRAP 23,
+#: and 0 back to the standard mode).
+MODE_CODES = {"standard": 0, "frap": 23}
+
+
+def lasx_mode(mode: str) -> Write:
+    """LAS X's application mode, as its window switches it; read back."""
+    if mode not in MODE_CODES:
+        raise ValueError(f"LAS X's mode is one of {sorted(MODE_CODES)}, not {mode!r}")
+
+    def fill(request: Request) -> None:
+        request.elements = [f'<ATL Command="ATL_Activate_ATL_Mode" Attribute="{MODE_CODES[mode]}" Origin="LMSApplication"/>']
+
+    return Write(command="set_mode", values={"value": mode}, request="ATL_Activate_ATL_Mode", fill=fill,
+                 description=f"LAS X's mode -> {mode}", ready=idle(), confirm=Expect("mode", lambda found: found == mode))
+
+
 def laser_power_state(name: str, route, on: bool) -> Write:
     """A laser on or off, as the Laser Overview's ON/OFF sends it (``SetLaserPowerState`` with the laser's full route;
     simulator, 2026-11-03); read back."""

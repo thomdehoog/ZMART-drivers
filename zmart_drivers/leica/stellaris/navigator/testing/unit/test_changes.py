@@ -2190,6 +2190,33 @@ class TestTheYStack:
         assert len(lasx.sent) == sent and lasx.z_um[1] == 0.0
 
 
+class TestLasXMode:
+    """LAS X's application modes, as its window switches them: ``ATL_Activate_ATL_Mode`` with the mode's number (FRAP 23,
+    back with 0); read back as ``Ra/ApplicationSessionGUID`` (STELLARIS, 2026-11-04)."""
+
+    def test_frap_and_back_to_standard_are_sent_as_the_window_sends_them(self, lasx, client):
+        to_frap = changes.set_mode(client, "frap")
+
+        assert to_frap["confirmed"] is True and to_frap["mode"] == "frap"
+        assert lasx.sent[-1] == '<ATL Command="ATL_Activate_ATL_Mode" Attribute="23" Origin="LMSApplication"/>'
+
+        back = changes.set_mode(client, "standard")
+
+        assert back["confirmed"] is True and back["mode"] == "standard"
+        assert lasx.sent[-1] == '<ATL Command="ATL_Activate_ATL_Mode" Attribute="0" Origin="LMSApplication"/>'
+
+    def test_the_mode_it_is_in_already_sends_nothing(self, lasx, client):
+        result = changes.set_mode(client, "standard")
+
+        assert result["success"] is True and "already" in result["message"]
+        assert lasx.commands() == []
+
+    @pytest.mark.parametrize("mode", ["navigator", "FRAP 1", None])
+    def test_another_mode_is_refused(self, lasx, client, mode):
+        assert changes.set_mode(client, mode)["success"] is False
+        assert lasx.commands() == []
+
+
 class TestZFlow:
     """The z-stack panel's Z Flow: LCS's IsScanHeadControlledZStackActive, written by the window with no command (STELLARIS,
     2026-11-04)."""

@@ -184,6 +184,7 @@ DATUMS = {
         DatumSpec("locked_laser_lines", direct_reader.get_locked_laser_lines, lambda v: isinstance(v, list)),
         DatumSpec("lasers", direct_reader.get_lasers, lambda v: isinstance(v, list)),
         DatumSpec("apply_to_hardware", direct_reader.get_apply_to_hardware, lambda v: isinstance(v, bool)),
+        DatumSpec("mode", direct_reader.get_mode, lambda v: isinstance(v, str)),
         DatumSpec("lambda_scan", direct_reader.get_lambda_scan, lambda v: isinstance(v, dict) and "begin_nm" in v),
         DatumSpec("excitation_scan", direct_reader.get_excitation_scan, lambda v: isinstance(v, dict) and "begin_nm" in v),
         DatumSpec("laser_output_power", direct_reader.get_laser_output_power, lambda v: isinstance(v, dict)),

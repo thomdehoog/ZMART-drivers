@@ -103,6 +103,7 @@ READS = (
     "locked_laser_lines",
     "lasers",
     "apply_to_hardware",
+    "mode",
     "lambda_scan",
     "excitation_scan",
     "laser_output_power",
@@ -1435,6 +1436,16 @@ def get_apply_to_hardware() -> bool:
     """Whether a change to a setting moves the hardware, as the settings toolbar's apply-to-hardware switch shows it
     (``Acquire/IsHwConnectedMode``; simulator, 2026-11-03). Off, LAS X keeps the changes in its settings only."""
     return bool(settings("the apply-to-hardware switch", {"on": ("Acquire", "IsHwConnectedMode")})["on"])
+
+
+#: LAS X's application modes, by how LCS names the session (``Ra/ApplicationSessionGUID``; STELLARIS, 2026-11-04).
+MODES = {"eWizardModeNone": "standard", "eWizardModeWizardFRAP": "frap"}
+
+
+def get_mode() -> str:
+    """LAS X's application mode: ``"standard"`` or ``"frap"``; another mode by LCS's own name for it."""
+    found = settings("LAS X's mode", {"mode": ("Ra", "ApplicationSessionGUID")})["mode"]
+    return MODES.get(found, str(found))
 
 
 #: Auto Sync's scan options, by scanner, where LCS keeps them.
