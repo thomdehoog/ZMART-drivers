@@ -273,6 +273,34 @@ class Microscope:
         found = acquire_step.current_settings(self.handle)
         return {name: found[name] for name in found if name != "fov_m"}
 
+    def lasers(self) -> dict:
+        """The light of the current setting, as LAS X's laser panel and Laser Overview show it: ``lasers`` (each laser,
+        on or off), ``lines`` (each line that is on: its laser, wavelength, ``percent`` and whether its shutter is open),
+        ``output_power`` (each light source's own, in percent) and ``excitation_control`` (each tunable laser's)."""
+        self.handle.require_open()
+        c = self.handle.client
+        lines = [
+            {"laser": line["laserName"], "light_source": line["lightSource"], "wavelength_nm": line["wavelength"],
+             "percent": line["intensity"] * 100, "shutter_open": line["shutterOpen"]}
+            for line in readings.get_laser_lines(c)
+        ]
+        return {"lasers": readings.get_lasers(c), "lines": lines, "output_power": readings.get_laser_output_power(c),
+                "excitation_control": readings.get_excitation_control(c)}
+
+    def detectors(self) -> dict:
+        """The detection of the current setting, as LAS X's detector panel shows it: ``in_use`` (each detector that is
+        on: its band, dye and gain with LAS X's range for it) and ``modes`` (every detector's operating and tau mode, by
+        LCS's code and by the window's name)."""
+        self.handle.require_open()
+        c = self.handle.client
+        in_use = [
+            {"name": d["name"], "band_nm": (d["detectionBegin"], d["detectionEnd"]), "dye": d["dye"], "gain": d["gain"]}
+            for d in readings.get_detectors(c)
+        ]
+        modes = {name: {key: mode[key] for key in ("operating", "operating_name", "tau", "tau_name")}
+                 for name, mode in readings.get_detector_modes(c).items()}
+        return {"in_use": in_use, "modes": modes}
+
     def change_setting(self, name: str, value) -> dict:
         """Change the setting *name* to *value*, and read it back.
 

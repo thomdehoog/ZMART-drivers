@@ -361,6 +361,20 @@ def test_the_pan_is_moved_by_micrometres_through_the_scanner(scope, lasx, monkey
 
 
 
+def test_the_lasers_and_the_detectors_are_read_as_the_window_shows_them(scope, lasx):
+    """Public reads, not the procedures' readers (STELLARIS, 2026-11-04: Microscope had no method for either)."""
+    from zmart_drivers.leica.stellaris.navigator.procedures import readings
+
+    light = scope.lasers()
+    detection = scope.detectors()
+
+    assert set(light) == {"lasers", "lines", "output_power", "excitation_control"}
+    assert [line["wavelength_nm"] for line in light["lines"]] == [line["wavelength"] for line in readings.get_laser_lines(scope.handle.client)]
+    assert all(set(line) == {"laser", "light_source", "wavelength_nm", "percent", "shutter_open"} for line in light["lines"])
+    assert [d["name"] for d in detection["in_use"]] == [d["name"] for d in readings.get_detectors(scope.handle.client)]
+    assert all(set(m) == {"operating", "operating_name", "tau", "tau_name"} for m in detection["modes"].values())
+
+
 def test_an_objective_without_a_collar_is_not_motorised_on_a_stand_that_could_turn_one(monkeypatch):
     """The stand's CanDoMotCorr alone said True for the STELLARIS's 10x dry, which has no collar (2026-11-04)."""
     import state_tree_stand_in
