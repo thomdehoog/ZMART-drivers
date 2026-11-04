@@ -47,6 +47,22 @@ def detectors():
     return {d["name"]: d for d in direct_reader.get_detectors()}
 
 
+def test_a_setting_saved_is_confirmed_by_its_file(lasx, client, tmp_path):
+    """LCS's answer to a save says nothing; the file is the read-back (STELLARIS, 2026-11-04: it was left unconfirmed)."""
+    result = setting_files.save(client, tmp_path / "s.seq")
+
+    assert result["success"] is True and result["confirmed"] is True and (tmp_path / "s.seq").is_file()
+
+
+def test_a_save_las_x_answers_but_does_not_write_is_refused(lasx, client, tmp_path, monkeypatch):
+    """STELLARIS, 2026-11-04: right after LAS X started, a save was answered without an error and no file was written."""
+    monkeypatch.setattr(lasx, "take_ATL_Block_Save_To_XML", lambda e: "<Result/>")
+
+    result = setting_files.save(client, tmp_path / "s.seq")
+
+    assert result["success"] is False and "did not write" in result["message"]
+
+
 def test_a_detector_is_switched_on_with_one_command_and_read_back(lasx, client, tmp_path):
     result = setting_files.set_detector(client, tmp_path, "Trans PMT", on=True)
 

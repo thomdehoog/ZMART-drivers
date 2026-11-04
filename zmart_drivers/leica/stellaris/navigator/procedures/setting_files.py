@@ -64,6 +64,9 @@ def save(client, path) -> dict:
     result = run(client, writes.save_setting(path))
     if result.get("success") and not path.is_file():
         result.update(success=False, message=f"LAS X did not write {path}")
+    elif result.get("success"):
+        # The file is the read-back: LCS's answer to a save says nothing more.
+        result["confirmed"] = True
     return result
 
 
