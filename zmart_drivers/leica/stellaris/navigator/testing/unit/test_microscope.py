@@ -361,6 +361,39 @@ def test_the_pan_is_moved_by_micrometres_through_the_scanner(scope, lasx, monkey
 
 
 
+def test_an_accumulation_that_puts_the_average_back_says_so(scope, monkeypatch):
+    """STELLARIS, 2026-11-04: Line Accu 2 put Line Average 2 back to 1, and each change was confirmed without a word."""
+    from zmart_drivers.leica.stellaris.navigator.procedures import readings
+
+    seen = iter([{"lineAverage": 2, "lineAccumulation": 1, "frameAverage": 1, "frameAccumulation": 1},
+                 {"lineAverage": 1, "lineAccumulation": 2, "frameAverage": 1, "frameAccumulation": 1}])
+    monkeypatch.setattr(readings, "get_averaging", lambda client, **k: next(seen))
+
+    result = scope.change_setting("line_accumulation", 2)
+
+    assert result["also_changed"] == {"lineAverage": {"before": 2, "after": 1}}
+    assert "LAS X changed by itself" in result["message"]
+
+
+def test_a_change_that_changes_nothing_else_says_nothing_else(scope):
+    result = scope.change_setting("line_average", 2)
+
+    assert "also_changed" not in result
+
+
+def test_a_z_stack_set_by_its_step_says_the_step_mode_changed(scope, lasx, monkeypatch):
+    """STELLARIS, 2026-11-04: Number of Steps went to Z-Step Size when the stack was set by its step."""
+    from zmart_drivers.leica.stellaris.navigator.procedures import readings
+
+    modes = iter(["steps", "step_size"])
+    monkeypatch.setattr(readings, "get_z_stack_mode", lambda client, **k: next(modes))
+    lasx.z_um[2] = 1000.0
+
+    stack = scope.set_z_stack("z-wide", 995.0, 1005.0, 2.0)
+
+    assert stack["also_changed"] == {"z_stack_mode": {"before": "steps", "after": "step_size"}}
+
+
 def test_the_lasers_and_the_detectors_are_read_as_the_window_shows_them(scope, lasx):
     """Public reads, not the procedures' readers (STELLARIS, 2026-11-04: Microscope had no method for either)."""
     from zmart_drivers.leica.stellaris.navigator.procedures import readings

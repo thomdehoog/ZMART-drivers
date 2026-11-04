@@ -318,7 +318,9 @@ class Microscope:
         ``setting_name`` (the current setting's name, plain text) and ``sequential_mode``
         (``"line"``, ``"frame"`` or ``"stack"``: how several settings are taken in turn) and ``z_stack_mode``
         (``"steps"``, ``"step_size"`` or ``"system_optimized"``: the z-stack panel's Number of Steps, Z-Step
-        Size or System Optimized). A lower zoom that pulls the pan in says so (``pan_pulled_in``). The limits are asked
+        Size or System Optimized). A lower zoom that pulls the pan in says so (``pan_pulled_in``). A value LAS X puts
+        back by itself with the change (an average with its accumulation, the autofocus's precision with its fixed
+        steps) is said in ``also_changed`` and the message (:data:`NEIGHBOURS`). The limits are asked
         first. Answers the change's result, with ``confirmed`` True when the
         read-back showed the new value; a change that was never seen is
         recorded and does not raise.
@@ -326,10 +328,14 @@ class Microscope:
         self.handle.require_open()
         if name not in SETTINGS and name not in NAMED_SETTINGS:
             raise ValueError(f"no setting {name!r}; the settings are {sorted([*SETTINGS, *NAMED_SETTINGS])}")
+        own, neighbours = NEIGHBOURS.get(name, (None, None))
+        before = neighbours(self.handle.client) if neighbours else None
         if name == "zoom":
             result = pan_step.change_zoom(self.handle.client, setting_files.folder_for(self.handle), value)
         else:
             result = changes.change(self.handle.client, name, value)
+        if before is not None and result.get("success"):
+            say_what_else_changed(result, what_else_changed(before, neighbours(self.handle.client), own))
         return checked(self.handle, result, f"change_setting({name!r}, {value!r})")
 
     def optimize_format(self) -> dict:
@@ -1252,12 +1258,16 @@ class Microscope:
         the distance between sections, whose number follows. Each end is
         checked like a z move from where the drive stands, so a stack far
         from the focus is refused. LAS X may stretch the end to fit whole
-        steps. From then on :meth:`acquire` takes the whole stack.
+        steps. From then on :meth:`acquire` takes the whole stack. LAS X takes the step as Z-Step Size: a step mode it
+        changes on the way is said in the answer's ``also_changed`` and logged.
         """
         self.handle.require_open()
+        before = {"z_stack_mode": readings.get_z_stack_mode(self.handle.client)}
         result = changes.set_z_stack(self.handle.client, drive, begin_um, end_um, step_um)
         checked(self.handle, result, f"set_z_stack({drive!r}, {begin_um!r}, {end_um!r}, {step_um!r})")
-        return result["z_stack"]
+        changed = what_else_changed(before, {"z_stack_mode": readings.get_z_stack_mode(self.handle.client)}, None)
+        say_what_else_changed(result, changed)
+        return {**result["z_stack"], **({"also_changed": changed} if changed else {})}
 
     def set_z_stack_size(self, size_um: float) -> dict:
         """Set the z-stack's size around its middle, as the window's Z Size; answers the stack. Its new ends are checked first."""
@@ -1510,6 +1520,35 @@ def refuse_with_drawings(handle, change: str, what: str) -> None:
     in_the_way = changes.drawings_in_the_way(handle.client, change)
     if in_the_way:
         checked(handle, {"success": False, "confirmed": False, "message": f"{change} was not changed: {in_the_way}"}, what)
+
+
+#: The values LAS X puts back by itself when one of these settings changes, and how to read them, by the reading's key
+#: of the setting itself (STELLARIS, 2026-11-04: an accumulation put its average back to 1, the autofocus's precision
+#: switched its fixed number of steps off, and the other way round).
+NEIGHBOURS = {
+    "line_average": ("lineAverage", lambda c: readings.get_averaging(c)),
+    "line_accumulation": ("lineAccumulation", lambda c: readings.get_averaging(c)),
+    "frame_average": ("frameAverage", lambda c: readings.get_averaging(c)),
+    "frame_accumulation": ("frameAccumulation", lambda c: readings.get_averaging(c)),
+    "autofocus_precision": ("precision", lambda c: {k: readings.get_autofocus_settings(c)[k] for k in ("precision", "steps")}),
+    "autofocus_steps": ("steps", lambda c: {k: readings.get_autofocus_settings(c)[k] for k in ("precision", "steps")}),
+}
+
+
+def what_else_changed(before: dict, after: dict, own: str | None) -> dict:
+    """The values other than *own* that are not what they were: ``{key: {"before", "after"}}``."""
+    return {key: {"before": before[key], "after": after.get(key)}
+            for key in before if key != own and after.get(key) != before[key]}
+
+
+def say_what_else_changed(result: dict, changed: dict) -> dict:
+    """Add *changed* to *result* as ``also_changed``, and a sentence to its message."""
+    if changed:
+        result["also_changed"] = changed
+        note = "LAS X changed by itself: " + ", ".join(f"{key} {v['before']!r} -> {v['after']!r}" for key, v in changed.items())
+        result["message"] = f"{result['message']} | {note}" if result.get("message") else note
+        log.warning(note)
+    return result
 
 
 def checked(handle: Session, result: dict, what: str) -> dict:
