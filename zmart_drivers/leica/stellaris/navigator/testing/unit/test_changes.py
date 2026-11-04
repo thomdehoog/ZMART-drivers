@@ -11,6 +11,8 @@ Author: Thom de Hoog, Center for Microscopy and Image Analysis (ZMB),
 University of Zurich (thom.dehoog@zmb.uzh.ch, thomdehoog@gmail.com).
 """
 
+import time
+from datetime import datetime
 from pathlib import Path
 
 import pytest
@@ -24,6 +26,7 @@ from zmart_drivers.leica.stellaris.navigator.primitives.direct import (
 from zmart_drivers.leica.stellaris.navigator.primitives.direct import (
     reads as direct_reader,
 )
+from zmart_drivers.leica.stellaris.navigator.primitives.direct import transfer
 from zmart_drivers.leica.stellaris.navigator.procedures import changes
 from zmart_drivers.leica.stellaris.navigator.procedures.clear_cache import (
     data_container,
@@ -596,6 +599,19 @@ class TestSmartCorr:
         assert result["success"] is True and result["confirmed"] is True
         assert result["collar"]["percent"] == 40.0
         assert lasx.commands() == ["StopAcquiring", "StartMotCorrAutomation"]
+
+    def test_a_dialog_shown_during_the_run_leaves_it_unconfirmed(self, lasx, client, tmp_path, monkeypatch):
+        """STELLARIS, 2026-11-04: the scan ran and finished, then LAS X showed "No light source selected!" (no line on)
+        while the driver had answered confirmed."""
+        log = tmp_path / "LAS X.log"
+        at = datetime.fromtimestamp(time.time() + 1).strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
+        log.write_text(f"{at} 0009  Info DbTracer 'MessageBox AutoLightSensorBased: No light source selected!'\n", encoding="latin-1")
+        monkeypatch.setattr(transfer, "LASX_LOG", log)
+
+        result = changes.smartcorr(client, project=24)
+
+        assert result["success"] is True and result["confirmed"] is False
+        assert "No light source selected!" in result["message"]
 
     def test_the_collar_goes_to_the_objective_s_reference_as_goto_does(self, lasx, client):
         lasx.nodes.objectives[0]["MotCorrRefPos"] = 30.0
@@ -1473,6 +1489,32 @@ class TestDyes:
         sent = lasx.sent[-1]
         assert sent.startswith('<Scanner IsAutoFocusDefinition="0" ActiveSettingIndex="-1" Command="SetConfocalDefinitionFromDyeAssistant">')
         assert "<Dye>Leica/ALEXA 405</Dye>" in sent and "<Intensity>0.02</Intensity>" in sent and "<LutName>Blue</LutName>" in sent
+
+    def test_the_colour_asked_for_is_sent_as_chosen_and_the_others_keep_theirs(self, lasx, client, monkeypatch):
+        """STELLARIS, 2026-11-04: sent as not user-defined, LAS X kept its own Gray; as user-defined, it took Blue."""
+        from zmart_drivers.leica.stellaris.navigator.procedures import readings
+
+        monkeypatch.setattr(readings, "get_setting_definitions", lambda client, **k: self.TWO_SETTINGS)
+        monkeypatch.setattr(readings, "get_setting", lambda client, **k: {"id": 120, "name": "Setting 2", "enabled": True,
+                                                                          "all": [{"id": 3, "name": "Setting 1"}, {"id": 120, "name": "Setting 2"}]})
+
+        changes.set_dyes(client, lines=[(405.0, 2.0)], detectors=[("HyD S 3", "Leica/ALEXA 405", (420.0, 470.0), "Cyan")])
+
+        first, second = lasx.sent[-1].split('<Sequence Index="1">')
+        assert "<LutName>Blue</LutName><IsLutUserDefined>0</IsLutUserDefined>" in first
+        assert "<LutName>Cyan</LutName><IsLutUserDefined>1</IsLutUserDefined>" in second
+
+    def test_a_colour_las_x_did_not_take_leaves_it_unconfirmed(self, lasx, client, monkeypatch):
+        from zmart_drivers.leica.stellaris.navigator.procedures import readings
+
+        shown = [{"name": "Setting 1", "lines": [], "detectors": [{"name": "HyD S 3", "route": (40, 2), "begin": 420.0, "end": 470.0,
+                                                                   "dye": "Leica/ALEXA 405", "relation": 2, "colour": "Gray", "colour_locked": False}]}]
+        monkeypatch.setattr(readings, "get_setting_definitions", lambda client, **k: shown)
+
+        result = changes.set_dyes(client, lines=[(405.0, 2.0)], detectors=[("HyD S 3", "Leica/ALEXA 405", (420.0, 470.0), "Blue")])
+
+        assert result["success"] is True and result["confirmed"] is False
+        assert "HyD S 3" in result["message"] and "Gray" in result["message"]
 
     def test_a_power_above_the_limits_is_refused_and_nothing_is_sent(self, lasx):
         from limits_fixtures import DEFAULT_STAGE_UM, merged_limits_payload

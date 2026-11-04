@@ -1,0 +1,109 @@
+
+2026-11-04 20:36:03.752 25136  Info Default CDCLanguageDictionary Report. 0 NS:DCBase key number:  64
+2026-11-04 20:36:03.752 25136  Info Default CDCLanguageDictionary Report. 0 NS:DCClient key number:  1
+2026-11-04 20:36:03.752 25136  Info Default CDCLanguageDictionary Report. 1 NS:DCBase key number:  29
+2026-11-04 20:36:03.753 25136  Info Default CDCLanguageDictionary Report. 1 NS:DCClient key number:  0
+2026-11-04 20:36:03.753 25136  Info Default CDCLanguageDictionary Report. 2 NS:DCBase key number:  27
+2026-11-04 20:36:03.753 25136  Info Default CDCLanguageDictionary Report. 2 NS:DCClient key number:  0
+2026-11-04 20:36:03.753 25136  Info Default CDCLanguageDictionary Report. 3 NS:DCBase key number:  29
+2026-11-04 20:36:03.753 25136  Info Default CDCLanguageDictionary Report. 3 NS:DCClient key number:  0
+2026-11-04 20:36:03.753 25136  Info Default CDCLanguageDictionary Report. 4 NS:DCBase key number:  27
+2026-11-04 20:36:03.753 25136  Info Default CDCLanguageDictionary Report. 4 NS:DCClient key number:  0
+2026-11-04 20:36:03.753 25136  Info Default CDCLanguageDictionary Report. 5 NS:DCBase key number:  29
+2026-11-04 20:36:03.753 25136  Info Default CDCLanguageDictionary Report. 5 NS:DCClient key number:  0
+2026-11-04 20:36:03.753 25136  Info Default CDCLanguageDictionary Report. 6 NS:DCBase key number:  29
+2026-11-04 20:36:03.753 25136  Info Default CDCLanguageDictionary Report. 6 NS:DCClient key number:  0
+2026-11-04 20:36:03.753 25136  Info Default CDCLanguageDictionary Report. 7 NS:DCBase key number:  29
+2026-11-04 20:36:03.753 25136  Info Default CDCLanguageDictionary Report. 7 NS:DCClient key number:  0
+2026-11-04 20:36:03.754 11208  Info Default Start Progress Sender Thread...Thread ID: 11208
+2026-11-04 20:36:03.755 29380  Info Default Start Progress Handler Thread... Thread ID:29380
+2026-11-04 20:36:03.755 25892  Info Default Start Update Thread...
+ Thread ID:25892
+2026-11-04 20:36:03.755 25136  Info Default Dump Global Memory Status:
+          32 percent of memory in use.
+    66739624 total KB of physical memory.
+    44826224 free  KB of physical memory.
+    76701096 total KB of paging file.
+    33936112 free  KB of paging file.
+137438953344 total KB of virtual memory.
+137433530796 free  KB of virtual memory.
+
+2026-11-04 20:36:03.756 19428  Info Default Start Progress Update Thread...
+ Thread ID:19428
+2026-11-04 20:36:03.756 25136  Info Default Init Data Container -   My Process ID:13996
+2026-11-04 20:36:03.756 25136  Info Default Base DLL Version 2,65,1,10324
+Client DLL Version 2,65,1,10324
+
+2026-11-04 20:36:03.756 25136  Info Default StartService SUCCESS.
+
+2026-11-04 20:36:03.757 25136  Info Default Connect to port: 8892
+2026-11-04 20:36:03.758 21168  Info Default Start new client MessageLoop. Client ID:1
+2026-11-04 20:36:03.759 25136  Info Default Result: V: 1,1, M:87,87, M: 235,235
+2026-11-04 20:36:16.683 21828  Info Default Destructor ElementUpdateThread called...
+2026-11-04 20:36:16.683 25892  Info Default Leave Update Thread...
+2026-11-04 20:36:16.684 21828  Info Default Destructor ProgressUpdateThread called...
+2026-11-04 20:36:16.684 19428  Info Default Leave Progress Update Thread...
+2026-11-04 20:36:16.684 21828  Info Default 
+2026-11-04 20:36:16.684 11208  Info Default Leave Progress Sender Thread...
+2026-11-04 20:36:16.684 21828  Info Default CConnection::SetShutDownInProgress()
+2026-11-04 20:36:16.685 21168  Info Default CSocketTransaction::Recv() recv returned: -1 expected: 16 LastError: (10004) A blocking operation was interrupted by a call to WSACancelBlockingCall.
+
+2026-11-04 20:36:16.685 21168  Info Default RecvLoop: Resv ends -> shutdown
+2026-11-04 20:36:16.685 21168  Info Default Start shutdown. Client:1
+2026-11-04 20:36:16.685 21168  Info Default End client MessageLoop. Client ID:1
+2026-11-04 20:36:16.685 21828  Info Default Destructor ElementProgressHandler called...
+2026-11-04 20:36:16.685 29380  Info Default Leave Progress Handler Thread...
+2026-11-04 20:39:58.939 17924  Info Default CDCLanguageDictionary Report. 0 NS:DCBase key number:  64
+2026-11-04 20:39:58.939 17924  Info Default CDCLanguageDictionary Report. 0 NS:DCClient key number:  1
+2026-11-04 20:39:58.939 17924  Info Default CDCLanguageDictionary Report. 1 NS:DCBase key number:  29
+2026-11-04 20:39:58.939 17924  Info Default CDCLanguageDictionary Report. 1 NS:DCClient key number:  0
+2026-11-04 20:39:58.939 17924  Info Default CDCLanguageDictionary Report. 2 NS:DCBase key number:  27
+2026-11-04 20:39:58.939 17924  Info Default CDCLanguageDictionary Report. 2 NS:DCClient key number:  0
+2026-11-04 20:39:58.939 17924  Info Default CDCLanguageDictionary Report. 3 NS:DCBase key number:  29
+2026-11-04 20:39:58.939 17924  Info Default CDCLanguageDictionary Report. 3 NS:DCClient key number:  0
+2026-11-04 20:39:58.939 17924  Info Default CDCLanguageDictionary Report. 4 NS:DCBase key number:  27
+2026-11-04 20:39:58.939 17924  Info Default CDCLanguageDictionary Report. 4 NS:DCClient key number:  0
+2026-11-04 20:39:58.939 17924  Info Default CDCLanguageDictionary Report. 5 NS:DCBase key number:  29
+2026-11-04 20:39:58.939 17924  Info Default CDCLanguageDictionary Report. 5 NS:DCClient key number:  0
+2026-11-04 20:39:58.939 17924  Info Default CDCLanguageDictionary Report. 6 NS:DCBase key number:  29
+2026-11-04 20:39:58.939 17924  Info Default CDCLanguageDictionary Report. 6 NS:DCClient key number:  0
+2026-11-04 20:39:58.939 17924  Info Default CDCLanguageDictionary Report. 7 NS:DCBase key number:  29
+2026-11-04 20:39:58.939 17924  Info Default CDCLanguageDictionary Report. 7 NS:DCClient key number:  0
+2026-11-04 20:39:58.940 15640  Info Default Start Progress Sender Thread...Thread ID: 15640
+2026-11-04 20:39:58.940 19600  Info Default Start Progress Handler Thread... Thread ID:19600
+2026-11-04 20:39:58.941 26156  Info Default Start Update Thread...
+ Thread ID:26156
+2026-11-04 20:39:58.941 17924  Info Default Dump Global Memory Status:
+          32 percent of memory in use.
+    66739624 total KB of physical memory.
+    44934532 free  KB of physical memory.
+    76701096 total KB of paging file.
+    33863480 free  KB of paging file.
+137438953344 total KB of virtual memory.
+137433530796 free  KB of virtual memory.
+
+2026-11-04 20:39:58.941 15372  Info Default Start Progress Update Thread...
+ Thread ID:15372
+2026-11-04 20:39:58.942 17924  Info Default Init Data Container -   My Process ID:1460
+2026-11-04 20:39:58.942 17924  Info Default Base DLL Version 2,65,1,10324
+Client DLL Version 2,65,1,10324
+
+2026-11-04 20:39:58.942 17924  Info Default StartService SUCCESS.
+
+2026-11-04 20:39:58.943 17924  Info Default Connect to port: 8892
+2026-11-04 20:39:58.945 24920  Info Default Start new client MessageLoop. Client ID:1
+2026-11-04 20:39:58.945 17924  Info Default Result: V: 1,1, M:87,87, M: 235,235
+2026-11-04 20:40:16.239 14536  Info Default Destructor ElementUpdateThread called...
+2026-11-04 20:40:16.239 26156  Info Default Leave Update Thread...
+2026-11-04 20:40:16.240 14536  Info Default Destructor ProgressUpdateThread called...
+2026-11-04 20:40:16.240 15372  Info Default Leave Progress Update Thread...
+2026-11-04 20:40:16.240 14536  Info Default 
+2026-11-04 20:40:16.240 15640  Info Default Leave Progress Sender Thread...
+2026-11-04 20:40:16.240 14536  Info Default CConnection::SetShutDownInProgress()
+2026-11-04 20:40:16.241 24920  Info Default CSocketTransaction::Recv() recv returned: -1 expected: 16 LastError: (10004) A blocking operation was interrupted by a call to WSACancelBlockingCall.
+
+2026-11-04 20:40:16.241 24920  Info Default RecvLoop: Resv ends -> shutdown
+2026-11-04 20:40:16.241 24920  Info Default Start shutdown. Client:1
+2026-11-04 20:40:16.241 24920  Info Default End client MessageLoop. Client ID:1
+2026-11-04 20:40:16.241 14536  Info Default Destructor ElementProgressHandler called...
+2026-11-04 20:40:16.241 19600  Info Default Leave Progress Handler Thread...

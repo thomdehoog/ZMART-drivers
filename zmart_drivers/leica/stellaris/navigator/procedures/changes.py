@@ -770,7 +770,10 @@ def picture(client, change, **watching) -> dict:
 
     A picture whose scan never starts fails: ``success`` False, and the
     message says so. One that started but was not seen to finish is a
-    success with ``confirmed`` False, like any unconfirmed change.
+    success with ``confirmed`` False, like any unconfirmed change. So is one
+    that finished while LAS X showed a dialog: SmartCORR with no laser line
+    ran its scan, and only then said "No light source selected!"
+    (STELLARIS, 2026-11-04).
     """
     handed_over = time.time()
     result = run(client, change)
@@ -782,12 +785,14 @@ def picture(client, change, **watching) -> dict:
     watch_s = time.perf_counter() - t0
     result["logs"].extend(watched["logs"])
     result["timing"].update(confirm_s=watch_s, total_s=result["timing"]["total_s"] + watch_s, confirm_attempts=1)
-    result["confirmed"] = watched["success"]
-    if watched["success"]:
-        return result
     dialog = write_loops.append_dialog_warning(
         direct_profile.WRITING.transport, result["logs"], handed_over, change.description
     )
+    result["confirmed"] = watched["success"] and not dialog
+    if watched["success"]:
+        if dialog:
+            result["message"] = f"{change.description} | UNCONFIRMED: the scan finished, but LAS X showed a dialog{dialog}"
+        return result
     if not watched["started"]:
         result["success"] = False
         result["message"] = f"{change.description} | the scan never started{dialog}"
@@ -1069,13 +1074,21 @@ def set_dyes(client, *, lines, detectors, max_retries=None) -> dict:
     except (RuntimeError, ValueError, TypeError) as why:
         return dispatch.refused(f"the setting's dyes cannot be set: {why}")
     result = run(client, change, max_retries=max_retries)
-    if result["success"] and len(before) > 1:
-        after = readers.get_setting_definitions(client)
+    if not result["success"]:
+        return result
+    after = readers.get_setting_definitions(client)
+    if len(before) > 1:
         kept = len(after) == len(before) and all(
             [d["dye"] for d in a["detectors"]] == [d["dye"] for d in b["detectors"]] for i, (a, b) in enumerate(zip(after, before)) if i != place)
         if not kept:
             result["confirmed"] = False
             result["message"] = f"LAS X changed more than the current setting: the job now has {[s['name'] for s in after]}"
+            return result
+    shown = {d["name"]: d["colour"] for d in (after[place]["detectors"] if place < len(after) else [])}
+    other = {name: shown.get(name) for name, _dye, _band, colour in detectors if name in shown and shown[name] != colour}
+    if other:
+        result["confirmed"] = False
+        result["message"] = f"{result.get('message', '')} | UNCONFIRMED: LAS X shows another colour: {other}"
     return result
 
 

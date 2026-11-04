@@ -1504,7 +1504,8 @@ def setting_dyes(lines, detectors, others=None, place: int = 0, sequential_mode:
     sequences = []
     for index, setting in enumerate(others if others else [None]):
         if index == place:
-            body = light(lines) + detection([(route, begin, end, dye, 2, colour, False) for _name, route, begin, end, dye, colour in detectors])
+            # The colour asked for goes as the user's own: not so, LAS X kept its own Gray (STELLARIS, 2026-11-04).
+            body = light(lines) + detection([(route, begin, end, dye, 2, colour, True) for _name, route, begin, end, dye, colour in detectors])
         else:
             body = light([(l["route"], l["line_index"], l["wavelength"], l["percent"]) for l in setting["lines"]]) + detection(
                 [(d["route"], d["begin"], d["end"], d["dye"], d["relation"] or 0, d["colour"], d["colour_locked"]) for d in setting["detectors"]])
