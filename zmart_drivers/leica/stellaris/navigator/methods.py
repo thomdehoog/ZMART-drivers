@@ -1369,7 +1369,11 @@ class Microscope:
         """Change the objective, by its slot, name or magnification, and keep the same spot in view.
 
         The stage is moved by the measured offset between the two objectives,
-        so the frame still points at the same place on the sample. Refused
+        so the frame still points at the same place on the sample. A change the
+        objective calibration does not cover is made without moving the stage
+        (``objective_compensation["uncompensated"]`` says why), and a change to
+        another immersion is made too (``immersion_changed``): the driver cannot
+        see the medium, so check it. Refused
         while bleach points or ROI regions are drawn: they are kept in the scan
         field, so with another objective they would land a little elsewhere on
         the sample; clear them first (:meth:`clear_drawings`) and draw them

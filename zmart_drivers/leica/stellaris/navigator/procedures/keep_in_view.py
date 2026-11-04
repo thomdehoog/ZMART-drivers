@@ -11,6 +11,9 @@ explained in ``procedures/absolute_coordinate_system``.
 The correction is made only when the change was accepted. When the correction
 cannot be made, the command answers ``success: False`` and names the step, so
 a picture is never taken at a position that no longer points at the sample.
+A change the calibration does not cover is made without any correction (Thom,
+2026-11-04): the answer's ``objective_compensation["uncompensated"]`` and its
+message say so.
 This wraps the bare change of the same name, ``procedures/changes.py``'s
 ``set_objective``; use that one when the stage should not be corrected.
 
@@ -80,14 +83,16 @@ def set_objective(
             )
         before = recorded["before"]
         if before is not None and before["slot"] != chosen["slot"]:
-            # The calibration must cover the change before the turret turns,
-            # not be found missing afterwards with the sample out of view.
+            # A change the calibration does not cover is made without moving
+            # the stage, as Thom decided on the STELLARIS (2026-11-04); the
+            # answer says it was not compensated.
             from ..driver_setup.optical_calibration import model as _cal_model
 
             try:
                 _cal_model.translation_delta_um(before["translations"], before["slot"], chosen["slot"])
             except RuntimeError as exc:
-                return dispatch.refused(f"refusing the objective change, so the turret is not turned: {exc}")
+                recorded["uncompensated"] = str(exc)
+                recorded["before"] = None
         return None
 
     result = changes.set_objective(
@@ -102,6 +107,13 @@ def set_objective(
     before = recorded.get("before")
     if before is not None and result.get("success"):
         result = merge_into_result(result, compensate_after_change(client, before, new_slot=recorded["slot"]))
+    elif recorded.get("uncompensated") and result.get("success"):
+        note = (f"the objective changed without compensation ({recorded['uncompensated']}): the stage and the focus "
+                "stayed where they were, so the picture may show another spot at another focus")
+        result["objective_compensation"] = {"objective_changed": True, "applied_translation_um": None,
+                                            "uncompensated": recorded["uncompensated"]}
+        result["message"] = f"{result['message']} | {note}" if result.get("message") else note
+        log.warning(note)
     return result
 
 

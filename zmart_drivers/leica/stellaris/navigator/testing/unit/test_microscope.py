@@ -141,25 +141,30 @@ def test_the_objective_changes_and_the_sample_stays_in_view(scope, lasx):
     assert lasx.live[("Microscope", "SlotPosition")] == 1
 
 
-def test_an_objective_of_another_immersion_is_refused_before_the_turret_turns(scope, lasx):
+def test_an_objective_of_another_immersion_is_changed_to_and_the_answer_says_to_check_the_medium(scope, lasx):
+    """Thom's decision on the STELLARIS (2026-11-04): the driver cannot see the medium, so it says so, and turns."""
     lasx.nodes.objectives[1]["Immersion"] = "OIL"
     lasx.nodes.reload()
 
-    with pytest.raises(RuntimeError, match="immersion"):
-        scope.change_objective(slot=1)
+    result = scope.change_objective(slot=1)
 
-    assert "SetSlotPosition" not in lasx.commands()
-    assert lasx.live[("Microscope", "SlotPosition")] == 0
+    assert result["immersion_changed"] == {"from": "DRY", "to": "OIL"}
+    assert "immersion" in result["message"] and "check" in result["message"]
+    assert lasx.live[("Microscope", "SlotPosition")] == 1
 
 
-def test_an_objective_the_calibration_does_not_cover_is_refused_before_the_turret_turns(scope, lasx):
+def test_an_objective_the_calibration_does_not_cover_is_changed_to_without_moving_the_stage(scope, lasx):
+    """Thom's decision on the STELLARIS (2026-11-04): the turret turns, the stage and focus stay, the answer says so."""
     scope.handle.translations = {0: (0.0, 0.0, 0.0)}
+    x0, y0 = lasx.x_um, lasx.y_um
 
-    with pytest.raises(RuntimeError, match="calibration"):
-        scope.change_objective(slot=1)
+    result = scope.change_objective(slot=1)
 
-    assert "SetSlotPosition" not in lasx.commands()
-    assert lasx.live[("Microscope", "SlotPosition")] == 0
+    assert lasx.live[("Microscope", "SlotPosition")] == 1
+    assert (lasx.x_um, lasx.y_um) == (pytest.approx(x0), pytest.approx(y0))
+    assert "calibration" in result["objective_compensation"]["uncompensated"]
+    assert result["objective_compensation"]["applied_translation_um"] is None
+    assert "without compensation" in result["message"]
 
 
 def test_capture_tile_scan_save_and_clear_call_their_procedures(scope, monkeypatch):
