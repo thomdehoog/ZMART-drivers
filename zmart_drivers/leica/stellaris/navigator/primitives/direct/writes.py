@@ -1279,7 +1279,7 @@ def tau_channel_colour(route, name: str, setting_id: int, channel: int, colour: 
 
 
 #: The operating modes by name and LCS's code for them (``OperatingMode``), as the window's Operating Mode list names them.
-OPERATING_CODES = {"Fast Mode": 4, "Counting": 1, "Analog": 10, "Reflection": 11}
+OPERATING_CODES = {name: code for code, name in direct_reader.OPERATING_NAMES.items()}
 
 
 def spectrum_shown(place: int, which: str, on: bool) -> Write:
@@ -1366,9 +1366,8 @@ def aobs_line(at: int, wavelength: float, node: str, on: bool) -> Write:
                  confirm=Expect("aobs_lines", shows))
 
 
-#: The tau modes by name and LCS's code for them (``DigitalGatingMode``), as the window's TauModes list names them
-#: (None, Intensity, TauGating, TauScan, TauSeparation, TauInteraction on the simulator, 2026-11-03; GateScan was not offered).
-TAU_CODES = {"None": 0, "Intensity": 2, "TauGating": 3, "TauScan": 5, "TauSeparation": 6, "TauInteraction": 10}
+#: The tau modes by name and LCS's code for them (``DigitalGatingMode``), as the window's TauModes list names them.
+TAU_CODES = {name: code for code, name in direct_reader.TAU_NAMES.items()}
 
 
 def autofocus_scan_change(name: str, elements: list[str], description: str, shows) -> Write:

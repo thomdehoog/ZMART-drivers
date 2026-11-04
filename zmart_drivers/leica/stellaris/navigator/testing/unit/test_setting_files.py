@@ -156,6 +156,14 @@ def test_each_operating_mode_is_written_as_las_x_writes_it_and_read_back(lasx, c
 
     assert result["confirmed"] is True
     assert direct_reader.get_detector_modes()["HyD S 3"]["operating"] == {"Fast Mode": 4, "Counting": 1, "Analog": 10, "Reflection": 11}[mode]
+    assert direct_reader.get_detector_modes()["HyD S 3"]["operating_name"] == mode
+
+
+@pytest.mark.parametrize("mode", ["Intensity", "TauGating", "TauScan", "TauSeparation", "TauInteraction"])
+def test_each_tau_mode_is_read_back_by_its_name(lasx, client, tmp_path, mode):
+    """The window's names, not only LCS's codes (STELLARIS, 2026-11-04: the codes alone had to be looked up)."""
+    assert setting_files.set_detector(client, tmp_path, "HyD S 3", tau_mode=mode)["confirmed"] is True
+    assert direct_reader.get_detector_modes()["HyD S 3"]["tau_name"] == mode
 
 
 def test_a_tau_mode_las_x_greys_out_is_refused_and_nothing_is_sent(lasx, client, tmp_path):

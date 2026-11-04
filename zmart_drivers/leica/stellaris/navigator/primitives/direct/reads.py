@@ -1050,8 +1050,16 @@ def get_autofocus_settings() -> dict:
 AUTOFOCUS_SETTING = ("Acquire", "ATL", "CurrentBlock", "ConfocalSequentialInfo", "SequentialAutofocusSetting")
 
 
+#: LCS's operating-mode codes (``OperatingMode``) by the name the window's Operating Mode list gives them.
+OPERATING_NAMES = {4: "Fast Mode", 1: "Counting", 10: "Analog", 11: "Reflection"}
+#: LCS's tau-mode codes (``DigitalGatingMode``) by the name the window's TauModes list gives them (simulator, 2026-11-03;
+#: GateScan was not offered).
+TAU_NAMES = {0: "None", 2: "Intensity", 3: "TauGating", 5: "TauScan", 6: "TauSeparation", 10: "TauInteraction"}
+
+
 def get_detector_modes() -> dict:
-    """Each detector's modes in the current setting, by name: ``tau`` and ``operating`` (LCS's codes now),
+    """Each detector's modes in the current setting, by name: ``tau`` and ``operating`` (LCS's codes now) with
+    ``tau_name`` and ``operating_name`` (the window's names for them; None for a code it does not name),
     ``tau_offered`` and ``operating_offered`` (codes, by place), ``tau_available`` (the tau
     modes the window does not grey out now), ``tau_colours`` and ``tau_lifetimes_ns``
     (TauSeparation's two channels' colours and lifetimes; empty in another tau mode), and ``at`` (the setting's, the
@@ -1126,8 +1134,12 @@ def get_detector_modes() -> dict:
         found = {}
         for name, (at, unit) in zip(names, units):
             operating = child_named(nodes, unit, "OperatingMode")
+            tau_code = node_value(nodes, named(nodes, unit, "DigitalGatingMode"))
+            operating_code = node_value(nodes, operating) if operating is not None else None
             found[name] = {
-                "tau": node_value(nodes, named(nodes, unit, "DigitalGatingMode")),
+                "tau": tau_code,
+                "tau_name": TAU_NAMES.get(tau_code),
+                "operating_name": OPERATING_NAMES.get(operating_code),
                 "tau_offered": listed_codes(unit, "DigitalGatingModeList_SeqInfo", "DigitalGatingMode", "DigitalGatingMode"),
                 "tau_available": [
                     code for code, enabled in zip(
@@ -1135,7 +1147,7 @@ def get_detector_modes() -> dict:
                         listed_codes(unit, "DigitalGatingModeList_SeqInfo", "DigitalGatingMode", "IsEnabled"),
                     ) if enabled
                 ],
-                "operating": node_value(nodes, operating) if operating is not None else None,
+                "operating": operating_code,
                 "operating_offered": listed_codes(unit, "DetectionUnitOperatingModeList_SeqInfo", "DetectionUnitOperatingMode", "OperatingMode"),
                 "tau_colours": listed_codes(unit, "TauSeparationDefinition_SeqInfo", "TauSeparationChannel", "LutName"),
                 "gates": tau_gates(unit),
